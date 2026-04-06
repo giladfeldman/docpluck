@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.1.0"
+NORMALIZATION_VERSION = "1.2.0"
 
 
 @dataclass
@@ -172,11 +172,18 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
     # that got split from "p =\n484". S9 would strip them as page numbers.
     if level == NormalizationLevel.academic:
         before = t
+        # Basic stat line break patterns
         t = re.sub(r"([pP])\s*\n\s*([=<>])", r"\1 \2", t)   # p\n< → p <
         t = re.sub(r"([pP]\s*[=<>])\s*\n\s*(\d)", r"\1 \2", t)
         t = re.sub(r"(OR|CI|RR)\s*\n\s*(\d)", r"\1 \2", t)
         t = re.sub(r"(95\s*%)\s*\n\s*(CI)", r"\1 \2", t)
         t = re.sub(r"([=<>])\s*\n\s*([-\d.])", r"\1 \2", t)
+        # Aggressive: skip up to 20 chars of column-boundary garbage between p= and value
+        t = re.sub(r"(p\s*[<=>]\s*)[^\n]{1,20}\n\s*([.\d]+)", r"\1\2", t)
+        # Rejoin test stat → p-value across line break: "t(23) = 2.34,\n p < .001"
+        t = re.sub(r"([,;])\s*\n\s*(p\s*[<=>])", r"\1 \2", t)
+        # Rejoin effect size → CI across line break: "d = 0.45,\n 95% CI"
+        t = re.sub(r"([,;])\s*\n\s*(\d+%\s*CI)", r"\1 \2", t)
         report._track("A1_stat_linebreak_repair", before, t, "stats_repaired")
 
     # S9: Header/footer removal
@@ -224,7 +231,14 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
 
         # A4: CI delimiter harmonization
         before = t
-        t = re.sub(r"\[(\s*[-\d.]+)\s*;\s*([-\d.]+\s*)\]", r"[\1, \2]", t)
+        # Semicolons → commas inside square brackets and parens
+        t = re.sub(r"\[(\s*[-+]?\d*\.?\d+)\s*;\s*([-+]?\d*\.?\d+\s*)\]", r"[\1, \2]", t)
+        t = re.sub(r"\((\s*[-+]?\d*\.?\d+)\s*;\s*([-+]?\d*\.?\d+\s*)\)", r"(\1, \2)", t)
+        # Curly braces → square brackets
+        t = re.sub(r"\{\s*([-+]?\d*\.?\d+)\s*[,;]\s*([-+]?\d*\.?\d+)\s*\}", r"[\1, \2]", t)
+        # Normalize spacing inside brackets and parens
+        t = re.sub(r"\[\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\]", r"[\1, \2]", t)
+        t = re.sub(r"\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)", r"(\1, \2)", t)
         report._track("A4_ci_delimiter_harmonization", before, t, "ci_delimiters_fixed")
 
         # A5: Math symbol and Greek letter normalization

@@ -444,3 +444,74 @@ class TestFullPipeline:
         assert "S3_ligature_expansion" in report.steps_applied
         assert "S5_dash_normalization" in report.steps_applied
         assert report.changes_made.get("ligatures_expanded", 0) > 0
+
+
+# ── A4 Enhanced: curly braces, spacing, paren semicolons ─────────────
+
+class TestA4_Enhanced:
+    def test_curly_braces_to_square_brackets(self):
+        """European CI: {0.45, 0.89} → [0.45, 0.89]"""
+        assert "[0.45, 0.89]" in norm("{0.45, 0.89}")
+
+    def test_curly_braces_with_semicolon(self):
+        """{0.45; 0.89} → [0.45, 0.89]"""
+        assert "[0.45, 0.89]" in norm("{0.45; 0.89}")
+
+    def test_curly_braces_negative(self):
+        """{-0.12, 0.34} → [-0.12, 0.34]"""
+        assert "[-0.12, 0.34]" in norm("{-0.12, 0.34}")
+
+    def test_bracket_spacing_compact(self):
+        """[0.45,0.89] → [0.45, 0.89]"""
+        assert "[0.45, 0.89]" in norm("[0.45,0.89]")
+
+    def test_bracket_spacing_wide(self):
+        """[ 0.45 , 0.89 ] → [0.45, 0.89]"""
+        assert "[0.45, 0.89]" in norm("[ 0.45 , 0.89 ]")
+
+    def test_paren_semicolon_to_comma(self):
+        """(0.12; 0.45) → (0.12, 0.45)"""
+        assert "(0.12, 0.45)" in norm("(0.12; 0.45)")
+
+    def test_paren_spacing(self):
+        """( 0.12 , 0.45 ) → (0.12, 0.45)"""
+        assert "(0.12, 0.45)" in norm("( 0.12 , 0.45 )")
+
+    def test_negative_in_parens(self):
+        """(-0.78; -0.67) → (-0.78, -0.67)"""
+        assert "(-0.78, -0.67)" in norm("(-0.78; -0.67)")
+
+
+# ── A1 Enhanced: aggressive stat line break patterns ─────────────────
+
+class TestA1_Enhanced:
+    def test_pvalue_garbage_linebreak(self):
+        """p = some text\n0.045 → p = 0.045 (skip garbage)"""
+        result = norm("p = some text\n0.045")
+        assert "p = 0.045" in result or "p =0.045" in result
+
+    def test_pvalue_short_garbage(self):
+        """p < column text\n.001 → p < .001"""
+        result = norm("p < column text\n.001")
+        assert "p < .001" in result or "p <.001" in result
+
+    def test_stat_to_pvalue_linebreak(self):
+        """t(23) = 2.34,\n p < .001 → rejoined on one line"""
+        result = norm("t(23) = 2.34,\n p < .001")
+        assert ", p < .001" in result
+
+    def test_stat_semicolon_to_pvalue(self):
+        """F(2, 24) = 5.67;\n p < .001 → rejoined"""
+        result = norm("F(2, 24) = 5.67;\n p < .001")
+        assert "; p < .001" in result
+
+    def test_effect_to_ci_linebreak(self):
+        """d = 0.45,\n 95% CI → rejoined"""
+        result = norm("d = 0.45,\n 95% CI [0.21, 0.69]")
+        assert ", 95% CI" in result
+
+    def test_does_not_eat_long_garbage(self):
+        """Garbage > 20 chars should NOT be skipped (too aggressive)."""
+        result = norm("p = this is a very long sentence that should not be eaten\n0.045")
+        # The garbage is > 20 chars, so the pattern should NOT match
+        assert "p = 0.045" not in result
