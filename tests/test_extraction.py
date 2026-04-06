@@ -8,9 +8,27 @@ These tests require:
 All tests skip gracefully when requirements are not available.
 """
 
+import os
+import shutil
 import pytest
-from conftest import requires_pdftotext, pdf_path, pdf_available
 from docpluck import extract_pdf, count_pages
+
+# Skip all extraction tests if pdftotext is not on PATH
+requires_pdftotext = pytest.mark.skipif(
+    shutil.which("pdftotext") is None,
+    reason="pdftotext not installed (apt-get install poppler-utils)"
+)
+
+_VIBE = os.path.join(os.path.expanduser("~"), "Dropbox", "Vibe")
+_PDF_DIR = os.path.join(_VIBE, "PDFextractor", "test-pdfs")
+
+
+def pdf_path(*parts: str) -> str:
+    return os.path.join(_PDF_DIR, *parts)
+
+
+def pdf_available(*parts: str) -> bool:
+    return os.path.isfile(pdf_path(*parts))
 
 
 @requires_pdftotext
