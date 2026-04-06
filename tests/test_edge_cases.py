@@ -225,7 +225,7 @@ class TestBenchmarkRegressions:
     def test_normalization_report_version(self):
         """Report must include version for consumer apps."""
         _, report = normalize_text("test", NormalizationLevel.standard)
-        assert report.version == "1.1.0"
+        assert report.version == "1.2.0"
         assert report.level == "standard"
 
     def test_normalization_report_all_steps_tracked(self):

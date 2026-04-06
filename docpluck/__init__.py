@@ -40,7 +40,7 @@ from .extract import extract_pdf, count_pages
 from .normalize import normalize_text, NormalizationLevel, NormalizationReport
 from .quality import compute_quality_score
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
