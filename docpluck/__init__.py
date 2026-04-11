@@ -55,19 +55,22 @@ See Also:
     - docs/NORMALIZATION.md — All 15 pipeline steps documented
 """
 
-from .extract import extract_pdf, count_pages
+from .extract import extract_pdf, extract_pdf_file, count_pages
 from .extract_docx import extract_docx
 from .extract_html import extract_html, html_to_text
 from .normalize import normalize_text, NormalizationLevel, NormalizationReport
 from .quality import compute_quality_score
+from .batch import ExtractionReport, extract_to_dir
+from .version import get_version_info
 
-__version__ = "1.3.1"
+__version__ = "1.4.2"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
 __all__ = [
     # Extraction
     "extract_pdf",
+    "extract_pdf_file",
     "extract_docx",
     "extract_html",
     "html_to_text",
@@ -78,4 +81,9 @@ __all__ = [
     "NormalizationReport",
     # Quality
     "compute_quality_score",
+    # Batch
+    "ExtractionReport",
+    "extract_to_dir",
+    # Version
+    "get_version_info",
 ]

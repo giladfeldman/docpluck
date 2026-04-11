@@ -30,19 +30,29 @@ class NormalizationReport:
     level: str
     version: str = NORMALIZATION_VERSION
     steps_applied: list[str] = field(default_factory=list)
+    steps_changed: list[str] = field(default_factory=list)
     changes_made: dict[str, int] = field(default_factory=dict)
 
     def _track(self, step_code: str, before: str, after: str, metric_name: str):
+        # ``steps_applied`` records every step that ran (kept for backward
+        # compatibility with tests and diagnostics that want to see the full
+        # pipeline order). ``steps_changed`` records only steps that actually
+        # modified the text — this is the field diagnostics should prefer
+        # when they want to know what the pipeline *did* on a given input.
+        # See MetaESCI request D7.2.
         self.steps_applied.append(step_code)
-        diff = len(before) - len(after)
-        if diff != 0:
-            self.changes_made[metric_name] = abs(diff)
+        if before != after:
+            self.steps_changed.append(step_code)
+            diff = len(before) - len(after)
+            if diff != 0:
+                self.changes_made[metric_name] = abs(diff)
 
     def to_dict(self) -> dict:
         return {
             "level": self.level,
             "version": self.version,
             "steps_applied": self.steps_applied,
+            "steps_changed": self.steps_changed,
             "changes_made": self.changes_made,
         }
 
@@ -149,9 +159,10 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
     )
     _fffd_after = t.count("\ufffd")
     _fffd_recovered = _fffd_before - _fffd_after
+    report.steps_applied.append("S5a_fffd_context_recovery")
     if _fffd_recovered > 0:
         report.changes_made["fffd_context_recovered"] = _fffd_recovered
-    report.steps_applied.append("S5a_fffd_context_recovery")
+        report.steps_changed.append("S5a_fffd_context_recovery")
 
     # S6: Whitespace and invisible character normalization
     before = t
@@ -312,9 +323,10 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
         ]
         for pattern in _N_PROTECT_PATTERNS:
             t = pattern.sub(_strip_commas_integer, t)
+        report.steps_applied.append("A3a_thousands_separator_protect")
         if _thousands_count[0] > 0:
             report.changes_made["thousands_separators_preserved"] = _thousands_count[0]
-        report.steps_applied.append("A3a_thousands_separator_protect")
+            report.steps_changed.append("A3a_thousands_separator_protect")
 
         # A3: Decimal comma normalization (European locale)
         #

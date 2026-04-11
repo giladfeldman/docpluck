@@ -1,5 +1,71 @@
 # Changelog
 
+## [1.4.2] — 2026-04-11
+
+### Added (MetaESCI D3/D5/D6/D7 follow-ups)
+
+Addresses the non-blocking items MetaESCI filed in
+`REQUESTS_FROM_METAESCI.md` ahead of the full 8,455-PDF batch. No
+normalization semantics changed — `NORMALIZATION_VERSION` is still
+`"1.4.1"`, so outputs byte-identical against v1.4.1 except for the
+diagnostics changes below.
+
+- **`docpluck.extract_pdf_file(path)`** — path-based wrapper around
+  `extract_pdf(bytes)` that raises a clean `FileNotFoundError` with the
+  offending path when the file is missing or is not a regular file (D7.1).
+  Keeps the bytes API untouched.
+- **`docpluck.extract_to_dir(paths, out_dir, level)`** + new
+  **`ExtractionReport`** dataclass in `docpluck/batch.py` (D6). Batch
+  runner that writes `<stem>.txt` (+ optional `<stem>.json` sidecar) for
+  each input PDF and returns a serializable receipt with the library
+  version, normalize version, git SHA, per-file method, timings, and
+  failure reasons. `report.write_receipt(path)` persists it for
+  downstream reproducibility pinning. Exceptions inside the loop are
+  recorded, not raised — batch runs never abort on a single bad file.
+- **`docpluck.get_version_info()`** + `docpluck/cli.py` (D3). New console
+  entry point `docpluck --version` (also `python -m docpluck --version`)
+  prints a single JSON line
+  `{"version": ..., "normalize_version": ..., "git_sha": ...}`. Batch
+  runners can call this once per run and stash the output next to
+  results as a "bundle receipt".
+- **`NormalizationReport.steps_changed`** (D7.2). New list alongside the
+  existing `steps_applied`, containing only pipeline steps that actually
+  modified the text. `steps_applied` is unchanged for backward compat;
+  `to_dict()` now exposes both. Use `steps_changed` when you want to
+  know what the pipeline *did* on a given input vs. what it *ran*.
+
+### Fixed
+
+- `docpluck/__init__.py` `__version__` was stale at `"1.3.1"` despite
+  `pyproject.toml` and `NORMALIZATION_VERSION` both advancing to
+  `"1.4.1"`. Now synced to `"1.4.2"`.
+
+### Docs
+
+- `docs/NORMALIZATION.md` — A5 section clarifies that
+  `NormalizationLevel.academic` intentionally transliterates Greek
+  statistical letters (η²→eta2, χ²→chi2, etc.) and points callers who
+  need Greek preserved at `NormalizationLevel.standard` (D5).
+
+### Unchanged
+
+- `NORMALIZATION_VERSION` stays at `"1.4.1"`. No regex, no A-rule
+  thresholds, no tokenization changed. Fresh batch runs against v1.4.2
+  produce identical `data/results` to v1.4.1 given the same corpus —
+  only diagnostic fields differ.
+- All 227 pre-existing tests continue to pass. New tests added for
+  `extract_pdf_file`, `extract_to_dir`, `steps_changed`, and the CLI.
+
+### Deferred (requires MetaESCI repro data)
+
+- **D1** (classify 4 + 54 dropped rows vs checkPDFdir) — needs the two
+  A/B CSVs per subset that MetaESCI references but that currently only
+  exist as a single merged CSV in their `data/results/subset/` tree.
+- **D2** (one lost source per subset) — same.
+- **D4** (A4 CI harmonization regex audit) — read-only audit done; see
+  `REPLY_FROM_DOCPLUCK.md` for the preliminary hypothesis. No regex
+  change until a real repro lands.
+
 ## [1.3.1] — 2026-04-11
 
 ### Fixed (normalization + quality scoring)
