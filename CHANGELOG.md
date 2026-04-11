@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.4.4] — 2026-04-11
+
+### Fixed (code-review follow-up to v1.4.3)
+
+- **A3b was too permissive** — the initial v1.4.3 pattern
+  `(\b[A-Za-z]{1,4})\[(\d+,\d+)\]` matched any 1-4 letter word before a
+  bracketed numeric pair, which falsely converted citation/figure/
+  equation references like `ref[1,2]`, `fig[1,2]`, `eq[1,2]` into
+  `ref(1, 2)`, `fig(1, 2)`, `eq(1, 2)`. Tightened the pattern to require
+  `=` immediately after the closing `]` — the assignment marker is the
+  real signal that the bracketed pair is a df expression being assigned
+  to a test statistic (as in `F[2,42]= 13.689`), not a reference list.
+  Caught in the docpluck-review skill pass immediately after v1.4.3 tag.
+
+### Tests
+
+- Added `test_a3b_does_not_fire_on_short_word_citations` with 4 probes.
+- Added `test_a3b_still_fires_on_real_stat_with_equals` as a positive-
+  path regression guard.
+- Full suite: **267 passing, 9 skipped** (+2 new cases vs v1.4.3).
+
 ## [1.4.3] — 2026-04-11
 
 ### Fixed (MetaESCI D1/D2 lost-source repro)
