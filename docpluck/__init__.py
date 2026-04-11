@@ -63,7 +63,7 @@ from .quality import compute_quality_score
 from .batch import ExtractionReport, extract_to_dir
 from .version import get_version_info
 
-__version__ = "1.4.3"
+__version__ = "1.4.4"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 

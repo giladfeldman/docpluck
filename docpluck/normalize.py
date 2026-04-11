@@ -370,15 +370,18 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
         # A3b: Statistical df-bracket harmonization (MetaESCI D2, 2026-04-11)
         #
         # Some PDFs encode F/t/chi2 degrees-of-freedom with square brackets
-        # instead of parentheses — e.g. pdftotext produces "F[2,42]=13.689"
+        # instead of parentheses — e.g. pdftotext produces "F[2,42]= 13.689"
         # from 10.15626/mp.2019.1723 where the paper visually uses parens.
         # effectcheck's parse.R only matches `F\s*\(`, so these rows are
         # silently dropped. Convert the bracket form to canonical parens
-        # when immediately following a one- or two-letter stat identifier
-        # (F, t, z, r, chi2, r2, etc.) and containing "digit , digit".
+        # when the bracket follows a short stat identifier AND is followed
+        # by `=` (the assignment to a numeric value). The `=` lookahead is
+        # the load-bearing constraint — it blocks false positives on
+        # `ref[1,2]`, `fig[1,2]`, `eq[1,2]` which look structurally
+        # identical but are citation/figure/equation references, not stats.
         before = t
         t = re.sub(
-            r"(\b[A-Za-z]{1,4})\[(\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*)\]",
+            r"(\b[A-Za-z][A-Za-z0-9]{0,3})\[(\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*)\](?=\s*=)",
             r"\1(\2)",
             t,
         )

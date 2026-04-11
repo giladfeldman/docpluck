@@ -780,3 +780,23 @@ class TestA3_StatBracketLookbehind:
         assert "[1,2]" in result or "[1, 2]" in result  # A4 may space it
         # must not become "(1, 2)"
         assert "references (1" not in result
+
+    def test_a3b_does_not_fire_on_short_word_citations(self):
+        """Review finding 2026-04-11: A3b must require `=` after the bracket
+        so short prefixes like ref/fig/eq/tab don't get their citation lists
+        rewritten into paren form. Only bracket-stats followed by `=` are
+        real F/t/chi2 expressions worth converting."""
+        for txt in [
+            "See ref[1,2] for details",
+            "fig[1,2] shows the interaction",
+            "eq[1,2] applies here",
+            "tab[1,2] lists participants",
+        ]:
+            result = norm(txt)
+            assert "(1, 2)" not in result, f"false positive on {txt!r}: {result!r}"
+            assert "(1,2)" not in result, f"false positive on {txt!r}: {result!r}"
+
+    def test_a3b_still_fires_on_real_stat_with_equals(self):
+        # The original D2 repro case — must still work after tightening
+        result = norm("interaction (F[7,140]= 1927, p<.0001)")
+        assert "F(7, 140)" in result or "F(7,140)" in result
