@@ -7,3 +7,13 @@ build/
 venv/
 .pytest_cache/
 *.egg
+
+# Private benchmark suite (real-corpus results + scripts with hardcoded paths
+# to CitationGuard / MetaESCI / PSPB files — not for public view).
+benchmarks/
+
+# Archive of internal design specs and cross-team handoff drafts.
+archive/
+
+# ESCImate -> Docpluck cross-team request doc (private handoff)
+REQUESTS_FROM_ESCIMATE.md
