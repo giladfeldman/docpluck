@@ -615,3 +615,82 @@ class TestA2_DroppedDecimalV2:
         """d = 10 → d = .10 (val=10.0, widening applies)"""
         result = norm("Cohen's d = 10 showed the effect.")
         assert "d = .10" in result
+
+
+# ── A3a: Thousands separator protection (ESCImate Request 1.1) ─────
+
+class TestA3a_ThousandsSeparator:
+    def test_capital_N_thousands_preserved(self):
+        result = norm("Participants (N = 1,182) completed the survey")
+        assert "N = 1182" in result
+        assert "N = 1.182" not in result
+
+    def test_lowercase_n_thousands_preserved(self):
+        result = norm("Sample of n = 2,443 adults")
+        assert "n = 2443" in result
+
+    def test_N_with_six_digit_integer(self):
+        result = norm("A large cohort (N = 1,234,567) was analyzed.")
+        assert "N = 1234567" in result
+
+    def test_df_with_thousands_separator(self):
+        result = norm("The test produced t(df = 1,197) = 2.34")
+        assert "df = 1197" in result
+
+    def test_sample_size_of_phrase(self):
+        result = norm("A sample size of 2,443 was collected.")
+        assert "2443" in result
+        assert "2.443" not in result
+
+    def test_total_of_participants_phrase(self):
+        result = norm("A total of 1,850 participants enrolled.")
+        assert "1850" in result
+
+    def test_decimal_comma_still_works_outside_N_context(self):
+        """German-style decimal comma must still normalize to period."""
+        result = norm("Der Mittelwert = 0,73 war signifikant")
+        assert "0.73" in result
+
+    def test_standard_level_preserves_commas(self):
+        """Standard level never runs A3, so commas must be preserved as-is."""
+        result = norm("Participants (N = 1,182) completed the survey", "standard")
+        # Standard doesn't run A3a either (it's academic-only), but A3 also
+        # doesn't run, so commas pass through untouched
+        assert "N = 1,182" in result
+
+    def test_report_tracks_thousands_count(self):
+        _, report = norm_report("N = 1,182 and n = 2,443 were enrolled.")
+        assert report.changes_made.get("thousands_separators_preserved") == 2
+        assert "A3a_thousands_separator_protect" in report.steps_applied
+
+
+# ── S5a: Context-aware U+FFFD recovery (ESCImate Request 1.2) ──────
+
+class TestS5a_FffdContextRecovery:
+    def test_fffd_with_superscript_two(self):
+        result = norm("Main effect was significant (\ufffd\u00B2 = 0.04)", "standard")
+        assert "eta" in result
+        assert "\ufffd" not in result
+
+    def test_fffd_with_plain_digit_two(self):
+        result = norm("Main effect, \ufffd2 = 0.04, was strong", "standard")
+        assert "eta2 = 0.04" in result or "eta 2 = 0.04" in result
+
+    def test_fffd_partial_eta_subscript(self):
+        result = norm("\ufffd_p\u00B2 = .12 in the interaction", "standard")
+        assert "eta" in result
+        # The _p^2 should be preserved since we only replaced FFFD
+        assert "_p" in result
+
+    def test_fffd_in_non_stat_context_preserved(self):
+        """Generic FFFD in prose must NOT be replaced."""
+        result = norm("The \ufffd symbol is a replacement character.", "standard")
+        assert "\ufffd" in result  # left alone
+
+    def test_fffd_report_tracks_recovery_count(self):
+        _, report = norm_report(
+            "Main (\ufffd\u00B2 = 0.04) and interaction (\ufffd\u00B2 = 0.12)",
+            "standard",
+        )
+        assert report.changes_made.get("fffd_context_recovered") == 2
+        assert "S5a_fffd_context_recovery" in report.steps_applied

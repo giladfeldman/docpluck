@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.3.1"
+NORMALIZATION_VERSION = "1.4.0"
 
 
 @dataclass
@@ -126,6 +126,32 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
     t = t.replace("\u2010", "-")   # Unicode hyphen
     t = t.replace("\u2011", "-")   # non-breaking hyphen
     report._track("S5_dash_normalization", before, t, "dashes_normalized")
+
+    # S5a: Context-aware U+FFFD -> eta recovery (ESCImate Request 1.2)
+    # pdftotext occasionally emits U+FFFD in place of Greek eta. The pdfplumber
+    # SMP fallback catches most; this is second-line defense when both engines
+    # drop the character. CONTEXT-AWARE — only rewrites U+FFFD when followed by
+    # a statistical "eta-squared" pattern (eta^2 = .NNN). Generic encoding-fail
+    # FFFDs in prose are left alone for the caller's quality scoring to flag.
+    before = t
+    _fffd_before = t.count("\ufffd")
+    # Core pattern: FFFD followed by (optional space) (superscript-2 or digit 2) = number
+    t = re.sub(
+        r"\ufffd(\s*(?:\u00B2|2)\s*=\s*-?\.?\d)",
+        r"eta\1",
+        t,
+    )
+    # Partial-eta subscript variant: FFFD_p^2 = .04
+    t = re.sub(
+        r"\ufffd(_?p\u00B2\s*=\s*-?\.?\d)",
+        r"eta\1",
+        t,
+    )
+    _fffd_after = t.count("\ufffd")
+    _fffd_recovered = _fffd_before - _fffd_after
+    if _fffd_recovered > 0:
+        report.changes_made["fffd_context_recovered"] = _fffd_recovered
+    report.steps_applied.append("S5a_fffd_context_recovery")
 
     # S6: Whitespace and invisible character normalization
     before = t
@@ -254,6 +280,41 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
         t = re.sub(r"([pP]\s*[=]\s*)(\d{2,3})" + _A2_LOOKAHEAD, _fix_dropped_decimal, t)
         t = re.sub(r"(\b[dDgG]\s*[=]\s*)(\d{2,3})" + _A2_LOOKAHEAD, _fix_dropped_decimal, t)
         report._track("A2_dropped_decimal_repair", before, t, "decimals_fixed")
+
+        # A3a: Protect thousands separators in N-context integers (ESCImate Request 1.1)
+        # Problem: A3 converts "0,05" -> "0.05" (European decimal commas). The same
+        # rule corrupts "N = 1,182" -> "N = 1.182" which downstream parses as a
+        # sample size of 1.182 people. This step strips commas from ONLY the
+        # matched integer token in sample-size contexts, so A3 sees the already-
+        # clean integer and leaves it alone.
+        #
+        # Runs in academic level because A3 itself is academic-only; in standard
+        # level the commas are preserved by default (no A3 to corrupt them).
+        before = t
+        _thousands_count = [0]
+
+        def _strip_commas_integer(m):
+            _thousands_count[0] += 1
+            groups = list(m.groups())
+            # The integer token is always the second capture group below
+            groups[1] = groups[1].replace(",", "")
+            return "".join(g for g in groups if g is not None)
+
+        _N_PROTECT_PATTERNS = [
+            # N = 1,182 / n = 2,443 / N=(1,234,567)
+            re.compile(r"(\b[Nn]\s*=\s*\(?\s*)(\d{1,3}(?:,\d{3})+)(\s*\)?)"),
+            # df = 1,197 (rare — df large enough to need thousands separator)
+            re.compile(r"(\bdf\s*=\s*)(\d{1,3}(?:,\d{3})+)(\b)"),
+            # "sample size of 2,443"
+            re.compile(r"(\bsample\s+size\s+of\s+)(\d{1,3}(?:,\d{3})+)(\b)", re.IGNORECASE),
+            # "total of 2,443 participants"
+            re.compile(r"(\btotal\s+of\s+)(\d{1,3}(?:,\d{3})+)(\s+participants)", re.IGNORECASE),
+        ]
+        for pattern in _N_PROTECT_PATTERNS:
+            t = pattern.sub(_strip_commas_integer, t)
+        if _thousands_count[0] > 0:
+            report.changes_made["thousands_separators_preserved"] = _thousands_count[0]
+        report.steps_applied.append("A3a_thousands_separator_protect")
 
         # A3: Decimal comma normalization (European locale)
         before = t
