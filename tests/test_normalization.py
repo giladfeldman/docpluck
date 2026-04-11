@@ -694,3 +694,51 @@ class TestS5a_FffdContextRecovery:
         )
         assert report.changes_made.get("fffd_context_recovered") == 2
         assert "S5a_fffd_context_recovery" in report.steps_applied
+
+
+# ── A3: Author-affiliation false-positive protection (ESCImate regression) ──
+
+class TestA3_BraunsteinLookbehind:
+    """Cross-ported from ESCImate test-extraction-quality.R SECTION 11.
+
+    The A3 decimal-comma rule must NOT fire on author affiliation
+    superscript sequences like "Braunstein1,3" or "Wagner1,3,4", where
+    the 1/3/4 are citation markers, not decimal values.
+    """
+
+    def test_braunstein_affiliation_preserved(self):
+        result = norm("Author Braunstein1,3 and colleagues")
+        assert "Braunstein1,3" in result
+        assert "Braunstein1.3" not in result
+
+    def test_wagner_triple_affiliation_preserved(self):
+        result = norm("Wagner1,3,4 led the analysis")
+        assert "Wagner1,3,4" in result
+        assert "Wagner1,3.4" not in result
+        assert "Wagner1.3" not in result
+
+    def test_affiliation_with_trailing_name(self):
+        result = norm("first1,3Boryana continued the study")
+        # Either the comma stays OR there's a clean boundary; must NOT become "first1.3Boryana"
+        assert "first1.3Boryana" not in result
+
+    def test_real_decimal_comma_still_converts(self):
+        result = norm("Der Mittelwert war 0,73 und signifikant")
+        assert "0.73" in result
+
+    def test_decimal_comma_after_letter_blocked(self):
+        """Lookbehind blocks a-z and A-Z — "x2,3" is ambiguous so leave alone."""
+        result = norm("variable x2,3 was coded")
+        # The "2,3" after "x" is an affiliation-like pattern; don't corrupt it
+        assert "x2.3" not in result
+
+    def test_multiple_affiliations_in_abstract(self):
+        result = norm(
+            "Chan1,2, Feldman3, and Zhao1,2,4 conducted the meta-analysis; "
+            "the effect was d = 0,44 across studies."
+        )
+        # Affiliations preserved
+        assert "Chan1,2" in result
+        assert "Zhao1,2,4" in result
+        # Real decimal still converts
+        assert "d = 0.44" in result
