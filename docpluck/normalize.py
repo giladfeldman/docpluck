@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.4.0"
+NORMALIZATION_VERSION = "1.4.1"
 
 
 @dataclass
@@ -317,8 +317,33 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
         report.steps_applied.append("A3a_thousands_separator_protect")
 
         # A3: Decimal comma normalization (European locale)
+        #
+        # Leading lookbehind (?<![a-zA-Z,0-9]) prevents three classes of false
+        # positive:
+        #
+        # 1. Author affiliation superscripts — "Braunstein1,3" or "Wagner1,3,4"
+        #    where the 1/3/4 are citation markers, not decimals. The letter
+        #    before "1" (Braunstein) and the comma before "3" (Wagner middle)
+        #    block those matches. Cross-ported from effectcheck/R/parse.R:189.
+        #
+        # 2. Multi-value CI content — "[0.45,0.89]" where A4 later fixes the
+        #    comma-separated pair. The digit before the comma (4) would
+        #    otherwise let A3 corrupt "5,089" -> "5.089" because the trailing
+        #    "]" matches the lookahead. Excluding digits from the lookbehind
+        #    blocks this.
+        #
+        # 3. Existing well-formed decimal lists like "0.5,0.8,1.2" where A3
+        #    should leave the commas alone (they're separators, not decimals).
+        #
+        # The trailing lookahead keeps the original restrictive character set
+        # (\s | ; ) ] | $) — broadening it to [^0-9a-zA-Z] caused A4 ordering
+        # regressions, so we rely on A4 to handle bracket-internal commas.
         before = t
-        t = re.sub(r"(\d),(\d{1,3})(?=\s|[;)\]]|$)", r"\1.\2", t)
+        t = re.sub(
+            r"(?<![a-zA-Z,0-9])(\d),(\d{1,3})(?=\s|[;)\]]|$)",
+            r"\1.\2",
+            t,
+        )
         report._track("A3_decimal_comma_normalization", before, t, "decimal_commas_fixed")
 
         # A4: CI delimiter harmonization
