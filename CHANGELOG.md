@@ -66,6 +66,60 @@ diagnostics changes below.
   `REPLY_FROM_DOCPLUCK.md` for the preliminary hypothesis. No regex
   change until a real repro lands.
 
+## [1.4.1] — 2026-04-11
+
+### Fixed
+
+- **A3 lookbehind to block author affiliation false-positives** (ESCImate
+  report via `effectcheck/R/parse.R:189`). The v1.4.0 A3 decimal-comma rule
+  was corrupting multi-affiliation citation markers like `Braunstein1,3`
+  into `Braunstein1.3`. Added a `(?<![a-zA-Z,0-9])` lookbehind that blocks
+  three classes of false positive:
+
+  1. Author affiliations like `Braunstein1,3` — the letter before `1`
+     blocks the match.
+  2. Multi-affiliation sequences like `Wagner1,3,4` — both the letter
+     before `1` and the comma before `3` block.
+  3. Bracket-internal multi-value content like `[0.45,0.89]` — the digit
+     before the comma blocks (A4 handles the bracket normalization).
+
+  Six new regression tests under `TestA3_BraunsteinLookbehind`. Full suite:
+  247 passed, 8 skipped.
+
+### Compatibility
+
+- No public API changes. `NORMALIZATION_VERSION` bumped `1.4.0 -> 1.4.1`.
+
+## [1.4.0] — 2026-04-11
+
+### Added
+
+- **A3a thousands-separator protection** (ESCImate Request 1.1). The A3
+  decimal-comma rule was corrupting `N = 1,182` to `N = 1.182`, which
+  downstream parsers read as a sample size of 1.182 people. New step A3a
+  runs before A3 and strips commas from only the integer token in known
+  sample-size contexts (`N` / `n` / `df` / `"sample size of"` /
+  `"total of ... participants"`), so A3 sees an already-clean integer and
+  leaves it alone.
+- **S5a FFFD eta context recovery** (ESCImate Request 1.2). pdftotext
+  occasionally drops Greek eta (U+03B7) as U+FFFD even after the
+  pdfplumber SMP fallback. Added a context-aware second line of defense
+  that rewrites `U+FFFD` to `"eta"` **only** when followed by a statistical
+  eta-squared pattern (`² = .NNN` / `2 = .NNN`, including the `_p²` partial
+  variant). Generic FFFDs in prose are left alone for the quality scorer
+  to flag.
+
+### Verified (no code change)
+
+- A5 Greek transliteration runs inside the academic block. Consumers that
+  need Greek preserved should pass `NormalizationLevel.standard`; the
+  effectcheck parser handles both forms. Documented in v1.4.2 after the
+  MetaESCI D5 follow-up.
+
+### Compatibility
+
+- No public API changes. `NORMALIZATION_VERSION` bumped `1.3.1 -> 1.4.0`.
+
 ## [1.3.1] — 2026-04-11
 
 ### Fixed (normalization + quality scoring)

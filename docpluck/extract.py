@@ -103,10 +103,12 @@ def extract_pdf_file(path: Union[str, Path]) -> tuple[str, str]:
         text, method = extract_pdf_file("paper.pdf")
     """
     p = Path(path)
-    if not p.exists():
-        raise FileNotFoundError(f"PDF file not found: {p}")
     if not p.is_file():
-        raise FileNotFoundError(f"Path is not a regular file: {p}")
+        # is_file() returns False for both missing paths and non-file entries
+        # (directories, broken symlinks). Distinguish for a clearer error.
+        if p.exists():
+            raise FileNotFoundError(f"Path is not a regular file: {p}")
+        raise FileNotFoundError(f"PDF file not found: {p}")
     return extract_pdf(p.read_bytes())
 
 
