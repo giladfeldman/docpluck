@@ -362,6 +362,19 @@ After:  "eta2 = .054, chi2(2) = 8.36, omega2 = .032"
 
 **Source:** ESCIcheck Lessons 12-13, MetaESCI Greek letter corpus.
 
+**Note on Greek preservation (MetaESCI request D5).** A5 runs only at
+`NormalizationLevel.academic`. The transliteration is intentional: downstream
+effect-size parsers (`effectcheck`, ESCImate, MetaESCI) rely on ASCII
+`eta2` / `chi2` / `omega2` tokens for their regex rulebook, so preserving the
+original Greek characters would break the match rate that academic-level is
+optimized for. If a consumer needs Greek preserved (publication-quality
+rendering, Greek-language documents, non-effect-size downstream work), pass
+`NormalizationLevel.standard` — the `standard` level skips A1–A6 entirely and
+leaves every Greek glyph untouched. The extraction-time Greek count reported
+by `extract_pdf` is independent of normalization level, so "how much Greek was
+in the raw text" and "how the academic pipeline treated it" can be measured
+separately.
+
 ---
 
 ### A6 — Footnote marker removal

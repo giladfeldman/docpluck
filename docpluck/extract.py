@@ -18,7 +18,8 @@ reading order. Verified on 50 PDFs across 8 citation styles — see BENCHMARKS.m
 import os
 import subprocess
 import tempfile
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Union
 
 
 def extract_pdf(pdf_bytes: bytes) -> tuple[str, str]:
@@ -79,6 +80,34 @@ def extract_pdf(pdf_bytes: bytes) -> tuple[str, str]:
 
     finally:
         os.unlink(tmp_path)
+
+
+def extract_pdf_file(path: Union[str, Path]) -> tuple[str, str]:
+    """Extract text from a PDF file on disk.
+
+    Thin convenience wrapper around ``extract_pdf`` that reads ``path`` and
+    raises a clean ``FileNotFoundError`` when the file does not exist, instead
+    of the generic exception pdftotext emits on a missing input. Useful for
+    batch runners that walk directories and want actionable errors.
+
+    Args:
+        path: Path to the PDF file on disk (str or pathlib.Path).
+
+    Returns:
+        Same tuple as ``extract_pdf``: ``(text, method)``.
+
+    Raises:
+        FileNotFoundError: If ``path`` does not exist or is not a regular file.
+
+    Example:
+        text, method = extract_pdf_file("paper.pdf")
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"PDF file not found: {p}")
+    if not p.is_file():
+        raise FileNotFoundError(f"Path is not a regular file: {p}")
+    return extract_pdf(p.read_bytes())
 
 
 def count_pages(pdf_bytes: bytes) -> int:

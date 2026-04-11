@@ -1,0 +1,52 @@
+"""
+Version introspection helper.
+
+Exposes :func:`get_version_info` which returns a machine-readable dict of
+``{version, normalize_version, git_sha}`` for batch runners that record an
+immutable "bundle receipt" alongside their outputs. See MetaESCI request D3.
+"""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+
+def _resolve_git_sha() -> str:
+    """Best-effort resolution of the docpluck git SHA.
+
+    Returns ``"unknown"`` if docpluck was installed from a wheel, from PyPI,
+    or from a directory that is not a git checkout. Never raises.
+    """
+    pkg_dir = Path(__file__).resolve().parent
+    repo_root = pkg_dir.parent
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() or "unknown"
+    except Exception:
+        pass
+    return "unknown"
+
+
+def get_version_info() -> dict:
+    """Return a dict with docpluck version metadata.
+
+    Keys:
+        version:           PEP 440 library version (matches ``pyproject.toml``).
+        normalize_version: ``NORMALIZATION_VERSION`` from ``normalize.py``.
+        git_sha:           Git SHA of the docpluck checkout, or ``"unknown"``.
+    """
+    from . import __version__
+    from .normalize import NORMALIZATION_VERSION
+
+    return {
+        "version": __version__,
+        "normalize_version": NORMALIZATION_VERSION,
+        "git_sha": _resolve_git_sha(),
+    }
