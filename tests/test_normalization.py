@@ -742,3 +742,41 @@ class TestA3_BraunsteinLookbehind:
         assert "Zhao1,2,4" in result
         # Real decimal still converts
         assert "d = 0.44" in result
+
+
+class TestA3_StatBracketLookbehind:
+    """MetaESCI D2 regression (2026-04-11): A3 must not corrupt the comma
+    inside statistical df brackets like F[2,42], F(2,42), t(1,197). The
+    lookbehind now excludes '[' and '(' so the comma survives A3; A3b then
+    harmonizes the square-bracket form to canonical parens.
+    """
+
+    def test_f_square_bracket_comma_preserved_not_decimal(self):
+        # A3 must not turn "F[2,42]" into "F[2.42]"
+        result = norm("effect of pose on mood (F[2,42]= 13.689, p < .001)")
+        assert "F[2.42]" not in result
+        # A3b harmonizes to parens so effectcheck can parse
+        assert "F(2, 42)" in result or "F(2,42)" in result
+
+    def test_f_paren_tight_comma_preserved(self):
+        # A3 must not turn "F(2,42)" into "F(2.42)"
+        result = norm("interaction (F(2,42)=13.689, p<.001)")
+        assert "F(2.42)" not in result
+        assert "F(2, 42)" in result or "F(2,42)" in result
+
+    def test_t_paren_tight_thousands_preserved(self):
+        result = norm("result was significant, t(1,197)=2.34, p<.05")
+        assert "t(1.197)" not in result
+
+    def test_a3b_harmonizes_bracket_to_paren_for_effectcheck(self):
+        # Standalone harmonization — independent of A3 lookbehind
+        result = norm("the interaction (F[7,140]=1927, p<.0001)")
+        assert "F(7, 140)" in result or "F(7,140)" in result
+        assert "F[7" not in result
+
+    def test_a3b_does_not_convert_non_stat_brackets(self):
+        # "See [1,2]" is a citation list, not a stat expression — leave alone
+        result = norm("See references [1,2] for details")
+        assert "[1,2]" in result or "[1, 2]" in result  # A4 may space it
+        # must not become "(1, 2)"
+        assert "references (1" not in result

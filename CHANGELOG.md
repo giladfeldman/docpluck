@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.4.3] — 2026-04-11
+
+### Fixed (MetaESCI D1/D2 lost-source repro)
+
+- **A3 lookbehind regression (D2 root cause).** The Braunstein lookbehind
+  `(?<![a-zA-Z,0-9])` added in v1.4.1 did not exclude `[` or `(`, so
+  pdftotext output like `F[2,42]=13.689` or `F(2,42)=13.689` (tight-
+  spaced df forms with no space after the comma) was corrupted to
+  `F[2.42]` / `F(2.42)` — converting the df separator into a decimal
+  point. Downstream effectcheck regex then failed to parse the stat and
+  silently dropped the row. Fix: lookbehind now excludes
+  `[a-zA-Z,0-9\[\(]`. Discovered via MetaESCI D2 repro on
+  `10.15626/mp.2019.1723` where docpluck produced 0 rows vs checkpdfdir's
+  3 rows.
+- **A3b statistical df-bracket harmonization (new step).** Some PDFs
+  encode F/t/chi2 degrees of freedom with square brackets, e.g.
+  `F[2,42]=13.689`. effectcheck's `parse.R` only matches parenthesized
+  df, so bracketed forms are silently dropped. A3b converts the bracket
+  form to canonical parens when the bracket immediately follows a short
+  stat identifier. Runs in academic level only, after A3 and before A4.
+  Tracked in `NormalizationReport.steps_applied` as
+  `A3b_stat_bracket_to_paren`.
+
+### Changed
+
+- `NORMALIZATION_VERSION` bumped `"1.4.1"` → `"1.4.2"` to reflect the A3b
+  addition and the A3 lookbehind semantic change. Downstream consumers
+  should invalidate their extraction cache on this bump.
+
+### Tests
+
+- New `TestA3_StatBracketLookbehind` class in `tests/test_normalization.py`
+  with 5 regression cases covering square-bracket and tight-paren df
+  forms, thousands-separator tight-paren form (`t(1,197)`), and a
+  citation-list negative case (`[1,2]` must not become `(1,2)`).
+- Full suite: **265 passed, 9 skipped** (+5 new cases vs v1.4.2).
+
+### Notes for MetaESCI downstream gaps
+
+- **D1** (row-count drops across 6 sources): 3 of 30 lost rows are
+  directly fixed by the A3/A3b changes above (all from
+  `10.15626/mp.2019.1723`). The remaining ~27 rows contain cleanly
+  normalized text in the docpluck output and appear to be effectcheck
+  `parse.R` edge cases (uppercase `P`, table rows with pipe separators,
+  and clean `F(df1, df2) = xx.xxx` forms that should match but don't).
+  Report these to the effectcheck team with the PDFs:
+  `10.1525/collabra.150`, `10.1177/0146167210376761`,
+  `10.1177/0146167220977709`, `10.15626/mp.2021.2803`,
+  `10.1098/rsos.211412`.
+- **D4** (CI width-ratio divergences): the `raw_text` columns are
+  byte-identical between Run A and Run B; only the computed CI bounds
+  differ. That places the divergence in effectcheck's CI compute logic
+  (`compute_ci` / `compute.R`), not in docpluck normalization. Not
+  actionable on the docpluck side.
+
 ## [1.4.2] — 2026-04-11
 
 ### Added (MetaESCI D3/D5/D6/D7 follow-ups)
