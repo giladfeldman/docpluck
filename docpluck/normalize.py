@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.4.1"
+NORMALIZATION_VERSION = "1.4.2"
 
 
 @dataclass
@@ -330,8 +330,8 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
 
         # A3: Decimal comma normalization (European locale)
         #
-        # Leading lookbehind (?<![a-zA-Z,0-9]) prevents three classes of false
-        # positive:
+        # Leading lookbehind (?<![a-zA-Z,0-9\[\(]) prevents four classes of
+        # false positive:
         #
         # 1. Author affiliation superscripts — "Braunstein1,3" or "Wagner1,3,4"
         #    where the 1/3/4 are citation markers, not decimals. The letter
@@ -347,16 +347,42 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
         # 3. Existing well-formed decimal lists like "0.5,0.8,1.2" where A3
         #    should leave the commas alone (they're separators, not decimals).
         #
+        # 4. Statistical df brackets — "F[2,42]", "F(2,42)", "t(1,197)" where
+        #    pdftotext produces the tight-no-space df form. Without excluding
+        #    "[" and "(" from the lookbehind, A3 corrupts "F[2,42]=13.689"
+        #    into "F[2.42]=13.689", which effectcheck's parser then fails to
+        #    match. Regression discovered via MetaESCI D2 lost-source repro
+        #    (10.15626/mp.2019.1723, 2026-04-11). The A3a step above handles
+        #    N=/df= thousands separators before A3 runs, so excluding "(" here
+        #    does not affect that path.
+        #
         # The trailing lookahead keeps the original restrictive character set
         # (\s | ; ) ] | $) — broadening it to [^0-9a-zA-Z] caused A4 ordering
         # regressions, so we rely on A4 to handle bracket-internal commas.
         before = t
         t = re.sub(
-            r"(?<![a-zA-Z,0-9])(\d),(\d{1,3})(?=\s|[;)\]]|$)",
+            r"(?<![a-zA-Z,0-9\[\(])(\d),(\d{1,3})(?=\s|[;)\]]|$)",
             r"\1.\2",
             t,
         )
         report._track("A3_decimal_comma_normalization", before, t, "decimal_commas_fixed")
+
+        # A3b: Statistical df-bracket harmonization (MetaESCI D2, 2026-04-11)
+        #
+        # Some PDFs encode F/t/chi2 degrees-of-freedom with square brackets
+        # instead of parentheses — e.g. pdftotext produces "F[2,42]=13.689"
+        # from 10.15626/mp.2019.1723 where the paper visually uses parens.
+        # effectcheck's parse.R only matches `F\s*\(`, so these rows are
+        # silently dropped. Convert the bracket form to canonical parens
+        # when immediately following a one- or two-letter stat identifier
+        # (F, t, z, r, chi2, r2, etc.) and containing "digit , digit".
+        before = t
+        t = re.sub(
+            r"(\b[A-Za-z]{1,4})\[(\s*\d+(?:\.\d+)?\s*,\s*\d+(?:\.\d+)?\s*)\]",
+            r"\1(\2)",
+            t,
+        )
+        report._track("A3b_stat_bracket_to_paren", before, t, "stat_brackets_fixed")
 
         # A4: CI delimiter harmonization
         before = t
