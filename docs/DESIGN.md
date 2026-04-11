@@ -166,6 +166,102 @@ pymupdf (PyMuPDF), pymupdf4llm, and PyMuPDF-story are all AGPL v3. Any code that
 
 docpluck's MIT license is incompatible with AGPL v3. No AGPL dependency will ever be added to docpluck. This is a hard constraint, not a preference.
 
+All current and planned dependencies are MIT or BSD-compatible:
+
+| Dep | License | Purpose |
+|-----|---------|---------|
+| pdfplumber | MIT | PDF SMP Unicode recovery |
+| mammoth | BSD-2 | DOCX → HTML conversion |
+| beautifulsoup4 | MIT | HTML parsing |
+| lxml | BSD-3 | HTML parser backend |
+
+---
+
+## 11. Why mammoth for DOCX — not python-docx, docx2txt, or pandoc
+
+Added in v1.3.0 when DOCX support was ported from Scimeto.
+
+### Why mammoth.convert_to_html, not extract_raw_text
+
+Mammoth provides two extraction modes:
+
+- **`extract_raw_text()`**: Returns plain text with paragraph separation as `\n\n`, but **loses intra-paragraph line breaks** (Shift+Enter soft breaks become nothing).
+- **`convert_to_html()`**: Returns structured HTML that preserves soft breaks as `<br>` tags, headings as `<h1>`–`<h6>`, and paragraph structure.
+
+Academic documents use soft breaks in addresses, equations, poetry, and tables. Losing them breaks regex patterns that depend on line boundaries. We use `convert_to_html()` and then run the same `html_to_text()` tree-walk used for native HTML input — a single code path for both formats.
+
+### Why not python-docx
+
+`python-docx` is designed for document *creation* and *editing*, not extraction. It only exposes paragraph-level access, requires manual iteration for anything structural, and has no built-in handling for footnotes, soft breaks, or tracked changes. It's the wrong tool.
+
+### Why not docx2txt
+
+`docx2txt` is effectively unmaintained (last meaningful release 2019). It returns one big string with no structure preservation. Inferior to mammoth in every measurable way.
+
+### Why not pypandoc
+
+Pandoc produces excellent output — arguably the best DOCX fidelity of any tool — but it requires the `pandoc` binary installed on the host, adding a ~100MB system dependency that's painful to deploy. Mammoth is 100% pure Python.
+
+### Why not docx2python
+
+docx2python is a strong alternative with better footnote and header/footer support. We chose mammoth because it is already battle-tested in Scimeto production (since Dec 2025) with the exact block/inline-aware pipeline we're porting. If docx2python ever becomes necessary (e.g., for OMML equation support), we can swap it in — the `extract_docx()` function contract is minimal.
+
+### OMML equation limitation
+
+Mammoth silently drops Office Math (OMML) equation objects. This is a real limitation for STEM papers that embed statistical formulas as math objects. In practice:
+
+- Social science papers (our primary use case) write inline stats as plain text — unaffected.
+- STEM papers with equation-embedded results will lose those values.
+
+Documented in README and BENCHMARKS. No workaround in v1.3.0.
+
+---
+
+## 12. Why BeautifulSoup + lxml with a custom tree-walk — not `get_text()`
+
+Added in v1.3.0 when HTML support was ported from Scimeto.
+
+### Why not BeautifulSoup.get_text(separator=...)
+
+This seems like the obvious choice, but it does not work. `get_text()` applies a single separator uniformly to all element boundaries — block and inline alike. This means:
+
+- `separator=' '` — `<p>Hello</p><p>World</p>` becomes `"Hello World"` (loses paragraph breaks)
+- `separator='\n'` — `<a>Chan</a><a>ORCID</a>` becomes `"Chan\nORCID"` (unwanted line break inside a name)
+
+The BeautifulSoup maintainer [has confirmed](https://bugs.launchpad.net/bugs/1768330) that block vs. inline awareness will not be added to BS4 because it would make BS4 "more like a web browser." The only correct approach is a custom tree-walk that knows about block vs. inline elements.
+
+### The ChanORCID bug
+
+Scimeto ran in production for weeks with a bug where adjacent `<a>` tags produced merged text: `<a>Chan</a><a>ORCID</a>` → `"ChanORCID"`. The fix: **always insert a space before and after every inline element**, not just between them. The docpluck port has a regression test named `test_chan_orcid_regression` specifically guarding this.
+
+### Why lxml parser (not html.parser, not html5lib)
+
+| Parser | Speed (100 iter) | Malformed HTML | Dependencies |
+|--------|:----------------:|:--------------:|--------------|
+| **lxml** | **7.55s** | Good recovery | C library (libxml2) |
+| html.parser | 11.79s | Stricter | Built-in |
+| html5lib | 22.35s | Best (full HTML5) | Pure Python |
+
+Academic publisher HTML is machine-generated and well-formed, so html5lib's perfect HTML5 compliance is overkill. lxml is 1.5–3× faster than html.parser with good enough error recovery for the rare malformed case.
+
+### Why not a content extractor (trafilatura, readability, jusText, newspaper4k)
+
+These tools are designed for *news article extraction from web pages* — identifying the "main content" and stripping navigation/boilerplate. They solve a fundamentally different problem and would actively harm docpluck's use case:
+
+- They would strip reference sections (considered "boilerplate")
+- They would strip supplementary material links
+- They would miss author affiliations and statistics in footers
+
+docpluck receives **already-isolated article content** (not a web page). The correct strategy is "extract everything, let the tree-walk preserve structure." BeautifulSoup has the highest text recall (0.994) in published article-extraction benchmarks — which for our use case is a feature, not a bug.
+
+### Why not inscriptis
+
+inscriptis is the strongest alternative — it's an academic tool (JOSS paper) with built-in block/inline handling. We considered it seriously. We chose BS4 + custom walker because:
+
+1. The Scimeto production walker is only ~60 lines and battle-tested
+2. inscriptis focuses on *visual layout fidelity* (table alignment, indentation) that docpluck doesn't need
+3. Porting Scimeto exactly gives us behavioral parity across the two codebases
+
 ---
 
 ## Known Limitations

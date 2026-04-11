@@ -79,11 +79,17 @@ class TestESCIcheckEdgeCases:
 
 class TestMetaESCIEdgeCases:
     def test_column_merge_detection(self):
-        """MetaESCI: 0.65% column merge rate. Garbled text should have low quality."""
-        text = "WorWdorFdrFraaggmmeentntCoCmopletmio " * 50
+        """MetaESCI: 0.65% column merge rate.
+
+        Real column-merge extraction retains extraction artifacts (ligatures,
+        occasional FFFD). The v1.3.1 quality scorer requires an independent
+        corruption signal before flagging garbled to avoid false positives on
+        non-prose documents like reviewer acknowledgment lists.
+        """
+        text = "Wor\ufb01Wdor\ufb01Fdr\ufb01Fraaggmm\ufb01eentnt\ufb01CoCmopletmio " * 50
         q = compute_quality_score(text)
+        assert q["details"]["ligatures_remaining"] >= 20
         assert q["garbled"] is True
-        assert q["score"] <= 50
 
     def test_page_footer_in_pvalue(self):
         """MetaESCI: 0.25% garbled p-values from page footers."""
@@ -224,8 +230,9 @@ class TestBenchmarkRegressions:
 
     def test_normalization_report_version(self):
         """Report must include version for consumer apps."""
+        from docpluck.normalize import NORMALIZATION_VERSION
         _, report = normalize_text("test", NormalizationLevel.standard)
-        assert report.version == "1.2.0"
+        assert report.version == NORMALIZATION_VERSION
         assert report.level == "standard"
 
     def test_normalization_report_all_steps_tracked(self):

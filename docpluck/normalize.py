@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.2.0"
+NORMALIZATION_VERSION = "1.3.1"
 
 
 @dataclass
@@ -172,8 +172,29 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
     # that got split from "p =\n484". S9 would strip them as page numbers.
     if level == NormalizationLevel.academic:
         before = t
-        # Basic stat line break patterns
-        t = re.sub(r"([pP])\s*\n\s*([=<>])", r"\1 \2", t)   # p\n< → p <
+        # Basic stat line break: `p\n<`, `p\n=`, `p\n>` → `p <` etc.
+        t = re.sub(r"([pP])\s*\n\s*([=<>])", r"\1 \2", t)
+
+        # A1-extended (2026-04-11, v1.3.1): column-bleed BETWEEN `p` and the
+        # operator. Pattern observed in PSPB papers: `p\n\n01\n\n01\n\n= .28`
+        # where "01", "11" etc. are short column-bleed fragments on their own
+        # lines. Must run before the simple `p =\n digit` rule below, otherwise
+        # the first fragment gets interpreted as the value.
+        t = re.sub(
+            r"([pP])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([<=>])",
+            r"\1 \2",
+            t,
+        )
+        # Same pattern with column-bleed BETWEEN operator and value:
+        # `p =\n01\n11\n.28` → `p = .28`. Must run before the simple
+        # `p =\n digit` rule below to avoid eating the first fragment.
+        t = re.sub(
+            r"([pP]\s*[<=>])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([-.\d])",
+            r"\1 \2",
+            t,
+        )
+
+        # Simple: p =\n digit → p = digit (must run AFTER column-bleed rules)
         t = re.sub(r"([pP]\s*[=<>])\s*\n\s*(\d)", r"\1 \2", t)
         t = re.sub(r"(OR|CI|RR)\s*\n\s*(\d)", r"\1 \2", t)
         t = re.sub(r"(95\s*%)\s*\n\s*(CI)", r"\1 \2", t)
@@ -211,17 +232,27 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
     if level == NormalizationLevel.academic:
 
         # A2: Dropped decimal repair (p > 1.0 -> p = 0.xxx)
+        #
+        # Changed 2026-04-11 (v1.3.1): accept val >= 1.0 (not > 1.0) so that
+        # `p = 01` and `p = 10` (both evaluating to 1.0 or 10.0) get repaired.
+        # The `\d{2,3}` prefix in the regex already guarantees we never touch
+        # single-digit values like `p = 1`, so this widening is safe.
+        #
+        # Changed 2026-04-11: lookahead accepts `.` only when not followed by
+        # another digit — so `p = 01.` (sentence-ending period) matches but
+        # `p = 15.8` (legitimate decimal) does not.
         before = t
 
         def _fix_dropped_decimal(m):
             val = float(m.group(2))
-            if val > 1.0 and val < 1000:
+            if val >= 1.0 and val < 1000:
                 return f"{m.group(1)}.{m.group(2)}"
             return m.group(0)
 
         # Fix p-values and effect sizes with dropped leading "0."
-        t = re.sub(r"([pP]\s*[=]\s*)(\d{2,3})(?=\s|[,;)\]]|$)", _fix_dropped_decimal, t)
-        t = re.sub(r"(\b[dDgG]\s*[=]\s*)(\d{2,3})(?=\s|[,;)\.]|$)", _fix_dropped_decimal, t)
+        _A2_LOOKAHEAD = r"(?=\s|[,;)\]]|\.(?!\d)|$)"
+        t = re.sub(r"([pP]\s*[=]\s*)(\d{2,3})" + _A2_LOOKAHEAD, _fix_dropped_decimal, t)
+        t = re.sub(r"(\b[dDgG]\s*[=]\s*)(\d{2,3})" + _A2_LOOKAHEAD, _fix_dropped_decimal, t)
         report._track("A2_dropped_decimal_repair", before, t, "decimals_fixed")
 
         # A3: Decimal comma normalization (European locale)

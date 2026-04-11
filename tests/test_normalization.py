@@ -515,3 +515,103 @@ class TestA1_Enhanced:
         result = norm("p = this is a very long sentence that should not be eaten\n0.045")
         # The garbage is > 20 chars, so the pattern should NOT match
         assert "p = 0.045" not in result
+
+
+class TestA1_ColumnBleed:
+    """Regression tests for the 2026-04-11 PSPB column-bleed fix.
+
+    Real-world pattern from MetaESCI corpus: PSPB multi-column layout produces
+    stray digit-only lines between 'p' and the '=' operator. Example from
+    10.1177/0146167215581712:
+
+        beta = .08 p\\n\\n01\\n\\n01\\n\\n= .28
+
+    where '01' lines are column-bleed fragments. The simple p\\n= rule can't
+    handle this because the intermediate lines aren't whitespace.
+    """
+
+    def test_column_bleed_single_fragment(self):
+        """p\\n01\\n= .28 → p = .28"""
+        result = norm("beta = .08 p\n01\n= .28")
+        assert "p\n01\n=" not in result
+        assert "p = .28" in result
+
+    def test_column_bleed_double_fragment(self):
+        """p\\n01\\n01\\n= .28 → p = .28 (the real PSPB pattern)"""
+        result = norm("beta = .08 p\n01\n01\n= .28")
+        assert "p = .28" in result
+
+    def test_column_bleed_with_blank_lines(self):
+        """p\\n\\n01\\n\\n01\\n\\n= .28 → p = .28 (literal raw PSPB)"""
+        result = norm("beta = .08 p\n\n01\n\n01\n\n= .28")
+        assert "p = .28" in result
+
+    def test_column_bleed_quadruple_fragment(self):
+        """Up to 4 fragment lines are allowed."""
+        result = norm("p\n01\n11\n12\n13\n= .05")
+        assert "p = .05" in result
+
+    def test_column_bleed_too_many_fragments_ignored(self):
+        """5+ fragments should NOT match (conservative upper bound)."""
+        result = norm("p\n01\n02\n03\n04\n05\n= .05")
+        # With 5 fragments, the regex doesn't match; we want the broken pattern
+        # to remain visible rather than be silently mis-joined with unrelated text.
+        assert "p = .05" not in result
+
+    def test_column_bleed_in_operator_value(self):
+        """p =\\n01\\n11\\n.28 → p = .28"""
+        result = norm("p =\n01\n11\n.28")
+        assert "p = .28" in result
+
+    def test_column_bleed_with_word_skipped(self):
+        """Intermediate lines that aren't short digits should NOT match."""
+        result = norm("p\nsome word\n= .28")
+        # Should NOT collapse (word isn't a column-bleed fragment)
+        assert "p = .28" not in result
+
+
+class TestA2_DroppedDecimalV2:
+    """Regression tests for the 2026-04-11 A2 widening fix.
+
+    Before: A2 used `val > 1.0` which excluded `p = 01` (val=1.0).
+    After:  A2 uses `val >= 1.0` so `p = 01` → `p = .01`.
+
+    The `\\d{2,3}` prefix in the regex already prevents `p = 1` (single digit)
+    from matching, so widening the threshold is safe.
+    """
+
+    def test_dropped_decimal_p_equals_01(self):
+        """p = 01 → p = .01 (val=1.0, used to be rejected)"""
+        result = norm("The effect was significant, p = 01.")
+        assert "p = .01" in result
+
+    def test_dropped_decimal_p_equals_10(self):
+        """p = 10 → p = .10 (val=10.0)"""
+        result = norm("Marginal effect, p = 10.")
+        assert "p = .10" in result
+
+    def test_dropped_decimal_p_equals_02(self):
+        """p = 02 → p = .02"""
+        result = norm("Significant effect, p = 02.")
+        assert "p = .02" in result
+
+    def test_single_digit_not_touched(self):
+        """p = 1 (single digit) must NOT be mangled."""
+        # The regex \d{2,3} requires 2-3 digits, so this should pass through
+        result = norm("p = 1 for the test.")
+        assert "p = .1" not in result
+
+    def test_genuine_decimal_not_touched(self):
+        """p = 0.05 must NOT be changed."""
+        result = norm("The effect is p = 0.05 and d = 0.34.")
+        assert "p = 0.05" in result
+
+    def test_p_equals_with_linebreak(self):
+        """p = 01\\nnext word → p = .01 next word (real PSPB pattern)"""
+        result = norm("beta = .11, p = 01\nbelieved that they lost status")
+        assert "p = .01" in result
+
+    def test_effect_size_dropped_decimal_widened(self):
+        """d = 10 → d = .10 (val=10.0, widening applies)"""
+        result = norm("Cohen's d = 10 showed the effect.")
+        assert "d = .10" in result

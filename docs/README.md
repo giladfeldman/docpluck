@@ -1,18 +1,35 @@
 # docpluck
 
-**PDF text extraction and normalization for academic papers.**
+**PDF, DOCX, and HTML text extraction and normalization for academic papers.**
 
 Built from cross-project experience across 8,000+ PDFs spanning psychology, medicine, economics, physics, and biology. Achieves 100% accuracy on 29 manually verified ground-truth passages (see [BENCHMARKS.md](BENCHMARKS.md)).
+
+Supports three input formats:
+- **PDF** via `pdftotext` default mode (with `pdfplumber` SMP recovery)
+- **DOCX** via `mammoth` (DOCX → HTML → text, preserving Shift+Enter soft breaks)
+- **HTML** via `beautifulsoup4` + `lxml` (block/inline-aware tree-walk)
+
+All three formats feed into the same 15-step normalization pipeline and quality scoring.
 
 ---
 
 ## Install
 
 ```bash
+# PDF only (pdfplumber)
 pip install docpluck
+
+# + DOCX support (adds mammoth)
+pip install docpluck[docx]
+
+# + HTML support (adds beautifulsoup4 + lxml)
+pip install docpluck[html]
+
+# Everything
+pip install docpluck[all]
 ```
 
-**System requirement for `extract_pdf()`:** [poppler-utils](https://poppler.freedesktop.org/) (provides the `pdftotext` binary).
+**System requirement for `extract_pdf()`:** [poppler-utils](https://poppler.freedesktop.org/) (provides the `pdftotext` binary). DOCX and HTML are pure Python — no system dependencies.
 
 ```bash
 # Linux / WSL
@@ -32,7 +49,7 @@ brew install poppler
 pip install git+https://github.com/giladfeldman/docpluck.git
 
 # Pinned version
-pip install "docpluck>=1.1.0"
+pip install "docpluck>=1.3.0"
 ```
 
 ---
@@ -40,11 +57,22 @@ pip install "docpluck>=1.1.0"
 ## Quick Start
 
 ```python
-from docpluck import extract_pdf, normalize_text, NormalizationLevel, compute_quality_score
+from docpluck import (
+    extract_pdf, extract_docx, extract_html,
+    normalize_text, NormalizationLevel, compute_quality_score,
+)
 
-# 1. Extract text from a PDF
+# 1. Extract text from any supported format
 with open("paper.pdf", "rb") as f:
     text, method = extract_pdf(f.read())
+
+# Or from DOCX:
+# with open("paper.docx", "rb") as f:
+#     text, method = extract_docx(f.read())
+
+# Or from HTML:
+# with open("paper.html", "rb") as f:
+#     text, method = extract_html(f.read())
 
 print(f"Extracted {len(text):,} chars via {method}")
 
@@ -90,9 +118,67 @@ if text.startswith("ERROR:"):
 
 ---
 
+### `extract_docx(docx_bytes: bytes) → tuple[str, str]`
+
+Extract text from DOCX (Word) file bytes via `mammoth`.
+
+**Parameters:**
+- `docx_bytes` — Raw DOCX file content as `bytes`
+
+**Returns:** `(text, method)` tuple where `method` is always `"mammoth"`.
+
+**How it works:** DOCX is converted to HTML first (preserving Shift+Enter soft breaks as `<br>` tags), then passed through the same block/inline-aware tree-walk used by `extract_html()`. This preserves paragraph structure, headings, lists, and soft breaks — which `mammoth.extract_raw_text()` would lose.
+
+**Requires:** `pip install docpluck[docx]` (adds `mammoth>=1.8.0`).
+
+**Known limitations:**
+- **OMML equations** (Office Math) are silently dropped. Inline stats written as plain text survive; stats inside equation objects do not.
+- **Tracked changes**: only deleted paragraphs are handled minimally.
+- **Memory**: peak usage is ~3–5× file size.
+
+```python
+from docpluck import extract_docx
+
+with open("paper.docx", "rb") as f:
+    text, method = extract_docx(f.read())
+```
+
+---
+
+### `extract_html(html_bytes: bytes) → tuple[str, str]`
+
+Extract text from HTML file bytes via `beautifulsoup4` + `lxml`.
+
+**Parameters:**
+- `html_bytes` — Raw HTML file content as `bytes` (UTF-8 decoded with error replacement)
+
+**Returns:** `(text, method)` tuple where `method` is always `"beautifulsoup"`.
+
+**How it works:** Custom tree-walk that distinguishes block from inline elements:
+- **Block elements** (`<p>`, `<div>`, `<h1>`–`<h6>`, `<li>`, `<td>`, etc.) get newlines before and after.
+- **Inline elements** (`<a>`, `<span>`, `<em>`, etc.) get spaces before and after — critical for preventing merged words like `"ChanORCID"` when adjacent inline elements have no whitespace between them.
+- **Ignored tags** (`<script>`, `<style>`, `<meta>`, `<svg>`, `<iframe>`, etc.) are decomposed before walking.
+
+**Why not `BeautifulSoup.get_text()`**: `get_text()` cannot distinguish block from inline elements — it applies a uniform separator everywhere, which either merges paragraphs or inserts spurious whitespace. The BeautifulSoup maintainer has [confirmed](https://bugs.launchpad.net/bugs/1768330) this will not be fixed. A custom tree-walk is required.
+
+**Requires:** `pip install docpluck[html]` (adds `beautifulsoup4>=4.12.0` and `lxml>=5.0.0`).
+
+```python
+from docpluck import extract_html, html_to_text
+
+# From bytes
+with open("article.html", "rb") as f:
+    text, method = extract_html(f.read())
+
+# From an already-decoded string
+text = html_to_text("<p>Hello <a>world</a></p>")
+```
+
+---
+
 ### `count_pages(pdf_bytes: bytes) → int`
 
-Count pages in a PDF using byte pattern matching. No external binary required.
+Count pages in a PDF using byte pattern matching. No external binary required. **PDF only** — returns `None` is not applicable for DOCX/HTML.
 
 ```python
 with open("paper.pdf", "rb") as f:
@@ -295,10 +381,13 @@ def extract_from_url(url: str) -> str:
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | Python | ≥ 3.10 | |
-| pdfplumber | ≥ 0.11.0 | Pip dependency — installed automatically |
+| pdfplumber | ≥ 0.11.0 | Core pip dependency — installed automatically |
 | poppler-utils | any recent | System package — for `extract_pdf()` only |
+| mammoth | ≥ 1.8.0 | Optional (`[docx]`) — pure Python, no system deps |
+| beautifulsoup4 | ≥ 4.12.0 | Optional (`[html]`) — pure Python |
+| lxml | ≥ 5.0.0 | Optional (`[html]`) — has prebuilt wheels |
 
-The normalization and quality functions (`normalize_text`, `compute_quality_score`) have **no system requirements** — pure Python, no external binaries.
+The normalization and quality functions (`normalize_text`, `compute_quality_score`) have **no system requirements** — pure Python, no external binaries. DOCX and HTML extraction are pure Python too; only PDF needs a system binary.
 
 ---
 
