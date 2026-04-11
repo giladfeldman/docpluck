@@ -9,9 +9,11 @@ immutable "bundle receipt" alongside their outputs. See MetaESCI request D3.
 from __future__ import annotations
 
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 
+@lru_cache(maxsize=1)
 def _resolve_git_sha() -> str:
     """Best-effort resolution of the docpluck git SHA.
 
@@ -41,6 +43,10 @@ def get_version_info() -> dict:
         version:           PEP 440 library version (matches ``pyproject.toml``).
         normalize_version: ``NORMALIZATION_VERSION`` from ``normalize.py``.
         git_sha:           Git SHA of the docpluck checkout, or ``"unknown"``.
+
+    The git SHA resolution is cached (shells out to ``git rev-parse`` at most
+    once per process). A fresh dict is returned on every call, so callers may
+    mutate the result without corrupting the cache.
     """
     from . import __version__
     from .normalize import NORMALIZATION_VERSION
