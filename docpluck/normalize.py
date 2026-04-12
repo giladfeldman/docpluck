@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.4.2"
+NORMALIZATION_VERSION = "1.4.3"
 
 
 @dataclass
@@ -236,8 +236,14 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
         t = re.sub(r"(OR|CI|RR)\s*\n\s*(\d)", r"\1 \2", t)
         t = re.sub(r"(95\s*%)\s*\n\s*(CI)", r"\1 \2", t)
         t = re.sub(r"([=<>])\s*\n\s*([-\d.])", r"\1 \2", t)
-        # Aggressive: skip up to 20 chars of column-boundary garbage between p= and value
-        t = re.sub(r"(p\s*[<=>]\s*)[^\n]{1,20}\n\s*([.\d]+)", r"\1\2", t)
+        # Column-boundary garbage: skip letter-starting text (1-20 chars) between
+        # p= and a valid p-value on the next line.  Two independent safety guards:
+        # Guard 1 — garbage must start with [a-zA-Z] (real stat content starts with
+        #   digits/dots, column-bleed garbage starts with word fragments).
+        # Guard 2 — next-line value must match 0?\.\d+ (valid p-value format;
+        #   rejects section numbers like 8.3, page numbers like 1024, footnotes).
+        # See MetaESCI D5 audit (2026-04-12): old [^\n]{1,20} ate real p-values.
+        t = re.sub(r"(p\s*[<=>]\s*)[a-zA-Z][^\n]{0,19}\n\s*(0?\.\d+)", r"\1\2", t)
         # Rejoin test stat → p-value across line break: "t(23) = 2.34,\n p < .001"
         t = re.sub(r"([,;])\s*\n\s*(p\s*[<=>])", r"\1 \2", t)
         # Rejoin effect size → CI across line break: "d = 0.45,\n 95% CI"
