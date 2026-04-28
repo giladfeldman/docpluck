@@ -103,6 +103,62 @@ Required variables (all must show as "Encrypted"):
 
 If any are missing, refer to SETUP_GUIDE.md.
 
+## Library Release Step (run BEFORE app deploy)
+
+If the library version changed since the last deploy, the library must be tagged + pushed FIRST so `service/requirements.txt` (now pointing at the new version) can resolve.
+
+```bash
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck
+LIB_VERSION=$(grep '^__version__' docpluck/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+
+# Skip if tag already exists
+if git rev-parse "v$LIB_VERSION" >/dev/null 2>&1; then
+  echo "Tag v$LIB_VERSION already exists — skipping tag/push"
+else
+  git tag "v$LIB_VERSION" -m "v$LIB_VERSION release"
+  git push origin main
+  git push origin "v$LIB_VERSION"
+  echo "✅ Library tagged + pushed v$LIB_VERSION"
+fi
+
+# Verify the PyPI publish workflow ran successfully on the tag.
+# The workflow file is .github/workflows/publish.yml; it uses PyPI Trusted
+# Publishing (no API token in repo). If it fails with "invalid-publisher",
+# the one-time PyPI configuration step is missing — go to
+# https://pypi.org/manage/account/publishing/ and add a pending publisher
+# matching: project=docpluck, owner=giladfeldman, repo=docpluck,
+# workflow=publish.yml, environment=pypi.
+echo "Waiting up to 3 minutes for PyPI publish workflow on tag v$LIB_VERSION..."
+for i in 1 2 3 4 5 6; do
+  sleep 30
+  STATUS=$(gh run list --workflow "Publish to PyPI" --limit 5 --json headBranch,status,conclusion,databaseId 2>/dev/null | python -c "
+import sys, json
+runs = json.load(sys.stdin)
+for r in runs:
+    if r['headBranch'] == 'v$LIB_VERSION':
+        print(f\"{r['status']}|{r['conclusion']}|{r['databaseId']}\")
+        break
+")
+  if [ -n "$STATUS" ]; then
+    echo "Run status: $STATUS"
+    if echo "$STATUS" | grep -q "completed|success"; then
+      echo "✅ PyPI publish succeeded"
+      break
+    elif echo "$STATUS" | grep -q "completed|failure"; then
+      RUN_ID=$(echo "$STATUS" | cut -d'|' -f3)
+      echo "❌ PyPI publish FAILED — run details:"
+      gh run view "$RUN_ID" --log-failed 2>&1 | tail -20
+      echo ""
+      echo "Common cause: PyPI Trusted Publisher not configured. Set up at:"
+      echo "https://pypi.org/manage/account/publishing/"
+      exit 1
+    fi
+  fi
+done
+```
+
+If the library version did NOT change, skip this section entirely.
+
 ## Deploy
 
 ### Frontend (Vercel)
