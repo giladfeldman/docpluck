@@ -1,5 +1,68 @@
 # Changelog
 
+## [1.5.0] — 2026-04-27
+
+### Added (Scimeto Request 9 — reference-list normalization)
+
+- **W0 — Watermark template library** (runs in standard + academic, before S0).
+  Strips four publisher-overlay templates that previously bled into the body
+  text: `Downloaded from URL on DATE`, the RSOS running-footer artifact
+  (`\d+royalsocietypublishing.org/journal/\w+ R. Soc. Open Sci. \d+: \d+`),
+  Wiley/Elsevier-style `Provided by ... on YYYY-MM-DD`, and
+  `This article is protected by copyright....`. Defense-in-depth alongside
+  S9's repetition-based scrub; bounds blast radius before any reflow.
+- **R2 — Inline orphan page-number scrub** (academic, inside references span).
+  Repairs the silent corruption case where pdftotext glued a page-header digit
+  between two body words inside a reference (e.g. ref 17 of the Li&Feldman
+  PDF read `psychological 41 science.` because `41` is the journal page).
+  Uses lowercase-surround guard to avoid touching volume numbers, page
+  ranges, or year boundaries.
+- **R3 — Continuation-line join** (academic, inside references span).
+  Joins lines inside the bibliography that don't start with a Vancouver,
+  IEEE, or APA reference marker onto the preceding reference. Eliminates
+  orphan-paragraph artifacts that mid-ref column wraps used to produce.
+- **A7 — DOI cross-line repair** (academic, document-wide).
+  Rejoins DOIs broken across a line by pdftotext (`(doi:10.\n1007/...)`).
+  The `doi:` prefix in the lookbehind chain is load-bearing — without it
+  the rule would damage decimals at line ends in normal prose.
+
+### Helper
+
+- New `_find_references_spans` returns ALL qualifying bibliography spans
+  (a header followed within 5k chars by ≥3 ref-like patterns) in document
+  order, so PDFs with both a main and a supplementary bibliography get
+  R2/R3 applied to each.
+
+### Tests
+
+- Added `tests/test_request_09_reference_normalization.py` (5 cases) gated on
+  the Li&Feldman 2025 RSOS fixture PDF (skipped if absent). Asserts the four
+  acceptance criteria from the request: watermark URL absent, RSOS footer
+  absent, bibliography splits cleanly into 45 numbered chunks 1..45, ref 17
+  free of `41 science`, ref 38 DOI rejoined.
+- Existing `TestVersionBumps` updated to expect `1.5.0`.
+- Full suite: **425 passing, 9 skipped** (+5 new cases).
+
+### Pretest finding (revises the original request's diagnosis)
+
+Scimeto's reproducer used `pdftotext -layout`. Docpluck explicitly avoids
+`-layout` (see `extract.py:13–16`). On actual Docpluck output of the same
+PDF, the full-URL watermark and orphan-paragraph reflow described in the
+request are **already** absent — S9's repetition-based scrub kills the URL
+banner, and default pdftotext reading-order reflow eliminates the
+orphan-paragraph artifact. The three artifacts that did survive
+(page-number digit residue, mid-ref `\n`, DOI line break) are now fixed.
+Corpus dry-run: 51 PDFs, 0 regressions, 46 changed.
+
+### Versioning
+
+- `__version__`: 1.4.5 → **1.5.0**
+- `NORMALIZATION_VERSION`: 1.4.5 → **1.5.0**
+- New `changes_made` keys: `watermarks_stripped`, `inline_pgnum_scrubbed`,
+  `ref_continuations_joined`, `doi_rejoined`.
+- New step codes: `W0_watermark_strip`, `R2_inline_pgnum_scrub`,
+  `R3_continuation_join`, `A7_doi_rejoin`.
+
 ## [1.4.4] — 2026-04-11
 
 ### Fixed (code-review follow-up to v1.4.3)

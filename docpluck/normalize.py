@@ -22,7 +22,101 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.4.3"
+NORMALIZATION_VERSION = "1.5.0"
+
+
+# ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
+# Three artifact classes that survive S0–A6 and silently corrupt bibliographies:
+#   W0 — Publisher-overlay watermarks glued mid-line (Royal Society "Downloaded
+#        from..." overlay, Wiley/Elsevier "Provided by..." stamps, etc.)
+#   R2 — Page-number digits that pdftotext glued between two body words inside
+#        a reference (e.g. "psychological 41 science." in ref 17).
+#   R3 — Continuation lines from a wrapped reference that didn't get rejoined,
+#        so the journal/volume tail looks like an orphan paragraph.
+#   A7 — DOIs broken across a line ("doi:10.\n1007/s10683-...").
+# Pretest (51-PDF corpus): W0 fires on RSOS-family PDFs; R2 catches the silent
+# corruption case; R3 fixes 1–142 continuations per PDF; A7 fixes long DOIs.
+
+_WATERMARK_PATTERNS = [
+    re.compile(r"Downloaded\s+from\s+https?://[^\s]+\s+on\s+\d{1,2}\s+\w+\s+\d{4}", re.IGNORECASE),
+    re.compile(r"Provided\s+by\s+[\w\s.,&-]+\s+on\s+\d{4}-\d{2}-\d{2}", re.IGNORECASE),
+    re.compile(r"This\s+article\s+is\s+protected\s+by\s+copyright\.[^\n]*", re.IGNORECASE),
+    # RSOS running-footer artifact glued onto body text:
+    # "41royalsocietypublishing.org/journal/rsos R. Soc. Open Sci. 12: 250979"
+    re.compile(r"\d+\s*royalsocietypublishing\.org/journal/\w+\s+R\.\s*Soc\.\s*Open\s*Sci\.\s*\d+:\s*\d+"),
+]
+
+_REFS_HEADER = re.compile(
+    r"^\s*(References?|Bibliography|Works\s+Cited|Literature\s+Cited)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+_REFS_END = re.compile(
+    r"\n\s*(Acknowledg|Funding|Author\s+contribution|Supplementary|Appendix|"
+    r"Conflict\s+of\s+interest|Competing\s+interest|Notes|Data\s+availability|"
+    r"Ethics\s+statement|Author's?\s+(note|disclosure))\b",
+    re.IGNORECASE,
+)
+_REF_START_VANCOUVER = re.compile(r"^\d{1,3}\.\s+[A-Z]")
+_REF_START_IEEE = re.compile(r"^\[\d+\]\s+[A-Z]")
+_REF_START_APA = re.compile(r"^[A-Z][a-z]+(?:-[A-Z][a-z]+)?,\s+[A-Z]\.")
+
+
+def _find_references_spans(text: str) -> list[tuple[int, int]]:
+    """Return all (start, end) spans for References / Bibliography sections.
+
+    A header qualifies only if followed within 5k chars by ≥3 ref-like
+    patterns — guards against false positives from in-text "References"
+    mentions or section-heading repetitions. Returns spans in document
+    order. Multiple bibliographies (main + supplementary) all qualify and
+    are returned separately, each ending at the next non-bibliography
+    section heading.
+    """
+    spans: list[tuple[int, int]] = []
+    for m in _REFS_HEADER.finditer(text):
+        start = m.end()
+        window = text[start:start + 5000]
+        ref_starts = (
+            len(re.findall(r"\b\d{1,3}\.\s+[A-Z]", window))
+            + len(re.findall(r"\n\[\d+\]\s+[A-Z]", window))
+            + len(re.findall(r"\n[A-Z][a-z]+(?:-[A-Z][a-z]+)?,\s+[A-Z]\.", window))
+        )
+        if ref_starts >= 3:
+            end_m = _REFS_END.search(text, start)
+            end = end_m.start() if end_m else len(text)
+            # Skip if this span overlaps the previous span (next-header
+            # qualifying within an already-claimed bibliography region).
+            if spans and start < spans[-1][1]:
+                continue
+            spans.append((start, end))
+    return spans
+
+
+def _detect_recurring_page_numbers(raw_text: str) -> set[int]:
+    """Return integers that appeared as standalone-line page numbers ≥2 times.
+
+    Threshold ≥2 (not ≥3) — short articles only repeat the page header on a
+    handful of pages, so we'd miss real artifacts (e.g. RSOS p.41 in
+    Li&Feldman appears only twice as standalone). Combined with the lowercase-
+    surround guard in R2, ≥2 is safe.
+    """
+    counts: dict[int, int] = {}
+    for line in raw_text.split("\n"):
+        s = line.strip()
+        # ASCII-only digit check: `str.isdigit()` matches Unicode superscripts
+        # (², ³) which would crash int() — guard with isascii() first.
+        if 1 <= len(s) <= 3 and s.isascii() and s.isdigit():
+            n = int(s)
+            if 1 <= n <= 999:
+                counts[n] = counts.get(n, 0) + 1
+    return {n for n, c in counts.items() if c >= 2}
+
+
+def _looks_like_ref_start(line: str) -> bool:
+    return bool(
+        _REF_START_VANCOUVER.match(line)
+        or _REF_START_IEEE.match(line)
+        or _REF_START_APA.match(line)
+    )
 
 
 @dataclass
@@ -64,6 +158,19 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
 
     report = NormalizationReport(level=level.value)
     t = text
+
+    # Snapshot raw page-number set before any mutation — R2 needs lines that
+    # match `^\s*\d+\s*$` in the original extraction.
+    _raw_page_numbers = _detect_recurring_page_numbers(text)
+
+    # ── W0: Publisher-overlay watermark stripping (Request 9) ──────────
+    # Runs BEFORE S0 so mid-line watermarks don't leak into body text via
+    # downstream whitespace collapse. Patterns are precise (URL+date or
+    # known publisher templates) — no false-positive risk on prose.
+    before = t
+    for _wp in _WATERMARK_PATTERNS:
+        t = _wp.sub("", t)
+    report._track("W0_watermark_strip", before, t, "watermarks_stripped")
 
     # ── Standard steps (S1-S9) ──────────────────────────────────────────
 
@@ -468,5 +575,63 @@ def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, Normaliza
             r"\1", t
         )
         report._track("A6_footnote_removal", before, t, "footnotes_removed")
+
+        # ── A7: DOI cross-line repair (Request 9, document-wide) ─────────
+        # pdftotext sometimes wraps long DOIs across a line, e.g.
+        # "(doi:10.\n1007/s10683-020-09663-x)". Rejoin them. The `doi:` prefix
+        # in the lookbehind chain is load-bearing — without it the rule
+        # would damage decimals at line ends in normal prose.
+        before = t
+        t = re.sub(r"(doi:\s*\S*?\d)\.\s*\n\s*(\d)", r"\1.\2", t, flags=re.IGNORECASE)
+        report._track("A7_doi_rejoin", before, t, "doi_rejoined")
+
+        # ── R2 + R3: References-section repairs (Request 9) ──────────────
+        # R2 scrubs page-number digits glued mid-reference (silent corruption
+        # of titles). R3 joins continuation lines so each reference is on a
+        # single logical line. Bounded to detected references spans; iterate
+        # right-to-left so prior span offsets remain valid after edits.
+        _refs_spans = _find_references_spans(t)
+        r2_count_total = 0
+        r3_joins_total = 0
+        for r_start, r_end in reversed(_refs_spans):
+            refs_text = t[r_start:r_end]
+
+            # R3 first: continuation join must run before R2 because R2's
+            # lowercase-surround guard relies on the page-number being
+            # surrounded by content from the SAME logical line.
+            before_r3 = refs_text
+            lines = refs_text.split("\n")
+            joined: list[str] = []
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    joined.append("")
+                    continue
+                if joined and joined[-1] and not _looks_like_ref_start(stripped):
+                    joined[-1] = joined[-1].rstrip() + " " + stripped
+                else:
+                    joined.append(stripped)
+            refs_text = "\n".join(joined)
+            r3_joins_total += before_r3.count("\n") - refs_text.count("\n")
+
+            # R2: scrub orphan page-number digits that appear surrounded by
+            # lowercase letters (so we don't touch volume numbers, page
+            # ranges with hyphens, or year boundaries).
+            for pg in _raw_page_numbers:
+                pat = re.compile(r"(?<=[a-z])\s+" + re.escape(str(pg)) + r"\s+(?=[a-z])")
+                refs_text, c = pat.subn(" ", refs_text)
+                r2_count_total += c
+
+            t = t[:r_start] + refs_text + t[r_end:]
+
+        report.steps_applied.append("R2_inline_pgnum_scrub")
+        if r2_count_total > 0:
+            report.changes_made["inline_pgnum_scrubbed"] = r2_count_total
+            report.steps_changed.append("R2_inline_pgnum_scrub")
+
+        report.steps_applied.append("R3_continuation_join")
+        if r3_joins_total > 0:
+            report.changes_made["ref_continuations_joined"] = r3_joins_total
+            report.steps_changed.append("R3_continuation_join")
 
     return t.strip(), report
