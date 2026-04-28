@@ -4,41 +4,86 @@ description: Deploy Docpluck to production. Pre-flight checks (Next.js build, Py
 tags: [docpluck, nextjs, python, vercel, railway, neon, auth, deploy]
 ---
 
-## Before starting: read ~/.claude/skills/_shared/preflight.md and follow it for this skill.
+## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
+
+**Your very first action in this skill, BEFORE reading anything else, is:**
+
+1. Run: `bash ~/.claude/skills/_shared/bin/preflight-filter.sh <this-skill-name>` and print its `🔧 skill-optimize pre-check · ...` heartbeat as your first visible output line.
+2. Initialize `~/.claude/skills/_shared/run-meta/<this-skill-name>.json` per `~/.claude/skills/_shared/preflight.md` step 6 (include `phase_start_sha` from `git rev-parse HEAD`).
+3. Load `~/.claude/skills/_shared/quality-loop/core.md` into working memory (MUST-level rules gated by /ship).
+
+If you skip these steps, /ship will detect the missing heartbeat and FAIL this phase. Do not proceed to the skill body until preflight has run.
 
 # Docpluck Deploy
 
 Deploy Docpluck to production on Vercel (frontend) and Railway (extraction service).
 
-## Project Location
-`C:\Users\filin\Dropbox\Vibe\PDFextractor`
+## Two-Repo Architecture (CRITICAL — read before deploying)
+
+Docpluck is split across **two repos** under `C:\Users\filin\Dropbox\Vibe\MetaScienceTools\`:
+
+| Path | Repo | Visibility | Contains |
+|------|------|------------|----------|
+| `docpluck/` | `giladfeldman/docpluck` | **public** | The `docpluck` Python library only (extraction + normalization + quality + DOCX/HTML). Published to PyPI. |
+| `PDFextractor/` | `giladfeldman/docpluckapp` | **private** | The SaaS app only (Next.js frontend, FastAPI service `service/app/main.py`, Drizzle schema, Auth.js). **No library code duplication** — the service imports `docpluck` via a git pin in `service/requirements.txt`. |
+
+Library changes therefore reach production via TWO steps:
+1. Tag + push the library repo (this updates PyPI, but the app pins by git tag).
+2. Bump the git pin in `PDFextractor/service/requirements.txt` (`docpluck @ git+https://...@v<NEW>`) and redeploy the app.
+
+**Skipping step 2 silently keeps production on the old library.** Deploy pre-flight check 4 below catches this.
 
 ## Pre-Flight Checks
 
 Run ALL checks before deploying. Any failure is a blocker.
 
-### 1. Git Status
+### 1. Git Status (both repos)
 ```bash
-cd C:/Users/filin/Dropbox/Vibe/PDFextractor
-git status
-git log --oneline -3
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck && git status --short && git log --oneline -3
+echo "---"
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor && git status --short && git log --oneline -3
 ```
-Working tree must be clean. All changes committed.
+Both working trees must be clean. Library tagged at `v<X.Y.Z>` matching `__version__`.
 
 ### 2. Frontend Build
 ```bash
-cd frontend && npm run build
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/frontend && npm run build
 ```
 Must pass with 0 errors.
 
 ### 3. Python Service Module Check
 ```bash
-cd service && python -c "
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/service && python -c "
 from app.main import app
-from app.normalize import normalize_text, NormalizationLevel
-from app.quality import compute_quality_score
-print('All imports OK')
+# Library modules (NOT app.normalize / app.quality — those moved to the docpluck library)
+from docpluck import normalize_text, NormalizationLevel, compute_quality_score, get_version_info
+info = get_version_info()
+print(f'All imports OK; docpluck=={info[\"version\"]} normalize={info[\"normalize_version\"]}')
 "
+```
+
+### 4. Cross-Repo Library Version Sync (CRITICAL)
+
+Verify the app's `service/requirements.txt` git pin matches the library's latest tag. Mismatches mean the deploy will silently ship the OLD library to prod.
+
+```bash
+LIB_VERSION=$(grep '^__version__' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck/docpluck/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+APP_PIN=$(grep -oE 'docpluck.*@v[0-9]+\.[0-9]+\.[0-9]+' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/service/requirements.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+echo "Library __version__: $LIB_VERSION"
+echo "App requirements.txt pin: v$APP_PIN"
+if [ "$LIB_VERSION" != "$APP_PIN" ]; then
+  echo "❌ MISMATCH — bump PDFextractor/service/requirements.txt to docpluck @ git+https://github.com/giladfeldman/docpluck.git@v$LIB_VERSION before deploying"
+  exit 1
+fi
+
+# Also verify the API.md examples are not stale beyond a major version
+API_DOC_VERSION=$(grep -oE 'docpluck_version["\s:]+[0-9]+\.[0-9]+\.[0-9]+' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/API.md | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+LIB_MAJOR_MINOR=$(echo "$LIB_VERSION" | cut -d. -f1,2)
+DOC_MAJOR_MINOR=$(echo "$API_DOC_VERSION" | cut -d. -f1,2)
+if [ "$LIB_MAJOR_MINOR" != "$DOC_MAJOR_MINOR" ]; then
+  echo "⚠️ API.md examples reference docpluck_version $API_DOC_VERSION; library is at $LIB_VERSION. Update PDFextractor/API.md."
+fi
+echo "✅ Library version sync OK"
 ```
 
 ### 4. Verify Vercel Environment Variables

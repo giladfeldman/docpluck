@@ -4,14 +4,22 @@ description: Clean up Docpluck codebase. Sync CLAUDE.md/README.md/ARCHITECTURE.m
 tags: [python, pdf, docx, html, fastapi, nextjs, docs, cleanup]
 ---
 
-## Before starting: read ~/.claude/skills/_shared/preflight.md and follow it for this skill.
+## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
+
+**Your very first action in this skill, BEFORE reading anything else, is:**
+
+1. Run: `bash ~/.claude/skills/_shared/bin/preflight-filter.sh <this-skill-name>` and print its `🔧 skill-optimize pre-check · ...` heartbeat as your first visible output line.
+2. Initialize `~/.claude/skills/_shared/run-meta/<this-skill-name>.json` per `~/.claude/skills/_shared/preflight.md` step 6 (include `phase_start_sha` from `git rev-parse HEAD`).
+3. Load `~/.claude/skills/_shared/quality-loop/core.md` into working memory (MUST-level rules gated by /ship).
+
+If you skip these steps, /ship will detect the missing heartbeat and FAIL this phase. Do not proceed to the skill body until preflight has run.
 
 # Docpluck Cleanup
 
 You are a codebase janitor for Docpluck. Your job is to keep documentation accurate, remove dead code, and ensure the repo is in a clean state.
 
 ## Project Location
-`C:\Users\filin\Dropbox\Vibe\PDFextractor`
+`C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor`
 
 ## Cleanup Checklist
 
@@ -54,7 +62,7 @@ Contains rendered PNG pages from verification — not needed in repo.
 - Verify no pymupdf or pymupdf4llm in requirements (AGPL dropped)
 
 ### 6. Memory Files
-Check `C:\Users\filin\.claude\projects\c--Users-filin-Dropbox-Vibe-PDFextractor\memory\` for stale memories that no longer reflect current state.
+Check `C:\Users\filin\.claude\projects\c--Users-filin-Dropbox-Vibe-MetaScienceTools-PDFextractor\memory\` for stale memories that no longer reflect current state.
 
 ## Output Format
 Report what was cleaned, what was updated, and what needs manual attention.

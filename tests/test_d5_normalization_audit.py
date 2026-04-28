@@ -825,8 +825,8 @@ class TestVersionBumps:
     """Verify version constants are correct after the D5 fix."""
 
     def test_normalization_version(self):
-        assert NORMALIZATION_VERSION == "1.4.3"
+        assert NORMALIZATION_VERSION == "1.5.0"
 
     def test_report_version(self):
         _, report = norm_report("test text")
-        assert report.version == "1.4.3"
+        assert report.version == "1.5.0"

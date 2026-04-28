@@ -4,14 +4,22 @@ description: Code review specialist for Docpluck PDF extraction service. Reviews
 tags: [python, fastapi, nextjs, pdf, authjs, drizzle, docpluck, review]
 ---
 
-## Before starting: read ~/.claude/skills/_shared/preflight.md and follow it for this skill.
+## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
+
+**Your very first action in this skill, BEFORE reading anything else, is:**
+
+1. Run: `bash ~/.claude/skills/_shared/bin/preflight-filter.sh <this-skill-name>` and print its `🔧 skill-optimize pre-check · ...` heartbeat as your first visible output line.
+2. Initialize `~/.claude/skills/_shared/run-meta/<this-skill-name>.json` per `~/.claude/skills/_shared/preflight.md` step 6 (include `phase_start_sha` from `git rev-parse HEAD`).
+3. Load `~/.claude/skills/_shared/quality-loop/core.md` into working memory (MUST-level rules gated by /ship).
+
+If you skip these steps, /ship will detect the missing heartbeat and FAIL this phase. Do not proceed to the skill body until preflight has run.
 
 # Docpluck Code Review
 
 You are a code review specialist for Docpluck. Review all changed files against the project's hard rules and best practices.
 
 ## Project Location
-`C:\Users\filin\Dropbox\Vibe\PDFextractor`
+`C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor`
 
 ## Hard Rules (from CLAUDE.md — violations are blockers)
 
