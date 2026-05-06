@@ -62,6 +62,10 @@ from .normalize import normalize_text, NormalizationLevel, NormalizationReport
 from .quality import compute_quality_score
 from .batch import ExtractionReport, extract_to_dir
 from .version import get_version_info
+from .sections import (
+    extract_sections, SectionedDocument, Section,
+    SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
+)
 
 __version__ = "1.5.0"
 __author__ = "Gilad Feldman"
@@ -86,4 +90,12 @@ __all__ = [
     "extract_to_dir",
     # Version
     "get_version_info",
+    # Sections
+    "extract_sections",
+    "SectionedDocument",
+    "Section",
+    "SectionLabel",
+    "Confidence",
+    "DetectedVia",
+    "SECTIONING_VERSION",
 ]

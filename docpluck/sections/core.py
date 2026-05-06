@@ -246,6 +246,30 @@ def partition_into_sections(
     return tuple(truncated)
 
 
+def extract_sections_from_text(
+    text: str,
+    *,
+    source_format: Literal["pdf", "docx", "html"],
+    page_offsets: tuple[int, ...] = (),
+) -> "SectionedDocument":
+    """Build a SectionedDocument from already-normalized text using the
+    text-only annotator. Used as fallback when no layout/markup is available."""
+    from .annotators.text import annotate_text
+    from .types import SectionedDocument
+    from . import SECTIONING_VERSION
+
+    hints = annotate_text(text)
+    sections = partition_into_sections(
+        text, hints, source_format=source_format, page_offsets=page_offsets,
+    )
+    return SectionedDocument(
+        sections=sections,
+        normalized_text=text,
+        sectioning_version=SECTIONING_VERSION,
+        source_format=source_format,
+    )
+
+
 def _pages_for(
     char_start: int, char_end: int, page_offsets: tuple[int, ...]
 ) -> tuple[int, ...]:
