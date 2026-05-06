@@ -15,11 +15,23 @@ _CANONICAL_VARIANTS = sorted(
 )
 _CANONICAL_ALT = "|".join(re.escape(v) for v in _CANONICAL_VARIANTS)
 
-# Match canonical heading at the start of a paragraph-leading line.
-# Allows body text on the same line (e.g., "Abstract Jordan et al., 2011...").
+# Pattern A+B: canonical heading at line start — passes (a) Capital-letter body or
+# (b) end-of-line disambiguator.  The preceded-by-blank check (c) is handled in
+# annotate_text by inspecting the characters before the match start.
 _CANONICAL_PARA_HEADING = re.compile(
     rf"(?im)"
     rf"^[ \t]*"
+    rf"(?:\d+(?:\.\d+)*\.?[ \t]+)?"
+    rf"(?P<heading>{_CANONICAL_ALT})"
+    rf"\b",
+)
+
+# Pattern C: canonical heading preceded by a blank line.  Catches headings whose
+# body starts with a lowercase word (e.g. "Keywords emotional pluralistic..."),
+# which would fail the Capital-body lookahead in Pattern A+B alone.
+_CANONICAL_AFTER_BLANK = re.compile(
+    rf"(?im)"
+    rf"\n[ \t]*\n[ \t]*"
     rf"(?:\d+(?:\.\d+)*\.?[ \t]+)?"
     rf"(?P<heading>{_CANONICAL_ALT})"
     rf"\b",
@@ -72,15 +84,10 @@ def annotate_text(text: str) -> list[BlockHint]:
     hints: list[BlockHint] = []
     seen_offsets: set[int] = set()
 
-    # Pass 1: canonical heading at line start.
-    # A canonical word is accepted as a heading if ANY of three context checks pass:
-    #   (a) Preceded by a blank line (or at start-of-doc) — the classic paragraph-break.
-    #   (b) Followed immediately by a Capital-letter word on the same line (case-sensitive
-    #       check) — handles "...\n Acknowledgments We thank..." (single newline, no blank
-    #       line between prior paragraph and heading).
-    #   (c) At end-of-line (line-isolated) — handles "Introduction\n".
-    # "Funding acquisition" is rejected: no blank line before it (fails a), "acquisition"
-    # is lowercase (fails b), and it's not at end-of-line (fails c).
+    # Pass 1a: canonical heading at line start — disambiguated by Capital-body (b)
+    # or end-of-line (c), OR by a blank-line predecessor check (a) done inline.
+    # "Funding acquisition" is rejected: no blank line before it (fails a),
+    # "acquisition" is lowercase (fails b), and it's not at end-of-line (fails c).
     for m in _CANONICAL_PARA_HEADING.finditer(text):
         start = m.start("heading")
         if start in seen_offsets:
@@ -118,6 +125,30 @@ def annotate_text(text: str) -> list[BlockHint]:
         if not (preceded_by_blank or followed_by_capital or at_end_of_line):
             continue
 
+        seen_offsets.add(start)
+        hints.append(BlockHint(
+            text=heading_text,
+            char_start=start,
+            char_end=start + len(heading_text),
+            page=None,
+            is_heading_candidate=True,
+            heading_strength="strong",
+            heading_source="text_pattern",
+        ))
+
+    # Pass 1b: canonical heading preceded by a blank line (Pattern C).
+    # Catches headings whose body starts with a lowercase word — e.g.
+    # "Keywords emotional pluralistic ignorance..." — which would not be
+    # detected by pass 1a's Capital-body or end-of-line checks when the
+    # preceding context is a URL line (no double-newline visible to 1a's
+    # inline blank-line check in all edge cases).  seen_offsets deduplicates.
+    for m in _CANONICAL_AFTER_BLANK.finditer(text):
+        start = m.start("heading")
+        if start in seen_offsets:
+            continue
+        heading_text = m.group("heading")
+        if not (heading_text == heading_text.title() or heading_text == heading_text.upper()):
+            continue
         seen_offsets.add(start)
         hints.append(BlockHint(
             text=heading_text,
