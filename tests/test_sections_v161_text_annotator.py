@@ -128,3 +128,43 @@ def test_canonical_heading_with_lowercase_body_caught_by_blank_line_pred():
     hints = annotate_text(text)
     texts = [h.text for h in hints]
     assert "Keywords" in texts, f"got {texts}"
+
+
+def test_credit_table_methodology_row_not_emitted():
+    """CRediT author-contribution tables list 'Methodology' as a row label
+    followed by a single-letter 'X' cell. That's a table cell, not a section heading."""
+    text = (
+        "Some discussion paragraph.\n"
+        "\n"
+        "Conceptualization\n"
+        "\n"
+        "X\n"
+        "\n"
+        "Pre-registrations\n"
+        "\n"
+        "X\n"
+        "\n"
+        "Methodology\n"
+        "\n"
+        "X\n"
+        "\n"
+        "Pre-registration peer review\n"
+    )
+    hints = annotate_text(text)
+    # Methodology in this context should not be emitted as a canonical hint.
+    assert not any(h.text == "Methodology" for h in hints), \
+        f"Methodology should not be detected when followed by 1-char table cell; got {[h.text for h in hints]}"
+
+
+def test_real_heading_followed_by_paragraph_still_emitted():
+    """A real Methods/Methodology heading is followed by paragraph body text."""
+    text = (
+        "...end of intro.\n"
+        "\n"
+        "Methodology\n"
+        "\n"
+        "We describe our methodology in detail. The participants were recruited from a university subject pool. We used a 2x2 design.\n"
+    )
+    hints = annotate_text(text)
+    assert any(h.text == "Methodology" for h in hints), \
+        f"Real Methodology heading should still be detected; got {[h.text for h in hints]}"

@@ -74,6 +74,70 @@ _CAPITAL_WORD_AFTER = re.compile(r"[ \t]+[A-Z]")
 _END_OF_LINE = re.compile(r"[ \t]*[:.]?[ \t]*(?:\n|$)")
 
 
+def _next_nonblank_line(text: str, after_pos: int) -> str | None:
+    """Return the next non-blank line of text starting after `after_pos`,
+    or None if no such line exists."""
+    i = after_pos
+    while i < len(text):
+        # Skip blank lines (lines containing only whitespace).
+        line_end = text.find("\n", i)
+        if line_end < 0:
+            line_end = len(text)
+        line = text[i:line_end].strip()
+        if line:
+            return line
+        i = line_end + 1
+    return None
+
+
+def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolated: bool) -> bool:
+    """A heading that was line-isolated and is followed by a tiny next line is
+    likely a table row label (e.g., CRediT author-contribution table rows).
+
+    Requires ALL of:
+    1. The heading was line-isolated (not followed by a Capital body word on same line).
+    2. The heading occupies its entire line — i.e., the text between `heading_end`
+       and the next newline is blank (optional trailing colon/space only).
+    3. There is a blank line immediately after the heading line.
+    4. The first non-blank line after that blank line is tiny (< 20 chars).
+
+    Condition 2 prevents false positives when a canonical heading word appears
+    at the START of a long line (e.g. "Keywords emotional pluralistic ignorance...")
+    — `heading_end` points mid-line there, not at end-of-line.
+    Condition 3 prevents false positives when a heading is immediately followed
+    by another heading or body text (e.g. "Introduction\\nBackground\\n").
+    """
+    if not heading_was_line_isolated:
+        return False
+    # Condition 2: heading must occupy the rest of its line.
+    # Find the newline that ends the heading's line.
+    line_end = text.find("\n", heading_end)
+    if line_end < 0:
+        return False  # No newline — end of text, not a table row.
+    rest_of_line = text[heading_end:line_end].strip(" \t:.")
+    if rest_of_line:
+        # There is substantive text after the heading on the same line (e.g.
+        # "Keywords emotional..." or "Methodology for data collection...").
+        # This is NOT a table row label — it's a heading+body line.
+        return False
+    # Condition 3: the line immediately following the heading line must be blank.
+    i = line_end + 1
+    j = i
+    while j < len(text) and text[j] in " \t":
+        j += 1
+    if j >= len(text) or text[j] != "\n":
+        # Not blank — e.g. "Introduction\nBackground\n". Not a table cell.
+        return False
+    # Condition 4: first non-blank line after the blank separator is tiny.
+    # Use a very conservative threshold (≤ 5 chars) to only catch genuine
+    # single-character or very short table cells (e.g. "X", "✓", "Yes").
+    # Real body text, even a short sentence fragment, is longer than this.
+    next_line = _next_nonblank_line(text, i)
+    if next_line is None:
+        return False
+    return len(next_line) <= 5
+
+
 def annotate_text(text: str) -> list[BlockHint]:
     """Scan `text` for heading candidates.
 
@@ -129,6 +193,15 @@ def annotate_text(text: str) -> list[BlockHint]:
         if not (preceded_by_blank or followed_by_capital or at_end_of_line):
             continue
 
+        # Table-cell filter: if the heading was line-isolated (not followed by a
+        # Capital body word on the same line) and the next non-blank line is < 20
+        # chars, this is likely a CRediT table row label, not a real heading.
+        # Add to seen_offsets even on rejection so Pass 3 doesn't re-emit it.
+        is_line_isolated = not followed_by_capital
+        if _looks_like_table_cell(text, m.end(), is_line_isolated):
+            seen_offsets.add(start)
+            continue
+
         seen_offsets.add(start)
         hints.append(BlockHint(
             text=heading_text,
@@ -152,6 +225,15 @@ def annotate_text(text: str) -> list[BlockHint]:
             continue
         heading_text = m.group("heading")
         if not (heading_text == heading_text.title() or heading_text == heading_text.upper()):
+            continue
+        # Pass 1b only catches blank-line-preceded headings, which means the
+        # heading might be followed by either body or another tiny line.
+        # Apply the table-cell filter here too — if next line is < 20 chars, reject.
+        # For pass 1b, "is_line_isolated" is effectively True because the regex
+        # didn't constrain what follows.
+        # Add to seen_offsets even on rejection so Pass 3 doesn't re-emit it.
+        if _looks_like_table_cell(text, m.end(), True):
+            seen_offsets.add(start)
             continue
         seen_offsets.add(start)
         hints.append(BlockHint(
