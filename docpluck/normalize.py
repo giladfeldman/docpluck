@@ -126,6 +126,8 @@ class NormalizationReport:
     steps_applied: list[str] = field(default_factory=list)
     steps_changed: list[str] = field(default_factory=list)
     changes_made: dict[str, int] = field(default_factory=dict)
+    footnote_spans: tuple[tuple[int, int], ...] = ()  # pre-strip char offsets
+    page_offsets: tuple[int, ...] = ()                 # post-strip body page offsets
 
     def _track(self, step_code: str, before: str, after: str, metric_name: str):
         # ``steps_applied`` records every step that ran (kept for backward
@@ -148,6 +150,8 @@ class NormalizationReport:
             "steps_applied": self.steps_applied,
             "steps_changed": self.steps_changed,
             "changes_made": self.changes_made,
+            "footnote_spans": [list(s) for s in self.footnote_spans],
+            "page_offsets": list(self.page_offsets),
         }
 
 
