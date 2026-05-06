@@ -193,10 +193,10 @@ def partition_into_sections(
             coalesced.append(s)
 
     # Boundary-aware truncation (spec §5.4): for each labeled span, scan its
-    # text line-by-line for a boundary pattern. If one fires AFTER the first
-    # 30 chars of the span (avoid matching the heading line itself), truncate
-    # the span at that line and emit a trailing `unknown` span covering the
-    # rest. Universal coverage is preserved.
+    # text line-by-line for a boundary pattern. Skip the first line of the
+    # span (the heading line) before scanning. If a boundary fires on any
+    # subsequent line, truncate the span at that line and emit a trailing
+    # `unknown` span covering the rest. Universal coverage is preserved.
     truncated: list[Section] = []
     for s in coalesced:
         if s.canonical_label == SectionLabel.unknown:
@@ -204,11 +204,11 @@ def partition_into_sections(
             continue
         offset = s.char_start
         cut_at: int | None = None
-        for line in s.text.splitlines(keepends=True):
+        for i, line in enumerate(s.text.splitlines(keepends=True)):
             line_start = offset
             offset += len(line)
-            # Skip the first ~30 chars (likely the heading itself).
-            if line_start - s.char_start < 30:
+            # Skip the first line (it contains the heading itself).
+            if i == 0:
                 continue
             if is_section_boundary(line):
                 cut_at = line_start
