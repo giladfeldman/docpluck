@@ -29,7 +29,7 @@ import io
 from .extract_html import html_to_text
 
 
-def extract_docx(docx_bytes: bytes) -> tuple[str, str]:
+def extract_docx(docx_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
     """Extract text from DOCX file bytes.
 
     Converts the DOCX to HTML via mammoth (preserving soft breaks and block
@@ -38,10 +38,16 @@ def extract_docx(docx_bytes: bytes) -> tuple[str, str]:
 
     Args:
         docx_bytes: Raw DOCX file content as bytes.
+        sections: Optional list of section labels (e.g. ``["abstract",
+            "methods"]``) to filter the output. When provided, ``extract_sections``
+            is called and only the requested sections are returned concatenated
+            in document order. Pass ``None`` (default) to return the full text.
 
     Returns:
         A tuple of (text, method) where:
           - text: Extracted plain text with block/inline-aware formatting.
+            When ``sections`` is not None, only text from the requested
+            sections is included.
           - method: Always "mammoth".
 
     Raises:
@@ -54,6 +60,10 @@ def extract_docx(docx_bytes: bytes) -> tuple[str, str]:
     Example:
         with open("paper.docx", "rb") as f:
             text, method = extract_docx(f.read())
+
+        # Filter to abstract only:
+        with open("paper.docx", "rb") as f:
+            text, method = extract_docx(f.read(), sections=["abstract"])
     """
     # Lazy import so the core library works without mammoth installed
     import mammoth
@@ -61,4 +71,10 @@ def extract_docx(docx_bytes: bytes) -> tuple[str, str]:
     result = mammoth.convert_to_html(io.BytesIO(docx_bytes))
     html = result.value
     text = html_to_text(html)
+
+    if sections is not None:
+        from .sections import extract_sections
+        doc = extract_sections(docx_bytes)
+        return doc.text_for(*sections), "mammoth"
+
     return text, "mammoth"
