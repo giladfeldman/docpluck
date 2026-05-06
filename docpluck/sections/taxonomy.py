@@ -64,7 +64,7 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
                "theoretical background", "theory"}): SectionLabel.literature_review,
     frozenset({"method", "methods", "materials and methods", "materials & methods",
                "experimental procedures", "methodology", "experimental design",
-               "study design", "procedure", "procedures"}): SectionLabel.methods,
+               "study design"}): SectionLabel.methods,
     frozenset({"results", "results and discussion", "findings",
                "empirical results"}): SectionLabel.results,
     frozenset({"discussion", "general discussion"}): SectionLabel.discussion,
@@ -79,6 +79,8 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
     frozenset({"conflict of interest", "conflicts of interest",
                "competing interests", "competing interest",
                "declaration of interest", "declaration of interests",
+               "declaration of competing interest",
+               "declaration of competing interests",
                "declarations", "disclosure", "disclosures",
                "competing financial interests"}):
         SectionLabel.conflict_of_interest,
