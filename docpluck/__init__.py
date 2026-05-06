@@ -68,7 +68,7 @@ from .sections import (
 )
 from .tables import Table
 from .figures import Figure
-from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult
+from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
 
 __version__ = "1.6.0"
 __author__ = "Gilad Feldman"
@@ -106,4 +106,5 @@ __all__ = [
     "Figure",
     "TABLE_EXTRACTION_VERSION",
     "StructuredResult",
+    "extract_pdf_structured",
 ]
