@@ -124,6 +124,23 @@ def partition_into_sections(
         dedup.append(m)
     markers = dedup
 
+    # v1.6.1: fold adjacent markers with the same canonical_label when the
+    # gap between them is small (< 100 chars). This handles the common
+    # "Introduction\nBackground\n..." pattern where both map to introduction.
+    # Keeps multi-study behavior intact: methods_2 of study 2 is far apart
+    # from methods of study 1, so they remain separate.
+    coalesced_markers: list[_Marker] = []
+    for m in markers:
+        if (
+            coalesced_markers
+            and coalesced_markers[-1].label == m.label
+            and m.char_start - coalesced_markers[-1].char_start < 100
+        ):
+            # Drop this marker; the prior one already opens this section.
+            continue
+        coalesced_markers.append(m)
+    markers = coalesced_markers
+
     if not markers:
         sole = Section(
             label="unknown",
