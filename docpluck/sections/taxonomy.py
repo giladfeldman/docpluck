@@ -53,7 +53,7 @@ class DetectedVia(str, Enum):
 # Variants per label are grouped in a frozenset for O(1) multi-key lookup.
 HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
     # Front matter
-    frozenset({"abstract", "summary"}): SectionLabel.abstract,
+    frozenset({"abstract"}): SectionLabel.abstract,
     frozenset({"keywords", "key words", "keyword"}): SectionLabel.keywords,
     frozenset({"author note", "author's note", "authors' note", "authors note"}):
         SectionLabel.author_note,
@@ -63,8 +63,7 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
     frozenset({"literature review", "review of literature", "related work",
                "theoretical background", "theory"}): SectionLabel.literature_review,
     frozenset({"method", "methods", "materials and methods", "materials & methods",
-               "experimental procedures", "methodology", "experimental design",
-               "study design"}): SectionLabel.methods,
+               "experimental procedures"}): SectionLabel.methods,
     frozenset({"results", "results and discussion", "findings",
                "empirical results"}): SectionLabel.results,
     frozenset({"discussion", "general discussion"}): SectionLabel.discussion,

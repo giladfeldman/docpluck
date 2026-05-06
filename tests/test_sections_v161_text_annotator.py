@@ -157,14 +157,19 @@ def test_credit_table_methodology_row_not_emitted():
 
 
 def test_real_heading_followed_by_paragraph_still_emitted():
-    """A real Methods/Methodology heading is followed by paragraph body text."""
+    """A canonical Methods heading followed by paragraph body text is still detected.
+
+    Note: 'Methodology' was removed from the canonical taxonomy in v1.6.1 (it is
+    a subsection label in APA papers, not a top-level section).  'Method' and
+    'Methods' remain canonical and must still be emitted by the text annotator.
+    """
     text = (
         "...end of intro.\n"
         "\n"
-        "Methodology\n"
+        "Method\n"
         "\n"
-        "We describe our methodology in detail. The participants were recruited from a university subject pool. We used a 2x2 design.\n"
+        "We describe our method in detail. The participants were recruited from a university subject pool. We used a 2x2 design.\n"
     )
     hints = annotate_text(text)
-    assert any(h.text == "Methodology" for h in hints), \
-        f"Real Methodology heading should still be detected; got {[h.text for h in hints]}"
+    assert any(h.text == "Method" for h in hints), \
+        f"Canonical 'Method' heading should still be detected; got {[h.text for h in hints]}"
