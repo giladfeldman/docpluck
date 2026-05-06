@@ -62,11 +62,15 @@ from .normalize import normalize_text, NormalizationLevel, NormalizationReport
 from .quality import compute_quality_score
 from .batch import ExtractionReport, extract_to_dir
 from .version import get_version_info
+from .sections import (
+    extract_sections, SectionedDocument, Section,
+    SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
+)
 from .tables import Table
 from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
@@ -89,6 +93,14 @@ __all__ = [
     "extract_to_dir",
     # Version
     "get_version_info",
+    # Sections (v1.6.0)
+    "extract_sections",
+    "SectionedDocument",
+    "Section",
+    "SectionLabel",
+    "Confidence",
+    "DetectedVia",
+    "SECTIONING_VERSION",
     # Structured extraction (v2.0)
     "Table",
     "Figure",
