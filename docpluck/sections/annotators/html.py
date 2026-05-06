@@ -29,6 +29,11 @@ def annotate_html(html_bytes: bytes) -> tuple[str, list[BlockHint]]:
     HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
     BLOCK_TAGS = HEADING_TAGS | {"p", "li", "div", "section", "article",
                                   "blockquote", "pre"}
+    # Containers that hold block-level children but are not themselves
+    # walked as blocks. Their text would otherwise be absorbed twice.
+    CONTAINER_TAGS = BLOCK_TAGS | {"ul", "ol", "dl", "dt",
+                                    "table", "tbody", "thead", "tfoot",
+                                    "tr", "th", "td", "caption"}
 
     body = soup.body or soup
 
@@ -41,7 +46,7 @@ def annotate_html(html_bytes: bytes) -> tuple[str, list[BlockHint]]:
         text_chunks: list[str] = []
         for child in el.children:
             child_name = getattr(child, "name", None)
-            if child_name in BLOCK_TAGS:
+            if child_name in CONTAINER_TAGS:
                 # Block child handled separately when iteration reaches it.
                 continue
             child_text = child.get_text() if child_name else str(child)
