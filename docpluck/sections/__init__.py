@@ -35,8 +35,8 @@ def extract_sections(
     """Public entry point. Either pass `file_bytes` (with optional
     source_format hint) or pre-extracted `text` + required `source_format`.
 
-    Supports text path, HTML bytes, and DOCX bytes. Layout-aware PDF byte
-    input lands in Phase 4.
+    Supports text path, HTML bytes, DOCX bytes, and PDF bytes (layout-aware
+    via pdfplumber).
     """
     if text is not None:
         if source_format is None:
@@ -51,6 +51,24 @@ def extract_sections(
         raise ValueError("extract_sections requires file_bytes= or text=")
 
     fmt = source_format or _detect_format(file_bytes)
+
+    if fmt == "pdf":
+        from .annotators.pdf import annotate_pdf, _annotate_layout  # noqa: F401
+        from .core import partition_into_sections
+        from ..extract_layout import extract_pdf_layout
+        layout = extract_pdf_layout(file_bytes)
+        normalized = layout.raw_text
+        _, hints = _annotate_layout(layout)
+        sections = partition_into_sections(
+            normalized, hints, source_format="pdf",
+            page_offsets=layout.page_offsets,
+        )
+        return SectionedDocument(
+            sections=sections,
+            normalized_text=normalized,
+            sectioning_version=SECTIONING_VERSION,
+            source_format="pdf",
+        )
 
     if fmt == "html":
         from .annotators.html import annotate_html
@@ -81,8 +99,7 @@ def extract_sections(
         )
 
     raise NotImplementedError(
-        f"Byte input for format '{fmt}' not yet supported. "
-        "Layout-aware PDF byte input lands in Phase 4."
+        f"Byte input for format '{fmt}' not yet supported."
     )
 
 
