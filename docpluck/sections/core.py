@@ -203,12 +203,12 @@ def partition_into_sections(
     # span (the heading line) before scanning. If a boundary fires on any
     # subsequent line, truncate the span at that line and emit a trailing
     # `unknown` span covering the rest. Universal coverage is preserved.
-    _NO_TRUNCATE = {
-        SectionLabel.unknown,
-        SectionLabel.references,
-        SectionLabel.appendix,
-        SectionLabel.supplementary,
-    }
+    #
+    # v1.6.1: with strict canonical-only markers + clean normalized text, the
+    # boundary-aware truncation pass is no longer needed and is destructive on
+    # real APA papers (e.g., 'Corresponding Author:' inside Introduction would
+    # truncate intro at that line). Disabled by listing all canonical labels.
+    _NO_TRUNCATE = set(SectionLabel)
     truncated: list[Section] = []
     for s in coalesced:
         if s.canonical_label in _NO_TRUNCATE:
