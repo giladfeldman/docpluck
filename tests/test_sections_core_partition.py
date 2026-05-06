@@ -75,11 +75,11 @@ def test_unknown_label_for_unrecognized_strong_heading():
     sections = partition_into_sections(
         text, [_hint("Frobnicator", idx, idx + 11)], source_format="pdf"
     )
-    # The strong-but-unrecognized heading still creates a partition boundary,
-    # and its span is labeled "unknown" with low confidence.
-    unknowns = [s for s in sections if s.canonical_label == SectionLabel.unknown]
-    assert any(s.char_start == idx for s in unknowns)
-    assert all(s.confidence == Confidence.low for s in unknowns)
+    # v1.6.1: strong-but-unrecognized heading no longer creates a new partition
+    # boundary. The whole document is a single unknown span.
+    assert len(sections) == 1
+    assert sections[0].canonical_label == SectionLabel.unknown
+    assert sections[0].char_start == 0
 
 
 def test_weak_heading_ignored():
@@ -94,3 +94,59 @@ def test_weak_heading_ignored():
     # Weak unrecognized heading does NOT create a new partition.
     assert len(sections) == 1
     assert sections[0].canonical_label == SectionLabel.unknown
+
+
+def test_resolve_label_strong_layout_unrecognized_returns_none():
+    """v1.6.1: strong-layout heading with unrecognized text no longer
+    creates an unknown marker. It returns None and goes to subheadings."""
+    from docpluck.sections.core import _resolve_label
+    from docpluck.sections.blocks import BlockHint
+
+    hint = BlockHint(
+        text="Power Analysis and Sensitivity Test",
+        char_start=100,
+        char_end=135,
+        page=1,
+        is_heading_candidate=True,
+        heading_strength="strong",
+        heading_source="layout",
+    )
+    assert _resolve_label(hint) is None
+
+
+def test_resolve_label_canonical_strong_layout_returns_high_marker():
+    from docpluck.sections.core import _resolve_label
+    from docpluck.sections.blocks import BlockHint
+    from docpluck.sections.taxonomy import SectionLabel, Confidence
+
+    hint = BlockHint(
+        text="Methods",
+        char_start=0,
+        char_end=7,
+        page=1,
+        is_heading_candidate=True,
+        heading_strength="strong",
+        heading_source="layout",
+    )
+    label, conf, _via = _resolve_label(hint)
+    assert label == SectionLabel.methods
+    assert conf == Confidence.high
+
+
+def test_resolve_label_canonical_weak_layout_returns_medium_marker():
+    from docpluck.sections.core import _resolve_label
+    from docpluck.sections.blocks import BlockHint
+    from docpluck.sections.taxonomy import SectionLabel, Confidence
+
+    hint = BlockHint(
+        text="Methods",
+        char_start=0,
+        char_end=7,
+        page=1,
+        is_heading_candidate=True,
+        heading_strength="weak",
+        heading_source="text_pattern",
+    )
+    label, conf, _via = _resolve_label(hint)
+    assert label == SectionLabel.methods
+    assert conf == Confidence.medium

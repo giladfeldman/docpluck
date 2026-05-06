@@ -24,20 +24,18 @@ class _Marker:
 
 
 def _resolve_label(hint: BlockHint) -> tuple[SectionLabel, Confidence, DetectedVia] | None:
-    """Apply the conflict-resolution rule from spec §5.3.
+    """v1.6.1: Only canonical-taxonomy heading matches create section markers.
 
-    - Canonical heading match (any layout strength) → use canonical label.
-    - Strong layout, unrecognized text → unknown label, low confidence.
-    - Weak layout, unrecognized text → no marker (return None).
+    Strong-layout-but-unrecognized text is no longer promoted to an `unknown`
+    span. Such hints are recorded by the caller for the post-partition
+    `subheadings` collection pass.
     """
     canonical = lookup_canonical_label(hint.text)
-    if canonical is not None:
-        if hint.heading_strength == "strong" or hint.heading_source == "markup":
-            return canonical, Confidence.high, _via_for(hint)
-        return canonical, Confidence.medium, _via_for(hint)
-    if hint.heading_strength == "strong":
-        return SectionLabel.unknown, Confidence.low, _via_for(hint)
-    return None
+    if canonical is None:
+        return None
+    if hint.heading_strength == "strong" or hint.heading_source == "markup":
+        return canonical, Confidence.high, _via_for(hint)
+    return canonical, Confidence.medium, _via_for(hint)
 
 
 def _via_for(hint: BlockHint) -> DetectedVia:
