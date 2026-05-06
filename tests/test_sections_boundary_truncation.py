@@ -39,7 +39,11 @@ def test_author_bio_inside_references_not_truncated():
     assert all_text == text
 
 
-def test_corresponding_author_truncates():
+def test_corresponding_author_no_longer_truncates():
+    """v1.6.1: boundary-aware truncation is disabled for ALL sections.
+    'Corresponding author:' lines inside a section no longer cause truncation —
+    with strict canonical-only markers and clean normalized text, the
+    truncation pass is purely destructive on real APA papers."""
     text = (
         "Pre.\n\nMethods\n\nProcedures used.\n\n"
         "Corresponding author: jane@example.org\nDept of X, U of Y.\n"
@@ -50,7 +54,9 @@ def test_corresponding_author_truncates():
         source_format="pdf",
     )
     methods = next(s for s in sections if s.canonical_label == SectionLabel.methods)
-    assert "jane@example.org" not in methods.text
+    # Truncation is now disabled: the full Methods span including the
+    # "Corresponding author:" line is preserved.
+    assert "jane@example.org" in methods.text
 
 
 def test_no_boundary_means_section_extends_to_eof():
