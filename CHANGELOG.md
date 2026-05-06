@@ -1,5 +1,43 @@
 # Changelog
 
+## [1.6.0] — 2026-05-06
+
+### Added
+
+- New `docpluck.sections` package: identifies academic-paper sections (abstract,
+  methods, references, disclosures, …) with universal char-level coverage and
+  per-section confidence + provenance. See
+  `docs/superpowers/specs/2026-05-06-section-identification-design.md`.
+  - 18 canonical labels + `unknown` fallback + numeric suffixes for repeats
+    (e.g. `methods_2` for multi-study papers).
+  - Two-tier algorithm: format-aware annotators (PDF/DOCX/HTML) +
+    unified core canonicalizer.
+  - `SECTIONING_VERSION` constant ("1.0.0") on every `SectionedDocument`.
+- New internal `docpluck.extract_layout` module: pdfplumber-based layout
+  extraction (per-page bounding boxes + font sizes). API not promised externally
+  in this release.
+- New `F0` step in `normalize_text(text, level, layout=...)`: layout-aware
+  stripping of footnotes, running headers, and running footers. Footnotes are
+  preserved and surface as the `footnotes` section.
+- Filter sugar on existing extract calls: `extract_pdf(b, sections=["abstract",
+  "references"])` returns concatenated section text in document order. Same
+  kwarg added to `extract_docx` and `extract_html`.
+- New CLI subcommands: `docpluck extract <file> --sections=...`,
+  `docpluck sections <file> [--format json|summary]`.
+
+### Changed
+
+- `NormalizationReport` gains `footnote_spans` and `page_offsets` fields
+  (default empty tuples). Existing field/tuple-unpacking call sites are
+  unchanged.
+
+### Backwards compatibility
+
+- `extract_pdf(bytes)`, `extract_docx(bytes)`, `extract_html(bytes)` byte-
+  identical to v1.5.0 when called without the new `sections=` kwarg.
+- `normalize_text(text, level)` byte-identical to v1.5.0 when called without
+  the new `layout=` kwarg.
+
 ## [1.5.0] — 2026-04-27
 
 ### Added (Scimeto Request 9 — reference-list normalization)

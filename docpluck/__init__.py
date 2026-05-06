@@ -67,7 +67,7 @@ from .sections import (
     SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
 )
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
