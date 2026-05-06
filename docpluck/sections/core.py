@@ -246,6 +246,57 @@ def partition_into_sections(
     return tuple(truncated)
 
 
+def append_footnotes_section(
+    sections: tuple[Section, ...],
+    normalized_text: str,
+    footnote_raw_spans: tuple[tuple[int, int], ...],
+) -> tuple[Section, ...]:
+    """If F0 produced a footnote appendix in `normalized_text` (sentinel
+    ``\\n\\f\\f\\n``), wrap it as a single `footnotes` Section."""
+    sentinel = "\n\f\f\n"
+    idx = normalized_text.find(sentinel)
+    if idx < 0:
+        return sections
+    appendix_start = idx + len(sentinel)
+    if appendix_start >= len(normalized_text):
+        return sections
+    appendix_text = normalized_text[appendix_start:]
+    if not appendix_text.strip():
+        return sections
+
+    # Truncate any existing section that overlaps the appendix so it doesn't
+    # include the sentinel or the footnote content.
+    truncated: list[Section] = []
+    for s in sections:
+        if s.char_end > idx:
+            truncated.append(Section(
+                label=s.label,
+                canonical_label=s.canonical_label,
+                text=normalized_text[s.char_start:idx],
+                char_start=s.char_start,
+                char_end=idx,
+                pages=s.pages,
+                confidence=s.confidence,
+                detected_via=s.detected_via,
+                heading_text=s.heading_text,
+            ))
+        else:
+            truncated.append(s)
+
+    footnotes = Section(
+        label="footnotes",
+        canonical_label=SectionLabel.footnotes,
+        text=appendix_text,
+        char_start=appendix_start,
+        char_end=len(normalized_text),
+        pages=(),
+        confidence=Confidence.medium,
+        detected_via=DetectedVia.layout_signal,
+        heading_text=None,
+    )
+    return tuple(truncated + [footnotes])
+
+
 def extract_sections_from_text(
     text: str,
     *,
