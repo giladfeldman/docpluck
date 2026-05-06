@@ -203,9 +203,15 @@ def partition_into_sections(
     # span (the heading line) before scanning. If a boundary fires on any
     # subsequent line, truncate the span at that line and emit a trailing
     # `unknown` span covering the rest. Universal coverage is preserved.
+    _NO_TRUNCATE = {
+        SectionLabel.unknown,
+        SectionLabel.references,
+        SectionLabel.appendix,
+        SectionLabel.supplementary,
+    }
     truncated: list[Section] = []
     for s in coalesced:
-        if s.canonical_label == SectionLabel.unknown:
+        if s.canonical_label in _NO_TRUNCATE:
             truncated.append(s)
             continue
         offset = s.char_start
