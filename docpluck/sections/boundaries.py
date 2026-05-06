@@ -38,11 +38,10 @@ BOUNDARY_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^(?:Address|E-?mail|Tel|Fax|Contact)\s*:", re.IGNORECASE),
     re.compile(r"^ORCID\s*:", re.IGNORECASE),
 
-    # Editorial metadata
-    re.compile(
-        r"^(?:Accepted by|Action Editor|Handling Editor|Received|Revised|Published)\s*:?\s",
-        re.IGNORECASE,
-    ),
+    # Editorial metadata — high-discrimination terms: colon optional
+    re.compile(r"^(?:Accepted by|Action Editor|Handling Editor)\s*:?\s", re.IGNORECASE),
+    # Editorial metadata — lower-discrimination terms: colon required to avoid false positives
+    re.compile(r"^(?:Received|Revised|Published)\s*:\s", re.IGNORECASE),
 )
 
 
