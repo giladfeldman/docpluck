@@ -97,15 +97,21 @@ def test_canonical_heading_after_period_newline_no_blank_line():
     assert "Funding" in texts
 
 
-def test_canonical_word_followed_by_lowercase_is_body_not_heading():
-    """`Funding acquisition` (lowercase 'acquisition') is body text, not a heading."""
+def test_canonical_word_inside_credit_taxonomy_list_not_emitted():
+    """CRediT taxonomy role like 'Funding acquisition' appears mid-sentence in real
+    APA papers (inside the Author Contributions body), never at line-start.  When
+    it's in the middle of a line — i.e., not following any newline — it must not
+    be detected as a heading."""
     text = (
-        "...listed below.\n"
+        "Author Contributions Ho Ching Ip: Conceptualization, Data curation,"
         " Funding acquisition; Preregistration peer review;\n"
     )
     hints = annotate_text(text)
-    # Funding here is mid-list-item, followed by lowercase 'acquisition'. Should NOT match.
-    assert not any(h.text == "Funding" for h in hints), f"got {[h.text for h in hints]}"
+    # 'Funding' is mid-sentence — it follows no newline, so neither Pass 1a nor
+    # Pass 1b should match it.  Only 'Author Contributions' (which has a Capital
+    # body following it) should be detected.
+    funding_hits = [h for h in hints if h.text == "Funding"]
+    assert len(funding_hits) == 0, f"got {[h.text for h in hints]}"
 
 
 def test_canonical_heading_with_lowercase_body_caught_by_blank_line_pred():

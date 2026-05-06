@@ -26,12 +26,16 @@ _CANONICAL_PARA_HEADING = re.compile(
     rf"\b",
 )
 
-# Pattern C: canonical heading preceded by a blank line.  Catches headings whose
-# body starts with a lowercase word (e.g. "Keywords emotional pluralistic..."),
-# which would fail the Capital-body lookahead in Pattern A+B alone.
+# Pattern C: canonical heading preceded by a newline (single or blank line).
+# Catches headings whose body starts with a lowercase word (e.g.
+# "Keywords emotional pluralistic...") — these would fail the Capital-body
+# disambiguator in Pattern A+B alone, AND fail the blank-line predecessor
+# check when the gap is only one newline (common in PSPB-style PDFs where
+# Keywords immediately follows the last sentence of the abstract).
+# The Title-Case / ALL-CAPS post-filter prevents body-text false positives.
 _CANONICAL_AFTER_BLANK = re.compile(
     rf"(?im)"
-    rf"\n[ \t]*\n[ \t]*"
+    rf"\n[ \t]*(?:\n[ \t]*)?"
     rf"(?:\d+(?:\.\d+)*\.?[ \t]+)?"
     rf"(?P<heading>{_CANONICAL_ALT})"
     rf"\b",
@@ -136,12 +140,12 @@ def annotate_text(text: str) -> list[BlockHint]:
             heading_source="text_pattern",
         ))
 
-    # Pass 1b: canonical heading preceded by a blank line (Pattern C).
+    # Pass 1b: canonical heading preceded by a newline (Pattern C).
     # Catches headings whose body starts with a lowercase word — e.g.
-    # "Keywords emotional pluralistic ignorance..." — which would not be
-    # detected by pass 1a's Capital-body or end-of-line checks when the
-    # preceding context is a URL line (no double-newline visible to 1a's
-    # inline blank-line check in all edge cases).  seen_offsets deduplicates.
+    # "Keywords emotional pluralistic ignorance..." — where pass 1a's
+    # Capital-body and end-of-line disambiguators both fail.  Matches
+    # single-newline separation (common in PSPB PDFs: abstract body → Keywords
+    # on next line) as well as blank-line separation.  seen_offsets deduplicates.
     for m in _CANONICAL_AFTER_BLANK.finditer(text):
         start = m.start("heading")
         if start in seen_offsets:
