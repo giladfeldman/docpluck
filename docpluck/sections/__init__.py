@@ -15,6 +15,17 @@ from .types import Section, SectionedDocument
 SECTIONING_VERSION = "1.0.0"
 
 
+def _detect_format(file_bytes: bytes) -> str:
+    if file_bytes[:5] == b"%PDF-":
+        return "pdf"
+    if file_bytes[:2] == b"PK":  # ZIP-based, likely DOCX
+        return "docx"
+    head = file_bytes[:64].lower()
+    if b"<!doctype html" in head or b"<html" in head:
+        return "html"
+    raise ValueError("Could not detect source format from bytes; pass source_format=")
+
+
 def extract_sections(
     file_bytes: bytes | None = None,
     *,
@@ -24,8 +35,8 @@ def extract_sections(
     """Public entry point. Either pass `file_bytes` (with optional
     source_format hint) or pre-extracted `text` + required `source_format`.
 
-    Phase 2 only supports the text path. Phases 3-4 add markup-aware
-    DOCX/HTML and layout-aware PDF paths.
+    Phase 2 supports the text path and HTML bytes. Phases 3-4 add markup-aware
+    DOCX and layout-aware PDF paths.
     """
     if text is not None:
         if source_format is None:
@@ -39,9 +50,25 @@ def extract_sections(
     if file_bytes is None:
         raise ValueError("extract_sections requires file_bytes= or text=")
 
+    fmt = source_format or _detect_format(file_bytes)
+
+    if fmt == "html":
+        from .annotators.html import annotate_html
+        from .core import partition_into_sections
+        reconstructed_text, hints = annotate_html(file_bytes)
+        sections = partition_into_sections(
+            reconstructed_text, hints, source_format="html"
+        )
+        return SectionedDocument(
+            sections=sections,
+            normalized_text=reconstructed_text,
+            sectioning_version=SECTIONING_VERSION,
+            source_format="html",
+        )
+
     raise NotImplementedError(
-        "Phase 2 only supports text= input. PDF/DOCX/HTML byte input "
-        "lands in Phases 3-4."
+        f"Byte input for format '{fmt}' not yet supported. "
+        "PDF/DOCX byte input lands in Phases 3-4."
     )
 
 
