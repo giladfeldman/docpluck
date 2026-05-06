@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.5.0"
+NORMALIZATION_VERSION = "1.6.0"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
