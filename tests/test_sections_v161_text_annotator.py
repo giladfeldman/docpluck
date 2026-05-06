@@ -106,3 +106,19 @@ def test_canonical_word_followed_by_lowercase_is_body_not_heading():
     hints = annotate_text(text)
     # Funding here is mid-list-item, followed by lowercase 'acquisition'. Should NOT match.
     assert not any(h.text == "Funding" for h in hints), f"got {[h.text for h in hints]}"
+
+
+def test_canonical_heading_with_lowercase_body_caught_by_blank_line_pred():
+    """`Keywords emotional pluralistic ignorance...` — lowercase body, but
+    blank line before. Should detect."""
+    text = (
+        "...data, and code: https://osf.io/bwmtr/\n"
+        "\n"
+        " Keywords emotional pluralistic ignorance, positive emotions, well-being\n"
+        "\n"
+        "Introduction\n"
+        "Background\n"
+    )
+    hints = annotate_text(text)
+    texts = [h.text for h in hints]
+    assert "Keywords" in texts, f"got {texts}"
