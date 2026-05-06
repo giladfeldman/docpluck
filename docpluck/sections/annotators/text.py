@@ -51,6 +51,12 @@ _UNDERLINED_HEADING = re.compile(
     """,
 )
 
+# Case-sensitive match for a Capital letter immediately after whitespace.
+# Used in Pass 1 to detect "Heading CapitalBodyWord" pattern.
+_CAPITAL_WORD_AFTER = re.compile(r"[ \t]+[A-Z]")
+# Matches end-of-line after the heading (optional trailing colon/period/space).
+_END_OF_LINE = re.compile(r"[ \t]*[:.]?[ \t]*(?:\n|$)")
+
 
 def annotate_text(text: str) -> list[BlockHint]:
     """Scan `text` for heading candidates.
@@ -66,33 +72,52 @@ def annotate_text(text: str) -> list[BlockHint]:
     hints: list[BlockHint] = []
     seen_offsets: set[int] = set()
 
-    # Pass 1: canonical heading at paragraph-leading line start.
+    # Pass 1: canonical heading at line start.
+    # A canonical word is accepted as a heading if ANY of three context checks pass:
+    #   (a) Preceded by a blank line (or at start-of-doc) — the classic paragraph-break.
+    #   (b) Followed immediately by a Capital-letter word on the same line (case-sensitive
+    #       check) — handles "...\n Acknowledgments We thank..." (single newline, no blank
+    #       line between prior paragraph and heading).
+    #   (c) At end-of-line (line-isolated) — handles "Introduction\n".
+    # "Funding acquisition" is rejected: no blank line before it (fails a), "acquisition"
+    # is lowercase (fails b), and it's not at end-of-line (fails c).
     for m in _CANONICAL_PARA_HEADING.finditer(text):
         start = m.start("heading")
         if start in seen_offsets:
             continue
-        # Require Title Case or ALL CAPS to reject body-text "abstract" usages.
         heading_text = m.group("heading")
+        # Reject body-text usages like "abstract concept" — require Title Case or ALL CAPS.
         if not (heading_text == heading_text.title() or heading_text == heading_text.upper()):
             continue
-        # Require paragraph-break-like context: preceded by blank line OR start-of-doc.
+
         line_start = m.start()
-        if line_start > 0:
-            # Look backwards through optional whitespace for a blank line.
+        heading_end = start + len(heading_text)
+        after_heading = text[heading_end:]
+
+        # (a) Preceded by blank line or at start-of-doc.
+        preceded_by_blank = False
+        if line_start == 0:
+            preceded_by_blank = True
+        else:
             i = line_start - 1
             while i > 0 and text[i] in " \t":
                 i -= 1
-            if text[i] != "\n":
-                continue
-            # Need at least one blank line: another \n preceded only by whitespace.
-            j = i - 1
-            while j > 0 and text[j] in " \t":
-                j -= 1
-            if text[j] != "\n" and j != 0:
-                # Allow direct line-after-line for cases like consecutive headings,
-                # but only if the prior line itself ended a heading. Safer: require
-                # blank line. Reject this candidate.
-                continue
+            if text[i] == "\n":
+                j = i - 1
+                while j > 0 and text[j] in " \t":
+                    j -= 1
+                if text[j] == "\n" or j == 0:
+                    preceded_by_blank = True
+
+        # (b) Followed by a Capital-letter word on same line (case-sensitive).
+        followed_by_capital = bool(_CAPITAL_WORD_AFTER.match(after_heading))
+
+        # (c) At end-of-line (with optional trailing colon/period/space).
+        at_end_of_line = bool(_END_OF_LINE.match(after_heading))
+
+        if not (preceded_by_blank or followed_by_capital or at_end_of_line):
+            continue
+
         seen_offsets.add(start)
         hints.append(BlockHint(
             text=heading_text,

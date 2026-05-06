@@ -78,3 +78,31 @@ def test_acknowledgments_after_blank_line():
     texts = [h.text for h in hints]
     assert "Acknowledgments" in texts
     assert "Funding" in texts
+
+
+def test_canonical_heading_after_period_newline_no_blank_line():
+    """Real PSPB pattern: paragraph ends with period, then heading on next line, no blank line between."""
+    text = (
+        "...estimations and well-being.\n"
+        " Acknowledgments We thank Nikolay Petrov for assistance.\n"
+        "...for final submission.\n"
+        " Author Contributions Ho Ching Ip: Conceptualization.\n"
+        "...this article.\n"
+        " Funding The author(s) disclosed receipt of financial support.\n"
+    )
+    hints = annotate_text(text)
+    texts = [h.text for h in hints]
+    assert "Acknowledgments" in texts
+    assert "Author Contributions" in texts
+    assert "Funding" in texts
+
+
+def test_canonical_word_followed_by_lowercase_is_body_not_heading():
+    """`Funding acquisition` (lowercase 'acquisition') is body text, not a heading."""
+    text = (
+        "...listed below.\n"
+        " Funding acquisition; Preregistration peer review;\n"
+    )
+    hints = annotate_text(text)
+    # Funding here is mid-list-item, followed by lowercase 'acquisition'. Should NOT match.
+    assert not any(h.text == "Funding" for h in hints), f"got {[h.text for h in hints]}"
