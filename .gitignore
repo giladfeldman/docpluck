@@ -8,6 +8,9 @@ venv/
 .pytest_cache/
 *.egg
 
+# Local worktree directory (used by superpowers:using-git-worktrees)
+.worktrees/
+
 # Private benchmark suite (real-corpus results + scripts with hardcoded paths
 # to CitationGuard / MetaESCI / PSPB files — not for public view).
 benchmarks/
