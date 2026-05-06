@@ -1,0 +1,36 @@
+{
+  "sectioning_version": "1.0.0",
+  "source_format": "html",
+  "sections": [
+    {
+      "label": "abstract",
+      "canonical_label": "abstract",
+      "char_start": 0,
+      "char_end": 38,
+      "pages": [],
+      "confidence": "high",
+      "detected_via": "markup",
+      "heading_text": "Abstract"
+    },
+    {
+      "label": "methods",
+      "canonical_label": "methods",
+      "char_start": 38,
+      "char_end": 63,
+      "pages": [],
+      "confidence": "high",
+      "detected_via": "markup",
+      "heading_text": "Methods"
+    },
+    {
+      "label": "references",
+      "canonical_label": "references",
+      "char_start": 63,
+      "char_end": 94,
+      "pages": [],
+      "confidence": "high",
+      "detected_via": "markup",
+      "heading_text": "References"
+    }
+  ]
+}

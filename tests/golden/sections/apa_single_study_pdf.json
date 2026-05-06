@@ -1,0 +1,78 @@
+{
+  "sectioning_version": "1.0.0",
+  "source_format": "pdf",
+  "sections": [
+    {
+      "label": "abstract",
+      "canonical_label": "abstract",
+      "char_start": 0,
+      "char_end": 36,
+      "pages": [
+        1
+      ],
+      "confidence": "high",
+      "detected_via": "layout_signal",
+      "heading_text": "Abstract"
+    },
+    {
+      "label": "introduction",
+      "canonical_label": "introduction",
+      "char_start": 36,
+      "char_end": 61,
+      "pages": [
+        1
+      ],
+      "confidence": "high",
+      "detected_via": "layout_signal",
+      "heading_text": "Introduction"
+    },
+    {
+      "label": "methods",
+      "canonical_label": "methods",
+      "char_start": 61,
+      "char_end": 84,
+      "pages": [
+        1
+      ],
+      "confidence": "high",
+      "detected_via": "layout_signal",
+      "heading_text": "Methods"
+    },
+    {
+      "label": "results",
+      "canonical_label": "results",
+      "char_start": 84,
+      "char_end": 108,
+      "pages": [
+        1
+      ],
+      "confidence": "high",
+      "detected_via": "layout_signal",
+      "heading_text": "Results"
+    },
+    {
+      "label": "discussion",
+      "canonical_label": "discussion",
+      "char_start": 108,
+      "char_end": 133,
+      "pages": [
+        1
+      ],
+      "confidence": "high",
+      "detected_via": "layout_signal",
+      "heading_text": "Discussion"
+    },
+    {
+      "label": "references",
+      "canonical_label": "references",
+      "char_start": 133,
+      "char_end": 163,
+      "pages": [
+        1
+      ],
+      "confidence": "high",
+      "detected_via": "layout_signal",
+      "heading_text": "References"
+    }
+  ]
+}
