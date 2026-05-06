@@ -54,3 +54,26 @@ def test_extract_sections_from_html_bytes():
     assert doc.abstract is not None
     assert "investigates X" in doc.abstract.text
     assert doc.references is not None
+
+
+def test_annotate_html_no_duplication_through_list_container():
+    """Reference lists wrapped in <section><ol><li> must not duplicate."""
+    html = b"""<html><body>
+<section>
+  <h2>References</h2>
+  <ol><li>Doe, J. (2020). Title. Journal.</li><li>Smith, A. (2021). Other. Journal.</li></ol>
+</section>
+</body></html>"""
+    text, hints = annotate_html(html)
+    # "Doe, J." should appear exactly once in the reconstructed text.
+    assert text.count("Doe, J.") == 1
+    assert text.count("Smith, A.") == 1
+
+
+def test_annotate_html_h5_h6_are_weak():
+    html = b"<html><body><h5>X</h5><h6>Y</h6></body></html>"
+    _, hints = annotate_html(html)
+    headings = [h for h in hints if h.is_heading_candidate]
+    assert len(headings) == 2
+    for h in headings:
+        assert h.heading_strength == "weak"
