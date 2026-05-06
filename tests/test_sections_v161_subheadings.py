@@ -65,6 +65,52 @@ def test_multiple_subheadings_in_document_order():
     assert methods.subheadings == ("Participants", "Materials", "Power Analysis")
 
 
+def test_text_pattern_weak_isolated_headings_attach_as_subheadings():
+    """Pass-3 line-isolated multi-word headings should reach subheadings."""
+    from docpluck.sections.annotators.text import annotate_text
+
+    text = (
+        "Method body of methods text.\n"
+        "\n"
+        "Power Analysis and Sensitivity Test\n"
+        "\n"
+        "Some body content explaining power analysis.\n"
+        "\n"
+        "Design and Procedure\n"
+        "\n"
+        "More body content.\n"
+        "\n"
+        "Results\n"
+        "results body text.\n"
+    )
+    hints = annotate_text(text)
+    sections = partition_into_sections(text, hints, source_format="pdf")
+    methods = next(s for s in sections if s.label == "methods")
+    assert "Power Analysis and Sensitivity Test" in methods.subheadings, \
+        f"got {methods.subheadings}"
+    assert "Design and Procedure" in methods.subheadings, \
+        f"got {methods.subheadings}"
+
+
+def test_table_cell_one_word_fragments_not_attached_as_subheadings():
+    """Table cells like 'No' or 'Year' should not pollute subheadings."""
+    from docpluck.sections.annotators.text import annotate_text
+
+    text = (
+        "Method body.\n"
+        "\n"
+        "No\nYes\nMaybe\n"  # table-cell-like fragments, not isolated
+        "\n"
+        "Results\nresults body.\n"
+    )
+    hints = annotate_text(text)
+    sections = partition_into_sections(text, hints, source_format="pdf")
+    methods = next(s for s in sections if s.label == "methods")
+    # Single-word fragments adjacent to other table-like fragments should be filtered.
+    for bad in ("No", "Yes", "Maybe"):
+        assert bad not in methods.subheadings, f"got {methods.subheadings}"
+
+
 def test_unrecognized_hint_outside_any_section_is_dropped():
     """Hints in the title-block prefix are not promoted to subheadings of unknown."""
     text = (

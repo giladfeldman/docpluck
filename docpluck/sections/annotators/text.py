@@ -145,19 +145,58 @@ def annotate_text(text: str) -> list[BlockHint]:
             heading_source="text_pattern",
         ))
 
-    # Pass 3: general heading-line pattern (existing logic, unchanged shape).
+    # Pass 3: general heading-line pattern.
+    # For canonical headings: accept if preceded by at least one newline.
+    # For non-canonical (weak) headings that will become subheadings: require
+    # ISOLATION (blank line before AND blank line after) so that table rows and
+    # body-text sentences are filtered out. Also require ≥ 5 chars + ≥ 2 words,
+    # and reject lines that end with a sentence-terminal period (heading lines
+    # don't end with periods; body sentences do).
     for m in _HEADING_LINE.finditer(text):
         start = m.start("heading")
         if start in seen_offsets:
             continue
         line_start = m.start()
-        before = text[max(0, line_start - 2):line_start]
-        if before and not before.endswith("\n\n") and not before.endswith("\n"):
-            continue
+        line_end = m.end()
         heading = m.group("heading").strip()
         if len(heading) < 2:
             continue
-        strength = "strong" if lookup_canonical_label(heading) is not None else "weak"
+        is_canonical = lookup_canonical_label(heading) is not None
+        strength = "strong" if is_canonical else "weak"
+
+        if is_canonical:
+            # Canonical headings: just need a preceding newline (same as before).
+            before = text[max(0, line_start - 2):line_start]
+            if before and not before.endswith("\n\n") and not before.endswith("\n"):
+                continue
+        else:
+            # Non-canonical (weak) headings: require full isolation + quality filters.
+            # (1) ≥ 5 chars AND ≥ 2 words.
+            if len(heading) < 5 or len(heading.split()) < 2:
+                continue
+            # (2) Reject lines that end with a period — those are body sentences.
+            raw_line = text[line_start:line_end].rstrip()
+            if raw_line.endswith("."):
+                continue
+            # (3) Require blank line BEFORE the heading line.
+            before4 = text[max(0, line_start - 4):line_start]
+            blank_before = (
+                line_start == 0
+                or "\n\n" in before4
+                or before4.endswith("\n\n")
+            )
+            if not blank_before:
+                continue
+            # (4) Require blank line AFTER the heading line.
+            after4 = text[line_end:min(len(text), line_end + 4)]
+            blank_after = (
+                line_end == len(text)
+                or "\n\n" in after4
+                or after4.startswith("\n\n")
+            )
+            if not blank_after:
+                continue
+
         seen_offsets.add(start)
         hints.append(BlockHint(
             text=heading,
