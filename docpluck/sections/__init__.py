@@ -35,8 +35,8 @@ def extract_sections(
     """Public entry point. Either pass `file_bytes` (with optional
     source_format hint) or pre-extracted `text` + required `source_format`.
 
-    Phase 2 supports the text path and HTML bytes. Phases 3-4 add markup-aware
-    DOCX and layout-aware PDF paths.
+    Supports text path, HTML bytes, and DOCX bytes. Layout-aware PDF byte
+    input lands in Phase 4.
     """
     if text is not None:
         if source_format is None:
@@ -82,7 +82,7 @@ def extract_sections(
 
     raise NotImplementedError(
         f"Byte input for format '{fmt}' not yet supported. "
-        "PDF/DOCX byte input lands in Phases 3-4."
+        "Layout-aware PDF byte input lands in Phase 4."
     )
 
 
