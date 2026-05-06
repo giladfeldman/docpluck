@@ -66,6 +66,9 @@ from .sections import (
     extract_sections, SectionedDocument, Section,
     SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
 )
+from .tables import Table
+from .figures import Figure
+from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult
 
 __version__ = "1.6.0"
 __author__ = "Gilad Feldman"
@@ -98,4 +101,9 @@ __all__ = [
     "Confidence",
     "DetectedVia",
     "SECTIONING_VERSION",
+    # Structured extraction (v2.0)
+    "Table",
+    "Figure",
+    "TABLE_EXTRACTION_VERSION",
+    "StructuredResult",
 ]
