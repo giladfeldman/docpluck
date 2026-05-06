@@ -66,6 +66,20 @@ def extract_sections(
             source_format="html",
         )
 
+    if fmt == "docx":
+        from .annotators.docx import annotate_docx
+        from .core import partition_into_sections
+        reconstructed_text, hints = annotate_docx(file_bytes)
+        sections = partition_into_sections(
+            reconstructed_text, hints, source_format="docx"
+        )
+        return SectionedDocument(
+            sections=sections,
+            normalized_text=reconstructed_text,
+            sectioning_version=SECTIONING_VERSION,
+            source_format="docx",
+        )
+
     raise NotImplementedError(
         f"Byte input for format '{fmt}' not yet supported. "
         "PDF/DOCX byte input lands in Phases 3-4."
