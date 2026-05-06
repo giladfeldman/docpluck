@@ -123,7 +123,7 @@ def _walk(element: Any, parts: list[str], NavigableString: type, Tag: type) -> N
                     parts.append(' ')
 
 
-def extract_html(html_bytes: bytes) -> tuple[str, str]:
+def extract_html(html_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
     """Extract text from HTML file bytes.
 
     Decodes as UTF-8 with error replacement (handles malformed encoding
@@ -131,10 +131,16 @@ def extract_html(html_bytes: bytes) -> tuple[str, str]:
 
     Args:
         html_bytes: Raw HTML file content as bytes.
+        sections: Optional list of section labels (e.g. ``["abstract",
+            "methods"]``) to filter the output. When provided, ``extract_sections``
+            is called and only the requested sections are returned concatenated
+            in document order. Pass ``None`` (default) to return the full text.
 
     Returns:
         A tuple of (text, method) where:
           - text: Extracted plain text (see html_to_text for formatting details).
+            When ``sections`` is not None, only text from the requested
+            sections is included.
           - method: Always "beautifulsoup".
 
     Requires:
@@ -143,7 +149,17 @@ def extract_html(html_bytes: bytes) -> tuple[str, str]:
     Example:
         with open("article.html", "rb") as f:
             text, method = extract_html(f.read())
+
+        # Filter to abstract only:
+        with open("article.html", "rb") as f:
+            text, method = extract_html(f.read(), sections=["abstract"])
     """
     html = html_bytes.decode('utf-8', errors='replace')
     text = html_to_text(html)
+
+    if sections is not None:
+        from .sections import extract_sections
+        doc = extract_sections(html_bytes)
+        return doc.text_for(*sections), "beautifulsoup"
+
     return text, "beautifulsoup"

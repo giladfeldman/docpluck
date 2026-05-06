@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.5.0"
+NORMALIZATION_VERSION = "1.6.0"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -91,6 +91,126 @@ def _find_references_spans(text: str) -> list[tuple[int, int]]:
     return spans
 
 
+def _body_size(layout) -> float:
+    """Return the most common font size by character count in the body zone.
+
+    Excludes spans in the top 5% and bottom 15% of each page to avoid
+    headers and footnotes skewing the result.
+    """
+    from collections import Counter
+    counter: Counter[float] = Counter()
+    for page in layout.pages:
+        h = page.height
+        y_lo = h * 0.15   # exclude bottom 15% (footnote zone)
+        y_hi = h * 0.95   # exclude top 5% (running header zone)
+        for span in page.spans:
+            if span.y0 < y_lo or span.y0 > y_hi:
+                continue
+            counter[round(span.font_size, 1)] += len(span.text)
+    if not counter:
+        return 11.0
+    return max(counter.items(), key=lambda kv: kv[1])[0]
+
+
+def _body_y_band(page, body_size: float) -> tuple[float, float]:
+    """Return (y_min, y_max) of the body-text band on this page."""
+    body_spans = [s for s in page.spans if abs(s.font_size - body_size) <= 1.0]
+    if not body_spans:
+        return 0.0, page.height
+    y_min = min(s.y0 for s in body_spans)
+    y_max = max(s.y1 for s in body_spans)
+    return y_min, y_max
+
+
+def _detect_repeating_lines(layout, *, position: str) -> set[str]:
+    """Return text lines that appear at the top (or bottom) of >=50% of pages."""
+    if len(layout.pages) < 2:
+        return set()
+    counts: dict[str, int] = {}
+    for page in layout.pages:
+        if not page.spans:
+            continue
+        y_sorted = sorted(page.spans, key=lambda s: s.y0)
+        if position == "top":
+            candidates = [y_sorted[-1].text.strip()] if y_sorted else []
+        else:
+            candidates = [y_sorted[0].text.strip()] if y_sorted else []
+        for c in candidates:
+            if c:
+                counts[c] = counts.get(c, 0) + 1
+    threshold = len(layout.pages) // 2 + 1
+    return {line for line, n in counts.items() if n >= threshold}
+
+
+def _f0_strip_running_and_footnotes(
+    raw_text: str, layout
+) -> tuple[str, list[tuple[int, int]]]:
+    """Strip running headers/footers and footnotes using layout info.
+
+    Returns (post_strip_text_with_appendix, footnote_spans_in_raw_text).
+    """
+    from .extract_layout import LayoutDoc
+
+    if not isinstance(layout, LayoutDoc) or not layout.pages:
+        return raw_text, []
+
+    body_size = _body_size(layout)
+
+    page_text_chunks: list[str] = []
+    footnote_chunks: list[str] = []
+    footnote_raw_spans: list[tuple[int, int]] = []
+
+    repeating_header_lines = _detect_repeating_lines(layout, position="top")
+    repeating_footer_lines = _detect_repeating_lines(layout, position="bottom")
+
+    for page in layout.pages:
+        body_y_min, body_y_max = _body_y_band(page, body_size)
+        keep_lines: list[str] = []
+        page_footnotes: list[str] = []
+
+        for span in page.spans:
+            line_text = span.text.strip()
+            if not line_text:
+                continue
+
+            is_header = (
+                line_text in repeating_header_lines
+                or span.y0 > body_y_max + 30
+            )
+            is_footer = (
+                line_text in repeating_footer_lines
+                and span.y0 < body_y_min - 30
+            )
+            is_footnote = (
+                span.y0 < body_y_min - 30
+                and span.font_size < body_size * 0.92
+                and not is_footer
+            )
+
+            if is_header or is_footer:
+                continue
+            if is_footnote:
+                page_footnotes.append(line_text)
+                page_start = layout.page_offsets[page.page_index]
+                idx = raw_text.find(line_text, page_start)
+                if idx >= 0:
+                    footnote_raw_spans.append((idx, idx + len(line_text)))
+                continue
+
+            keep_lines.append(line_text)
+
+        page_text_chunks.append("\n".join(keep_lines))
+        if page_footnotes:
+            footnote_chunks.append("\n".join(page_footnotes))
+
+    body = "\n\f".join(page_text_chunks)
+    if footnote_chunks:
+        appendix = "\n\f\f\n" + "\n\n".join(footnote_chunks)
+    else:
+        appendix = ""
+    return body + appendix, footnote_raw_spans
+
+
 def _detect_recurring_page_numbers(raw_text: str) -> set[int]:
     """Return integers that appeared as standalone-line page numbers ≥2 times.
 
@@ -126,6 +246,8 @@ class NormalizationReport:
     steps_applied: list[str] = field(default_factory=list)
     steps_changed: list[str] = field(default_factory=list)
     changes_made: dict[str, int] = field(default_factory=dict)
+    footnote_spans: tuple[tuple[int, int], ...] = ()  # pre-strip char offsets
+    page_offsets: tuple[int, ...] = ()                 # post-strip body page offsets
 
     def _track(self, step_code: str, before: str, after: str, metric_name: str):
         # ``steps_applied`` records every step that ran (kept for backward
@@ -148,20 +270,48 @@ class NormalizationReport:
             "steps_applied": self.steps_applied,
             "steps_changed": self.steps_changed,
             "changes_made": self.changes_made,
+            "footnote_spans": [list(s) for s in self.footnote_spans],
+            "page_offsets": list(self.page_offsets),
         }
 
 
-def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, NormalizationReport]:
-    """Apply normalization pipeline at the specified level."""
+def normalize_text(
+    text: str,
+    level: NormalizationLevel,
+    *,
+    layout=None,
+) -> tuple[str, NormalizationReport]:
+    """Apply normalization pipeline at the specified level.
+
+    When `layout` is provided (a docpluck.extract_layout.LayoutDoc), the
+    F0 step strips footnotes/running-headers/footers using PDF layout info
+    and populates report.footnote_spans + report.page_offsets.
+    """
     if level == NormalizationLevel.none:
-        return text, NormalizationReport(level="none")
+        report = NormalizationReport(level="none")
+        if layout is not None:
+            report.page_offsets = layout.page_offsets
+        return text, report
 
     report = NormalizationReport(level=level.value)
+    if layout is not None:
+        report.page_offsets = layout.page_offsets
     t = text
 
     # Snapshot raw page-number set before any mutation — R2 needs lines that
     # match `^\s*\d+\s*$` in the original extraction.
     _raw_page_numbers = _detect_recurring_page_numbers(text)
+
+    # ── F0: Layout-aware running-header/footer + footnote strip ─────────
+    # Requires a LayoutDoc from extract_pdf_layout. When present, strips
+    # repeating running headers/footers and moves footnotes to an appendix
+    # section after "\n\f\f\n". Populates report.footnote_spans.
+    if layout is not None:
+        t, footnote_spans = _f0_strip_running_and_footnotes(t, layout)
+        report.footnote_spans = tuple(footnote_spans)
+        report.steps_applied.append("F0")
+        if footnote_spans:
+            report.steps_changed.append("F0")
 
     # ── W0: Publisher-overlay watermark stripping (Request 9) ──────────
     # Runs BEFORE S0 so mid-line watermarks don't leak into body text via
