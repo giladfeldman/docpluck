@@ -96,9 +96,12 @@ def partition_into_sections(
     for hint in hints:
         resolved = _resolve_label(hint)
         if resolved is None:
-            # Only collect strong/markup hints as candidate subheadings —
-            # weak hints are likely paragraph noise.
-            if hint.heading_strength == "strong" or hint.heading_source == "markup":
+            # v1.6.1: accept strong hints OR markup OR text_pattern weak hints
+            # (pass-3 of the text annotator already filters weak hints by isolation,
+            # word-count, and sentence-terminal period, so body noise is pre-filtered).
+            if (hint.heading_strength == "strong"
+                    or hint.heading_source == "markup"
+                    or hint.heading_source == "text_pattern"):
                 unrecognized.append(hint)
             continue
         canonical, conf, via = resolved
