@@ -92,9 +92,14 @@ def partition_into_sections(
          (skipping the heading line) and split at the first boundary line.
     """
     markers: list[_Marker] = []
+    unrecognized: list[BlockHint] = []
     for hint in hints:
         resolved = _resolve_label(hint)
         if resolved is None:
+            # Only collect strong/markup hints as candidate subheadings —
+            # weak hints are likely paragraph noise.
+            if hint.heading_strength == "strong" or hint.heading_source == "markup":
+                unrecognized.append(hint)
             continue
         canonical, conf, via = resolved
         markers.append(_Marker(
@@ -241,7 +246,33 @@ def partition_into_sections(
             heading_text=None,
         ))
 
-    return tuple(truncated)
+    # v1.6.1: attach unrecognized hints to the section that contains them.
+    final: list[Section] = []
+    for s in truncated:
+        if not unrecognized:
+            final.append(s)
+            continue
+        contained = tuple(
+            h.text for h in unrecognized
+            if s.char_start <= h.char_start < s.char_end
+            and s.canonical_label != SectionLabel.unknown
+        )
+        if not contained:
+            final.append(s)
+            continue
+        final.append(Section(
+            label=s.label,
+            canonical_label=s.canonical_label,
+            text=s.text,
+            char_start=s.char_start,
+            char_end=s.char_end,
+            pages=s.pages,
+            confidence=s.confidence,
+            detected_via=s.detected_via,
+            heading_text=s.heading_text,
+            subheadings=contained,
+        ))
+    return tuple(final)
 
 
 def append_footnotes_section(
