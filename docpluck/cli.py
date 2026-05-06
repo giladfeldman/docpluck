@@ -112,7 +112,10 @@ def main(argv: list[str] | None = None) -> int:
     sections.add_argument("--format", default="json", choices=["json", "summary"])
     sections.set_defaults(func=_cmd_sections)
 
-    parsed = parser.parse_args(args_in)
+    try:
+        parsed = parser.parse_args(args_in)
+    except SystemExit as exc:
+        return int(exc.code) if exc.code is not None else 2
     return parsed.func(parsed)
 
 
