@@ -1,6 +1,6 @@
 ---
 name: docpluck-review
-description: Code review specialist for Docpluck PDF extraction service. Reviews changes against CLAUDE.md hard rules (never use -layout flag, never use AGPL deps like pymupdf4llm, always normalize U+2212), checks normalization pipeline completeness, validates FastAPI endpoint security, reviews Auth.js middleware, checks for hardcoded secrets/URLs, verifies Dockerfile best practices. Use /docpluck-review after making code changes or before merging.
+description: Code review specialist for Docpluck PDF extraction library + app. Reviews changes against CLAUDE.md hard rules (never use -layout flag, never use AGPL deps like pymupdf4llm, always normalize U+2212, no broad regex catch-alls in normalize.py per D5 lesson) plus section-identification rules (universal-coverage invariant in partition_into_sections, F0 footnote sentinel preservation, HTML CONTAINER_TAGS skip, PDF boundary-truncation skips heading line not flat char count). Checks normalization pipeline completeness, validates FastAPI endpoint security, reviews Auth.js middleware, checks for hardcoded secrets/URLs, verifies Dockerfile best practices. Use /docpluck-review after making code changes (especially in docpluck/sections/, docpluck/extract_layout.py, docpluck/normalize.py) or before merging.
 tags: [python, fastapi, nextjs, pdf, authjs, drizzle, docpluck, review]
 ---
 
@@ -55,6 +55,34 @@ The `<` in `p < .001` gets interpreted as HTML tag start, eating content.
 - **Check:** Every regex that skips/removes content must have TWO independent safety guards (constrain both the skipped content AND the replacement target)
 - **Check:** Every regex must be tested against `stat-value\nsection-number` patterns (the #1 false positive in academic PDFs)
 - **Check:** Run `pytest tests/test_d5_normalization_audit.py -v` (153 tests) after any normalization change
+- **Severity:** BLOCKER
+
+### 7. NEVER use AGPL alternatives in extract_layout.py (v1.6.0)
+pdfplumber (BSD-3) is the only allowed PDF layout extractor. pymupdf4llm, PyMuPDF column_boxes(), and pymupdf-layout are AGPL and incompatible with the authenticated SaaS service.
+- **Check:** grep `docpluck/extract_layout.py` and `docpluck/sections/annotators/pdf.py` for `pymupdf4llm`, `column_boxes`, `pymupdf-layout`
+- **Severity:** BLOCKER
+
+### 8. Universal-coverage invariant in `partition_into_sections` (v1.6.0)
+Sum of section spans MUST equal `len(text)` — every char accounted for.
+- **Check:** If `docpluck/sections/core.py` is modified, run `pytest tests/test_sections_core_partition.py tests/test_sections_boundary_truncation.py tests/test_sections_unit_corpus.py -v`
+- **Check:** Coalescing in `partition_into_sections` must SKIP `unknown` labels (otherwise heading-derived `unknown` spans merge with prefix unknown and lose the boundary marker — `test_unknown_label_for_unrecognized_strong_heading` will fail)
+- **Severity:** BLOCKER
+
+### 9. F0 footnote sentinel preservation (v1.6.0)
+The literal sentinel `"\n\f\f\n"` separates body from footnote appendix in `normalize_text(layout=...)` output. `append_footnotes_section` finds this sentinel to extract the footnotes span.
+- **Check:** Any normalization step that runs AFTER F0 in `docpluck/normalize.py` must NOT collapse `\f\f` whitespace runs
+- **Check:** If you modify any step that touches form-feed or whitespace runs, re-run `pytest tests/test_normalize_f0_footnote_strip.py tests/test_sections_footnote_section.py -v`
+- **Severity:** BLOCKER
+
+### 10. HTML annotator must skip non-block containers (v1.6.0)
+`docpluck/sections/annotators/html.py` defines `CONTAINER_TAGS = BLOCK_TAGS | {ul, ol, dl, dt, table, tbody, thead, tfoot, tr, th, td, caption}`. The child-skip loop in `annotate_html` MUST use `CONTAINER_TAGS`, NOT `BLOCK_TAGS` — otherwise `<section><ol><li>` reference lists produce duplicated text in `reconstructed_text`.
+- **Check:** grep `annotate_html` for `child_name in CONTAINER_TAGS` (correct) vs `child_name in BLOCK_TAGS` (broken)
+- **Check:** `pytest tests/test_sections_html_annotator.py::test_annotate_html_no_duplication_through_list_container` must pass
+- **Severity:** BLOCKER
+
+### 11. PDF section partitioner: boundary truncation skips first line, not flat char count (v1.6.0)
+`partition_into_sections` boundary-aware truncation MUST skip the first line of each span (the heading line itself), NOT a flat character count. The original "skip first 30 chars" approach failed `test_corresponding_author_truncates` because the boundary line sat at offset 27 in the methods section.
+- **Check:** in `core.py`, the truncation loop uses `if i == 0: continue` (line-index guard) not `if line_start - s.char_start < N` (char-offset guard)
 - **Severity:** BLOCKER
 
 ## Review Checklist
