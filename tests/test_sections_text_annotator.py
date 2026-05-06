@@ -58,3 +58,10 @@ def test_block_hints_have_correct_offsets():
     hints = annotate_text(text)
     for h in hints:
         assert text[h.char_start:h.char_end] == h.text
+
+
+def test_block_hints_have_correct_offsets_spaced_caps():
+    text = "Body.\n\nR E F E R E N C E S\n\n[1] Smith.\n"
+    hints = annotate_text(text)
+    for h in hints:
+        assert text[h.char_start:h.char_end] == h.text
