@@ -10,7 +10,7 @@ from .boundaries import is_section_boundary
 from .taxonomy import (
     SectionLabel, Confidence, DetectedVia, lookup_canonical_label
 )
-from .types import Section
+from .types import Section, SectionedDocument
 
 
 @dataclass
@@ -251,11 +251,10 @@ def extract_sections_from_text(
     *,
     source_format: Literal["pdf", "docx", "html"],
     page_offsets: tuple[int, ...] = (),
-) -> "SectionedDocument":
+) -> SectionedDocument:
     """Build a SectionedDocument from already-normalized text using the
     text-only annotator. Used as fallback when no layout/markup is available."""
     from .annotators.text import annotate_text
-    from .types import SectionedDocument
     from . import SECTIONING_VERSION
 
     hints = annotate_text(text)
