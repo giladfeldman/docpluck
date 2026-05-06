@@ -62,6 +62,9 @@ from .normalize import normalize_text, NormalizationLevel, NormalizationReport
 from .quality import compute_quality_score
 from .batch import ExtractionReport, extract_to_dir
 from .version import get_version_info
+from .tables import Table
+from .figures import Figure
+from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult
 
 __version__ = "1.5.0"
 __author__ = "Gilad Feldman"
@@ -86,4 +89,9 @@ __all__ = [
     "extract_to_dir",
     # Version
     "get_version_info",
+    # Structured extraction (v2.0)
+    "Table",
+    "Figure",
+    "TABLE_EXTRACTION_VERSION",
+    "StructuredResult",
 ]
