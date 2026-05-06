@@ -13,7 +13,10 @@ def _hint(text, start, end):
     )
 
 
-def test_author_bio_truncates_references_section():
+def test_author_bio_inside_references_not_truncated():
+    """v1.6.1: References are exempt from boundary truncation, so an
+    author-bio paragraph that follows the reference list stays inside
+    the references section rather than being split into an unknown tail."""
     text = (
         "Pre.\n\n"
         "References\n\n"
@@ -28,16 +31,12 @@ def test_author_bio_truncates_references_section():
         source_format="pdf",
     )
     refs = next(s for s in sections if s.canonical_label == SectionLabel.references)
-    # The author-bio paragraph must NOT be inside references.
-    assert "HERMAN AGUINIS" not in refs.text
-    # And it must be SOMEWHERE in the partition (universal coverage).
+    # References runs to end-of-text; the author-bio is inside it (not truncated).
+    assert "HERMAN AGUINIS" in refs.text
+    assert refs.char_end == len(text)
+    # Universal coverage is preserved.
     all_text = "".join(s.text for s in sections)
     assert all_text == text
-    # An unknown span absorbs the bio.
-    assert any(
-        s.canonical_label == SectionLabel.unknown and "HERMAN AGUINIS" in s.text
-        for s in sections
-    )
 
 
 def test_corresponding_author_truncates():
@@ -64,3 +63,37 @@ def test_no_boundary_means_section_extends_to_eof():
     abstract = next(s for s in sections if s.canonical_label == SectionLabel.abstract)
     assert "This is the abstract content" in abstract.text
     assert abstract.char_end == len(text)
+
+
+def test_references_section_not_truncated_by_boundary_patterns():
+    """References + Appendix + Supplementary are exempt from boundary
+    truncation (v1.6.1 — they legitimately run to end-of-doc)."""
+    from docpluck.sections.blocks import BlockHint
+    from docpluck.sections.core import partition_into_sections
+
+    # These lines START with patterns that fire is_section_boundary():
+    #   "ORCID: ..."  → matches ^ORCID\s*:
+    #   "HERMAN AGUINIS is ..."  → matches ^[A-Z]{2,}...is\s
+    # They are legitimate reference-list content but would trigger
+    # truncation for non-exempt sections.
+    text = (
+        "References\n"
+        "Smith, J. (2020). A paper. Journal, 1(1), 1-10.\n"
+        "ORCID: 0000-0002-1234-5678\n"  # boundary-pattern bait (start of line)
+        "Jones, K. (2021). Another paper. Journal, 2(2), 11-20.\n"
+        "HERMAN AGUINIS is a professor at GWU.\n"  # author-bio boundary bait
+    )
+    refs_start = 0
+    hint = BlockHint(
+        text="References", char_start=refs_start,
+        char_end=refs_start + len("References"), page=1,
+        is_heading_candidate=True, heading_strength="strong",
+        heading_source="layout",
+    )
+    sections = partition_into_sections(text, [hint], source_format="pdf")
+    refs = next(s for s in sections if s.label == "references")
+    assert refs.char_end == len(text), \
+        f"References should span to end-of-text, got char_end={refs.char_end} of {len(text)}"
+    assert "Smith" in refs.text
+    assert "Jones" in refs.text
+    assert "HERMAN AGUINIS" in refs.text
