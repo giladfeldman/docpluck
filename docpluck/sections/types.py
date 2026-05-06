@@ -19,6 +19,7 @@ class Section:
     confidence: Confidence
     detected_via: DetectedVia
     heading_text: str | None            # literal heading found, if any
+    subheadings: tuple[str, ...] = ()   # in-section unrecognized headings (v1.6.1)
 
 
 @dataclass(frozen=True)

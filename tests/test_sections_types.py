@@ -72,3 +72,38 @@ def test_sectioned_document_property_accessors():
     assert doc.results is None
     assert doc.introduction is None
     assert doc.discussion is None
+
+
+def test_section_subheadings_default_empty():
+    from docpluck.sections.types import Section
+    from docpluck.sections.taxonomy import SectionLabel, Confidence, DetectedVia
+    s = Section(
+        label="methods",
+        canonical_label=SectionLabel.methods,
+        text="body",
+        char_start=0,
+        char_end=4,
+        pages=(),
+        confidence=Confidence.high,
+        detected_via=DetectedVia.heading_match,
+        heading_text="Method",
+    )
+    assert s.subheadings == ()
+
+
+def test_section_subheadings_set_value():
+    from docpluck.sections.types import Section
+    from docpluck.sections.taxonomy import SectionLabel, Confidence, DetectedVia
+    s = Section(
+        label="methods",
+        canonical_label=SectionLabel.methods,
+        text="body",
+        char_start=0,
+        char_end=4,
+        pages=(),
+        confidence=Confidence.high,
+        detected_via=DetectedVia.heading_match,
+        heading_text="Method",
+        subheadings=("Participants", "Procedure"),
+    )
+    assert s.subheadings == ("Participants", "Procedure")
