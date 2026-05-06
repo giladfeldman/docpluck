@@ -8,8 +8,10 @@ venv/
 .pytest_cache/
 *.egg
 
-# Local worktree directory (used by superpowers:using-git-worktrees)
+# Local worktree directories (used by superpowers:using-git-worktrees and
+# the Claude Agent harness)
 .worktrees/
+.claude/worktrees/
 
 # Private benchmark suite (real-corpus results + scripts with hardcoded paths
 # to CitationGuard / MetaESCI / PSPB files — not for public view).
