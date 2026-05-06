@@ -38,3 +38,32 @@ def test_existing_conflict_of_interest_variants_still_work():
     assert lookup_canonical_label("Declaration of Interest") == SectionLabel.conflict_of_interest
     assert lookup_canonical_label("Declaration of Interests") == SectionLabel.conflict_of_interest
     assert lookup_canonical_label("Disclosure") == SectionLabel.conflict_of_interest
+
+
+# --- Fix 3 (chan_feldman_2025 / chandrashekar_2023): subsection synonyms ---
+
+def test_subsection_methods_synonyms_no_longer_canonical():
+    """v1.6.1: Methodology/Experimental design/Study design are typically
+    subsections of Method in APA papers, not top-level methods sections."""
+    assert lookup_canonical_label("Methodology") is None
+    assert lookup_canonical_label("Experimental design") is None
+    assert lookup_canonical_label("Experimental Design") is None
+    assert lookup_canonical_label("Study design") is None
+    assert lookup_canonical_label("Study Design") is None
+
+
+def test_method_canonical_methods_still_works():
+    assert lookup_canonical_label("Method") == SectionLabel.methods
+    assert lookup_canonical_label("Methods") == SectionLabel.methods
+    assert lookup_canonical_label("Materials and Methods") == SectionLabel.methods
+
+
+def test_summary_no_longer_abstract_canonical():
+    """v1.6.1: 'Summary' is too ambiguous to canonicalize as abstract.
+    Meta-analyses use it as a per-study subsection."""
+    assert lookup_canonical_label("Summary") is None
+
+
+def test_abstract_canonical_still_works():
+    assert lookup_canonical_label("Abstract") == SectionLabel.abstract
+    assert lookup_canonical_label("ABSTRACT") == SectionLabel.abstract
