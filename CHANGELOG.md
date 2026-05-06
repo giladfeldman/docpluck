@@ -1,5 +1,84 @@
 # Changelog
 
+## [1.6.1] — 2026-05-06
+
+### Changed
+
+- **Section identification: architectural pivot.** The PDF section path now
+  consumes `extract_pdf` (pdftotext) + `normalize_text(academic)` instead of
+  `extract_pdf_layout` (pdfplumber). Sectioning runs after the library's
+  canonical 22-step normalization pipeline (hyphenation repair, line-break
+  joining, header/footer removal, footnote stripping, page-number scrub,
+  watermark strip, statistical pattern repair, etc.) and so inherits all of it
+  for free. The pdfplumber-based path was producing column-merged text (e.g.
+  `References` jammed mid-line into body text) and font-size heuristics that
+  failed on body-font-bold headings (`Abstract`). Result on a 5-paper APA
+  corpus: every canonical section is detected, no garbage `unknown` spans, no
+  running-header contamination.
+- **Section partitioner: only canonical-taxonomy heading matches create
+  section markers.** v1.6.0 promoted any layout-strong heading (including
+  page running headers, citation residue, methods/results subsections) to an
+  `unknown` section, which on real APA papers shredded ~90% of the document
+  into incoherent fragments. Layout-strong headings whose text isn't in the
+  canonical taxonomy are no longer separate sections.
+- **`SECTIONING_VERSION` 1.0.0 → 1.1.0** (additive `subheadings` field, output
+  shape change).
+- **Boundary-aware truncation disabled** for all canonical labels. With
+  strict canonical-only markers + clean normalized text, truncation patterns
+  (Email/ORCID/author-bio caps) were destructive — cutting References to a
+  few characters or chopping Introduction at a `Corresponding Author:` line.
+
+### Added
+
+- `Section.subheadings: tuple[str, ...]` (default `()`) — placeholder for
+  in-section structure surfaced by future smart subheading detection. Empty
+  in v1.6.1; populated in a later release.
+- Text annotator detects canonical headings whether line-isolated, followed
+  by Capital-body word, or preceded by blank line — so `Abstract Jordan
+  et al., 2011...` style (heading + first paragraph on one line) is caught.
+- CRediT author-contribution table cells are filtered out of heading
+  candidates (e.g. `Methodology\n\nX\n\nPre-registration peer review`).
+
+### Fixed
+
+- Adjacent same-canonical-label markers with a small gap coalesce into one
+  span (handles `Introduction\nBackground\n...` producing one `introduction`
+  instead of `introduction` + `introduction_2`).
+- `Acknowledgments`, `Author Contributions`, `Funding`, `Keywords` are now
+  detected when preceded by single-newline paragraph break (not just
+  blank-line).
+- `References`, `Appendix`, `Supplementary` no longer truncate at
+  `Email:` / `ORCID:` / author-bio boundary patterns.
+- `Declaration of Competing Interest` (Elsevier-style) added to
+  `conflict_of_interest` taxonomy variants.
+
+### Removed (taxonomy tightening)
+
+- `procedure`, `procedures` removed from canonical `methods` set — these are
+  subsection labels in APA papers, not top-level sections.
+- `study design`, `experimental design`, `methodology` removed from canonical
+  `methods` set — same reason.
+- `summary` removed from canonical `abstract` set — too ambiguous (meta-analyses
+  use it as per-study subheading).
+
+### Known limitations
+
+- Papers with no `Introduction` heading (some JESP papers jump from Abstract
+  directly to `6.2. Method`) produce a large `abstract` span covering both
+  abstract and intro. Structural — without an explicit marker, the partitioner
+  can't break the section.
+- Meta-analyses with embedded per-study summaries may produce unusual section
+  ordering. v1.6.1's target is well-formatted single-study APA papers.
+- Subheadings field is empty by design in v1.6.1 (smart list-vs-heading
+  discrimination deferred).
+
+### Internal
+
+- Sections package: `extract_pdf_layout` and `_annotate_layout` (pdfplumber
+  PDF annotator) are no longer used by the sections path. They remain in the
+  library for use by the structured (tables/figures) module. F0 step in
+  normalize remains for callers who explicitly pass `layout=...`.
+
 ## [1.6.0] — 2026-05-06
 
 ### Added
