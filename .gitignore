@@ -20,3 +20,8 @@ archive/
 
 # ESCImate -> Docpluck cross-team request doc (private handoff)
 REQUESTS_FROM_ESCIMATE.md
+
+# PDFs are never committed to this public MIT repo. Test fixtures use the
+# manifest-with-skip pattern via tests/conftest.py and tests/fixtures/structured/MANIFEST.json
+# referencing PDFs in the local ~/Dropbox/Vibe/ corpus.
+*.pdf
