@@ -21,6 +21,10 @@ def _hint(text, start, end, *, strong=True, source="layout"):
 
 
 def test_unrecognized_strong_hint_inside_methods_attaches_as_subheading():
+    """Unrecognized hints with heading_strength="strong" (regardless of source)
+    inside a canonical section are attached as subheadings.  'Participants' is
+    unrecognized by the taxonomy but has heading_strength="strong", so it becomes
+    a subheading of the enclosing methods section."""
     text = (
         "Method\nbody of methods.\n"
         "Participants\nWe recruited 200 students.\n"
@@ -65,35 +69,16 @@ def test_multiple_subheadings_in_document_order():
     assert methods.subheadings == ("Participants", "Materials", "Power Analysis")
 
 
-def test_text_pattern_weak_isolated_headings_attach_as_subheadings():
-    """Pass-3 line-isolated multi-word headings should reach subheadings."""
-    from docpluck.sections.annotators.text import annotate_text
-
-    text = (
-        "Method body of methods text.\n"
-        "\n"
-        "Power Analysis and Sensitivity Test\n"
-        "\n"
-        "Some body content explaining power analysis.\n"
-        "\n"
-        "Design and Procedure\n"
-        "\n"
-        "More body content.\n"
-        "\n"
-        "Results\n"
-        "results body text.\n"
-    )
-    hints = annotate_text(text)
-    sections = partition_into_sections(text, hints, source_format="pdf")
-    methods = next(s for s in sections if s.label == "methods")
-    assert "Power Analysis and Sensitivity Test" in methods.subheadings, \
-        f"got {methods.subheadings}"
-    assert "Design and Procedure" in methods.subheadings, \
-        f"got {methods.subheadings}"
-
-
 def test_table_cell_one_word_fragments_not_attached_as_subheadings():
-    """Table cells like 'No' or 'Year' should not pollute subheadings."""
+    """Asserts that weak text_pattern hints are not attached as subheadings (v1.6.1
+    narrow subheading filter).
+
+    With the v1.6.1 filter (strong-or-markup only), ALL weak text_pattern hints
+    — including table-cell fragments like 'No'/'Yes'/'Maybe' — are discarded
+    before the subheadings attachment pass.  This test passes trivially because
+    the pre-Issue-3 filter already excludes every weak text_pattern hint.
+    Smart list-vs-heading discrimination is deferred to v1.6.2+.
+    """
     from docpluck.sections.annotators.text import annotate_text
 
     text = (
@@ -106,7 +91,7 @@ def test_table_cell_one_word_fragments_not_attached_as_subheadings():
     hints = annotate_text(text)
     sections = partition_into_sections(text, hints, source_format="pdf")
     methods = next(s for s in sections if s.label == "methods")
-    # Single-word fragments adjacent to other table-like fragments should be filtered.
+    # Weak text_pattern hints are excluded by the v1.6.1 narrow filter.
     for bad in ("No", "Yes", "Maybe"):
         assert bad not in methods.subheadings, f"got {methods.subheadings}"
 
