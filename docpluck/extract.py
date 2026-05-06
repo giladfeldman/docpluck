@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 
-def extract_pdf(pdf_bytes: bytes) -> tuple[str, str]:
+def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
     """Extract text from PDF bytes.
 
     Uses pdftotext as the primary engine. Automatically falls back to
@@ -31,11 +31,18 @@ def extract_pdf(pdf_bytes: bytes) -> tuple[str, str]:
 
     Args:
         pdf_bytes: Raw PDF file content as bytes.
+        sections: Optional list of section labels (e.g. ``["abstract",
+            "methods"]``) to filter the output. When provided, the full text
+            is first extracted, then ``extract_sections`` is called and only
+            the requested sections are returned concatenated in document order.
+            Pass ``None`` (default) to return the full unfiltered text.
 
     Returns:
         A tuple of (text, method) where:
-          - text: Extracted plain text. May start with "ERROR: ..." if extraction
-            failed — check with text.startswith("ERROR:").
+          - text: Extracted plain text. When ``sections`` is not None, only the
+            text from the requested sections is included. May start with
+            "ERROR: ..." if extraction failed — check with
+            text.startswith("ERROR:").
           - method: Engine used. One of:
               "pdftotext_default"                   — normal extraction
               "pdftotext_default+pdfplumber_recovery" — SMP fallback triggered
@@ -47,6 +54,10 @@ def extract_pdf(pdf_bytes: bytes) -> tuple[str, str]:
         with open("paper.pdf", "rb") as f:
             text, method = extract_pdf(f.read())
         print(f"Extracted {len(text)} chars via {method}")
+
+        # Filter to only abstract + methods:
+        with open("paper.pdf", "rb") as f:
+            text, method = extract_pdf(f.read(), sections=["abstract", "methods"])
     """
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(pdf_bytes)
@@ -75,6 +86,11 @@ def extract_pdf(pdf_bytes: bytes) -> tuple[str, str]:
             if recovered:
                 text = recovered
                 method = "pdftotext_default+pdfplumber_recovery"
+
+        if sections is not None:
+            from .sections import extract_sections
+            doc = extract_sections(pdf_bytes)
+            return doc.text_for(*sections), method
 
         return text, method
 
