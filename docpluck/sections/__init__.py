@@ -53,18 +53,45 @@ def extract_sections(
     fmt = source_format or _detect_format(file_bytes)
 
     if fmt == "pdf":
-        from .annotators.pdf import annotate_pdf, _annotate_layout  # noqa: F401
-        from .core import partition_into_sections
+        from .annotators.pdf import _annotate_layout
+        from .core import partition_into_sections, append_footnotes_section
         from ..extract_layout import extract_pdf_layout
+        from ..normalize import normalize_text, NormalizationLevel
+
         layout = extract_pdf_layout(file_bytes)
-        normalized = layout.raw_text
+        # Run normalize at academic level WITH layout — this strips
+        # footnotes/headers/footers and appends a footnote appendix.
+        normalized, report = normalize_text(
+            layout.raw_text, NormalizationLevel.academic, layout=layout
+        )
+        # Re-extract layout-aware hints from raw layout (annotator works on
+        # the layout itself, not on the post-strip text).
         _, hints = _annotate_layout(layout)
+        # Adjust hint offsets: hints reference offsets in the RAW text;
+        # F0 produced a different normalized string. Drop hints that don't
+        # appear verbatim in `normalized` and rebuild offsets via .find().
+        adjusted: list = []
+        cursor = 0
+        for h in hints:
+            idx = normalized.find(h.text, cursor)
+            if idx < 0:
+                continue
+            cursor = idx + len(h.text)
+            adjusted.append(type(h)(
+                text=h.text, char_start=idx, char_end=idx + len(h.text),
+                page=h.page, is_heading_candidate=h.is_heading_candidate,
+                heading_strength=h.heading_strength,
+                heading_source=h.heading_source,
+            ))
         sections = partition_into_sections(
-            normalized, hints, source_format="pdf",
-            page_offsets=layout.page_offsets,
+            normalized, adjusted, source_format="pdf",
+            page_offsets=report.page_offsets,
+        )
+        sections = append_footnotes_section(
+            sections, normalized, report.footnote_spans
         )
         return SectionedDocument(
-            sections=sections,
+            sections=tuple(sections),
             normalized_text=normalized,
             sectioning_version=SECTIONING_VERSION,
             source_format="pdf",
