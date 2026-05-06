@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 
 
@@ -46,8 +47,6 @@ class DetectedVia(str, Enum):
     text_pattern_fallback = "text_pattern_fallback"
     position_inferred = "position_inferred"
 
-
-import re
 
 # Heading-text → canonical-label map. Lookup is case-folded,
 # whitespace-collapsed, leading-numbering-stripped, trailing-punctuation-stripped.
