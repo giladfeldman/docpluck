@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from ..blocks import BlockHint
+from ..taxonomy import lookup_canonical_label
 
 # A "strong" heading line: standalone, on its own line, with optional numbering,
 # matches a known canonical heading word, and has no terminal period in body
@@ -35,26 +36,6 @@ _UNDERLINED_HEADING = re.compile(
     """,
 )
 
-_SPACED_CAPS = re.compile(r"(?m)^[ \t]*(?:[A-Z][ \t]){2,30}[A-Z][ \t]*$")
-
-
-def _spaced_caps_pass(text: str, hints: list[BlockHint], seen: set[int]) -> None:
-    for m in _SPACED_CAPS.finditer(text):
-        start, end = m.start(), m.end()
-        if start in seen:
-            continue
-        seen.add(start)
-        compact = m.group().replace(" ", "").replace("\t", "")
-        hints.append(BlockHint(
-            text=compact,
-            char_start=start,
-            char_end=end,
-            page=None,
-            is_heading_candidate=True,
-            heading_strength="strong",  # spaced caps are visually distinct
-            heading_source="text_pattern",
-        ))
-
 
 def annotate_text(text: str) -> list[BlockHint]:
     """Scan `text` for standalone heading-candidate lines.
@@ -83,9 +64,6 @@ def annotate_text(text: str) -> list[BlockHint]:
             heading_source="text_pattern",
         ))
 
-    # Spaced-caps pass before the general heading scan.
-    _spaced_caps_pass(text, hints, seen_offsets)
-
     for m in _HEADING_LINE.finditer(text):
         start = m.start("heading")
         end = m.end("heading")
@@ -107,7 +85,6 @@ def annotate_text(text: str) -> list[BlockHint]:
             continue
         # Strong if it's a recognized canonical heading by simple lowercase
         # whole-word check; weak otherwise.
-        from ..taxonomy import lookup_canonical_label
         strength = "strong" if lookup_canonical_label(heading) is not None else "weak"
         hints.append(BlockHint(
             text=heading,
