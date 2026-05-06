@@ -64,6 +64,7 @@ def test_lookup_synonyms():
     assert lookup_canonical_label("Competing Interests") == SectionLabel.conflict_of_interest
     assert lookup_canonical_label("Disclosure") == SectionLabel.conflict_of_interest
     assert lookup_canonical_label("Supporting Information") == SectionLabel.supplementary
+    assert lookup_canonical_label("General Discussion") == SectionLabel.general_discussion
 
 
 def test_lookup_returns_none_for_unrecognized():
