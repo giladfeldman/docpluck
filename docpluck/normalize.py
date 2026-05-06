@@ -155,12 +155,27 @@ class NormalizationReport:
         }
 
 
-def normalize_text(text: str, level: NormalizationLevel) -> tuple[str, NormalizationReport]:
-    """Apply normalization pipeline at the specified level."""
+def normalize_text(
+    text: str,
+    level: NormalizationLevel,
+    *,
+    layout=None,
+) -> tuple[str, NormalizationReport]:
+    """Apply normalization pipeline at the specified level.
+
+    When `layout` is provided (a docpluck.extract_layout.LayoutDoc), the
+    F0 step strips footnotes/running-headers/footers using PDF layout info
+    and populates report.footnote_spans + report.page_offsets.
+    """
     if level == NormalizationLevel.none:
-        return text, NormalizationReport(level="none")
+        report = NormalizationReport(level="none")
+        if layout is not None:
+            report.page_offsets = layout.page_offsets
+        return text, report
 
     report = NormalizationReport(level=level.value)
+    if layout is not None:
+        report.page_offsets = layout.page_offsets
     t = text
 
     # Snapshot raw page-number set before any mutation — R2 needs lines that
