@@ -82,13 +82,16 @@ def partition_into_sections(
     Algorithm:
       1. Resolve each hint to (label, confidence, via) per conflict rule.
          Drop hints that resolve to None.
-      2. Sort markers by char_start. Coalesce duplicates at same offset.
-      3. Each marker starts a span ending at the next marker's char_start
-         (or end-of-text). If first marker is not at offset 0, prepend an
-         `unknown` span covering [0, first_marker).
-      4. Coalesce ADJACENT spans with the same label into one (rare).
-      5. Assign numeric suffixes to repeated canonical labels in document
-         order.
+      2. Sort markers by char_start. Deduplicate markers at same offset.
+      3. Assign numeric suffixes to repeated canonical labels in document
+         order (so suffix is on the marker before sections are built).
+      4. Build sections: each marker starts a span ending at the next
+         marker's char_start (or end-of-text). If first marker is not at
+         offset 0, prepend an `unknown` span covering [0, first_marker).
+      5. Coalesce ADJACENT spans with the same canonical label (skipped for
+         `unknown` to preserve heading-derived span boundaries).
+      6. Boundary-aware truncation: scan each labeled span line-by-line
+         (skipping the heading line) and split at the first boundary line.
     """
     markers: list[_Marker] = []
     for hint in hints:
