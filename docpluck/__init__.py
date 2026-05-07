@@ -66,7 +66,7 @@ from .sections import (
     extract_sections, SectionedDocument, Section,
     SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
 )
-from .tables import Table
+from .tables import Cell, Table
 from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
 
@@ -102,6 +102,7 @@ __all__ = [
     "DetectedVia",
     "SECTIONING_VERSION",
     # Structured extraction (v2.0)
+    "Cell",
     "Table",
     "Figure",
     "TABLE_EXTRACTION_VERSION",
