@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased — v2.0.0 candidate] — 2026-05-07
+
+### Added
+- `extract_pdf_structured()` — structured PDF extraction returning tables, figures, page count, method, and text in a single call. Opt-in companion to `extract_pdf()`; the existing function is unchanged.
+- `docpluck.tables` package — table region detection, lattice + whitespace cell clustering, HTML rendering, confidence scoring with isolation fallback (`ISOLATION_THRESHOLD = 0.4`).
+- `docpluck.figures` package — caption-anchored figure detection (label, page, bbox, caption metadata only; no image extraction in v2.0).
+- `Cell`, `Table`, `Figure`, `StructuredResult` TypedDicts and `TABLE_EXTRACTION_VERSION` re-exported from top-level `docpluck`.
+- New CLI flags on `docpluck extract`: `--structured`, `--thorough`, `--text-mode {raw,placeholder}`, `--tables-only`, `--figures-only`, `--html-tables-to DIR`.
+- F0 footnote-strip in `normalize_text()` accepts a new `table_regions=` kwarg; lines whose y-range falls inside any provided table region are preserved (so table footnotes like `Note. *p < .05.` are not misclassified as page footnotes).
+- New geometric primitives on `LayoutDoc.PageLayout`: `lines`, `rects`, `curves`, `chars`, `words` (all backwards-compatible additions; section-id v1.6.0 consumers continue to read only `spans`).
+- 12-fixture smoke corpus driven by `tests/fixtures/structured/MANIFEST.json` (manifest-only — PDFs not committed; tests skip cleanly when source PDFs are not on the local Dropbox tree).
+- Backwards-compat snapshot tests for `extract_pdf()` across all 12 fixtures.
+
+### Coordination
+- Builds on top of section-id v1.6.0's `extract_pdf_layout()` / `LayoutDoc`.
+- Resolves the latent F0 / table-footnote conflict noted in v1.6.0's spec.
+
+### Compatibility
+- `extract_pdf()` output is byte-identical to v1.6.x — verified by snapshot tests on 12 PDFs.
+- All existing public APIs unchanged.
+- New surface is purely additive.
+- `__version__` not bumped in this commit; release timing TBD (concurrent section-id v1.6.1 work is also in flight).
+
 ## [1.6.1] — 2026-05-06
 
 ### Changed

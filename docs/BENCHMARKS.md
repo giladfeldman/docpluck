@@ -403,3 +403,31 @@ The v1.3.0 baseline surfaced three real gaps. All three are addressed in v1.3.1.
 ### Verdict
 
 **v1.3.1: all 9 criteria PASS.** 200/200 files, 100% high confidence, avg quality 99.95/100, zero garbled, zero residual artifacts across the entire MetaESCI corpus. The `metaesci_regression` gate in Phase C.3 is now clear.
+
+---
+
+## Phase 4: Table & Figure Extraction (v2.0 — preliminary)
+
+Smoke fixture corpus only (12 PDFs, hand-picked for category coverage). Formal TEDS / cell-exact-match benchmarks deferred to v2.1 (see `TODO.md`).
+
+### Detection
+
+| Category | Fixtures | All detect ≥ expected (±2)? |
+|---|---|---|
+| APA lineless | 4 | ✓ |
+| Lattice (full-grid) | 4 | ✓ |
+| Nature minimal-rule | 2 | ✓ |
+| Figure-heavy | 2 | ✓ |
+
+The smoke test asserts only that detected counts fall within ±2 of the manifest's expected counts — heuristic variance is expected at this stage; calibrated counts are recorded in `tests/fixtures/structured/MANIFEST.json`.
+
+### Hard guarantees verified by smoke
+
+- `extract_pdf_structured(pdf_bytes)` never raises — graceful degradation to empty `tables=[]`, `figures=[]` on extraction failures.
+- Every `kind="structured"` table emits non-empty cells, non-null HTML, and a confidence ∈ [0.4, 0.95].
+- Every `kind="isolated"` table has empty cells, null HTML, null confidence, and non-empty `raw_text`.
+- `extract_pdf()` output is byte-identical to v1.6.x on all 12 fixtures (snapshot-based).
+
+### Deferred to v2.1
+
+Hand-labeled HTML ground truth + TEDS / cell-exact-match metrics on a 30-40 PDF APA-psych corpus. Target: TEDS > 0.80 on the APA-psych slice.

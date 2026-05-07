@@ -264,6 +264,24 @@ inscriptis is the strongest alternative — it's an academic tool (JOSS paper) w
 
 ---
 
+## 13. Why a separate `extract_pdf_structured()` function (v2.0)
+
+v2.0 added structured table and figure extraction. We considered three API approaches:
+
+1. **Additive function** — keep `extract_pdf()` as is, add `extract_pdf_structured()` returning a richer dict.
+2. **Opt-in flag on `extract_pdf()`** — `extract_pdf(pdf_bytes, structured=True)` returns a dict instead of a tuple.
+3. **Breaking change** — `extract_pdf()` always returns a dict in v2.0.
+
+We chose (1). The two-tuple `(text, method)` contract is pinned by the SaaS service via git-pin and consumed by 4+ downstream projects (ESCIcheck, MetaESCI, Scimeto, MetaMisCitations). A breaking change forces a coordinated bump everywhere; an opt-in flag changes the return type based on a parameter (awkward to type and document); an additive function lets new consumers opt in without disturbing old ones.
+
+Internally the two functions share the PDF parse via the v1.6.0 `LayoutDoc` abstraction; structured extraction costs ~3-5× more than text-only because of the geometric clustering pass, not because of duplicated parsing.
+
+Confidence is scored in two stages — `score_table()` returns the raw pre-clamp value (used for the isolation fall-back decision at threshold 0.4); `clamp_confidence()` applies per-rendering floor/ceiling to produce the user-visible `Table.confidence`. The separation matters: the whitespace floor is 0.4, equal to the threshold — clamping inside `score_table()` would silently absorb the fall-back signal.
+
+See `docs/superpowers/specs/2026-05-06-table-extraction-design.md` for full data model and detection algorithm.
+
+---
+
 ## Known Limitations
 
 See the Docpluck App [UNADDRESSED_ISSUES.md](https://github.com/giladfeldman/docpluckapp) for the full list. Key ones:
