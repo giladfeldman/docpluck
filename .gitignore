@@ -20,6 +20,11 @@ benchmarks/
 # Archive of internal design specs and cross-team handoff drafts.
 archive/
 
+# v1.6.1 surgical-fix brainstorm — content was rolled into the v2.0.0
+# release (not a separate release artifact). Local working docs only.
+docs/superpowers/specs/2026-05-06-section-identification-v1.6.1-surgical-fix-design.md
+docs/superpowers/plans/2026-05-06-section-identification-v1.6.1-surgical-fix.md
+
 # ESCImate -> Docpluck cross-team request doc (private handoff)
 REQUESTS_FROM_ESCIMATE.md
 
