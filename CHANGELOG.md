@@ -1,106 +1,64 @@
 # Changelog
 
-## [Unreleased — v2.0.0 candidate] — 2026-05-07
+## [2.0.0] — 2026-05-07
 
-### Added
+A combined release: structured-extraction (tables + figures) and a section-identification surgical fix that makes sectioning actually usable on real APA papers. Both work streams landed concurrently on `feat/table-extraction` and ship together.
+
+### Added — structured extraction
+
 - `extract_pdf_structured()` — structured PDF extraction returning tables, figures, page count, method, and text in a single call. Opt-in companion to `extract_pdf()`; the existing function is unchanged.
 - `docpluck.tables` package — table region detection, lattice + whitespace cell clustering, HTML rendering, confidence scoring with isolation fallback (`ISOLATION_THRESHOLD = 0.4`).
 - `docpluck.figures` package — caption-anchored figure detection (label, page, bbox, caption metadata only; no image extraction in v2.0).
 - `Cell`, `Table`, `Figure`, `StructuredResult` TypedDicts and `TABLE_EXTRACTION_VERSION` re-exported from top-level `docpluck`.
 - New CLI flags on `docpluck extract`: `--structured`, `--thorough`, `--text-mode {raw,placeholder}`, `--tables-only`, `--figures-only`, `--html-tables-to DIR`.
 - F0 footnote-strip in `normalize_text()` accepts a new `table_regions=` kwarg; lines whose y-range falls inside any provided table region are preserved (so table footnotes like `Note. *p < .05.` are not misclassified as page footnotes).
-- New geometric primitives on `LayoutDoc.PageLayout`: `lines`, `rects`, `curves`, `chars`, `words` (all backwards-compatible additions; section-id v1.6.0 consumers continue to read only `spans`).
+- New geometric primitives on `LayoutDoc.PageLayout`: `lines`, `rects`, `curves`, `chars`, `words` — all additive.
 - 12-fixture smoke corpus driven by `tests/fixtures/structured/MANIFEST.json` (manifest-only — PDFs not committed; tests skip cleanly when source PDFs are not on the local Dropbox tree).
-- Backwards-compat snapshot tests for `extract_pdf()` across all 12 fixtures.
+- Backwards-compat snapshot tests for `extract_pdf()` across all 12 fixtures (output is byte-identical to v1.6.x).
 
-### Coordination
-- Builds on top of section-id v1.6.0's `extract_pdf_layout()` / `LayoutDoc`.
-- Resolves the latent F0 / table-footnote conflict noted in v1.6.0's spec.
+### Changed — section identification (surgical fix)
+
+- **Architectural pivot.** The PDF section path now consumes `extract_pdf` (pdftotext) + `normalize_text(academic)` instead of `extract_pdf_layout` (pdfplumber). Sectioning runs after the library's canonical 22-step normalization pipeline (hyphenation repair, line-break joining, header/footer removal, footnote stripping, page-number scrub, watermark strip, statistical pattern repair, etc.) and so inherits all of it for free. The pdfplumber-based path was producing column-merged text (e.g. `References` jammed mid-line into body text) and font-size heuristics that failed on body-font-bold headings (`Abstract`). Result on a 5-paper APA corpus: every canonical section is detected, no garbage `unknown` spans, no running-header contamination.
+- **Section partitioner: only canonical-taxonomy heading matches create section markers.** v1.6.0 promoted any layout-strong heading (including page running headers, citation residue, methods/results subsections) to an `unknown` section, which on real APA papers shredded ~90% of the document into incoherent fragments. Layout-strong headings whose text isn't in the canonical taxonomy are no longer separate sections.
+- **`SECTIONING_VERSION` 1.0.0 → 1.1.0** (additive `subheadings` field; output shape change).
+- **Boundary-aware truncation disabled** for all canonical labels. With strict canonical-only markers + clean normalized text, truncation patterns (Email/ORCID/author-bio caps) were destructive — cutting References to a few characters or chopping Introduction at a `Corresponding Author:` line.
+
+### Added — section identification
+
+- `Section.subheadings: tuple[str, ...]` (default `()`) — placeholder for in-section structure surfaced by future smart subheading detection. Empty in v2.0.0; populated in a later release.
+- Text annotator detects canonical headings whether line-isolated, followed by Capital-body word, or preceded by blank line — so `Abstract Jordan et al., 2011...` style (heading + first paragraph on one line) is caught.
+- CRediT author-contribution table cells are filtered out of heading candidates (e.g. `Methodology\n\nX\n\nPre-registration peer review`).
+
+### Fixed — section identification
+
+- Adjacent same-canonical-label markers with a small gap coalesce into one span (handles `Introduction\nBackground\n...` producing one `introduction` instead of `introduction` + `introduction_2`).
+- `Acknowledgments`, `Author Contributions`, `Funding`, `Keywords` are now detected when preceded by single-newline paragraph break (not just blank-line).
+- `References`, `Appendix`, `Supplementary` no longer truncate at `Email:` / `ORCID:` / author-bio boundary patterns.
+- `Declaration of Competing Interest` (Elsevier-style) added to `conflict_of_interest` taxonomy variants.
+
+### Removed — section taxonomy tightening
+
+- `procedure`, `procedures` removed from canonical `methods` set — APA subsection labels, not top-level sections.
+- `study design`, `experimental design`, `methodology` removed from canonical `methods` set — same reason.
+- `summary` removed from canonical `abstract` set — too ambiguous (meta-analyses use it as per-study subheading).
 
 ### Compatibility
+
 - `extract_pdf()` output is byte-identical to v1.6.x — verified by snapshot tests on 12 PDFs.
 - All existing public APIs unchanged.
-- New surface is purely additive.
-- `__version__` not bumped in this commit; release timing TBD (concurrent section-id v1.6.1 work is also in flight).
+- New surface (structured extraction) is purely additive; opt-in via `extract_pdf_structured()` or `--structured` CLI flag.
+- `Section.subheadings` is an additive dataclass field with default `()`; existing constructors keep working unchanged.
 
-## [1.6.1] — 2026-05-06
+### Known limitations (sections)
 
-### Changed
-
-- **Section identification: architectural pivot.** The PDF section path now
-  consumes `extract_pdf` (pdftotext) + `normalize_text(academic)` instead of
-  `extract_pdf_layout` (pdfplumber). Sectioning runs after the library's
-  canonical 22-step normalization pipeline (hyphenation repair, line-break
-  joining, header/footer removal, footnote stripping, page-number scrub,
-  watermark strip, statistical pattern repair, etc.) and so inherits all of it
-  for free. The pdfplumber-based path was producing column-merged text (e.g.
-  `References` jammed mid-line into body text) and font-size heuristics that
-  failed on body-font-bold headings (`Abstract`). Result on a 5-paper APA
-  corpus: every canonical section is detected, no garbage `unknown` spans, no
-  running-header contamination.
-- **Section partitioner: only canonical-taxonomy heading matches create
-  section markers.** v1.6.0 promoted any layout-strong heading (including
-  page running headers, citation residue, methods/results subsections) to an
-  `unknown` section, which on real APA papers shredded ~90% of the document
-  into incoherent fragments. Layout-strong headings whose text isn't in the
-  canonical taxonomy are no longer separate sections.
-- **`SECTIONING_VERSION` 1.0.0 → 1.1.0** (additive `subheadings` field, output
-  shape change).
-- **Boundary-aware truncation disabled** for all canonical labels. With
-  strict canonical-only markers + clean normalized text, truncation patterns
-  (Email/ORCID/author-bio caps) were destructive — cutting References to a
-  few characters or chopping Introduction at a `Corresponding Author:` line.
-
-### Added
-
-- `Section.subheadings: tuple[str, ...]` (default `()`) — placeholder for
-  in-section structure surfaced by future smart subheading detection. Empty
-  in v1.6.1; populated in a later release.
-- Text annotator detects canonical headings whether line-isolated, followed
-  by Capital-body word, or preceded by blank line — so `Abstract Jordan
-  et al., 2011...` style (heading + first paragraph on one line) is caught.
-- CRediT author-contribution table cells are filtered out of heading
-  candidates (e.g. `Methodology\n\nX\n\nPre-registration peer review`).
-
-### Fixed
-
-- Adjacent same-canonical-label markers with a small gap coalesce into one
-  span (handles `Introduction\nBackground\n...` producing one `introduction`
-  instead of `introduction` + `introduction_2`).
-- `Acknowledgments`, `Author Contributions`, `Funding`, `Keywords` are now
-  detected when preceded by single-newline paragraph break (not just
-  blank-line).
-- `References`, `Appendix`, `Supplementary` no longer truncate at
-  `Email:` / `ORCID:` / author-bio boundary patterns.
-- `Declaration of Competing Interest` (Elsevier-style) added to
-  `conflict_of_interest` taxonomy variants.
-
-### Removed (taxonomy tightening)
-
-- `procedure`, `procedures` removed from canonical `methods` set — these are
-  subsection labels in APA papers, not top-level sections.
-- `study design`, `experimental design`, `methodology` removed from canonical
-  `methods` set — same reason.
-- `summary` removed from canonical `abstract` set — too ambiguous (meta-analyses
-  use it as per-study subheading).
-
-### Known limitations
-
-- Papers with no `Introduction` heading (some JESP papers jump from Abstract
-  directly to `6.2. Method`) produce a large `abstract` span covering both
-  abstract and intro. Structural — without an explicit marker, the partitioner
-  can't break the section.
-- Meta-analyses with embedded per-study summaries may produce unusual section
-  ordering. v1.6.1's target is well-formatted single-study APA papers.
-- Subheadings field is empty by design in v1.6.1 (smart list-vs-heading
-  discrimination deferred).
+- Papers with no `Introduction` heading (some JESP papers jump from Abstract directly to `6.2. Method`) produce a large `abstract` span covering both abstract and intro. Structural — without an explicit marker, the partitioner can't break the section.
+- Meta-analyses with embedded per-study summaries may produce unusual section ordering. v2.0.0's section target is well-formatted single-study APA papers.
+- `subheadings` field is empty by design in v2.0.0 (smart list-vs-heading discrimination deferred).
 
 ### Internal
 
-- Sections package: `extract_pdf_layout` and `_annotate_layout` (pdfplumber
-  PDF annotator) are no longer used by the sections path. They remain in the
-  library for use by the structured (tables/figures) module. F0 step in
-  normalize remains for callers who explicitly pass `layout=...`.
+- Sections package: `extract_pdf_layout` and `_annotate_layout` (pdfplumber PDF annotator) are no longer used by the sections path. They remain in the library for use by the structured (tables/figures) module. F0 step in normalize remains for callers who explicitly pass `layout=...`.
+- Coordination: structured extraction builds on top of `extract_pdf_layout()` / `LayoutDoc`; resolves the latent F0 / table-footnote conflict noted in v1.6.0's spec.
 
 ## [1.6.0] — 2026-05-06
 
