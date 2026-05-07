@@ -30,6 +30,14 @@ class PageLayout:
     width: float
     height: float
     spans: tuple[TextSpan, ...]
+    # v2.0 geometric primitives (added for table/figure extraction).
+    # These mirror pdfplumber's native per-page collections, frozen as
+    # immutable tuples of plain dicts so the dataclass stays hashable.
+    lines: tuple[dict, ...] = ()
+    rects: tuple[dict, ...] = ()
+    curves: tuple[dict, ...] = ()
+    chars: tuple[dict, ...] = ()
+    words: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -72,6 +80,11 @@ def extract_pdf_layout(pdf_bytes: bytes) -> LayoutDoc:
                 width=float(p.width),
                 height=float(p.height),
                 spans=spans,
+                lines=tuple(p.lines or ()),
+                rects=tuple(p.rects or ()),
+                curves=tuple(p.curves or ()),
+                chars=tuple(p.chars or ()),
+                words=tuple(p.extract_words() or ()),
             ))
 
     return LayoutDoc(

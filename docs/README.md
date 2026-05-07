@@ -91,6 +91,52 @@ if quality["garbled"]:
 
 ---
 
+## Structured extraction (v2.0)
+
+For consumers that need tables and figures as structured data — meta-analysis tooling, statistical-claim extraction, dashboards — call `extract_pdf_structured()`:
+
+```python
+from docpluck import extract_pdf_structured
+
+with open("paper.pdf", "rb") as f:
+    result = extract_pdf_structured(f.read())
+
+print(f"{result['page_count']} pages")
+print(f"{len(result['tables'])} tables, {len(result['figures'])} figures")
+
+for t in result["tables"]:
+    print(f"  {t['label']} on page {t['page']} ({t['kind']}, confidence={t['confidence']})")
+    if t["kind"] == "structured":
+        print(f"    {t['n_rows']} rows × {t['n_cols']} cols")
+```
+
+### Modes
+
+```python
+# Default: caption-anchored fast path.
+extract_pdf_structured(pdf_bytes)
+
+# Thorough: scan every page for uncaptioned tables (slower).
+extract_pdf_structured(pdf_bytes, thorough=True)
+
+# Strip table/figure regions from `text` and replace with [Label: caption] markers.
+extract_pdf_structured(pdf_bytes, table_text_mode="placeholder")
+```
+
+### CLI
+
+```
+docpluck extract paper.pdf --structured > out.json
+docpluck extract paper.pdf --structured --thorough --text-mode placeholder
+docpluck extract paper.pdf --structured --html-tables-to ./out/
+```
+
+`extract_pdf()` (the v1 text-only path) is unchanged. New consumers opt in to the structured path; existing consumers see no behavioral change.
+
+See `docs/superpowers/specs/2026-05-06-table-extraction-design.md` for the full schema and design rationale.
+
+---
+
 ## API Reference
 
 ### `extract_pdf(pdf_bytes: bytes) → tuple[str, str]`

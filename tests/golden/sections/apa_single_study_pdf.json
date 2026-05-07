@@ -1,5 +1,5 @@
 {
-  "sectioning_version": "1.0.0",
+  "sectioning_version": "1.1.0",
   "source_format": "pdf",
   "sections": [
     {
@@ -7,11 +7,9 @@
       "canonical_label": "abstract",
       "char_start": 0,
       "char_end": 36,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Abstract"
     },
     {
@@ -19,11 +17,9 @@
       "canonical_label": "introduction",
       "char_start": 36,
       "char_end": 61,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Introduction"
     },
     {
@@ -31,11 +27,9 @@
       "canonical_label": "methods",
       "char_start": 61,
       "char_end": 84,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Methods"
     },
     {
@@ -43,11 +37,9 @@
       "canonical_label": "results",
       "char_start": 84,
       "char_end": 108,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Results"
     },
     {
@@ -55,11 +47,9 @@
       "canonical_label": "discussion",
       "char_start": 108,
       "char_end": 133,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Discussion"
     },
     {
@@ -67,11 +57,9 @@
       "canonical_label": "references",
       "char_start": 133,
       "char_end": 163,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "References"
     }
   ]

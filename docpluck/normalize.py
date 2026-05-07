@@ -143,7 +143,7 @@ def _detect_repeating_lines(layout, *, position: str) -> set[str]:
 
 
 def _f0_strip_running_and_footnotes(
-    raw_text: str, layout
+    raw_text: str, layout, table_regions: list[dict] | None = None,
 ) -> tuple[str, list[tuple[int, int]]]:
     """Strip running headers/footers and footnotes using layout info.
 
@@ -155,6 +155,27 @@ def _f0_strip_running_and_footnotes(
         return raw_text, []
 
     body_size = _body_size(layout)
+
+    # Pre-index table regions by 1-indexed page number for fast lookup.
+    regions_by_page: dict[int, list[tuple[float, float, float, float]]] = {}
+    if table_regions:
+        for r in table_regions:
+            page = int(r.get("page", 0))
+            bbox = r.get("bbox")
+            if page < 1 or not bbox or len(bbox) != 4:
+                continue
+            regions_by_page.setdefault(page, []).append(tuple(bbox))  # type: ignore[arg-type]
+
+    def _span_in_table_region(span_y0: float, span_y1: float, span_x0: float,
+                              span_x1: float, page_1based: int) -> bool:
+        for rx0, rtop, rx1, rbot in regions_by_page.get(page_1based, ()):
+            # Span y-range overlaps region y-range AND x-range overlaps region x-range.
+            if span_y1 < rtop or span_y0 > rbot:
+                continue
+            if span_x1 < rx0 or span_x0 > rx1:
+                continue
+            return True
+        return False
 
     page_text_chunks: list[str] = []
     footnote_chunks: list[str] = []
@@ -185,6 +206,9 @@ def _f0_strip_running_and_footnotes(
                 span.y0 < body_y_min - 30
                 and span.font_size < body_size * 0.92
                 and not is_footer
+                and not _span_in_table_region(
+                    span.y0, span.y1, span.x0, span.x1, page.page_index + 1,
+                )
             )
 
             if is_header or is_footer:
@@ -280,12 +304,18 @@ def normalize_text(
     level: NormalizationLevel,
     *,
     layout=None,
+    table_regions: list[dict] | None = None,
 ) -> tuple[str, NormalizationReport]:
     """Apply normalization pipeline at the specified level.
 
     When `layout` is provided (a docpluck.extract_layout.LayoutDoc), the
     F0 step strips footnotes/running-headers/footers using PDF layout info
     and populates report.footnote_spans + report.page_offsets.
+
+    When `table_regions` (a list of ``{"page": int, "bbox": (x0, top, x1, bottom)}``)
+    is provided alongside `layout`, F0 will not strip lines whose y-range falls
+    inside any table region — preserving table footnotes (e.g. ``Note. *p < .05.``)
+    that would otherwise be misclassified as page footnotes.
     """
     if level == NormalizationLevel.none:
         report = NormalizationReport(level="none")
@@ -307,7 +337,7 @@ def normalize_text(
     # repeating running headers/footers and moves footnotes to an appendix
     # section after "\n\f\f\n". Populates report.footnote_spans.
     if layout is not None:
-        t, footnote_spans = _f0_strip_running_and_footnotes(t, layout)
+        t, footnote_spans = _f0_strip_running_and_footnotes(t, layout, table_regions=table_regions)
         report.footnote_spans = tuple(footnote_spans)
         report.steps_applied.append("F0")
         if footnote_spans:
