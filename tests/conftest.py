@@ -9,6 +9,13 @@ import os
 import shutil
 import pytest
 
+# Ensure subprocess calls that invoke the docpluck CLI inherit UTF-8 stdio.
+# This is needed on Windows where the default console encoding is cp1252 and
+# U+2212 (MINUS SIGN) — which appears in normalized statistical text — is not
+# representable.  Setting PYTHONUTF8 here propagates to any subprocess launched
+# by subprocess.run() in tests without an explicit env= argument.
+os.environ.setdefault("PYTHONUTF8", "1")
+
 
 def pdftotext_available():
     """Check if pdftotext binary is on PATH."""
