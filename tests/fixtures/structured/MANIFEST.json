@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "vibe_relative": true,
+  "fixtures": [
+    {
+      "id": "apa_chan_feldman_lineless",
+      "category": "apa_lineless",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chan_feldman_2025_cogemo.pdf",
+      "expected_tables": 8,
+      "expected_figures": 11,
+      "notes": "APA 2-column psychology paper, primary use case. Lineless tables. Calibrated 2026-05-07: table/figure detector identifies sub-regions and candidate cells more granularly."
+    },
+    {
+      "id": "apa_chen_jesp_lineless",
+      "category": "apa_lineless",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chen_2021_jesp.pdf",
+      "expected_tables": 11,
+      "expected_figures": 0,
+      "notes": "APA JESP paper, lineless tables. Calibrated 2026-05-07: granular table region detection."
+    },
+    {
+      "id": "apa_efendic_affect",
+      "category": "apa_lineless",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/efendic_2022_affect.pdf",
+      "expected_tables": 1,
+      "expected_figures": 0,
+      "notes": "APA Affect paper, lineless tables."
+    },
+    {
+      "id": "apa_ip_feldman_pspb",
+      "category": "apa_lineless",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ip_feldman_2025_pspb.pdf",
+      "expected_tables": 7,
+      "expected_figures": 0,
+      "notes": "APA PSPB paper. Lineless tables, possibly correlation matrix. Calibrated 2026-05-07: granular region detection."
+    },
+    {
+      "id": "bmc_lattice",
+      "category": "lattice_table",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_1.pdf",
+      "expected_tables": 1,
+      "expected_figures": 4,
+      "notes": "BMC Medicine — Springer-style lattice tables. Calibrated 2026-05-07: figure detection now active."
+    },
+    {
+      "id": "ieee_lattice",
+      "category": "lattice_table",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_2.pdf",
+      "expected_tables": 1,
+      "expected_figures": 0,
+      "notes": "IEEE Access — heavy-grid lattice tables."
+    },
+    {
+      "id": "jama_lattice",
+      "category": "lattice_table",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_1.pdf",
+      "expected_tables": 1,
+      "expected_figures": 0,
+      "notes": "JAMA Open — biomedical lattice tables."
+    },
+    {
+      "id": "amj_lattice",
+      "category": "lattice_table",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amj_1.pdf",
+      "expected_tables": 1,
+      "expected_figures": 0,
+      "notes": "Academy of Management Journal — lattice tables."
+    },
+    {
+      "id": "nature_minimal_rule",
+      "category": "nature_minimal_rule",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_1.pdf",
+      "expected_tables": 1,
+      "expected_figures": 1,
+      "notes": "Nature Communications — minimal-rule tables, gray-band header."
+    },
+    {
+      "id": "scirep_minimal_rule",
+      "category": "nature_minimal_rule",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_1.pdf",
+      "expected_tables": 1,
+      "expected_figures": 1,
+      "notes": "Scientific Reports — minimal-rule tables."
+    },
+    {
+      "id": "nat_comms_figure_only",
+      "category": "figure_only",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_2.pdf",
+      "expected_tables": 0,
+      "expected_figures": 2,
+      "notes": "Nature Communications paper with figures, expected no tables."
+    },
+    {
+      "id": "ieee_figure_heavy",
+      "category": "figure_only",
+      "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_3.pdf",
+      "expected_tables": 0,
+      "expected_figures": 2,
+      "notes": "IEEE engineering paper, figure-heavy."
+    }
+  ],
+  "known_gaps": [
+    "table_of_contents_negative — no fixture currently in the corpus",
+    "negative_no_tables_no_figures — no fixture currently in the corpus",
+    "uncaptioned_table — no fixture currently in the corpus"
+  ]
+}

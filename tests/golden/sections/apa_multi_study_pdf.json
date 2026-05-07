@@ -1,5 +1,5 @@
 {
-  "sectioning_version": "1.0.0",
+  "sectioning_version": "1.1.0",
   "source_format": "pdf",
   "sections": [
     {
@@ -7,11 +7,9 @@
       "canonical_label": "abstract",
       "char_start": 0,
       "char_end": 28,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Abstract"
     },
     {
@@ -19,11 +17,9 @@
       "canonical_label": "introduction",
       "char_start": 28,
       "char_end": 53,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Introduction"
     },
     {
@@ -31,11 +27,9 @@
       "canonical_label": "methods",
       "char_start": 53,
       "char_end": 78,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Methods"
     },
     {
@@ -43,11 +37,9 @@
       "canonical_label": "results",
       "char_start": 78,
       "char_end": 103,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Results"
     },
     {
@@ -55,11 +47,9 @@
       "canonical_label": "methods",
       "char_start": 103,
       "char_end": 128,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Methods"
     },
     {
@@ -67,11 +57,9 @@
       "canonical_label": "results",
       "char_start": 128,
       "char_end": 153,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "Results"
     },
     {
@@ -79,11 +67,9 @@
       "canonical_label": "general_discussion",
       "char_start": 153,
       "char_end": 183,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "General Discussion"
     },
     {
@@ -91,11 +77,9 @@
       "canonical_label": "references",
       "char_start": 183,
       "char_end": 213,
-      "pages": [
-        1
-      ],
+      "pages": [],
       "confidence": "high",
-      "detected_via": "layout_signal",
+      "detected_via": "heading_match",
       "heading_text": "References"
     }
   ]

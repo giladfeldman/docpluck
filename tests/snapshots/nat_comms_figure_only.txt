@@ -1,0 +1,913 @@
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Para-infectious brain injury in COVID-19
+
+persists at follow-up despite attenuated
+
+cytokine and autoantibody responses
+
+1234567890():,; 1234567890():,;
+
+Received: 4 May 2023 Accepted: 6 October 2023 Published online: 22 December 2023
+Check for updates
+
+A list of authors and their afﬁliations appears at the end of the paper
+To understand neurological complications of COVID-19 better both acutely and for recovery, we measured markers of brain injury, inﬂammatory mediators, and autoantibodies in 203 hospitalised participants; 111 with acute sera (1–11 days post-admission) and 92 convalescent sera (56 with COVID-19associated neurological diagnoses). Here we show that compared to 60 uninfected controls, tTau, GFAP, NfL, and UCH-L1 are increased with COVID-19 infection at acute timepoints and NfL and GFAP are signiﬁcantly higher in participants with neurological complications. Inﬂammatory mediators (IL-6, IL-12p40, HGF, M-CSF, CCL2, and IL-1RA) are associated with both altered consciousness and markers of brain injury. Autoantibodies are more common in COVID-19 than controls and some (including against MYL7, UCH-L1, and GRIN3B) are more frequent with altered consciousness. Additionally, convalescent participants with neurological complications show elevated GFAP and NfL, unrelated to attenuated systemic inﬂammatory mediators and to autoantibody responses. Overall, neurological complications of COVID-19 are associated with evidence of neuroglial injury in both acute and late disease and these correlate with dysregulated innate and adaptive immune responses acutely.
+
+At the beginning of the COVID-19 pandemic, neurological complications occurred in a signiﬁcant proportion of hospitalised patients1 and even in those with mild COVID-19 infection2. While these neurological ‘complications’ were often mild (headache and myalgia), it became clear that more signiﬁcant neurological sequelae were observed, including encephalitis/encephalopathies, Guillain Barre Syndrome, seizure, and stroke3–6.
+Although in vitro studies show that SARS-CoV-2 can infect neurons and astrocytes7,8, autopsy studies indicate that direct viral invasion is unlikely to be a cause of neurological dysfunction in vivo9. Post-
+mortem studies failed to detect viral infection of the brain by immu-
+nohistochemistry in the majority of cases, and viral qPCR levels were often low and may simply have reﬂected viraemia10–12. In addition, virus and/or anti-viral antibodies were rarely found in cerebrospinal ﬂuid (CSF)13. Thus, it seems more likely that the virus affects the brain indirectly. This could be through peripherally generated inﬂammatory
+
+mediators, immune cells, autoantibodies and/or blood brain barrier changes associated with endothelial damage14,15. Immune inﬁltrates have been found in autopsy studies, including neutrophils and T cells, although agonal effects could not be excluded16. On the other hand, elevated IL-6 levels in sera and CSF have been associated with neurological complications, including meningitis, thrombosis, stroke, cognitive and memory deﬁcits, regardless of respiratory disease severity17–20. One study found that the brain injury markers NfL and GFAP, and inﬂammatory cytokines were elevated in COVID-19 and scaled with severity21–25; another study showed that baseline CSF NfL levels correlated with neurological outcomes at follow-up26 but overall, the relationships between these immune mediators and markers of brain injury and neuropathology remains to be fully explored. Finally, speciﬁc neuronal autoantibodies have been reported in some neurological patients raising the possibility of para- or post-infectious autoimmunity14,27.
+
+e-mail: benmic@liverpool.ac.uk
+
+Nature Communications | (2023)14:8487
+
+1
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+To assess the relationship between host immune response and markers of brain injury with neurological injury, we studied two large, multisite cohorts which, in combination, provided acute, early and late convalescent sera from COVID-19-positive (COVID+ve) participants. We measured brain injury markers, a range of cytokines and associated inﬂammatory mediators, and autoantibodies in these samples, and related them to reduced levels of consciousness (deﬁned as a Glasgow Coma Scale Score [GCS] GCS ≤ 14) in the acute phase, or the history of a neurological complication of COVID-19 in convalescent participants. We tested the hypothesis that immune mediators would correlate with brain injury markers and reveal a signature of neurological complications associated with COVID-19.
+Results
+COVID-19 results in acute elevation of serum markers of brain injury, more so in participants with abnormal Glasgow coma scale (GCS) score We used sera from the International Severe Acute Respiratory and emerging Infection Consortium Clinical Characterisation Protocol United Kingdom (ISARIC CCP-UK) study, obtained 1–11 days post admission, that included 111 participants with COVID-19 of varying severity and 60 uninfected healthy controls (labelled Control). Participants were stratiﬁed by normal (n = 76) or abnormal (n = 35) Glasgow Coma Scale scores (labelled GCS = 15 or GCS ≤ 14, respectively) to provide a proxy for neurological dysfunction (Fig. 1a). GFAP (glial ﬁbrillary acidic protein, marker of astrocyte injury), UCH-L1 (a marker of neuronal cell body injury), and NfL (neuroﬁlament light) and Tau (both markers of axonal and dendritic injury) were measured. Overall, serum levels of NfL, GFAP, and total-Tau (tTau) were signiﬁcantly higher in COVID-19 participants compared to the uninfected healthy controls but, as shown in Fig. 1b–e, those participants with abnormal GCS scores had higher levels of NfL and UCH-L1 than those with normal GCS scores. Thus, all four markers of brain injury were raised in COVID19 participants (both GCS = 15 and GCS ≤ 14) but, in addition, axonal and neuronal body injury biomarkers discriminated between participants with and without reduced GCS.
+Markers of brain injury remain elevated in the early and late convalescent phases in participants who have had a CNS complication of COVID-19 To ask whether these ﬁndings persisted in participants recovering from COVID-19-related neurological complications, ninety-two COVID-19 participants were recruited to the COVID-Clinical Neuroscience Study (COVID-CNS), 56 who had had a new neurological diagnosis that developed as an acute complication of COVID-19 (group labelled “neuro-COVID”), and 36 with no such neurological complication (group labelled “COVID”, Fig. 1f, Table 1, Supplementary Tables 1 and 2). When compared to the same healthy controls (n = 60), across all timepoints, both COVID-19 subgroups (COVID and neuro-COVID) showed increased levels of NfL, GFAP, and tTau (but not UCH-L1 (Fig. 1g–j, Supplementary Table 1)). Furthermore, participants recovering from neuro-COVID had signiﬁcantly higher levels of NfL, and a trend towards higher levels of tTau, than the COVID participants (Fig. 1g, j). Highest NfL serum levels were present in participants with cerebrovascular conditions, whereas tTau was elevated in participants with cerebrovascular, CNS inﬂammation and peripheral nerve complications (Fig. 1k, l). NfL remained signiﬁcantly elevated in a multiple regression model adjusted for age (Supplementary Fig. 1a, b). We then separately compared the two cohorts at early and late convalescent follow-up periods (less than and over six weeks after admission respectively). NfL and GFAP levels remained elevated in all COVID-19 participants in the convalescent period, but only remained elevated beyond 6 weeks in participants who had suffered an acute neurological complication (neuro-COVID, Fig. 1m–p; Supplementary Fig. 1c). The presence of elevated brain
+
+injury markers in the acute phase of COVID-19 conﬁrms previous ﬁndings14, but the elevated levels of NfL and GFAP in those who are convalescent from acute neurological complications suggest ongoing neuroglial injury.
+Clinical and brain injury markers evidence of neurological insult levels are associated with levels of innate inﬂammatory mediators in the acute phase of COVID-19 To explore whether the acute and persistent elevation of markers of brain injury observed in participants with COVID-19 was associated with an acute inﬂammatory response, we measured a panel of 48 inﬂammatory mediators in serum at the same timepoints. In the ISARIC samples, six mediators were signiﬁcantly higher in participants with an abnormal GCS than in those with a normal GCS (interleukin [IL]-6, hepatocyte growth factor [HGF], IL-12p40, IL-1RA, CCL2 and macrophage colony stimulating factor [M-CSF]), indicating increased innate inﬂammation (Fig. 2a, Supplementary Fig. 2a). Pearson’s correlation tests identiﬁed correlations between these signiﬁcant immune mediators in an interrelated pro-inﬂammatory network (Fig. 2b, c), and unsupervised Euclidean hierarchical cluster analysis revealed clusters of pro-inﬂammatory mediators elevated together (Fig. 2d). The ﬁrst cluster incorporated the IL-1 family (including IL-1RA), interferons and M-CSF, and the second cluster included IL-6, CCL2, CXCL9, HGF, and IL-12p40 (boxes in Fig. 2d). Brain injury biomarkers correlated with elevations in these inﬂammatory mediators: GFAP and UCL-H1 correlated with a number of mediators in the ﬁrst cluster, whereas tTau and NfL correlated strongly with HGF and IL-12p40 in the second cluster (Supplementary Table 3).
+A more stringent analysis of median-centred cytokine data (which corrected for between participant skewing of mediator levels) conﬁrmed that HGF and IL-12p40 were higher in the abnormal GCS COVID19 participants, and correlated with cognate NfL levels (Supplementary Table 4). Taken together these data suggest that activation of the innate immune system was related to both clinical and blood marker evidence of CNS insult.
+Inﬂammatory mediators are not elevated across the participant cohort at late timepoints after COVID-19; but late tTau elevations correlate with levels of several inﬂammatory mediators In contrast to the acute data, the levels of cytokines and associated mediators were lower when measured during the convalescent periods even in those who had suffered neurological complications of COVID19 (group labelled “neuro-COVID”. Supplementary Fig. 2b). The correlations between cytokines and associated mediators no longer displayed the same tight clusters (Fig. 2e, f). GFAP remained elevated during the convalescent phase of neurological complications (Fig. 1p) but did not show correlations with the inﬂammatory mediators. Similarly NfL was higher overall in those with neurological complications (Fig. 1n) but there were no signiﬁcant correlations with inﬂammatory mediators (Fig. 2f). However, tTau remained elevated overall in those with neurological complications ((1.7 (1.3, 2.2) pg/mL versus 1.3 (1.1, 1.9) pg/mL)) and levels correlated with eight immune mediators including CCL2, IL-1RA, IL-2Rα and M-CSF along with CCL7, stem cell factor (SCF), IL-16 and IL-18 (Fig. 2f, Supplementary Table 5, Supplementary Fig. 2c). This last association was speciﬁc to the late phase of the illness and was not found in acute COVID-19.
+Cytokine networks are signiﬁcantly altered in participants with neurological complications of COVID-19: both acute encephalopathy, and those recovering from a neurological complication We used graph theoretical approaches to compare these cytokine networks between participants with: acute COVID-19 and normal GCS; acute COVID-19 with altered consciousness (GCS ≤ 14), and convalescent participants recovering from a neurological complication of COVID-19 (neuro-COVID). Participants with both neurological
+
+Nature Communications | (2023)14:8487
+
+2
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+a
+
+b
+
+c NfL pg/mL <0.0001
+
+UCH-L1 pg/mL d
+
+e GFAP pg/mL <0.0001
+
+Tau pg/mL
+0.0002
+
+Healthy controls,
+
+10000 <0.0001
+
+10000
+
+0.0270
+
+100000 <0.0001
+
+100 <0.0001
+
+n=60
+
+1000
+
+1000
+
+10000
+
+100
+
+1000
+
+10
+
+100
+
+COVID+ve
+
+10
+
+100
+
+GCS = 15, n=76
+
+10
+
+1
+
+10
+
+1
+
+1
+
+0.1
+
+1
+
+COVID+ve
+
+0.1
+
+0.01
+
+0.1
+
+0.1
+
+GGCCCoSSn≤=tr11o45l
+
+GCS≤14, n=35
+
+ControGl CS=1G5CS ≤14
+
+ControGl CS=1G5CS ≤14
+
+ControGl CS=1G5CS ≤14
+
+g
+
+NfL pg/mL
+
+h UCH-L1 pg/mL i GFAP pg/mL
+
+j Tau pg/mL
+
+f Healthy controls, n=60
+
+10000
+
+0.0004 0.0045
+
+10000 1000
+
+<0.0001
+<0.0001
+10000
+
+<0.0001 100
+<0.0001
+
+1000
+COVID+ve
+
+100
+
+1000
+
+10
+
+No neurological
+
+100
+
+100
+
+disease
+
+10
+
+“COVID”
+
+n=36
+
+1
+
+10 1
+
+10
+
+1
+
+1
+
+Early convalescent n=28
+Late convalescent n=8
+COVID+ve with k
+neurological disease,
+
+0.1
+
+0.1
+
+Control CNOeVuIrDo-CNOfVLIDpg/mL
+
+0.1
+l
+
+0.1
+Tau pg/mL
+
+“Neuro-COVID”
+
+n=56
+
+Early convalescent
+
+n=13
+
+Late convalescent
+
+n=43
+
+Neuro-CCCOoOnVtVIrIDoDl Neuro-CCCoOOntVVrIIoDlD Neuro-CCCoOOntVVrIIoDlD
+
+m
+10000 1000 100
+
+Early convalescent NfL pg/mL
+<0.0001 <0.0001
+
+n
+
+Late convalescent
+
+NfL pg/mL
+
+10000 1000 100
+
+<0.0001
+
+o
+10000 1000 100
+
+Early convalescent GFAP pg/mL
+<0.0001
+<0.0001
+
+p
+10000
+
+Late convalescent GFAP pg/mL
+<0.0001
+
+1000
+
+100
+
+10
+
+10
+
+10
+
+10
+
+1
+Control
+
+COVNIDeuro-COVID
+
+1
+Control
+
+COVNIDeuro-COVID
+
+1
+Control
+
+COVNIDeuro-COVID
+
+1
+Control
+
+COVNIDeuro-COVID
+
+Fig. 1 | Brain injury markers are elevated acutely in COVID-19 participants with an abnormal Glasgow coma scale score (GCS) and in participants who experienced a neurological complication associated with COVID-19. a The acute ISARIC cohort included Day 1–11 hospital admission timepoints. b–e Acute serum brain injury markers were assessed by Simoa: b NfL, c UCH-L1, d GFAP, and e tTau. All four were elevated in COVID-19 cases with normal Glasgow coma scale scores (GCS) relative to controls overall. Dotted lines show lower limit of quantiﬁcation (LLOQ). f–j The Simoa analyses were performed for the sera from the COVID-CNS COVID and neuro-COVID groups at early and late convalescent timepoints (g, j) showing persistence of NfL, GFAP, and tTau in COVID participants, with NfL higher in neuro-COVID than COVID participants. k Within the combined early and
+
+late convalescent COVID-19 neurological cases, the highest levels of NfL were observed in participants who had suffered a cerebrovascular event at the time of SARS-CoV-2 infection. l tTau levels were raised in the cerebrovascular, CNS inﬂammatory and seizure conditions. m, n Serum NfL remained elevated in both the early (<6 weeks from positive SARS-CoV-2 test) and late convalescent phases (>6 weeks) in neuro-COVID compared to COVID non-neurological cases. o, p GFAP was elevated in neurological cases in the early and late convalescent phase. Box and whisker plots show all data points with median as centre line with 25th and 75th percentiles. Sample sizes shown in (a) and (f). Group comparisons are by Kruskal–Wallis test with Dunn’s post-hoc multiple comparison test, no statistical comparison made for panel (h) as medians were at LLOQ.
+
+Nature Communications | (2023)14:8487
+
+3
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Table 1 | Clinical characteristics of healthy controls and COVID-CNS participants
+
+Clinical characteristics Age
+
+Mean (SD)
+
+Control (n = 60) 48 (18)
+
+COVID (n = 36) 51 (17)
+
+Neuro-COVID (n = 56)a 58 (13)
+
+Median (Q1,Q3)
+
+50 (32,62)
+
+52 (34,65)
+
+61 (48,67)
+
+Gender
+
+Male n (%)
+
+21 (35%)
+
+21 (58.3%)
+
+36 (64.3%)
+
+Sampling time (days)b,c
+
+Median (Q1,Q3)
+
+8 (4,14)
+
+148 (52,272)
+
+COVID severityc,d
+
+Median (Q1,Q3)
+
+5 (5,5)
+
+7 (5,8)
+
+aNeuro-COVID group comprises cases of: cerebrovascular conditions (21%), CNS inﬂammation (16%), movement disorders (5.4%), seizures and other CNS conditions (30%), and peripheral nervous system conditions (27%). bSampling time in days between the ﬁrst COVID+ve test and serum sample. cTwo Neuro-COVID participants with approximate COVID-infection timing and nine with indeterminate severity. dAs per COVID-19 WHO severity score from 0 to 10.
+
+consequences of COVID-19 (GCS ≤ 14) and Neuro-COVID both showed cytokine networks that were different from COVID-19 participants with no neurological problems (Fig. 2b, c, e; p < 0.001, Steiger test), suggesting a speciﬁc dysregulated innate immune response that is associated with neurological complications of COVID-19. Further pathway analyses using the KEGG enrichment scores on the signiﬁcantly different cytokines, revealed many commonalities with other inﬂammatory syndromes (Supplementary Fig. 3a, b). Interestingly, cytokine proﬁles of the neurological complications groups from both the ISARIC and COVID-CNS cohort led to JAK-STAT signalling being a signiﬁcant involved pathway which would be amenable to immunomodulation, for example, by tofacitinib, which has been shown to reduce mortality in COVID-1928.
+COVID-19 is associated with an acute adaptive immune response overall, which includes antibodies to viral antigen and CNS autoantigens in those with abnormal GCS scores Given past reports of autoantibody responses following COVID-1914,27, we sought evidence of similar dysregulated adaptive immune responses in our participant cohorts. We used a bespoke protein microarray of 153 viral and tissue proteins to measure IgM (Fig. 3a–d) and IgG (Fig. 4a–d) reactivity in the acute phase ISARIC sera. The median ﬂuorescence intensities for each putative antigen were normalized for each participant and the Z-scores were compared to healthy control data, to determine positive reactivity to the different antigens (with a threshold for detection set at three standard deviations above controls for each antigen; see Supplementary Table 6, Supplementary Fig. 4a). IgM and IgG responses in COVID-19 participants showed greater reactivity overall (both GCS = 15 and GCS ≤ 14), compared to the controls, with no difference in normalised ﬂuorescence Z scores or the number of participants with IgG ‘hits’ (a Z-score >3) between those with normal or abnormal GCS score (Fig. 3a, b, Fig. 4a, b). However, several IgM and IgG autoantibodies, including those against the CNS antigens UCH-L1, GRIN3B and DRD2, along with the cardiac antigen, myosin light chain (MYL)7, were present in a greater proportion of participants with an abnormal GCS score, as were antibodies to spike protein (Figs. 3c, 4c). None of the antibodies correlated signiﬁcantly with levels of brain injury markers (Supplementary Figs. 4b, c, 5b, c), but they did show correlations with each other (Figs. 3d, 4d, h), suggesting a nonspeciﬁc antibody response in some individuals during the acute phase.
+Normalized ﬂuorescence Z scores of serum IgM and IgG autoantibodies in the early and late convalescent samples were similar to those in the acute samples (Figs. 3e, 4e), and the IgM and IgG ‘hits’ were more frequent than in controls (highest in the neuro-COVID group, Figs. 3f, 4f, Supplementary Fig. 5a). However, speciﬁc autoantibody responses to MYL7, gonadotrophin releasing hormone receptor (GNRHR) and several HLA antigens were common in the neuro-COVID participants (Figs. 3g, 4g, Supplementary Fig. 5a). When the IgM and IgG hits were stratiﬁed by condition,
+
+cerebrovascular and inﬂammatory conditions showed the highest number (Supplementary Fig. 5d, e). As in the acute phase, autoantibody responses did not show signiﬁcant associations with brain injury markers, but did tend to correlate with each other (Fig. 4h, Supplementary Fig. 5b, c).
+Finally, to explore binding to native neuronal antigens, sera from acute COVID-19 participants with CNS antigen reactivity were incubated with sections of rat brain, neurons and antigen-expressing cells. Binding to rat brain sections identiﬁed 42/185 (23%) of participants with strongly positive immunohistochemical staining (e.g. Fig. 4i) and overall, sera from the COVID+ve ISARIC participants showed more frequent binding to brainstem regions than control sera, but this did not relate to the GCS or neurological disease of the participants (Fig. 4j, Supplementary Fig. 6). In addition, from 34 selected samples tested via cell-based assays to examine for the presence of speciﬁc autoantibodies (LGI1, CASPR2, NMDAR, GABAB receptor), only one bound to the extracellular domain of the GABAB receptor (from the ISARIC cohort, Supplementary Fig. 7a, b), as expected of a pathogenic autoantibody.
+Discussion
+We used several approaches to study neurological complications of COVID-19 infection. These included assessment of immune mediators and markers of brain injury in participants with and without neurological complications, both in the acute and convalescent phases after COVID-19 infection. We demonstrated increased levels of brain injury markers following COVID-19, which showed speciﬁc patterns with disease phase (acute or convalescent), and varied with the presence or absence of neurological injury or dysfunction. In the acute phase, all four brain injury markers (GFAP, NfL, tTau and UCH-L1) were elevated in participants when compared to controls, and speciﬁc markers of dendritic and axonal injury (tTau and NfL) were signiﬁcantly higher in participants who showed a reduced level of consciousness (GCS ≤ 14). In the early convalescent phase (<6 weeks post-infection), GFAP, NfL, and tTau were elevated in participants recovering from COVID-19, with no differences between those who had or had not sustained a neurological complication of disease. However, at late timepoints (>6 weeks) elevations of NfL and GFAP were only seen in participants who had sustained a neurological complication of COVID-19 in the acute phase of their illness. These data suggest that clinical neurological dysfunction in COVID-19 is reﬂected by increases in markers of neuroglial injury, both in the acute phase and at follow-up, which are related to a dysregulated immune response, more robustly in the acute phase of illness.
+In the acute phase, when compared to controls, we also observed increases in a range of inﬂammatory mediators (IL-6, HGF, IL-12p40, IL1RA, CCL2, and M-CSF) in the overall cohort of COVID-19 participants, with HGF and IL-12p40 showing robust differentiation between participants with and without alterations in consciousness. By contrast, participants at the late phase after COVID-19 showed no group level elevation of inﬂammatory mediators. However, late elevations in tTau correlated with levels of CCL2, CCL7, IL-1RA, IL-2Rα, M-CSF, SCF, IL-16,
+
+Nature Communications | (2023)14:8487
+
+4
+
+Article
+
+a
+
+d
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Protein abundance
+
+*****************
+
+b GCS=15***
+
+**
+
+c GCS≤14***
+
+f
+
+** *
+
+*
+
+e Neuro-COVID***
+
+**
+
+** *
+NeuroCOVID COVID
+* ** *
+
+** ****
+
+Fig. 2 | Immune mediators are elevated acutely and correlate with different brain injury markers at different timepoints. Serum mediators from the ISARIC and COVID-CNS cohorts were assessed by Luminex. a A volcano plot was generated to identify mediators which were elevated in participants with an abnormal GCS (GCS ≤ 14) compared to normal GCS (GCS = 15) and b, c a network analysis identiﬁed the highest correlations between the mediators (***signiﬁcantly different from ISARIC GCS = 15 by Steiger test p < 0.001). d Unbiased Euclidean hierarchical cluster and correlation analyses identiﬁed two clusters of up-regulation of several proinﬂammatory mediators in concert. The ﬁrst group included interleukin (IL)-6, IL12p40, CCL2, CXCL9 and hepatocyte growth factor (HGF) and the second group
+
+included the IL-1 family, interferons, and macrophage colony stimulating factor (MCSF); to the right is shown the correlations between each cytokine with the four brain injury biomarkers (signiﬁcance indicated by asterisks). e Network analysis and heatmaps of correlations between mediators did not demonstrate the tight interconnectedness that had been identiﬁed in acute samples and there were differences between neuro-COVID (e) and ISARIC GCS = 15 and GCS ≤ 14 by Steiger test (***p < 0.001). f At this later stage several mediators correlated with tTau. Volcano plot used multiple two-tailed Mann–Whitney U tests with a false discovery rate set to 5%. Correlations are Pearson’s coefﬁcients (*p < 0.05, **p < 0.01, ***p < 0.001, ****p < 0.0001).
+
+Nature Communications | (2023)14:8487
+
+5
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Normalized Z-scores
+
+a
+
+10000
+
+GCS ≤14 (n=34); GCS = 15 (n=72)
+
+1000
+
+Spike
+
+100
+
+10
+
+1 0.1 0.01
+. CNS antigens
+
+BBB
+
+Non-CNS antigens
+
+b 50
+
+<0.0001
+
+c
+
+ACE
+
+IgM hits (Z-score above 3)
+
+<0.0001 40
+
+Spike Nucleocapsid
+
+*
+
+d GLRA1
+
+30
+
+SFTPC HLA-B GLRA1
+
+* * *
+
+GCS=15 GCS≤14
+
+20
+
+DPYSL5 DLAT
+
+* *
+
+DPYSL5
+
+10
+
+ACE
+
+*
+
+0 Control GCS=15 GCS≤14
+e
+
+0 5 10 15 20 50
+
+100
+
+% of participants with antibody
+
+SFTPC
+
+Spike
+
+10000 COVID (n=31); Neuro-COVID (n=51)
+1000
+
+Nucelocapsid Spike
+
+100
+
+10
+
+Normalized Z-scores
+
+1 0.1 0.01
+.
+
+CNS antigens
+
+f 80
+
+BBB
+g
+
+Non-CNS antigens
+
+DLAT HLA-B
+
+IgM hits (Z-score above 3)
+
+60
+
+40
+
+20
+
+0
+
+COVID
+
+Neuro-COVID
+
+Fig. 3 | There is an IgM antibody response in participants with COVID-19 directed at SARS-CoV-2 spike protein and against several self-antigens. a Acute samples were tested for IgM antibodies by protein microarray with normalized ﬂuorescence Z-scores shown. b COVID-19 participants showed considerably more binding ‘hits’ than healthy controls (ﬂuorescence with a Z-score of 3 or above compared to controls), although overall there was no difference in the acute samples between participants with normal (GCS = 15) or abnormal GCS (GCS ≤ 14)). Nevertheless, c COVID-19 participants with abnormal GCS (GCS ≤ 14) more frequently had raised IgM antibodies than COVID-19 participants with a normal GCS (GCS = 15), including those directed at SARS-CoV-2 spike protein (Fisher’s exact tests *p < 0.05). d A chord diagram shows the associations between antibodies,
+
+Spike Nucleocapsid
+
+COVID neuro-COVID
+
+* KRT18
+
+HLA-DRB4
+
+*
+
+0
+
+50
+
+100
+
+% of participants with antibody
+
+including those against Spike. e IgM antibodies were also analysed in the convalescent participants. f A largr proportion of COVID and Neuro-COVID participants had positive antibody ‘hits’ for IgM (deﬁned by Z-score 3 and above compared to controls). g Of those antibodies against self-antigens identiﬁed, they were only two with different frequencies between the groups (Fisher’s exact tests *p < 0.05). At this timepoint there was no signiﬁcant difference in the proportion of individuals with IgM against SARS-CoV-2 spike or nucleocapsid epitopes. Violin plots show all data points with median at centre line and 25th and 75th quartile lines. Group comparisons are by Kruskal–Wallis test with post-hoc Dunn’s multiple comparison test, pairwise comparisons by two-tailed Mann–Whitney U test, and correlations are Pearson’s coefﬁcients.
+
+and IL-18, suggesting that these markers of the late innate host response were associated with persisting markers of dendritic/axonal injury markers. A network analysis showed that the repertoire of cytokine responses was different in participants both with acute reductions in GCS, or those recovering from a neurological complication of COVID-19 when compared to the GCS = 15 group.
+Participants with acute COVID-19 also developed IgG autoantibody responses to a larger number of both neural and non-neural antigens, than seen in controls. These increased IgG responses
+
+persisted into the late phase but to different antigens. While the diversity of autoantibody response did not differ between participants with and without neurological dysfunction, autoantibody responses to speciﬁc antigens, including the neural antigens UCH-L1, GRIN3B, and DRD2, were more common in participants with abnormal GCS at presentation. In the late phase, participants who had or had not experienced a neurological complication of COVID-19 were distinguished by the presence of autoantibodies to HLA antigens rather than neural antigens.
+
+Nature Communications | (2023)14:8487
+
+6
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Normalized Z-scores
+
+a
+
+10000 1000
+
+GCS = 15 (n=72); GCS ≤14 (n=34)
+
+Spike Nucleocapsid
+
+100
+
+10
+
+1 0.1 0.01
+.
+
+CNS antigens
+
+BBB
+
+Non-CNS antigens
+
+IgG hits (Z-score above 3)
+
+b
+
+<0.0001
+
+50
+
+<0.0001
+
+40
+
+30
+
+20
+
+10
+
+0
+
+c
+
+Spike
+
+*
+
+Nucleocapsid
+
+GLRA1 MYL7 FGB F2
+UCH-L1 GRIN3B
+DRD2
+
+* * *
+* *
+* *
+
+GCS=15 GCS≤14
+
+0 5 10 15 20 50 100
+
+% of participants with antibody
+
+UCH-L1
+d
+GRIN3B
+
+F2 FGB
+
+GLRA1
+
+DRD2
+
+Spike
+
+MYL7
+
+Control GCS=15 GCS≤14
+
+Normalized Z-scores
+
+e
+
+10000 COVID (n=36); Neuro-COVID (n=56) Nucleocapsid Spike
+
+1000
+
+SFTPA1
+
+100
+
+10
+
+1 0.1 0.01
+.
+
+CNS antigens
+
+BBB
+
+Non-CNS antigens
+
+f
+60
+
+0.0271
+
+g Spike Nucleocapsid
+
+IgG hits (Z-score above 3)
+
+40
+20
+0 COVID Neuro-COVID
+
+MYL7 HLA-G HLA-F HLA-DQA1 GNRHR
+
+* * * *
+*
+
+COVID neuro-COVID
+
+0
+
+50
+
+100
+
+% of participants with antibody
+
+h
+
+GNRHR
+
+HLA-DQA1
+
+HLA-F
+
+HLA-G
+
+Spike
+
+MYL7
+
+i
+
+j
+
+Binding to rat brainstem
+
+Number of sera tested
+
+Acute
+
+80
+
+<0.05
+
+60
+
+<0.05
+
+40
+
+Convalescent
+
+Negative Positive
+
+20
+
+0 Control GCS=15 GCS≤14
+
+COVID Neuro-COVID
+
+Fig. 4 | There is an IgG antibody response in participants with COVID-19 directed at SARS-CoV-2 nucleocapsid and spike proteins and against several self-antigens. a Acute samples were tested for IgG antibodies by protein microarray with normalized ﬂuorescence Z-scores shown. b COVID-19 participants showed considerably more binding ‘hits’ than healthy controls (ﬂuorescence with a Z-score of 3 or above compared to controls) but, overall, there was no difference in the acute samples between participants with normal (GCS = 15) or abnormal GCS (GCS ≤ 14). c COVID-19 participants with abnormal GCS more frequently had several raised IgG antibodies than COVID-19 participants with a normal GCS, including those directed at SARS-CoV-2 spike protein and several CNS proteins ((DRD2, GRIN3B, and UCH-L1) Fisher’s exact tests * p < 0.05)). d A chord diagram shows the association of antibodies with differences in frequency, including those against Spike. e IgG antibodies in early and late convalescent sera were also analysed. f A larger proportion of Neuro-COVID participants had positive antibody ‘hits’ for IgG
+
+(deﬁned by Z-score 3 and above compared to controls). g Of those antibodies against self-antigens identiﬁed, only ﬁve showed a difference in frequency between groups (Fisher’s exact tests *p < 0.05). At this timepoint there was no signiﬁcant difference in the proportion of individuals with IgG against SARS-CoV-2 spike or nucleocapsid epitopes. h A chord diagram shows the association of antibodies with differences in frequency plus anti-Spike antibody. i Representative images of rat brains incubated with participants’ sera and screened for IHC binding of antihuman IgG to detect CNS reactivity. Scale bars = 1 mm. j Percentage of participant serum IgG reactivity to rat brainstems, detected by Fisher’s exact test with Benjamini and Hochberg correction. Violin plots show all data points with median at centre line and 25th and 75th quartile lines. Group comparisons are by Kruskal–Wallis test with post-hoc Dunn’s multiple comparison test, pairwise comparisons by two-tailed Mann–Whitney U test, and correlations are Pearson’s coefﬁcients.
+
+Nature Communications | (2023)14:8487
+
+7
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+These data from clinical disease provide important insights regarding the pathophysiology and pathogenesis of neurological injury, dysfunction, and disease in COVID-19. The clinical characteristics of our participant cohorts, and the elevation in brain injury markers, provide evidence of both acute and ongoing neurological injury29. Furthermore, the literature data on the rarity of direct CNS infection by the virus, suggest that the innate and adaptive host responses that we document should be explored as pathogenic mechanisms. The incidence of neurological cases has decreased since the ﬁrst wave of the pandemic, possibly due to the use of immunosuppressants, such as dexamethasone, although this may also reﬂect vaccines attenuating disease and changes in the prevalence of different strains of SARS-CoV-230.
+The inﬂammatory mediators that we found to be elevated in the acute phase are broadly concordant with many other publications that have examined innate immune responses in COVID-1921,22 but there are limited data addressing associations between such responses and the development of neurological complications. It is possible that some of the risk of developing such complications is simply related to the severity of systemic infection and the host response, and it would be surprising if these were not strong contributors. However, our data suggest that acute neurological dysfunction in COVID-19 is also associated with a different repertoire of cytokine responses, with HGF and IL-12p40 showing the statistically most robust discrimination between participants with and without an abnormal GCS. HGF has important roles in brain development and synaptic biology31 and its elevation may represent a protective/reparative response in participants with neurological injury. IL-12p40 has a core role in orchestrating Th1 responses, and has been reported to be central in the development of central and peripheral neuroinﬂammation, with p40 monomer subunits perhaps acting as inhibitors of the process32–34. Interestingly, the cytokine network that was activated in the late convalescent phase was different, potentially indicating differential drivers of neurological injury throughout the disease course. Though group level comparisons with controls showed some commonalities in inﬂammatory mediator increase, most notably in IL-1RA, CCL2, and M-CSF, there were many differences. The late tTau elevation that we demonstrated was signiﬁcantly associated with elevations in these three mediators, but also CCL7, IL-2Rα, SCF, IL-16, and IL-18. These are all important proinﬂammatory mediators, and their association with tTau levels may reﬂect the persistence of a systemic inﬂammatory response that can enhance neuroinﬂammation32,34,35.
+We found a general increase in antibody production following COVID-19 infection and only a few autoantibody frequencies were different when compared by GCS or COVID versus neuro-COVID cases. Of note, absolute levels of autoantibodies were low in comparison to anti-viral antibodies that developed over the course of the acute illness, with the exception of SFTPA1. Antibodies to SFTPA1, a lung surfactant protein, have been found to correlate with COVID-19 severity14, but these antibodies were present in only a few acute cases. HLA antibodies, on the other hand, were more frequent in Neuro-COVID than COVID participants and this requires further investigation. The autoantibodies detected in COVID-19, as in other infections, could be through molecular mimicry or bystander effects36–39, but the lack of association of autoantibody levels with markers of brain injury is evidence against a causal role for these adaptive immune responses. Further analysis by screening the antibodies against brain antigens ex vivo revealed sporadic reactivity in both cases and controls with only the brainstem showing increased reactivity in acute COVID+ve participants; the frequencies were lower in COVID and neuro-COVID cases with no difference between them.
+Our studies have several limitations including: limited clinical information on the acute participants and lack of longitudinal blood samples; in addition, the low GCS could indicate sedation for intubation, rather than CNS disease, in the acute cohort. Although we did not
+
+have COVID-19 severity scores, we did know whether participants had required oxygen or not; when data were analysed within the cohorts comparing participants who had or had not required oxygen, 5 out of 6 cytokines remained signiﬁcantly elevated in the abnormal GCS group. In the COVID-CNS study where we did have in-depth clinical information, we were limited by not having acute blood samples. Nevertheless, several cytokines showed signiﬁcant positive correlations with the brain injury marker tTau, and interestingly, three of them were cytokines that were signiﬁcantly associated with abnormal GCS in the acute cohort (IL-1RA, CCL2, and M-CSF) highlighting a network of coupregulated immune mediators associated with neurological complications. The commonalities in innate immune response in participants who suffered neurological dysfunction/complications, both in the acute phase and at convalescence, is underlined by the results of network analysis. Pro-inﬂammatory cytokines are expected to be increased in the anti-viral response, but we found that they not only correlate with COVID-19 severity, but with GCS, as well. Strengths of our study include the large cohort of participants studied with wellcharacterized neurological syndromes and a known range of timings since COVID-19 infection. We studied aspects of the innate and adaptive immune response as well as brain injury markers in order to discover useful markers of neurological complications over time.
+Several hypotheses for how SARS-CoV-2 causes neuropathology have been tested. A prospective study of hospitalised patients showing IL-6 and D-dimer as risk factors for neurological complications implicates the innate immune response and coagulation pathways19. The complement pathway and microthrombosis have been associated with brain endothelial damage from the infection, and this phenotype persists months after COVID-1940,41. Animal models have provided key insights into COVID-19 neuropathology that warrant discussion. There have been at least two reports of viral encephalitis and neuron degeneration and apoptosis observed in non-human primates42,43. It is important to note that in these studies the virus was present at low amounts in the brain and predominantly in the vasculature as visualized by co-localization with Von Willebrand Factor43. Similar to the clinical scenario, there was no correlation of neuropathology with respiratory disease severity43. A recent mouse study is particularly relevant to our work and involved assessment of a mouse model that lacked direct viral neural invasion by infecting mice that were intratracheally transfected with human ACE2. This study reported increased CXCL11 (eotaxin) in mouse serum and CSF that correlated with demyelination and was recapitulated by giving CXCL11 intraperitoneally44; this was linked to clinical studies that showed elevated CXCL11 in patients with brain fog44. A combined analysis of hamster and clinical studies showed that COVID19 led to IL-1β and IL-6 expression within the hippocampus and medulla oblongata and decreased neurogenesis in the hippocampal dentate gyrus which may relate to learning and memory deﬁcits45. This was also borne out during in vitro studies that showed that serum from COVID patients with delirium lead to decreased proliferation and increased apoptosis of a human hippocampal progenitor cell line mediated by elevated IL-646.
+In conclusion, we show evidence of quantiﬁable neuroglial injury markers in blood from COVID-19 infection, which is more prominent in patients with neurological dysfunction in the acute phase of the illness, and persists in the convalescent phase in patients who suffered deﬁned acute neurological complications. These brain injury markers are associated with dysregulated systemic innate and adaptive immune responses in the acute phase of the disease, and suggest that these may represent targets for therapy.
+Methods
+Human participant studies/healthy controls and ethics information The ISARIC WHO Clinical Characterization Protocol for Severe Emerging Infections in the UK (CCP-UK) was a prospective cohort study of
+
+Nature Communications | (2023)14:8487
+
+8
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+hospitalised patients with COVID-19, which recruited across England, Wales, and Scotland (National Institute for Health Research Clinical Research Network Central Portfolio Management System ID: 14152). Participants were recruited prospectively during their hospitalisation with COVID-19 between February 2020 and May 2021. The protocol, revision history, case report form, patient information leaﬂets, consent forms and details of the Independent Data and Material Access Committee are available online47. Ethical approval for CCP-UK was given by the South Central - Oxford C Research Ethics Committee in England (Ref 13/SC/0149) and the Scotland A Research Ethics Committee (Ref 20/SS/0028). We examined 111 participants with anonymized clinical data including Glasgow coma scale score and consented serum sample. ISARIC samples were collected during the acute phase (1–11 days from hospital admission). Healthy control participants between the ages of 20–79 years old were recruited through the Cambridge Biomedical Research Centre (prior to the COVID-19 pandemic) and were non-hospitalised, without SARS-CoV-2 infection, and had no neurological diagnoses. All participants provided written consent. Sex was not considered in the study design and the sex of participants was selfreported.
+Participants were recruited into the COVID-Clinical Neuroscience Study (COVID-CNS) between October 2020 and October 2022 and either the participant or their next of kin consented in accordance with the ethically-approved NIHR Bioresource (East of England—Cambridge Central Research Ethics Committee (Ref 17/EE/0025; 22/EE/0230). The purpose of the study was to investigate patients who had been hospitalised with COVID-19 with or without neurological complications. These were deﬁned by the following criteria: neurological disease onset within 6 weeks of acute SARS-CoV-2 infection and no evidence of other commonly associated causes, and diagnostic criteria previously described48. Participants were recruited both as in-patients and retrospectively after discharge. The diagnosis was reviewed and ﬁnalized by a multi-disciplinary Clinical Case Evaluation panel. In this study, there were COVID patients without neurological complications (COVIDcontrols) and COVID patients with neurological complications (NeuroCOVID cases) and these cases were stratiﬁed by diagnostic deﬁnitions of each type of neurological complication, very few had overlapping syndromes in this relatively small cohort and the Evaluation Panel were able to provide a primary diagnosis for all”4. Co-morbidities and known treatments are shown in Supplementary Table 7. Serum samples were collected at either the early (<6 weeks from COVID-19 positive test) or late convalescent (>6 weeks) phases. The samples were aliquoted, labelled with anonymised identiﬁers, and frozen immediately at −70 °C.
+Human brain injury markers measurements Brain injury markers were measured in thawed sera using a Quanterix Simoa kit run on an automated HD-X Analyser according to the manufacturer’s protocol (Quanterix, Billerica, MA, USA, Neurology 4-Plex B Advantage Kit, cat#103345). We assessed neuroﬁlament light chain (NfL), Ubiquitin C-Terminal Hydrolase L1 (UCH-L1), total-Tau (tTau), and glial ﬁbrillary acidic protein (GFAP) in sera diluted 1:4 and used the manufacturer’s calibrators to calculate concentrations.
+Human serum cytokine measurements Analytes in thawed sera were quantiﬁed using the BioRad human cytokine screening 48-plex kit (Cat# 12007283) following manufacturer’s instructions on a Bioplex 200 using Manager software 6.2. This involved incubation of 1:4 diluted sera with antibody-coated magnetic beads, automated magnetic plate washing, incubating the beads with secondary detection antibodies, and adding streptavidinPE. Standard curves of known protein concentrations were used to quantify analytes. Samples that were under the limit of detection were valued at the lowest detectable value adjusted for 1:4 dilution factor.
+
+Median-centred normalization of human serum cytokine measurements To minimise any potential impact of any possible variation in sample storage and transport, concentrations were median-centred and normalised for each participant, using established methodology49–51. The pg/mL of cytokines were log-transformed and the median per participant across all cytokines was calculated. The log-transformed median was subtracted from each log-transformed value to generate a normalized set.
+Protein microarray autoantibody proﬁling Autoantibodies were measured from thawed sera as previously described in Needham et al.14. Brieﬂy, a protein array of antigens (based on the HuProt™ (version 4.0) platform) was used to measure bound IgM and IgG from sera, using secondary antibodies with different ﬂuorescent labels detected by a Tecan LS400 scanner and GenePix Pro v4 software. As developed in previous studies14,52, antibody positivity was determined by measuring the median ﬂuorescence intensity (MFI) of the four quadruplicate spots of each antigen. The MFI was then normalized to the MFI of all antigens for that patient’s sample by dividing each value by the median MFI. Z-scores were obtained from these normalized values based on the distribution derived for each antigen from the healthy control cohort. A positive autoantibody ‘hit’ was deﬁned as an antigen where Z ≥ 3.
+Detection of antibodies by immunohistochemistry Immunohistochemistry was performed on sagittal sections of female Wistar rat brains. Brains were removed, ﬁxed in 4% paraformaldehyde (PFA) at 4 °C for 1 h, cryoprotected in 40% sucrose for 48 h, embedded in freezing medium and snap-frozen in isopentane chilled on dry ice. 10-µm-thick sections were cut and mounted on slides in a cryostat. A standard avidin-biotin peroxidase method was used, as reported previously53,54, where thawed sera were diluted 1:200 in 5% normal goat serum and incubated at 4 °C overnight, and secondary biotinylated goat anti-human IgG Fc was diluted (1:500) and incubated at room temperature for 1 h. Finally, slides were counter-stained using cresyl violet.
+Detection of autoantibodies with cell-based assays HEK293T cells were seeded on 96 well plates in DMEM + 10% FCS at 37 °C and 5% CO2, transiently transfected with polyethylenimine with the relevant antigen-encoding plasmids GABAB-R1 and GABAB-R2 of the GABAB receptor, membrane tethered LGI1, CASPR2 and the NR1 subunit of the NMDA receptor, as described previously55–57. Thawed serum samples were incubated at 1:100 dilution for CASPR2 and GABAB receptor assays, and at 1:20 for LGI1 and NMDAR. After washing, cells were ﬁxed with 4% PFA, washed again and incubated with unconjugated goat anti-human IgG Fc antibody, and donkey antigoat IgG heavy and light chain Alexa Fluor 568 antibody. Cells were costained with DAPI.
+Statistical analyses Prism software (version 9.4.1, GraphPad Software Inc.) was used for graph generation and statistical analysis. The Shapiro-Wilk normality test used to check the normality of the distribution. Individual data points, median lines, and ﬁrst and third quartiles are shown on box and whisker plots and violin plots with minimum and maximum points as error bars. Heatmaps, volcano plots and Chord diagrams were made using R studio (version 4.1.1 RStudio, PBC). The 2D cytokine network analyses were created using the qgraph package in R software and matrices differences were assessed by Steiger test58. Univariate analyses were conducted to test for differences between two groups. Differences between two normally distributed groups were tested using the paired or unpaired Student’s t test as appropriate. The difference between two non-normally distributed groups
+
+Nature Communications | (2023)14:8487
+
+9
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+was tested using Mann–Whitney U test. Volcano plots used multiple Mann–Whitney U tests with a false discovery rate set to 5%, and heatmaps show Pearson’s correlations adjusted for a false discovery rate of 5%. Group comparisons were by Kruskal–Wallis test. Frequency differences of antibodies were measured by Fisher’s exact tests. Proteins which were statistically signiﬁcantly different in the COVID-positive controls (GCS = 15 or COVID groups, respectively) versus the GCS less than or equal to 14 or neurological cases by Mann-Whitney test (p ≤ 0.05) were analysed with the KEGG (Kyoto Encyclopedia of Genes and Genomes) database. Pathway classiﬁcations from the KEGG map search results were ranked by highest number of mapped candidates and exported in the KGML format using R package clusterProﬁler. p ≤ 0.05 was considered statistically signiﬁcant.
+Reporting summary Further information on research design is available in the Nature Portfolio Reporting Summary linked to this article.
+Data availability
+The individual-level data from these studies is not publicly available to main conﬁdentiality. Data generated by the ISARIC4C consortium is available for collaborative analysis projects through an independent data and materials access committee at isaric4c.net/sample_access. Data and samples from the COVID-Clinical Neuroscience Study are available through collaborative research by application through the NIHR bioresource at https://bioresource.nihr.ac.uk/using-ourbioresource/apply-for-bioresource-data-access/. Brain injury marker and immune mediator data are present in the paper and in the source data ﬁle. Source data are provided with this paper.
+References
+1. Drake, T. M. et al. Characterisation of in-hospital complications associated with COVID-19 using the ISARIC WHO Clinical Characterisation Protocol UK: a prospective, multicentre cohort study. Lancet 398, 223–237 (2021).
+2. Xu, E., Xie, Y. & Al-Aly, Z. Long-term neurologic outcomes of COVID19. Nat. Med. 1–10 https://doi.org/10.1038/s41591-022-02001-z (2022).
+3. Varatharaj, A. et al. Neurological and neuropsychiatric complications of COVID-19 in 153 patients: a UK-wide surveillance study. Lancet Psychiatry 7, 875–882 (2020).
+4. Ross Russell, A. L. et al. Spectrum, risk factors and outcomes of neurological and psychiatric complications of COVID-19: a UK-wide cross-sectional surveillance study. Brain Commun. 3, fcab168 (2021).
+5. Paterson, R. W. et al. The emerging spectrum of COVID-19 neurology: clinical, radiological and laboratory ﬁndings. Brain 143, 3104–3120 (2020).
+6. Mao, L. et al. Neurologic manifestations of hospitalized patients with coronavirus disease 2019 in Wuhan, China. JAMA Neurol. 77, 683–690 (2020).
+7. Song, E. et al. Neuroinvasion of SARS-CoV-2 in human and mouse brain. J. Exp. Med. 218, e20202135 (2021).
+8. Crunﬂi, F. et al. Morphological, cellular, and molecular basis of brain infection in COVID-19 patients. Proc. Natl Acad. Sci. USA 119, e2200960119 (2022).
+9. Normandin, E. et al. Neuropathological features of SARS-CoV-2 delta and omicron variants. J. Neuropathol. Exp. Neurol. 82, 283–295 (2023).
+10. Meinhardt, J. et al. Olfactory transmucosal SARS-CoV-2 invasion as a port of central nervous system entry in individuals with COVID-19. Nat. Neurosci. 24, 168–175 (2021).
+11. Thakur, K. T. et al. COVID-19 neuropathology at Columbia University Irving Medical Center/New York Presbyterian Hospital. Brain 144, 2696–2708 (2021).
+
+12. Khan, M. et al. Visualizing in deceased COVID-19 patients how SARS-CoV-2 attacks the respiratory and olfactory mucosae but spares the olfactory bulb. Cell 184, 5932–5949.e15 (2021).
+13. Domingues, R. B., Leite, F. B. V. de M. & Senne, C. Cerebrospinal ﬂuid analysis in patients with COVID-19-associated central nervous system manifestations: a systematic review. Arq. Neuropsiquiatr. https://doi.org/10.1590/0004-282X-ANP-2021-0117 (2022).
+14. Needham, E. J. et al. Brain injury in COVID-19 is associated with dysregulated innate and adaptive immune responses. Brain awac321, https://doi.org/10.1093/brain/awac321 (2022).
+15. Dunai, C., Collie, C. & Michael, B. D. Immune-mediated mechanisms of COVID-19 neuropathology. Front. Neurol. 13, 782 (2022).
+16. Maiese, A. et al. SARS-CoV-2 and the brain: a review of the current knowledge on neuropathology in COVID-19. Brain Pathol. 31, e13013 (2021).
+17. Reinhold, D. et al. The brain reacting to COVID-19: analysis of the cerebrospinal ﬂuid proteome, RNA and inﬂammation. J. Neuroinﬂammation 20, 30 (2023).
+18. Fara, M. G. et al. Macrothrombosis and stroke in patients with mild COVID-19 infection. J. Thromb. Haemost. 18, 2031–2033 (2020).
+19. Frontera, J. A. et al. A prospective study of neurologic disorders in hospitalized patients with COVID-19 in New York City. Neurology 96, e575–e586 (2021).
+20. Hampshire, A. et al. Multivariate proﬁle and acute-phase correlates of cognitive deﬁcits in a COVID-19 hospitalised cohort. eClinicalMedicine 47, 101417 (2022).
+21. Lucas, C. et al. Longitudinal analyses reveal immunological misﬁring in severe COVID-19. Nature 584, 463–469 (2020).
+22. Thwaites, R. S. et al. Inﬂammatory proﬁles across the spectrum of disease reveal a distinct role for GM-CSF in severe COVID-19. Sci. Immunol. 6, eabg9873 (2021).
+23. Perreau, M. et al. The cytokines HGF and CXCL13 predict the severity and the mortality in COVID-19 patients. Nat. Commun. 12, 4888 (2021).
+24. Li, L. et al. Interleukin-8 as a biomarker for disease prognosis of coronavirus disease-2019 patients. Front. Immunol. 11, 602395 (2021).
+25. Kanberg, N. et al. Neurochemical signs of astrocytic and neuronal injury in acute COVID-19 normalizes during long-term follow-up. EBioMedicine 70, 103512 (2021).
+26. Guasp, M. et al. CSF biomarkers in COVID-19 associated encephalopathy and encephalitis predict long-term outcome. Front. Immunol. 13, 1600 (2022).
+27. Bertin, D. et al. Anticardiolipin IgG autoantibody level is an independent risk factor for COVID‐19 severity. Arthritis Rheumatol. Hoboken Nj 72, 1953–1955 (2020).
+28. Guimarães, P. O. et al. Tofacitinib in patients hospitalized with COVID-19 pneumonia. N. Engl. J. Med. 385, 406–415 (2021).
+29. Thelin, E. P. et al. Serial sampling of serum protein biomarkers for monitoring human traumatic brain injury dynamics: a systematic review. Front. Neurol. 8, 300 (2017).
+30. Grundmann, A. et al. Impact of dexamethasone and remdesivir on neurological complications during COVID-19. https://doi.org/10. 2139/ssrn.4065552 (2022).
+31. Desole, C. et al. HGF and MET: from brain development to neurological disorders. Front. Cell Dev. Biol. 9, 683609 (2021).
+32. Bao, L. et al. The critical role of IL-12p40 in initiating, enhancing, and perpetuating pathogenic events in murine experimental autoimmune neuritis. Brain Pathol. 12, 420–429 (2002).
+33. Mondal, S. et al. IL-12 p40 monomer is different from other IL-12 family members to selectively inhibit IL-12Rβ1 internalization and suppress EAE. Proc. Natl Acad. Sci. USA 117, 21557–21567 (2020).
+34. Kroenke, M. A., Carlson, T. J., Andjelkovic, A. V. & Segal, B. M. IL-12and IL-23-modulated T cells induce distinct types of EAE based on
+
+Nature Communications | (2023)14:8487
+
+10
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+histology, CNS chemokine proﬁle, and response to cytokine inhibition. J. Exp. Med. 205, 1535–1541 (2008). 35. Yu, S. et al. Neutralizing antibodies to IL-18 ameliorate experimental autoimmune neuritis by counter-regulation of autoreactive Th1 responses to peripheral myelin antigen. J. Neuropathol. Exp. Neurol. 61, 614–622 (2002). 36. Rivera-Correa, J. & Rodriguez, A. Autoantibodies during infectious diseases: Lessons from malaria applied to COVID-19 and other infections. Front. Immunol. 13, 938011 (2022). 37. Mohkhedkar, M., Venigalla, S. S. K. & Janakiraman, V. Untangling COVID-19 and autoimmunity: Identiﬁcation of plausible targets suggests multi organ involvement. Mol. Immunol. 137, 105–113 (2021). 38. Moody, R., Wilson, K., Flanagan, K. L., Jaworowski, A. & Plebanski, M. Adaptive immunity and the risk of autoreactivity in COVID-19. Int. J. Mol. Sci. 22, 8965 (2021). 39. Johnson, D. & Jiang, W. Infectious diseases, autoantibodies, and autoimmunity. J. Autoimmun. 137, 102962 (2023). 40. Lee, M. H. et al. Neurovascular injury with complement activation and inﬂammation in COVID-19. Brain J. Neurol. 145, 2555–2568 (2022). 41. Pretorius, E. et al. Persistent clotting protein pathology in Long COVID/Post-Acute Sequelae of COVID-19 (PASC) is accompanied by increased levels of antiplasmin. Cardiovasc. Diabetol. 20, 172 (2021). 42. Choudhary, S. et al. Modeling SARS-CoV-2: comparative pathology in rhesus macaque and Golden Syrian hamster models. Toxicol. Pathol. https://doi.org/10.1177/01926233211072767 (2022). 43. Rutkai, I. et al. Neuropathology and virus in brain of SARS-CoV-2 infected non-human primates. Nat. Commun. 13, 1745 (2022). 44. Fernández-Castañeda, A. et al. Mild respiratory COVID can cause multi-lineage neural cell and myelin dysregulation. Cell 185, 2452–2468.e16 (2022). 45. Soung, A. L. et al. COVID-19 induces CNS cytokine expression and loss of hippocampal neurogenesis. Brain awac270 https://doi.org/ 10.1093/brain/awac270 (2022). 46. Borsini, A. et al. Neurogenesis is disrupted in human hippocampal progenitor cells upon exposure to serum samples from hospitalized COVID-19 patients with neurological symptoms. Mol. Psychiatry 1–13, https://doi.org/10.1038/s41380-02201741-1 (2022). 47. ISARIC4C Comprehensive Clinical Characterisation Collaboration Website. https://isaric4c.net. 48. Ellul, M. A. et al. Neurological associations of COVID-19. Lancet Neurol. 19, 767–783 (2020). 49. Michael, B. D. et al. Characteristic cytokine and chemokine proﬁles in encephalitis of infectious, immune-mediated, and unknown aetiology. PLoS ONE 11, e0146288 (2016). 50. Grifﬁths, M. J. et al. In enterovirus 71 encephalitis with cardiorespiratory compromise, elevated interleukin 1β, interleukin 1 receptor antagonist, and granulocyte colony-stimulating factor levels are markers of poor prognosis. J. Infect. Dis. 206, 881–892 (2012). 51. Michael, B. D. et al. Post-acute serum eosinophil and neutrophilassociated cytokine/chemokine proﬁle can distinguish between patients with neuromyelitis optica and multiple sclerosis; and identiﬁes potential pathophysiological mechanisms—a pilot study. Cytokine 64, 90–96 (2013). 52. Needham, E. J. et al. Complex autoantibody responses occur following moderate to severe traumatic brain injury. J. Immunol. 207, 90–100 (2021). 53. Ances, B. M. et al. Treatment-responsive limbic encephalitis identiﬁed by neuropil antibodies: MRI and PET correlates. Brain 128, 1764–1777 (2005).
+
+54. Lai, M. et al. Investigation of LGI1 as the antigen in limbic encephalitis previously attributed to potassium channels: a case series. Lancet Neurol. 9, 776–785 (2010).
+55. Irani, S. R. et al. Antibodies to Kv1 potassium channel-complex proteins leucine-rich, glioma inactivated 1 protein and contactinassociated protein-2 in limbic encephalitis, Morvan’s syndrome and acquired neuromyotonia. Brain 133, 2734–2748 (2010).
+56. Uy, C. E. et al. Detection and signiﬁcance of neuronal autoantibodies in patients with meningoencephalitis in Vientiane, Lao PDR. Trans. R. Soc. Trop. Med. Hyg. 116, 959–965 (2022).
+57. Irani, S. R. et al. N-methyl-d-aspartate antibody encephalitis: temporal progression of clinical and paraclinical observations in a predominantly non-paraneoplastic disorder of both sexes. Brain 133, 1655–1667 (2010).
+58. Masi, A. et al. Cytokine levels and associations with symptom severity in male and female children with autism spectrum disorder. Mol. Autism 8, 63 (2017).
+Acknowledgements
+We thank the patients and their loved ones who volunteered to contribute to these studies at one of the most difﬁcult times in their lives, and the research staff in every hospital who recruited patients at personal risk under challenging conditions. This research was funded by the National Institute for Health and Care Research (NIHR) (CO-CIN-01) and jointly by NIHR and UK Research and Innovation (CV220-169, MC_PC_19059). B.D.M. is supported by the UKRI/MRC (MR/V03605X/1), the MRC/UKRI (MR/V007181/1), MRC (MR/T028750/1) and Wellcome (ISSF201902/3). C.D. is supported by MRC (MC_PC_19044). We would like to thank the University of Liverpool GCP laboratory facility team for Luminex assistance and the Liverpool University Biobank team for all their help, especially Dr. Victoria Shaw, Lara Lavelle-Langham, and Sue Holden. We would like to acknowledge the Liverpool Experimental Cancer Medicine Centre for providing infrastructure support for this research (Grant Reference: C18616/A25153). We acknowledge the Liverpool Centre for Cell Imaging (CCI) for provision of imaging equipment (Dragonﬂy confocal microscope) and excellent technical assistance (BBSRC grant number BB/R01390X/1). Tom Solomon is supported by The Pandemic Institute and the NIHR Health Protection Research Unit (HPRU) in Emerging and Zoonotic Infections at University of Liverpool. D.K.M. and E.N. are supported by the NIHR Cambridge Biomedical Centre and by NIHR funding to the NIHR BioResource (RG94028 and RG85445), and by funding from Brain Research UK 201819-20. We thank NIHR BioResource volunteers for their participation, and gratefully acknowledge NIHR BioResource centres, NHS Trusts and staff for their contribution. We thank the National Institute for Health and Care Research, NHS Blood and Transplant, and Health Data Research UK as part of the Digital Innovation Hub Programme. Support for title page creation and format was provided by AuthorArranger, a tool developed at the National Cancer Institute. The authors would like to acknowledge the eDRIS team (Public Health Scotland) for their support in obtaining approvals, the provisioning and linking of data and facilitating access to the National Safe Haven. The views expressed are those of the author(s) and not necessarily those of the UKRI, NHS, the NIHR or the Department of Health and Social Care.
+Author contributions
+B.D.M., C.D., E.J.N., K.T., R.W., Y.H., G.K.W., C.C., J. Cavanagh, S.R.I., A.V., L.S.T. and D.K.M. designed, analysed data, interpreted experiments, and wrote the manuscript. T.S., J.P.S., G.B., M.G., J.-C.S., A.J.C., M.A.E. and A.P. provided scientiﬁc orientation and critically reviewed the manuscript. K. Stirrups, N.K., J.R.B., and P.F.C. provided oversight of the COVID-Clinical Neuroscience Study. J.K.B., P.J.M.O., and M.G.S. led the ISARIC4C study and provided oversight of the manuscript. G.S., A.G. and A.-C.C. analysed data. S.A.B., J. Clark, P.S., K. Subramaniam,
+
+Nature Communications | (2023)14:8487
+
+11
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+M.H., C.H. and F.N.E. performed preliminary feasibility experiments. C.D., R.D., A.R., E.N., M.L., S.E., A.F. and H.F. performed experiments and analysed the data. E.T. managed the collection of the patients’ samples. ISARIC4C and COVID-CNS consortia recruited the patients for the study.
+
+Correspondence and requests for materials should be addressed to Benedict D. Michael.
+Peer review information Nature Communications thanks Avindra Nath, Michael Pizzi and the other, anonymous, reviewer(s) for their contribution to the peer review of this work. A peer review ﬁle is available.
+
+Competing interests
+T.S. is the Director of The Pandemic Institute which has received funding from Innova and CSL Seqirus and Aviva and DAM Health. T.S. was an advisor to the GSK Ebola Vaccine programme and the Siemens Diagnostic Programme. T.S. Chaired the Siemens Healthineers Clinical Advisory Board. T.S. Co-Chaired the WHO Neuro-COVID task force and sat on the UK Government Advisory Committee on Dangerous Pathogens, and the Medicines and Healthcare Products Regulatory Agency (MHRA) Expert Working Group on Covid-19 vaccines. T.S. Advised to the UK COVID-19 Therapeutics Advisory Panel (UK-TAP). T.S. was a Member of COVID-19 Vaccines Beneﬁt Risk Expert Working Group for the Commission on Human Medicines (CHM) committee of the Medicines and Healthcare products Regulatory Agency (MHRA). T.S. has been a member of the Encephalitis Society since 1998 and President of the Encephalitis Society since 2019.
+Additional information
+Supplementary information The online version contains supplementary material available at https://doi.org/10.1038/s41467-023-42320-4.
+
+Reprints and permissions information is available at http://www.nature.com/reprints
+Publisher’s note Springer Nature remains neutral with regard to jurisdictional claims in published maps and institutional afﬁliations.
+Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as long as you give appropriate credit to the original author(s) and the source, provide a link to the Creative Commons license, and indicate if changes were made. The images or other third party material in this article are included in the article’s Creative Commons license, unless indicated otherwise in a credit line to the material. If material is not included in the article’s Creative Commons license and your intended use is not permitted by statutory regulation or exceeds the permitted use, you will need to obtain permission directly from the copyright holder. To view a copy of this license, visit http://creativecommons.org/ licenses/by/4.0/.
+© The Author(s) 2023, corrected publication 2024
+
+Benedict D. Michael 1,2,3,82 , Cordelia Dunai 1,2,82, Edward J. Needham 4,5, Kukatharmini Tharmaratnam 6, Robyn Williams 7,8, Yun Huang 1, Sarah A. Boardman 1, Jordan J. Clark9,10,11, Parul Sharma12, Krishanthi Subramaniam12, Greta K. Wood1, Ceryce Collie 1, Richard Digby 5, Alexander Ren5, Emma Norton5, Maya Leibowitz5, Soraya Ebrahimi5, Andrew Fower7, Hannah Fox7, Esteban Tato 13,14, Mark A. Ellul1,3, Geraint Sunderland 1, Marie Held 15, Claire Hetherington 1, Franklyn N. Egbe 1, Alish Palmos 13,14, Kathy Stirrups 16,17, Alexander Grundmann18,19, Anne-Cecile Chiollaz20, Jean-Charles Sanchez20, James P. Stewart 12, Michael Grifﬁths1, Tom Solomon 1,2,3,21, Gerome Breen 13,14, Alasdair J. Coles4, Nathalie Kingston16,22, John R. Bradley16,23, Patrick F. Chinnery 4,16, Jonathan Cavanagh 24, Sarosh R. Irani 7,8, Angela Vincent 25, J. Kenneth Baillie 26,27, Peter J. Openshaw 28,29, Malcolm G. Semple 1,2,30, ISARIC4C Investigators*, COVID-CNS Consortium*, Leonie S. Taams 31,83 & David K. Menon 5,83
+1Clinical Infection, Microbiology, and Immunology, Institute of Infection, Veterinary and Ecological Sciences, University of Liverpool, Liverpool L69 7BE, UK. 2NIHR Health Protection Research Unit (HPRU) in Emerging and Zoonotic Infections at University of Liverpool, Liverpool L69 7BE, UK. 3The Walton Centre NHS Foundation Trust, Liverpool L9 7BB, UK. 4Department of Clinical Neurosciences, University of Cambridge, Cambridge CB2 0QQ, UK. 5Division of Anaesthesia, Department of Medicine, University of Cambridge, Cambridge CB2 0QQ, UK. 6Health Data Science, Institute of Population Health, University of Liverpool, Liverpool L69 3GF, UK. 7Oxford Autoimmune Neurology Group, Nufﬁeld Department of Clinical Neurosciences, University of Oxford, Oxford OX3 9DU, UK. 8Departments of Neurology and Neuroscience, Mayo Clinic, Jacksonville, FL 32224, USA. 9University of Liverpool, Liverpool L69 7BE, UK. 10Department of Microbiology, Icahn School of Medicine, Mount Sinai, NY 10029, USA. 11Center for Vaccine Research and Pandemic Preparedness (C-VARPP), Icahn School of Medicine, Mount Sinai, NY 10029, USA. 12Infection Biology & Microbiomes, Institute of Infection, Veterinary and Ecological Sciences, University of Liverpool, Liverpool L3 5RF, UK. 13Social, Genetic and Developmental Psychiatry Centre, Institute of Psychiatry, Psychology & Neuroscience, King’s College London, London SE5 8AF, UK. 14NIHR Maudsley Biomedical Research Centre, King’s College London, London SE5 8AF, UK. 15Centre for Cell Imaging, Liverpool Shared Research Facilities, Faculty of Health and Life Sciences, University of Liverpool, Liverpool L69 7ZB, UK. 16NIHR BioResource, Cambridge University Hospitals NHS Foundation, Cambridge CB2 0QQ, UK. 17Department of Haematology, University of Cambridge, Cambridge CB2 0QQ, UK. 18Clinical Neurosciences, Clinical and Experimental Science, Faculty of Medicine, University of Southampton, Southampton SO17 1BF, UK. 19Department of Neurology, Wessex Neurological Centre, University Hospital Southampton NHS Foundation Trust, Southampton SO16 6YD, UK. 20Département de médecine interne des spécialités (DEMED), University of Geneva, Geneva CH-1211, Switzerland. 21The Pandemic Institute, Liverpool L7 3FA, UK. 22University of Cambridge, Cambridge CB2 0QQ, UK. 23Department of Medicine, School of Clinical Medicine, University of Cambridge, Cambridge CB2 0QQ, UK. 24Centre for Immunology, School of Infection & Immunity, College of Medical, Veterinary & Life Sciences, University of Glasgow, Glasgow G12 8TA, UK. 25Nufﬁeld Department of Clinical
+
+Nature Communications | (2023)14:8487
+
+12
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Neurosciences, University of Oxford, Oxford OX3 9DU, UK. 26Roslin Institute, University of Edinburgh, Edinburgh EH25 9RG, UK. 27Intensive Care Unit, Royal Inﬁrmary of Edinburgh, Edinburgh EH10 5HF, UK. 28National Heart and Lung Institute, Imperial College London, London SW7 2BX, UK. 29Imperial College Healthcare NHS Trust, London W2 1NY, UK. 30Respiratory Unit, Alder Hey Children’s Hospital NHS Foundation Trust, Liverpool L14 5AB, UK. 31Centre for Inﬂammation Biology and Cancer Immunology, King’s College London, London SE1 9RT, UK. 82These authors contributed equally: Benedict D. Michael, Cordelia Dunai. 83These authors jointly supervised this work: Leonie S. Taams, David K. Menon. *Lists of authors and their afﬁliations appear at the end of the
+paper. e-mail: benmic@liverpool.ac.uk
+
+ISARIC4C Investigators
+J. Kenneth Baillie32, Peter J. Openshaw33, Malcolm G. Semple34, Beatrice Alex32, Petros Andrikopoulos33, Benjamin Bach32, Wendy S. Barclay33, Debby Bogaert32, Meera Chand35, Kanta Chechi33, Graham S. Cooke33, Ana da Silva36, Thushan de Silva37, Annemarie B. Docherty32, Gonçalo dos Santos33, Marc-Emmanuel Dumas33, Jake Dunning35, Tom Fletcher38, Christoper A. Green39, William Greenhalf34, Julian L. Grifﬁn33, Rishi K. Gupta40, Ewen M. Harrison32, Antonia Y. Wai36, Karl Holden34, Peter W. Horby41, Samreen Ijaz35, Saye Khoo34, Paul Klenerman41, Andrew Law32, Matthew R. Lewis33, Sonia Liggi33, Wei S. Lim42, Lynn Maslen33, Alexander J. Mentzer43, Laura Merson41, Alison M. Meynert32, Shona C. Moore34, Mahdad Noursadeghi40, Michael Olanipekun33, Anthonia Osagie33, Massimo Palmarini36, Carlo Palmieri34, William A. Paxton34, Georgios Pollakis34, Nicholas Price44, Andrew Rambaut32, David L. Robertson36, Clark D. Russell32, Vanessa Sancho-Shimizu33, Caroline J. Sands33, Janet T. Scott36, Louise Sigfrid41, Tom Solomon34, Shiranee Sriskandan33, David Stuart41, Charlotte Summers45, Olivia V. Swann32, Zoltan Takats33, Panteleimon Takis33, Richard S. Tedder35, A. A. R. Thompson37, Emma C. Thomson36, Ryan S. Thwaites33, Lance C. Turtle34, Maria Zambon35, Thomas M. Drake32, Cameron J. Fairﬁeld32, Stephen R. Knight32, Kenneth A. Mclean32, Derek Murphy32, Lisa Norman32, Riinu Pius32, Catherine A. Shaw32, Marie Connor34, Jo Dalton34, Carrol Gamble34, Michelle Girvan34, Sophie Halpin34, Janet Harrison34, Clare Jackson34, James Lee41, Laura Marsh34, Daniel Plotkin41, Stephanie Roberts34, Egle Saviciute34, Sara Clohisey32, Ross Hendry32, Susan Knight46, Eva Lahnsteiner47, Gary Leeming48, Lucy Norris32, James Scott-Brown32, Sarah Tait46, Murray Wham32, Richard Clark47, Audrey Coutts47, Lorna Donnelly47, Angie Fawkes47, Tammy Gilchrist47, Katarzyna Hafezi47, Louise MacGillivray47, Alan Maclean47, Sarah McCafferty47, Kirstie Morrice47, Lee Murphy47, Nicola Wrobel47, Gail Carson41, Kayode Adeniji47, Daniel Agranoff47, Ken Agwuh47, Dhiraj Ail47, Erin L. Aldera47, Ana Alegria47, Sam Allen47, Brian Angus47, Abdul Ashish47, Dougal Atkinson47, Shahedal Bari47, Gavin Barlow47, Stella Barnass47, Nicholas Barrett47, Christopher Bassford47, Sneha Basude47, David Baxter47, Michael Beadsworth47, Jolanta Bernatoniene47, John Berridge47, Colin Berry47, Nicola Best47, Pieter Bothma47, Robin Brittain-Long47, Naomi Bulteel47, Tom Burden47, Andrew Burtenshaw47, Vikki Caruth47, David Chadwick47, Duncan Chambler47, Nigel Chee47, Jenny Child47, Srikanth Chukkambotla47, Tom Clark47, Paul Collini47, Catherine Cosgrove47, Jason Cupitt47, Maria-Teresa Cutino-Moguel47, Paul Dark47, Chris Dawson47, Samir Dervisevic47, Phil Donnison47, Sam Douthwaite47, Andrew Drummond47, Ingrid DuRand47, Ahilanadan Dushianthan47, Tristan Dyer47, Cariad Evans47, Chi Eziefula47, Chrisopher Fegan47, Adam Finn47, Duncan Fullerton47, Sanjeev Garg47, Atul Garg47, Effrossyni Gkrania-Klotsas47, Jo Godden47, Arthur Goldsmith47, Clive Graham47, Tassos Grammatikopoulos49, Elaine Hardy47, Stuart Hartshorn47, Daniel Harvey47, Peter Havalda47, Daniel B. Hawcutt47, Maria Hobrok47, Luke Hodgson47, Anil Hormis47, Joanne Howard47, Michael Jacobs47, Susan Jain47, Paul Jennings47, Agilan Kaliappan47, Vidya Kasipandian47, Stephen Kegg47, Michael Kelsey47, Jason Kendall47, Caroline Kerrison47, Ian Kerslake47, Oliver Koch47, Gouri Koduri47, George Koshy47, Shondipon Laha47, Steven Laird47, Susan Larkin47, Tamas Leiner47, Patrick Lillie47, James Limb47, Vanessa Linnett47, Jeff Little47, Mark Lyttle47, Michael MacMahon47, Emily MacNaughton47, Ravish Mankregod47, Huw Masson47, Elijah Matovu47, Katherine McCullough47, Ruth McEwen47, Manjula Meda47, Gary Mills47, Jane Minton47, Kavya Mohandas47, Quen Mok47, James Moon47, Elinoor Moore47, Patrick Morgan47, Craig Morris47, Katherine Mortimore47, Samuel Moses47, Mbiye Mpenge47, Rohinton Mulla47, Michael Murphy47, Thapas Nagarajan47, Megan Nagel47, Mark Nelson47, Lillian Norris47, Matthew K. O’Shea47, Marlies Ostermann44, Igor Otahal47, Mark Pais47, Selva Panchatsharam47, Danai Papakonstantinou47, Padmasayee Papineni47, Hassan Paraiso47, Brij Patel47, Natalie Pattison47, Justin Pepperell47, Mark Peters47, Mandeep Phull47, Stefania Pintus47, Tim Planche47, Frank Post47, David Price47, Rachel Prout47, Nikolas Rae47, Henrik Reschreiter47, Tim Reynolds47, Neil Richardson47, Mark Roberts47, Devender Roberts47, Alistair Rose47, Guy Rousseau47, Bobby Ruge47, Brendan Ryan47, Taranprit Saluja47, Matthias L. Schmid47, Aarti Shah47, Manu Shankar-Hari47, Prad Shanmuga47, Anil Sharma47, Anna Shawcross47, Jagtur S. Pooni47, Jeremy Sizer47, Richard Smith47, Catherine Snelson47, Nick Spittle47, Nikki Staines47, Tom Stambach47, Richard Stewart47, Pradeep Subudhi47, Tamas Szakmany47, Kate Tatham47, Jo Thomas47, Chris Thompson47, Robert Thompson47, Ascanio Tridente47, Darell Tupper-Carey47, Mary Twagira47, Nick Vallotton47, Rama Vancheeswaran47, Rachel Vincent47, Lisa Vincent-Smith47, Shico Visuvanathan47, Alan Vuylsteke47, Sam Waddy47, Rachel Wake47,
+
+Nature Communications | (2023)14:8487
+
+13
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+Andrew Walden47, Ingeborg Welters47, Tony Whitehouse47, Paul Whittaker47, Ashley Whittington47, Meme Wijesinghe47, Martin Williams47, Lawrence Wilson47, Stephen Winchester47, Martin Wiselka47, Adam Wolverson47, Daniel G. Wootton47, Andrew Workman47, Bryan Yates47, Peter Young47, Sarah E. McDonald36, Victoria Shaw34, Katie A. Ahmed47, Jane A. Armstrong47, Milton Ashworth47, Innocent G. Asiimwe47, Siddharth Bakshi47, Samantha L. Barlow47, Laura Booth47, Benjamin Brennan47, Katie Bullock47, Nicola Carlucci47, Emily Cass47, Benjamin W. Catterall47, Jordan J. Clark47, Emily A. Clarke47, Sarah Cole47, Louise Cooper47, Helen Cox47, Christopher Davis47, Oslem Dincarslan47, Alejandra D. Carracedo47, Chris Dunn47, Philip Dyer47, Angela Elliott47, Anthony Evans47, Lorna Finch47, Lewis W. Fisher47, Lisa Flaherty47, Terry Foster47, Isabel Garcia-Dorival47, Philip Gunning47, Catherine Hartley47, Anthony Holmes47, Rebecca L. Jensen47, Christopher B. Jones47, Trevor R. Jones47, Shadia Khandaker47, Katharine King47, Robyn T. Kiy47, Chrysa Koukorava47, Annette Lake47, Suzannah Lant47, Diane Latawiec47, Lara Lavelle-Langham47, Daniella Lefteri47, Lauren Lett47, Lucia A. Livoti47, Maria Mancini47, Hannah Massey47, Nicole Maziere47, Sarah McDonald47, Laurence McEvoy47, John McLauchlan47, Soeren Metelmann47, Nahida S. Miah47, Joanna Middleton47, Joyce Mitchell47, Ellen G. Murphy47, Rebekah Penrice-Randal47, Jack Pilgrim47, Tessa Prince47, Will Reynolds47, P. M. Ridley47, Debby Sales47, Victoria E. Shaw47, Rebecca K. Shears47, Benjamin Small47, Krishanthi S. Subramaniam47, Agnieska Szemiel47, Aislynn Taggart47, Jolanta Tanianis-Hughes47, Jordan Thomas47, Erwan Trochu47, Libby v. Tonder47, Eve Wilcock47, J. E. Zhang47, Seán Keating50, Cara Donegan34, Rebecca G. Spencer34, Chloe Donohue34, Fiona Grifﬁths51, Hayley Hardwick34 & Wilna Oosthuyzen32
+
+32University of Edinburgh, Edinburgh, UK. 33Imperial College London, London, UK. 34University of Liverpool, Liverpool, UK. 35Public Health England, London, UK. 36MRC-University of Glasgow Centre for Virus Research, Glasgow, UK. 37University of Shefﬁeld, Shefﬁeld, UK. 38Liverpool School of Tropical Medicine, Liverpool, UK. 39University of Birmingham, Birmingham, UK. 40University College London, London, UK. 41University of Oxford, Oxford, UK. 42Nottingham University Hospitals NHS Trust, Nottingham, UK. 43John Radcliffe Hospital, Oxford, UK. 44King’s College London, London, UK. 45University of Cambridge, Cambridge, UK. 46Public Health Scotland, Edinburgh, UK. 47ISARIC4C Investigators, Liverpool, UK. 48University of Manchester, Manchester, UK. 49King’s College Hospital, London, UK. 50Royal Inﬁrmary Edinburgh, Edinburgh, UK. 51Roslin Institute, Edinburgh, UK.
+COVID-CNS Consortium
+Adam Hampshire33, Adam Sieradzki52, Adam W. Seed53, Afagh Garjani54, Akshay Nair44, Alaisdair Coles45, Alan Carson55, Alastair Darby34, Alex Berry40, Alex Dregan44, Alexander Grundmann56, Alish Palmos44, Ammar Al-Chalabi44, Andrew M. McIntosh32, Angela E. Holland57, Angela Roberts45, Angela Vincent41, Annalena Venneri37, Anthony S. David40, Arina Tamborska34, Arvind Patel58, Ava Easton34, Benedict D. Michael34, Bethan Blackledge59, Bethany Facer34, Bhagteshwar Singh34, Brendan Sargent34, Ceryce Collie34, Charles Leek34, Cherie Armour60, Christopher M. Morris61, Christopher M. Allen54, Ciaran Mulholland60, Claire L. MacIver60, Cordelia Dunai34, Craig J. Smith48, Daniel J. van44, Daniel Madarshahian63, David Christmas64, David Cousins61, David K. Menon45, David M. Christmas45, David P. Breen32, Dina Monssen44, Edward Bullmore45, Edward Needham45, Emily McGlinchey60, Emma Thomson58, Eugene Duff41, Eva M. Hodel34, Ewan Harrison45, Fernando Zelaya44, Gabriella Lewis65, Gavin McDonnell66, Gerome Breen44, Greta K. Wood34, Guy B. Williams45, C. Hannah34, Henry C. Rogers44, Ian Galea56, Jacqueline Smith67, Jade D. Harris59, James B. Lilleker68, Jay Amin56, John P. Aggleton62, John R. Bradley45, John-Paul Taylor61, Jonathan Cavanagh58, Jonathan R. Coleman44, Jonathan Underwood62, Judith Breuer40, Julian Hiscox34, Karla Miller41, Katherine C. Dodd48, Kiran Glen44, Laura Benjamin40, Leonie Taams44, Lily George44, Marc Hardwick56, Mark R. Baker61, Marlies Ostermann43, Masud Husain41, Matthew Butler44, Matthew Hotopf44, Matthew R. Broome39, Merna Samuel34, Michael Grifﬁths34, Michael P. Lunn40, Michael S. Zandi40, Monika Hartmann69, Nadine Cossette70, Naomi Martin44, Nathalie Nicholas71, Neil A. Harrison62, Neil Basu58, Neil Harrison62, Nicholas Davies33, Nicholas Wood40, Nikos Evangelou54, Obioma Orazulume40, Pamela J. Shaw37, Parisa Mansoori72, Paul J. Harrison41, Peter Jezzard41, Peter M. Fernandes32, Rachel Upthegrove73, Rahul Batra44, Rebecca Gregory74, Rhys H. Thomas75, Richard Bethlehem45, Richard Francis76, Ronan O’Malley77, Rustam A. Salman78, Ryan McIlwaine60, Sandar Kyaw79, Sarosh Irani41, Savini Gunatilake80, Scott Semple32, Shahd H. Hamid34, Sharon Peacock45, Silvia Rota44, Simon Keller34, Sophie Pendered34, Suzanne Barrett81, Stella Hughes66, Stella-Maria Paddick61, Stephen J. Sawcer45, Stephen Smith41, Steven Williams44, Sui H. Wong44, Sylviane Defres38, Thomas Jackson73, Thomas M. Jenkins37, Thomas Pollak44, Timothy Nicholson44, Tom Solomon33, Tonny Veenith39, Victoria Grimbly34 & Virginia Newcombe45
+
+52COVID-CNS Consortium, York, UK. 53Liverpool University Hospitals NHS Foundation Trust, Liverpool, UK. 54University of Nottingham, Nottingham, UK. 55Edinburgh University, Edinburgh, UK. 56University of Southampton, Southampton, UK. 57Nottingham University Hospital, Nottingham, UK. 58University of Glasgow, Glasgow, UK. 59Salford Royal Foundation Trust, Manchester, UK. 60Queens University Belfast, Belfast, UK. 61Newcastle University, Newcastle, UK. 62Cardiff University, Cardiff, UK. 63Shefﬁeld Institute for Translational Neuroscience, Shefﬁeld, UK. 64Dundee University, Dundee, UK. 65South London and Maudsley NHS Foundation Trust, London, UK. 66Belfast Health and Social Care Trust, Belfast, UK. 67COVID-CNS Consortium, Edinburgh, UK. 68The University
+
+Nature Communications | (2023)14:8487
+
+14
+
+Article
+
+https://doi.org/10.1038/s41467-023-42320-4
+
+of Manchester, Manchester, UK. 69Kings College London, London, UK. 70Royal Inﬁrmary of Edinburgh, Edinburgh, UK. 71Aintree University Hospital, Liverpool, UK. 72National Institute for Health Research (NIHR) Bioresource, London, UK. 73Birmingham University, Birmingham, UK. 74Shefﬁeld Teaching Hospitals NHS Foundation Trust, Shefﬁeld, UK. 75Translational and Clinical Research, Newcastle, UK. 76The Stroke Association, London, UK. 77The University of Shefﬁeld, Shefﬁeld, UK. 78The University of Edinburgh, Edinburgh, UK. 79Institute of Mental health, Nottingham, UK. 80Royal Stoke University Hospital, Stoke on Trent, UK. 81Northern Health and Social Care Trust, Belfast, UK.
+
+Nature Communications | (2023)14:8487
+
+15
+
+

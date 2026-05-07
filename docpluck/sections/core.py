@@ -24,20 +24,18 @@ class _Marker:
 
 
 def _resolve_label(hint: BlockHint) -> tuple[SectionLabel, Confidence, DetectedVia] | None:
-    """Apply the conflict-resolution rule from spec §5.3.
+    """v1.6.1: Only canonical-taxonomy heading matches create section markers.
 
-    - Canonical heading match (any layout strength) → use canonical label.
-    - Strong layout, unrecognized text → unknown label, low confidence.
-    - Weak layout, unrecognized text → no marker (return None).
+    Strong-layout-but-unrecognized text is no longer promoted to an `unknown`
+    span. Such hints are recorded by the caller for the post-partition
+    `subheadings` collection pass.
     """
     canonical = lookup_canonical_label(hint.text)
-    if canonical is not None:
-        if hint.heading_strength == "strong" or hint.heading_source == "markup":
-            return canonical, Confidence.high, _via_for(hint)
-        return canonical, Confidence.medium, _via_for(hint)
-    if hint.heading_strength == "strong":
-        return SectionLabel.unknown, Confidence.low, _via_for(hint)
-    return None
+    if canonical is None:
+        return None
+    if hint.heading_strength == "strong" or hint.heading_source == "markup":
+        return canonical, Confidence.high, _via_for(hint)
+    return canonical, Confidence.medium, _via_for(hint)
 
 
 def _via_for(hint: BlockHint) -> DetectedVia:
@@ -94,9 +92,17 @@ def partition_into_sections(
          (skipping the heading line) and split at the first boundary line.
     """
     markers: list[_Marker] = []
+    unrecognized: list[BlockHint] = []
     for hint in hints:
         resolved = _resolve_label(hint)
         if resolved is None:
+            # v1.6.1: only strong-layout or markup hints become subheadings.
+            # Weak text_pattern hints (pass-3 line-isolated headings) are excluded:
+            # they cannot be reliably distinguished from table-cell list items whose
+            # normalized representation is also blank-line-separated single lines.
+            # Smart list-vs-heading discrimination is deferred to v1.6.2+.
+            if hint.heading_strength == "strong" or hint.heading_source == "markup":
+                unrecognized.append(hint)
             continue
         canonical, conf, via = resolved
         markers.append(_Marker(
@@ -120,6 +126,23 @@ def partition_into_sections(
         seen.add(m.char_start)
         dedup.append(m)
     markers = dedup
+
+    # v1.6.1: fold adjacent markers with the same canonical_label when the
+    # gap between them is small (< 100 chars). This handles the common
+    # "Introduction\nBackground\n..." pattern where both map to introduction.
+    # Keeps multi-study behavior intact: methods_2 of study 2 is far apart
+    # from methods of study 1, so they remain separate.
+    coalesced_markers: list[_Marker] = []
+    for m in markers:
+        if (
+            coalesced_markers
+            and coalesced_markers[-1].label == m.label
+            and m.char_start - coalesced_markers[-1].char_start < 100
+        ):
+            # Drop this marker; the prior one already opens this section.
+            continue
+        coalesced_markers.append(m)
+    markers = coalesced_markers
 
     if not markers:
         sole = Section(
@@ -200,9 +223,15 @@ def partition_into_sections(
     # span (the heading line) before scanning. If a boundary fires on any
     # subsequent line, truncate the span at that line and emit a trailing
     # `unknown` span covering the rest. Universal coverage is preserved.
+    #
+    # v1.6.1: with strict canonical-only markers + clean normalized text, the
+    # boundary-aware truncation pass is no longer needed and is destructive on
+    # real APA papers (e.g., 'Corresponding Author:' inside Introduction would
+    # truncate intro at that line). Disabled by listing all canonical labels.
+    _NO_TRUNCATE = set(SectionLabel)
     truncated: list[Section] = []
     for s in coalesced:
-        if s.canonical_label == SectionLabel.unknown:
+        if s.canonical_label in _NO_TRUNCATE:
             truncated.append(s)
             continue
         offset = s.char_start
@@ -243,7 +272,33 @@ def partition_into_sections(
             heading_text=None,
         ))
 
-    return tuple(truncated)
+    # v1.6.1: attach unrecognized hints to the section that contains them.
+    final: list[Section] = []
+    for s in truncated:
+        if not unrecognized:
+            final.append(s)
+            continue
+        contained = tuple(
+            h.text for h in unrecognized
+            if s.char_start <= h.char_start < s.char_end
+            and s.canonical_label != SectionLabel.unknown
+        )
+        if not contained:
+            final.append(s)
+            continue
+        final.append(Section(
+            label=s.label,
+            canonical_label=s.canonical_label,
+            text=s.text,
+            char_start=s.char_start,
+            char_end=s.char_end,
+            pages=s.pages,
+            confidence=s.confidence,
+            detected_via=s.detected_via,
+            heading_text=s.heading_text,
+            subheadings=contained,
+        ))
+    return tuple(final)
 
 
 def append_footnotes_section(
