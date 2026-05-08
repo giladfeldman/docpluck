@@ -5,6 +5,11 @@ WITHOUT layout/F0. The F0 step (which stripped footnotes and appended them as a
 separate section) is no longer run. Footnote text remains inline in the normalized
 text and no 'footnotes' section is emitted. The old test is kept below but updated
 to document the new behavior.
+
+(2026-05-09 note: a layout-aware re-wiring was attempted and reverted —
+the pdfplumber output format diverges enough from pdftotext that the
+heading-detection patterns broke on 60+ corpus papers.  The right fix is
+in the W0 watermark layer, not by switching the extraction tool.)
 """
 
 import io
@@ -35,11 +40,11 @@ def test_footnote_in_separate_section():
     body section that contains it. This test documents the new behavior."""
     from docpluck import extract_sections
     doc = extract_sections(_pdf_with_footnote_in_abstract())
-    # No separate footnotes section in the new path.
+    # No separate footnotes section in the no-layout path.
     fn = doc.get("footnotes")
     assert fn is None, (
-        "v1.6.1 PDF path does not emit a 'footnotes' section; "
-        "footnote text remains inline."
+        "PDF path does not emit a 'footnotes' section; footnote text "
+        "remains inline."
     )
     # Abstract and Methods should still be detected.
     assert doc.abstract is not None or any(
