@@ -264,7 +264,28 @@ inscriptis is the strongest alternative — it's an academic tool (JOSS paper) w
 
 ---
 
-## 13. Why a separate `extract_pdf_structured()` function (v2.0)
+## 13. Two channels: text (pdftotext) and layout (pdfplumber)
+
+**The single most-recurring mistake in this codebase is to "fix" a real-world-paper bug by swapping the PDF text-extraction tool.**  See [LESSONS.md L-001](../LESSONS.md#l-001--never-swap-the-pdf-text-extraction-tool-as-a-fix-for-downstream-problems) for the incident log.  The architectural rule:
+
+| Channel | Source | Consumers |
+|---|---|---|
+| **Text** (linear, reading-order) | `extract_pdf` (pdftotext default) | `sections/`, `normalize.py`, `batch.py`, statistics extraction |
+| **Layout** (per-char fonts / positions / page geometry) | `extract_pdf_layout` (pdfplumber) | `tables/`, `figures/`, F0 layout-aware running-header strip |
+
+The two are **not interchangeable text sources**.  Heading regexes, taxonomy variants, watermark patterns, paragraph-detection heuristics, and ~250 unit tests are all calibrated to pdftotext's word-spacing / line-wrapping format.  Switching to pdfplumber's text breaks all of them.
+
+When pdftotext output looks broken on a specific paper (column interleaving, etc.), the right fix is in the layer that owns the artifact:
+- Watermarks / running headers → `normalize.py` `_WATERMARK_PATTERNS` (W0).
+- Heading not detected → `sections/annotators/text.py` regex tweak or `sections/taxonomy.py` canonical variant.
+- Abstract / Introduction synthesis → `sections/core.py` (Pattern E).
+- Numbering prefix → `sections/taxonomy.py::_NUMBERING_PREFIX` and `annotators/text.py::_NUM_PREFIX_FRAG`.
+
+If a paper's geometry truly cannot be recovered from pdftotext output (rare, e.g. tightly-packed-column physics journals), the strategy is to **port pdfplumber's column-detection algorithm** into a per-paper conditional fallback — not to replace the default text source.  Credit pdfplumber (MIT) in code comments when its algorithms are ported.
+
+`extract_structured()` (next section) is the canonical example of correctly using both channels without mixing them.
+
+## 14. Why a separate `extract_pdf_structured()` function (v2.0)
 
 v2.0 added structured table and figure extraction. We considered three API approaches:
 
