@@ -37,10 +37,30 @@ Skipping step 5 is the most common failure mode. The deploy skill catches it.
 
 ## Critical hard rules (from project history)
 
-- **NEVER use pdftotext with `-layout` flag** — causes column interleaving on two-column papers. See `docpluck/extract.py:13–16`.
-- **NEVER use `pymupdf4llm` or `column_boxes()`** — AGPL license, incompatible with the authenticated SaaS service.
-- **ALWAYS normalize Unicode MINUS SIGN (U+2212) → ASCII hyphen** — breaks statistical pattern matching otherwise. (`normalize.py` step S5.)
-- **Test on APA psychology / RR papers** — not ML / engineering papers (false-positive stats from performance-metric tables).
+> **READ [`LESSONS.md`](./LESSONS.md) BEFORE TOUCHING `extract*.py`, `normalize.py`, or `sections/`.**
+> It is the durable incident log for the recurring mistakes below.  When in doubt about a change, the answer is almost always already there.
+
+- **NEVER swap the PDF text-extraction tool as a fix for downstream problems.** The TEXT channel is `extract_pdf` (pdftotext default mode); the LAYOUT channel is `extract_pdf_layout` (pdfplumber).  They are not interchangeable text sources.  Sections / normalize / batch consume the text channel; tables / figures / F0-layout-strip consume the layout channel.  Real-world-paper bugs (watermarks in body, abstract not detected, column interleaving) must be fixed in the layer that owns the artifact (`normalize.py` W0, `sections/annotators/text.py`, `sections/taxonomy.py`, `sections/core.py`) — not by switching extraction tools.  See [LESSONS.md L-001](./LESSONS.md#l-001--never-swap-the-pdf-text-extraction-tool-as-a-fix-for-downstream-problems) for the full incident record.
+- **NEVER use pdftotext with `-layout` flag** — causes column interleaving. See `docpluck/extract.py:13–16` and [LESSONS.md L-002](./LESSONS.md#l-002--never-use-pdftotext--layout-flag).
+- **NEVER use `pymupdf4llm`, PyMuPDF (`fitz`), or `column_boxes()`** — AGPL license, incompatible with the authenticated SaaS service.  pdfplumber (MIT) is the only allowed PDF library alongside pdftotext.  See [LESSONS.md L-003](./LESSONS.md#l-003--never-use-pymupdf4llm-pymupdf-fitz-column_boxes-or-other-agpl-licensed-pdf-tools).
+- **ALWAYS normalize Unicode MINUS SIGN (U+2212) → ASCII hyphen** — breaks statistical pattern matching otherwise. (`normalize.py` step S5.)  See [LESSONS.md L-004](./LESSONS.md#l-004--always-normalize-unicode-minus-sign-u2212--ascii-hyphen).
+- **Test on APA psychology / replication papers, not ML / engineering papers** — performance-metric tables look like statistical results and mask real failures.  See [LESSONS.md L-005](./LESSONS.md#l-005--test-on-apa--replication-report-papers-not-ml--engineering-papers).
+
+## Architecture: text channel vs layout channel
+
+| Need | Channel | Module |
+|------|---------|--------|
+| Reading-order linear text | `extract_pdf` (pdftotext default) | `docpluck/extract.py` |
+| Per-character font / position / page geometry | `extract_pdf_layout` (pdfplumber) | `docpluck/extract_layout.py` |
+| Tables (cell bboxes, columns) | `extract_pdf_layout` only | `docpluck/tables/` |
+| Figures (image bboxes) | `extract_pdf_layout` only | `docpluck/figures/` |
+| Sections, normalize, batch | `extract_pdf` only | `docpluck/sections/`, `normalize.py`, `batch.py` |
+| F0 layout-aware running-header / footnote strip | text from `extract_pdf` + layout from `extract_pdf_layout` | `normalize.py::_f0_strip_running_and_footnotes` |
+| Combined output (text + tables + figures) | both, as separate channels | `docpluck/extract_structured.py` |
+
+`extract_structured.py` is the canonical example of using both channels correctly without mixing them.
+
+**On using pdfplumber as reference material:**  pdfplumber's source is open (MIT).  When docpluck needs better column / reading-order handling than pdftotext provides, the strategy is to **study pdfplumber's algorithm** (`pdfplumber/page.py`) and re-implement the relevant logic in docpluck — applied as a *conditional fallback* (e.g. when default pdftotext output looks broken on a paper) rather than as a default replacement.  Credit pdfplumber in code comments and `docs/DESIGN.md` when its algorithms are ported.
 
 ## Project skills (in `.claude/skills/docpluck-*`)
 

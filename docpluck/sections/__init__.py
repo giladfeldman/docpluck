@@ -53,6 +53,18 @@ def extract_sections(
     fmt = source_format or _detect_format(file_bytes)
 
     if fmt == "pdf":
+        # Architecture note: the section pipeline reads the TEXT channel
+        # (pdftotext via extract_pdf), not the LAYOUT channel
+        # (pdfplumber via extract_pdf_layout).  See LESSONS.md L-001 and
+        # docs/DESIGN.md §13.  All heading regexes, taxonomy variants,
+        # watermark patterns, and unit tests are calibrated to pdftotext's
+        # output format.  DO NOT replace `extract_pdf` here — pdfplumber's
+        # text wraps differently and breaks ~60+ corpus papers in one
+        # commit (verified 2026-05-09).  Real-world-paper artifacts must
+        # be fixed in the layer that owns them: normalize.py W0 patterns
+        # for watermarks/headers, sections/annotators/text.py for heading
+        # detection, sections/core.py for synthesis, sections/taxonomy.py
+        # for canonical variants and numbering prefixes.
         from ..extract import extract_pdf
         from ..normalize import normalize_text, NormalizationLevel
         from .annotators.text import annotate_text
