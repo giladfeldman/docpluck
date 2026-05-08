@@ -217,6 +217,190 @@ class TestS8_LineBreaks:
 
 # ── S9: Header/footer removal ───────────────────────────────────────
 
+class TestW0_PublisherCopyrightAndRunningHeader:
+    """Issues H + I (2026-05-07): strip Elsevier-style copyright stamp on its
+    own line, and two-column running headers like
+    'M. Muraven / Journal of Experimental Social Psychology 46 (2010) 465-468'.
+    Both leak into section bodies if not stripped, blowing the strict-bar
+    cross-section bleed budget on every Elsevier two-column paper."""
+
+    def test_elsevier_copyright_line_stripped(self):
+        text = (
+            "...end of abstract paragraph.\n"
+            "© 2009 Elsevier Inc. All rights reserved.\n"
+            "\n"
+            "Introduction\n"
+        )
+        result = norm(text)
+        assert "Elsevier Inc. All rights reserved" not in result
+        assert "end of abstract paragraph" in result
+        assert "Introduction" in result
+
+    def test_springer_copyright_line_stripped(self):
+        text = (
+            "...end of paragraph.\n"
+            "© 2020 Springer Nature Limited. All rights reserved.\n"
+            "\n"
+            "Introduction\n"
+        )
+        result = norm(text)
+        assert "All rights reserved" not in result
+
+    def test_pdftotext_O_acute_for_copyright_stripped(self):
+        """pdftotext sometimes flattens © to Ó depending on font/encoding."""
+        text = (
+            "...end of abstract.\n"
+            "Ó 2009 Elsevier Inc. All rights reserved.\n"
+            "\n"
+            "Introduction\n"
+        )
+        result = norm(text)
+        assert "All rights reserved" not in result
+
+    def test_copyright_in_running_text_NOT_stripped(self):
+        """A copyright stamp embedded mid-prose should not be removed —
+        only standalone-line stamps qualify."""
+        text = (
+            "We discuss the implications of the © 2009 Elsevier Inc. All rights"
+            " reserved policy on data sharing in psychology.\n"
+        )
+        result = norm(text)
+        # The line is not anchored to start-of-line as a copyright stamp
+        # (it has prose before "©").  Should be preserved.
+        assert "© 2009 Elsevier" in result or "Ó 2009 Elsevier" in result
+
+    def test_two_column_running_header_stripped(self):
+        text = (
+            "...end of body paragraph.\n"
+            "M. Muraven / Journal of Experimental Social Psychology 46 (2010) 465-468\n"
+            "\n"
+            "Continuation of body.\n"
+        )
+        result = norm(text)
+        assert "M. Muraven / Journal of Experimental" not in result
+        assert "Continuation of body" in result
+
+    def test_two_column_running_header_with_two_authors(self):
+        text = (
+            "...end of body paragraph.\n"
+            "J. Smith and K. Jones / Cognitive Psychology 12 (2020) 100-120\n"
+            "Continuation of body.\n"
+        )
+        result = norm(text)
+        assert "Cognitive Psychology 12" not in result
+        assert "Continuation of body" in result
+
+    def test_two_column_running_header_en_dash_pages(self):
+        """Some publishers use en-dash for page ranges instead of hyphen."""
+        text = (
+            "...end of body paragraph.\n"
+            "A. Author / Journal of X 5 (2021) 50–75\n"
+            "Continuation of body.\n"
+        )
+        result = norm(text)
+        assert "A. Author / Journal" not in result
+        assert "Continuation of body" in result
+
+    def test_cc_license_footer_stripped(self):
+        """Korbmacher-style: 'Copyright: © 2022. The authors license this
+        article under the terms of the Creative Commons Attribution 3.0
+        License.' appended to abstract — should not contaminate abstract body."""
+        text = (
+            "...generalizability and robustness of the phenomenon. "
+            "Copyright: © 2022. The authors license this article under the"
+            " terms of the Creative Commons Attribution 3.0 License.\n"
+            "\n"
+            "1 Introduction\n"
+        )
+        result = norm(text)
+        assert "Creative Commons Attribution 3.0 License" not in result
+        assert "license this article" not in result
+        # The abstract content prior to the footer must survive.
+        assert "robustness of the phenomenon" in result
+
+    def test_collabra_downloaded_from_with_by_guest_stripped(self):
+        """Collabra Psychology / UCPress watermark variant has 'by guest'
+        between URL and 'on <date>'.  The original W0 pattern required no
+        intermediate text and missed every Collabra paper (Aiyer, Brick,
+        Maier, Adelina, etc.) — relaxed 2026-05-09."""
+        text = (
+            "Body paragraph.\n"
+            "Downloaded from http://online.ucpress.edu/collabra/article-pdf/"
+            "7/1/23443/foo.pdf by guest on 03 June 2021\n"
+            "More body.\n"
+        )
+        result = norm(text)
+        assert "Downloaded from" not in result
+        assert "by guest" not in result
+        assert "Body paragraph" in result
+        assert "More body" in result
+
+    def test_author_equal_contribution_footnote_stripped(self):
+        """Brick et al 2021 / Adelina-Feldman / many open-access papers
+        emit an author-equal-contribution footnote at the bottom of page 1.
+        pdftotext extracts it inline between abstract and intro."""
+        text = (
+            "End of abstract paragraph.\n"
+            "a Brick, Fillon, Yeung, Wang, Lyu, Ho, and Wong are equal-contribution"
+            " first authors b gfeldman@hku.hk / giladfel@gmail.com\n"
+            "Introduction\n"
+            "Body of intro.\n"
+        )
+        result = norm(text)
+        assert "Brick, Fillon" not in result
+        assert "equal-contribution" not in result
+        assert "Introduction" in result
+        assert "End of abstract paragraph" in result
+
+    def test_author_joint_first_footnote_stripped(self):
+        text = (
+            "Some paragraph.\n"
+            "a Smith, Jones, and Lee are joint first authors b email@example.com\n"
+            "Next.\n"
+        )
+        result = norm(text)
+        assert "joint first authors" not in result
+        assert "Some paragraph" in result
+        assert "Next" in result
+
+    def test_lowercase_prose_NOT_stripped_as_author_footnote(self):
+        """Genuine prose lines that happen to start with a lowercase letter
+        must NOT match — discriminator is the 'equal contribution' / 'joint
+        first authors' phrase, plus 3+ capitalized surnames."""
+        text = (
+            "Some paragraph.\n"
+            "a study published last year reported that participants in"
+            " the control condition performed worse.\n"
+            "Next.\n"
+        )
+        result = norm(text)
+        # The lowercase-prose continuation must survive.
+        assert "study published last year" in result
+
+    def test_cc_license_footer_4_0_variant_stripped(self):
+        text = (
+            "...end of paragraph.\n"
+            "The authors license this article under the terms of the Creative"
+            " Commons Attribution 4.0 International License.\n"
+        )
+        result = norm(text)
+        assert "Creative Commons Attribution" not in result
+
+    def test_reference_line_NOT_stripped_as_running_header(self):
+        """A reference list entry that happens to look similar must be preserved.
+        References don't have the '<initial>. <Surname> / <Journal> <vol> (<year>) <pages>'
+        shape — they have year inside, not after journal."""
+        text = (
+            "References\n"
+            "Muraven, M. (2010). Building self-control. Journal of Experimental"
+            " Social Psychology, 46(3), 465-468.\n"
+            "Smith, J. (2020). Another paper. Cognitive Psychology, 12, 100-120.\n"
+        )
+        result = norm(text)
+        assert "Muraven, M. (2010). Building" in result
+        assert "Smith, J. (2020). Another paper" in result
+
+
 class TestS9_HeaderFooter:
     def test_repeated_line_stripped(self):
         header = "Journal of Example Studies Vol. 1"

@@ -38,12 +38,83 @@ NORMALIZATION_VERSION = "1.6.0"
 # corruption case; R3 fixes 1–142 continuations per PDF; A7 fixes long DOIs.
 
 _WATERMARK_PATTERNS = [
-    re.compile(r"Downloaded\s+from\s+https?://[^\s]+\s+on\s+\d{1,2}\s+\w+\s+\d{4}", re.IGNORECASE),
+    # 2026-05-09: relaxed to allow optional intermediate phrase between the
+    # URL and the "on <date>" tail.  Collabra Psychology renders the watermark
+    # as "Downloaded from <url> by guest on <date>"; the previous pattern
+    # required `<url> on <date>` with nothing in between and missed it on
+    # every Collabra paper.
+    re.compile(
+        r"Downloaded\s+from\s+https?://[^\s]+(?:\s+by\s+\w+)?"
+        r"\s+on\s+\d{1,2}\s+\w+\s+\d{4}",
+        re.IGNORECASE,
+    ),
     re.compile(r"Provided\s+by\s+[\w\s.,&-]+\s+on\s+\d{4}-\d{2}-\d{2}", re.IGNORECASE),
     re.compile(r"This\s+article\s+is\s+protected\s+by\s+copyright\.[^\n]*", re.IGNORECASE),
     # RSOS running-footer artifact glued onto body text:
     # "41royalsocietypublishing.org/journal/rsos R. Soc. Open Sci. 12: 250979"
     re.compile(r"\d+\s*royalsocietypublishing\.org/journal/\w+\s+R\.\s*Soc\.\s*Open\s*Sci\.\s*\d+:\s*\d+"),
+    # Issue H — Publisher copyright stamp on its own line. Format:
+    #   "© 2009 Elsevier Inc. All rights reserved."
+    #   "Ó 2009 Elsevier Inc. All rights reserved."  (pdftotext sometimes flattens © → Ó)
+    #   "© 2020 Springer Nature Limited. All rights reserved."
+    #   "© 2021 The Author(s). Published by Wiley..."  (do NOT match — no "rights reserved")
+    # We anchor to start-of-line and require ALL of: © or Ó, a 4-digit year,
+    # then "All rights reserved" (case-insensitive). The intervening publisher
+    # name is bounded to a single line. Trailing period optional. Also strip
+    # the trailing newline so we don't leave a blank line behind.
+    re.compile(
+        r"(?im)^\s*[©Ó]\s*\d{4}[^\n]*?All\s+rights\s+reserved\.?\s*\n?",
+    ),
+    # Issue I — Two-column running header that pdftotext extracts at page
+    # boundaries.  Format:
+    #   "M. Muraven / Journal of Experimental Social Psychology 46 (2010) 465-468"
+    #   "J. Smith / Cognitive Psychology 12 (2020) 100-120"
+    # Anchored to its own line; recognized by the trailing "<vol> (<year>) <pages>"
+    # signature.  We require at least one initial-then-surname before the slash
+    # and one Capitalized word after.  The page range may use a hyphen or en-dash.
+    re.compile(
+        r"(?m)^\s*[A-Z]\.\s*(?:[A-Z]\.\s*)?[A-Z][\w'\-]+"
+        r"(?:\s*(?:and|&|,)\s*[A-Z]\.\s*(?:[A-Z]\.\s*)?[A-Z][\w'\-]+)*"
+        r"\s*/\s*"
+        r"[A-Z][^/\n]{2,80}?"
+        r"\s+\d+\s*\(\d{4}\)\s+\d+\s*[-–]\s*\d+\s*\n?",
+    ),
+    # 2026-05-09: Author-equal-contribution footnote line.
+    # Collabra/IRSP and other open-access journals print a footnote at the
+    # bottom of page 1 of the form:
+    #   "a Surname, Surname, ... are equal-contribution first authors b email@..."
+    # pdftotext extracts this in reading order, often interleaved between
+    # the abstract and the introduction body.  The pattern requires:
+    #   - leading lowercase letter + space (footnote marker "a ")
+    #   - a list of capitalized surnames (3+ tokens, comma-separated)
+    #   - the literal phrase "equal" + "contribution" OR "equal contribution"
+    #     OR "joint first authors" anywhere in the line
+    # The "equal contribution" phrase is the discriminator that distinguishes
+    # this from genuine prose body lines that happen to start with a lowercase
+    # letter (rare but possible).
+    re.compile(
+        r"(?m)^\s*[a-z]\s+"
+        r"(?:[A-Z][\w-]+,\s+(?:and\s+)?){2,15}"
+        r"[A-Z][\w-]+"
+        r"\s+(?:are\s+)?(?:equal[ -]?contribution|joint\s+first\s+author)"
+        r"[^\n]*\n?",
+    ),
+    # Issue J — Creative Commons / open-access license footer sentences that
+    # publishers append to abstract paragraphs.  These are NOT abstract content;
+    # they're licensing metadata.  Examples:
+    #   "Copyright: © 2022. The authors license this article under the terms of
+    #    the Creative Commons Attribution 3.0 License."
+    #   "The authors license this article under the terms of the Creative
+    #    Commons Attribution 4.0 International License."
+    # The match starts at the optional "Copyright:..." prefix or at "The authors
+    # license...", and runs to the first "License" closer.  We use lazy
+    # `[^\n]*?` because the license version may contain a period ("4.0", "3.0")
+    # that a `[^\n.]` class would reject.
+    re.compile(
+        r"(?:Copyright[: ]\s*[©Ó]?\s*\d{4}\.?\s+)?"
+        r"The authors? licen[cs]e this article under the terms of the\s+"
+        r"Creative\s+Commons[^\n]*?License\.?",
+    ),
 ]
 
 _REFS_HEADER = re.compile(
