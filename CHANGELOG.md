@@ -1,5 +1,51 @@
 # Changelog
 
+## [2.1.0] — 2026-05-09
+
+Strict-bar iteration on a 101-PDF corpus across 9 academic styles (apa, ieee, nature, vancouver, aom, ama, asa, harvard, chicago-ad). 96–98 of 101 papers PASS or PASS_W under the pragmatic grader; all 9 styles converge (≥3 consecutive first-try-clean papers). 14 targeted fixes across the section identification + normalization layers; no API surface changes. See [`docs/superpowers/plans/sections-issues-backlog.md`](docs/superpowers/plans/sections-issues-backlog.md) for the full per-issue ledger and [`LESSONS.md`](LESSONS.md) for the durable architectural rules this iteration codified.
+
+### Added — section identification
+
+- New canonical label `SectionLabel.conclusion` (separate from `discussion`). Many empirical papers — especially IEEE technical, Collabra Psychology, JESP / Cogn Psych replication reports — have BOTH a Discussion section AND a brief Conclusion wrap-up. Mapping `Conclusion` to its own label preserves the distinction in the output rather than producing `discussion_2`. Combined `Discussion and Conclusion(s)` headings stay as `discussion`.
+- Pattern A: lowercase line-isolated canonical headings now detected (Elsevier renders `Abstract` as `a b s t r a c t`, which pdftotext flattens to lowercase `abstract`).
+- Sentence-case heading acceptance: `Materials and methods` (lowercase function words) alongside Title Case / ALL CAPS.
+- Roman-numeral and letter numbering prefixes: `I. INTRODUCTION`, `II. METHODOLOGY`, `A. SUBSECTION` (IEEE / ACM technical papers).
+- Pattern E synthesis (`core.py::_synthesize_abstract_from_leading_unknown`): when no Abstract heading is detected and the first section is a long unknown span, synthesize an `abstract` from the first ≥600-char prose paragraph. Smart citation-block detection skips the leading paragraph if it has DOI/`Department`/email tokens and is <1500 chars. Falls back to a per-line scan when the leading unknown is one big paragraph.
+- Pattern E synthesis part 2 (`core.py::_synthesize_introduction_if_bloated_front_matter`): when no Introduction heading is detected and the front-matter section is >3000 chars and >5% of doc, split into shrunken-front-matter + introduction. Recovers bjps_1 (theory papers with body in keywords) and bloated-abstract Collabra/JDM cases.
+- Taxonomy variants added — methods: `experiment`, `experiments`, `methodology`. results: `experimental results`, `evaluation`, `experimental evaluation`, `performance evaluation`. funding: `financial disclosure`, `financial disclosure/funding`, `funding/financial disclosure`. Conclusion variants: `conclusions`, `conclusion and future work`, `conclusions and future work`, `concluding remarks`.
+
+### Removed — section taxonomy
+
+- `summary` removed from canonical `abstract` set. In real-world psychology papers it is more often a mid-paper subsection (`Summary of Original Studies`, per-study summary in meta-analyses) than an abstract heading. The Royal Society Open Science layout that uses `1. Summary` as its abstract is recovered by Pattern E synthesis instead.
+
+### Added — normalization (W0 publisher / running-header / footnote watermarks)
+
+- Elsevier-style copyright stamp on its own line (`© 2009 Elsevier Inc. All rights reserved.`), including pdftotext's `Ó` flattening of `©`.
+- Two-column running headers like `M. Muraven / Journal of Experimental Social Psychology 46 (2010) 465-468`.
+- Creative Commons license footer sentences in abstract paragraphs.
+- Collabra/UCPress watermark `Downloaded from <url> by guest on <date>` — relaxed the existing `Downloaded from` pattern to allow the optional intermediate `by guest` phrase. Was missing on every Collabra paper before.
+- Author-equal-contribution footnote line (`a Surname, Surname, … are equal-contribution first authors b email`) — open-access journals print this at bottom of page 1; pdftotext interleaves it into the abstract.
+
+### Documentation
+
+- `LESSONS.md` (NEW) — durable incident log with five lessons (L-001 to L-005). Most critical: L-001, "never swap the PDF text-extraction tool as a fix for downstream problems." Three sessions in a row had re-derived this lesson by trial and error; this iteration codifies it permanently.
+- `docs/DESIGN.md` §13 — explicit `text channel (pdftotext)` vs `layout channel (pdfplumber)` architecture rule, with the right layer to fix each class of real-world-paper artifact.
+- `CLAUDE.md` Critical hard rules section now leads with the channel-separation rule and points future sessions at LESSONS.md before they touch `extract*.py` / `normalize.py` / `sections/`.
+- Inline guard comment at the PDF branch of `extract_sections()` warning future sessions not to swap `extract_pdf` for `extract_pdf_layout`.
+
+### Compatibility
+
+- All public APIs unchanged. Library is drop-in compatible with v2.0.0 callers.
+- `SECTIONING_VERSION`: `1.1.0` → `1.2.0` (additive: new `conclusion` label).
+- `NORMALIZATION_VERSION`: `1.6.0` → `1.7.0` (additive: new W0 watermark patterns).
+- Section partitioning output may differ on Collabra Psychology, RSOS, IEEE, and Elsevier two-column papers — these previously emitted bloated front-matter / missing abstract / `discussion_2` instead of `conclusion`. Behavior on the 250+ unit-test corpus is unchanged.
+
+### Tests
+
+- 749 passed, 18 skipped (full repo suite). 255 passed + 2 skipped on `tests/test_sections_*.py` + `tests/test_normalization.py`.
+- 14 new W0 unit tests in `TestW0_PublisherCopyrightAndRunningHeader`.
+- New sectioning tests for `conclusion` canonicalization, lowercase-isolated heading acceptance, Roman-numeral prefix parsing, sentence-case heading acceptance, and Pattern E synthesis.
+
 ## [2.0.0] — 2026-05-07
 
 A combined release: structured-extraction (tables + figures) and a section-identification surgical fix that makes sectioning actually usable on real APA papers. Both work streams landed concurrently on `feat/table-extraction` and ship together.
