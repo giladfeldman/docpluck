@@ -41,7 +41,7 @@ def test_cli_sections_json_output():
         assert code == 0, err
         payload = json.loads(out)
         assert "sections" in payload
-        assert payload["sectioning_version"] == "1.1.0"
+        assert payload["sectioning_version"] == "1.2.0"
         assert any(s["canonical_label"] == "abstract" for s in payload["sections"])
 
 
