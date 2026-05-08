@@ -822,11 +822,18 @@ class TestLine238_Line260_ModerateRisk:
 
 
 class TestVersionBumps:
-    """Verify version constants are correct after the D5 fix."""
+    """Verify version constants are correct after the D5 fix.
+
+    NORMALIZATION_VERSION was bumped 1.6.0 → 1.7.0 in v2.1.0 (2026-05-09)
+    when 5 additive W0 watermark patterns were added (Elsevier copyright,
+    two-column running header, Creative Commons license footer, Collabra
+    "Downloaded from … by guest" relaxation, and author-equal-contribution
+    footnote).  No D5 behavior changed.
+    """
 
     def test_normalization_version(self):
-        assert NORMALIZATION_VERSION == "1.6.0"
+        assert NORMALIZATION_VERSION == "1.7.0"
 
     def test_report_version(self):
         _, report = norm_report("test text")
-        assert report.version == "1.6.0"
+        assert report.version == "1.7.0"
