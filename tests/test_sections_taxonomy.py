@@ -7,7 +7,7 @@ def test_canonical_labels_present():
     expected = {
         "title_block", "abstract", "keywords", "author_note",
         "introduction", "literature_review", "methods", "results",
-        "discussion", "general_discussion",
+        "discussion", "general_discussion", "conclusion",
         "acknowledgments", "funding", "conflict_of_interest",
         "data_availability", "author_contributions",
         "references", "appendix", "supplementary",

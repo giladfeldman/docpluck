@@ -15,13 +15,28 @@ _CANONICAL_VARIANTS = sorted(
 )
 _CANONICAL_ALT = "|".join(re.escape(v) for v in _CANONICAL_VARIANTS)
 
+# Numbering-prefix used by Pass 1a / 1b to peel a leading section number from
+# the heading line.  Matches:
+#   - Arabic: "1.", "2.3.", "1.4.1."
+#   - Roman:  "I.", "II.", "IV." (IEEE / ACM technical papers)
+#   - Single capital letter: "A.", "B." (IEEE second-level subsections)
+# Anchored by a required trailing space so we don't eat words that just
+# happen to begin with capital letters.
+_NUM_PREFIX_FRAG = (
+    r"(?:"
+    r"\d+(?:\.\d+)*\.?"          # 1, 2.3, 1.4.1
+    r"|[IVX]+\.?"                 # I, II, IV
+    r"|[A-Z]\."                   # A., B., C.
+    r")[ \t]+"
+)
+
 # Pattern A+B: canonical heading at line start — passes (a) Capital-letter body or
 # (b) end-of-line disambiguator.  The preceded-by-blank check (c) is handled in
 # annotate_text by inspecting the characters before the match start.
 _CANONICAL_PARA_HEADING = re.compile(
     rf"(?im)"
     rf"^[ \t]*"
-    rf"(?:\d+(?:\.\d+)*\.?[ \t]+)?"
+    rf"(?:{_NUM_PREFIX_FRAG})?"
     rf"(?P<heading>{_CANONICAL_ALT})"
     rf"\b",
 )
@@ -36,7 +51,7 @@ _CANONICAL_PARA_HEADING = re.compile(
 _CANONICAL_AFTER_BLANK = re.compile(
     rf"(?im)"
     rf"\n[ \t]*(?:\n[ \t]*)?"
-    rf"(?:\d+(?:\.\d+)*\.?[ \t]+)?"
+    rf"(?:{_NUM_PREFIX_FRAG})?"
     rf"(?P<heading>{_CANONICAL_ALT})"
     rf"\b",
 )
@@ -88,6 +103,70 @@ def _next_nonblank_line(text: str, after_pos: int) -> str | None:
             return line
         i = line_end + 1
     return None
+
+
+def _is_fully_isolated_heading(text: str, line_start: int, heading_end: int) -> bool:
+    """True if the matched heading word occupies its entire line AND that line
+    is preceded by a blank line AND the next non-blank line starts with an
+    uppercase letter (i.e. a real paragraph / sentence start).
+
+    Used to admit lowercase-typography canonical headings (e.g. Elsevier's
+    spaced-letter "a b s t r a c t" rendered by pdftotext as a lone lowercase
+    "abstract" line, with the abstract paragraph following directly on the
+    next line) while still rejecting body usages like:
+
+      - "abstract concept of fairness in psychology"  (other words on same line)
+      - "abstract\\nis a word that can mean many things..."  (next line is
+         lowercase — a body sentence continuation, not a paragraph start).
+    """
+    # The heading must be at the start of its line (after optional whitespace).
+    line_actual_start = text.rfind("\n", 0, line_start) + 1
+    leading = text[line_actual_start:line_start]
+    if leading and leading.strip():
+        return False
+    # Nothing else on the heading line after the heading word (allow trailing
+    # whitespace / colon / period only).
+    line_end = text.find("\n", heading_end)
+    if line_end < 0:
+        line_end = len(text)
+    trailing = text[heading_end:line_end].strip(" \t:.")
+    if trailing:
+        return False
+    # Blank line BEFORE: walk back over whitespace on the prior line; if we hit
+    # '\n' or doc-start, it was a blank line.
+    if line_actual_start == 0:
+        before_ok = True
+    else:
+        prev_line_end = line_actual_start - 1
+        if prev_line_end <= 0:
+            before_ok = True
+        else:
+            j = prev_line_end - 1
+            while j >= 0 and text[j] in " \t":
+                j -= 1
+            before_ok = j < 0 or text[j] == "\n"
+    if not before_ok:
+        return False
+    # Find the next non-blank line and check that it starts with uppercase.
+    if line_end >= len(text):
+        # Heading at very end of doc — no following paragraph; that's not a
+        # real heading.
+        return False
+    k = line_end + 1
+    while k < len(text):
+        # Skip whitespace at line start
+        line_content_start = k
+        while k < len(text) and text[k] in " \t":
+            k += 1
+        if k >= len(text):
+            return False
+        if text[k] == "\n":
+            # Blank line — keep scanning for the next non-blank.
+            k += 1
+            continue
+        # Found first non-blank content of the next non-blank line.
+        return text[k].isupper()
+    return False
 
 
 def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolated: bool) -> bool:
@@ -161,9 +240,17 @@ def annotate_text(text: str) -> list[BlockHint]:
         if start in seen_offsets:
             continue
         heading_text = m.group("heading")
-        # Reject body-text usages like "abstract concept" — require Title Case or ALL CAPS.
-        if not (heading_text == heading_text.title() or heading_text == heading_text.upper()):
-            continue
+        # Accept the heading if it starts with an uppercase letter
+        # (Title Case, Sentence case, or ALL CAPS).  Reject all-lowercase
+        # body usages ("abstract concept of fairness") unless the word is
+        # fully line-isolated (Elsevier "a b s t r a c t" spaced-letter
+        # typography, flattened by pdftotext to lone lowercase).
+        # The disambiguation checks below (blank-line predecessor, Capital
+        # body, end-of-line) keep body sentences like "Methods are widely
+        # used in..." from misfiring even though they start with uppercase.
+        if not heading_text[:1].isupper():
+            if not _is_fully_isolated_heading(text, m.start(), m.end("heading")):
+                continue
 
         line_start = m.start()
         heading_end = start + len(heading_text)
@@ -224,8 +311,12 @@ def annotate_text(text: str) -> list[BlockHint]:
         if start in seen_offsets:
             continue
         heading_text = m.group("heading")
-        if not (heading_text == heading_text.title() or heading_text == heading_text.upper()):
-            continue
+        # Same case rule as Pass 1a: first letter must be uppercase, with the
+        # line-isolated lowercase carve-out for Elsevier "a b s t r a c t"
+        # typography.
+        if not heading_text[:1].isupper():
+            if not _is_fully_isolated_heading(text, start, m.end("heading")):
+                continue
         # Pass 1b only catches blank-line-preceded headings, which means the
         # heading might be followed by either body or another tiny line.
         # Apply the table-cell filter here too — if next line is < 20 chars, reject.

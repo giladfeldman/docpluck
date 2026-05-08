@@ -156,6 +156,67 @@ def test_credit_table_methodology_row_not_emitted():
         f"Methodology should not be detected when followed by 1-char table cell; got {[h.text for h in hints]}"
 
 
+def test_lowercase_canonical_heading_isolated_paragraph_follows_emitted():
+    """Older Elsevier journals (JESP, JoEP) render the abstract heading in
+    spaced-letter lowercase ("a b s t r a c t").  pdftotext flattens the
+    letter spacing and emits a lone lowercase ``abstract`` line whose body
+    paragraph starts directly on the next line (no blank line between).
+    This must be detected as a real canonical heading so the abstract is
+    correctly framed.
+
+    Cf. test_lowercase_canonical_word_at_paragraph_start_rejected — that
+    case has body text on the same line as 'abstract' and remains rejected.
+    """
+    text = (
+        "Keywords: Self-control Building strength Inhibition\n"
+        "\n"
+        "abstract\n"
+        "Self-control performance may be improved by the regular practice"
+        " of small acts of self-control.\n"
+        "\n"
+        "Introduction\n"
+        "A model of self-control strength has suggested that...\n"
+    )
+    hints = annotate_text(text)
+    texts = [h.text for h in hints]
+    # Expect the lowercase 'abstract' to be detected.
+    assert "abstract" in texts, (
+        f"line-isolated lowercase 'abstract' should be detected; got {texts}"
+    )
+    # And keywords + introduction still detected.
+    assert "Keywords" in texts
+    assert "Introduction" in texts
+
+
+def test_lowercase_canonical_with_body_text_on_same_line_still_rejected():
+    """Regression: the existing 'abstract concept of fairness' rejection must
+    survive the new lowercase-isolated detection path."""
+    text = (
+        "Some intro line.\n"
+        "\n"
+        "abstract concept of fairness in psychology\n"
+    )
+    hints = annotate_text(text)
+    assert not any(h.text.lower() == "abstract" for h in hints), \
+        f"lowercase 'abstract' with body on same line must stay rejected; got {[h.text for h in hints]}"
+
+
+def test_lowercase_canonical_followed_by_lowercase_continuation_rejected():
+    """A lowercase canonical word followed by a line that begins with a
+    lowercase word is body-text continuation, not a heading.  This is the
+    safety net that distinguishes a real heading-then-paragraph from a
+    soft-wrapped sentence."""
+    text = (
+        "Some title block content.\n"
+        "\n"
+        "abstract\n"
+        "is a word that can mean many things in everyday speech.\n"
+    )
+    hints = annotate_text(text)
+    assert not any(h.text.lower() == "abstract" for h in hints), \
+        f"lowercase 'abstract' followed by lowercase line must stay rejected; got {[h.text for h in hints]}"
+
+
 def test_real_heading_followed_by_paragraph_still_emitted():
     """A canonical Methods heading followed by paragraph body text is still detected.
 
