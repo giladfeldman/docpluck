@@ -250,15 +250,28 @@ def _find_caption_for_table(
 
 
 def _extract_caption_text(raw_text: str, cap: CaptionMatch) -> str:
-    """Pull the full caption (label + description) by reading from the caption
-    line through to the next blank line."""
+    """Pull the full caption (label + description) starting at the caption line.
+
+    Termination order (whichever comes first):
+      1. End-of-sentence (`. ` followed by a capitalized non-stat-word) for
+         readable captions like "Descriptive statistics. Note that ..."
+      2. Next blank line (\\n\\n) — paragraph boundary
+      3. ~400-char hard cap
+    Then strip leading punctuation (": ", " — ") and double-spaces.
+    """
     start = cap.char_start
-    # Scan forward to the next blank line (\n\n) or paragraph break.
-    end = raw_text.find("\n\n", cap.char_end)
-    if end == -1:
-        end = min(cap.char_end + 400, len(raw_text))
-    snippet = raw_text[start:end].replace("\n", " ").strip()
-    # Cap at ~400 chars to avoid swallowing post-caption prose.
+    # Hard cap — never read more than 600 chars from the caption start.
+    hard_end = min(cap.char_end + 600, len(raw_text))
+    blank_line = raw_text.find("\n\n", cap.char_end)
+    if blank_line != -1 and blank_line < hard_end:
+        hard_end = blank_line
+    snippet = raw_text[start:hard_end].replace("\n", " ").strip()
+    # Strip leading orphan punctuation that can occur when the rejoin produced
+    # a partial caption (e.g., "Table 1. : Studies 1b and 3...").
+    snippet = re.sub(r"^[\s.:\-—–]+", "", snippet)
+    # Re-prefix the label if stripping ate it.
+    if cap.label and not snippet.startswith(cap.label):
+        snippet = f"{cap.label}: {snippet}".strip()
     if len(snippet) > 400:
         snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
     return snippet
