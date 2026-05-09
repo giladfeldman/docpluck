@@ -166,22 +166,6 @@ Design and Procedure
 We summarized the experimental design and all measures in Table 4 (more details are available in the Supplemental Materials).
 Participants rated their own emotional experiences and others’ emotional experiences in random order. Misestimations were measured as participants’ estimates of others’ emotional experiences minus the average of all participants’ own emotional experiences. In the target article’s Study 1b, the prevalence and intensity were confounded, which we adjusted to measure prevalence and intensity separately (see “Measures” subsection).
 
-### Table 3
-*Comparison of Target Article Versus Replication: Differences and Similarities.*
-
-```
-Study
-Jordan et al. (2011) Study 1b
-Jordan et al. (2011) Study 3
-Replication
-Sample size Geographic origin Gender
-Medium (location) Compensation
-80 U.S. American students 35 males, 45 females, 0 other/did
-not disclose Paper-and-pen N/A
-Year
-2011 or earlier
-```
-
 104 U.S. American students 51 males, 54 females, 0 other/did
 not disclose Computer (online) Nominal payment
 2011 or earlier
@@ -421,7 +405,22 @@ Social Comparison Orientation.  We added the social comparison orientation (SC
 | To  test  whether  underestimation  of  emotional  experiences | subjective happiness (β = .32, t(591) = 6.73, p < .001), and |
 | also  extends  to  emotional  intensity,  we  conducted  similar | the number of confidants (β = .19, t(591) = 3.98, p < .001). |
 
-001).
+## Results
+
+Prevalence Estimate Errors (Replication)
+We summarized descriptives in Tables 6 (prevalence) and 7 (intensity), and correlations in Table 8.
+Consistent with Hypothesis 2a and the original findings, we found support for an underestimation of others’ negative emotional experiences. Mirroring the analyses conducted in the original article, we computed the estimation error for each item of positive and negative experiences by comparing the self-rating with ratings for their peers. We conducted an item-level one-sample t-test on the estimation errors to examine if they differed from 0. We found support for the expected underestimation of negative (t(5) = −4.30, p = .008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for an unexpected underestimation of positive experiences (t(5) = −3.67, p = .014, d = −1.50, [−2.67, −0.26]).
+We further extended our analyses to a series of participant-level one-sample t-tests on the estimation error of emotional experiences, summarized in Table 6. Overall, we found support for participants’ underestimation of all six negative emotional experiences and of five of the six positive emotional experiences. The participant-level analyses mirrored that of the item-level analyses, with support for the expected underestimation of negative emotional experiences (M = 23.56; t(593) = −35.02, p < .001, d = −1.44, 95% CI [−1.55, −1.32]), yet again with the unexpected underestimation of positive emotional experiences (M = 15.97; t(593) = −24.17, p < .001, d = −0.99, [−1.09, −0.89]).
+Partially consistent with Hypothesis 2b, the underestimation of negative experiences was stronger than positive experiences, yet only for the participant-level analysis. Specifically, for the item-level analyses, we ran an independent samples t-test comparing negative and positive emotional experiences and did not find support for Hypothesis 2b in estimation error (t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We anticipated this in advance, given that the item-level analysis had too few items and therefore power to detect such differences, which is why we planned and preregistered to also run participant-level analyses, which we felt were more appropriate and accurate. The participant-level paired-samples t-test analysis allowed us to find support for a larger estimation error for negative compared to positive experiences (t(593) = −11.90, p < .001, d = −0.49, [−0.57, −0.40]).
+Intensity Estimate Errors (Extension)
+To test whether underestimation of emotional experiences also extends to emotional intensity, we conducted similar
+
+analyses on the emotional intensity measures. We began with item-level one-sample t-tests and found support for Hypothesis 2d with an overestimation of positive experiences (t(5) = 2.97, p = .031, d = 1.21, 95% CI [0.099, 2.26]), yet contrary to our expectations in Hypothesis 2c, we also found an overestimation for negative experiences (t(5) = 3.51, p = .017, d = 1.43, [0.23, 2.58]).
+The participant-level analyses showed a similar trend, as we found support for the expected overestimation of positive emotional experiences (M = 5.60; t(593) = 8.45, p < .001, d = 0.35, 95% CI [0.26, 0.43]), and again the unexpected overestimation of negative emotional experiences (M = 12.54; t(593) = 19.42, p < .001, d = 0.80, [0.70, 0.89]). We ran one-sample t-tests for each of the experiences and found that participants overestimated five out of the six negative emotional experiences and five out of the six positive emotional experiences.
+Mirroring the target’s analyses for item-level prevalence comparing positive and negative, we ran the same analysis for intensity estimates and found no signal for difference in overestimation error between negative and positive emotional experiences, though large effect size (t(10) = 1.72, p = .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most likely due to the small number of items a power analysis of which shows an unreasonably large effect in order to be detectable with null hypothesis significance testing. We supplemented the item-level analysis by conducting a participant-level paired sample t-test, which was far better powered, and indeed found support for stronger overestimation for negative experiences than for positive experiences (t(593) = 10.63, p < .001, d = 0.44, [0.35, 0.52]).
+Prevalence Estimates Associations with WellBeing (Replication)
+We summarized the Pearson’s correlations in Table 8, and the regression model findings predicting well-being from negative and positive prevalence estimates in Table 9 (comparing with the target’s).
+Inconsistent with and opposite to Hypothesis 4, prevalence estimations of negative emotional experiences were negatively associated with well-being, as indicated by a negative association with life satisfaction (β = −.23, t(591) = −4.87, p < .001), and subjective happiness (β = −.26, t(591) = −5.59, p < .001), and a positive association with loneliness (β = .33, t(591) = 7.04, p < .001), brooding (β = .37, t(591) = 8.08, p < .001), depressive symptoms (β = .41, t(591) = 9.01, p < .001). On the other hand, positive prevalence estimates were negatively associated with loneliness (β = −.25, t(591) = −5.40, p < .001), and depressive symptoms (β = −.22, t(591) = −4.69, p < .001), and positively associated with life satisfaction (β = .25, t(591) = 5.35, p < .001), subjective happiness (β = .32, t(591) = 6.73, p < .001), and the number of confidants (β = .19, t(591) = 3.98, p < .001).
 
 Table 6.  Prevalence of Emotional Experiences (Replication and Extension): One-Sample t-Tests of Estimation Error.
 
@@ -589,41 +588,6 @@ M SD Alpha
 
 Note. df = 592. SCO = social comparison orientation. *p < .05. **p < .01. ***p < .001.
 
-### Table 9
-*Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al. (2011)’s Study 3 Versus Replication.*
-
-```
-Jordan et al. (2011)
-Replication
-Measure
-β for negative β for positive
-β for negative β for positive
-prevalence prevalence
-prevalence prevalence
-Cronbach’s α estimate
-estimate R2
-estimate
-estimate R2
-Interpretation
-Negative
-Loneliness
-.81
-Rumination/brooding
-.72
-Depressive symptoms
-.73
-Positive
-Satisfaction with life
-.84
-Subjective Happiness
-.80
-Number of confidants
-/
-Social orientation scale
-/
-(extension)
-```
-
 −.30** −.28**
 .00
 .23* .19 N/A
@@ -723,7 +687,14 @@ When consulting with external expert reviewers to examine the possible explanati
 | tion analysis in the Supplemental Material. Given the many | found  that  participants  also  underestimated  positive  emo- |
 | analyses conducted and the many findings that have shown | tional experiences, albeit to a lesser extent than they did for |
 
-d for
+## Discussion
+
+We conducted a preregistered replication of Studies 1b and 3 from Jordan et al. (2011) and tested their theoretical framework, measurement, and analysis strategy with a larger sample. We also went beyond the target article by adding additional tests that seem fit for the experimental design, and by adding extensions testing for the generalizability to emotional experience intensity and examining SCO.
+Our results were mixed, and we summarized a comparison of our findings to that of the target in Tables 6 and 9. We concluded a successful replication only regarding people’s underestimation of the prevalence of others’ negative emotions, yet with an unexpected underestimation of the prevalence of positive emotions. In addition, we only observed differences between the underestimation of positive and negative emotional experiences when conducting the betterpowered participant-level analysis, yet not when repeating that target’s item-level analysis, likely due to the small number of items and the analysis being underpowered.
+Most surprising was that we found opposite effects to the target’s theory and findings regarding the associations between prevalence estimates and psychological well-being factors. Based on the target’s findings, we expected higher estimations for prevalence of negative emotions to be positively associated with higher well-being, and instead, we found support for a negative relationship. We discuss possible explanations for the mixed findings, followed by a discussion of limitations and suggestions for future research directions.
+Replication: Prevalence
+We conclude mixed findings concerning our replication of the systematic misperception of others’ emotional experiences. We found that (a) people underestimated the prevalence of others’ negative and positive emotional experiences, (b) underestimation errors were stronger for negative experiences than for positive experiences, (c) prevalence estimation of others’ negative emotions was positively associated with loneliness, rumination, depressive symptoms, and negatively associated with life satisfaction and subjective happiness, (d) prevalence estimation of others’ positive emotions was positively associated with life satisfaction and subjective happiness and negatively associated with loneliness, rumination, and depressive symptoms.
+Jordan et al. (2011) argued that underestimation was mainly about negative emotional events, yet instead, we found that participants also underestimated positive emotional experiences, albeit to a lesser extent than they did for
 
 negative events. This supports a needed reframing of their null hypothesis that we suggested in our preregistration (Hypothesis 2b; see Table 2), that instead of null effects for positive emotions, the hypothesis could be that the underestimation of positive events is weaker than that of negative events. We note, however, that there would still be an unexplained inconsistency with the target article’s Study 2, which extended the idea from Study 1, and using a preexisting dataset from Srivastava et al. (2009) showed very large differences in misestimation between negative and positive emotions, such that negative emotions were underestimated (8 out of 9 emotions), compared to an overestimation of positive emotions (7 out of 8 emotions). We therefore see much value in conducting also a follow-up replication of the target’s Study 2 with possible theoretical and empirical extensions that would try and resolve the differences in results.
 Prevalence Estimations and Well-Being
@@ -808,7 +779,7 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
 
 ## Tables (unlocated in body)
 
-## Table 3
+### Table 3
 *  Comparison of Target Article Versus Replication: Differences and Similarities.*
 
 | 6 | Personality and Social Psychology Bulletin 00(0) |
@@ -912,7 +883,7 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
 | Overall positive | 53.60 | 59.20 | 5.60 | 16.16 | 8.45 | <.001 | 0.35 [0.26, 0.43] | 2.97 | 5 | .031 | 1.21 [0.099, 2.26] |
 | Overall: positive and negative combined | 47.65 | 56.72 | 9.07 | 13.83 | 15.99 | <.001 | 0.66 [0.57, 0.74] | 4.14 | 11 | .002 | 1.20 [0.43, 1.90] |
 
-## Table 9
+### Table 9
 *  Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al.*
 
 |  |  | β for negative | β for positive |  | β for negative | β for positive |  |  |

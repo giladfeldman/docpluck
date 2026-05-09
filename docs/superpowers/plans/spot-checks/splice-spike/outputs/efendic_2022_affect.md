@@ -134,25 +134,6 @@ manipulation check (see Figure 2 and Tables S41–S44 for detailed statistics).
 Negative Relationship Between Risks and Benefits. To test whether we observe a negative relationship between risks and benefits, we looked at the effects of the manipulated attribute on the nonmanipulated attribute. Specifically, we regressed change in ratings of nonmanipulated attributes (DV) on Direction, Manipulated Attribute, and their interaction, adjusting for covariates at Level 1 (Pre-rating manipulated attribute; and three-way interaction between pre-rating non-manipulated attribute, Direction, and Manipulated Attribute) and Level 2 (i.e., Technology type and participant’s ID). Table 3 summarizes these results (see Table S20–S24 in the supplementary material for step-bystep regression results and model comparisons).
 The main effect of direction supports the original finding of the negative relationship. In addition, we find that the directionality of pre- and post-treatment changes in the non-manipulated attribute was consistent with the predicted inverse relationship, except in the Low-benefit condition (see Figure 3 and Tables S41–S44 for detailed statistics).
 
-### Table 2
-*Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
-
-```
-Predictors
-DV: Change in non-manipulated attribute
-B
-SE
-95% CI
-Intercept
-Pre-rating manipulated attribute (PMA)
-Direction (high vs. low)
-Manipulated attribute (risk vs. benefit)
-Direction 3 manipulated attribute
-PMA 3direction
-PMA 3 manipulated attribute
-PMA 3 direction 3 manipulated attribute
-```
-
 [20.21, 0.04] [21.15, 21.03] [2.42, 2.69] [20.40, 20.13] [0.22, 0.75] [20.22, 0.02] [20.11, 0.14] [20.08, 0.40]
 
 Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.
@@ -363,7 +344,7 @@ Handling Editor: Lissa Libby
 
 ## Tables (unlocated in body)
 
-## Table 2
+### Table 2
 *Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
 
 | 1178 Social Psychological and Personality Science 13(7) |

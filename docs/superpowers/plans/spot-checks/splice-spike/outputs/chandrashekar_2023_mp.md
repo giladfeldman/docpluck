@@ -172,7 +172,9 @@ Extension 1: The effect of choice permanence. Participants in Sample 1 were part
 | [Negative frame, No-default]: | LeBel et al. (2019) criteria. We summarize the present |
 | Notify me about more health surveys. | replications as very close. |
 
-als).
+## Results
+
+We provide a summary of the ﬁndings in Table 9. We present complete descriptive statistics across the two samples in Table 5 (also see Table S10 in the supplementary materials).
 
 ### Table 3
 | Table 3 | Table 4 |
@@ -272,7 +274,15 @@ We failed to ﬁnd support for differences in rates of consent to receive health
 |  |  |  |  | sented to receive health-related information at a lower |
 |  |  |  |  | rate than participants in the Opt-In condition (33.6%). |
 
-.6%).
+## Results
+
+of direct replications of Johnson and Goldstein (2003). Percentage of participants consenting to organ donation by condition across both samples. Note.* p < .05, ** p< .01, *** p < .001
+
+Framing effects
+Participants in the positive framing condition consented to receive health-related information (91.7%) at a higher rate than participants in the negative framing condition (28.9%) (b= 2.74, p < .001, OR = 15.61, 95% CI [10.31, 23.63]).
+Exploratory: Default effects as a function of frames
+We proceeded to conduct additional exploratory (not preregistered) analyses examining the interaction between framing and defaults. We found support for an interaction (see Table 7). We considered two sets of interactions: 1) (Positive – Negative) times (No-default – Opt-In); 2) (Positive – Negative) times (Opt-Out – OptIn).
+For the (Positive – Negative) × (No-default – OptIn) interaction, we looked at the consent rates between the No-Default and Opt-In conditions across the positive and negative frame (b = 1.01, p = .003, OR = 2.76, 95% CI [1.43, 5.32]). Within positive framing conditions, participants in the No-Default condition (93.4%) consented to receive health-related information at a higher rate than participants in the Opt-In condition (88.6%) (see Table S12 and Table S13 in the supplementary materials). The pattern of results was in the opposite direction in the negative framing conditions: participants in the No-Default condition (25.3%) consented to receive health-related information at a lower rate than participants in the Opt-In condition (33.6%).
 
 The results were similar for the (Positive – Negative) times (Opt-Out – Opt-In) interaction (b = 0.85, p = .010, OR = 2.35, 95% CI [1.23, 4.49]). Within positive framing conditions, participants in the Opt-Out condition (93.1%) consented to receive health-related information at a higher rate than participants in the Opt-In condition (88.6%). The pattern of results was in the opposite direction within the negative framing conditions: participants in the Opt-Out condition (27.6%) consented to receive health-related information at a lower rate than participants in the Opt-In condition (33.6%).
 Extensions

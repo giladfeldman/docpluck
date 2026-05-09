@@ -529,6 +529,44 @@ def _join_split_captions(text: str) -> str:
     return text
 
 
+def _table_block_content_end(text: str, content_start: int, hard_end: int) -> int:
+    """Find the end of a `### Table N` block's actual content within
+    [content_start, hard_end].
+
+    A table block's content consists of paragraphs that are one of:
+      - blank
+      - italic caption ``*…*``
+      - code fence ``\\`\\`\\``` and the lines until the matching close
+      - pipe-table rows ``| … |`` and ``| --- | --- |``
+    The block ends at the first paragraph that doesn't match any of these.
+    """
+    section = text[content_start:hard_end]
+    paragraphs = re.split(r"(\n\s*\n)", section)
+    # paragraphs alternates: [text, sep, text, sep, ..., text]
+    in_fence = False
+    consumed = 0
+    for chunk in paragraphs:
+        if chunk == "" or re.fullmatch(r"\n\s*\n", chunk):
+            consumed += len(chunk)
+            continue
+        first_line = chunk.lstrip("\n").splitlines()[0] if chunk.strip() else ""
+        is_caption = first_line.startswith("*") and first_line.endswith("*")
+        is_fence_open = first_line.startswith("```")
+        is_pipe_row = first_line.startswith("|")
+        # Heuristic: pipe-table BLOCK if MOST lines start with `|`
+        chunk_lines = chunk.strip().splitlines()
+        pipe_lines = sum(1 for ln in chunk_lines if ln.lstrip().startswith("|"))
+        fence_lines = sum(1 for ln in chunk_lines if ln.strip() == "```")
+        is_pipe_block = chunk_lines and pipe_lines / max(len(chunk_lines), 1) >= 0.5
+        is_fence_block = fence_lines >= 1
+        if is_caption or is_pipe_row or is_pipe_block or is_fence_open or is_fence_block:
+            consumed += len(chunk)
+            continue
+        # Not a table-content paragraph → stop here
+        break
+    return content_start + consumed
+
+
 def _existing_table_numbers(text: str) -> set[int]:
     """Collect the set of table numbers already present as ``### Table N`` headings."""
     nums: set[int] = set()
@@ -548,11 +586,23 @@ def _dedupe_table_blocks(text: str) -> str:
     matches = list(re.finditer(r"^### Table\s+(\d+)\s*$", text, re.MULTILINE))
     for i, m in enumerate(matches):
         start = m.start()
+        # Default end = next ### heading or end-of-text.
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        # Don't span across an H2 boundary (like "## Tables (unlocated in body)")
-        h2 = re.search(r"^## ", text[start + 1:end], re.MULTILINE)
+        # Skip the current heading line so search ^ anchors don't false-match.
+        heading_line_end = text.find("\n", m.start())
+        if heading_line_end == -1:
+            heading_line_end = m.end()
+        else:
+            heading_line_end += 1
+        # Don't span across an H2 boundary (like "## Tables (unlocated in body)").
+        # ^##(?!#)\s ensures we match a real H2, not the `### Table N+1` heading.
+        h2 = re.search(r"^##(?!#)\s", text[heading_line_end:end], re.MULTILINE)
         if h2:
-            end = start + 1 + h2.start()
+            end = heading_line_end + h2.start()
+        # Trim block to only the table's own content (heading + caption + table).
+        # Stop at the first paragraph that's NOT pipe-row, NOT code-fence, NOT
+        # blank, NOT italic-caption — that's body text starting after the table.
+        end = _table_block_content_end(text, heading_line_end, end)
         block_text = text[start:end]
         pipe_rows = len(re.findall(r"^\| ", block_text, re.MULTILINE))
         num = int(m.group(1))
@@ -812,6 +862,23 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     edits: list[tuple[int, int, str]] = []
 
     # Tables first (so we can detect overlap with section ranges later).
+    # Pre-compute section start positions so we can shrink any table region
+    # that bleeds across a section boundary — section headings must always win
+    # over a table region that extended too far.
+    section_starts = sorted(
+        s.char_start for s in sections
+        if not (s.canonical_label.name == "unknown" and s.char_start == 0)
+    )
+
+    def _shrink_to_avoid_section(start: int, end: int) -> tuple[int, int]:
+        """If any section heading start lies strictly inside (start, end),
+        truncate end to that section start (leave a small gap so the heading
+        falls outside the table region)."""
+        for sec_start in section_starts:
+            if start < sec_start < end:
+                return (start, sec_start)
+        return (start, end)
+
     unlocated: list[dict] = []
     for t in tables:
         region = _locate_table_per_page(cleaned, page_starts, t)
@@ -819,6 +886,11 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
             unlocated.append(t)
             continue
         char_start, char_end = region
+        char_start, char_end = _shrink_to_avoid_section(char_start, char_end)
+        if char_start >= char_end:
+            # Region collapsed entirely — defer to the appendix
+            unlocated.append(t)
+            continue
         replacement = "\n\n" + _format_table_md(t, pdf_path=pdf_path) + "\n\n"
         edits.append((char_start, char_end, replacement))
 

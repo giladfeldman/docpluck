@@ -85,17 +85,6 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
 
 1Reconstructed cell Ns. 2Impossible to recover cell N because no cell size is specified. †No appropriate omnibus effect size. /Absent. - - -Impossible to calculate without original data.
 
-### Table 2
-*Comparison of differences across conditions.*
-
-```
-Paying to know, , difference in % Pay $5 across conditions
-N
-Pass-Fail
-Pass-Uncertain
-Fail-Uncertain
-```
-
 Tversky & Shafir, 1992 (within-subjects)
 Inferential statistics Effect size [95% CI] Tversky & Shafir, 1992
 (between-subjects) Inferential statistics
@@ -300,7 +289,7 @@ preference for indirect harm effect In press at Meta Psychology . Accepted for p
 
 ## Tables (unlocated in body)
 
-## Table 2
+### Table 2
 *Comparison of differences across conditions.*
 
 | Table 2 |  |  |  |  |  |  |  |  |

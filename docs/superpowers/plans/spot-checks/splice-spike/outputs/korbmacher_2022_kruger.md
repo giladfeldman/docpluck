@@ -48,33 +48,6 @@ To examine the relationship between one’s own absolute ability and comparative
 1.6.1 Extension 1: Manipulating domain diﬃculty
 We aimed to extend the replication study by considering the ambiguities in the deﬁnitions of easy and diﬃcult used in the domains of the original study. The ability domains in the target article were only succinctly described (see Table 2). Each ability domain may connote
 
-### Table 1
-*Kruger’s (1999) ﬁndings: Mean comparative ability estimates and judgmental weight of own and peers’ abilities.*
-
-```
-Ability
-Domain diﬃculty1
-Comparative Judgmental weight Judgmental weight
-ability2
-of Own ability3 of Others’ ability3
-Easy
-Using a mouse
-Driving
-Riding a bicycle
-Saving money
-58.8∗∗ 65.4∗∗∗∗ 64.0∗∗∗∗ 61.5∗∗
-0.21 .89∗∗∗∗ .61∗∗∗∗ .90∗∗∗∗
-0.06 –.25∗ –0.02 –.25∗∗∗
-Diﬃcult
-Telling jokes
-Playing chess
-Juggling
-Programming
-46.5 27.8∗∗∗∗ 26.5∗∗∗∗ 24.8∗∗∗∗
-.91∗∗∗∗ .96∗∗∗∗ .89∗∗∗∗ .85∗∗∗∗
-–0.03 –.22∗∗ –0.16 –0.1
-```
-
 1 Higher numbers reﬂect greater diﬃculty. 2 Mean percentile estimates above 50 reﬂect an above-average eﬀect, estimates below 50 reﬂect a below-average eﬀect. 3 Standardised betas from multiple regressions predicting participants’ comparative ability (percentile) estimates from their estimates of their own absolute ability and the absolute ability of their peers, respectively.
 ∗p < .05. ∗∗p < .01. *** p< .001. ∗∗∗∗p < .0001.
 
@@ -325,24 +298,6 @@ Eﬀect
 | strong support for H1. |  |  |  |  |
 |  | averaging the 8 domains for each participant (row-wise), resulting in 240 rows. P-values for vector-compiled |  |  |  |
 |  | scores correlations are not provided as those do not account for repeated responses of the same person. |  |  |  |
-
-### Table 9
-*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability.*
-
-```
-Predictors
-B
-S.E.
-CI
-p
-(Intercept) Own Ability Others’ Ability
-12.56 7.18 –0.42
-[9.95, 15.18]
-< 0.001
-[6.86, 7.50]
-< 0.001
-[–0.84, –0.01]
-```
 
 Note. The table presents the ﬁxed-eﬀects coeﬃcients with all the model predictors. See supplementary section “Mixed Models” for step-wise regression results.
 
@@ -648,7 +603,7 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 
 ## Tables (unlocated in body)
 
-## Table 1
+### Table 1
 *: Kruger’s (1999) ﬁndings: Mean comparative ability estimates and judgmental*
 
 | weight of own and peers’ abilities. |  |  |  |  |
@@ -682,7 +637,7 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 | group, the easy domain group, and the diﬃcult domain extension |
 | group. Participants were presented with either the original |
 
-## Table 9
+### Table 9
 *: Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with*
 
 | 3.2.3 H2: Relationship between comparative ability, domain diﬃculty, and desirabil- |
