@@ -45,335 +45,234 @@ In Study 1b, they examined whether people would accurately predict the prevalenc
 Ip and Feldman
 
 ### Table 1
-*Jordan et al. (2011) Studies 1b and 3: Summary of Findings.*
+*  Jordan et al.*
 
-```
-Study 1b
-Study 3
-Experiences
-Estimation errora
-Average estimation
-Estimation Average estimation
-error (%)
-t-statistics error
-error (%)
-t-statistics
-```
+|  | Estimation | Average estimation |  | Estimation | Average estimation |  |
+| --- | --- | --- | --- | --- | --- | --- |
+| Experiences | errora | error (%) | t-statistics | error | error (%) | t-statistics |
+| Negative experiences |  | −17.2 | 5.47** |  | −21.4 | 5.99** |
+| Had fight/argument | −13.0*** |  |  | −13.8*** |  |  |
+| Thought about distant friends/ | −28.2*** |  |  | −26.3*** |  |  |
+| family |  |  |  |  |  |  |
+| Thought about enormous | −12.2*** |  |  | −11.3*** |  |  |
+| workload |  |  |  |  |  |  |
+| Was rejected by boy/girl | −8.9*** |  |  | −18.4*** |  |  |
+| Received low grade | −15.9*** |  |  | −23.3*** |  |  |
+| Thought about bad personal | −24.1*** |  |  | −35.0*** |  |  |
+| health habits |  |  |  |  |  |  |
+| Positive experiences |  | +5.6 | 1.18 |  | +3.8 | 1.06 |
+| Received high grade | −3.0 |  |  | −0.3 |  |  |
+| Attended fun party | +20.9*** |  |  | +13.2*** |  |  |
+| Participated in athletics | +13.7*** |  |  | +7.6*** |  |  |
+| Went out with friends | +12.6*** |  |  | +11.5*** |  |  |
+| Talked to distant friends/family | −8.3*** |  |  | −9.9*** |  |  |
+| Had great meal | −2.3 |  |  | +0.5 |  |  |
 
-Negative experiences   Had fight/argument    Thought about distant friends/
-family   Thought about enormous
-workload   Was rejected by boy/girl    Received low grade   Thought about bad personal
-health habits Positive experiences
- Received high grade  Attended fun party  Participated in athletics Went out with friends  Talked to distant friends/family  Had great meal
-
-−13.0*** −28.2***
-−12.2***
-−8.9*** −15.9*** −24.1***
-−3.0 +20.9*** +13.7*** +12.6***
-−8.3*** −2.3
-
-−17.2 +5.6
-
-5.47** 1.18
-
-−13.8*** −26.3***
-−11.3***
-−18.4*** −23.3*** −35.0***
-−0.3 +13.2***
-+7.6*** +11.5***
-−9.9*** +0.5
-
-−21.4 +3.8
-
-5.99**    
-
-Source. The table was adopted from Jordan et al. (2011, pp. 126, 130). aA positive number indicates an overestimation and a negative number indicates an underestimation. **p < .01. ***p < .001.
-
-interaction hypothesis: (b-reframed) underestimation errors are stronger for negative experiences than for positive experiences. Study 2 showed similar results using a re-analysis of a dataset by Srivastava et al. (2009) with an underestimation of negative emotions and an overestimation of positive emotions.
-In Study 3, the researchers examined the associations between prevalence estimations and psychological wellbeing. Participants completed scales regarding loneliness, rumination, depressive symptoms, life satisfaction, subjective happiness, and self-reported their number of friends, in addition to rating the same emotional events from Study 1b. They hypothesized that (c) higher prevalence estimates of others’ negative emotional experiences are associated with poorer psychological outcomes: greater loneliness, rumination, depressive symptoms, and lower life satisfaction and subjective happiness. They also hypothesized that (d) having fewer peers is associated with stronger misestimation.
-We summarized the findings of Study 1b and Study 3 in Table 1 and the hypotheses of the target article in Table 2 (under “Replication: Prevalence estimations”).
-Extensions
-Intensity of Emotional Experiences.  The authors of the target article acknowledged a limitation in their design, specifically that they did not differentiate between prevalence and intensity. For instance, participants were asked to rate the prevalence of their peers “receiving a bad grade and felt really bad about it,” making it difficult to distinguish between their
-
-estimation of the prevalence of receiving a bad grade and their estimation of the intensity of the emotions associated with that event. As such, we were unsure whether participants underestimated the prevalence of their peers’ negative emotions because they believed their peers rarely experienced such events (prevalence), or because they believed they these events would not elicit strong emotional responses (intensity).
-Therefore, we revised the questions to inquire about both the prevalence of the events and the intensity of the emotional experiences. By expanding upon the original article, our aim was to examine the interplay between prevalence and intensity estimates and gain a clearer understanding of the source of the misestimation.
 Social Comparison Orientation (Exploratory). We aimed to investigate the role of social comparison orientation, the tendency to compare oneself with others, as a potential predictor of misestimation and well-being measures. Gibbons and Buunk (1999) found that individuals with a higher social comparison orientation exhibited greater uncertainty and instability regarding their self-worth. Consequently, they tended to evaluate themselves based on how others were faring in public. This has the potential to be even more pronounced in an era in which social media provides ample opportunities for social comparison.
 Accumulating evidence suggests a positive link between social comparison orientation and threats to psychological wellbeing online, as many social media users tend to selectively present mostly positive aspects of their lives (Vogel et al., 2014).
 
-### Table 2
-*Replication and Extensions: Summary of Hypotheses.*
+Table 2.  Replication and Extensions: Summary of Hypotheses.
 
-```
 Replication: prevalence estimations
-No Hypothesis
-2a People underestimate the prevalence of others’ negative emotional experiences.
-2b People do not underestimate the prevalence and extent of others’ positive emotional experiences.
-[Our reframing of the target’s null hypothesis: Prevalence underestimation errors are stronger for negative
-experiences than for positive experiences.]
-4 4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and
-well-being.a
-4b) There is a negative association between the estimation of the prevalence of positive emotional experiences and
-well-being.a
-Negative indicators—higher well-being: lower depressive symptoms, lower loneliness, lower rumination
-4-1 4-1a) There is a negative association between the estimation of the prevalence of negative emotional experiences and
-depressive symptoms.
-4-1b) There is a positive association between the estimation of the prevalence of positive emotional experiences and
-depressive symptoms.
-4-2 4-2a) There is a negative association between the estimation of the prevalence of negative emotional experiences and
-loneliness.
-4-2b) There is a positive association between the estimation of the prevalence of positive emotional experiences and
-loneliness.
-4-3 4-3a) There is a negative association between the estimation of the prevalence of negative emotional experiences and
-rumination.
-4-3b) There is a positive association between the estimation of the prevalence of positive emotional experiences and
-rumination.
-Positive indicators—higher well-being: higher life-satisfaction, higher subjective happiness.
-4-4 4-4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and
-life satisfaction.
-4-4b) There is a negative association between the estimation of the prevalence of negative emotional experiences and
-life satisfaction.
-4-5 4-5a) There is a positive association between the estimation of the prevalence of negative emotional experiences and
-subjective happiness.b
-4-5b) There is a negative association between the estimation of the prevalence of negative emotional experiences and
-subjective happiness.b
-Extensions: intensity estimations
-No Hypothesis
-2c People underestimate the intensity of others’ negative emotional experiences.c
-2d People overestimate the intensity of others’ positive emotional experiences.c
-5 Social comparison orientation interacts with misestimation in predicting well-being:
-The higher the social comparison orientation, the stronger the associations in Hypothesis 4
-(Hypotheses 4-1a to 4-5b).
-6 Social comparison orientation is negatively associated with well-being.
-Negative indicators—higher well-being: lower depressive symptoms, lower loneliness, lower rumination
-6a Social comparison orientation is positively associated with depressive symptoms.
-6b Social comparison orientation is positively associated with loneliness.
-6c Social comparison orientation is positively associated with rumination.
-Positive indicators—higher well-being: higher life-satisfaction, higher subjective happiness.
-6d Social comparison orientation is negatively associated with life satisfaction.
-6e Social comparison orientation is negatively associated with subjective happiness.
-aThe target article sometimes shifts from referring to misestimation in its predictions to tests regarding prevalence estimations. We aligned the
-hypotheses with the tests conducted and the findings reported, rather than the versions of theory and hypothesis referring to misestimation. In addition,
-we specified separate hypotheses for estimations of negative emotions and estimations of positive emotions, to make things clearer.
-bThe hypothesis was not supported in the original target article, yet is included due the possibility of lacking power given the item-level analysis and small
-number of items.
-cWe had no specific predictions for the associations between intensity estimations of positive and negative emotional experience, and these should
-therefore be treated as exploratory.
-```
+
+No
+
+Hypothesis
 
 ### Table 2
-*In hypotheses 2c and 2d, we built on the target arti- for a sample of 600.*
+*  Replication and Extensions: Summary of Hypotheses.*
 
-```
-This is related to other issues with some of the effects
-found that social comparison orientation was associated with reported in the target (e.g., d = 2.52 in Study 1b and d = 3.16
-increased usage of social networks, which in turn predicted in Study 3) being much larger than typical effects in the field
-lower life satisfaction and higher levels of jealousy and envy. (see Jané et al., 2024).
-We therefore considered the possibility that this trait Therefore, instead of using the target article’s effects, we
-encompasses aspects related to social misestimation, as a aimed for a sample size that would allow for participant-
-greater inclination to compare oneself against others may also level detection of paired-sample t-test d(z) = 0.2 (N = 272),
-make individuals more vulnerable to potential discrepancies and correlations of r = .15 (N = 472). These effect sizes are
-between their own experiences and those of others. Therefore, far smaller than any of the effects reported in the target arti-
-our aim was to examine the association between social com- cle and are considered weak to medium effects in social psy-
-parison orientation, misestimation of others’ emotional experi- chology (Jané et al., 2024). This approach also aligns with
-ences, and psychological well-being. Furthermore, we sought the conservative estimate of 460 according to the rule of
-to explore the interaction between social comparison orienta- thumb recommendations by Simonsohn (2015) for a sample
-tion and misestimation of emotional experiences in relation to size 2.5 times larger than the combined samples in the origi-
-well-being measures, with the exploratory prediction that the nal article (80 in the original Study 1b and 104 in the original
-higher the social comparison orientation, the stronger the neg- Study 3), though we note that these recommendations were
-ative link between misestimation of emotional experiences intended for participant-level between subject-designs, and
-and well-being measures. not for item-level analyses with fixed number of items. To
-account for possible exclusions in case of a failed replication
-Replication and Extension: Overview. We summarized the (see data analysis strategy section) and multiple analyses on
-hypotheses for our adjusted replication and extensions in the same sample, we exceeded the planned sample by aiming
-Table 2. In hypotheses 2c and 2d, we built on the target arti- for a sample of 600.
-cle’s hypotheses 2a and 2b to separately assess the preva-
-lence and emotional intensity of emotional events. We also
+| 4 | Personality and Social Psychology Bulletin 00(0) |
+| --- | --- |
+| Replication: prevalence estimations |  |
+| No | Hypothesis |
+| 2a | People underestimate the prevalence of others’ negative emotional experiences. |
+| 2b | People do not underestimate the prevalence and extent of others’ positive emotional experiences. |
+|  | [Our reframing of the target’s null hypothesis: Prevalence underestimation errors are stronger for negative |
+|  | experiences than for positive experiences.] |
+| 4 | 4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and |
+|  | well-being.a |
+|  | 4b) There is a negative association between the estimation of the prevalence of positive emotional experiences and |
+|  | well-being.a |
+|  | Negative indicators—higher well-being: lower depressive symptoms, lower loneliness, lower rumination |
+| 4-1 | 4-1a) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
+|  | depressive symptoms. |
+|  | 4-1b) There is a positive association between the estimation of the prevalence of positive emotional experiences and |
+|  | depressive symptoms. |
+| 4-2 | 4-2a) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
+|  | loneliness. |
+|  | 4-2b) There is a positive association between the estimation of the prevalence of positive emotional experiences and |
+|  | loneliness. |
+| 4-3 | 4-3a) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
+|  | rumination. |
+|  | 4-3b) There is a positive association between the estimation of the prevalence of positive emotional experiences and |
+|  | rumination. |
+|  | Positive indicators—higher well-being: higher life-satisfaction, higher subjective happiness. |
+| 4-4 | 4-4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and |
+|  | life satisfaction. |
+|  | 4-4b) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
+|  | life satisfaction. |
+| 4-5 | 4-5a) There is a positive association between the estimation of the prevalence of negative emotional experiences and |
+|  | subjective happiness.b |
+|  | 4-5b) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
+|  | subjective happiness.b |
+
+Social comparison orientation interacts with misestimation in predicting well-being:
+
+The higher the social comparison orientation, the stronger the associations in Hypothesis 4
+
+(Hypotheses 4-1a to 4-5b).
+
+Social comparison orientation is negatively associated with well-being.
+
+Negative indicators—higher well-being: lower depressive symptoms, lower loneliness, lower rumination
+
+6a Social comparison orientation is positively associated with depressive symptoms.
+
+6b Social comparison orientation is positively associated with loneliness.
+
+6c Social comparison orientation is positively associated with rumination.
+
+Positive indicators—higher well-being: higher life-satisfaction, higher subjective happiness.
+
+6d Social comparison orientation is negatively associated with life satisfaction.
+
+6e Social comparison orientation is negatively associated with subjective happiness.
+
+aThe target article sometimes shifts from referring to misestimation in its predictions to tests regarding prevalence estimations. We aligned the hypotheses with the tests conducted and the findings reported, rather than the versions of theory and hypothesis referring to misestimation. In addition, we specified separate hypotheses for estimations of negative emotions and estimations of positive emotions, to make things clearer. bThe hypothesis was not supported in the original target article, yet is included due the possibility of lacking power given the item-level analysis and small number of items. cWe had no specific predictions for the associations between intensity estimations of positive and negative emotional experience, and these should therefore be treated as exploratory.
+
+Ip and Feldman
+
+For example, Vogel et al. (2015) found that people with higher social comparison orientation were more susceptible to deleterious consequences such as lower self-esteem and poorer affect balance when using social media. Similarly, Wang et al. (2017) found that social comparison orientation was associated with increased usage of social networks, which in turn predicted lower life satisfaction and higher levels of jealousy and envy.
+We therefore considered the possibility that this trait encompasses aspects related to social misestimation, as a greater inclination to compare oneself against others may also make individuals more vulnerable to potential discrepancies between their own experiences and those of others. Therefore, our aim was to examine the association between social comparison orientation, misestimation of others’ emotional experiences, and psychological well-being. Furthermore, we sought to explore the interaction between social comparison orientation and misestimation of emotional experiences in relation to well-being measures, with the exploratory prediction that the higher the social comparison orientation, the stronger the negative link between misestimation of emotional experiences and well-being measures.
+Replication and Extension: Overview. We summarized the hypotheses for our adjusted replication and extensions in Table 2. In hypotheses 2c and 2d, we built on the target article’s hypotheses 2a and 2b to separately assess the prevalence and emotional intensity of emotional events. We also introduced social comparison orientation as a new measure to examine its association with the misperception of peers’ emotional experiences and psychological well-being in Hypotheses 5 and 6.
+
+## Data Availability
+
+Preregistration, and Open-Science Disclosures.  We provided all materials, data, and code on the Open Science Framework (OSF): https://osf.io/bwmtr/. We first preregistered the experiment on the OSF (https://osf.io/ qda7j/) and data collection was launched later that week. All measures, manipulations, exclusions are reported, and data collection was completed before analyses. The preregistration and manuscript were written based on a template by Feldman (2023).
+
+which does not seem to matter for the recruitment of participants, and with the small number of items requiring a very large effect size on the item-level to be able to detect any effects. This is related to other issues with some of the effects reported in the target (e.g., d = 2.52 in Study 1b and d = 3.16 in Study 3) being much larger than typical effects in the field (see Jané et al., 2024).
+Therefore, instead of using the target article’s effects, we aimed for a sample size that would allow for participantlevel detection of paired-sample t-test d(z) = 0.2 (N = 272), and correlations of r = .15 (N = 472). These effect sizes are far smaller than any of the effects reported in the target article and are considered weak to medium effects in social psychology (Jané et al., 2024). This approach also aligns with the conservative estimate of 460 according to the rule of thumb recommendations by Simonsohn (2015) for a sample size 2.5 times larger than the combined samples in the original article (80 in the original Study 1b and 104 in the original Study 3), though we note that these recommendations were intended for participant-level between subject-designs, and not for item-level analyses with fixed number of items. To account for possible exclusions in case of a failed replication (see data analysis strategy section) and multiple analyses on the same sample, we exceeded the planned sample by aiming for a sample of 600.
 Participants
-introduced social comparison orientation as a new measure
-to examine its association with the misperception of peers’ We recruited a total of 594 U.S. American college students
-emotional experiences and psychological well-being in on Prolific (Palan & Schitter, 2018; 290 males, 285 females,
-Hypotheses 5 and 6. 19 other/did not disclose; using the Prolific internal quali-
-fier for students). We used Prolific’s filters, by restricting
-Data Availability, Preregistration, and Open-Science Disclo- the location to the United States using “standard sample,”
-sures. We provided all materials, data, and code on the Open we set it to “Nationality: United States,” “Country of birth:
-Science Framework (OSF): https://osf.io/bwmtr/. We first United States,” “Student status: Yes,” “Minimum Approval
-preregistered the experiment on the OSF (https://osf.io/ Rate: 95, Maximum Approval Rate: 100,” “Minimum
-qda7j/) and data collection was launched later that week. All Submissions: 50, Maximum Submissions: 100,000,” “Total
-measures, manipulations, exclusions are reported, and data times a participant can complete your study: Once.” We
-collection was completed before analyses. The preregistra- summarized a comparison of the target article sample and
-tion and manuscript were written based on a template by the replication sample in Table 3. We outlined the details of
-Feldman (2023). the pay and survey procedures in the Supplemental Material.
-Design and Procedure
-Method
-We summarized the experimental design and all measures in
-Power Analysis and Sensitivity Test
-Table 4 (more details are available in the Supplemental
-We first calculated the effect sizes of the findings reported Materials).
-in the target article with the help of a guide by Jané et al. Participants rated their own emotional experiences and oth-
-(2024). We then conducted an a priori power analysis ers’ emotional experiences in random order. Misestimations
-(power = 0.95, alpha = .05), with an upward adjustment. were measured as participants’ estimates of others’ emotional
-The calculated effect sizes are summarized in the experiences minus the average of all participants’ own emo-
-Supplemental Materials. tional experiences. In the target article’s Study 1b, the preva-
-There were several issues with using the target article’s lence and intensity were confounded, which we adjusted to
-effects as a basis for power analyses. The target conducted measure prevalence and intensity separately (see “Measures”
-their analyses on an item-level with an analysis on 12 items, subsect
-```
+We recruited a total of 594 U.S. American college students on Prolific (Palan & Schitter, 2018; 290 males, 285 females, 19 other/did not disclose; using the Prolific internal qualifier for students). We used Prolific’s filters, by restricting the location to the United States using “standard sample,” we set it to “Nationality: United States,” “Country of birth: United States,” “Student status: Yes,” “Minimum Approval Rate: 95, Maximum Approval Rate: 100,” “Minimum Submissions: 50, Maximum Submissions: 100,000,” “Total times a participant can complete your study: Once.” We summarized a comparison of the target article sample and the replication sample in Table 3. We outlined the details of the pay and survey procedures in the Supplemental Material.
 
-bsection).
+## Method
+
+Power Analysis and Sensitivity Test
+We first calculated the effect sizes of the findings reported in the target article with the help of a guide by Jané et al. (2024). We then conducted an a priori power analysis (power = 0.95, alpha = .05), with an upward adjustment. The calculated effect sizes are summarized in the Supplemental Materials.
+There were several issues with using the target article’s effects as a basis for power analyses. The target conducted their analyses on an item-level with an analysis on 12 items,
+
+Design and Procedure
+We summarized the experimental design and all measures in Table 4 (more details are available in the Supplemental Materials).
+Participants rated their own emotional experiences and others’ emotional experiences in random order. Misestimations were measured as participants’ estimates of others’ emotional experiences minus the average of all participants’ own emotional experiences. In the target article’s Study 1b, the prevalence and intensity were confounded, which we adjusted to measure prevalence and intensity separately (see “Measures” subsection).
 
 ### Table 3
 *Comparison of Target Article Versus Replication: Differences and Similarities.*
 
 ```
-Study Jordan et al. (2011) Study 1b Jordan et al. (2011) Study 3 Replication
-Sample size 80 104 594
-Geographic origin U.S. American students U.S. American students U.S. American students on prolific
-Gender 35 males, 45 females, 0 other/did 51 males, 54 females, 0 other/did 290 males, 285 females, 19 other/did not
-not disclose not disclose disclose
-Medium (location) Paper-and-pen Computer (online) Computer (online)
-Compensation N/A Nominal payment Nominal payment (2 British pounds for an
-estimated 12 min completion time)
-Year 2011 or earlier 2011 or earlier 2023
-We conducted the study using Qualtrics. All participants 1 = lowest emotional intensity, and 100 = highest emotional
-first indicated their consent. They then rated the prevalence intensity.
-of six positive and six negative emotional experiences for
-themselves and for other U.S. student participants taking this In this way, we measured both prevalence and intensity in
-survey, in counterbalanced order. the same question: a value of 0 indicated that the participant
-Prior to each rating task, we added comprehension checks has not experienced this event, and a value of 1 to 100 indi-
-to ensure that participants were paying attention to the type of cated that the participant has experienced it with a rating of
-rating (prevalence or intensity) and who they are rating (self the intensity of the experience.
-vs. other). Participants had to answer these checks correctly in
-order to proceed to the rating task. We note that this is a devia- Prevalence of Others’ Emotional Experiences (Replication). We
-tion from the target article’s procedure to ensure that partici- closely followed the target’s measure of participants’ esti-
-pants were attentive and knew who and what they were mates of others’ emotional experiences with: “Please esti-
-rating. mate the percentage of other U.S. American student
-For exploratory purposes, we included three questions participants on Prolific taking the survey like you who had
-that asked participants to provide short sentences regarding had, sometime in the past 2 weeks, each of the following
-their perceptions of the test items they had previously rated, emotional experiences. (0%–100%)”
-to help us better understand participants’ mindsets when
-answering some of the items from the target article, to Intensity of Others’ Emotional Experiences (Extension). We
-address the possibility of puzzling or surprising findings extended the target’s measure of prevalence (above) with a
-using these items. measure of intensity: “Please try and estimate the emotional
-Participants then completed measures assessing their lone- intensity for other U.S. American student participants on
-liness, rumination tendency, depressive symptoms, life satis- Prolific taking the survey like you who have experienced this
-faction, subjective happiness, and social comparison emotion (1 = Lowest emotional intensity, and 100 = Highest
-orientation. We randomized the order of the six well-being and emotional intensity).”
-trait measures. Finally, participants answered a funneling sec-
-tion, provided demographic information, and were debriefed.
-Misestimations of Prevalence and Intensity. We first calculated
-the actual prevalence of emotional experiences by counting
-Measures for each experience the number of participants who indicated
-having that experience, and then converted that into a per-
-Prevalence and Intensity of Own Emotional Experiences (Replica-
-centage. We then calculated for each participant, and for each
-tion and Extension). In the target article, participants only
-emotional experience, the misestimation of the prevalence of
-rated whether they had experienced an emotional event or
-that emotional experience as the estimation of prevalence
-not. We adjusted and extended the measures to also include
-minus the actual prevalence of that emotional experience.
-intensity:
-We calculated the actual intensity of emotional experi-
-ence by calculating the average of all self-reported intensity
-For each of the following emotional experiences, please indicate
-for all those who reported having that experience. We then
-whether you have experienced those sometime in the past
-calculated for each participant and for each emotional expe-
-2 weeks and, if you have, the intensity of the emotion.
-rience, the misestimation of the intensity as the participant’s
-0 means: You have NOT experienced this emotion in the past estimation of the intensity of that emotional experience
-two weeks. minus the actual intensity of that emotional experience.
-This means that for both prevalence and intensity, a mises-
-1–100 means: You have experienced this emotion at least once timation score higher than zero indicates an overestimation,
-in the past two weeks. and a score lower than zero indicates an underestimation.
+Study
+Jordan et al. (2011) Study 1b
+Jordan et al. (2011) Study 3
+Replication
+Sample size Geographic origin Gender
+Medium (location) Compensation
+80 U.S. American students 35 males, 45 females, 0 other/did
+not disclose Paper-and-pen N/A
+Year
+2011 or earlier
 ```
+
+104 U.S. American students 51 males, 54 females, 0 other/did
+not disclose Computer (online) Nominal payment
+2011 or earlier
+
+594 U.S. American students on prolific 290 males, 285 females, 19 other/did not
+disclose Computer (online) Nominal payment (2 British pounds for an
+estimated 12 min completion time) 2023
+
+We conducted the study using Qualtrics. All participants first indicated their consent. They then rated the prevalence of six positive and six negative emotional experiences for themselves and for other U.S. student participants taking this survey, in counterbalanced order.
+Prior to each rating task, we added comprehension checks to ensure that participants were paying attention to the type of rating (prevalence or intensity) and who they are rating (self vs. other). Participants had to answer these checks correctly in order to proceed to the rating task. We note that this is a deviation from the target article’s procedure to ensure that participants were attentive and knew who and what they were rating.
+For exploratory purposes, we included three questions that asked participants to provide short sentences regarding their perceptions of the test items they had previously rated, to help us better understand participants’ mindsets when answering some of the items from the target article, to address the possibility of puzzling or surprising findings using these items.
+Participants then completed measures assessing their loneliness, rumination tendency, depressive symptoms, life satisfaction, subjective happiness, and social comparison orientation. We randomized the order of the six well-being and trait measures. Finally, participants answered a funneling section, provided demographic information, and were debriefed.
+Measures
+Prevalence and Intensity of Own Emotional Experiences (Replication and Extension). In the target article, participants only rated whether they had experienced an emotional event or not. We adjusted and extended the measures to also include intensity:
+For each of the following emotional experiences, please indicate whether you have experienced those sometime in the past 2 weeks and, if you have, the intensity of the emotion.
+0 means: You have NOT experienced this emotion in the past two weeks.
+1–100 means: You have experienced this emotion at least once in the past two weeks.
+
+1 = lowest emotional intensity, and 100 = highest emotional intensity.
+In this way, we measured both prevalence and intensity in the same question: a value of 0 indicated that the participant has not experienced this event, and a value of 1 to 100 indicated that the participant has experienced it with a rating of the intensity of the experience.
+Prevalence of Others’ Emotional Experiences (Replication).  We closely followed the target’s measure of participants’ estimates of others’ emotional experiences with: “Please estimate the percentage of other U.S. American student participants on Prolific taking the survey like you who had had, sometime in the past 2 weeks, each of the following emotional experiences. (0%–100%)”
+Intensity of Others’ Emotional Experiences (Extension). We extended the target’s measure of prevalence (above) with a measure of intensity: “Please try and estimate the emotional intensity for other U.S. American student participants on Prolific taking the survey like you who have experienced this emotion (1 = Lowest emotional intensity, and 100 = Highest emotional intensity).”
+Misestimations of Prevalence and Intensity.  We first calculated the actual prevalence of emotional experiences by counting for each experience the number of participants who indicated having that experience, and then converted that into a percentage. We then calculated for each participant, and for each emotional experience, the misestimation of the prevalence of that emotional experience as the estimation of prevalence minus the actual prevalence of that emotional experience.
+We calculated the actual intensity of emotional experience by calculating the average of all self-reported intensity for all those who reported having that experience. We then calculated for each participant and for each emotional experience, the misestimation of the intensity as the participant’s estimation of the intensity of that emotional experience minus the actual intensity of that emotional experience.
+This means that for both prevalence and intensity, a misestimation score higher than zero indicates an overestimation, and a score lower than zero indicates an underestimation.
 
 Ip and Feldman
 
-Table 4.  Replication and Extension: Experimental Design and Measures.
-
-IV1: positive vs. negative emotions (within; all participants rated both)
-IV2: self vs. others rating (within; all participants rated both)
-Self ratings Participants were asked to estimate
-based on their own emotional experiences.
-Others ratings Participants were asked to make
-estimations of U.S. American student participants on Prolific taking the survey.
-Exploratory open-ended
-Well-being measures and traits
-
-IV1: estimation of positive emotional events IV1: estimation of negative emotional events
-
-“Felt happy because they. . .”
-
 ### Table 4
-*Replication and Extension: Experimental Design and Measures.*
+*  Replication and Extension: Experimental Design and Measures.*
 
-```
-IV1: positive vs. negative IV1: estimation of positive emotional events IV1: estimation of negative emotional events
-emotions (within; all “Felt happy because they. . .” “Felt sad because they. . .”
-participants rated both) 1. Received high grades 1. Had a fight or argument
-IV2: self vs. others rating (within; all 2. Attended fun party 2. Thought about distant friends or family
-participants rated both) 3. Participated in athletics 3. Thought about enormous workload
-4. They went out with friends 4. Were rejected by someone
-5. They talked to distant friends or family 5. Received a low grade
-6. Had great meal 6. Thought about bad personal health habits
-Self ratings DV1: prevalence and intensity of own emotional experiences [replication + extension]
-Participants were asked to estimate “For each of the following emotional experiences, please indicate whether you have experienced those
-based on their own emotional sometime in the past 2 weeks and if you have—the intensity of the emotion.
-experiences. 0 means: You have NOT experienced this emotion in the past two weeks.
-1–100 means: You have experienced this emotion at least once in the past two weeks”
-(0 = Not experienced; 1 = Lowest emotional intensity; 100 = Highest emotional intensity.)
-Others ratings DV1a: prevalence of others’ emotional experiences [replication]
-Participants were asked to make “Please estimate the percentage of other U.S. American student participants on Prolific taking the survey like
-estimations of U.S. American student you who had had, sometime in the past 2 weeks, each of the following emotional experiences.
-participants on Prolific taking the (0% to 100%)
-survey. DV1b: intensity of others’ emotional experiences [extension]
-“Please try and estimate the emotional intensity for other U.S. American student participants on Prolific
-taking the survey like you who have experienced this emotion
-(1 = Lowest emotional intensity; 100 = Highest emotional intensity)”
-Exploratory open-ended Perception of vague test items:
-Participants briefly wrote about their understanding of vague test items.
-“What is a “bad” grade? How do you classify a grade as being a bad grade? Can you give a quick example?
-(1–2 sentences)”
-“What is an ‘enormous’ workload? How do you classify workload as being an enormous workload? Can you
-give a quick example? (1–2 sentences)”
-“What is a ‘bad’ personal health habit? How do you classify personal health habit as being bad? Can you give
-a quick example? (1–2 sentences)”
-Well-being measures and traits (presented in random order)
-Loneliness [replication]
-UCLA Loneliness Scale (Hays & DiMatteo, 1987, p. 4), 8-item short-form version.
-Sample items: “There is no one I can turn to.” and “I can find companionship when I want it.”
-(1 = Never to 4 = Often)
-Rumination [replication]
-Brooding subscale (5-item) of the Ruminative Responses to Depression Questionnaire (Nolen-Hoeksema,
-1991; Treynor et al., 2003). Sample items: “Think What am I doing to deserve this?” and “Think about a
-recent situation, wishing it had gone better.” etc.
-(1 = Almost never to 4 = Almost always)
-Depressive symptoms [replication]
-Center for Epidemiologic Studies Depression Scale 10-item short-form version (Cole et al., 2004; Radloff,
-1977). Sample items: “I was bothered by things that usually don’t bother me.” and “I had trouble keeping
-my mind on what I was doing.” etc.
-(1 = Rarely or none of the time (less than 1 day) to 4 = All of the time (5–7 days))
-Life satisfaction [replication]
-Participants were asked to complete the 5-item SWLS (Diener et al., 1985). Sample items: “In most ways my
-life is close to my ideal.” and “If I could live my life over, I would change almost nothing.” etc.
-(1 = Strongly disagree to 7 = Strongly agree)
-Subjective happiness [replication]
-SHS 4-item (Lyubomirsky & Lepper, 1999). Sample items:
-“In general, I consider myself. . .” and “Compared to most of my peers, I consider myself. . .” etc.
-(1 = Not at all/Less happy; 7 = A very happy person/More happy/A great deal)
-Social comparison orientation [extension]
-The INCOM (Gibbons & Buunk, 1999)
-Sample items: “I often compare myself with others with respect to what I have accomplished in life” and “If I
-want to learn more about something I try to find out what others think about it”
-(1 = Strongly disagree to 5 = Strongly agree)
-Note. All materials are provided in the Qualtrics survey export provided in the OSF folder. INCOM = Iowa-Netherlands comparison orientation
-measure; SWLS = satisfaction with life scale; SHS = subjective happiness scale.
-Depressive Symptoms. We measured depressive symptoms items such as “My sleep was restless,” and “I had trouble
-using the 10-item short-form version of the Center for Epide- keeping my mind on what I was doing” (0 = “Rarely or none
-miologic Studies Depression Scale (Radloff, 1977). Respon- of the time (less than 1 day)”; 3 = “All of the time (5–7 days)”;
-dents indicated the frequ
-```
+| Ip and Feldman | 7 |
+| --- | --- |
+| IV1: positive vs. negative | IV1: estimation of negative emotional events IV1: estimation of positive emotional events |
+| emotions (within; all | “Felt sad because they. . .” “Felt happy because they. . .” |
+| participants rated both) | 1.  Had a fight or argument 1.  Received high grades |
+| IV2: self vs. others rating (within; all | 2.  Thought about distant friends or family 2.  Attended fun party |
+| participants rated both) | 3.  Thought about enormous workload 3.  Participated in athletics |
+|  | 4.  Were rejected by someone 4.  They went out with friends |
+|  | 5.  Received a low grade 5.  They talked to distant friends or family |
+|  | 6.  Thought about bad personal health habits 6.  Had great meal |
+| Self ratings | DV1: prevalence and intensity of own emotional experiences [replication + extension] |
+| Participants were asked to estimate | “For each of the following emotional experiences, please indicate whether you have experienced those |
+| based on their own emotional | sometime in the past 2 weeks and if you have—the intensity of the emotion. |
+| experiences. | 0 means: You have NOT experienced this emotion in the past two weeks. |
+|  | 1–100 means: You have experienced this emotion at least once in the past two weeks” |
+|  | (0 = Not experienced; 1 = Lowest emotional intensity; 100 = Highest emotional intensity.) |
+| Others ratings | DV1a: prevalence of others’ emotional experiences [replication] |
+| Participants were asked to make | “Please estimate the percentage of other U.S. American student participants on Prolific taking the survey like |
+| estimations of U.S. American student | you who had had, sometime in the past 2 weeks, each of the following emotional experiences. |
+| participants on Prolific taking the | (0% to 100%) |
+| survey. | DV1b: intensity of others’ emotional experiences [extension] |
+|  | “Please try and estimate the emotional intensity for other U.S. American student participants on Prolific |
+|  | taking the survey like you who have experienced this emotion |
+|  | (1 = Lowest emotional intensity; 100 = Highest emotional intensity)” |
+| Exploratory open-ended | Perception of vague test items: |
+|  | Participants briefly wrote about their understanding of vague test items. |
+|  | “What is a “bad” grade? How do you classify a grade as being a bad grade? Can you give a quick example? |
+|  | (1–2 sentences)” |
+|  | “What is an ‘enormous’ workload? How do you classify workload as being an enormous workload? Can you |
+|  | give a quick example? (1–2 sentences)” |
+|  | “What is a ‘bad’ personal health habit? How do you classify personal health habit as being bad? Can you give |
+|  | a quick example? (1–2 sentences)” |
+| Well-being measures and traits | (presented in random order) |
+|  | Loneliness [replication] |
+|  | UCLA Loneliness Scale (Hays & DiMatteo, 1987, p. 4), 8-item short-form version. |
+|  | Sample items: “There is no one I can turn to.” and “I can find companionship when I want it.” |
+|  | (1 = Never to 4 = Often) |
+|  | Rumination [replication] |
+|  | Brooding subscale (5-item) of the Ruminative Responses to Depression Questionnaire (Nolen-Hoeksema, |
+|  | 1991; Treynor et al., 2003). Sample items: “Think What am I doing to deserve this?” and “Think about a |
+|  | recent situation, wishing it had gone better.” etc. |
+|  | (1 = Almost never to 4 = Almost always) |
+|  | Depressive symptoms [replication] |
+|  | Center for Epidemiologic Studies Depression Scale 10-item short-form version (Cole et al., 2004; Radloff, |
+|  | 1977). Sample items: “I was bothered by things that usually don’t bother me.” and “I had trouble keeping |
+|  | my mind on what I was doing.” etc. |
+|  | (1 = Rarely or none of the time (less than 1 day) to 4 = All of the time (5–7 days)) |
+|  | Life satisfaction [replication] |
+|  | Participants were asked to complete the 5-item SWLS (Diener et al., 1985). Sample items: “In most ways my |
+|  | life is close to my ideal.” and “If I could live my life over, I would change almost nothing.” etc. |
+|  | (1 = Strongly disagree to 7 = Strongly agree) |
+|  | Subjective happiness [replication] |
+|  | SHS 4-item (Lyubomirsky & Lepper, 1999). Sample items: |
+|  | “In general, I consider myself. . .” and “Compared to most of my peers, I consider myself. . .” etc. |
+|  | (1 = Not at all/Less happy; 7 = A very happy person/More happy/A great deal) |
+|  | Social comparison orientation [extension] |
+|  | The INCOM (Gibbons & Buunk, 1999) |
+|  | Sample items: “I often compare myself with others with respect to what I have accomplished in life” and “If I |
+|  | want to learn more about something I try to find out what others think about it” |
+|  | (1 = Strongly disagree to 5 = Strongly agree) |
 
 Brooding/Rumination.  We measured Brooding/Rumination using the Brooding subscale (5-item) of the Ruminative Responses to Depression Questionnaire (Nolen-Hoeksema, 1991; Treynor et al., 2003). Participants rated items such as “Why can’t I handle things better,” and “What am I doing to deserve this” (1 = almost never; 4 = almost always), scoring from 5 to 20 (α = .87).
 Loneliness.  We measured participants’loneliness with the 8-item short-form version of the UCLA Loneliness Scale (Hays & DiMatteo, 1987; Russell et al., 1980). Participants rated their agreement with statements such as “I feel left out” and “I lack companionship” (1 = Never; 4 = Always; α = .88).
@@ -396,86 +295,133 @@ and conducted all the analyses for prevalence above also for intensity, for both
 Social Comparison Orientation.  We added the social comparison orientation (SCO) measure to all the correlational and regression analyses detailed above for both prevalence and intensity, with all the other well-being measures. We also conducted regression interaction analyses to examine
 
 ### Table 5
-*Classification of the Replication Based on LeBel et al.*
+*  Classification of the Replication Based on LeBel et al.*
 
-```
-Design facet Replication Details of deviation Reasons for change
-IV construct Same, with an
-extension
-DV construct Similar, with an added We separated prevalence from intensity, by adjusting We proposed that social
-extension the self-report measure and adding a separate comparison orientation
-measure estimating emotional intensity. may interact with the
-We added a social comparison orientation individual misperception and
-differences measure. contribute to differential
-well-being outcomes.
-IV operationalization Similar
-DV operationalization Similar Original: Study 1b conflated emotional prevalence
-and intensity. Study 3 stripped intensity.
-Replication: Emotional prevalence and emotional
-intensity in self were combined into the same
-question. For others’ they were rated as two
-separate measures—frequency and intensity.
-Original: “rejected by a boy or girl” includes gender.
-Replication: adjusted to “rejected by someone” for
-inclusiveness.
-We added measures evaluating views on test items
-that were vague, such as “received a bad grade.”
-Population Similar The population in our studies was also students, but
-with a larger and more diverse sample from across
-the United States.
-Original: N = 80 (Study 1b); N = 104 (Study 3)
-Replication: N = 594
-Procedural details Different We added comprehension checks before the rating Ensuring participants read and
-task to ensure participants understand (a) target understood the instructions
-(self or others), and (b) dimension (prevalence or and to rate accordingly.
-intensity). Address order effects
-We randomized the self-other rating order and the Address possibility of diverging
-order of scale measures. perceptions of our test
-We added three clarification questions that inquired items.
-about how they perceived subjective test items.
-Physical settings Similar to Study 3 Original: Study 1b: In person; Study 3: Online. Target’s Studies 1b and 3 had
-Replication: Online. similar designs that can be
-combined and extended.
-Contextual variables Similar Original studies: Participants were recruited from a
-medium-sized West Coast university in the United
-States.
-Current replication: Our replication was conducted
-in 2023 broadly targeting college students across
-the United States.
-Statistical analyses Similar with additional We added participant-level analyses to supplement Misestimations were
-analyses that were the item-level analyses in the original article. determined based on
-more suitable and We also conducted moderation analyses. estimate-actual comparisons.
-tested robustness To examine the effect of social
-comparison orientation.
-Replication Close to far Mostly followed the target, yet the self-rating
-classification replication adjustment to measuring both prevalence
-and intensity warranted a more conservative
-categorization.
-whether SCO interacts with estimation error in predicting entire questionnaire with no further exclusions. We also pre-
-well-being measures. registered that in case we failed to find support for the esti-
-mation hypotheses in our replication of the target article, we
-Outliers and Exclusions. We followed the preregistered plan to would supplement our analyses by rerunning the analyses
-only include responses from participants who completed the with exclusion and stricter alpha to account for mu
-```
+| Design facet | Replication | Details of deviation | Reasons for change |
+| --- | --- | --- | --- |
+| IV construct | Same, with an |  |  |
+|  | extension |  |  |
+| DV construct | Similar, with an added | We separated prevalence from intensity, by adjusting | We proposed that social |
+|  | extension | the self-report measure and adding a separate | comparison orientation |
+|  |  | measure estimating emotional intensity. | may interact with the |
+|  |  | We added a social comparison orientation individual | misperception and |
+|  |  | differences measure. | contribute to differential |
+|  |  |  | well-being outcomes. |
+| IV operationalization | Similar |  |  |
+| DV operationalization | Similar | Original: Study 1b conflated emotional prevalence |  |
+|  |  | and intensity. Study 3 stripped intensity. |  |
+|  |  | Replication: Emotional prevalence and emotional |  |
+|  |  | intensity in self were combined into the same |  |
+|  |  | question. For others’ they were rated as two |  |
+|  |  | separate measures—frequency and intensity. |  |
+|  |  | Original: “rejected by a boy or girl” includes gender. |  |
+|  |  | Replication: adjusted to “rejected by someone” for |  |
+|  |  | inclusiveness. |  |
+|  |  | We added measures evaluating views on test items |  |
+|  |  | that were vague, such as “received a bad grade.” |  |
+| Population | Similar | The population in our studies was also students, but |  |
+|  |  | with a larger and more diverse sample from across |  |
+|  |  | the United States. |  |
+|  |  | Original: N = 80 (Study 1b); N = 104 (Study 3) |  |
+|  |  | Replication: N = 594 |  |
+| Procedural details | Different | We added comprehension checks before the rating | Ensuring participants read and |
+|  |  | task to ensure participants understand (a) target | understood the instructions |
+|  |  | (self or others), and (b) dimension (prevalence or | and to rate accordingly. |
+|  |  | intensity). | Address order effects |
+|  |  | We randomized the self-other rating order and the | Address possibility of diverging |
+|  |  | order of scale measures. | perceptions of our test |
+|  |  | We added three clarification questions that inquired | items. |
+|  |  | about how they perceived subjective test items. |  |
+| Physical settings | Similar to Study 3 | Original: Study 1b: In person; Study 3: Online. | Target’s Studies 1b and 3 had |
 
-analyses (alpha = .005). We found support for misestimation effects (see below) using the full sample (N = 594) and therefore did not proceed to conduct or report the analyses with exclusions.
+### Table 6
+*  Prevalence of Emotional Experiences (Replication and Extension): One-Sample t-Tests of Estimation Error.*
 
-## Results
+| 10 | Personality and Social Psychology Bulletin 00(0) |
+| --- | --- |
+| analyses (alpha = .005). We found support for misestimation | analyses on the emotional intensity measures. We began with |
+| effects  (see  below)  using  the  full  sample  (N  =  594)  and | item-level  one-sample  t-tests  and  found  support  for |
+| therefore did not proceed to conduct or report the analyses | Hypothesis  2d  with  an  overestimation  of  positive  experi- |
+| with exclusions. | ences  (t(5)  =  2.97,  p  =  .031,  d  =  1.21,  95%  CI  [0.099, |
+|  | 2.26]), yet contrary to our expectations in Hypothesis 2c, we |
+|  | also found an overestimation for negative experiences (t(5) |
+| Results |  |
+|  | = 3.51, p = .017, d = 1.43, [0.23, 2.58]). |
+| Prevalence Estimate Errors (Replication) | The participant-level analyses showed a similar trend, as |
+|  | we found support for the expected overestimation of positive |
+| We summarized descriptives in Tables 6 (prevalence) and 7 |  |
+|  | emotional experiences (M = 5.60; t(593) = 8.45, p < .001, d |
+| (intensity), and correlations in Table 8. |  |
+|  | =  0.35,  95%  CI  [0.26,  0.43]),  and  again  the  unexpected |
+| Consistent with Hypothesis 2a and the original findings, |  |
+|  | overestimation  of  negative  emotional  experiences  (M  = |
+| we found support for an underestimation of others’ negative |  |
+|  | 12.54; t(593) = 19.42, p < .001, d = 0.80, [0.70, 0.89]). We |
+| emotional experiences. Mirroring the analyses conducted in |  |
+|  | ran one-sample t-tests for each of the experiences and found |
+| the  original  article,  we  computed  the  estimation  error  for |  |
+|  | that  participants  overestimated  five  out  of  the  six  negative |
+| each item of positive and negative experiences by comparing |  |
+|  | emotional experiences and five out of the six positive emo- |
+| the self-rating with ratings for their peers. We conducted an |  |
+|  | tional experiences. |
+| item-level  one-sample  t-test  on  the  estimation  errors  to |  |
+|  | Mirroring the target’s analyses for item-level prevalence |
+| examine  if  they  differed  from  0. We  found  support  for  the |  |
+|  | comparing positive and negative, we ran the same analysis |
+| expected  underestimation  of  negative  (t(5)  =  −4.30,  p  = |  |
+|  | for intensity estimates and found no signal for difference in |
+| .008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for |  |
+|  | overestimation  error  between  negative  and  positive  emo- |
+| an unexpected underestimation of positive experiences (t(5) |  |
+|  | tional experiences, though large effect size (t(10) = 1.72, p |
+| = −3.67, p = .014, d = −1.50, [−2.67, −0.26]). |  |
+|  | = .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most |
+| We  further  extended  our  analyses  to  a  series  of  partici- |  |
+|  | likely due to the small number of items a power analysis of |
+| pant-level one-sample t-tests on the estimation error of emo- |  |
+|  | which  shows  an  unreasonably  large  effect  in  order  to  be |
+| tional experiences, summarized in Table 6. Overall, we found |  |
+|  | detectable with null hypothesis significance testing. We sup- |
+| support for participants’ underestimation of all six negative |  |
+|  | plemented  the  item-level  analysis  by  conducting  a  partici- |
+| emotional experiences  and of  five of  the six positive emo- |  |
+|  | pant-level paired sample t-test, which was far better powered, |
+| tional  experiences.  The  participant-level  analyses  mirrored |  |
+|  | and  indeed  found  support  for  stronger  overestimation  for |
+| that of the item-level analyses, with support for the expected |  |
+|  | negative experiences than for positive experiences (t(593) = |
+| underestimation  of  negative  emotional  experiences  (M  = |  |
+|  | 10.63, p < .001, d = 0.44, [0.35, 0.52]). |
+| 23.56; t(593) = −35.02, p < .001, d = −1.44, 95% CI [−1.55, |  |
+| −1.32]),  yet  again  with  the  unexpected  underestimation  of |  |
+| positive emotional experiences (M = 15.97; t(593) = −24.17, |  |
+|  | Prevalence Estimates Associations with Well- |
+| p < .001, d = −0.99, [−1.09, −0.89]). |  |
+|  | Being (Replication) |
+| Partially consistent with Hypothesis 2b, the underestima- |  |
+| tion of negative experiences was stronger than positive experi- | We  summarized  the  Pearson’s  correlations  in  Table  8,  and |
+| ences, yet only for the participant-level analysis. Specifically, | the  regression  model  findings  predicting  well-being  from |
+| for  the  item-level  analyses,  we  ran  an  independent  samples | negative and positive prevalence estimates in Table 9 (com- |
+| t-test comparing negative and positive emotional experiences | paring with the target’s). |
+| and did not find support for Hypothesis 2b in estimation error | Inconsistent  with  and  opposite  to  Hypothesis  4,  preva- |
+| (t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We | lence  estimations  of  negative  emotional  experiences  were |
+| anticipated this in advance, given that the item-level analysis | negatively associated with well-being, as indicated by a neg- |
+| had too few items and therefore power to detect such differ- | ative association with life satisfaction (β = −.23, t(591) = |
+| ences, which is why we planned and preregistered to also run | −4.87, p < .001), and subjective happiness (β = −.26, t(591) |
+| participant-level analyses, which we felt were more appropri- | =  −5.59,  p < .001),  and  a  positive  association  with  loneli- |
+| ate  and  accurate.  The  participant-level  paired-samples  t-test | ness (β = .33, t(591) = 7.04, p < .001), brooding (β = .37, |
+| analysis allowed us to find support for a larger estimation error | t(591)  =  8.08,  p < .001),  depressive  symptoms  (β  =  .41, |
+| for  negative  compared  to  positive  experiences  (t(593)  = | t(591) = 9.01, p < .001). On the other hand, positive preva- |
+| −11.90, p < .001, d = −0.49, [−0.57, −0.40]). | lence estimates were negatively associated with loneliness (β |
+|  | = −.25, t(591) = −5.40, p < .001), and depressive symptoms |
+|  | (β = −.22, t(591) = −4.69, p < .001), and positively associ- |
+| Intensity Estimate Errors (Extension) |  |
+|  | ated with life satisfaction (β = .25, t(591) = 5.35, p < .001), |
+| To  test  whether  underestimation  of  emotional  experiences | subjective happiness (β = .32, t(591) = 6.73, p < .001), and |
+| also  extends  to  emotional  intensity,  we  conducted  similar | the number of confidants (β = .19, t(591) = 3.98, p < .001). |
 
-Prevalence Estimate Errors (Replication)
-We summarized descriptives in Tables 6 (prevalence) and 7 (intensity), and correlations in Table 8.
-Consistent with Hypothesis 2a and the original findings, we found support for an underestimation of others’ negative emotional experiences. Mirroring the analyses conducted in the original article, we computed the estimation error for each item of positive and negative experiences by comparing the self-rating with ratings for their peers. We conducted an item-level one-sample t-test on the estimation errors to examine if they differed from 0. We found support for the expected underestimation of negative (t(5) = −4.30, p = .008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for an unexpected underestimation of positive experiences (t(5) = −3.67, p = .014, d = −1.50, [−2.67, −0.26]).
-We further extended our analyses to a series of participant-level one-sample t-tests on the estimation error of emotional experiences, summarized in Table 6. Overall, we found support for participants’ underestimation of all six negative emotional experiences and of five of the six positive emotional experiences. The participant-level analyses mirrored that of the item-level analyses, with support for the expected underestimation of negative emotional experiences (M = 23.56; t(593) = −35.02, p < .001, d = −1.44, 95% CI [−1.55, −1.32]), yet again with the unexpected underestimation of positive emotional experiences (M = 15.97; t(593) = −24.17, p < .001, d = −0.99, [−1.09, −0.89]).
-Partially consistent with Hypothesis 2b, the underestimation of negative experiences was stronger than positive experiences, yet only for the participant-level analysis. Specifically, for the item-level analyses, we ran an independent samples t-test comparing negative and positive emotional experiences and did not find support for Hypothesis 2b in estimation error (t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We anticipated this in advance, given that the item-level analysis had too few items and therefore power to detect such differences, which is why we planned and preregistered to also run participant-level analyses, which we felt were more appropriate and accurate. The participant-level paired-samples t-test analysis allowed us to find support for a larger estimation error for negative compared to positive experiences (t(593) = −11.90, p < .001, d = −0.49, [−0.57, −0.40]).
-Intensity Estimate Errors (Extension)
-To test whether underestimation of emotional experiences also extends to emotional intensity, we conducted similar
-
-analyses on the emotional intensity measures. We began with item-level one-sample t-tests and found support for Hypothesis 2d with an overestimation of positive experiences (t(5) = 2.97, p = .031, d = 1.21, 95% CI [0.099, 2.26]), yet contrary to our expectations in Hypothesis 2c, we also found an overestimation for negative experiences (t(5) = 3.51, p = .017, d = 1.43, [0.23, 2.58]).
-The participant-level analyses showed a similar trend, as we found support for the expected overestimation of positive emotional experiences (M = 5.60; t(593) = 8.45, p < .001, d = 0.35, 95% CI [0.26, 0.43]), and again the unexpected overestimation of negative emotional experiences (M = 12.54; t(593) = 19.42, p < .001, d = 0.80, [0.70, 0.89]). We ran one-sample t-tests for each of the experiences and found that participants overestimated five out of the six negative emotional experiences and five out of the six positive emotional experiences.
-Mirroring the target’s analyses for item-level prevalence comparing positive and negative, we ran the same analysis for intensity estimates and found no signal for difference in overestimation error between negative and positive emotional experiences, though large effect size (t(10) = 1.72, p = .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most likely due to the small number of items a power analysis of which shows an unreasonably large effect in order to be detectable with null hypothesis significance testing. We supplemented the item-level analysis by conducting a participant-level paired sample t-test, which was far better powered, and indeed found support for stronger overestimation for negative experiences than for positive experiences (t(593) = 10.63, p < .001, d = 0.44, [0.35, 0.52]).
-Prevalence Estimates Associations with WellBeing (Replication)
-We summarized the Pearson’s correlations in Table 8, and the regression model findings predicting well-being from negative and positive prevalence estimates in Table 9 (comparing with the target’s).
-Inconsistent with and opposite to Hypothesis 4, prevalence estimations of negative emotional experiences were negatively associated with well-being, as indicated by a negative association with life satisfaction (β = −.23, t(591) = −4.87, p < .001), and subjective happiness (β = −.26, t(591) = −5.59, p < .001), and a positive association with loneliness (β = .33, t(591) = 7.04, p < .001), brooding (β = .37, t(591) = 8.08, p < .001), depressive symptoms (β = .41, t(591) = 9.01, p < .001). On the other hand, positive prevalence estimates were negatively associated with loneliness (β = −.25, t(591) = −5.40, p < .001), and depressive symptoms (β = −.22, t(591) = −4.69, p < .001), and positively associated with life satisfaction (β = .25, t(591) = 5.35, p < .001), subjective happiness (β = .32, t(591) = 6.73, p < .001), and the number of confidants (β = .19, t(591) = 3.98, p < .001).
+001).
 
 Table 6.  Prevalence of Emotional Experiences (Replication and Extension): One-Sample t-Tests of Estimation Error.
 
@@ -486,33 +432,6 @@ Item-level analysis
 Experiences
 Negative experiences    Had fight/argument    Thought about
 distant friends/ family    Thought about enormous workload    Was rejected by boy/girl    Received low grade    Thought about bad personal health habits Overall negative
-
-```
-Actual Prevalence
-prevalence estimate
-average
-mean
-Error mean
-71.04 78.79
-47.41 45.76
-−23.63 −33.02
-62.14 −24.22
-50.17 85.35
-42.60 42.51
-−10.09
-−7.57 −42.85
-46.08 −23.56
-Error SD
-23.54 22.61
-22.11 23.60 23.02
-t-stat
-p
-−24.47 <.001 −35.60 <.001
-−26.49 <.001
-−11.12 <.001
-−7.82 <.001 −45.36 <.001
-−35.02 <.001
-```
 
 Cohen’s d and CI
 −1.00 [−1.10, −0.90] −1.46 [−1.58, −1.34]
@@ -525,30 +444,6 @@ Signal; same direction Signal; same direction
 Signal; same direction
 Signal; same direction Signal; same direction Signal; same direction
 Signal; same direction
-
-```
-t-stat df
-p
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-−4.30 5 .008
-```
 
 Cohen’s d and CI
 / /
@@ -565,169 +460,42 @@ athletics   Went out with
 friends   Talked to distant
 friends/ family    Had great meal
 
-```
-51.35 54.04 77.27 72.90 94.44
-52.36 39.45 65.61 53.68 63.31
-Overall positive
-−21.4
-−5.99 5 <.01
-−20.35 24.35 −20.27 <.001 −0.83 [0.92, 0.74]
-Unexpected signal; same /
-/
-/
-direction
-1.01 24.04
-1.03 .305
-0.04 [−0.04, 0.12]
-Unexpected no signal;
-/
-/
-/
-−14.59 22.64 −15.70 <.001 −0.64 [−0.73, 0.56]
-Signal; opposite
-/
-/
-/
-direction
-−11.66 19.63 −14.48 <.001 −0.59 [−0.68, −0.51] Signal; opposite
-/
-/
-/
-direction
-−19.22 22.47 −20.84 <.001 −0.86 [−0.95, 0.76]
-Signal; opposite
-/
-/
-/
-direction
-−31.22 22.00 −34.49 <.001 −1.42 [−1.53, −1.30] Unexpected signal; same /
-/
-/
-direction
-−15.97 16.10 −24.17 <.001 −0.99 [−1.09, −0.89] Unexpected signal
-−3.67 5
-.014
-−2.68 [−4.65, −0.68]
-/ / / / / / −1.50 [−2.67, −0.26]
-Overall positive: target article (Study 3)
-Overall positive and negative combined
-3.8 −19.77
-8.7 14.27
-−33.75 <.001
-— −1.38 [−1.50, −1.27]
-1.06 5 n.s
-0.48 [−0.48, 1.38]
-−5.61 11 <.001 −1.62 [−2.48, −.73]
-```
-
 Note. One-sample t-tests, N = 594, participant level df = 593, 95% CI (confidence intervals). The interpretation of the outcome is based on LeBel et al. (2019). We summarized whether we found a signal (p < alpha), whether the signal or lack of was expected, and whether it was in the same direction as that of the target’s per the singular item. We did not summarize effect size consistency (target’s effect within replication confidence intervals) given that we conducted analyses on participant level whereas the target conducted analysis on item-level.
 
-### Table 7
-*Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.*
+Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.
 
-```
 Participant-level analyses
+
 Experiences
+
 Actual Intensity
-intensity estimate Error Error
-average mean mean SD t-stat
-p
-```
 
-Negative experiences Had fight/argument Thought about distant friends/ family Thought about enormous workload Was rejected by boy/girl Received low grade
-   Thought about bad personal health habits
- Overall negative Positive experiences    Received high grade    Attended fun party    Participated in athletics    Went out with friends    Talked to distant friends/family    Had great meal  Overall positive Overall: positive and negative combined
+### Table 7
+*  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.*
 
-```
-42.63 42.65 50.81 33.00 37.05 44.07
-56.07 50.63 44.95 59.11 52.03 58.80 53.60 47.65
-59.64 48.48 60.44 58.16 53.65 45.07
-60.56 62.65 49.35 67.65 57.96 57.03 59.20 56.72
-17.01 5.84 9.63 25.17 16.60 1.01
-22.27 21.48 22.13 23.94 22.46 21.93
-18.62 6.62 10.60 25.62 18.01 1.12
-12.54 15.73 19.42
-4.50 12.03
-4.40 8.54 5.93 −1.77 5.60 9.07
-22.39 21.35 22.16 19.47 20.29 23.40 16.16 13.83
-```
-
-4.90 13.73
-4.84 10.69
-7.12 −1.85
-8.45 15.99
-
-<.001 <.001 <.001 <.001 <.001 =.264
-<.001
-<.001 <.001 <.001 <.001 <.001 =.065 <.001 <.001
-
-Note. One-sample t-tests, N = 594, participant level df = 593, 95% CI (confidence intervals).
-
-Cohen’s d and CI
-0.76 [0.67, 0.86] 0.27 [0.19, 0.35] 0.43 [0.35, 0.52] 1.05 [0.95, 1.15] 0.74 [0.65, 0.83] 0.05 [−0.03, 0.13]
-0.80 [0.70, 0.89]
-0.20 [0.12, 0.28] 0.56 [0.48, 0.65] 0.20 [0.12, 0.28] 0.44 [0.35, 0.52] 0.29 [0.21, 0.37] −0.08 [−0.16, 0.004] 0.35 [0.26, 0.43] 0.66 [0.57, 0.74]
-
-```
-Item-level analyses
-t-stat df
-p
-Cohen’s d and CI
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-3.51 5
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-2.97 5
-4.14 11
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-.017 1.43 [0.23, 2.58]
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-/
-.031 1.21 [0.099, 2.26]
-.002 1.20 [0.43, 1.90]
-```
+|  |  |  |  | Participant-level analyses |  |  |  |  |  | Item-level analyses |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|  | Actual | Intensity |  |  |  |  |  |  |  |  |  |
+|  | intensity | estimate | Error | Error |  |  |  |  |  |  |  |
+| Experiences | average | mean | mean | SD | t-stat | p | Cohen’s d and CI | t-stat | df | p | Cohen’s d and CI |
+| Negative experiences |  |  |  |  |  |  |  |  |  |  |  |
+| Had fight/argument | 42.63 | 59.64 | 17.01 | 22.27 | 18.62 | <.001 | 0.76 [0.67, 0.86] | / | / | / | / |
+| Thought about distant friends/ family | 42.65 | 48.48 | 5.84 | 21.48 | 6.62 | <.001 | 0.27 [0.19, 0.35] | / | / | / | / |
+| Thought about enormous workload | 50.81 | 60.44 | 9.63 | 22.13 | 10.60 | <.001 | 0.43 [0.35, 0.52] | / | / | / | / |
+| Was rejected by boy/girl | 33.00 | 58.16 | 25.17 | 23.94 | 25.62 | <.001 | 1.05 [0.95, 1.15] | / | / | / | / |
+| Received low grade | 37.05 | 53.65 | 16.60 | 22.46 | 18.01 | <.001 | 0.74 [0.65, 0.83] | / | / | / | / |
+| Thought about bad personal health | 44.07 | 45.07 | 1.01 | 21.93 | 1.12 | =.264 | 0.05 [−0.03, 0.13] | / | / | / | / |
+| habits |  |  |  |  |  |  |  |  |  |  |  |
+| Overall negative | 41.70 | 54.24 | 12.54 | 15.73 | 19.42 | <.001 | 0.80 [0.70, 0.89] | 3.51 | 5 | .017 | 1.43 [0.23, 2.58] |
+| Positive experiences |  |  |  |  |  |  |  |  |  |  |  |
+| Received high grade | 56.07 | 60.56 | 4.50 | 22.39 | 4.90 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
+| Attended fun party | 50.63 | 62.65 | 12.03 | 21.35 | 13.73 | <.001 | 0.56 [0.48, 0.65] | / | / | / | / |
+| Participated in athletics | 44.95 | 49.35 | 4.40 | 22.16 | 4.84 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
+| Went out with friends | 59.11 | 67.65 | 8.54 | 19.47 | 10.69 | <.001 | 0.44 [0.35, 0.52] | / | / | / | / |
+| Talked to distant friends/family | 52.03 | 57.96 | 5.93 | 20.29 | 7.12 | <.001 | 0.29 [0.21, 0.37] | / | / | / | / |
+| Had great meal | 58.80 | 57.03 | −1.77 | 23.40 | −1.85 | =.065 | −0.08 [−0.16, 0.004] | / | / | / | / |
+| Overall positive | 53.60 | 59.20 | 5.60 | 16.16 | 8.45 | <.001 | 0.35 [0.26, 0.43] | 2.97 | 5 | .031 | 1.21 [0.099, 2.26] |
+| Overall: positive and negative combined | 47.65 | 56.72 | 9.07 | 13.83 | 15.99 | <.001 | 0.66 [0.57, 0.74] | 4.14 | 11 | .002 | 1.20 [0.43, 1.90] |
 
 Table 8.  Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.
 
@@ -837,133 +605,123 @@ estimate R2
 estimate
 estimate R2
 Interpretation
-```
-
-### Table 9
-*Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al.*
-
-```
-Personality and Social Psychology Bulletin 00(0)
-Table 9. Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al. (2011)’s Study 3 Versus
-Replication.
-Jordan et al. (2011) Replication
-β for negative β for positive β for negative β for positive
-prevalence prevalence prevalence prevalence
-Measure Cronbach’s α estimate estimate R2 estimate estimate R2 Interpretation
 Negative
-Loneliness .81 −.30** .08 .08 .33*** −.25*** .08 Signal; inconsistent
-opposite
-Rumination/brooding .72 −.28** .17 .08 .37*** −.15** .10 Signal; inconsistent
-opposite
-Depressive symptoms .73 .00 −.02 .00 .41*** −.22*** .12 Signal; inconsistent
-opposite
+Loneliness
+.81
+Rumination/brooding
+.72
+Depressive symptoms
+.73
 Positive
-Satisfaction with life .84 .23* −.37*** .15 −.23*** .25*** .05 Signal; inconsistent
-opposite
-Subjective Happiness .80 .19 −.16 .05 −.26*** .32*** .08 Signal; inconsistent
-opposite
-Number of confidants / N/A N/A N/A −.11* .19*** .03
-Social orientation scale / / / / .26*** −.10* .05 Supported
+Satisfaction with life
+.84
+Subjective Happiness
+.80
+Number of confidants
+/
+Social orientation scale
+/
 (extension)
-Note. Linear regression, N = 594. N/A = not reported.
-Source. The “original” column was adopted from Jordan et al. (2011, p. 130). The interpretation of the outcome is based on LeBel et al. (2019).
-*p < .05. **p < .01. ***p < .001.
-We conclude that our findings are in the opposite direction to brooding (r = .25 [0.17, 0.32]), and depression (r = .26
-that reported in the target article, for both negative and posi- [0.19, 0.34]), and that reporting more the listed positive emo-
-tive emotional experiences prevalence estimates. tional experiences was positively correlated with life satis-
-faction (r = .22 [0.14, 0.29]) and happiness (r = .27 [0.20,
-0.35]) and negatively associated with loneliness (r = −.16
-Intensity Estimates Associations with Well-Being
-[−0.23, −0.07]; all p < .001).
-(Extension)
-We conducted the same analyses on intensity estimates as the Complementary Analysis: Interaction Between
-ones reported above for prevalence, and summarized those in
-Self and Others in Predicting Well-Being
-Tables 8 and 10. We found a similar pattern, with support for
-(Exploratory Extension)
-a positive association between negative emotional experi-
-ences intensity estimates and loneliness (β = .29, t(591) = We also explored interactions between one’s own negative
-6.21, p < .001), brooding (β = .22, t(591) = 4.74, p < .001), experiences and estimates of others’ negative experiences in
-and depressive symptoms (β = .29, t(591) = 6.31, p < .001), predicting well-being, and found support for an interaction
-and negative association with life satisfaction (β = −.18, for both loneliness, brooding, and depression, such that the
-t(591) = −3.79, p < .001), and subjective happiness (β = positive association between prevalence estimates and nega-
-−.28, t(591) = −6.07, p < .001). tive factors of well-being was stronger the less negative
-On the other hand, we found that positive emotional expe- experiences one had. We also found support for an interac-
-riences intensity had a negative association with loneliness tion with happiness and well-being, such that the negative
-(β = −.21, t(591) = −4.63, p < .001) and depressive symp- association between prevalence estimates and positive fac-
-toms (β = −.20, t(591) = −4.23, p <
 ```
+
+−.30** −.28**
+.00
+.23* .19 N/A
+/
+
+.08 Signal; inconsistent opposite
+.10 Signal; inconsistent opposite
+.12 Signal; inconsistent opposite
+.05 Signal; inconsistent opposite
+.08 Signal; inconsistent opposite
+.03   .05 Supported
+
+Note. Linear regression, N = 594. N/A = not reported. Source. The “original” column was adopted from Jordan et al. (2011, p. 130). The interpretation of the outcome is based on LeBel et al. (2019). *p < .05. **p < .01. ***p < .001.
+
+We conclude that our findings are in the opposite direction to that reported in the target article, for both negative and positive emotional experiences prevalence estimates.
+Intensity Estimates Associations with Well-Being (Extension)
+We conducted the same analyses on intensity estimates as the ones reported above for prevalence, and summarized those in Tables 8 and 10. We found a similar pattern, with support for a positive association between negative emotional experiences intensity estimates and loneliness (β = .29, t(591) = 6.21, p < .001), brooding (β = .22, t(591) = 4.74, p < .001), and depressive symptoms (β = .29, t(591) = 6.31, p < .001), and negative association with life satisfaction (β = −.18, t(591) = −3.79, p < .001), and subjective happiness (β = −.28, t(591) = −6.07, p < .001).
+On the other hand, we found that positive emotional experiences intensity had a negative association with loneliness (β = −.21, t(591) = −4.63, p < .001) and depressive symptoms (β = −.20, t(591) = −4.23, p < .001).
+Complementary Analysis: Self-Reports Associations with Well-Being (Exploratory Extension)
+We explored the associations between self-reports of emotional experiences and well-being measures. We found that reporting more of the negative emotional experiences was positively correlated with loneliness (r = .16 [0.08, 0.23]),
+
+brooding (r = .25 [0.17, 0.32]), and depression (r = .26 [0.19, 0.34]), and that reporting more the listed positive emotional experiences was positively correlated with life satisfaction (r = .22 [0.14, 0.29]) and happiness (r = .27 [0.20, 0.35]) and negatively associated with loneliness (r = −.16 [−0.23, −0.07]; all p < .001).
+Complementary Analysis: Interaction Between Self and Others in Predicting Well-Being (Exploratory Extension)
+We also explored interactions between one’s own negative experiences and estimates of others’ negative experiences in predicting well-being, and found support for an interaction for both loneliness, brooding, and depression, such that the positive association between prevalence estimates and negative factors of well-being was stronger the less negative experiences one had. We also found support for an interaction with happiness and well-being, such that the negative association between prevalence estimates and positive factors of well-being was stronger, the less negative experiences one had. We did not find such interactions for the positive experiences.
+External Analysis: Suppression Using Target’s Analyses
+When consulting with external expert reviewers to examine the possible explanation for our associations being in the opposite direction from that of the target article, a reviewer
 
 ### Table 10
-*Intensity Estimates Regression Coefficients with no support, we only summarized interactions that were sup- Outcomes (Extension).*
+*  Intensity Estimates Regression Coefficients with Outcomes (Extension).*
 
-```
-nd Feldman 15
-Table 10. Intensity Estimates Regression Coefficients with no support, we only summarized interactions that were sup-
-Outcomes (Extension). ported and documented below p < .05, yet we strongly cau-
-tion against over-interpreting those and recommend focusing
-β for negative β for positive
-on the much stronger and clearer main effects.
-prevalence prevalence
-Measure estimate estimate R2
-Negative well-being Discussion
-Loneliness .29*** −.21*** .07
-We conducted a preregistered replication of Studies 1b and 3
-Rumination/brooding .22*** −.10* .04
-from Jordan et al. (2011) and tested their theoretical frame-
-Depressive symptoms .29*** −.20*** .07
-work, measurement, and analysis strategy with a larger sam-
-Positive well-being
-ple. We also went beyond the target article by adding additional
-Satisfaction with life −.18*** .24*** .05
-tests that seem fit for the experimental design, and by adding
-Subjective happiness −.28*** .34*** .10
-extensions testing for the generalizability to emotional experi-
-Number of confidants −.07 .15** .02
-ence intensity and examining SCO.
-Social orientation scale .13** .01 .02
-(extension) Our results were mixed, and we summarized a compari-
-son of our findings to that of the target in Tables 6 and 9. We
-Note. Linear regression, N = 594. concluded a successful replication only regarding people’s
-*p < .05. **p < .01. ***p < .001.
-underestimation of the prevalence of others’ negative emo-
-tions, yet with an unexpected underestimation of the preva-
-was kind to review the target article’s and our results. In his lence of positive emotions. In addition, we only observed
-analyses (shared on https://osf.io/zy5qa/), he pointed out that differences between the underestimation of positive and
-there might be suppression in the regression analyses (Sharpe negative emotional experiences when conducting the better-
-& Roberts, 1997; Thompson & Levine, 1997) that were con- powered participant-level analysis, yet not when repeating
-ducted by the target article and that we repeated in our repli- that target’s item-level analysis, likely due to the small num-
-cation. His conclusion was that the regression analyses ber of items and the analysis being underpowered.
-should at best be interpreted with caution, and that interpre- Most surprising was that we found opposite effects to the
-tations should be focused on the raw correlation effects, target’s theory and findings regarding the associations
-which were weaker yet in the same direction (see Table 8). between prevalence estimates and psychological well-being
-We reached out to the original authors of the target article, factors. Based on the target’s findings, we expected higher
-and received the reply that the raw data, analysis code, and estimations for prevalence of negative emotions to be posi-
-correlations for the target article’s studies are not available. tively associated with higher well-being, and instead, we
-However, the reviewer, the original authors, and we agreed found support for a negative relationship. We discuss possi-
-that suppression alone is not likely to explain the complete ble explanations for the mixed findings, followed by a dis-
-reversal of the pattern of effects. cussion of limitations and suggestions for future research
-directions.
-SCO (Exploratory Extension)
-Replication: Prevalence
-We conducted Pearson’s correlation tests to examine the
-associations between SCO and well-being variables, and We conclude mixed findings concerning our replication of
-summarized them in Table 8. We found support for the systematic misperception of others’ emotional experi-
-Hypotheses 6a to 6c, in that SCO was positively associated ences. We found that (a) people underestimated the preva-
-with depressive symptoms (r(592) = .32, 95% CI [0.25, lence of others’ negative and positive emotional experiences,
-0.39], p < .001), loneliness (r(592) = .28, [0.20, 0.35], (b) underestimation errors were stronger for negative experi-
-p < .001), and rumination (r(592) = .45, [0.38, 0.51], ences than for positive experiences, (c) prevalence estima-
-p < .001). We also found support for Hypotheses 6d and 6e tion of others’ negative emotions was positively associated
-that SCO was negatively associated with subjective happi- with loneliness, rumination, depressive symptoms, and nega-
-ness (r(592) = −.18, [−0.26, −0.11], p < .001), and life satis- tively associated with life satisfaction and subjective happi-
-faction (r(592) = −.17, [−0.25, −0.09], p < .001). ness, (d) prevalence estimation of others’ positive emotions
-We also examined interactions with the misestimation of was positively associated with life satisfaction and subjec-
-emotional experiences in predicting psychological well- tive happiness and negatively associated with loneliness,
-being. We failed to find support for SCO as moderating the rumination, and depressive symptoms.
-associations between misestimations and well-being mea- Jordan et al. (2011) argued that underestimation was
-sures. We summarized the results with plots of the modera- mainly about negative emotional events, yet instead, we
-tion analysis in the Supplemental Material. Given the many found that participants also underestimated positive emo-
-```
+| Ip and Feldman | 15 |
+| --- | --- |
+| Outcomes (Extension). |  |
+|  | ported and documented below p < .05, yet we strongly cau- |
+|  | tion against over-interpreting those and recommend focusing |
+| β for negative  β for positive |  |
+|  | on the much stronger and clearer main effects. |
+| prevalence  prevalence |  |
+| Measure estimate R2 estimate |  |
+| Negative well-being | Discussion |
+| Loneliness .29*** −.21*** .07 |  |
+|  | We conducted a preregistered replication of Studies 1b and 3 |
+| Rumination/brooding .22*** −.10* .04 |  |
+|  | from  Jordan  et  al.  (2011)  and  tested  their  theoretical  frame- |
+| Depressive symptoms .29*** −.20*** .07 |  |
+|  | work, measurement, and analysis strategy with a larger sam- |
+| Positive well-being |  |
+|  | ple. We also went beyond the target article by adding additional |
+| Satisfaction with life −.18*** .24*** .05 |  |
+|  | tests that seem fit for the experimental design, and by adding |
+| Subjective happiness −.28*** .34*** .10 |  |
+|  | extensions testing for the generalizability to emotional experi- |
+| Number of confidants −.07 .15** .02 |  |
+|  | ence intensity and examining SCO. |
+| Social orientation scale  .13** .01 .02 |  |
+| (extension) | Our results were mixed, and we summarized a compari- |
+|  | son of our findings to that of the target in Tables 6 and 9. We |
+| Note. Linear regression, N = 594. |  |
+|  | concluded  a  successful  replication  only  regarding  people’s |
+| *p < .05. **p < .01. ***p < .001. |  |
+|  | underestimation of the prevalence of others’ negative emo- |
+|  | tions, yet with an unexpected underestimation of the preva- |
+| was kind to review the target article’s and our results. In his | lence  of  positive  emotions.  In  addition,  we  only  observed |
+| analyses (shared on https://osf.io/zy5qa/), he pointed out that | differences  between  the  underestimation  of  positive  and |
+| there might be suppression in the regression analyses (Sharpe | negative emotional experiences when conducting the better- |
+| & Roberts, 1997; Thompson & Levine, 1997) that were con- | powered  participant-level  analysis,  yet  not  when  repeating |
+| ducted by the target article and that we repeated in our repli- | that target’s item-level analysis, likely due to the small num- |
+| cation.  His  conclusion  was  that  the  regression  analyses | ber of items and the analysis being underpowered. |
+| should at best be interpreted with caution, and that interpre- | Most surprising was that we found opposite effects to the |
+| tations  should  be  focused  on  the  raw  correlation  effects, | target’s  theory  and  findings  regarding  the  associations |
+| which were weaker yet in the same direction (see Table 8). | between prevalence estimates and psychological well-being |
+| We reached out to the original authors of the target article, | factors. Based on the target’s findings, we expected higher |
+| and received the reply that the raw data, analysis code, and | estimations for prevalence of negative emotions to be posi- |
+| correlations for the target article’s studies are not available. | tively  associated  with  higher  well-being,  and  instead,  we |
+| However, the reviewer, the original authors, and we agreed | found support for a negative relationship. We discuss possi- |
+| that suppression alone is not likely to explain the complete | ble explanations for the mixed findings, followed by a dis- |
+| reversal of the pattern of effects. | cussion  of  limitations  and  suggestions  for  future  research |
+|  | directions. |
+| SCO (Exploratory Extension) |  |
+|  | Replication: Prevalence |
+| We  conducted  Pearson’s  correlation  tests  to  examine  the |  |
+| associations  between  SCO  and  well-being  variables,  and | We  conclude  mixed  findings  concerning  our  replication  of |
+| summarized  them  in  Table  8.  We  found  support  for | the  systematic  misperception  of  others’  emotional  experi- |
+| Hypotheses 6a to 6c, in that SCO was positively associated | ences. We  found  that  (a)  people  underestimated  the  preva- |
+| with  depressive  symptoms  (r(592)  =  .32,  95%  CI  [0.25, | lence of others’ negative and positive emotional experiences, |
+| .28,  [0.20,  0.35],  0.39],  p < .001),  loneliness  (r(592)  = | (b) underestimation errors were stronger for negative experi- |
+| rumination  .45,  [0.38,  0.51],  p < .001),  and  (r(592)  = | ences  than  for  positive  experiences,  (c)  prevalence  estima- |
+| p < .001). We also found support for Hypotheses 6d and 6e | tion of others’ negative emotions was positively associated |
+| that  SCO  was  negatively  associated  with  subjective  happi- | with loneliness, rumination, depressive symptoms, and nega- |
+| ness (r(592) = −.18, [−0.26, −0.11], p < .001), and life satis- | tively associated with life satisfaction and subjective happi- |
+| faction (r(592) = −.17, [−0.25, −0.09], p < .001). | ness, (d) prevalence estimation of others’ positive emotions |
+| We also examined interactions with the misestimation of | was  positively  associated  with  life  satisfaction  and  subjec- |
+| emotional  experiences  in  predicting  psychological  well- | tive  happiness  and  negatively  associated  with  loneliness, |
+| being. We failed to find support for SCO as moderating the | rumination, and depressive symptoms. |
+| associations  between  misestimations  and  well-being  mea- | Jordan  et  al.  (2011)  argued  that  underestimation  was |
+| sures. We summarized the results with plots of the modera- | mainly  about  negative  emotional  events,  yet  instead,  we |
+| tion analysis in the Supplemental Material. Given the many | found  that  participants  also  underestimated  positive  emo- |
+| analyses conducted and the many findings that have shown | tional experiences, albeit to a lesser extent than they did for |
 
 d for
 
@@ -1046,3 +804,133 @@ Yonelinas, A. P., & Ritchey, M. (2015). The slow forgetting of emotional episodi
 Young, S. D., & Jordan, A. H. (2013). The influence of social networking photos on social norms and sexual health behaviors. Cyberpsychology, Behavior, and Social Networking, 16(4), 243–247. https://doi.org/10.1089/cyber.2012.0080
 Yu, E., & Kim, H. (2020). Is she really happy? A dual-path model of narcissistic self-presentation outcomes for female Facebook users. Computers in Human Behavior, 108, 106328. https://doi. org/10.1016/j.chb.2020.106328
 Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replication mainstream. Behavioral and Brain Sciences, 41, e120.
+
+
+## Tables (unlocated in body)
+
+## Table 3
+*  Comparison of Target Article Versus Replication: Differences and Similarities.*
+
+| 6 | Personality and Social Psychology Bulletin 00(0) |
+| --- | --- |
+| Table 3.  Comparison of Target Article Versus Replication: Differences and Similarities. |  |
+| Study Jordan et al. (2011) Study 1b | Jordan et al. (2011) Study 3 Replication |
+| Sample size 80 | 104 594 |
+| Geographic origin U.S. American students U.S. American students | U.S. American students on prolific |
+| Gender 35 males, 45 females, 0 other/did | 51 males, 54 females, 0 other/did  290 males, 285 females, 19 other/did not |
+| not disclose not disclose | disclose |
+| Medium (location) Paper-and-pen Computer (online) | Computer (online) |
+| Compensation N/A Nominal payment | Nominal payment (2 British pounds for an |
+|  | estimated 12 min completion time) |
+| Year 2011 or earlier 2011 or earlier | 2023 |
+| We conducted the study using Qualtrics. All participants |  |
+|  | 1  =  lowest  emotional  intensity,  and  100  =  highest  emotional |
+| first indicated their consent. They then rated the prevalence | intensity. |
+| of  six  positive  and  six  negative  emotional  experiences  for |  |
+| themselves and for other U.S. student participants taking this | In this way, we measured both prevalence and intensity in |
+| survey, in counterbalanced order. | the same question: a value of 0 indicated that the participant |
+| Prior to each rating task, we added comprehension checks | has not experienced this event, and a value of 1 to 100 indi- |
+| to ensure that participants were paying attention to the type of | cated that the participant has experienced it with a rating of |
+| rating (prevalence or intensity) and who they are rating (self | the intensity of the experience. |
+| vs. other). Participants had to answer these checks correctly in |  |
+| order to proceed to the rating task. We note that this is a devia- | Prevalence of Others’ Emotional Experiences (Replication).  We |
+| tion from the target article’s procedure to ensure that partici- | closely  followed  the  target’s  measure  of  participants’  esti- |
+| pants  were  attentive  and  knew  who  and  what  they  were | mates  of  others’  emotional  experiences  with:  “Please  esti- |
+| rating. | mate  the  percentage  of  other  U.S.  American  student |
+| For  exploratory  purposes,  we  included  three  questions | participants on Prolific taking the survey like you who had |
+| that asked participants to provide short sentences regarding | had,  sometime  in  the  past  2 weeks,  each  of  the  following |
+| their perceptions of the test items they had previously rated, | emotional experiences. (0%–100%)” |
+| to  help  us  better  understand  participants’  mindsets  when |  |
+| answering  some  of  the  items  from  the  target  article,  to |  |
+|  | Intensity  of  Others’  Emotional  Experiences  (Extension).  We |
+| address  the  possibility  of  puzzling  or  surprising  findings |  |
+|  | extended the target’s measure of prevalence (above) with a |
+| using these items. |  |
+|  | measure of intensity: “Please try and estimate the emotional |
+| Participants then completed measures assessing their lone- |  |
+|  | intensity  for  other  U.S.  American  student  participants  on |
+| liness, rumination tendency, depressive symptoms, life satis- |  |
+|  | Prolific taking the survey like you who have experienced this |
+| faction,  subjective  happiness,  and  social  comparison |  |
+|  | emotion (1 = Lowest emotional intensity, and 100 = Highest |
+| orientation. We randomized the order of the six well-being and |  |
+|  | emotional intensity).” |
+| trait measures. Finally, participants answered a funneling sec- |  |
+| tion, provided demographic information, and were debriefed. |  |
+|  | Misestimations of Prevalence and Intensity.  We first calculated |
+|  | the actual prevalence of emotional experiences by counting |
+| Measures | for each experience the number of participants who indicated |
+|  | having that experience, and then converted that into a per- |
+| Prevalence and Intensity of Own Emotional Experiences (Replica- |  |
+|  | centage. We then calculated for each participant, and for each |
+| tion  and  Extension).  In  the  target  article,  participants  only |  |
+|  | emotional experience, the misestimation of the prevalence of |
+| rated  whether  they  had  experienced  an  emotional  event  or |  |
+|  | that  emotional  experience  as  the  estimation  of  prevalence |
+| not. We adjusted and extended the measures to also include |  |
+|  | minus the actual prevalence of that emotional experience. |
+| intensity: |  |
+|  | We  calculated  the  actual  intensity  of  emotional  experi- |
+|  | ence by calculating the average of all self-reported intensity |
+| For each of the following emotional experiences, please indicate |  |
+|  | for all those who reported having that experience. We then |
+| whether  you  have  experienced  those  sometime  in  the  past |  |
+|  | calculated for each participant and for each emotional expe- |
+| 2 weeks and, if you have, the intensity of the emotion. |  |
+|  | rience, the misestimation of the intensity as the participant’s |
+| 0 means: You have NOT experienced this emotion in the past | estimation  of  the  intensity  of  that  emotional  experience |
+| two weeks. | minus the actual intensity of that emotional experience. |
+|  | This means that for both prevalence and intensity, a mises- |
+| 1–100 means: You have experienced this emotion at least once | timation  score  higher  than  zero  indicates  an  overestimation, |
+| in the past two weeks. | and a score lower than zero indicates an underestimation. |
+
+### Table 8
+*  Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.*
+
+|  | Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error. |  |  |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  | Participant-level analyses |  |  |  |  |  | Item-level analyses |  |
+|  | Actual | Intensity |  |  |  |  |  |  |  |  |  |
+|  | intensity | estimate | Error | Error |  |  |  |  |  |  |  |
+| Experiences | average | mean | mean | SD | t-stat | p | Cohen’s d and CI | t-stat | df | p | Cohen’s d and CI |
+| Negative experiences |  |  |  |  |  |  |  |  |  |  |  |
+| Had fight/argument | 42.63 | 59.64 | 17.01 | 22.27 | 18.62 | <.001 | 0.76 [0.67, 0.86] | / | / | / | / |
+| Thought about distant friends/ family | 42.65 | 48.48 | 5.84 | 21.48 | 6.62 | <.001 | 0.27 [0.19, 0.35] | / | / | / | / |
+| Thought about enormous workload | 50.81 | 60.44 | 9.63 | 22.13 | 10.60 | <.001 | 0.43 [0.35, 0.52] | / | / | / | / |
+| Was rejected by boy/girl | 33.00 | 58.16 | 25.17 | 23.94 | 25.62 | <.001 | 1.05 [0.95, 1.15] | / | / | / | / |
+| Received low grade | 37.05 | 53.65 | 16.60 | 22.46 | 18.01 | <.001 | 0.74 [0.65, 0.83] | / | / | / | / |
+| Thought about bad personal health | 44.07 | 45.07 | 1.01 | 21.93 | 1.12 | =.264 | 0.05 [−0.03, 0.13] | / | / | / | / |
+| habits |  |  |  |  |  |  |  |  |  |  |  |
+| Overall negative | 41.70 | 54.24 | 12.54 | 15.73 | 19.42 | <.001 | 0.80 [0.70, 0.89] | 3.51 | 5 | .017 | 1.43 [0.23, 2.58] |
+| Positive experiences |  |  |  |  |  |  |  |  |  |  |  |
+| Received high grade | 56.07 | 60.56 | 4.50 | 22.39 | 4.90 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
+| Attended fun party | 50.63 | 62.65 | 12.03 | 21.35 | 13.73 | <.001 | 0.56 [0.48, 0.65] | / | / | / | / |
+| Participated in athletics | 44.95 | 49.35 | 4.40 | 22.16 | 4.84 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
+| Went out with friends | 59.11 | 67.65 | 8.54 | 19.47 | 10.69 | <.001 | 0.44 [0.35, 0.52] | / | / | / | / |
+| Talked to distant friends/family | 52.03 | 57.96 | 5.93 | 20.29 | 7.12 | <.001 | 0.29 [0.21, 0.37] | / | / | / | / |
+| Had great meal | 58.80 | 57.03 | −1.77 | 23.40 | −1.85 | =.065 | −0.08 [−0.16, 0.004] | / | / | / | / |
+| Overall positive | 53.60 | 59.20 | 5.60 | 16.16 | 8.45 | <.001 | 0.35 [0.26, 0.43] | 2.97 | 5 | .031 | 1.21 [0.099, 2.26] |
+| Overall: positive and negative combined | 47.65 | 56.72 | 9.07 | 13.83 | 15.99 | <.001 | 0.66 [0.57, 0.74] | 4.14 | 11 | .002 | 1.20 [0.43, 1.90] |
+
+## Table 9
+*  Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al.*
+
+|  |  | β for negative | β for positive |  | β for negative | β for positive |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  | prevalence | prevalence |  | prevalence | prevalence |  |  |
+| Measure | Cronbach’s α | estimate | estimate | R2 | estimate | estimate | R2 | Interpretation |
+| Negative |  |  |  |  |  |  |  |  |
+| Loneliness | .81 | −.30** | .08 | .08 | .33*** | −.25*** | .08 | Signal; inconsistent |
+|  |  |  |  |  |  |  |  | opposite |
+| Rumination/brooding | .72 | −.28** | .17 | .08 | .37*** | −.15** | .10 | Signal; inconsistent |
+|  |  |  |  |  |  |  |  | opposite |
+| Depressive symptoms | .73 | .00 | −.02 | .00 | .41*** | −.22*** | .12 | Signal; inconsistent |
+|  |  |  |  |  |  |  |  | opposite |
+| Positive |  |  |  |  |  |  |  |  |
+| Satisfaction with life | .84 | .23* | −.37*** | .15 | −.23*** | .25*** | .05 | Signal; inconsistent |
+|  |  |  |  |  |  |  |  | opposite |
+| Subjective Happiness | .80 | .19 | −.16 | .05 | −.26*** | .32*** | .08 | Signal; inconsistent |
+|  |  |  |  |  |  |  |  | opposite |
+| Number of confidants | / | N/A | N/A | N/A | −.11* | .19*** | .03 |  |
+| Social orientation scale | / | / | / | / | .26*** | −.10* | .05 | Supported |
+| (extension) |  |  |  |  |  |  |  |  |

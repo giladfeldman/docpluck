@@ -1,3 +1,5 @@
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (52.92854917, 508.19139674999997, 517.61071455, 683.8643870766667)
+  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
 Journal of Economic Psychology 83 (2021) 102350 Contents lists available at ScienceDirect
 Journal of Economic Psychology
 journal homepage: www.elsevier.com/locate/joep
@@ -27,237 +29,61 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
 ### Table 1
 *Descriptive and omnibus inferential statistics, across original studies and replications.*
 
-```
-Paying to know
-N
-Choice
-Win
-Loss
-Uncertain Inferential
-Statistics
-Tversky & Shafir, 1992,
-/
-/
-/
-/
-/
-/
-original (within-
-subject)
-/
-/
-/
-/
-/
-/
-Tversky & Shafir, 1992, original (betweensubject)
-199 Buy (%) 36 (54%)
-38 (57%)
-21 (32%)
-χ2 (4) = 19.02, p < .001
-Tversky & Shafir, 1992,
-/
-modified gambles
-(between-subject)
-Not buy (%) Pay $5 (%) /
-11 (16%) 20 (30%) /
-8 (12%) 21 (31%) /
-4 (7%)
-41 (61%)
-/
-/
-/
-/
-/
-/
-/
-/
-Kühberger et al., 2001,
-/
-/
-/
-/
-/
-/
-exp. 1 (between-
-subject)
-/
-/
-/
-/
-/
-/
-Kühberger et al., 2001,
-/
-/
-/
-/
-/
-/
-exp. 2 (between-
-subject)
-/
-/
-/
-/
-/
-/
-ES [95% CI] / / Cramer’s V = 0.218 [0.137, 0.317]
-/
-/ / / / /
-Kühberger et al., 2001,
-/
-/
-/
-/
-/
-/
-/
-exp. 3 (within-
-subject)
-/
-/
-/
-/
-/
-/
-/
-Kühberger et al., 2001,
-/
-/
-/
-/
-/
-/
-/
-exp. 4 (between-
-subject)
-/
-/
-/
-/
-/
-/
-/
-Lambdin & Burdsal, 2007 /
-/
-/
-/
-/
-/
-/
-```
-
-### Table 1
-*Descriptive and omnibus inferential statistics, across original studies and replications.*
-
-```
-Paying to know Choice under risk
-N Choice Win Loss Uncertain Inferential ES [95% CI] N Choice Win Loss Uncertain Inferential ES [95% CI]
-Statistics Statistics
-Tversky & Shafir, 1992, / / / / / / / 98 Accept 68 58 35 (34%)
-original (within- (%) (69%) (59%)
-subject)
-/ / / / / / / Reject 30 40 63 (66%)
-(%) (31%) (41%)
-Tversky & Shafir, 1992, 199 Buy (%) 36 38 21 (32%) χ2 (4) =19.02, Cramer’s V = 213 Accept 49 40 χ2 (2) =13.89, Cramer’s V
-original (between- (54%) (57%) p <.001 0.218 [0.137, (%) (69%)1 (57%)1 p <.001 =0.255
-subject) 0.317] [0.144,
-0.394]
-Not buy 11 8 4 (7%) Reject 22 31
-(%) (16%) (12%) (%) (31%)1 (43%)1
-Pay $5 20 21 41 (61%)
-(%) (30%) (31%)
-Tversky & Shafir, 1992, / / / / / / / 171 Accept 42 39 43 χ2 (2) =0.76, Cramer’s V
-modified gambles (%) (73%)1 (69%)1 (75%)1 p =.68 =0.067
-(between-subject) [(cid:0) 0.108,
-0.218]
-/ / / / / / / Reject 15 18 14
-(%) (27%)1 (31%)1 (25%)1
-Kühberger et al., 2001, / / / / / / / 177 Accept … …
-exp. 1 (between- (%) (60%)2 (47%)2 (47%)2
-subject)
-/ / / / / / / Reject … …
-(%) (40%)2 (53%)2 (53%)2
-Kühberger et al., 2001, / / / / / / / 184 Accept … …
-exp. 2 (between- (%) (83%)2 (70%)2 (62%)2
-subject)
-/ / / / / / / Reject … …
-(%) (17%)2 (30%)2 (38%)2
-Kühberger et al., 2001, / / / / / / / 35 Accept 28 13 15 … …
-exp. 3 (within- (%) (80%)1 (37%)1 (43%)1
-subject)
-/ / / / / / / Reject 7 22 20 … …
-(%) (20%)1 (63%)1 (57%)1
-Kühberger et al., 2001, / / / / / / / 97 Accept … …
-exp. 4 (between- (%) (68%)2 (32%)2 (38%)2
-subject)
-/ / / / / / / Reject … …
-(%) (32%)2 (68%)2 (62%)2
-Lambdin & Burdsal, 2007 / / / / / / / 55 Accept 35 26 21 (38%) … …
-(within-subject) (%) (64%) (47%)
-/ / / / / / / Reject 20
-```
-
-```
-†
-(continued on next page)
-Table 1 (continued )
-Paying to know
-N
-Choice
-Win
-Loss
-Present work (betweensubject)
-Not buy 97
-(%)
-(22%)
-Pay $5 92
-(%)
-(21%)
-445 Buy (%) 58
-(39%)
-247 (56%) 71 (16%) 61 (42%)
-Not buy (%) Pay $5 (%)
-38 (26%) 52 (35%)
-61 (42%) 22 (16%)
-```
+| Table 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|  | Descriptive and omnibus inferential statistics, across original studies and replications. |  |  |  |  |  |  |  |  |  |  |  |  |
+|  |  | Paying to know |  |  |  |  |  | Choice under risk |  |  |  |  |  |
+|  | N | Choice | Win | Loss | Uncertain  Inferential | ES [95% CI] | N | Choice | Win | Loss | Uncertain | Inferential | ES [95% CI] |
+|  |  |  |  |  | Statistics |  |  |  |  |  |  | Statistics |  |
+| Tversky & Shafir, 1992, | / | / | / | / | /  / | / | 98 | Accept | 68 | 58 | 35 (34%) |  |  |
+| original (within- |  |  |  |  |  |  |  | (%) | (69%) | (59%) |  |  |  |
+| subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | / | / | / | / | /  / | / |  | Reject | 30 | 40 | 63 (66%) |  |  |
+|  |  |  |  |  |  |  |  | (%) | (31%) | (41%) |  |  |  |
+| Tversky & Shafir, 1992, | 199 | Buy (%) | 36 | 38 | 21 (32%)  χ2 (4) = 19.02, | Cramer’s V = | 213 | Accept |  | 49 | 40 | χ2 (2) = 13.89, | Cramer’s V |
+| original (between- |  |  | (54%) | (57%) | p < .001 | 0.218 [0.137, |  | (%) |  | (69%)1 | (57%)1 | p < .001 | = 0.255 |
+| subject) |  |  |  |  |  | 0.317] |  |  |  |  |  |  | [0.144, |
+|  |  |  |  |  |  |  |  |  |  |  |  |  | 0.394] |
+|  |  | Not buy | 11 | 8 | 4 (7%) |  |  | Reject |  | 22 | 31 |  |  |
+|  |  | (%) | (16%) | (12%) |  |  |  | (%) |  | (31%)1 | (43%)1 |  |  |
+|  |  | Pay $5 | 20 | 21 | 41 (61%) |  |  |  |  |  |  |  |  |
+|  |  | (%) | (30%) | (31%) |  |  |  |  |  |  |  |  |  |
+| Tversky & Shafir, 1992, | / | / | / | / | /  / | / | 171 | Accept | 42 | 39 | 43 | χ2 (2) = 0.76, | Cramer’s V |
+| modified gambles |  |  |  |  |  |  |  | (%) | (73%)1 | (69%)1 | (75%)1 | p = .68 | = 0.067 |
+| (between-subject) |  |  |  |  |  |  |  |  |  |  |  |  | [(cid:0) 0.108, |
+|  |  |  |  |  |  |  |  |  |  |  |  |  | 0.218] |
+|  | / | / | / | / | /  / | / |  | Reject | 15 | 18 | 14 |  |  |
+|  |  |  |  |  |  |  |  | (%) | (27%)1 | (31%)1 | (25%)1 |  |  |
+| Kühberger et al., 2001, | / | / | / | / | /  / | / | 177 | Accept |  |  |  | … | … |
+|  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 2 exp. 1 (between- |  |  |  |  |  |  |  | (%) | (60%)2 | (47%)2 | (47%)2 |  |  |
+| subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | / | / | / | / | /  / | / |  | Reject |  |  |  | … | … |
+|  |  |  |  |  |  |  |  | (%) | (40%)2 | (53%)2 | (53%)2 |  |  |
+| Kühberger et al., 2001, | / | / | / | / | /  / | / | 184 | Accept |  |  |  | … | … |
+| exp. 2 (between- |  |  |  |  |  |  |  | (%) | (83%)2 | (70%)2 | (62%)2 |  |  |
+| subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | / | / | / | / | /  / | / |  | Reject |  |  |  | … | … |
+|  |  |  |  |  |  |  |  | (%) | (17%)2 | (30%)2 | (38%)2 |  |  |
+| Kühberger et al., 2001, | / | / | / | / | /  / | / | 35 | Accept | 28 | 13 | 15 | … | … |
+| exp. 3 (within- |  |  |  |  |  |  |  | (%) | (80%)1 | (37%)1 | (43%)1 |  |  |
+| subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | / | / | / | / | /  / | / |  | Reject | 7 | 22 | 20 | … | … |
+|  |  |  |  |  |  |  |  | (%) | (20%)1 | (63%)1 | (57%)1 |  |  |
+| Kühberger et al., 2001, | / | / | / | / | /  / | / | 97 | Accept |  |  |  | … | … |
+| exp. 4 (between- |  |  |  |  |  |  |  | (%) | (68%)2 | (32%)2 | (38%)2 |  |  |
+| subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
+|  | / | / | / | / | /  / | / |  | Reject |  |  |  | … | … |
+|  |  |  |  |  |  |  |  | (%) | (32%)2 | (68%)2 | (62%)2 |  |  |
+| Lambdin & Burdsal, 2007 | / | / | / | / | /  / | / | 55 | Accept | 35 | 26 | 21 (38%) | … | … |
+| (within-subject) |  |  |  |  |  |  |  | (%) | (64%) | (47%) |  |  |  |
+|  | / | / | / | / | /  / | / |  | Reject | 20 | 31 | 34 | … | … |
+|  |  |  |  |  |  |  |  | (%) | (36%) | (53%) | (62%) |  |  |
+| Present work (within- | 445 | Buy (%) | 256 | 127 | 99 (22%) | † | 445 | Accept | 164 | 187 | 165 |  | † |
+| subject) |  |  | (58%) | (29%) |  |  |  | (%) | (37%) | (42%) | (37%) |  |  |
+|  |  |  |  |  |  |  |  |  |  |  |  |  | (continued on next page) |
 
 1Reconstructed cell Ns. 2Impossible to recover cell N because no cell size is specified. †No appropriate omnibus effect size. /Absent. - - -Impossible to calculate without original data.
-
-```
-Uncertain
-168 (38%) 178 (40%) 25 (16%)
-Inferential Statistics Friedman χ2 (2) = 132.678, p < .001
-χ2 (4) = 81.00, p < .001
-ES [95% CI]
-Cramer’s V = 0.302 [0.239, 0.368]
-29 (19%)
-99 (65%)
-Choice under risk
-N
-Choice
-Win
-Reject (%)
-281 (63%)
-Loss
-258 (58%)
-Uncertain
-280 (63%)
-Inferential Statistics
-Cochran’s Q (2) = 4.63, p = .099
-ES [95% CI]
-445 Accept (%)
-46 (31%)
-56 (38%)
-65 (44%)
-Reject (%)
-102 (69%)
-92 (62%)
-84 (56%)
-χ2 (2) = 4.99, p = .082
-Cramer’s V = 0.106 [− 0.067, 0.202]
-```
 
 ### Table 2
 *Comparison of differences across conditions.*
@@ -277,89 +103,10 @@ Effect size [95% CI]
 Tversky & Shafir, 1992, modified gambles (between-subjects)
 Inferential statistics
 
-```
-/
-/
-/
-/
-/
-/
-/
-/
-/
-199 − 1
-− 31
-χ2 (2) = 0.552, p = .759
-χ2 (2) = 14.437, p < .001
-Cramer’s V = Cramer’s V =
-[− 0.122,
-[0.188, 0.505]
-0.231]
-/
-/
-/
-```
-
 /
 / / − 30
 χ2 (2) = 12.676, p = .001 Cramer’s V = 0.308 [0.171, 0.484]
 /
-
-```
-/
-/
-/
-/
-Effect size [95% CI]
-/
-/
-/
-/
-Kühberger et al., 2001, exp. 1 /
-/
-/
-(between-subject)
-Inferential statistics
-/
-/
-/
-Effect size [95% CI]
-/
-/
-/
-Kühberger et al., 2001, exp. 2 /
-/
-/
-(between-subject)
-Inferential statistics
-/
-/
-/
-Effect size [95% CI]
-/
-/
-/
-Kühberger et al., 2001, exp. 3 /
-/
-/
-(within-subject)
-Inferential statistics
-/
-/
-/
-Effect size [95% CI]
-/
-/
-/
-Kühberger et al., 2001, exp. 4 /
-/
-/
-(between-subject)
-Inferential statistics
-/
-/
-/
-```
 
 Effect size [95% CI] Lambdin & Burdsal, 2007
 (within-subject) Inferential statistics Effect size [95% CI] Present work
@@ -367,21 +114,6 @@ Effect size [95% CI] Lambdin & Burdsal, 2007
 Effect size [95% CI] Present work
 (between-subject) Inferential statistics
 Effect size [95% CI]
-
-```
-/
-/
-/
-35 17
-445 − 5
-− 19
-χ2 (3) = 138.38, p < .001 †
-445 − 20
-χ2 (3) = 152.08, p < .001
-† − 30
-χ2 (2) = 17.53, p < .001 Cramer’s V = 0.245 [0.146, 0.363]
-χ2 (2) = 28.88, p < .001 Cramer’s V = 0.31 [0.207, 0.426]
-```
 
 /
 /
@@ -398,121 +130,36 @@ Effect size [95% CI]
 
 †No appropriate omnibus effect size. /Absent. - - - Impossible to recalculate from original paper.
 
-```
-Choice under risk, difference in % Accept across conditions
-N
-Win-Loss
-Win-: Uncertain
-LossUncertain
-98 10
-†
-†
-213 14
-χ2 (1) = 1.927, χ2 (1) =
-p = .165
-12.484, p <
-.001
-Cramer’s V = Cramer’s V =
-[− 0.083,
-[0.168, 0.482]
-0.307]
-171 − 2
-```
-
 … † 17
 χ2 (1) = 4.07, p = .04
 Cramer’s V = 0.183 [0.08, 0.357]
 −4
 
-```
-χ2 (1) = 0.171, χ2 (1) < 0.001, χ2 (1) =
-p = .68
-p > .99
-0.391,
-p = .531
-Cramer’s V = Cramer’s V = Cramer’s V =
-[− 0.094,
-[− 0.093,
-[− 0.094,
-0.258]
-0.207]
-0.278]
-177 13
-χ2 < 2.14, p > .14 …
-171 18
-χ2 < 2.14, p > .14 …
-χ2 < 2.14, p > .14 …
-χ2 (1) = 2.76, p = .10 …
-184 44
-χ2 (1) = 6.50, p = .01 …
-χ2 (1) = 0.88, p = .35 …
-p < .001
-p < .001
-p = .73
-97 35
-χ2 (1) = 8.02, p = .005 …
-/
-χ2 (1) = 6.24, p = .01 …
-/
-χ2 (1) = 0.19, p = .66 …
-/
-/
-/
-/
-/
-/
-/
-445 − 5
-−5
-χ2 (1) = 2.989, χ2 (1) = 0.007, χ2 (1) =
-p = .084
-p = .936
-4.481,
-p = .034
-†
-†
-†
-445 − 7
-− 13
-−6
-χ2 (1) = 1.496, p = .221 Cramer’s V = 0.071 [− 0.058, 0.194]
-χ2 (1) = 4.991, p = .025 Cramer’s V = 0.13 [− 0.058, 0.25]
-χ2 (1) = 1.03, p = .31 Cramer’s V = 0.059 [− 0.058, 0.182]
-```
-
 ### Table 3
 *Attention check results.*
 
-```
-Response alternative “Never answer scales in online studies seriously”* “Always carefully read and answer each item on online surveys”**
-Counts % of total Counts % of total
-1 (Not at all characteristic of me) 834 93.7% 1 0.1%
-2 (A little characteristic of me) 19 2.1% 9 1.0%
-3 (Somewhat characteristic of me) 19 2.1% 19 2.1%
-4 (Very characteristic of me) 14 1.6% 81 9.1%
-5 (Entirely characteristic of me) 4 0.4% 780 87.6%
-*M =1.13; SD =0.55 (here, lower numbers indicate higher attentiveness).
-**M =4.83, SD =0.51 (here, higher numbers indicate higher attentiveness).
-making definitive choices that definitive outcomes provide, compared to uncertain ones. They argued the following: when people
-envision that they have passed an exam, they could easily come up with reasons to go on vacation (“let’s celebrate!”); when people
-envision they have failed an exam, they could easily find opposite reasons to go on vacation (“let’s live a little!”); yet, an uncertain
-outcome does not elicit good reasons to make a definitive decision.
+| I. Ziano et al. |  |  |  |  | Journal of Economic Psychology 83 (2021) 102350 |
+| --- | --- | --- | --- | --- | --- |
+| Table 3 |  |  |  |  |  |
+| Attention check results. |  |  |  |  |  |
+| Response alternative |  | “Never answer scales in online studies seriously”* |  | “Always carefully read and answer each item on online surveys”** |  |
+|  | Counts | % of total | Counts | % of total |  |
+| 1 (Not at all characteristic of me) | 834 | 93.7% | 1 | 0.1% |  |
+| 2 (A little characteristic of me) | 19 | 2.1% | 9 | 1.0% |  |
+| 3 (Somewhat characteristic of me) | 19 | 2.1% | 19 | 2.1% |  |
+| 4 (Very characteristic of me) | 14 | 1.6% | 81 | 9.1% |  |
+| 5 (Entirely characteristic of me) | 4 | 0.4% | 780 | 87.6% |  |
+| *M = 1.13; SD = 0.55 (here, lower numbers indicate higher attentiveness). |  |  |  |  |  |
+
+making definitive choices that definitive outcomes provide, compared to uncertain ones. They argued the following: when people envision that they have passed an exam, they could easily come up with reasons to go on vacation (“let’s celebrate!”); when people envision they have failed an exam, they could easily find opposite reasons to go on vacation (“let’s live a little!”); yet, an uncertain outcome does not elicit good reasons to make a definitive decision.
+
 1.1. Chosen target for replication: Tversky and Shafir (1992)
-We chose Tversky and Shafir (1992) due to the impact the article has had, the lack of direct close replications, and open questions
-regarding the findings (Coles, Tiokhin, Scheel, Isager, & Lakens, 2018; Lambdin & Burdsal, 2007; Li, Jiang, Dunn, & Wang, 2012). We
-identified several potential contributions and clarifications that could be achieved by revisiting this classic, and we discuss those
-further below.
-The original article has been highly influential across disciplines because it provided a new model of decision-makers, one that is
-based on rationalization and not on expected value. At the time of writing, the article had been cited 664 times according to Google
-Scholar. Furthermore, highly influential theoretical papers about decision-making in psychology (Shafir, Simonson, & Tversky, 1993),
-marketing (Simonson & Tversky, 1992) and management (Tversky & Simonson, 1993) were directly based on this empirical finding.
-Tversky and Shafir claimed support for the disjunction effect in both “choice under risk” and “paying to know“ paradigms, and for
-these to hold for both between-subject and within-subject experimental designs. Tversky and Shafir did not report any inferential
-statistics in their paper, limiting the discussion of their results to descriptives.
-The “choice under risk” results are not without controversy. Kühberger, Komunska, and Perner (2001) failed to replicate the
-“choice under risk” problem four times, and Lambdin and Burdsal (2007) also failed to find support for a disjunction effect (as
-Figure 1. Tversky and Shafir (1992) original studies’ results and present replications
-```
+We chose Tversky and Shafir (1992) due to the impact the article has had, the lack of direct close replications, and open questions regarding the findings (Coles, Tiokhin, Scheel, Isager, & Lakens, 2018; Lambdin & Burdsal, 2007; Li, Jiang, Dunn, & Wang, 2012). We identified several potential contributions and clarifications that could be achieved by revisiting this classic, and we discuss those further below.
+The original article has been highly influential across disciplines because it provided a new model of decision-makers, one that is based on rationalization and not on expected value. At the time of writing, the article had been cited 664 times according to Google Scholar. Furthermore, highly influential theoretical papers about decision-making in psychology (Shafir, Simonson, & Tversky, 1993), marketing (Simonson & Tversky, 1992) and management (Tversky & Simonson, 1993) were directly based on this empirical finding.
+Tversky and Shafir claimed support for the disjunction effect in both “choice under risk” and “paying to know“ paradigms, and for these to hold for both between-subject and within-subject experimental designs. Tversky and Shafir did not report any inferential statistics in their paper, limiting the discussion of their results to descriptives.
+The “choice under risk” results are not without controversy. Kühberger, Komunska, and Perner (2001) failed to replicate the “choice under risk” problem four times, and Lambdin and Burdsal (2007) also failed to find support for a disjunction effect (as
+
+Figure 1. Tversky and Shafir (1992) original studies’ results and present replications results. 5
 
 conceptualized by the original authors). However, it may be that neither replication team had sufficient power to detect a disjunction effect in two-step gambles. Moreover, Li et al. (2012) found support for the disjunction effect in a conceptual replication involving a World Cup scenario, and mixed support for the disjunction effect in a variation of the two-steps gambles problem. Further, there are no known direct replications of the “paying to know” problem. Given the paper’s influence across fields and the controversy surrounding the findings, we decided to attempt a pre-registered well-powered replication using a between-subject design resembling the original study. We summarized our review of the current findings in the literature in Tables 1 and 2.
 
@@ -648,80 +295,75 @@ preference for indirect harm effect In press at Meta Psychology . Accepted for p
 
 ## Figures
 
-*Figure 1. Fig. 1. Tversky and Shafir (1992) original studies’ results and present replications results. 5*
+*Figure 1. Tversky and Shafir (1992) original studies’ results and present replications results. 5*
 
 
 ## Tables (unlocated in body)
 
-### Table 2
+## Table 2
 *Comparison of differences across conditions.*
 
-```
-Paying to know, , difference in % Pay $5 across conditions Choice under risk, difference in % Accept across conditions
-N Pass-Fail Pass-Uncertain Fail-Uncertain N Win-Loss Win-: Loss-
-Uncertain Uncertain
-Tversky & Shafir, 1992 / / / / 98 10 35 25
-(within-subjects)
-Inferential statistics / / / / … … …
-Effect size [95% CI] / / / / † † †
-Tversky & Shafir, 1992 199 (cid:0) 1 (cid:0) 31 (cid:0) 30 213 14 31 17
-(between-subjects)
-Inferential statistics χ2 (2) =0.552, χ2 (2) =14.437, χ2 (2) = χ2 (1) =1.927, χ2 (1) = χ2 (1) =4.07,
-p =.759 p <.001 12.676, p = p =.165 12.484, p < p =.04
-.001 .001
-Effect size [95% CI] Cramer’s V = Cramer’s V = Cramer’s V = Cramer’s V = Cramer’s V = Cramer’s V =
-0.064 0.329 0.308 0.131 0.31 0.183
-[(cid:0) 0.122, [0.188, 0.505] [0.171, 0.484] [(cid:0) 0.083, [0.168, 0.482] [0.08, 0.357]
-0.231] 0.307]
-Tversky & Shafir, 1992, / / / / 171 (cid:0) 2 1 (cid:0) 4
-modified gambles
-(between-subjects)
-Inferential statistics / / / / χ2 (1) =0.171, χ2 (1) <0.001, χ2 (1) =
-p =.68 p >.99 0.391,
-p =.531
-Effect size [95% CI] / / / / Cramer’s V = Cramer’s V = Cramer’s V =
-0.058 0.02 0.078
-[(cid:0) 0.094, [(cid:0) 0.093, [(cid:0) 0.094,
-0.258] 0.207] 0.278]
-Kühberger et al., 2001, exp. 1 / / / / 177 13 13 0
-(between-subject)
-Inferential statistics / / / / χ2 <2.14, χ2 <2.14, χ2 <2.14,
-p >.14 p >.14 p >.14
-Effect size [95% CI] / / / / … … …
-Kühberger et al., 2001, exp. 2 / / / / 171 18 26 6
-(between-subject)
-Inferential statistics / / / / χ2 (1) =2.76, χ2 (1) =6.50, χ2 (1) =0.88,
-p =.10 p =.01 p =.35
-Effect size [95% CI] / / / / … … …
-Kühberger et al., 2001, exp. 3 / / / / 184 44 39 5
-(within-subject)
-Inferential statistics / / / / p <.001 p <.001 p =.73
-Effect size [95% CI] / / / /
-Kühberger et al., 2001, exp. 4 / / / / 97 35 30 5
-(between-subject)
-Inferential statistics / / / / χ2 (1) =8.02, χ2 (1) =6.24, χ2 (1) =0.19,
-p =.005 p =.01 p =.66
-Effect size [95% CI] / / / / … … …
-Lambdin & Burdsal, 2007 35 17 26 9 / / /
-(within-subject)
-Inferential statistics … … … / / /
-Effect size [95% CI] … … … / / /
-Present work 445 (cid:0) 5 (cid:0) 19 (cid:0) 24 445 (cid:0) 5 0 (cid:0) 5
-(within-subject)
-Inferential statistics χ2 (3) = χ2 (3) =152.08, χ2 (3) =85.72, χ2 (1) =2.989, χ2 (1) =0.007, χ2 (1) =
-138.38, p <.001 p <.001 p =.084 p =.936 4.481,
-p <.001 p =.034
-Effect size [95% CI] † † † † † †
-Present work 445 (cid:0) 20 (cid:0) 30 (cid:0) 50 445 (cid:0) 7 (cid:0) 13 (cid:0) 6
-(between-subject)
-Inferential statistics χ2 (2) =17.53, χ2 (2) =28.88, χ2 (2) =75.24, χ2 (1) =1.496, χ2 (1) =4.991, χ2 (1) =1.03,
-p <.001 p <.001 p <.001 p =.221 p =.025 p =.31
-Effect size [95% CI] Cramer’s V = Cramer’s V = Cramer’s V = Cramer’s V = Cramer’s V = Cramer’s V =
-0.245 0.31 [0.207, 0.503 0.071 0.13 0.059
-[0.146, 0.363] 0.426] [0.394, 0.619] [(cid:0) 0.058, [(cid:0) 0.058, 0.25] [(cid:0) 0.058,
-0.194] 0.182]
-†
-No appropriate omnibus effect size.
-/Absent.
-- - - Impossible to recalculate from original
-```
+| Table 2 |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Comparison of differences across conditions. |  |  |  |  |  |  |  |  |
+|  |  | Paying to know, , difference in % Pay $5 across conditions |  |  |  | Choice under risk, difference in % Accept across conditions |  |  |
+|  | N | Pass-Fail | Pass-Uncertain | Fail-Uncertain | N | Win-Loss | Win-: | Loss- |
+|  |  |  |  |  |  |  | Uncertain | Uncertain |
+| Tversky & Shafir, 1992 | / | / | / | / | 98 | 10 | 35 | 25 |
+| (within-subjects) |  |  |  |  |  |  |  |  |
+| Inferential statistics | / | / | / | / |  | … | … | … |
+| Effect size [95% CI] | / | / | / | / |  | † | † | † |
+| Tversky & Shafir, 1992 | 199 | (cid:0) 1 | (cid:0) 31 | (cid:0) 30 | 213 | 14 | 31 | 17 |
+| (between-subjects) |  |  |  |  |  |  |  |  |
+| Inferential statistics |  | χ2 (2) = 0.552, | χ2 (2) = 14.437, | χ2 (2) = |  | χ2 (1) = 1.927, | χ2 (1) = | χ2 (1) = 4.07, |
+|  |  | p = .759 | p < .001 | 12.676, p = |  | p = .165 | 12.484, p < | p = .04 |
+|  |  |  |  | .001 |  |  | .001 |  |
+| Effect size [95% CI] |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |
+|  |  | 0.064 | 0.329 | 0.308 |  | 0.131 | 0.31 | 0.183 |
+|  |  | [(cid:0) 0.122, | [0.188, 0.505] | [0.171, 0.484] |  | [(cid:0) 0.083, | [0.168, 0.482] | [0.08, 0.357] |
+|  |  | 0.231] |  |  |  | 0.307] |  |  |
+| Tversky & Shafir, 1992, | / | / | / | / | 171 | (cid:0) 2 | 1 | (cid:0) 4 |
+| modified gambles |  |  |  |  |  |  |  |  |
+| (between-subjects) |  |  |  |  |  |  |  |  |
+| Inferential statistics | / | / | / | / |  | χ2 (1) = 0.171, | χ2 (1) < 0.001, | χ2 (1) = |
+|  |  |  |  |  |  | p = .68 | p > .99 | 0.391, |
+|  |  |  |  |  |  |  |  | p = .531 |
+| Effect size [95% CI] | / | / | / | / |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |
+|  |  |  |  |  |  | 0.058 | 0.02 | 0.078 |
+|  |  |  |  |  |  | [(cid:0) 0.094, | [(cid:0) 0.093, | [(cid:0) 0.094, |
+|  |  |  |  |  |  | 0.258] | 0.207] | 0.278] |
+| Kühberger et al., 2001, exp. 1 | / | / | / | / | 177 | 13 | 13 | 0 |
+| (between-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics | / | / | / | / |  | χ2 < 2.14, | χ2 < 2.14, | χ2 < 2.14, |
+|  |  |  |  |  |  | p > .14 | p > .14 | p > .14 |
+| Effect size [95% CI] | / | / | / | / |  | … | … | … |
+| Kühberger et al., 2001, exp. 2 | / | / | / | / | 171 | 18 | 26 | 6 |
+| (between-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics | / | / | / | / |  | χ2 (1) = 2.76, | χ2 (1) = 6.50, | χ2 (1) = 0.88, |
+|  |  |  |  |  |  | p = .10 | p = .01 | p = .35 |
+| Effect size [95% CI] | / | / | / | / |  | … | … | … |
+| Kühberger et al., 2001, exp. 3 | / | / | / | / | 184 | 44 | 39 | 5 |
+| (within-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics | / | / | / | / |  | p < .001 | p < .001 | p = .73 |
+| Effect size [95% CI] | / | / | / | / |  |  |  |  |
+| Kühberger et al., 2001, exp. 4 | / | / | / | / | 97 | 35 | 30 | 5 |
+| (between-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics | / | / | / | / |  | χ2 (1) = 8.02, | χ2 (1) = 6.24, | χ2 (1) = 0.19, |
+|  |  |  |  |  |  | p = .005 | p = .01 | p = .66 |
+| Effect size [95% CI] | / | / | / | / |  | … | … | … |
+| Lambdin & Burdsal, 2007 | 35 | 17 | 26 | 9 |  | / | / | / |
+| (within-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics |  | … | … | … |  | / | / | / |
+| Effect size [95% CI] |  | … | … | … |  | / | / | / |
+| Present work | 445 | (cid:0) 5 | (cid:0) 19 | (cid:0) 24 | 445 | (cid:0) 5 | 0 | (cid:0) 5 |
+| (within-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics |  | χ2 (3) = | χ2 (3) = 152.08, | χ2 (3) = 85.72, |  | χ2 (1) = 2.989, | χ2 (1) = 0.007, | χ2 (1) = |
+|  |  | 138.38, | p < .001 | p < .001 |  | p = .084 | p = .936 | 4.481, |
+|  |  | p < .001 |  |  |  |  |  | p = .034 |
+| Effect size [95% CI] |  | † | † | † |  | † | † | † |
+| Present work | 445 | (cid:0) 20 | (cid:0) 30 | (cid:0) 50 | 445 | (cid:0) 7 | (cid:0) 13 | (cid:0) 6 |
+| (between-subject) |  |  |  |  |  |  |  |  |
+| Inferential statistics |  | χ2 (2) = 17.53, | χ2 (2) = 28.88, | χ2 (2) = 75.24, |  | χ2 (1) = 1.496, | χ2 (1) = 4.991, | χ2 (1) = 1.03, |
+|  |  | p < .001 | p < .001 | p < .001 |  | p = .221 | p = .025 | p = .31 |
+| Effect size [95% CI] |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |
+|  |  | 0.245 | 0.31 [0.207, | 0.503 |  | 0.071 | 0.13 | 0.059 |

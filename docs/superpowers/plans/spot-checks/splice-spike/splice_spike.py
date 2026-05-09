@@ -529,7 +529,61 @@ def _join_split_captions(text: str) -> str:
     return text
 
 
-def _wrap_table_fragments(text: str) -> str:
+def _existing_table_numbers(text: str) -> set[int]:
+    """Collect the set of table numbers already present as ``### Table N`` headings."""
+    nums: set[int] = set()
+    for m in re.finditer(r"^### Table\s+(\d+)", text, re.MULTILINE):
+        nums.add(int(m.group(1)))
+    return nums
+
+
+def _dedupe_table_blocks(text: str) -> str:
+    """Among multiple ``### Table N`` blocks with the same N, keep the one with
+    the most pipe-table rows (``| ... |`` lines). Drop the others.
+
+    A "block" runs from a ``### Table N`` heading to the next ``### `` /
+    ``## `` heading or end of text.
+    """
+    blocks: list[tuple[int, int, int, int]] = []  # (start, end, num, pipe_rows)
+    matches = list(re.finditer(r"^### Table\s+(\d+)\s*$", text, re.MULTILINE))
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        # Don't span across an H2 boundary (like "## Tables (unlocated in body)")
+        h2 = re.search(r"^## ", text[start + 1:end], re.MULTILINE)
+        if h2:
+            end = start + 1 + h2.start()
+        block_text = text[start:end]
+        pipe_rows = len(re.findall(r"^\| ", block_text, re.MULTILINE))
+        num = int(m.group(1))
+        blocks.append((start, end, num, pipe_rows))
+
+    # Group by number; pick the block with most pipe_rows; mark others for removal.
+    by_num: dict[int, list[tuple[int, int, int, int]]] = {}
+    for b in blocks:
+        by_num.setdefault(b[2], []).append(b)
+    to_remove: list[tuple[int, int]] = []
+    for num, group in by_num.items():
+        if len(group) <= 1:
+            continue
+        group.sort(key=lambda b: (-b[3], b[0]))  # max pipe_rows, then earliest
+        for b in group[1:]:
+            to_remove.append((b[0], b[1]))
+
+    if not to_remove:
+        return text
+    to_remove.sort(reverse=True)
+    out = text
+    for s, e in to_remove:
+        out = out[:s] + out[e:]
+    return out
+
+
+def _wrap_table_fragments(
+    text: str,
+    *,
+    existing_table_nums: set[int] | None = None,
+) -> str:
     """Wrap runs of consecutive "fragmented" short paragraphs in fenced code
     blocks.
 
@@ -592,6 +646,7 @@ def _wrap_table_fragments(text: str) -> str:
             # continues across one paragraph break).
             caption_label: str | None = None
             caption_desc: str | None = None
+            caption_label_num: int | None = None
             for lookback in (1, 2):
                 if len(out_parts) < lookback:
                     break
@@ -617,18 +672,37 @@ def _wrap_table_fragments(text: str) -> str:
 
             fragment_lines = [paragraphs[j].strip() for j in range(run_start, i)]
             block_parts: list[str] = []
+            suppressed = False
             if caption_label:
                 # Normalize the label: "T 1" → "Table 1", "Fig 2" → "Figure 2"
                 norm_label = re.sub(r"^T\b", "Table", caption_label, flags=re.IGNORECASE)
                 norm_label = re.sub(r"^Fig\.?", "Figure", norm_label, flags=re.IGNORECASE)
-                block_parts.append(f"### {norm_label}")
-                if caption_desc:
-                    block_parts.append(f"*{caption_desc}*")
-                    block_parts.append("")
-            block_parts.append("```")
-            block_parts.append("\n".join(fragment_lines))
-            block_parts.append("```")
-            out_parts.append("\n".join(block_parts))
+                # If a real ``### Table N`` already exists for this number from
+                # a Camelot splice, drop this fragment-wrap synthesis to avoid
+                # a duplicate `### Table N` block.
+                num_match = re.search(r"\d+", norm_label)
+                if (
+                    existing_table_nums
+                    and num_match
+                    and norm_label.lower().startswith("table")
+                    and int(num_match.group(0)) in existing_table_nums
+                ):
+                    suppressed = True
+                else:
+                    block_parts.append(f"### {norm_label}")
+                    if caption_desc:
+                        block_parts.append(f"*{caption_desc}*")
+                        block_parts.append("")
+            if not suppressed and caption_label:
+                # Only emit fragment-wrap blocks that have an absorbed caption.
+                # Unlabeled fragment-wraps (no caption found) are typically
+                # leftover noise from fragmented tables Camelot already
+                # rendered as a labeled pipe-table elsewhere — emitting them
+                # produces duplicate content as a code block.
+                block_parts.append("```")
+                block_parts.append("\n".join(fragment_lines))
+                block_parts.append("```")
+                out_parts.append("\n".join(block_parts))
         else:
             for j in range(run_start, i):
                 out_parts.append(paragraphs[j])
@@ -811,7 +885,13 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     out = _join_split_captions(out)
     # Wrap runs of fragmented "table-like" short lines in code blocks. Tables
     # missed by pdfplumber show up in pdftotext as one-word-per-line fragments.
-    out = _wrap_table_fragments(out)
+    # Pass the set of table numbers already present as ``### Table N`` headings
+    # (from the splice step) so fragment-wrap doesn't duplicate them.
+    existing_table_nums = _existing_table_numbers(out)
+    out = _wrap_table_fragments(out, existing_table_nums=existing_table_nums)
+    # Final dedupe pass: among multiple ``### Table N`` blocks for the same N,
+    # keep the one with the most pipe-table rows.
+    out = _dedupe_table_blocks(out)
     out = out.strip() + "\n"
 
     # ---- Appendices ----
@@ -830,6 +910,9 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     if appendix_parts:
         out = out.rstrip() + "\n\n" + "\n".join(appendix_parts).rstrip() + "\n"
 
+    # Final dedupe pass — also covers ``### Table N`` blocks that ended up in
+    # the appendix vs. inline.
+    out = _dedupe_table_blocks(out)
     return out
 
 

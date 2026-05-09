@@ -27,26 +27,65 @@ Corresponding Author: Gilad Feldman, Department of Psychology, The University of
 ### Table 1
 *Summary of the Predictions According to the Affect Heuristic (AH).*
 
-```
-Manipulated attribute
-Impact on affect
-Risk is high Risk is low Benefit is high Benefit is low
-Negative affect Positive affect Positive affect Negative affect
-Impact on non-manipulated attribute
-Benefit is low Benefit is high Risk is low Risk is high
-```
-
-efficient—than weighing the pros and cons or retrieving from memory many relevant examples, especially when the required judgment or decision is complex or mental resources are limited’’ (Finucane et al., 2000, p. 3).
-Reliance on affect is a general process and, consistent with an AH, a wide range of findings support the idea that affect provides valuable information that people use to simplify their decision-making. For instance, affect-laden imagery has been shown to predict people’s preferences in investment decisions (MacGregor et al., 2000), smoking (Benthin et al., 1995), information integration (Anderson, 1981; Efendic´ et al., 2019), simple choice gambles (Bateman et al., 2007), and morality judgments (Slovic & Va¨ stfja¨ ll, 2010).
-Risks and Benefits
-For a long time, the negative relationship between judgments of risks and benefits puzzled researchers (Fischhoff et al., 1978) as these judgments should be positively correlated or independent of one another (Slovic, 1987). In a breakthrough study, Alhakami and Slovic (1994) found that the negative relationship was linked to how a person generally feels about a hazard. Later, Finucane et al. (2000) showed that the inverse relationship between risk and benefits was strengthened under time pressure designed to limit analytic thinking (their Study 1) and that it is causally determined. Specifically, manipulating one attribute—for example, increasing risk— led to an affectively congruent but inverse relationship, that is, decreased benefit and vice versa (their Study 2).
-This inverse relationship has been observed elsewhere as well. It has been found that when general negative affect is evoked (i.e., participants were shown photographs depicting houses in flooded regions), this led to increased levels of perceived risk (Keller et al., 2006). Similarly, incidental negative affect (e.g., negative mood) was found to amplify reliance on affect, which led to stronger negative correlations between risks and benefits (Va¨ stfja¨ ll et al., 2014). Interestingly, affective association with a particular hazard has been shown to influence the interpretation of new information. People evaluated nuclear power more negatively than solar power because of more negative feelings associated with nuclear power (Siegrist & Su¨ tterlin, 2014). Similar negative associations between risk and benefits have been found in consumer judgments of novel products (King & Slovic, 2014), in the financial domain (Ganzach, 2000), and in wood smoke pollution (Bhullar et al., 2014).
-
-Recently, Skagerlund et al. (2020) found that the negative correlation is tied to cognitive reflection ability.
-Replication Value and Present Research
-In this article, with two well-powered studies, we aimed to closely replicate and extend our understanding of the causal demonstration of the negative relationship between risks and benefits, using the same materials and procedure as in the original paper (Finucane et al., 2000).
-We chose to replicate Study 2 from Finucane et al. (2000) for several reasons. First, while many correlational studies have found the negative relationship, few demonstrated it causally. King and Slovic (2014) used a similar method as Finucane and colleagues, but other work mostly found correlational support (some research has even failed to find the same relationship, Raue et al., 2019). There is therefore value in demonstrating, with sufficient statistical power, whether the causal effect is robust. Second, the analysis approach used in the original studies and in later demonstrations of the negative relationship (e.g., King & Slovic, 2014) were nonstandard, failing to account for non-independence of data and relying on counting the number of times the manipulation worked in the predicted direction—a strategy that leads to large information loss. A more stringent analytic approach with mixed-effect modeling ought to provide information on the generalizability of the effect. Third, the findings are relevant for risk communication. Changing risk/benefit judgments by manipulating solely one attribute (either risk or benefit) has vast applied potential. Risk campaigns can focus on changing people’s judgments about many plights of today’s society (e.g., smoking, obesity, and so on). Fourth, as of this writing, we are unaware of any other attempts to directly replicate this study. This is surprising given the relevance in understanding the relationship between risks and benefits, as well as the popularity of the original article and how it promoted the AH in the judgment and decision-making literature. As of this writing, the original article has been cited 3,363 times with a later updated review article being cited 3,860 times (Slovic et al., 2007).
-We also wish to highlight an important distinction. The observation of the negative relationship is often presented as evidence for an AH in risk judgments. For example, observing the negative relationship leads authors to
+| Risk is low Positive affect | Benefit is high |
+| --- | --- |
+| Benefit is high Positive affect | Risk is low |
+| Benefit is low Negative affect | Risk is high |
+| efficient—than weighing the pros and cons or retrieving | Recently, Skagerlund et al. (2020) found that the negative |
+| from memory many relevant examples, especially when the | correlation is tied to cognitive reflection ability. |
+| required judgment or decision is complex or mental |  |
+| resources are limited’’ (Finucane et al., 2000, p. 3). |  |
+| Reliance on affect is a general process and, consistent with | Replication Value and Present Research |
+| an AH, a wide range of findings support the idea that affect |  |
+|  | In this article, with two well-powered studies, we aimed to |
+| provides valuable information that people use to simplify |  |
+|  | closely replicate and extend our understanding of the causal |
+| their decision-making. For instance, affect-laden imagery has |  |
+|  | demonstration of the negative relationship between risks |
+| been shown to predict people’s preferences in investment |  |
+|  | and benefits, using the same materials and procedure as in |
+| decisions (MacGregor et al., 2000), smoking (Benthin et al., |  |
+|  | the original paper (Finucane et al., 2000). |
+| 1995), information integration (Anderson, 1981; Efendic´ |  |
+|  | We chose to replicate Study 2 from Finucane et al. |
+| et al., 2019), simple choice gambles (Bateman et al., 2007), |  |
+|  | (2000) for several reasons. First, while many correlational |
+| and morality judgments (Slovic & Va¨ stfja¨ ll, 2010). |  |
+|  | studies have found the negative relationship, few demon- |
+|  | strated it causally. King and Slovic (2014) used a similar |
+|  | method as Finucane and colleagues, but other work |
+| Risks and Benefits |  |
+|  | mostly found correlational support (some research has |
+| For a long time, the negative relationship between judgments | even failed to find the same relationship, Raue et al., |
+| of risks and benefits puzzled researchers (Fischhoff et al., | 2019). There is therefore value in demonstrating, with |
+| 1978) as these judgments should be positively correlated or | sufficient statistical power, whether the causal effect is |
+| independent of one another (Slovic, 1987). In a breakthrough | robust. Second, the analysis approach used in the original |
+| study, Alhakami and Slovic (1994) found that the negative | studies and in later demonstrations of the negative rela- |
+| relationship was linked to how a person generally feels about | tionship (e.g., King & Slovic, 2014) were nonstandard, |
+| a hazard. Later, Finucane et al. (2000) showed that the | failing to account for non-independence of data and rely- |
+| inverse relationship between risk and benefits was strength- | ing on counting the number of times the manipulation |
+| ened under time pressure designed to limit analytic thinking | worked in the predicted direction—a strategy that leads |
+| (their Study 1) and that it is causally determined. Specifically, | to large information loss. A more stringent analytic |
+| manipulating one attribute—for example, increasing risk— | approach with mixed-effect modeling ought to provide |
+| led to an affectively congruent but inverse relationship, that | information on the generalizability of the effect. Third, |
+| is, decreased benefit and vice versa (their Study 2). | the findings are relevant for risk communication. |
+| This inverse relationship has been observed elsewhere as | Changing risk/benefit judgments by manipulating solely |
+| well. It has been found that when general negative affect is | one attribute (either risk or benefit) has vast applied |
+| evoked (i.e., participants were shown photographs depict- | potential. Risk campaigns can focus on changing people’s |
+| ing houses in flooded regions), this led to increased levels | judgments about many plights of today’s society (e.g., |
+| of perceived risk (Keller et al., 2006). Similarly, incidental | smoking, obesity, and so on). Fourth, as of this writing, |
+| negative affect (e.g., negative mood) was found to amplify | we are unaware of any other attempts to directly replicate |
+| reliance on affect, which led to stronger negative correla- | this study. This is surprising given the relevance in under- |
+| tions between risks and benefits et al., 2014). (Va¨ stfja¨ ll | standing the relationship between risks and benefits, as |
+| Interestingly, affective association with a particular hazard | well as the popularity of the original article and how it |
+| has been shown to influence the interpretation of new | promoted the AH in the judgment and decision-making |
+| information. People evaluated nuclear power more nega- | literature. As of this writing, the original article has been |
+| tively than solar power because of more negative feelings | cited 3,363 times with a later updated review article being |
+| associated with nuclear power (Siegrist & Su¨ tterlin, 2014). | cited 3,860 times (Slovic et al., 2007). |
+| Similar negative associations between risk and benefits | We also wish to highlight an important distinction. The |
+| have been found in consumer judgments of novel products | observation of the negative relationship is often presented |
+| (King & Slovic, 2014), in the financial domain (Ganzach, | as evidence for an AH in risk judgments. For example, |
+| 2000), and in wood smoke pollution (Bhullar et al., 2014). | observing the negative relationship leads authors to |
 
 conclude that the AH is a robust phenomenon (Skagerlund et al., 2020). However, the original, as well as many other studies, fail to demonstrate that it is affect that mediates this relationship (although converging evidence on the importance of affect would suggest this is the case). Our aim here is to replicate the negative causal relationship between risks and benefits. As such, this replication also does not speak to the mechanism that underlies the relationship. Other more cognitive, rather than affective, mechanisms remain a plausible explanation. Nevertheless, we hope that investigating whether the causal relationship replicates will (a) provide important insight into this interesting phenomenon and (b) serve other researchers who wish to use the paradigm to further understand whether it is affect or something else that explains it.
 We thus consider this investigation to be a needed direct replication. Replications should be sufficiently similar to the original study to adequately gauge support for the original findings (LeBel et al., 2019). Furthermore, given the prevalence of publication bias (Bakker et al., 2012), a close replication adds value by providing evidence that strengthens or weakens the finding.
@@ -138,39 +177,21 @@ The interaction between manipulated attribute and CMA (change in manipulated att
 ### Table 3
 *Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Non-Manipulated Attribute as the DV.*
 
-```
-Predictors
-DV: Change in non-manipulated attribute
-B
-SE
-95% CI
-p
-Intercept
-Pre-rating manipulated attribute (PMA)
-Pre-rating non-manipulated attribute (PNMA)
-Direction (high vs. low)
-Attribute (risk vs. benefit)
-PNMA 3 Direction
-PNMA 3 Attribute
-Direction 3 Attribute
-PNMA 3 Direction3 Attribute
-```
-
-[20.45, 20.06] [20.27, 20.15] [21.01, 20.89] [21.27, 21.03] [0.43, 0.67] [0.04, 0.25] [20.27, 20.05] [21.58, 21.10] [20.08, 0.35]
-
-.009 \.001 \.001 \.001 \.001
-.008 .004 \.001 .221
-
-Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.
-
-Figure 3. Distribution of Rating on Change in Non-Manipulated Attribute as DV by Experimental Conditions.
-Note. Figure includes violin plots displaying the distribution of responses, boxplots displaying the median, first, and third quartiles, while the mean value is identified by the red circle.
-
-Figure 4. The Interaction Between Change in Manipulated Attribute and Pleasure on Change in Non-Manipulated Attribute
-
-strength of the negative relationship between the manipulated and non-manipulated attribute was stronger when risks, as opposed to benefits, were manipulated. Furthermore, the three-way interaction (Direction 3 Manipulated Attribute 3 CMA) suggests that the extent of difference between risks and benefits varies as a function of the direction of manipulation (High vs. Low). Proceeding to conduct separate analyses for Low and High conditions, results within the high condition show no support for interaction. However, results within the low condition do find support for the interaction (See Table S32 and Table S33 in the supplementary material for detailed results). This lack of consistency leads us to conclude that the strength of the negative relationship between the manipulated and the non-manipulated attribute being stronger when risks, as opposed to benefits, were
-
-manipulated is mainly driven by participants’ responses within the Low-Benefit condition (see Figure 5). Specifically, we note large differences in change in ratings of non-manipulated attribute across Risk, Mchange = 0.74 (SE = 0.05) and Benefit, Mchange = 20.14, (0.05), manipulation within the low condition. However, those differences are much smaller within the high condition, Risk: Mchange = 21.01 (0.06); Benefit: Mchange = 20.62, (0.05).
+| Efendic´ et al. |  |  |  | 1179 |
+| --- | --- | --- | --- | --- |
+| DV. |  |  |  |  |
+| Predictors |  |  | DV: Change in non-manipulated attribute |  |
+|  | B | SE | 95% CI | p |
+| Intercept | 20.26 | 0.10 | [20.45, 20.06] | .009 |
+| Pre-rating manipulated attribute (PMA) | 20.21 | 0.03 | [20.27, 20.15] | \.001 |
+| Pre-rating non-manipulated attribute (PNMA) | 20.95 | 0.03 | [21.01, 20.89] | \.001 |
+| Direction (high vs. low) | 21.15 | 0.06 | [21.27, 21.03] | \.001 |
+| Attribute (risk vs. benefit) | 0.55 | 0.06 | [0.43, 0.67] | \.001 |
+| PNMA 3 Direction | 0.14 | 0.05 | [0.04, 0.25] | .008 |
+| PNMA 3 Attribute | 20.16 | 0.06 | [20.27, 20.05] | .004 |
+| Direction 3 Attribute | 21.34 | 0.12 | [21.58, 21.10] | \.001 |
+| PNMA 3 Direction3 Attribute | 0.13 | 0.11 | [20.08, 0.35] | .221 |
+|  | Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval. |  |  |  |
 
 ## General Discussion
 
@@ -179,69 +200,58 @@ In two studies, using samples from the United States and the United Kingdom, we 
 ### Table 4
 *Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Adding Pleasure and Arousal Measures on Change in Non-Manipulated Attribute as DV.*
 
-```
-Predictors
-DV: Change in non-manipulated attribute
-B
-SE
-95% CI
-p
-Intercept
-Pre-rating non-manipulated attribute (PNMA)
-Pre-rating manipulated attribute (PMA)
-Pleasure
-Arousal
-Change in manipulated attribute (CMA)
-Direction (high vs. low)
-Manipulated attribute (risk vs. benefit)
-Pleasure 3 Arousal
-Pleasure 3 CMA
-Arousal 3 CMA
-Pleasure 3 Arousal 3 CMA
-```
-
-[20.88, 20.29] [20.72, 20.54] [21.13, 20.97] [20.07, 0.13] [20.16, 0.04] [20.79, 20.61] [0.13, 0.48] [0.23, 0.56] [20.08, 0.04] [20.16, 20.01] [20.04, 0.13] [20.09, 0.02]
-
-\.001 \.001 \.001
-.557 .266 \.001 .001 \.001 .536 .025 .293 .201
-
-Note. CI = confidence interval.
-
-### Table 5
-*Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Looking at Moderation of the Negative Relationship by Risks/Benefits.*
-
-```
-Predictors
-DV: Change in non-manipulated attribute
-B
-SE
-95% CI
-p
-Intercept
-Pre-rating manipulated attribute (PMA)
-Pre-rating non-manipulated attribute (PNMA)
-Direction (high vs. low)
-Manipulated attribute (risk vs. benefit)
-Change in manipulated attribute (CMA)
-Direction 3 Manipulated Attribute
-Direction 3 CMA
-CMA 3 Manipulated Attribute
-Direction 3 Manipulated Attribute 3 CMA
-```
-
-[20.49, 0.02] [20.65, 20.53] [21.06, 20.95] [20.49, 20.24] [0.31, 0.56] [20.80, 20.68] [21.09, 20.60] [20.23, 20.02] [20.37, 20.16] [0.01, 0.43]
-
-.066 \.001 \.001 \.001 \.001 \.001 \.001
-.022 \.001
-.037
-
-Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.
-
-for the demonstration of a causal negative relationship between risks and benefit judgments. Specifically, we showed that increasing the risks of three technologies (nuclear energy, food preservatives, and natural gas) led to lower judgments on benefits while increasing the benefits led to lower judgments on risks. Vice versa, decreasing risks led to higher judgments of benefits. However, we did not find any differences in the low-benefit conditions. Specifically, decreasing the benefits did not lead to higher judgments of risks (See Table S41–S44 in the supplementary material for detailed results).
-In addition, we report two extensions. First, we found that the negative relationship between risks and benefits was stronger among participants who reported feeling higher incidental pleasure. Concurrently, people who felt pleasant may have generally relied more on heuristic processing—in this case the AH (Bohner et al., 1995). Previous findings, which manipulated negative mood, showed increased risk perceptions (Va¨ stfja¨ ll et al., 2014).
-
-This may indicate that negative mood has a more pointed effect on risk-benefit judgments, although our findings cannot speak on this as we did not have a lot of data on the negative side of our measures, meaning we had few participants feeling low pleasure and low arousal (see Figure S5 in the supplementary material). This may have reduced our chances of obtaining more precise findings on how incidental affect can modulate the negative relationship. Furthermore, it is important to note that we measured naturally occurring incidental mood whereas previous research manipulated mood directly.
-Second, we looked at whether manipulating risks or manipulating benefits impacts the strength of the negative relationship. Initially, our results showed the strength of the negative relationship was stronger when risks, as opposed to benefits, were manipulated. However, a more detailed look shows that this effect is most likely a product of the fact that there was no impact on the nonmanipulated attribute in the low-benefit condition (see
+| 1180 | Social Psychological and Personality Science 13(7) |
+| --- | --- |
+| in Non-Manipulated Attribute as DV. |  |
+| Predictors | DV: Change in non-manipulated attribute |
+| B | SE 95% CI p |
+| Intercept 20.59 | 0.15 [20.88, 20.29] \.001 |
+| Pre-rating non-manipulated attribute (PNMA) 20.63 | 0.05 [20.72, 20.54] \.001 |
+| Pre-rating manipulated attribute (PMA) 21.05 | 0.04 [21.13, 20.97] \.001 |
+| Pleasure 0.03 | 0.05 [20.07, 0.13] .557 |
+| Arousal 20.06 | 0.05 [20.16, 0.04] .266 |
+| Change in manipulated attribute (CMA) 20.70 | 0.05 [20.79, 20.61] \.001 |
+| Direction (high vs. low) 0.30 | 0.09 [0.13, 0.48] .001 |
+| Manipulated attribute (risk vs. benefit) 0.39 | 0.08 [0.23, 0.56] \.001 |
+| Pleasure 3 Arousal 20.02 | 0.03 [20.08, 0.04] .536 |
+| Pleasure 3 CMA 20.09 | 0.04 [20.16, 20.01] .025 |
+| Arousal 3 CMA 0.05 | 0.04 [20.04, 0.13] .293 |
+| Pleasure 3 Arousal 3 CMA 20.03 | 0.03 [20.09, 0.02] .201 |
+| Note. CI = confidence interval. |  |
+| Table 5. | Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Looking at Moderation of the Negative Relationship |
+| by Risks/Benefits. |  |
+| Predictors | DV: Change in non-manipulated attribute |
+| B | SE 95% CI p |
+| Intercept 20.24 | 0.13 [20.49, 0.02] .066 |
+| Pre-rating manipulated attribute (PMA) 20.59 | 0.03 [20.65, 20.53] \.001 |
+| Pre-rating non-manipulated attribute (PNMA) 21.01 | 0.03 [21.06, 20.95] \.001 |
+| Direction (high vs. low) 20.37 | 0.06 [20.49, 20.24] \.001 |
+| Manipulated attribute (risk vs. benefit) 0.44 | 0.06 [0.31, 0.56] \.001 |
+| Change in manipulated attribute (CMA) 20.74 | 0.03 [20.80, 20.68] \.001 |
+| Direction 3 Manipulated Attribute 20.85 | 0.12 [21.09, 20.60] \.001 |
+| Direction 3 CMA 20.12 | 0.05 [20.23, 20.02] .022 |
+| CMA 3 Manipulated Attribute 20.27 | 0.05 [20.37, 20.16] \.001 |
+| Direction 3 Manipulated Attribute 3 CMA 0.22 | 0.11 [0.01, 0.43] .037 |
+| Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval. |  |
+| for the demonstration of a causal negative relationship | This may indicate that negative mood has a more pointed |
+| between risks and benefit judgments. Specifically, we | effect on risk-benefit judgments, although our findings can- |
+| showed that increasing the risks of three technologies | not speak on this as we did not have a lot of data on the |
+| (nuclear energy, food preservatives, and natural gas) led to | negative side of our measures, meaning we had few partici- |
+| lower judgments on benefits while increasing the benefits | pants feeling low pleasure and low arousal (see Figure S5 |
+| led to lower judgments on risks. Vice versa, decreasing | in the supplementary material). This may have reduced our |
+| risks led to higher judgments of benefits. However, we did | chances of obtaining more precise findings on how inciden- |
+| not find any differences in the low-benefit conditions. | tal affect can modulate the negative relationship. |
+| Specifically, decreasing the benefits did not lead to higher | Furthermore, it is important to note that we measured |
+| judgments of risks (See Table S41–S44 in the supplemen- | naturally occurring incidental mood whereas previous |
+| tary material for detailed results). | research manipulated mood directly. |
+| In addition, we report two extensions. First, we found | Second, we looked at whether manipulating risks or |
+| that the negative relationship between risks and benefits | manipulating benefits impacts the strength of the negative |
+| was stronger among participants who reported feeling | relationship. Initially, our results showed the strength of |
+| higher incidental pleasure. Concurrently, people who felt | the negative relationship was stronger when risks, as |
+| pleasant may have generally relied more on heuristic | opposed to benefits, were manipulated. However, a more |
+| processing—in this case the AH (Bohner et al., 1995). | detailed look shows that this effect is most likely a product |
+| Previous findings, which manipulated negative mood, | of the fact that there was no impact on the non- |
+| showed increased risk perceptions (Va¨ stfja¨ ll et al., 2014). | manipulated attribute in the low-benefit condition (see |
 
 Figure 5. Relationship Between Manipulated and Non-Manipulated Attributes as a Function of Risk/Benefit Manipulations
 
@@ -264,14 +274,6 @@ the pre-registration, and ran data collection. E.E. and S.P.C. fol- 5.
 lowed up on initial work by the other coauthors to verify and con-
 
 duct additional analyses, and completed the manuscript draft.
-
-```
-E.E., S.P.C., and G.F. jointly finalized the manuscript for submis-
-sion. C.S.L., L.Y.Y., M.J.K., and C.Y.L. conducted the replica-
-tion and extension as part of university course work. They
-conducted an initial analysis of the paper, designed the replication,
-initiated the extensions, wrote the pre-registration, conducted ini-
-```
 
 tial data analysis, and wrote initial replication reports.
 
@@ -344,3 +346,137 @@ Min Ji Kim is a student at the University of Hong Kong during the academic year 
 Ching Yee Lee is a student at the University of Hong Kong during the academic year 2019–2020.
 Gilad Feldman is an assistant professor with the University of Hong Kong psychology department. His research focuses on judgment and decision-making.
 Handling Editor: Lissa Libby
+
+
+## Figures
+
+*Figure 1. t-Values for Manipulated Versus Non-Manipulated Attributes.*
+
+*Figure 2. Distribution of Ratings on Change in Manipulated Attribute as DV by Experimental Conditions.*
+
+*Figure 3. Distribution of Rating on Change in Non-Manipulated Attribute as DV by Experimental Conditions.*
+
+*Figure 4. The Interaction Between Change in Manipulated Attribute and Pleasure on Change in Non-Manipulated Attribute*
+
+*Figure 5. Relationship Between Manipulated and Non-Manipulated Attributes as a Function of Risk/Benefit Manipulations*
+
+
+## Tables (unlocated in body)
+
+## Table 2
+*Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
+
+| 1178 Social Psychological and Personality Science 13(7) |
+| --- |
+| Table 2. Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute |
+| as the DV. |
+| Predictors DV: Change in non-manipulated attribute |
+| B SE 95% CI p |
+| Intercept 20.09 0.06 [20.21, 0.04] .185 |
+| Pre-rating manipulated attribute (PMA) 21.09 0.03 [21.15, 21.03] \.001 |
+| Direction (high vs. low) 2.56 0.07 [2.42, 2.69] \.001 |
+| Manipulated attribute (risk vs. benefit) 20.27 0.07 [20.40, 20.13] \.001 |
+| Direction 3 manipulated attribute 0.49 0.14 [0.22, 0.75] \.001 |
+| PMA 3direction 20.10 0.06 [20.22, 0.02] .109 |
+| PMA 3 manipulated attribute 0.01 0.06 [20.11, 0.14] .819 |
+| PMA 3 direction 3 manipulated attribute 0.16 0.12 [20.08, 0.40] .199 |
+| Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval. |
+| Exploratory Analysis: Mediation Effects. We also tested whether |
+| the effect of the experimental manipulation on change in |
+| the non-manipulated attributes was mediated by the |
+| changes in the manipulated attribute as the analytic rea- |
+| soning would suggest. To do this, we conducted a multile- |
+| vel mediation analysis (this analysis was not part of the |
+| pre-registration). Bayesian estimation of the multilevel |
+| mediation model was performed using the bmlm R package |
+| (Vuorre & Bolger, 2018). Because our experimental design |
+| involved two directions (High vs. Low), we conducted two |
+| independent mediation analyses that looked at the |
+| responses within High and Low separately. Indeed, both |
+| sets of mediation analysis show a significant indirect |
+| effect of manipulation on non-manipulated attribute rating |
+| through manipulated attribute rating (High only media- |
+| tion: Mposterior = 20.54, SD=0.04, CI = [20.61, 20.47]; |
+| Figure 2. Distribution of Ratings on Change in Manipulated SD=0.04, CI= Low only mediation: Mposterior=0.55, |
+| Attribute as DV by Experimental Conditions. [0.48, 0.62]). For details results see Table S25–S26 in the |
+| Note. Figure includes violin plots displaying the distribution of responses, |
+| supplementary material. |
+| boxplots displaying the median, first, and third quartiles, while the mean value |
+| is identified by the red circle. |
+| Extensions |
+| Naturally Occurring Incidental Mood and the Negative Relationship Specifically, the negative relationship was stronger among |
+| Between Risks and Benefits. We conducted an analysis where participants who reported higher incidental pleasure in |
+| the change in ratings of manipulated attributes, level of |
+| comparison to participants who reported lower incidental |
+| pleasure, level of arousal, and their interaction were set as |
+| pleasure. |
+| predictors of change in the ratings of the non-manipulated |
+| attributes. Table 4 and Figure 4 summarize the results. As |
+| a representation of the negative relationship between risks Risk/Benefit Strength. We also examined whether there was a |
+| stronger negative relationship when risks, as opposed to and benefits, we looked at predicting change in non- |
+| benefits were manipulated and the extent to which it may manipulated attribute with change in manipulated attri- |
+| depend on the manipulated conditions. For the analysis, bute. Indeed, a negative correlation between these two vari- |
+| similar to above, we again used the change in ratings of ables represents the negative relationship. We decided to |
+| manipulated attributes, Manipulated Attribute (Risk vs. use this (rather than an interaction between the dummy |
+| Benefit), Direction, and their interaction as predictors of coded direction and manipulated attribute), as it is easier |
+| change in the ratings of the non-manipulated attributes. to represent and interpret a potential two-way interaction |
+| Table 5 and Figure 5 summarize the results. with pleasure or arousal. |
+| The interaction between manipulated attribute and We found some support that the negative relationship is |
+| CMA (change in manipulated attribute) indicates that the moderated by incidental pleasure (see Figure 4). |
+
+### Table 5
+*Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Looking at Moderation of the Negative Relationship by Risks/Benefits.*
+
+| 1180 | Social Psychological and Personality Science 13(7) |
+| --- | --- |
+| Table 4. | Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Adding Pleasure and Arousal Measures on Change |
+| in Non-Manipulated Attribute as DV. |  |
+| Predictors | DV: Change in non-manipulated attribute |
+| B | SE 95% CI p |
+| Intercept 20.59 | 0.15 [20.88, 20.29] \.001 |
+| Pre-rating non-manipulated attribute (PNMA) 20.63 | 0.05 [20.72, 20.54] \.001 |
+| Pre-rating manipulated attribute (PMA) 21.05 | 0.04 [21.13, 20.97] \.001 |
+| Pleasure 0.03 | 0.05 [20.07, 0.13] .557 |
+| Arousal 20.06 | 0.05 [20.16, 0.04] .266 |
+| Change in manipulated attribute (CMA) 20.70 | 0.05 [20.79, 20.61] \.001 |
+| Direction (high vs. low) 0.30 | 0.09 [0.13, 0.48] .001 |
+| Manipulated attribute (risk vs. benefit) 0.39 | 0.08 [0.23, 0.56] \.001 |
+| Pleasure 3 Arousal 20.02 | 0.03 [20.08, 0.04] .536 |
+| Pleasure 3 CMA 20.09 | 0.04 [20.16, 20.01] .025 |
+| Arousal 3 CMA 0.05 | 0.04 [20.04, 0.13] .293 |
+| Pleasure 3 Arousal 3 CMA 20.03 | 0.03 [20.09, 0.02] .201 |
+| Note. CI = confidence interval. |  |
+| Table 5. | Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Looking at Moderation of the Negative Relationship |
+| by Risks/Benefits. |  |
+| Predictors | DV: Change in non-manipulated attribute |
+| B | SE 95% CI p |
+| Intercept 20.24 | 0.13 [20.49, 0.02] .066 |
+| Pre-rating manipulated attribute (PMA) 20.59 | 0.03 [20.65, 20.53] \.001 |
+| Pre-rating non-manipulated attribute (PNMA) 21.01 | 0.03 [21.06, 20.95] \.001 |
+| Direction (high vs. low) 20.37 | 0.06 [20.49, 20.24] \.001 |
+| Manipulated attribute (risk vs. benefit) 0.44 | 0.06 [0.31, 0.56] \.001 |
+| Change in manipulated attribute (CMA) 20.74 | 0.03 [20.80, 20.68] \.001 |
+| Direction 3 Manipulated Attribute 20.85 | 0.12 [21.09, 20.60] \.001 |
+| Direction 3 CMA 20.12 | 0.05 [20.23, 20.02] .022 |
+| CMA 3 Manipulated Attribute 20.27 | 0.05 [20.37, 20.16] \.001 |
+| Direction 3 Manipulated Attribute 3 CMA 0.22 | 0.11 [0.01, 0.43] .037 |
+| Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval. |  |
+| for the demonstration of a causal negative relationship | This may indicate that negative mood has a more pointed |
+| between risks and benefit judgments. Specifically, we | effect on risk-benefit judgments, although our findings can- |
+| showed that increasing the risks of three technologies | not speak on this as we did not have a lot of data on the |
+| (nuclear energy, food preservatives, and natural gas) led to | negative side of our measures, meaning we had few partici- |
+| lower judgments on benefits while increasing the benefits | pants feeling low pleasure and low arousal (see Figure S5 |
+| led to lower judgments on risks. Vice versa, decreasing | in the supplementary material). This may have reduced our |
+| risks led to higher judgments of benefits. However, we did | chances of obtaining more precise findings on how inciden- |
+| not find any differences in the low-benefit conditions. | tal affect can modulate the negative relationship. |
+| Specifically, decreasing the benefits did not lead to higher | Furthermore, it is important to note that we measured |
+| judgments of risks (See Table S41–S44 in the supplemen- | naturally occurring incidental mood whereas previous |
+| tary material for detailed results). | research manipulated mood directly. |
+| In addition, we report two extensions. First, we found | Second, we looked at whether manipulating risks or |
+| that the negative relationship between risks and benefits | manipulating benefits impacts the strength of the negative |
+| was stronger among participants who reported feeling | relationship. Initially, our results showed the strength of |
+| higher incidental pleasure. Concurrently, people who felt | the negative relationship was stronger when risks, as |
+| pleasant may have generally relied more on heuristic | opposed to benefits, were manipulated. However, a more |
+| processing—in this case the AH (Bohner et al., 1995). | detailed look shows that this effect is most likely a product |
+| Previous findings, which manipulated negative mood, | of the fact that there was no impact on the non- |
+| showed increased risk perceptions (Va¨ stfja¨ ll et al., 2014). | manipulated attribute in the low-benefit condition (see |

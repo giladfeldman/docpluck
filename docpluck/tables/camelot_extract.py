@@ -18,8 +18,116 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import re
+
 from docpluck.tables import Cell, Table
 from docpluck.tables.render import cells_to_html
+
+
+# Patterns used to detect rows that look like running headers / page footers.
+# These are rows where the joined cell content matches one of:
+#   - Journal name + Vol./No./year ("Personality and Social Psychology Bulletin 00(0)")
+#   - "Journal of X, Vol. N, No. M, ..." style
+#   - Single small integer (page number)
+#   - Author-list short header ("Ip and Feldman", "Korbmacher et al.")
+_RUNNING_HEADER_PATTERNS = [
+    re.compile(r"^\s*(?:[A-Z][\w&'-]*\s+){1,8}\d+\s*\([^)]*\)\s*$"),  # "Journal Name 00(0)"
+    re.compile(r"\bVol\.?\s*\d+\b", re.IGNORECASE),                   # contains "Vol. N"
+    re.compile(r"\bNo\.\s*\d+\b", re.IGNORECASE),                     # contains "No. N"
+    re.compile(r"^\s*\d{1,4}\s*$"),                                    # page number only
+    re.compile(r"^\s*[A-Z][\w'-]+(?:\s+(?:and|&|et\s+al\.?))\s+[A-Z][\w'-]+\s*$"),  # "Ip and Feldman"
+    re.compile(r"^\s*[A-Z][\w'-]+\s+et\s+al\.?\s*$"),                  # "Korbmacher et al."
+    re.compile(r"^\s*Journal\s+of\s+", re.IGNORECASE),                 # starts "Journal of X"
+    re.compile(r"\bJanuary|February|March|April|May|June|July|August|September|October|November|December\b\s+\d{4}\b"),  # "January 2022"
+    re.compile(r"https?://", re.IGNORECASE),                           # DOI/URL footer
+    re.compile(r"^\s*\d+\s*\([^)]*\)\s*\d{4}\s*$"),                    # "13(7) 2022"
+    re.compile(r"^\s*Personality\s+and\s+Social\s+Psychology", re.IGNORECASE),
+    re.compile(r"^\s*Judgment\s+and\s+Decision", re.IGNORECASE),
+]
+
+_CAPTION_ROW_PATTERN = re.compile(
+    r"^\s*(?:Table|Fig\.?|Figure)\s+\d+(?:\.\d+)?\s*[.:]",
+    re.IGNORECASE,
+)
+
+
+def _row_joined(row: list[str]) -> str:
+    return " ".join(c for c in row if c).strip()
+
+
+def _looks_like_running_header(row: list[str]) -> bool:
+    joined = _row_joined(row)
+    if not joined or len(joined) > 120:
+        return False
+    # If only one column has content, more likely a running header
+    nonempty = [c for c in row if c]
+    if len(nonempty) > 2:
+        return False
+    for pat in _RUNNING_HEADER_PATTERNS:
+        if pat.search(joined):
+            return True
+    return False
+
+
+def _strip_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Drop rows at the top or bottom that look like page running headers/footers."""
+    out = list(rows)
+    while out and _looks_like_running_header(out[0]):
+        out.pop(0)
+    while out and _looks_like_running_header(out[-1]):
+        out.pop()
+    return out
+
+
+def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
+    """Drop "Table N. Caption text" rows from among the first 3 rows.
+
+    Camelot sometimes includes the caption line as a table row. The caller has
+    already extracted the caption from the surrounding text, so this row is
+    duplicate noise. Scan the first 3 rows to catch cases where the running
+    header occupies row 0 and the caption is at row 1 or 2.
+    """
+    out: list[list[str]] = []
+    seen_caption = False
+    for i, row in enumerate(rows):
+        if i < 3 and not seen_caption and _CAPTION_ROW_PATTERN.search(_row_joined(row)):
+            seen_caption = True
+            continue
+        out.append(row)
+    return out
+
+
+_NUMERIC_CELL_RE = re.compile(r"-?\d+\.?\d*|[a-zA-Z]\.?\s*\d+|\d+%|\(\d+\)")
+
+
+def _is_data_cell(cell: str) -> bool:
+    """A "data cell" is short and either numeric, a short code, or a short label."""
+    if not cell:
+        return False
+    s = cell.strip()
+    if len(s) > 60:
+        return False
+    if _NUMERIC_CELL_RE.search(s):
+        return True
+    # Short capitalized labels also count (column headers, category names).
+    if len(s) <= 30 and s.split() and len(s.split()) <= 5:
+        return True
+    return False
+
+
+def _is_table_like(rows: list[list[str]]) -> bool:
+    """Heuristic: ≥40% of non-empty rows have at least one numeric/short cell.
+
+    Rejects "tables" that are 2-column journal body prose Camelot picked up.
+    """
+    nonempty = [r for r in rows if any(c for c in r)]
+    if len(nonempty) < 2:
+        return False
+    data_like = sum(
+        1 for r in nonempty
+        if any(_is_data_cell(c) for c in r if c)
+    )
+    return (data_like / len(nonempty)) >= 0.4
 
 if TYPE_CHECKING:
     pass
@@ -72,13 +180,29 @@ def extract_tables_camelot(
             if n_rows < 2 or n_cols < 2:
                 continue
 
+            # Build the row matrix first; trim noisy rows; then emit cells.
+            row_matrix: list[list[str]] = []
+            for r in range(n_rows):
+                row_cells: list[str] = [
+                    str(df.iloc[r, c]).replace("\n", " ").strip()
+                    for c in range(n_cols)
+                ]
+                row_matrix.append(row_cells)
+
+            row_matrix = _strip_running_header_rows(row_matrix)
+            row_matrix = _drop_caption_first_row(row_matrix)
+            if not _is_table_like(row_matrix):
+                # The "table" Camelot detected is mostly prose laid out in columns
+                # (a 2-column journal page rather than a real table). Skip.
+                continue
+
+            n_rows = len(row_matrix)
+            n_cols = max((len(r) for r in row_matrix), default=0)
+
             cells: list[Cell] = []
             raw_row_texts: list[str] = []
-            for r in range(n_rows):
-                row_cells: list[str] = []
-                for c in range(n_cols):
-                    text = str(df.iloc[r, c]).replace("\n", " ").strip()
-                    row_cells.append(text)
+            for r, row_cells in enumerate(row_matrix):
+                for c, text in enumerate(row_cells):
                     if not text:
                         continue
                     cells.append(
