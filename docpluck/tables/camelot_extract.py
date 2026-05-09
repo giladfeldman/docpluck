@@ -31,18 +31,21 @@ from docpluck.tables.render import cells_to_html
 #   - Single small integer (page number)
 #   - Author-list short header ("Ip and Feldman", "Korbmacher et al.")
 _RUNNING_HEADER_PATTERNS = [
-    re.compile(r"^\s*(?:[A-Z][\w&'-]*\s+){1,8}\d+\s*\([^)]*\)\s*$"),  # "Journal Name 00(0)"
-    re.compile(r"\bVol\.?\s*\d+\b", re.IGNORECASE),                   # contains "Vol. N"
-    re.compile(r"\bNo\.\s*\d+\b", re.IGNORECASE),                     # contains "No. N"
+    re.compile(r"\b(?:[A-Z][\w&'-]*\s+){1,8}\d+\s*\([^)]*\)\s*$"),     # "...Journal Name 00(0)"
+    re.compile(r"\bVol\.?\s*\d+\b", re.IGNORECASE),                    # contains "Vol. N"
+    re.compile(r"\bNo\.\s*\d+\b", re.IGNORECASE),                      # contains "No. N"
     re.compile(r"^\s*\d{1,4}\s*$"),                                    # page number only
     re.compile(r"^\s*[A-Z][\w'-]+(?:\s+(?:and|&|et\s+al\.?))\s+[A-Z][\w'-]+\s*$"),  # "Ip and Feldman"
     re.compile(r"^\s*[A-Z][\w'-]+\s+et\s+al\.?\s*$"),                  # "Korbmacher et al."
-    re.compile(r"^\s*Journal\s+of\s+", re.IGNORECASE),                 # starts "Journal of X"
-    re.compile(r"\bJanuary|February|March|April|May|June|July|August|September|October|November|December\b\s+\d{4}\b"),  # "January 2022"
+    re.compile(r"\bJournal\s+of\s+\w+", re.IGNORECASE),                # "...Journal of X..."
+    re.compile(r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b"),
     re.compile(r"https?://", re.IGNORECASE),                           # DOI/URL footer
     re.compile(r"^\s*\d+\s*\([^)]*\)\s*\d{4}\s*$"),                    # "13(7) 2022"
-    re.compile(r"^\s*Personality\s+and\s+Social\s+Psychology", re.IGNORECASE),
-    re.compile(r"^\s*Judgment\s+and\s+Decision", re.IGNORECASE),
+    re.compile(r"\bPersonality\s+and\s+Social\s+Psychology\b", re.IGNORECASE),
+    re.compile(r"\bJudgment\s+and\s+Decision\b", re.IGNORECASE),
+    re.compile(r"\bSocial\s+Psychological\s+and\s+Personality\s+Science\b", re.IGNORECASE),
+    re.compile(r"\bMeta-?Psychology\b", re.IGNORECASE),
+    re.compile(r"\bJournal\s+of\s+Economic\s+Psychology\b", re.IGNORECASE),
 ]
 
 _CAPTION_ROW_PATTERN = re.compile(
@@ -97,20 +100,36 @@ def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
     return out
 
 
-_NUMERIC_CELL_RE = re.compile(r"-?\d+\.?\d*|[a-zA-Z]\.?\s*\d+|\d+%|\(\d+\)")
+# A "purely numeric" cell: starts with a number-like token (-?digits, optional
+# decimal, optional %, optional ± SD, etc.). Citations like "p. 3" or
+# "(Finucane et al., 2000, p. 3)" should NOT match — they're prose with a
+# number embedded, not data cells.
+_PURE_NUMERIC_RE = re.compile(
+    r"^\s*-?\d+(?:\.\d+)?\s*[%*]?\s*$"      # 0.45, -0.15, 95%, 5*
+    r"|^\s*\(?\d+(?:\.\d+)?\)?\s*\(.*\)\s*$"  # 5 (3.2), (5)
+    r"|^\s*[-+−–]?\.\d+\s*[*]*\s*$"           # .45, -.45, .45***
+    r"|^\s*[χβtFpr]\s*[=<>]?\s*\d"            # χ²=, β=, t=, F=, p=, r=
+)
 
 
 def _is_data_cell(cell: str) -> bool:
-    """A "data cell" is short and either numeric, a short code, or a short label."""
+    """A "data cell" is either:
+      - purely numeric (a stat value: 0.45, 95%, χ²=12.3, etc.), or
+      - a short categorical label (≤25 chars, ≤4 words) that doesn't end with
+        a sentence terminator.
+    Long prose with embedded citations like "(Finucane et al., 2000, p. 3)"
+    should NOT count as a data cell.
+    """
     if not cell:
         return False
     s = cell.strip()
     if len(s) > 60:
         return False
-    if _NUMERIC_CELL_RE.search(s):
+    if _PURE_NUMERIC_RE.match(s):
         return True
-    # Short capitalized labels also count (column headers, category names).
-    if len(s) <= 30 and s.split() and len(s.split()) <= 5:
+    # Short categorical labels: ≤25 chars, ≤4 words, no terminal period.
+    # The end-period check rejects body-prose endings like "...as we found.".
+    if len(s) <= 25 and s.split() and len(s.split()) <= 4 and not s.endswith((".", "!", "?")):
         return True
     return False
 
@@ -118,7 +137,7 @@ def _is_data_cell(cell: str) -> bool:
 def _is_table_like(rows: list[list[str]]) -> bool:
     """Heuristic: ≥40% of non-empty rows have at least one numeric/short cell.
 
-    Rejects "tables" that are 2-column journal body prose Camelot picked up.
+    Rejects "tables" that are entirely 2-column journal body prose.
     """
     nonempty = [r for r in rows if any(c for c in r)]
     if len(nonempty) < 2:
@@ -129,8 +148,93 @@ def _is_table_like(rows: list[list[str]]) -> bool:
     )
     return (data_like / len(nonempty)) >= 0.4
 
+
+def _row_looks_like_prose(row: list[str]) -> bool:
+    """A row is "prose-like" if it has no data cells AND ≥1 cell of long text
+    that ends with sentence punctuation OR is clearly a continuation."""
+    if not any(c for c in row):
+        return False
+    if any(_is_data_cell(c) for c in row if c):
+        return False
+    longs = [c for c in row if c and len(c) > 30]
+    if not longs:
+        return False
+    # At least one long cell — looks prose-y.
+    return True
+
+
+def _trim_prose_tail(rows: list[list[str]]) -> list[list[str]]:
+    """Trim trailing prose rows from a Camelot table.
+
+    Camelot sometimes bundles a real small table at the top of a 2-column page
+    with 50+ rows of body prose below it. We keep the data rows at the top,
+    trim where the prose run begins.
+
+    Rule: walk from the end backwards. Drop while the row is empty or prose-like.
+    Then walk from the start forward; stop at the first run of ≥3 consecutive
+    prose-like rows and trim there.
+    """
+    if not rows:
+        return rows
+    # Drop trailing empty/prose rows.
+    while rows and (not any(c for c in rows[-1]) or _row_looks_like_prose(rows[-1])):
+        rows = rows[:-1]
+    if not rows:
+        return rows
+    # Forward scan: find first run of ≥3 consecutive prose rows.
+    n = len(rows)
+    i = 0
+    while i < n:
+        # Skip non-prose rows
+        if not _row_looks_like_prose(rows[i]):
+            i += 1
+            continue
+        # Found a prose row — count run length
+        j = i
+        while j < n and _row_looks_like_prose(rows[j]):
+            j += 1
+        run_len = j - i
+        if run_len >= 3:
+            # Trim everything from i onward
+            return rows[:i]
+        i = j
+    return rows
+
 if TYPE_CHECKING:
     pass
+
+
+def _pick_best_per_page(stream_tables: list, lattice_tables: list) -> list:
+    """Given Camelot's stream and lattice outputs, pick the better extraction
+    per (page, bbox-region).
+
+    Heuristic: for each page, lattice usually wins when it returns ≥1 high-
+    accuracy table on that page (lattice means the PDF has visible ruled
+    lines, which is a strong tabularity signal). Otherwise stream wins.
+    """
+    by_page: dict[int, list] = {}
+    for ct in stream_tables:
+        page = getattr(ct, "page", 1)
+        by_page.setdefault(page, []).append(("stream", ct))
+    pages_with_lattice: dict[int, list] = {}
+    for ct in lattice_tables:
+        page = getattr(ct, "page", 1)
+        try:
+            acc = float(getattr(ct, "accuracy", 0))
+        except (ValueError, TypeError):
+            acc = 0.0
+        if acc >= 80.0:
+            pages_with_lattice.setdefault(page, []).append(("lattice", ct))
+
+    out: list = []
+    for page in sorted(set(list(by_page.keys()) + list(pages_with_lattice.keys()))):
+        if page in pages_with_lattice:
+            for _, ct in pages_with_lattice[page]:
+                out.append(ct)
+        else:
+            for _, ct in by_page.get(page, []):
+                out.append(ct)
+    return out
 
 
 def extract_tables_camelot(
@@ -159,9 +263,28 @@ def extract_tables_camelot(
 
     try:
         try:
-            tables_obj = camelot.read_pdf(tmp_path, pages="all", flavor="stream")
+            # `strip_text="\n"` collapses cell-internal newlines so multi-line
+            # cells render as single lines (per Camelot best practice).
+            # Run BOTH stream and lattice; pick the better one per (page, region).
+            stream_tables = list(
+                camelot.read_pdf(tmp_path, pages="all", flavor="stream", strip_text="\n")
+            )
         except Exception:
-            return []
+            stream_tables = []
+        try:
+            lattice_tables = list(
+                camelot.read_pdf(
+                    tmp_path,
+                    pages="all",
+                    flavor="lattice",
+                    strip_text="\n",
+                    line_scale=40,
+                    process_background=True,
+                )
+            )
+        except Exception:
+            lattice_tables = []
+        tables_obj = _pick_best_per_page(stream_tables, lattice_tables)
 
         out: list[Table] = []
         for idx, ct in enumerate(tables_obj):
@@ -191,9 +314,12 @@ def extract_tables_camelot(
 
             row_matrix = _strip_running_header_rows(row_matrix)
             row_matrix = _drop_caption_first_row(row_matrix)
+            # Trim trailing prose rows (Camelot sometimes bundles a small real
+            # table at the top of a 2-column page with body prose below).
+            row_matrix = _trim_prose_tail(row_matrix)
             if not _is_table_like(row_matrix):
-                # The "table" Camelot detected is mostly prose laid out in columns
-                # (a 2-column journal page rather than a real table). Skip.
+                # Even after trimming, the remaining content doesn't look like
+                # a real table. Skip.
                 continue
 
             n_rows = len(row_matrix)
