@@ -8,10 +8,11 @@
 
 | Option | Tool | korbmacher | ziano | New dep? | Single-extractor? | Notes |
 |---|---|---|---|---|---|---|
-| **A** | pdfplumber `extract_tables(text strategy)` | ❌ Bad — 3 cols, "Usingamouse" merged | ❌ Unusable | No | No | Subagent crashed twice with API overload but produced output; quality is the worst of the four. |
+| **A** | pdfplumber `extract_tables(text strategy)` | ❌ Bad — 3 cols, "Usingamouse" merged | ❌ Unusable | No | No | Subagent crashed twice with API overload but produced output; quality is the worst of the five. |
 | **B** | pdfplumber `extract_words` + custom column-cluster | 🟡 OK — 5 cols, header garbled, asterisks misplaced | ❌ Side-by-side detection wrong | No | No | Most algorithmic effort, weakest result outside best case. |
-| **C** | pdfminer.six word-bbox (replaces pdfplumber for cells) | ✅ Near-perfect | 🟡 Partial — data clean, rotated-margin "I. Ziano et al." creates spurious 15th column | No (pdfminer.six is already a transitive dep) | **Yes for cells**; pdfplumber still helps for detection on complex layouts | Closest to your "one extractor" preference. **Note:** the spec called for `pdftotext -bbox-layout`, but the installed `pdftotext` is xpdf v4.00 (no `-bbox-layout` flag). pdfminer.six is a functional analog. |
-| **D** | Camelot `flavor="stream"` | ✅ Near-perfect — accuracy 97.7 | ✅ Surprisingly clean — 52×14 single wide table, both sub-tables merged but values intact | **Yes** (`camelot-py[cv]`) | No — Camelot is yet another extractor on top of pdftotext + pdfplumber | No Ghostscript needed (stream flavor only). Best raw quality but adds a third extractor dependency, contradicting your stated preference. |
+| **C** | pdfminer.six word-bbox (replaces pdfplumber for cells) | ✅ Near-perfect | 🟡 Partial — data clean, rotated-margin "I. Ziano et al." creates spurious 15th column | No (pdfminer.six is already a transitive dep) | **Yes for cells**; pdfplumber still helps for detection on complex layouts | Closest to single-extractor preference. **Note:** spec called for `pdftotext -bbox-layout`, but installed `pdftotext` is xpdf v4.00 (no flag). pdfminer.six is a functional analog. |
+| **D** | Camelot `flavor="stream"` | ✅ Near-perfect — accuracy 97.7 | ✅ Surprisingly clean — 52×14 single wide table, both sub-tables merged but values intact | **Yes** (`camelot-py[cv]`) | No — Camelot is another extractor | No Ghostscript needed (stream flavor only). Best raw quality. |
+| **E** | **Real Poppler `pdftotext -bbox-layout`** + custom row/col clustering | ❌ Worst — entire row groups merged ("Easy Using a mouse Driving Riding a bicycle Saving money" all in one cell) | ❌ Multi-line study labels merged; row groups collapsed | Yes (Poppler binary) | Closest in spirit (single tool gives both text and word-bboxes) | Poppler installed cleanly, raw word-bbox data is the highest-quality input of any option, but the row-clustering algorithm is hard to get right. The subagent's implementation merged consecutive rows aggressively. **Theoretically best foundation, hardest to implement well.** Camelot has already solved this problem. |
 
 ## Headlines
 
@@ -34,13 +35,24 @@ If you want to see the failure modes:
 - **A's outputs** show what pdfplumber-text-strategy produces — instructive for "why this approach is rejected."
 - **B's notes** ([`option-b/notes.md`](option-b/notes.md)) document why custom word-clustering breaks on side-by-side tables (the bimodal-gap algorithm is confounded by continuation rows).
 
-## Recommendation
+## Recommendation (post-E)
 
-If you weigh **architecture (single extractor)** more, **C is the answer**. We accept the "rotated margin text creates spurious column" failure mode on landscape pages, which is fixable with a narrow-column-filter post-processor.
+**D wins.** Reasoning:
 
-If you weigh **raw output quality** more, **D is the answer**. Camelot stream flavor is best-in-class for stats tables and works out-of-the-box without per-paper tuning, at the cost of a new dependency.
+- Real Poppler `pdftotext -bbox-layout` (option E) provides the cleanest *raw input* of any option, but extracting cell structure from word bboxes requires nontrivial row/column clustering. The subagent's E implementation got it wrong — entire row groups collapsed into single cells. To beat D with E, we'd need to invest weeks porting algorithms that Camelot has already implemented. That's not a good trade.
+- C is acceptable but its rotated-margin failure mode on landscape pages requires a custom post-processor we'd have to maintain.
+- D works out-of-the-box with no per-paper tuning, no manual column-detection algorithm, no rotated-text post-processor. Accuracy 97.7 on korbmacher and 99.2 on ziano (Camelot's self-reported metric).
 
-A hybrid is also possible: use **C for the common case (whitespace tables, like the entire APA corpus)** and **fall back to D only when we detect the failure mode**. That defers the new-dependency cost to the rare case. But hybrids are hard to justify and add complexity.
+**Tradeoff accepted:** Camelot is a new dependency that doesn't satisfy the original "one extractor" goal. The user has explicitly accepted this: dropping pdfplumber (described as "horrible") and adding Camelot (described as "excellent"). Net dependency count stays the same, quality improves dramatically.
+
+## What about pure pdftotext-bbox-layout in the long term?
+
+Even after picking D for now, the E experiment confirmed:
+- Real Poppler `pdftotext -bbox-layout` is installable on Windows.
+- The HTML output format gives word-level bboxes as advertised.
+- Building a robust cell extractor on top would take weeks of algorithm work.
+
+A future direction (out of scope for this iteration): re-implement Camelot's stream-flavor algorithm against `pdftotext -bbox-layout` HTML output. That gives us the single-extractor architecture without depending on Camelot. But this is a multi-week effort and the value-add over Camelot is purely architectural (no quality gain). Not worth doing now.
 
 ## Critical reminder
 
