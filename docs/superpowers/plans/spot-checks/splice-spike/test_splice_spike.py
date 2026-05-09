@@ -174,3 +174,86 @@ def test_handles_pdftotext_column_interleaving_gracefully():
         # The region must contain at least the data row's identifying tokens
         assert "Age" in region_text
         assert "24.3" in region_text
+
+
+from splice_spike import splice_tables_into_text
+
+
+def test_replaces_table_region_with_markdown_table():
+    pdftotext_text = (
+        "Page 1 prose introduction.\n"
+        "We measured the following variables.\n"
+        "Variable      M     SD\n"
+        "Age          24.3   3.1\n"
+        "IQ          100.5  15.2\n"
+        "Discussion follows the table."
+    )
+    tables = [
+        {
+            "page": 0,  # only page in this synthetic input
+            "rows": [
+                ["Variable", "M", "SD"],
+                ["Age", "24.3", "3.1"],
+                ["IQ", "100.5", "15.2"],
+            ],
+        }
+    ]
+    result = splice_tables_into_text(pdftotext_text, tables)
+
+    # Original prose preserved
+    assert "Page 1 prose introduction." in result
+    assert "Discussion follows the table." in result
+    # Original garbled table rows replaced
+    assert "Variable      M     SD" not in result
+    # Markdown table inserted
+    assert "| Variable | M | SD |" in result
+    assert "| --- | --- | --- |" in result
+    assert "| Age | 24.3 | 3.1 |" in result
+
+
+def test_handles_multiple_pages_via_form_feed():
+    page1 = (
+        "Page 1 prose.\n"
+        "Variable A    Value\n"
+        "thing         42\n"
+        "more page 1 prose."
+    )
+    page2 = (
+        "Page 2 prose, different tokens.\n"
+        "Country  Population\n"
+        "France   67000000\n"
+        "page 2 ending."
+    )
+    pdftotext_text = page1 + "\f" + page2
+    tables = [
+        {"page": 0, "rows": [["Variable A", "Value"], ["thing", "42"]]},
+        {"page": 1, "rows": [["Country", "Population"], ["France", "67000000"]]},
+    ]
+    result = splice_tables_into_text(pdftotext_text, tables)
+    assert "| Variable A | Value |" in result
+    assert "| Country | Population |" in result
+    assert "| thing | 42 |" in result
+    assert "| France | 67000000 |" in result
+    # Prose between pages still present
+    assert "Page 1 prose." in result
+    assert "Page 2 prose, different tokens." in result
+
+
+def test_table_with_unfindable_region_falls_back_to_page_top():
+    """If find_table_region_in_text returns None, the orchestrator inserts the
+    markdown table at the top of that page with a note. Tested by giving a
+    table whose tokens do not appear on the page."""
+    pdftotext_text = "Page with prose only and no table content."
+    tables = [
+        {
+            "page": 0,
+            "rows": [
+                ["alpha", "beta"],
+                ["gamma", "delta"],
+            ],
+        }
+    ]
+    result = splice_tables_into_text(pdftotext_text, tables)
+    assert "| alpha | beta |" in result
+    # Note must accompany unlocated tables so the eyeball reviewer can spot them.
+    assert "[splice-spike: table location not found" in result

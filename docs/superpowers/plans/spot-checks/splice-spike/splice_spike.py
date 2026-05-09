@@ -107,3 +107,77 @@ def find_table_region_in_text(
         return None
     _, length, start = best
     return (start, start + length)
+
+
+def splice_tables_into_text(
+    pdftotext_text: str,
+    tables: list[dict],
+) -> str:
+    """Splice each table's markdown rendering into the page it belongs to.
+
+    ``pdftotext_text`` uses ``\\f`` (form feed, ASCII 12) as the page
+    separator — this is pdftotext's default behavior.
+
+    Each entry in ``tables`` is a dict with at least:
+      - ``page``: 0-based index of the page (matches ``pdftotext_text.split('\\f')``)
+      - ``rows``: pdfplumber-style list-of-lists of cells
+
+    For each table, we find its line range on its page using
+    ``find_table_region_in_text``. If found, we replace those lines with the
+    markdown-rendered table. If not, we prepend the markdown table at the top
+    of the page with a visible diagnostic note so reviewers can spot the
+    failure mode.
+    """
+    pages = pdftotext_text.split("\f")
+
+    # Group tables by page so we can splice all of a page's tables before
+    # moving on (table region indices shift as we splice; per-page reverse
+    # ordering keeps indices stable).
+    by_page: dict[int, list[dict]] = {}
+    for t in tables:
+        by_page.setdefault(t["page"], []).append(t)
+
+    new_pages: list[str] = []
+    for page_idx, page_text in enumerate(pages):
+        page_tables = by_page.get(page_idx, [])
+        if not page_tables:
+            new_pages.append(page_text)
+            continue
+
+        # Locate each table's region first, then splice in reverse line order
+        # so earlier indices stay valid.
+        located: list[tuple[Optional[tuple[int, int]], dict]] = []
+        for t in page_tables:
+            region = find_table_region_in_text(page_text, t["rows"])
+            located.append((region, t))
+
+        lines = page_text.split("\n")
+
+        # Splice located tables in reverse-start order.
+        located_with_region = [
+            (region, t) for (region, t) in located if region is not None
+        ]
+        located_with_region.sort(key=lambda x: x[0][0], reverse=True)
+        for region, t in located_with_region:
+            start, end = region
+            md = pdfplumber_table_to_markdown(t["rows"]).rstrip("\n")
+            lines[start:end] = [md]
+
+        # Prepend unlocated tables (with diagnostic note) at the top of page.
+        unlocated = [t for (region, t) in located if region is None]
+        if unlocated:
+            preface: list[str] = []
+            for t in unlocated:
+                md = pdfplumber_table_to_markdown(t["rows"]).rstrip("\n")
+                note = (
+                    "[splice-spike: table location not found on this page; "
+                    "inserted at top]"
+                )
+                preface.append(note)
+                preface.append(md)
+                preface.append("")
+            lines = preface + lines
+
+        new_pages.append("\n".join(lines))
+
+    return "\n".join(new_pages)
