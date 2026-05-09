@@ -138,6 +138,22 @@ After any normalize.py / sections/ change that targets a real-world paper artifa
 
 **Date:** 2026-05-09.
 
+### Addendum (same date): HTML tables inside Markdown, not pipe-tables
+
+After seeing pipe-table vs HTML rendering side-by-side on real complex tables (korbmacher Table 1 with Easy/Difficult group separators + multi-row headers; ip_feldman Table 2 with multi-line hypothesis cells), the user decided that **all tables in the .md output are rendered as HTML `<table>` blocks**, not Markdown pipe-tables. CommonMark allows raw HTML inline, so all renderers handle this correctly.
+
+Reasoning: pipe-tables cannot represent merged cells, multi-line cells, group-separator rows, or multi-row headers, and most academic tables have at least one of these features.
+
+The renderer (`pdfplumber_table_to_markdown` — keeping name for API stability) emits HTML with these features:
+- Continuation rows (col 0 empty + prose elsewhere) merge into the previous row's cell with `<br>`.
+- Col-0 wrap detection (prev row's col 0 ends with `/`, `-`, `—`, `–`) merges col-0-only continuation rows into that cell.
+- Group separator rows (only first cell, ≥3-col table, ≥3-char label with letters) emit as `<tr><td colspan="N"><strong>label</strong></td></tr>`.
+- HTML special chars escaped; `<br>` placeholder is escape-safe.
+
+Section headings (`## Heading`, `### Table N`) and italic captions (`*caption*`) remain Markdown.
+
+Demo showing the difference: `docs/superpowers/plans/spot-checks/splice-spike/html-fallback-demo.md`.
+
 ---
 
 ## When to add a new lesson here
