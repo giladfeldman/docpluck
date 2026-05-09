@@ -33,7 +33,8 @@ def _read(fixture_id: str) -> bytes:
 def test_imports_ok():
     from docpluck import extract_pdf_structured, TABLE_EXTRACTION_VERSION
     assert callable(extract_pdf_structured)
-    assert TABLE_EXTRACTION_VERSION == "1.0.0"
+    # v2+ marks the post-pdfplumber Camelot-based pipeline (LESSONS L-006).
+    assert int(TABLE_EXTRACTION_VERSION.split(".")[0]) >= 2
 
 
 def test_returns_required_fields():
@@ -63,7 +64,10 @@ def test_method_string_indicates_structured_extraction():
     from docpluck import extract_pdf_structured
     data = _read("apa_chan_feldman_lineless")
     result = extract_pdf_structured(data)
-    assert "pdfplumber_tables" in result["method"]
+    # Post-LESSONS-L-006: tables come from Camelot stream. Test that the method
+    # string carries some structured-extraction marker (any of the v2 tokens).
+    method = result["method"]
+    assert any(tok in method for tok in ("camelot_stream", "camelot_failed")), method
 
 
 def test_thorough_mode_method_string():

@@ -1,8 +1,14 @@
-"""Splice spike (phase 0).
+"""Splice spike (phase 0+).
 
-Throwaway prototype that wraps existing docpluck extraction and produces
-a single .md per input PDF with pdfplumber tables spliced into pdftotext
-text. Used to answer: is the splice algorithm viable?
+Throwaway prototype that produces a single .md per input PDF combining:
+- pdftotext text (cleaned of running headers)
+- docpluck section boundaries (## headings)
+- Camelot stream-flavor tables (### Table N + pipe-table)
+- fragment-wrapping for tables Camelot misses
+
+Per the 2026-05-09 5-option bake-off (LESSONS L-006), Camelot stream is the
+chosen library for table cell extraction. pdfplumber returns 0 cells for
+APA whitespace tables; Camelot returns clean cell grids without per-paper tuning.
 
 This module is NOT production code. It will be deleted (or its surviving
 helpers moved into proper modules) once phase 1 ships.
@@ -11,6 +17,110 @@ from __future__ import annotations
 
 import re
 from typing import Optional, Sequence
+
+
+# ---------------------------------------------------------------------------
+# Camelot cell extraction with per-page caching
+# ---------------------------------------------------------------------------
+
+# Cache keyed by (pdf_path, page) → list of camelot.core.Table objects.
+# Populated lazily on first request; one Camelot call per page across the run.
+_CAMELOT_CACHE: dict[tuple[str, int], list] = {}
+
+
+def _camelot_tables_for_page(pdf_path: str, page_1indexed: int) -> list:
+    """Run Camelot stream on a single page, cached. Returns list of Camelot Tables."""
+    key = (pdf_path, page_1indexed)
+    if key in _CAMELOT_CACHE:
+        return _CAMELOT_CACHE[key]
+    try:
+        import camelot
+    except ImportError:
+        _CAMELOT_CACHE[key] = []
+        return []
+    try:
+        tables = list(camelot.read_pdf(pdf_path, pages=str(page_1indexed), flavor="stream"))
+    except Exception:
+        tables = []
+    _CAMELOT_CACHE[key] = tables
+    return tables
+
+
+def _bbox_overlap_score(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+    """Intersection-over-union for two (x0, y0, x1, y1) bboxes."""
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    ix0 = max(ax0, bx0)
+    iy0 = max(ay0, by0)
+    ix1 = min(ax1, bx1)
+    iy1 = min(ay1, by1)
+    if ix0 >= ix1 or iy0 >= iy1:
+        return 0.0
+    inter = (ix1 - ix0) * (iy1 - iy0)
+    a_area = max(0.0, (ax1 - ax0)) * max(0.0, (ay1 - ay0))
+    b_area = max(0.0, (bx1 - bx0)) * max(0.0, (by1 - by0))
+    union = a_area + b_area - inter
+    if union <= 0:
+        return 0.0
+    return inter / union
+
+
+def _camelot_cells_for_table(pdf_path: str, table: dict) -> list[list[str]] | None:
+    """For a docpluck Table dict, return Camelot-extracted cell grid or None.
+
+    Strategy: run Camelot stream on the table's page; pick the Camelot Table
+    whose bbox overlaps best with docpluck's bbox; convert its DataFrame into
+    a list of rows. Returns None if Camelot found nothing or has no overlap.
+    """
+    page = table.get("page", 0) or 0
+    if page < 1:
+        return None
+    cam_tables = _camelot_tables_for_page(pdf_path, page)
+    if not cam_tables:
+        return None
+
+    # Camelot bbox is (x0, y0_top, x1, y1_bottom) in PDF points (y from bottom).
+    # docpluck bbox is (x0, top, x1, bottom) where top/bottom are from page top.
+    # For overlap purposes, both spaces are consistent within themselves;
+    # for landscape pages or single-table pages the best Camelot table is
+    # usually the one with the largest area / most rows.
+    target_bbox = tuple(table.get("bbox") or (0.0, 0.0, 0.0, 0.0))
+
+    best = None  # (-score, -rows, idx)
+    for i, ct in enumerate(cam_tables):
+        try:
+            cb = ct._bbox  # (x1, y1, x2, y2) in PDF points; y from bottom
+        except AttributeError:
+            cb = None
+        score = 0.0
+        if cb and target_bbox != (0.0, 0.0, 0.0, 0.0):
+            # Convert candidate to (x0, y0, x1, y1) in any consistent space.
+            # We only care about ranking; use raw IoU with whatever frames we have.
+            score = _bbox_overlap_score(target_bbox, (cb[0], cb[1], cb[2], cb[3]))
+        rows = len(ct.df)
+        candidate = (-score, -rows, i)
+        if best is None or candidate < best:
+            best = candidate
+
+    if best is None:
+        return None
+    _, _, idx = best
+    chosen = cam_tables[idx]
+    df = chosen.df
+
+    # Convert DataFrame to list of rows. Strip cells; collapse internal whitespace.
+    rows: list[list[str]] = []
+    for ri in range(len(df)):
+        row = [str(df.iloc[ri, ci]).replace("\n", " ").strip() for ci in range(len(df.columns))]
+        rows.append(row)
+    # Drop fully-empty leading/trailing rows
+    while rows and not any(c for c in rows[0]):
+        rows.pop(0)
+    while rows and not any(c for c in rows[-1]):
+        rows.pop()
+    if len(rows) < 2:
+        return None
+    return rows
 
 
 def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
@@ -264,23 +374,24 @@ def _table_caption_short(caption: str | None, label: str | None) -> str:
     return ""
 
 
-def _format_table_md(table: dict) -> str:
+def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
     """Render a docpluck Table as a self-contained markdown block.
 
-    Lattice tables (cells populated) → pipe-table.
-    Isolated tables (cells empty) → fenced code block of raw_text (preserves
-    column alignment for monospace viewers, which is the best honest rendering
-    we have without proper cell extraction).
+    Order of preference for cell content:
+      1. ``cells`` populated by docpluck (lattice tables) → render directly.
+      2. Camelot stream extraction (whitespace tables, the APA case) → render.
+      3. Raw text in a fenced code block (last-resort fallback if Camelot fails).
     """
     label = table.get("label") or "Table"
     short_caption = _table_caption_short(table.get("caption"), label)
 
-    cells = table.get("cells") or []
     block_parts = [f"### {label}"]
     if short_caption and short_caption != label:
         block_parts.append(f"*{short_caption}*")
         block_parts.append("")
 
+    # 1. Lattice table from docpluck
+    cells = table.get("cells") or []
     if cells:
         n_rows = max(c["r"] for c in cells) + 1
         n_cols = max(c["c"] for c in cells) + 1
@@ -289,36 +400,36 @@ def _format_table_md(table: dict) -> str:
             grid[c["r"]][c["c"]] = c["text"]
         if n_rows >= 2:
             block_parts.append(pdfplumber_table_to_markdown(grid).rstrip("\n"))
-        else:
-            raw = table.get("raw_text") or ""
-            block_parts.append("```")
-            block_parts.append(raw.rstrip())
-            block_parts.append("```")
-    else:
-        # Isolated / whitespace table: dump raw_text in a code block
-        raw = (table.get("raw_text") or "").rstrip()
-        # Strip the leading label / caption lines that would duplicate the heading.
-        # Heuristic: drop lines that are exactly the label or that appear in the
-        # short caption.
-        raw_lines = raw.splitlines()
-        drop_count = 0
-        for ln in raw_lines[:3]:
-            stripped = ln.strip()
-            if not stripped:
-                drop_count += 1
-                continue
-            if stripped == label:
-                drop_count += 1
-                continue
-            if short_caption and stripped.startswith(short_caption[:30]):
-                drop_count += 1
-                continue
-            break
-        body = "\n".join(raw_lines[drop_count:]).rstrip()
-        if body:
-            block_parts.append("```")
-            block_parts.append(body)
-            block_parts.append("```")
+            return "\n".join(block_parts)
+
+    # 2. Camelot stream extraction
+    if pdf_path:
+        cam_rows = _camelot_cells_for_table(pdf_path, table)
+        if cam_rows:
+            block_parts.append(pdfplumber_table_to_markdown(cam_rows).rstrip("\n"))
+            return "\n".join(block_parts)
+
+    # 3. Last-resort fallback: raw_text in a code block
+    raw = (table.get("raw_text") or "").rstrip()
+    raw_lines = raw.splitlines()
+    drop_count = 0
+    for ln in raw_lines[:3]:
+        stripped = ln.strip()
+        if not stripped:
+            drop_count += 1
+            continue
+        if stripped == label:
+            drop_count += 1
+            continue
+        if short_caption and stripped.startswith(short_caption[:30]):
+            drop_count += 1
+            continue
+        break
+    body = "\n".join(raw_lines[drop_count:]).rstrip()
+    if body:
+        block_parts.append("```")
+        block_parts.append(body)
+        block_parts.append("```")
 
     return "\n".join(block_parts)
 
@@ -634,7 +745,7 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
             unlocated.append(t)
             continue
         char_start, char_end = region
-        replacement = "\n\n" + _format_table_md(t) + "\n\n"
+        replacement = "\n\n" + _format_table_md(t, pdf_path=pdf_path) + "\n\n"
         edits.append((char_start, char_end, replacement))
 
     # Section heading insertions: replace [char_start, char_end] with
@@ -713,7 +824,7 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     if unlocated:
         appendix_parts.append("\n## Tables (unlocated in body)\n")
         for t in unlocated:
-            appendix_parts.append(_format_table_md(t))
+            appendix_parts.append(_format_table_md(t, pdf_path=pdf_path))
             appendix_parts.append("")
 
     if appendix_parts:
