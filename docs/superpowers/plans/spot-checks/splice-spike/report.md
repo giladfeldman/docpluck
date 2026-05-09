@@ -1,9 +1,17 @@
 # Splice Spike — Phase 0 Report
 
-**Date:** 2026-05-09
+**Date:** 2026-05-09 (updated post-iteration)
 **Spec:** [`docs/superpowers/specs/2026-05-08-unified-extraction-design.md`](../../specs/2026-05-08-unified-extraction-design.md)
 **Plan:** [`docs/superpowers/plans/2026-05-08-unified-extraction-phase-0-splice-spike.md`](../../2026-05-08-unified-extraction-phase-0-splice-spike.md)
-**Author:** AI verification pass; awaiting user eyeball review.
+**Status:** AI verification + iteration complete; user eyeball-review pending.
+
+> **2026-05-09 update.** The original plan stopped at "splice the table where pdfplumber detected one." That produced markdown that was technically structured but visually no better than raw pdftotext (pipe-wrapped prose, no section headings). After feedback, the spike was extended to produce *actual* Markdown:
+> 1. Section headings via `extract_sections`.
+> 2. Running-header strip (preserving form-feeds for the per-page locator).
+> 3. Tables formatted as `### Table N` + italic caption + fenced code block.
+> 4. Fragment-wrapping for tables pdfplumber missed: runs of short pdftotext paragraphs get wrapped in code blocks; preceding "Table N: ..." captions get absorbed into proper `### Table N` headings.
+>
+> See "Iterated outputs" section below for current quality. The original "splice viability" finding stands (locator works), but the dominant story is now: with caption-driven fragment-wrapping, even papers where docpluck detected zero structural tables now produce labeled `### Table N` blocks. That changes the recommendation toward (b)+(extension) rather than (b)+(rewrite).
 
 ## Summary
 
@@ -101,6 +109,32 @@ The splice algorithm itself (locator + orchestrator) is reusable for phase 1 as-
 - **Whether pdftotext `-bbox-layout` mode would help.** Suggested in the recommendation but not prototyped.
 - **Whether the markdown profile's other elements** (sections, footnotes, figures) are correct — phase 0 only addressed the splice algorithm.
 - **Whether downstream consumers** (ESCIcheck, MetaESCI, Scimeto) would prefer the prose-block fallback or the silent-missing-tables status quo.
+
+## Iterated outputs (2026-05-09 update)
+
+After the second iteration, all 5 outputs have real Markdown structure. Counts:
+
+| Paper | `## ` sections | `### Table N` | Code-block fences | Detected tables (pdfplumber) |
+|---|---|---|---|---|
+| chandrashekar_2023_mp.md | 21 | 2 | 66 | 0 |
+| efendic_2022_affect.md | 10 | 5 | 12 | 0 |
+| ip_feldman_2025_pspb.md | 10 | 10 | 30 | 7 |
+| korbmacher_2022_kruger.md | 9 | 9 | 50 | 0 |
+| ziano_2021_joep.md | 11 | 5 | 24 | 3 |
+
+**Notable observations:**
+
+- **korbmacher** (0 detected tables, 9 `### Table N` headings): every `### Table N` was synthesized by the caption-absorption + fragment-wrap pipeline, not from pdfplumber. The PDF has many tables that pdfplumber missed but pdftotext fragmented in a recognizable pattern.
+- **ip_feldman** (7 detected, 10 `### Table N`): 7 from pdfplumber, 3 additional from caption-absorption. The 7 pdfplumber ones still render as fenced code blocks because cells were empty.
+- **chandrashekar** (0 detected, 2 `### Table N`): low caption-absorption hit rate. Captions in this paper use unusual layout that the regex doesn't catch.
+- **All 5 papers**: clean `## Section` headings (Abstract / Keywords / Introduction / Method / Results / Discussion / etc.) with no duplicated heading text in the body.
+
+**What still doesn't work:**
+
+- **Subsection headings** ("Default Effect", "Framing Effects", numbered "1.6.1 Extension 1: ...") remain inline as paragraph text — `extract_sections` only returns top-level sections.
+- **Multi-page tables** (ziano Table 1 spans landscape pp 2–3): the page-3 continuation gets fragment-wrapped but appears as a separate code block from the page-2 splice, with no caption.
+- **Captions in unusual format** (chandrashekar) aren't detected.
+- **The pdfplumber-detected isolated tables still render as code blocks of raw_text**, not as proper pipe-tables — because `cells` is empty for whitespace tables. Caption-absorption gives them labels but doesn't recover cell structure.
 
 ## Files referenced
 
