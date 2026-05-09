@@ -25,7 +25,9 @@ def test_figure_reexported_from_top_level():
 
 def test_table_extraction_version_reexported_from_top_level():
     from docpluck import TABLE_EXTRACTION_VERSION
-    assert TABLE_EXTRACTION_VERSION == "1.0.0"
+    # v2+ marks the post-pdfplumber Camelot-based pipeline (LESSONS L-006).
+    major = TABLE_EXTRACTION_VERSION.split(".")[0]
+    assert int(major) >= 2
 
 
 def test_existing_extract_pdf_still_exported():

@@ -114,6 +114,32 @@ After any normalize.py / sections/ change that targets a real-world paper artifa
 
 ---
 
+## L-006 — Use Camelot (`flavor="stream"`) for table cell extraction; pdfplumber is unsuitable
+
+**Surface:** "Tables in our markdown output look unreadable. pdfplumber's `extract_tables()` returns `cells: []` for whitespace-aligned tables (the entire APA corpus). What library should we use?"
+
+**Failure mode (the temptation):** Try harder with pdfplumber. Tune `text_x_tolerance`, switch `vertical_strategy` to `text`, write a custom word-cluster algorithm on top of `extract_words()`. After a 2026-05-09 5-way bake-off — pdfplumber `extract_tables(text)` (Option A), pdfplumber `extract_words` + custom column-cluster (Option B), pdfminer.six word-bbox (C), Camelot stream (D), real Poppler `pdftotext -bbox-layout` + custom clustering (E) — every pdfplumber-based approach failed on either the simple case (column merging, words concatenated like "Usingamouse") or the side-by-side landscape case. **pdfplumber's table extraction is fundamentally bad for APA whitespace tables and tuning won't fix it.**
+
+**The rule:**
+
+- Use **Camelot `read_pdf(..., flavor="stream")`** for table cell extraction. Stream flavor needs no Ghostscript (lattice flavor does). Camelot accuracy: ~97–99% on APA stats matrices, no per-paper tuning.
+- pdfplumber is dropped from docpluck's table pipeline. It remains a transitive dependency only as long as it's pulled in elsewhere; the goal is to remove it entirely.
+- This **supersedes the "pdfplumber-only" constraint in L-003**. Permissive license rule still holds: Camelot is MIT.
+- License check: Camelot is MIT-licensed (atlanhq/camelot). Confirmed compatible with the closed-source SaaS PDFextractor app.
+- If Camelot returns one wide table for a side-by-side landscape layout (it merges them — e.g., ziano Table 1), that's a known limitation. Post-process to split if needed; do NOT abandon Camelot for this.
+- Don't try Option E (real Poppler `pdftotext -bbox-layout` + custom clustering) thinking you'll do better than Camelot. The 2026-05-09 spike confirmed the input data is excellent but rebuilding what Camelot already does is multi-week algorithm work for zero quality gain.
+
+**Evidence trail:**
+- Experiments at [`docs/superpowers/plans/spot-checks/splice-spike/experiments/`](./docs/superpowers/plans/spot-checks/splice-spike/experiments/) (commit `a3cc72a`).
+- 8 sample `.md` outputs across 5 options × 2 papers (korbmacher 4×8 stats matrix, ziano landscape side-by-side).
+- [`COMPARISON.md`](./docs/superpowers/plans/spot-checks/splice-spike/experiments/COMPARISON.md) summarizes the bake-off and recommendation.
+
+**The "PyMuPDF would also be nice" question:** PyMuPDF / `fitz` is AGPL — see L-003. It is permanently excluded.
+
+**Date:** 2026-05-09.
+
+---
+
 ## When to add a new lesson here
 
 Add a lesson when:

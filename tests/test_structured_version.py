@@ -23,6 +23,8 @@ def test_table_extraction_version_is_semver_string():
     assert all(p.isdigit() for p in parts)
 
 
-def test_table_extraction_version_starts_at_1_0_0():
+def test_table_extraction_version_v2_after_pdfplumber_removal():
+    """v2.x.x marks the post-pdfplumber, Camelot-based pipeline (LESSONS L-006)."""
     from docpluck.extract_structured import TABLE_EXTRACTION_VERSION
-    assert TABLE_EXTRACTION_VERSION == "1.0.0"
+    major = TABLE_EXTRACTION_VERSION.split(".")[0]
+    assert int(major) >= 2
