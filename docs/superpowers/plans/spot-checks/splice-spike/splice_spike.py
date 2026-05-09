@@ -123,35 +123,184 @@ def _camelot_cells_for_table(pdf_path: str, table: dict) -> list[list[str]] | No
     return rows
 
 
-def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
-    """Render a pdfplumber-style table (list of rows of cells) as a GFM pipe table.
+def _html_escape(s: str | None) -> str:
+    """Escape HTML special characters for safe inclusion in cell content,
+    then convert merge-separator placeholders to ``<br>``."""
+    if s is None:
+        return ""
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace(_MERGE_SEPARATOR, "<br>")
+    )
 
-    - Cells that are None render as empty strings.
-    - Embedded newlines in a cell collapse to a single space (pipe-table syntax
-      cannot represent in-cell newlines).
-    - Pipe characters in cells are escaped as ``\\|``.
-    - Returns the empty string for tables with fewer than 2 rows (no data).
+
+_MERGE_SEPARATOR = "\x00BR\x00"  # placeholder swapped to <br> after escaping
+
+
+def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Merge rows where the first column is empty INTO the previous row.
+
+    Camelot output for tables with multi-line cells often appears as:
+        ['2a', 'People underestimate...']
+        ['',   'continuation of the hypothesis']
+        ['',   'still continuing']
+
+    We merge those continuations back into the parent row's cell, joined
+    with a placeholder that is later replaced by ``<br>`` AFTER HTML
+    escaping (so the placeholder isn't escaped to ``&lt;br&gt;``).
+    """
+    def _looks_prose_like(cells: list[str]) -> bool:
+        """A continuation row should have at least one cell with prose-like
+        content (≥2 words OR ≥10 chars). Short single-token cells like "2" or
+        "0.45" are likely separate data rows with an empty first column, not
+        continuations."""
+        for c in cells:
+            s = (c or "").strip()
+            if not s:
+                continue
+            if len(s.split()) >= 2 or len(s) >= 10:
+                return True
+        return False
+
+    def _prev_col0_is_wrap(parent: list[str]) -> bool:
+        """The previous row's col 0 ends with an EXPLICIT wrap mark (``/``,
+        ``-``, ``—``, ``–``) — strong signal that the next col-0-only row
+        is a continuation of this cell. Lowercase-letter endings are NOT
+        used as a signal because group-separator labels (``Easy``,
+        ``Difficult``, ``Ability``) usually end in lowercase too."""
+        if not parent or not parent[0]:
+            return False
+        s = parent[0].rstrip()
+        if not s:
+            return False
+        return s.endswith(("/", "-", "—", "–"))
+
+    out: list[list[str]] = []
+    for row in rows:
+        first = row[0].strip() if row else ""
+        rest_has_content = any((c or "").strip() for c in row[1:])
+
+        # Case A: row has content only in non-first columns → continuation
+        # of the parent row's data cells (multi-line cell wrapping in col 1+).
+        if out and not first and rest_has_content and _looks_prose_like(row[1:]):
+            parent = out[-1]
+            for i in range(min(len(row), len(parent))):
+                v = (row[i] or "").strip()
+                if not v:
+                    continue
+                if parent[i].strip():
+                    parent[i] = parent[i] + _MERGE_SEPARATOR + v
+                else:
+                    parent[i] = v
+            continue
+
+        # Case B: row has content only in col 0 (others empty) AND the
+        # previous row's col 0 looks like it wraps → continuation of col 0.
+        if (
+            out
+            and first
+            and not rest_has_content
+            and _prev_col0_is_wrap(out[-1])
+        ):
+            parent = out[-1]
+            parent[0] = parent[0].rstrip() + first if parent[0].rstrip().endswith(("/", "-")) else parent[0].rstrip() + " " + first
+            continue
+
+        out.append([(c or "").strip() for c in row])
+    return out
+
+
+def _is_group_separator(row: list[str], n_cols: int) -> bool:
+    """A "group separator" row has content in only the first cell AND
+    the table has ≥3 columns AND the label looks like a section header
+    (≥3 chars, contains a letter — not a stat value or number).
+
+    The 3-col threshold prevents tiny rows like ``[1, ""]`` in a 2-column
+    table from being treated as group separators.
+    """
+    if not row or n_cols < 3:
+        return False
+    first = row[0].strip() if row[0] else ""
+    rest = [c for c in row[1:] if (c or "").strip()]
+    if rest:
+        return False
+    if len(first) < 3:
+        return False
+    # Must contain at least one letter (avoid pure numerics like "123")
+    if not re.search(r"[A-Za-z]", first):
+        return False
+    return True
+
+
+def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
+    """Render a table (list of rows of cells) as an HTML ``<table>`` block
+    suitable for embedding inside Markdown.
+
+    Per the user's 2026-05-09 decision: HTML rendering is now the default
+    for all tables (not just complex ones). The pipe-table syntax cannot
+    represent merged cells, multi-line cells, group separators, or
+    multi-row headers, all of which are common in academic tables.
+
+    The function name is kept for API stability with the existing tests,
+    but the output is now HTML.
+
+    Smart features:
+      - First row → ``<thead>`` with ``<th>`` cells.
+      - Continuation rows (first cell empty, others have content) merge
+        into the previous data row's cells with ``<br>`` separators.
+      - Group separator rows (only first cell has content) emit as
+        ``<tr><td colspan="N"><strong>group</strong></td></tr>``.
+      - HTML special characters (``<``, ``>``, ``&``) are escaped.
+      - Cells are stripped of surrounding whitespace.
+      - Returns empty string for tables with fewer than 2 rows.
     """
     if len(rows) < 2:
         return ""
 
-    def _cell(value: str | None) -> str:
-        if value is None:
-            return ""
-        return value.replace("\n", " ").replace("|", "\\|").strip()
+    # Normalize rows: convert None → "", strip cells, ensure list-of-lists.
+    norm: list[list[str]] = []
+    for row in rows:
+        norm.append([(c or "").strip() if c is not None else "" for c in row])
 
-    header = [_cell(c) for c in rows[0]]
-    body = [[_cell(c) for c in row] for row in rows[1:]]
+    # Merge continuation rows.
+    merged = _merge_continuation_rows(norm)
+    if len(merged) < 2:
+        return ""
 
-    n_cols = len(header)
-    lines: list[str] = []
-    lines.append("| " + " | ".join(header) + " |")
-    lines.append("| " + " | ".join(["---"] * n_cols) + " |")
+    n_cols = max(len(r) for r in merged) if merged else 0
+    if n_cols == 0:
+        return ""
+
+    # Pad short rows to n_cols.
+    for r in merged:
+        while len(r) < n_cols:
+            r.append("")
+
+    header = merged[0]
+    body = merged[1:]
+
+    lines: list[str] = ["<table>"]
+    lines.append("  <thead>")
+    lines.append("    <tr>")
+    for c in header:
+        lines.append(f"      <th>{_html_escape(c)}</th>")
+    lines.append("    </tr>")
+    lines.append("  </thead>")
+    lines.append("  <tbody>")
     for row in body:
-        # pad / truncate to header width so pipe-table is rectangular
-        normalized = list(row) + [""] * max(0, n_cols - len(row))
-        normalized = normalized[:n_cols]
-        lines.append("| " + " | ".join(normalized) + " |")
+        if _is_group_separator(row, n_cols):
+            lines.append(
+                f'    <tr><td colspan="{n_cols}"><strong>{_html_escape(row[0])}</strong></td></tr>'
+            )
+            continue
+        lines.append("    <tr>")
+        for c in row:
+            lines.append(f"      <td>{_html_escape(c)}</td>")
+        lines.append("    </tr>")
+    lines.append("  </tbody>")
+    lines.append("</table>")
 
     return "\n".join(lines) + "\n"
 

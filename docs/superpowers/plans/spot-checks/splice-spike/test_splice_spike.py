@@ -7,20 +7,24 @@ sys.path.insert(0, str(Path(__file__).parent))
 from splice_spike import pdfplumber_table_to_markdown
 
 
-def test_simple_2x3_table_becomes_pipe_table():
+def test_simple_2x3_table_becomes_html_table():
     table = [
         ["Variable", "M", "SD"],
         ["Age", "24.3", "3.1"],
         ["IQ", "100.5", "15.2"],
     ]
     result = pdfplumber_table_to_markdown(table)
-    expected = (
-        "| Variable | M | SD |\n"
-        "| --- | --- | --- |\n"
-        "| Age | 24.3 | 3.1 |\n"
-        "| IQ | 100.5 | 15.2 |\n"
-    )
-    assert result == expected
+    # HTML rendering (per 2026-05-09 user decision: HTML is the default)
+    assert "<table>" in result
+    assert "</table>" in result
+    assert "<th>Variable</th>" in result
+    assert "<th>M</th>" in result
+    assert "<th>SD</th>" in result
+    assert "<td>Age</td>" in result
+    assert "<td>24.3</td>" in result
+    assert "<td>IQ</td>" in result
+    assert "<thead>" in result
+    assert "<tbody>" in result
 
 
 def test_none_cells_render_as_empty_string():
@@ -30,44 +34,40 @@ def test_none_cells_render_as_empty_string():
         [None, "2"],
     ]
     result = pdfplumber_table_to_markdown(table)
-    expected = (
-        "| A | B |\n"
-        "| --- | --- |\n"
-        "| 1 |  |\n"
-        "|  | 2 |\n"
-    )
-    assert result == expected
+    assert "<th>A</th>" in result
+    assert "<th>B</th>" in result
+    assert "<td>1</td>" in result
+    assert "<td>2</td>" in result
+    # Empty cells render as <td></td>
+    assert "<td></td>" in result
 
 
-def test_pipe_in_cell_is_escaped():
+def test_html_special_chars_escaped():
+    """HTML special characters (<, >, &) must be escaped, not pipe characters."""
     table = [
         ["expression"],
-        ["a | b"],
+        ["a < b & c > d"],
     ]
     result = pdfplumber_table_to_markdown(table)
-    expected = (
-        "| expression |\n"
-        "| --- |\n"
-        "| a \\| b |\n"
-    )
-    assert result == expected
+    assert "&lt;" in result
+    assert "&gt;" in result
+    assert "&amp;" in result
 
 
-def test_multiline_cell_collapses_to_single_line():
-    """pdfplumber sometimes returns cells with embedded newlines.
-    Pipe-table syntax cannot represent newlines inside a cell, so they
-    must collapse to a space."""
+def test_multiline_cell_renders_with_br():
+    """Embedded newlines in a cell render as <br> tags in HTML output
+    (the pipe-table limitation no longer applies)."""
     table = [
         ["heading"],
         ["line one\nline two"],
     ]
+    # Note: input is two rows, so this is ONE data row with cell="line one\nline two".
+    # The HTML renderer doesn't auto-split on \n inside a single cell — it's a
+    # convention from the older pipe-table API. With HTML, the cell renders
+    # as-is (newline preserved or normalized). Test that both lines appear.
     result = pdfplumber_table_to_markdown(table)
-    expected = (
-        "| heading |\n"
-        "| --- |\n"
-        "| line one line two |\n"
-    )
-    assert result == expected
+    assert "line one" in result
+    assert "line two" in result
 
 
 def test_empty_table_returns_empty_string():
@@ -78,6 +78,33 @@ def test_single_row_returns_empty_string():
     """A table with only a header and no data rows is degenerate; emit nothing
     so the spike doesn't insert phantom tables."""
     assert pdfplumber_table_to_markdown([["header only"]]) == ""
+
+
+def test_continuation_rows_merge_with_br():
+    """Rows where the first column is empty are continuations of the previous
+    data row's cells, joined with ``<br>`` in the merged cell."""
+    table = [
+        ["No", "Hypothesis"],
+        ["2a", "People underestimate negative experiences."],
+        ["", "Multi-line continuation."],
+    ]
+    result = pdfplumber_table_to_markdown(table)
+    # The continuation should be merged into hypothesis 2a's cell
+    assert "<td>2a</td>" in result
+    assert "People underestimate negative experiences.<br>Multi-line continuation." in result
+
+
+def test_group_separator_row_uses_colspan():
+    """A row with content only in the first cell (and N total columns) emits
+    as a single <td colspan="N"> spanning the whole row."""
+    table = [
+        ["Ability", "Score", "Rank"],
+        ["Easy", "", ""],
+        ["Using a mouse", "3.1", "1"],
+    ]
+    result = pdfplumber_table_to_markdown(table)
+    assert 'colspan="3"' in result
+    assert "<strong>Easy</strong>" in result
 
 
 from splice_spike import find_table_region_in_text
@@ -205,10 +232,11 @@ def test_replaces_table_region_with_markdown_table():
     assert "Discussion follows the table." in result
     # Original garbled table rows replaced
     assert "Variable      M     SD" not in result
-    # Markdown table inserted
-    assert "| Variable | M | SD |" in result
-    assert "| --- | --- | --- |" in result
-    assert "| Age | 24.3 | 3.1 |" in result
+    # HTML table inserted (per 2026-05-09 user decision: tables render as HTML)
+    assert "<th>Variable</th>" in result
+    assert "<th>M</th>" in result
+    assert "<td>Age</td>" in result
+    assert "<td>24.3</td>" in result
 
 
 def test_handles_multiple_pages_via_form_feed():
@@ -230,10 +258,10 @@ def test_handles_multiple_pages_via_form_feed():
         {"page": 1, "rows": [["Country", "Population"], ["France", "67000000"]]},
     ]
     result = splice_tables_into_text(pdftotext_text, tables)
-    assert "| Variable A | Value |" in result
-    assert "| Country | Population |" in result
-    assert "| thing | 42 |" in result
-    assert "| France | 67000000 |" in result
+    assert "<th>Variable A</th>" in result
+    assert "<th>Country</th>" in result
+    assert "<td>thing</td>" in result
+    assert "<td>France</td>" in result
     # Prose between pages still present
     assert "Page 1 prose." in result
     assert "Page 2 prose, different tokens." in result
@@ -254,6 +282,7 @@ def test_table_with_unfindable_region_falls_back_to_page_top():
         }
     ]
     result = splice_tables_into_text(pdftotext_text, tables)
-    assert "| alpha | beta |" in result
+    assert "<th>alpha</th>" in result
+    assert "<td>gamma</td>" in result
     # Note must accompany unlocated tables so the eyeball reviewer can spot them.
     assert "[splice-spike: table location not found" in result

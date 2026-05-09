@@ -47,26 +47,158 @@ Ip and Feldman
 ### Table 1
 *Jordan et al. (2011) Studies 1b and 3: Summary of Findings.*
 
-|  | Estimation | Average estimation |  | Estimation | Average estimation |  |
-| --- | --- | --- | --- | --- | --- | --- |
-| Experiences | errora | error (%) | t-statistics | error | error (%) | t-statistics |
-| Negative experiences |  | −17.2 | 5.47** |  | −21.4 | 5.99** |
-| Had fight/argument | −13.0*** |  |  | −13.8*** |  |  |
-| Thought about distant friends/ | −28.2*** |  |  | −26.3*** |  |  |
-| family |  |  |  |  |  |  |
-| Thought about enormous | −12.2*** |  |  | −11.3*** |  |  |
-| workload |  |  |  |  |  |  |
-| Was rejected by boy/girl | −8.9*** |  |  | −18.4*** |  |  |
-| Received low grade | −15.9*** |  |  | −23.3*** |  |  |
-| Thought about bad personal | −24.1*** |  |  | −35.0*** |  |  |
-| health habits |  |  |  |  |  |  |
-| Positive experiences |  | +5.6 | 1.18 |  | +3.8 | 1.06 |
-| Received high grade | −3.0 |  |  | −0.3 |  |  |
-| Attended fun party | +20.9*** |  |  | +13.2*** |  |  |
-| Participated in athletics | +13.7*** |  |  | +7.6*** |  |  |
-| Went out with friends | +12.6*** |  |  | +11.5*** |  |  |
-| Talked to distant friends/family | −8.3*** |  |  | −9.9*** |  |  |
-| Had great meal | −2.3 |  |  | +0.5 |  |  |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Estimation</th>
+      <th>Average estimation</th>
+      <th></th>
+      <th>Estimation</th>
+      <th>Average estimation</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Experiences</td>
+      <td>errora</td>
+      <td>error (%)</td>
+      <td>t-statistics</td>
+      <td>error</td>
+      <td>error (%)</td>
+      <td>t-statistics</td>
+    </tr>
+    <tr>
+      <td>Negative experiences</td>
+      <td></td>
+      <td>−17.2</td>
+      <td>5.47**</td>
+      <td></td>
+      <td>−21.4</td>
+      <td>5.99**</td>
+    </tr>
+    <tr>
+      <td>Had fight/argument</td>
+      <td>−13.0***</td>
+      <td></td>
+      <td></td>
+      <td>−13.8***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Thought about distant friends/family</td>
+      <td>−28.2***</td>
+      <td></td>
+      <td></td>
+      <td>−26.3***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Thought about enormous</td>
+      <td>−12.2***</td>
+      <td></td>
+      <td></td>
+      <td>−11.3***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr><td colspan="7"><strong>workload</strong></td></tr>
+    <tr>
+      <td>Was rejected by boy/girl</td>
+      <td>−8.9***</td>
+      <td></td>
+      <td></td>
+      <td>−18.4***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Received low grade</td>
+      <td>−15.9***</td>
+      <td></td>
+      <td></td>
+      <td>−23.3***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Thought about bad personal</td>
+      <td>−24.1***</td>
+      <td></td>
+      <td></td>
+      <td>−35.0***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr><td colspan="7"><strong>health habits</strong></td></tr>
+    <tr>
+      <td>Positive experiences</td>
+      <td></td>
+      <td>+5.6</td>
+      <td>1.18</td>
+      <td></td>
+      <td>+3.8</td>
+      <td>1.06</td>
+    </tr>
+    <tr>
+      <td>Received high grade</td>
+      <td>−3.0</td>
+      <td></td>
+      <td></td>
+      <td>−0.3</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Attended fun party</td>
+      <td>+20.9***</td>
+      <td></td>
+      <td></td>
+      <td>+13.2***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Participated in athletics</td>
+      <td>+13.7***</td>
+      <td></td>
+      <td></td>
+      <td>+7.6***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Went out with friends</td>
+      <td>+12.6***</td>
+      <td></td>
+      <td></td>
+      <td>+11.5***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Talked to distant friends/family</td>
+      <td>−8.3***</td>
+      <td></td>
+      <td></td>
+      <td>−9.9***</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Had great meal</td>
+      <td>−2.3</td>
+      <td></td>
+      <td></td>
+      <td>+0.5</td>
+      <td></td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
 
 Social Comparison Orientation (Exploratory). We aimed to investigate the role of social comparison orientation, the tendency to compare oneself with others, as a potential predictor of misestimation and well-being measures. Gibbons and Buunk (1999) found that individuals with a higher social comparison orientation exhibited greater uncertainty and instability regarding their self-worth. Consequently, they tended to evaluate themselves based on how others were faring in public. This has the potential to be even more pronounced in an era in which social media provides ample opportunities for social comparison.
 Accumulating evidence suggests a positive link between social comparison orientation and threats to psychological wellbeing online, as many social media users tend to selectively present mostly positive aspects of their lives (Vogel et al., 2014).
@@ -82,39 +214,52 @@ Hypothesis
 ### Table 2
 *Replication and Extensions: Summary of Hypotheses.*
 
-| Replication: prevalence estimations |  |
-| --- | --- |
-| No | Hypothesis |
-| 2a | People underestimate the prevalence of others’ negative emotional experiences. |
-| 2b | People do not underestimate the prevalence and extent of others’ positive emotional experiences. |
-|  | [Our reframing of the target’s null hypothesis: Prevalence underestimation errors are stronger for negative |
-|  | experiences than for positive experiences.] |
-| 4 | 4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and |
-|  | well-being.a |
-|  | 4b) There is a negative association between the estimation of the prevalence of positive emotional experiences and |
-|  | well-being.a |
-|  | Negative indicators—higher well-being: lower depressive symptoms, lower loneliness, lower rumination |
-| 4-1 | 4-1a) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
-|  | depressive symptoms. |
-|  | 4-1b) There is a positive association between the estimation of the prevalence of positive emotional experiences and |
-|  | depressive symptoms. |
-| 4-2 | 4-2a) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
-|  | loneliness. |
-|  | 4-2b) There is a positive association between the estimation of the prevalence of positive emotional experiences and |
-|  | loneliness. |
-| 4-3 | 4-3a) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
-|  | rumination. |
-|  | 4-3b) There is a positive association between the estimation of the prevalence of positive emotional experiences and |
-|  | rumination. |
-|  | Positive indicators—higher well-being: higher life-satisfaction, higher subjective happiness. |
-| 4-4 | 4-4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and |
-|  | life satisfaction. |
-|  | 4-4b) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
-|  | life satisfaction. |
-| 4-5 | 4-5a) There is a positive association between the estimation of the prevalence of negative emotional experiences and |
-|  | subjective happiness.b |
-|  | 4-5b) There is a negative association between the estimation of the prevalence of negative emotional experiences and |
-|  | subjective happiness.b |
+<table>
+  <thead>
+    <tr>
+      <th>Replication: prevalence estimations</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>No</td>
+      <td>Hypothesis</td>
+    </tr>
+    <tr>
+      <td>2a</td>
+      <td>People underestimate the prevalence of others’ negative emotional experiences.</td>
+    </tr>
+    <tr>
+      <td>2b</td>
+      <td>People do not underestimate the prevalence and extent of others’ positive emotional experiences.<br>[Our reframing of the target’s null hypothesis: Prevalence underestimation errors are stronger for negative<br>experiences than for positive experiences.]</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and<br>well-being.a<br>4b) There is a negative association between the estimation of the prevalence of positive emotional experiences and<br>well-being.a<br>Negative indicators—higher well-being: lower depressive symptoms, lower loneliness, lower rumination</td>
+    </tr>
+    <tr>
+      <td>4-1</td>
+      <td>4-1a) There is a negative association between the estimation of the prevalence of negative emotional experiences and<br>depressive symptoms.<br>4-1b) There is a positive association between the estimation of the prevalence of positive emotional experiences and<br>depressive symptoms.</td>
+    </tr>
+    <tr>
+      <td>4-2</td>
+      <td>4-2a) There is a negative association between the estimation of the prevalence of negative emotional experiences and<br>loneliness.<br>4-2b) There is a positive association between the estimation of the prevalence of positive emotional experiences and<br>loneliness.</td>
+    </tr>
+    <tr>
+      <td>4-3</td>
+      <td>4-3a) There is a negative association between the estimation of the prevalence of negative emotional experiences and<br>rumination.<br>4-3b) There is a positive association between the estimation of the prevalence of positive emotional experiences and<br>rumination.<br>Positive indicators—higher well-being: higher life-satisfaction, higher subjective happiness.</td>
+    </tr>
+    <tr>
+      <td>4-4</td>
+      <td>4-4a) There is a positive association between the estimation of the prevalence of negative emotional experiences and<br>life satisfaction.<br>4-4b) There is a negative association between the estimation of the prevalence of negative emotional experiences and<br>life satisfaction.</td>
+    </tr>
+    <tr>
+      <td>4-5</td>
+      <td>4-5a) There is a positive association between the estimation of the prevalence of negative emotional experiences and<br>subjective happiness.b<br>4-5b) There is a negative association between the estimation of the prevalence of negative emotional experiences and<br>subjective happiness.b</td>
+    </tr>
+  </tbody>
+</table>
 
 2d People overestimate the intensity of others’ positive emotional experiences.c
 
@@ -180,16 +325,44 @@ Replication
 ### Table 3
 *Comparison of Target Article Versus Replication: Differences and Similarities.*
 
-| StudyJordan et al. (2011) Study 1b | Jordan et al. (2011) Study 3Replication |
-| --- | --- |
-| Sample size80 | 104594 |
-| Geographic originU.S. American studentsU.S. American students | U.S. American students on prolific |
-| Gender35 males, 45 females, 0 other/did | 51 males, 54 females, 0 other/did 290 males, 285 females, 19 other/did not |
-| not disclosenot disclose | disclose |
-| Medium (location)Paper-and-penComputer (online) | Computer (online) |
-| CompensationN/ANominal payment | Nominal payment (2 British pounds for an |
-|  | estimated 12 min completion time) |
-| Year2011 or earlier2011 or earlier | 2023 |
+<table>
+  <thead>
+    <tr>
+      <th>StudyJordan et al. (2011) Study 1b</th>
+      <th>Jordan et al. (2011) Study 3Replication</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Sample size80</td>
+      <td>104594</td>
+    </tr>
+    <tr>
+      <td>Geographic originU.S. American studentsU.S. American students</td>
+      <td>U.S. American students on prolific</td>
+    </tr>
+    <tr>
+      <td>Gender35 males, 45 females, 0 other/did</td>
+      <td>51 males, 54 females, 0 other/did 290 males, 285 females, 19 other/did not</td>
+    </tr>
+    <tr>
+      <td>not disclosenot disclose</td>
+      <td>disclose</td>
+    </tr>
+    <tr>
+      <td>Medium (location)Paper-and-penComputer (online)</td>
+      <td>Computer (online)</td>
+    </tr>
+    <tr>
+      <td>CompensationN/ANominal payment</td>
+      <td>Nominal payment (2 British pounds for an<br>estimated 12 min completion time)</td>
+    </tr>
+    <tr>
+      <td>Year2011 or earlier2011 or earlier</td>
+      <td>2023</td>
+    </tr>
+  </tbody>
+</table>
 
 For exploratory purposes, we included three questions that asked participants to provide short sentences regarding their perceptions of the test items they had previously rated, to help us better understand participants’ mindsets when answering some of the items from the target article, to address the possibility of puzzling or surprising findings using these items.
 Participants then completed measures assessing their loneliness, rumination tendency, depressive symptoms, life satisfaction, subjective happiness, and social comparison orientation. We randomized the order of the six well-being and trait measures. Finally, participants answered a funneling section, provided demographic information, and were debriefed.
@@ -208,6 +381,29 @@ We calculated the actual intensity of emotional experience by calculating the av
 This means that for both prevalence and intensity, a misestimation score higher than zero indicates an overestimation, and a score lower than zero indicates an underestimation.
 
 Ip and Feldman
+
+### Table 4
+*Replication and Extension: Experimental Design and Measures.*
+
+```
+IV1: estimation of positive emotional events IV1: estimation of negative emotional events
+“Felt happy because they. . .”
+“Felt sad because they. . .”
+1.  Received high grades
+1.  Had a fight or argument
+2.  Attended fun party
+2.  Thought about distant friends or family
+3.  Participated in athletics
+3.  Thought about enormous workload
+4.  They went out with friends
+4.  Were rejected by someone
+5.  They talked to distant friends or family
+5.  Received a low grade
+6.  Had great meal
+6.  Thought about bad personal health habits
+DV1: prevalence and intensity of own emotional experiences [replication + extension]
+“For each of the following emotional experiences, please indicate whether you have experienced those
+```
 
 sometime in the past 2 weeks and if you have—the intensity of the emotion.
 
@@ -339,18 +535,48 @@ Close to far replication
 ### Table 5
 *Classification of the Replication Based on LeBel et al. (2018).*
 
-| Design facet | Replication | Details of deviation | Reasons for change |
-| --- | --- | --- | --- |
-| IV construct | Same, with an |  |  |
-|  | extension |  |  |
-| DV construct | Similar, with an added | We separated prevalence from intensity, by adjusting | We proposed that social |
-|  | extension | the self-report measure and adding a separate | comparison orientation |
-|  |  | measure estimating emotional intensity. | may interact with the |
-|  |  | We added a social comparison orientation individual | misperception and |
-|  |  | differences measure. | contribute to differential |
-|  |  |  | well-being outcomes. |
-| IV operationalization | Similar |  |  |
-| DV operationalization | Similar | Original: Study 1b conflated emotional prevalence |  |
+<table>
+  <thead>
+    <tr>
+      <th>Design facet</th>
+      <th>Replication</th>
+      <th>Details of deviation</th>
+      <th>Reasons for change</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IV construct</td>
+      <td>Same, with an</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>extension</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DV construct</td>
+      <td>Similar, with an added<br>extension</td>
+      <td>We separated prevalence from intensity, by adjusting<br>the self-report measure and adding a separate<br>measure estimating emotional intensity.<br>We added a social comparison orientation individual<br>differences measure.</td>
+      <td>We proposed that social<br>comparison orientation<br>may interact with the<br>misperception and<br>contribute to differential<br>well-being outcomes.</td>
+    </tr>
+    <tr>
+      <td>IV operationalization</td>
+      <td>Similar</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>DV operationalization</td>
+      <td>Similar</td>
+      <td>Original: Study 1b conflated emotional prevalence</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
 
 whether SCO interacts with estimation error in predicting well-being measures.
 Outliers and Exclusions.  We followed the preregistered plan to only include responses from participants who completed the
@@ -426,29 +652,281 @@ Actual Intensity
 ### Table 7
 *Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.*
 
-|  |  |  |  | Participant-level analyses |  |  |  |  |  | Item-level analyses |  |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-|  | Actual | Intensity |  |  |  |  |  |  |  |  |  |
-|  | intensity | estimate | Error | Error |  |  |  |  |  |  |  |
-| Experiences | average | mean | mean | SD | t-stat | p | Cohen’s d and CI | t-stat | df | p | Cohen’s d and CI |
-| Negative experiences |  |  |  |  |  |  |  |  |  |  |  |
-| Had fight/argument | 42.63 | 59.64 | 17.01 | 22.27 | 18.62 | <.001 | 0.76 [0.67, 0.86] | / | / | / | / |
-| Thought about distant friends/ family | 42.65 | 48.48 | 5.84 | 21.48 | 6.62 | <.001 | 0.27 [0.19, 0.35] | / | / | / | / |
-| Thought about enormous workload | 50.81 | 60.44 | 9.63 | 22.13 | 10.60 | <.001 | 0.43 [0.35, 0.52] | / | / | / | / |
-| Was rejected by boy/girl | 33.00 | 58.16 | 25.17 | 23.94 | 25.62 | <.001 | 1.05 [0.95, 1.15] | / | / | / | / |
-| Received low grade | 37.05 | 53.65 | 16.60 | 22.46 | 18.01 | <.001 | 0.74 [0.65, 0.83] | / | / | / | / |
-| Thought about bad personal health | 44.07 | 45.07 | 1.01 | 21.93 | 1.12 | =.264 | 0.05 [−0.03, 0.13] | / | / | / | / |
-| habits |  |  |  |  |  |  |  |  |  |  |  |
-| Overall negative | 41.70 | 54.24 | 12.54 | 15.73 | 19.42 | <.001 | 0.80 [0.70, 0.89] | 3.51 | 5 | .017 | 1.43 [0.23, 2.58] |
-| Positive experiences |  |  |  |  |  |  |  |  |  |  |  |
-| Received high grade | 56.07 | 60.56 | 4.50 | 22.39 | 4.90 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
-| Attended fun party | 50.63 | 62.65 | 12.03 | 21.35 | 13.73 | <.001 | 0.56 [0.48, 0.65] | / | / | / | / |
-| Participated in athletics | 44.95 | 49.35 | 4.40 | 22.16 | 4.84 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
-| Went out with friends | 59.11 | 67.65 | 8.54 | 19.47 | 10.69 | <.001 | 0.44 [0.35, 0.52] | / | / | / | / |
-| Talked to distant friends/family | 52.03 | 57.96 | 5.93 | 20.29 | 7.12 | <.001 | 0.29 [0.21, 0.37] | / | / | / | / |
-| Had great meal | 58.80 | 57.03 | −1.77 | 23.40 | −1.85 | =.065 | −0.08 [−0.16, 0.004] | / | / | / | / |
-| Overall positive | 53.60 | 59.20 | 5.60 | 16.16 | 8.45 | <.001 | 0.35 [0.26, 0.43] | 2.97 | 5 | .031 | 1.21 [0.099, 2.26] |
-| Overall: positive and negative combined | 47.65 | 56.72 | 9.07 | 13.83 | 15.99 | <.001 | 0.66 [0.57, 0.74] | 4.14 | 11 | .002 | 1.20 [0.43, 1.90] |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>Participant-level analyses</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>Item-level analyses</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td></td>
+      <td>Actual</td>
+      <td>Intensity</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>intensity</td>
+      <td>estimate</td>
+      <td>Error</td>
+      <td>Error</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Experiences</td>
+      <td>average</td>
+      <td>mean</td>
+      <td>mean</td>
+      <td>SD</td>
+      <td>t-stat</td>
+      <td>p</td>
+      <td>Cohen’s d and CI</td>
+      <td>t-stat</td>
+      <td>df</td>
+      <td>p</td>
+      <td>Cohen’s d and CI</td>
+    </tr>
+    <tr><td colspan="12"><strong>Negative experiences</strong></td></tr>
+    <tr>
+      <td>Had fight/argument</td>
+      <td>42.63</td>
+      <td>59.64</td>
+      <td>17.01</td>
+      <td>22.27</td>
+      <td>18.62</td>
+      <td>&lt;.001</td>
+      <td>0.76 [0.67, 0.86]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Thought about distant friends/ family</td>
+      <td>42.65</td>
+      <td>48.48</td>
+      <td>5.84</td>
+      <td>21.48</td>
+      <td>6.62</td>
+      <td>&lt;.001</td>
+      <td>0.27 [0.19, 0.35]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Thought about enormous workload</td>
+      <td>50.81</td>
+      <td>60.44</td>
+      <td>9.63</td>
+      <td>22.13</td>
+      <td>10.60</td>
+      <td>&lt;.001</td>
+      <td>0.43 [0.35, 0.52]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Was rejected by boy/girl</td>
+      <td>33.00</td>
+      <td>58.16</td>
+      <td>25.17</td>
+      <td>23.94</td>
+      <td>25.62</td>
+      <td>&lt;.001</td>
+      <td>1.05 [0.95, 1.15]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Received low grade</td>
+      <td>37.05</td>
+      <td>53.65</td>
+      <td>16.60</td>
+      <td>22.46</td>
+      <td>18.01</td>
+      <td>&lt;.001</td>
+      <td>0.74 [0.65, 0.83]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Thought about bad personal health</td>
+      <td>44.07</td>
+      <td>45.07</td>
+      <td>1.01</td>
+      <td>21.93</td>
+      <td>1.12</td>
+      <td>=.264</td>
+      <td>0.05 [−0.03, 0.13]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr><td colspan="12"><strong>habits</strong></td></tr>
+    <tr>
+      <td>Overall negative</td>
+      <td>41.70</td>
+      <td>54.24</td>
+      <td>12.54</td>
+      <td>15.73</td>
+      <td>19.42</td>
+      <td>&lt;.001</td>
+      <td>0.80 [0.70, 0.89]</td>
+      <td>3.51</td>
+      <td>5</td>
+      <td>.017</td>
+      <td>1.43 [0.23, 2.58]</td>
+    </tr>
+    <tr><td colspan="12"><strong>Positive experiences</strong></td></tr>
+    <tr>
+      <td>Received high grade</td>
+      <td>56.07</td>
+      <td>60.56</td>
+      <td>4.50</td>
+      <td>22.39</td>
+      <td>4.90</td>
+      <td>&lt;.001</td>
+      <td>0.20 [0.12, 0.28]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Attended fun party</td>
+      <td>50.63</td>
+      <td>62.65</td>
+      <td>12.03</td>
+      <td>21.35</td>
+      <td>13.73</td>
+      <td>&lt;.001</td>
+      <td>0.56 [0.48, 0.65]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Participated in athletics</td>
+      <td>44.95</td>
+      <td>49.35</td>
+      <td>4.40</td>
+      <td>22.16</td>
+      <td>4.84</td>
+      <td>&lt;.001</td>
+      <td>0.20 [0.12, 0.28]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Went out with friends</td>
+      <td>59.11</td>
+      <td>67.65</td>
+      <td>8.54</td>
+      <td>19.47</td>
+      <td>10.69</td>
+      <td>&lt;.001</td>
+      <td>0.44 [0.35, 0.52]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Talked to distant friends/family</td>
+      <td>52.03</td>
+      <td>57.96</td>
+      <td>5.93</td>
+      <td>20.29</td>
+      <td>7.12</td>
+      <td>&lt;.001</td>
+      <td>0.29 [0.21, 0.37]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Had great meal</td>
+      <td>58.80</td>
+      <td>57.03</td>
+      <td>−1.77</td>
+      <td>23.40</td>
+      <td>−1.85</td>
+      <td>=.065</td>
+      <td>−0.08 [−0.16, 0.004]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Overall positive</td>
+      <td>53.60</td>
+      <td>59.20</td>
+      <td>5.60</td>
+      <td>16.16</td>
+      <td>8.45</td>
+      <td>&lt;.001</td>
+      <td>0.35 [0.26, 0.43]</td>
+      <td>2.97</td>
+      <td>5</td>
+      <td>.031</td>
+      <td>1.21 [0.099, 2.26]</td>
+    </tr>
+    <tr>
+      <td>Overall: positive and negative combined</td>
+      <td>47.65</td>
+      <td>56.72</td>
+      <td>9.07</td>
+      <td>13.83</td>
+      <td>15.99</td>
+      <td>&lt;.001</td>
+      <td>0.66 [0.57, 0.74]</td>
+      <td>4.14</td>
+      <td>11</td>
+      <td>.002</td>
+      <td>1.20 [0.43, 1.90]</td>
+    </tr>
+  </tbody>
+</table>
 
 Table 8.  Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.
 
@@ -542,6 +1020,41 @@ M SD Alpha
 
 Note. df = 592. SCO = social comparison orientation. *p < .05. **p < .01. ***p < .001.
 
+### Table 9
+*Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al. (2011)’s Study 3 Versus Replication.*
+
+```
+Jordan et al. (2011)
+Replication
+Measure
+β for negative β for positive
+β for negative β for positive
+prevalence prevalence
+prevalence prevalence
+Cronbach’s α estimate
+estimate R2
+estimate
+estimate R2
+Interpretation
+Negative
+Loneliness
+.81
+Rumination/brooding
+.72
+Depressive symptoms
+.73
+Positive
+Satisfaction with life
+.84
+Subjective Happiness
+.80
+Number of confidants
+/
+Social orientation scale
+/
+(extension)
+```
+
 −.30** −.28**
 .00
 .23* .19 N/A
@@ -576,17 +1089,40 @@ Negative well-being  Loneliness  Rumination/brooding  Depressive symptoms 
 ### Table 10
 *Intensity Estimates Regression Coefficients with Outcomes (Extension).*
 
-| Ip and Feldman | 15 |
-| --- | --- |
-| Outcomes (Extension). |  |
-|  | ported and documented below p < .05, yet we strongly cau- |
-|  | tion against over-interpreting those and recommend focusing |
-| β for negative β for positive |  |
-|  | on the much stronger and clearer main effects. |
-| prevalence prevalence |  |
-| MeasureestimateR2estimate |  |
-| Negative well-being | Discussion |
-| Loneliness.29***−.21***.07 |  |
+<table>
+  <thead>
+    <tr>
+      <th>Ip and Feldman</th>
+      <th>15</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Outcomes (Extension).</td>
+      <td>ported and documented below p &lt; .05, yet we strongly cau-<br>tion against over-interpreting those and recommend focusing</td>
+    </tr>
+    <tr>
+      <td>β for negative β for positive</td>
+      <td>on the much stronger and clearer main effects.</td>
+    </tr>
+    <tr>
+      <td>prevalence prevalence</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>MeasureestimateR2estimate</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Negative well-being</td>
+      <td>Discussion</td>
+    </tr>
+    <tr>
+      <td>Loneliness.29***−.21***.07</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
 
 ## Discussion
 
@@ -680,151 +1216,678 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
 
 ## Tables (unlocated in body)
 
-### Table 4
-*Replication and Extension: Experimental Design and Measures.*
-
-| Ip and Feldman | 7 |
-| --- | --- |
-| IV1: positive vs. negative | IV1: estimation of negative emotional eventsIV1: estimation of positive emotional events |
-| emotions (within; all | “Felt sad because they. . .”“Felt happy because they. . .” |
-| participants rated both) | 1.  Had a fight or argument1. Received high grades |
-| IV2: self vs. others rating (within; all | 2. Thought about distant friends or family2. Attended fun party |
-| participants rated both) | 3. Thought about enormous workload3. Participated in athletics |
+<table>
+  <thead>
+    <tr>
+      <th>Ip and Feldman</th>
+      <th>7</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IV1: positive vs. negative</td>
+      <td>IV1: estimation of negative emotional eventsIV1: estimation of positive emotional events</td>
+    </tr>
+    <tr>
+      <td>emotions (within; all</td>
+      <td>“Felt sad because they. . .”“Felt happy because they. . .”</td>
+    </tr>
+    <tr>
+      <td>participants rated both)</td>
+      <td>1.  Had a fight or argument1. Received high grades</td>
+    </tr>
+    <tr>
+      <td>IV2: self vs. others rating (within; all</td>
+      <td>2. Thought about distant friends or family2. Attended fun party</td>
+    </tr>
+    <tr>
+      <td>participants rated both)</td>
+      <td>3. Thought about enormous workload3. Participated in athletics</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Table 6
 *Prevalence of Emotional Experiences (Replication and Extension): One-Sample t-Tests of Estimation Error.*
 
-| 10 | Personality and Social Psychology Bulletin 00(0) |
-| --- | --- |
-| analyses (alpha = .005). We found support for misestimation | analyses on the emotional intensity measures. We began with |
-| effects  (see  below)  using  the  full  sample  (N  =  594)  and | item-level  one-sample  t-tests  and  found  support  for |
-| therefore did not proceed to conduct or report the analyses | Hypothesis  2d  with  an  overestimation  of  positive  experi- |
-| with exclusions. | ences  (t(5)  =  2.97,  p  =  .031,  d  =  1.21,  95%  CI  [0.099, |
-|  | 2.26]), yet contrary to our expectations in Hypothesis 2c, we |
-|  | also found an overestimation for negative experiences (t(5) |
-| Results |  |
-|  | = 3.51, p = .017, d = 1.43, [0.23, 2.58]). |
-| Prevalence Estimate Errors (Replication) | The participant-level analyses showed a similar trend, as |
-|  | we found support for the expected overestimation of positive |
-| We summarized descriptives in Tables 6 (prevalence) and 7 |  |
-|  | emotional experiences (M = 5.60; t(593) = 8.45, p < .001, d |
-| (intensity), and correlations in Table 8. |  |
-|  | =  0.35,  95%  CI  [0.26,  0.43]),  and  again  the  unexpected |
-| Consistent with Hypothesis 2a and the original findings, |  |
-|  | overestimation  of  negative  emotional  experiences  (M  = |
-| we found support for an underestimation of others’ negative |  |
-|  | 12.54; t(593) = 19.42, p < .001, d = 0.80, [0.70, 0.89]). We |
-| emotional experiences. Mirroring the analyses conducted in |  |
-|  | ran one-sample t-tests for each of the experiences and found |
-| the  original  article,  we  computed  the  estimation  error  for |  |
-|  | that  participants  overestimated  five  out  of  the  six  negative |
-| each item of positive and negative experiences by comparing |  |
-|  | emotional experiences and five out of the six positive emo- |
-| the self-rating with ratings for their peers. We conducted an |  |
-|  | tional experiences. |
-| item-level  one-sample  t-test  on  the  estimation  errors  to |  |
-|  | Mirroring the target’s analyses for item-level prevalence |
-| examine  if  they  differed  from  0. We  found  support  for  the |  |
-|  | comparing positive and negative, we ran the same analysis |
-| expected  underestimation  of  negative  (t(5)  =  −4.30,  p  = |  |
-|  | for intensity estimates and found no signal for difference in |
-| .008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for |  |
-|  | overestimation  error  between  negative  and  positive  emo- |
-| an unexpected underestimation of positive experiences (t(5) |  |
-|  | tional experiences, though large effect size (t(10) = 1.72, p |
-| = −3.67, p = .014, d = −1.50, [−2.67, −0.26]). |  |
-|  | = .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most |
-| We  further  extended  our  analyses  to  a  series  of  partici- |  |
-|  | likely due to the small number of items a power analysis of |
-| pant-level one-sample t-tests on the estimation error of emo- |  |
-|  | which  shows  an  unreasonably  large  effect  in  order  to  be |
-| tional experiences, summarized in Table 6. Overall, we found |  |
-|  | detectable with null hypothesis significance testing. We sup- |
-| support for participants’ underestimation of all six negative |  |
-|  | plemented  the  item-level  analysis  by  conducting  a  partici- |
-| emotional experiences  and of  five of  the six positive emo- |  |
-|  | pant-level paired sample t-test, which was far better powered, |
-| tional  experiences.  The  participant-level  analyses  mirrored |  |
-|  | and  indeed  found  support  for  stronger  overestimation  for |
-| that of the item-level analyses, with support for the expected |  |
-|  | negative experiences than for positive experiences (t(593) = |
-| underestimation  of  negative  emotional  experiences  (M  = |  |
-|  | 10.63, p < .001, d = 0.44, [0.35, 0.52]). |
-| 23.56; t(593) = −35.02, p < .001, d = −1.44, 95% CI [−1.55, |  |
-| −1.32]),  yet  again  with  the  unexpected  underestimation  of |  |
-| positive emotional experiences (M = 15.97; t(593) = −24.17, |  |
-|  | Prevalence Estimates Associations with Well- |
-| p < .001, d = −0.99, [−1.09, −0.89]). |  |
-|  | Being (Replication) |
-| Partially consistent with Hypothesis 2b, the underestima- |  |
-| tion of negative experiences was stronger than positive experi- | We  summarized  the  Pearson’s  correlations  in  Table  8,  and |
-| ences, yet only for the participant-level analysis. Specifically, | the  regression  model  findings  predicting  well-being  from |
-| for  the  item-level  analyses,  we  ran  an  independent  samples | negative and positive prevalence estimates in Table 9 (com- |
-| t-test comparing negative and positive emotional experiences | paring with the target’s). |
-| and did not find support for Hypothesis 2b in estimation error | Inconsistent  with  and  opposite  to  Hypothesis  4,  preva- |
-| (t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We | lence  estimations  of  negative  emotional  experiences  were |
-| anticipated this in advance, given that the item-level analysis | negatively associated with well-being, as indicated by a neg- |
-| had too few items and therefore power to detect such differ- | ative association with life satisfaction (β = −.23, t(591) = |
-| ences, which is why we planned and preregistered to also run | −4.87, p < .001), and subjective happiness (β = −.26, t(591) |
-| participant-level analyses, which we felt were more appropri- | =  −5.59,  p < .001),  and  a  positive  association  with  loneli- |
-| ate  and  accurate.  The  participant-level  paired-samples  t-test | ness (β = .33, t(591) = 7.04, p < .001), brooding (β = .37, |
-| analysis allowed us to find support for a larger estimation error | t(591)  =  8.08,  p < .001),  depressive  symptoms  (β  =  .41, |
-| for  negative  compared  to  positive  experiences  (t(593)  = | t(591) = 9.01, p < .001). On the other hand, positive preva- |
-| −11.90, p < .001, d = −0.49, [−0.57, −0.40]). | lence estimates were negatively associated with loneliness (β |
-|  | = −.25, t(591) = −5.40, p < .001), and depressive symptoms |
-|  | (β = −.22, t(591) = −4.69, p < .001), and positively associ- |
-| Intensity Estimate Errors (Extension) |  |
-|  | ated with life satisfaction (β = .25, t(591) = 5.35, p < .001), |
-| To  test  whether  underestimation  of  emotional  experiences | subjective happiness (β = .32, t(591) = 6.73, p < .001), and |
-| also  extends  to  emotional  intensity,  we  conducted  similar | the number of confidants (β = .19, t(591) = 3.98, p < .001). |
+<table>
+  <thead>
+    <tr>
+      <th>10</th>
+      <th>Personality and Social Psychology Bulletin 00(0)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>analyses (alpha = .005). We found support for misestimation</td>
+      <td>analyses on the emotional intensity measures. We began with</td>
+    </tr>
+    <tr>
+      <td>effects  (see  below)  using  the  full  sample  (N  =  594)  and</td>
+      <td>item-level  one-sample  t-tests  and  found  support  for</td>
+    </tr>
+    <tr>
+      <td>therefore did not proceed to conduct or report the analyses</td>
+      <td>Hypothesis  2d  with  an  overestimation  of  positive  experi-</td>
+    </tr>
+    <tr>
+      <td>with exclusions.</td>
+      <td>ences  (t(5)  =  2.97,  p  =  .031,  d  =  1.21,  95%  CI  [0.099,<br>2.26]), yet contrary to our expectations in Hypothesis 2c, we<br>also found an overestimation for negative experiences (t(5)</td>
+    </tr>
+    <tr>
+      <td>Results</td>
+      <td>= 3.51, p = .017, d = 1.43, [0.23, 2.58]).</td>
+    </tr>
+    <tr>
+      <td>Prevalence Estimate Errors (Replication)</td>
+      <td>The participant-level analyses showed a similar trend, as<br>we found support for the expected overestimation of positive</td>
+    </tr>
+    <tr>
+      <td>We summarized descriptives in Tables 6 (prevalence) and 7</td>
+      <td>emotional experiences (M = 5.60; t(593) = 8.45, p &lt; .001, d</td>
+    </tr>
+    <tr>
+      <td>(intensity), and correlations in Table 8.</td>
+      <td>=  0.35,  95%  CI  [0.26,  0.43]),  and  again  the  unexpected</td>
+    </tr>
+    <tr>
+      <td>Consistent with Hypothesis 2a and the original findings,</td>
+      <td>overestimation  of  negative  emotional  experiences  (M  =</td>
+    </tr>
+    <tr>
+      <td>we found support for an underestimation of others’ negative</td>
+      <td>12.54; t(593) = 19.42, p &lt; .001, d = 0.80, [0.70, 0.89]). We</td>
+    </tr>
+    <tr>
+      <td>emotional experiences. Mirroring the analyses conducted in</td>
+      <td>ran one-sample t-tests for each of the experiences and found</td>
+    </tr>
+    <tr>
+      <td>the  original  article,  we  computed  the  estimation  error  for</td>
+      <td>that  participants  overestimated  five  out  of  the  six  negative</td>
+    </tr>
+    <tr>
+      <td>each item of positive and negative experiences by comparing</td>
+      <td>emotional experiences and five out of the six positive emo-</td>
+    </tr>
+    <tr>
+      <td>the self-rating with ratings for their peers. We conducted an</td>
+      <td>tional experiences.</td>
+    </tr>
+    <tr>
+      <td>item-level  one-sample  t-test  on  the  estimation  errors  to</td>
+      <td>Mirroring the target’s analyses for item-level prevalence</td>
+    </tr>
+    <tr>
+      <td>examine  if  they  differed  from  0. We  found  support  for  the</td>
+      <td>comparing positive and negative, we ran the same analysis</td>
+    </tr>
+    <tr>
+      <td>expected  underestimation  of  negative  (t(5)  =  −4.30,  p  =</td>
+      <td>for intensity estimates and found no signal for difference in</td>
+    </tr>
+    <tr>
+      <td>.008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for</td>
+      <td>overestimation  error  between  negative  and  positive  emo-</td>
+    </tr>
+    <tr>
+      <td>an unexpected underestimation of positive experiences (t(5)</td>
+      <td>tional experiences, though large effect size (t(10) = 1.72, p</td>
+    </tr>
+    <tr>
+      <td>= −3.67, p = .014, d = −1.50, [−2.67, −0.26]).</td>
+      <td>= .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most</td>
+    </tr>
+    <tr>
+      <td>We  further  extended  our  analyses  to  a  series  of  partici-pant-level one-sample t-tests on the estimation error of emo-tional experiences, summarized in Table 6. Overall, we found</td>
+      <td>likely due to the small number of items a power analysis of<br>which  shows  an  unreasonably  large  effect  in  order  to  be<br>detectable with null hypothesis significance testing. We sup-</td>
+    </tr>
+    <tr>
+      <td>support for participants’ underestimation of all six negative</td>
+      <td>plemented  the  item-level  analysis  by  conducting  a  partici-</td>
+    </tr>
+    <tr>
+      <td>emotional experiences  and of  five of  the six positive emo-tional  experiences.  The  participant-level  analyses  mirrored</td>
+      <td>pant-level paired sample t-test, which was far better powered,<br>and  indeed  found  support  for  stronger  overestimation  for</td>
+    </tr>
+    <tr>
+      <td>that of the item-level analyses, with support for the expected</td>
+      <td>negative experiences than for positive experiences (t(593) =</td>
+    </tr>
+    <tr>
+      <td>underestimation  of  negative  emotional  experiences  (M  =</td>
+      <td>10.63, p &lt; .001, d = 0.44, [0.35, 0.52]).</td>
+    </tr>
+    <tr>
+      <td>23.56; t(593) = −35.02, p &lt; .001, d = −1.44, 95% CI [−1.55,</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>−1.32]),  yet  again  with  the  unexpected  underestimation  of</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>positive emotional experiences (M = 15.97; t(593) = −24.17,</td>
+      <td>Prevalence Estimates Associations with Well-</td>
+    </tr>
+    <tr>
+      <td>p &lt; .001, d = −0.99, [−1.09, −0.89]).</td>
+      <td>Being (Replication)</td>
+    </tr>
+    <tr>
+      <td>Partially consistent with Hypothesis 2b, the underestima-</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>tion of negative experiences was stronger than positive experi-</td>
+      <td>We  summarized  the  Pearson’s  correlations  in  Table  8,  and</td>
+    </tr>
+    <tr>
+      <td>ences, yet only for the participant-level analysis. Specifically,</td>
+      <td>the  regression  model  findings  predicting  well-being  from</td>
+    </tr>
+    <tr>
+      <td>for  the  item-level  analyses,  we  ran  an  independent  samples</td>
+      <td>negative and positive prevalence estimates in Table 9 (com-</td>
+    </tr>
+    <tr>
+      <td>t-test comparing negative and positive emotional experiences</td>
+      <td>paring with the target’s).</td>
+    </tr>
+    <tr>
+      <td>and did not find support for Hypothesis 2b in estimation error</td>
+      <td>Inconsistent  with  and  opposite  to  Hypothesis  4,  preva-</td>
+    </tr>
+    <tr>
+      <td>(t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We</td>
+      <td>lence  estimations  of  negative  emotional  experiences  were</td>
+    </tr>
+    <tr>
+      <td>anticipated this in advance, given that the item-level analysis</td>
+      <td>negatively associated with well-being, as indicated by a neg-</td>
+    </tr>
+    <tr>
+      <td>had too few items and therefore power to detect such differ-</td>
+      <td>ative association with life satisfaction (β = −.23, t(591) =</td>
+    </tr>
+    <tr>
+      <td>ences, which is why we planned and preregistered to also run</td>
+      <td>−4.87, p &lt; .001), and subjective happiness (β = −.26, t(591)</td>
+    </tr>
+    <tr>
+      <td>participant-level analyses, which we felt were more appropri-</td>
+      <td>=  −5.59,  p &lt; .001),  and  a  positive  association  with  loneli-</td>
+    </tr>
+    <tr>
+      <td>ate  and  accurate.  The  participant-level  paired-samples  t-test</td>
+      <td>ness (β = .33, t(591) = 7.04, p &lt; .001), brooding (β = .37,</td>
+    </tr>
+    <tr>
+      <td>analysis allowed us to find support for a larger estimation error</td>
+      <td>t(591)  =  8.08,  p &lt; .001),  depressive  symptoms  (β  =  .41,</td>
+    </tr>
+    <tr>
+      <td>for  negative  compared  to  positive  experiences  (t(593)  =</td>
+      <td>t(591) = 9.01, p &lt; .001). On the other hand, positive preva-</td>
+    </tr>
+    <tr>
+      <td>−11.90, p &lt; .001, d = −0.49, [−0.57, −0.40]).</td>
+      <td>lence estimates were negatively associated with loneliness (β<br>= −.25, t(591) = −5.40, p &lt; .001), and depressive symptoms<br>(β = −.22, t(591) = −4.69, p &lt; .001), and positively associ-</td>
+    </tr>
+    <tr>
+      <td>Intensity Estimate Errors (Extension)</td>
+      <td>ated with life satisfaction (β = .25, t(591) = 5.35, p &lt; .001),</td>
+    </tr>
+    <tr>
+      <td>To  test  whether  underestimation  of  emotional  experiences</td>
+      <td>subjective happiness (β = .32, t(591) = 6.73, p &lt; .001), and</td>
+    </tr>
+    <tr>
+      <td>also  extends  to  emotional  intensity,  we  conducted  similar</td>
+      <td>the number of confidants (β = .19, t(591) = 3.98, p &lt; .001).</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Table 8
 *Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.*
 
-|  | Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error. |  |  |  |  |  |  |  |  |  |  |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-|  |  |  |  | Participant-level analyses |  |  |  |  |  | Item-level analyses |  |
-|  | Actual | Intensity |  |  |  |  |  |  |  |  |  |
-|  | intensity | estimate | Error | Error |  |  |  |  |  |  |  |
-| Experiences | average | mean | mean | SD | t-stat | p | Cohen’s d and CI | t-stat | df | p | Cohen’s d and CI |
-| Negative experiences |  |  |  |  |  |  |  |  |  |  |  |
-| Had fight/argument | 42.63 | 59.64 | 17.01 | 22.27 | 18.62 | <.001 | 0.76 [0.67, 0.86] | / | / | / | / |
-| Thought about distant friends/ family | 42.65 | 48.48 | 5.84 | 21.48 | 6.62 | <.001 | 0.27 [0.19, 0.35] | / | / | / | / |
-| Thought about enormous workload | 50.81 | 60.44 | 9.63 | 22.13 | 10.60 | <.001 | 0.43 [0.35, 0.52] | / | / | / | / |
-| Was rejected by boy/girl | 33.00 | 58.16 | 25.17 | 23.94 | 25.62 | <.001 | 1.05 [0.95, 1.15] | / | / | / | / |
-| Received low grade | 37.05 | 53.65 | 16.60 | 22.46 | 18.01 | <.001 | 0.74 [0.65, 0.83] | / | / | / | / |
-| Thought about bad personal health | 44.07 | 45.07 | 1.01 | 21.93 | 1.12 | =.264 | 0.05 [−0.03, 0.13] | / | / | / | / |
-| habits |  |  |  |  |  |  |  |  |  |  |  |
-| Overall negative | 41.70 | 54.24 | 12.54 | 15.73 | 19.42 | <.001 | 0.80 [0.70, 0.89] | 3.51 | 5 | .017 | 1.43 [0.23, 2.58] |
-| Positive experiences |  |  |  |  |  |  |  |  |  |  |  |
-| Received high grade | 56.07 | 60.56 | 4.50 | 22.39 | 4.90 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
-| Attended fun party | 50.63 | 62.65 | 12.03 | 21.35 | 13.73 | <.001 | 0.56 [0.48, 0.65] | / | / | / | / |
-| Participated in athletics | 44.95 | 49.35 | 4.40 | 22.16 | 4.84 | <.001 | 0.20 [0.12, 0.28] | / | / | / | / |
-| Went out with friends | 59.11 | 67.65 | 8.54 | 19.47 | 10.69 | <.001 | 0.44 [0.35, 0.52] | / | / | / | / |
-| Talked to distant friends/family | 52.03 | 57.96 | 5.93 | 20.29 | 7.12 | <.001 | 0.29 [0.21, 0.37] | / | / | / | / |
-| Had great meal | 58.80 | 57.03 | −1.77 | 23.40 | −1.85 | =.065 | −0.08 [−0.16, 0.004] | / | / | / | / |
-| Overall positive | 53.60 | 59.20 | 5.60 | 16.16 | 8.45 | <.001 | 0.35 [0.26, 0.43] | 2.97 | 5 | .031 | 1.21 [0.099, 2.26] |
-| Overall: positive and negative combined | 47.65 | 56.72 | 9.07 | 13.83 | 15.99 | <.001 | 0.66 [0.57, 0.74] | 4.14 | 11 | .002 | 1.20 [0.43, 1.90] |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.</th>
+      <th></th>
+      <th></th>
+      <th>Participant-level analyses</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>Item-level analyses</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td></td>
+      <td>Actual</td>
+      <td>Intensity</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>intensity</td>
+      <td>estimate</td>
+      <td>Error</td>
+      <td>Error</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Experiences</td>
+      <td>average</td>
+      <td>mean</td>
+      <td>mean</td>
+      <td>SD</td>
+      <td>t-stat</td>
+      <td>p</td>
+      <td>Cohen’s d and CI</td>
+      <td>t-stat</td>
+      <td>df</td>
+      <td>p</td>
+      <td>Cohen’s d and CI</td>
+    </tr>
+    <tr><td colspan="12"><strong>Negative experiences</strong></td></tr>
+    <tr>
+      <td>Had fight/argument</td>
+      <td>42.63</td>
+      <td>59.64</td>
+      <td>17.01</td>
+      <td>22.27</td>
+      <td>18.62</td>
+      <td>&lt;.001</td>
+      <td>0.76 [0.67, 0.86]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Thought about distant friends/ family</td>
+      <td>42.65</td>
+      <td>48.48</td>
+      <td>5.84</td>
+      <td>21.48</td>
+      <td>6.62</td>
+      <td>&lt;.001</td>
+      <td>0.27 [0.19, 0.35]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Thought about enormous workload</td>
+      <td>50.81</td>
+      <td>60.44</td>
+      <td>9.63</td>
+      <td>22.13</td>
+      <td>10.60</td>
+      <td>&lt;.001</td>
+      <td>0.43 [0.35, 0.52]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Was rejected by boy/girl</td>
+      <td>33.00</td>
+      <td>58.16</td>
+      <td>25.17</td>
+      <td>23.94</td>
+      <td>25.62</td>
+      <td>&lt;.001</td>
+      <td>1.05 [0.95, 1.15]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Received low grade</td>
+      <td>37.05</td>
+      <td>53.65</td>
+      <td>16.60</td>
+      <td>22.46</td>
+      <td>18.01</td>
+      <td>&lt;.001</td>
+      <td>0.74 [0.65, 0.83]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Thought about bad personal health</td>
+      <td>44.07</td>
+      <td>45.07</td>
+      <td>1.01</td>
+      <td>21.93</td>
+      <td>1.12</td>
+      <td>=.264</td>
+      <td>0.05 [−0.03, 0.13]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr><td colspan="12"><strong>habits</strong></td></tr>
+    <tr>
+      <td>Overall negative</td>
+      <td>41.70</td>
+      <td>54.24</td>
+      <td>12.54</td>
+      <td>15.73</td>
+      <td>19.42</td>
+      <td>&lt;.001</td>
+      <td>0.80 [0.70, 0.89]</td>
+      <td>3.51</td>
+      <td>5</td>
+      <td>.017</td>
+      <td>1.43 [0.23, 2.58]</td>
+    </tr>
+    <tr><td colspan="12"><strong>Positive experiences</strong></td></tr>
+    <tr>
+      <td>Received high grade</td>
+      <td>56.07</td>
+      <td>60.56</td>
+      <td>4.50</td>
+      <td>22.39</td>
+      <td>4.90</td>
+      <td>&lt;.001</td>
+      <td>0.20 [0.12, 0.28]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Attended fun party</td>
+      <td>50.63</td>
+      <td>62.65</td>
+      <td>12.03</td>
+      <td>21.35</td>
+      <td>13.73</td>
+      <td>&lt;.001</td>
+      <td>0.56 [0.48, 0.65]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Participated in athletics</td>
+      <td>44.95</td>
+      <td>49.35</td>
+      <td>4.40</td>
+      <td>22.16</td>
+      <td>4.84</td>
+      <td>&lt;.001</td>
+      <td>0.20 [0.12, 0.28]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Went out with friends</td>
+      <td>59.11</td>
+      <td>67.65</td>
+      <td>8.54</td>
+      <td>19.47</td>
+      <td>10.69</td>
+      <td>&lt;.001</td>
+      <td>0.44 [0.35, 0.52]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Talked to distant friends/family</td>
+      <td>52.03</td>
+      <td>57.96</td>
+      <td>5.93</td>
+      <td>20.29</td>
+      <td>7.12</td>
+      <td>&lt;.001</td>
+      <td>0.29 [0.21, 0.37]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Had great meal</td>
+      <td>58.80</td>
+      <td>57.03</td>
+      <td>−1.77</td>
+      <td>23.40</td>
+      <td>−1.85</td>
+      <td>=.065</td>
+      <td>−0.08 [−0.16, 0.004]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Overall positive</td>
+      <td>53.60</td>
+      <td>59.20</td>
+      <td>5.60</td>
+      <td>16.16</td>
+      <td>8.45</td>
+      <td>&lt;.001</td>
+      <td>0.35 [0.26, 0.43]</td>
+      <td>2.97</td>
+      <td>5</td>
+      <td>.031</td>
+      <td>1.21 [0.099, 2.26]</td>
+    </tr>
+    <tr>
+      <td>Overall: positive and negative combined</td>
+      <td>47.65</td>
+      <td>56.72</td>
+      <td>9.07</td>
+      <td>13.83</td>
+      <td>15.99</td>
+      <td>&lt;.001</td>
+      <td>0.66 [0.57, 0.74]</td>
+      <td>4.14</td>
+      <td>11</td>
+      <td>.002</td>
+      <td>1.20 [0.43, 1.90]</td>
+    </tr>
+  </tbody>
+</table>
 
-### Table 9
-*Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al. (2011)’s Study 3 Versus Replication.*
-
-|  |  | β for negative | β for positive |  | β for negative | β for positive |  |  |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-|  |  | prevalence | prevalence |  | prevalence | prevalence |  |  |
-| Measure | Cronbach’s α | estimate | estimate | R2 | estimate | estimate | R2 | Interpretation |
-| Negative |  |  |  |  |  |  |  |  |
-| Loneliness | .81 | −.30** | .08 | .08 | .33*** | −.25*** | .08 | Signal; inconsistent |
-|  |  |  |  |  |  |  |  | opposite |
-| Rumination/brooding | .72 | −.28** | .17 | .08 | .37*** | −.15** | .10 | Signal; inconsistent |
-|  |  |  |  |  |  |  |  | opposite |
-| Depressive symptoms | .73 | .00 | −.02 | .00 | .41*** | −.22*** | .12 | Signal; inconsistent |
-|  |  |  |  |  |  |  |  | opposite |
-| Positive |  |  |  |  |  |  |  |  |
-| Satisfaction with life | .84 | .23* | −.37*** | .15 | −.23*** | .25*** | .05 | Signal; inconsistent |
-|  |  |  |  |  |  |  |  | opposite |
-| Subjective Happiness | .80 | .19 | −.16 | .05 | −.26*** | .32*** | .08 | Signal; inconsistent |
-|  |  |  |  |  |  |  |  | opposite |
-| Number of confidants | / | N/A | N/A | N/A | −.11* | .19*** | .03 |  |
-| Social orientation scale | / | / | / | / | .26*** | −.10* | .05 | Supported |
-| (extension) |  |  |  |  |  |  |  |  |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th></th>
+      <th>β for negative<br>prevalence</th>
+      <th>β for positive<br>prevalence</th>
+      <th></th>
+      <th>β for negative<br>prevalence</th>
+      <th>β for positive<br>prevalence</th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Measure</td>
+      <td>Cronbach’s α</td>
+      <td>estimate</td>
+      <td>estimate</td>
+      <td>R2</td>
+      <td>estimate</td>
+      <td>estimate</td>
+      <td>R2</td>
+      <td>Interpretation</td>
+    </tr>
+    <tr><td colspan="9"><strong>Negative</strong></td></tr>
+    <tr>
+      <td>Loneliness</td>
+      <td>.81</td>
+      <td>−.30**</td>
+      <td>.08</td>
+      <td>.08</td>
+      <td>.33***</td>
+      <td>−.25***</td>
+      <td>.08</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Rumination/brooding</td>
+      <td>.72</td>
+      <td>−.28**</td>
+      <td>.17</td>
+      <td>.08</td>
+      <td>.37***</td>
+      <td>−.15**</td>
+      <td>.10</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Depressive symptoms</td>
+      <td>.73</td>
+      <td>.00</td>
+      <td>−.02</td>
+      <td>.00</td>
+      <td>.41***</td>
+      <td>−.22***</td>
+      <td>.12</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr><td colspan="9"><strong>Positive</strong></td></tr>
+    <tr>
+      <td>Satisfaction with life</td>
+      <td>.84</td>
+      <td>.23*</td>
+      <td>−.37***</td>
+      <td>.15</td>
+      <td>−.23***</td>
+      <td>.25***</td>
+      <td>.05</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Subjective Happiness</td>
+      <td>.80</td>
+      <td>.19</td>
+      <td>−.16</td>
+      <td>.05</td>
+      <td>−.26***</td>
+      <td>.32***</td>
+      <td>.08</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Number of confidants</td>
+      <td>/</td>
+      <td>N/A</td>
+      <td>N/A</td>
+      <td>N/A</td>
+      <td>−.11*</td>
+      <td>.19***</td>
+      <td>.03</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Social orientation scale</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>.26***</td>
+      <td>−.10*</td>
+      <td>.05</td>
+      <td>Supported</td>
+    </tr>
+    <tr><td colspan="9"><strong>(extension)</strong></td></tr>
+  </tbody>
+</table>

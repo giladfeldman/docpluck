@@ -48,6 +48,33 @@ To examine the relationship between one’s own absolute ability and comparative
 1.6.1 Extension 1: Manipulating domain diﬃculty
 We aimed to extend the replication study by considering the ambiguities in the deﬁnitions of easy and diﬃcult used in the domains of the original study. The ability domains in the target article were only succinctly described (see Table 2). Each ability domain may connote
 
+### Table 1
+*Kruger’s (1999) ﬁndings: Mean comparative ability estimates and judgmental weight of own and peers’ abilities.*
+
+```
+Ability
+Domain diﬃculty1
+Comparative Judgmental weight Judgmental weight
+ability2
+of Own ability3 of Others’ ability3
+Easy
+Using a mouse
+Driving
+Riding a bicycle
+Saving money
+58.8∗∗ 65.4∗∗∗∗ 64.0∗∗∗∗ 61.5∗∗
+0.21 .89∗∗∗∗ .61∗∗∗∗ .90∗∗∗∗
+0.06 –.25∗ –0.02 –.25∗∗∗
+Diﬃcult
+Telling jokes
+Playing chess
+Juggling
+Programming
+46.5 27.8∗∗∗∗ 26.5∗∗∗∗ 24.8∗∗∗∗
+.91∗∗∗∗ .96∗∗∗∗ .89∗∗∗∗ .85∗∗∗∗
+–0.03 –.22∗∗ –0.16 –0.1
+```
+
 1 Higher numbers reﬂect greater diﬃculty. 2 Mean percentile estimates above 50 reﬂect an above-average eﬀect, estimates below 50 reﬂect a below-average eﬀect. 3 Standardised betas from multiple regressions predicting participants’ comparative ability (percentile) estimates from their estimates of their own absolute ability and the absolute ability of their peers, respectively.
 ∗p < .05. ∗∗p < .01. *** p< .001. ∗∗∗∗p < .0001.
 
@@ -58,32 +85,104 @@ For the two extension groups, the extension domains aim to be speciﬁcally de�
 ### Table 2
 *Extension: Manipulation of perceived domain diﬃculty in target’s domains.*
 
-| Original domain groupEasy domain group | Diﬃcult domain group |
-| --- | --- |
-| (replication)(extension) | (extension) |
-| Easy domains |  |
-| Using a mouseUsing a mouse with your | Using a mouse with your |
-| dominant hand | non-dominant hand |
-| DrivingDriving a car with automatic | Driving a car with manual gear |
-| gear in your home country | in a foreign country where |
-|  | people drive on the opposite |
-|  | side of the road |
-| Riding a bicycleRiding a bicycle for 10 minutes | Riding a bicycle for an hour up |
-| on a ﬂat road | a road with an upwards incline |
-|  | slope |
-| Saving moneySaving 3% of your income each | Saving 20% of your income |
-| month | each month |
-| Diﬃcult domains |  |
-| Telling jokesTelling a joke to one person | Telling a joke in front of a live |
-| you know well (e.g., friend, | audience in an improv stand-up |
-| family member, etc.) | comedy club |
-| Playing chessWin a game of chess against an | Win a game of chess against an |
-| AI (computer) in beginners’ | AI (computer) in advanced |
-| mode | mode |
-| JugglingJuggling 2 balls | Juggling 4 balls |
-| ProgrammingProgramming guided by | Programming guided by |
-| someone very knowledgeable | someone not knowledgeable in |
-| in programming | programming |
+<table>
+  <thead>
+    <tr>
+      <th>Original domain groupEasy domain group</th>
+      <th>Diﬃcult domain group</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>(replication)(extension)</td>
+      <td>(extension)</td>
+    </tr>
+    <tr>
+      <td>Easy domains</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Using a mouseUsing a mouse with your</td>
+      <td>Using a mouse with your</td>
+    </tr>
+    <tr>
+      <td>dominant hand</td>
+      <td>non-dominant hand</td>
+    </tr>
+    <tr>
+      <td>DrivingDriving a car with automatic</td>
+      <td>Driving a car with manual gear</td>
+    </tr>
+    <tr>
+      <td>gear in your home country</td>
+      <td>in a foreign country where<br>people drive on the opposite<br>side of the road</td>
+    </tr>
+    <tr>
+      <td>Riding a bicycleRiding a bicycle for 10 minutes</td>
+      <td>Riding a bicycle for an hour up</td>
+    </tr>
+    <tr>
+      <td>on a ﬂat road</td>
+      <td>a road with an upwards incline</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>slope</td>
+    </tr>
+    <tr>
+      <td>Saving moneySaving 3% of your income each</td>
+      <td>Saving 20% of your income</td>
+    </tr>
+    <tr>
+      <td>month</td>
+      <td>each month</td>
+    </tr>
+    <tr>
+      <td>Diﬃcult domains</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Telling jokesTelling a joke to one person</td>
+      <td>Telling a joke in front of a live</td>
+    </tr>
+    <tr>
+      <td>you know well (e.g., friend,</td>
+      <td>audience in an improv stand-up</td>
+    </tr>
+    <tr>
+      <td>family member, etc.)</td>
+      <td>comedy club</td>
+    </tr>
+    <tr>
+      <td>Playing chessWin a game of chess against an</td>
+      <td>Win a game of chess against an</td>
+    </tr>
+    <tr>
+      <td>AI (computer) in beginners’</td>
+      <td>AI (computer) in advanced</td>
+    </tr>
+    <tr>
+      <td>mode</td>
+      <td>mode</td>
+    </tr>
+    <tr>
+      <td>JugglingJuggling 2 balls</td>
+      <td>Juggling 4 balls</td>
+    </tr>
+    <tr>
+      <td>ProgrammingProgramming guided by</td>
+      <td>Programming guided by</td>
+    </tr>
+    <tr>
+      <td>someone very knowledgeable</td>
+      <td>someone not knowledgeable in</td>
+    </tr>
+    <tr>
+      <td>in programming</td>
+      <td>programming</td>
+    </tr>
+  </tbody>
+</table>
 
 For the second extension, we added an additional dependent variable measuring domain diﬃculty. In the original study, domain diﬃculty was determined in a pretest by a separate group of participants (n = 39). They rated their absolute ability – the extent of how skilled they are – on the eight abilities on a 10-point scale (higher number indicates higher
 
@@ -110,28 +209,56 @@ H1
 ### Table 3
 *Summary of the hypotheses.*
 
-| Hypothesis | Statement | Variables | Conditions |
-| --- | --- | --- | --- |
-| H1 | Compared to judgments of others’ | Own absolute | Replication and |
-|  | abilities, participant judgments of | ability; others’ | extension |
-|  | their own abilities better predict | absolute ability; | conditions |
-|  | their comparative ability | comparative |  |
-|  | judgments. | ability |  |
-| (Original) |  |  |  |
-| H2 | The more diﬃcult the ability | Comparative | Replication and |
-|  | domain, the more likely a person | ability; domain | extension |
-|  | is to shift from perceiving oneself | diﬃculty; | conditions |
-|  | as above average to perceiving | desirability; |  |
-|  | oneself as below average. | ambiguity |  |
-| (Original reframed) |  |  |  |
-| H3 | Compared to the replication | Domain | Replication and |
-| (Extension) | condition participants, the easy | diﬃculty; | easy domain |
-|  | domain condition participants | ambiguity | conditions |
-|  | assign lower domain diﬃculty and |  |  |
-|  | ambiguity ratings to abilities. |  |  |
-| H4 | Compared to the replication | Domain | Replication and |
-| (Extension) | condition, the diﬃcult domain | diﬃculty; | diﬃcult domain |
-|  | condition participants assign | ambiguity | conditions |
+<table>
+  <thead>
+    <tr>
+      <th>Hypothesis</th>
+      <th>Statement</th>
+      <th>Variables</th>
+      <th>Conditions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>H1</td>
+      <td>Compared to judgments of others’<br>abilities, participant judgments of<br>their own abilities better predict<br>their comparative ability<br>judgments.</td>
+      <td>Own absolute<br>ability; others’<br>absolute ability;<br>comparative<br>ability</td>
+      <td>Replication and<br>extension<br>conditions</td>
+    </tr>
+    <tr><td colspan="4"><strong>(Original)</strong></td></tr>
+    <tr>
+      <td>H2</td>
+      <td>The more diﬃcult the ability<br>domain, the more likely a person<br>is to shift from perceiving oneself<br>as above average to perceiving<br>oneself as below average.</td>
+      <td>Comparative<br>ability; domain<br>diﬃculty;<br>desirability;<br>ambiguity</td>
+      <td>Replication and<br>extension<br>conditions</td>
+    </tr>
+    <tr><td colspan="4"><strong>(Original reframed)</strong></td></tr>
+    <tr>
+      <td>H3</td>
+      <td>Compared to the replication</td>
+      <td>Domain</td>
+      <td>Replication and</td>
+    </tr>
+    <tr>
+      <td>(Extension)</td>
+      <td>condition participants, the easy<br>domain condition participants<br>assign lower domain diﬃculty and<br>ambiguity ratings to abilities.</td>
+      <td>diﬃculty;<br>ambiguity</td>
+      <td>easy domain<br>conditions</td>
+    </tr>
+    <tr>
+      <td>H4</td>
+      <td>Compared to the replication</td>
+      <td>Domain</td>
+      <td>Replication and</td>
+    </tr>
+    <tr>
+      <td>(Extension)</td>
+      <td>condition, the diﬃcult domain<br>condition participants assign</td>
+      <td>diﬃculty;<br>ambiguity</td>
+      <td>diﬃcult domain<br>conditions</td>
+    </tr>
+  </tbody>
+</table>
 
 et al., 2011). Second, the loss of power by dichotomizing variables at the median is equal to discarding one-third of the data (Cohen, 1983; MacCallum et al., 2002). Third, variation between categorized groups may be underestimated as close response scores divided into diﬀerent groups are deﬁned as being very diﬀerent instead of very similar. It has thus been suggested to keep variables continuous using methods such as linear regressions instead of t-tests (Altman & Royston, 2006).
 For the above reasons, we did not assign ability domains to speciﬁc dichotomic easy/diﬃcult categories. The above- and below-average-eﬀects were tested on a continuous scale: instead of using one-sample t-tests, correlations were used to test the relationship between domain diﬃculty and comparative ability in three diﬀerent ways: item-wise, compiled items in a vector (but not averaging across them), and row-wise averaged for the three conditions. Applying this method is a more direct assessment of perceived diﬃculty with the same sample. For a full overview of diﬀerences between the current and the original study see the OSF supplement, section “Comparisons and deviations”.
@@ -153,17 +280,54 @@ Table 4: Comparison of original study and replication’s samples.
 ### Table 4
 *Comparison of original study and replication’s samples.*
 
-|  | Kruger (1999) | MTurk sample | MTurk sample |
-| --- | --- | --- | --- |
-|  |  | (pre-exclusion) | (post-exclusion) |
-| Sample size | 37 | 756 | 691 |
-| Geographic origin US American |  | US American | US American |
-| Gender | 8 males, 29 females | 442 males, 307 | 397 males, 288 |
-|  |  | females, 7 unspeciﬁed | females, 6 unspeciﬁed |
-| Medium (location) Questionnaire |  | Computer (online) | Computer (online) |
-|  | (Cornell University) |  |  |
-| Compensation | Course credit | Nominal payment | Nominal payment |
-| Year | 1999 | 2020 | 2020 |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Kruger (1999)</th>
+      <th>MTurk sample<br>(pre-exclusion)</th>
+      <th>MTurk sample<br>(post-exclusion)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Sample size</td>
+      <td>37</td>
+      <td>756</td>
+      <td>691</td>
+    </tr>
+    <tr>
+      <td>Geographic origin US American</td>
+      <td></td>
+      <td>US American</td>
+      <td>US American</td>
+    </tr>
+    <tr>
+      <td>Gender</td>
+      <td>8 males, 29 females</td>
+      <td>442 males, 307<br>females, 7 unspeciﬁed</td>
+      <td>397 males, 288<br>females, 6 unspeciﬁed</td>
+    </tr>
+    <tr>
+      <td>Medium (location) Questionnaire</td>
+      <td>(Cornell University)</td>
+      <td>Computer (online)</td>
+      <td>Computer (online)</td>
+    </tr>
+    <tr>
+      <td>Compensation</td>
+      <td>Course credit</td>
+      <td>Nominal payment</td>
+      <td>Nominal payment</td>
+    </tr>
+    <tr>
+      <td>Year</td>
+      <td>1999</td>
+      <td>2020</td>
+      <td>2020</td>
+    </tr>
+  </tbody>
+</table>
 
 Based on the categorization in the original study, of the eight ability domains, four were categorized as easy and the other four as diﬃcult (see Table2), presented in randomized order.
 2.4 Measures
@@ -227,16 +391,84 @@ Original domains Easy domains
 ### Table 6
 *Mean ratings across all abilities for the three conditions.*
 
-|  | Original domains |  | Easy domains |  |  | Diﬃcult domains |
-| --- | --- | --- | --- | --- | --- | --- |
-|  | (n = 240) |  | (n = 225) |  | (n = 226) |  |
-| Variable | Mean | SD | Mean | SD | Mean | SD |
-| Mean domain diﬃculty | 6.05 | 1.15 | 5.22 | 1.63 | 7.39 | 1.19 |
-| Mean comparative ability | 53.29 | 14.5 | 58.86 | 14.92 | 46.97 | 18.86 |
-| Mean own absolute ability | 6.04 | 1.37 | 6.64 | 1.44 | 4.77 | 2.02 |
-| Mean others’ absolute ability | 6.22 | 1.14 | 6.59 | 1.33 | 5.06 | 1.79 |
-| Mean desirability | 8.15 | 0.99 | 7.9 | 1.15 | 7.54 | 1.35 |
-| Mean ambiguity∗ | 3.00 | 1.24 | 2.68 | 1.23 | 2.76 | 1.43 |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Original domains<br>(n = 240)</th>
+      <th></th>
+      <th>Easy domains<br>(n = 225)</th>
+      <th></th>
+      <th>(n = 226)</th>
+      <th>Diﬃcult domains</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Variable</td>
+      <td>Mean</td>
+      <td>SD</td>
+      <td>Mean</td>
+      <td>SD</td>
+      <td>Mean</td>
+      <td>SD</td>
+    </tr>
+    <tr>
+      <td>Mean domain diﬃculty</td>
+      <td>6.05</td>
+      <td>1.15</td>
+      <td>5.22</td>
+      <td>1.63</td>
+      <td>7.39</td>
+      <td>1.19</td>
+    </tr>
+    <tr>
+      <td>Mean comparative ability</td>
+      <td>53.29</td>
+      <td>14.5</td>
+      <td>58.86</td>
+      <td>14.92</td>
+      <td>46.97</td>
+      <td>18.86</td>
+    </tr>
+    <tr>
+      <td>Mean own absolute ability</td>
+      <td>6.04</td>
+      <td>1.37</td>
+      <td>6.64</td>
+      <td>1.44</td>
+      <td>4.77</td>
+      <td>2.02</td>
+    </tr>
+    <tr>
+      <td>Mean others’ absolute ability</td>
+      <td>6.22</td>
+      <td>1.14</td>
+      <td>6.59</td>
+      <td>1.33</td>
+      <td>5.06</td>
+      <td>1.79</td>
+    </tr>
+    <tr>
+      <td>Mean desirability</td>
+      <td>8.15</td>
+      <td>0.99</td>
+      <td>7.9</td>
+      <td>1.15</td>
+      <td>7.54</td>
+      <td>1.35</td>
+    </tr>
+    <tr>
+      <td>Mean ambiguity∗</td>
+      <td>3.00</td>
+      <td>1.24</td>
+      <td>2.68</td>
+      <td>1.23</td>
+      <td>2.76</td>
+      <td>1.43</td>
+    </tr>
+  </tbody>
+</table>
 
 1.15 7.54
 
@@ -258,16 +490,69 @@ Eﬀect
 ### Table 7
 *Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃculty ratings between easy and diﬃcult abilities (within conditions).*
 
-|  | ratings between easy and diﬃcult abilities (within conditions). |  |  |  |  |  |
-| --- | --- | --- | --- | --- | --- | --- |
-|  |  |  | Mean |  | Eﬀect |  |
-| Condition | T-statistic | df | diﬀerence | p-value | size r | 95% CI |
-| Original | 668.5 | 238 | 2.78 | <.001 | 0.82 | [0.79, 0.85] |
-| (replication) |  |  |  |  |  |  |
-| Easy domain | 1416 | 223 | 1.99 | <.001 | 0.75 | [0.69, 0.80] |
-| (extension) |  |  |  |  |  |  |
-| Diﬃcult domain | 1917 | 224 | 1.22 | <.001 | 0.69 | [0.62, 0.75] |
-| (extension) |  |  |  |  |  |  |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>ratings between easy and diﬃcult abilities (within conditions).</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Mean</td>
+      <td></td>
+      <td>Eﬀect</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Condition</td>
+      <td>T-statistic</td>
+      <td>df</td>
+      <td>diﬀerence</td>
+      <td>p-value</td>
+      <td>size r</td>
+      <td>95% CI</td>
+    </tr>
+    <tr>
+      <td>Original</td>
+      <td>668.5</td>
+      <td>238</td>
+      <td>2.78</td>
+      <td>&lt;.001</td>
+      <td>0.82</td>
+      <td>[0.79, 0.85]</td>
+    </tr>
+    <tr><td colspan="7"><strong>(replication)</strong></td></tr>
+    <tr>
+      <td>Easy domain</td>
+      <td>1416</td>
+      <td>223</td>
+      <td>1.99</td>
+      <td>&lt;.001</td>
+      <td>0.75</td>
+      <td>[0.69, 0.80]</td>
+    </tr>
+    <tr><td colspan="7"><strong>(extension)</strong></td></tr>
+    <tr>
+      <td>Diﬃcult domain</td>
+      <td>1917</td>
+      <td>224</td>
+      <td>1.22</td>
+      <td>&lt;.001</td>
+      <td>0.69</td>
+      <td>[0.62, 0.75]</td>
+    </tr>
+    <tr><td colspan="7"><strong>(extension)</strong></td></tr>
+  </tbody>
+</table>
 
 Table 8: Replication condition: Mean comparative ability estimates and judgmental weight
 of own versus peers’ abilities.
@@ -277,20 +562,102 @@ Ability
 ### Table 8
 *Replication condition: Mean comparative ability estimates and judgmental weight of own versus peers’ abilities.*
 
-| of own versus peers’ abilities. |  |  |  |  |
-| --- | --- | --- | --- | --- |
-| Ability | Domain | Percentile | Judgment weight: | Judgment weight: |
-|  | diﬃculty1 | estimate2 | Own ability3 | Others’ ability3 |
-| Using mouse | 2.70 (2.63) | 71.2∗∗∗ (17.90) | 0.29∗∗∗ | 0.04 |
-| Driving | 5.19 (2.41) | 65.2∗∗∗ (22.08) | 0.85∗∗∗ | –0.11∗∗ |
-| Riding bicycle | 4.14 (2.44) | 61.0∗∗∗ (20.48) | 0.76∗∗∗ | –0.06 |
-| Saving money | 6.63 (2.08) | 62.9∗∗∗ (21.10) | 0.79∗∗∗ | –0.05 |
-| Telling jokes | 6.10 (2.06) | 52.4 (22.63) | 0.75∗∗∗ | 0.04 |
-| Playing chess | 7.74 (1.75) | 41.0∗∗∗ (27.00) | 0.82∗∗∗ | –0.03 |
-| Juggling | 7.64 (1.97) | 32.0∗∗∗ (27.67) | 0.59∗∗∗ | 0.18∗∗ |
-| Programming | 8.29 (1.74) | 40.7∗∗∗ (29.22) | 0.83∗∗∗ | –0.06 |
+<table>
+  <thead>
+    <tr>
+      <th>of own versus peers’ abilities.</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ability</td>
+      <td>Domain<br>diﬃculty1</td>
+      <td>Percentile<br>estimate2</td>
+      <td>Judgment weight:<br>Own ability3</td>
+      <td>Judgment weight:<br>Others’ ability3</td>
+    </tr>
+    <tr>
+      <td>Using mouse</td>
+      <td>2.70 (2.63)</td>
+      <td>71.2∗∗∗ (17.90)</td>
+      <td>0.29∗∗∗</td>
+      <td>0.04</td>
+    </tr>
+    <tr>
+      <td>Driving</td>
+      <td>5.19 (2.41)</td>
+      <td>65.2∗∗∗ (22.08)</td>
+      <td>0.85∗∗∗</td>
+      <td>–0.11∗∗</td>
+    </tr>
+    <tr>
+      <td>Riding bicycle</td>
+      <td>4.14 (2.44)</td>
+      <td>61.0∗∗∗ (20.48)</td>
+      <td>0.76∗∗∗</td>
+      <td>–0.06</td>
+    </tr>
+    <tr>
+      <td>Saving money</td>
+      <td>6.63 (2.08)</td>
+      <td>62.9∗∗∗ (21.10)</td>
+      <td>0.79∗∗∗</td>
+      <td>–0.05</td>
+    </tr>
+    <tr>
+      <td>Telling jokes</td>
+      <td>6.10 (2.06)</td>
+      <td>52.4 (22.63)</td>
+      <td>0.75∗∗∗</td>
+      <td>0.04</td>
+    </tr>
+    <tr>
+      <td>Playing chess</td>
+      <td>7.74 (1.75)</td>
+      <td>41.0∗∗∗ (27.00)</td>
+      <td>0.82∗∗∗</td>
+      <td>–0.03</td>
+    </tr>
+    <tr>
+      <td>Juggling</td>
+      <td>7.64 (1.97)</td>
+      <td>32.0∗∗∗ (27.67)</td>
+      <td>0.59∗∗∗</td>
+      <td>0.18∗∗</td>
+    </tr>
+    <tr>
+      <td>Programming</td>
+      <td>8.29 (1.74)</td>
+      <td>40.7∗∗∗ (29.22)</td>
+      <td>0.83∗∗∗</td>
+      <td>–0.06</td>
+    </tr>
+  </tbody>
+</table>
 
 averaging the 8 domains for each participant (row-wise), resulting in 240 rows. P-values for vector-compiled scores correlations are not provided as those do not account for repeated responses of the same person.
+
+### Table 9
+*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability.*
+
+```
+Predictors
+B
+S.E.
+CI
+p
+(Intercept) Own Ability Others’ Ability
+12.56 7.18 –0.42
+[9.95, 15.18]
+< 0.001
+[6.86, 7.50]
+< 0.001
+[–0.84, –0.01]
+```
 
 Note. The table presents the ﬁxed-eﬀects coeﬃcients with all the model predictors. See supplementary section “Mixed Models” for step-wise regression results.
 
@@ -318,19 +685,82 @@ We conducted multiple linear regression analyses to test how ratings of both own
 ### Table 11
 *Extension conditions: Mean comparative ability estimates and judgmental weight of own and peers’ abilities by domain diﬃculty.*
 
-| of own and peers’ abilities by domain diﬃculty. |  |  |  |  |
-| --- | --- | --- | --- | --- |
-|  | Easy domain condition |  | Diﬃcult domain condition |  |
-|  | Judgmental weight | Judgmental weight | Judgmental weight | Judgmental weight |
-| Ability | of own ability1 | of others’ ability1 | of own ability1 | of others’ ability1 |
-| Using mouse | 0.48∗∗∗ | 0.03 | 0.58∗∗∗ | 0.15∗ |
-| Driving | 0.75∗∗∗ | –0.1 | 0.78∗∗∗ | –0.02 |
-| Riding bicycle | 0.65∗∗∗ | 0.06 | 0.79∗∗∗ | 0.06 |
-| Saving money | 0.81∗∗∗ | –0.03 | 0.78∗∗∗ | –0.07 |
-| Telling jokes | 0.70∗∗∗ | 0.10∗ | 0.70∗∗∗ | 0.14∗∗ |
-| Playing chess | 0.79∗∗∗ | 0.02 | 0.75∗∗∗ | 0.01 |
-| Juggling | 0.78∗∗∗ | 0.05 | 0.68∗∗∗ | 0.05 |
-| Programming | 0.85∗∗∗ | –0.03 | 0.79∗∗∗ | 0.03 |
+<table>
+  <thead>
+    <tr>
+      <th>of own and peers’ abilities by domain diﬃculty.</th>
+      <th>Easy domain condition<br>Judgmental weight</th>
+      <th>Judgmental weight</th>
+      <th>Diﬃcult domain condition<br>Judgmental weight</th>
+      <th>Judgmental weight</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ability</td>
+      <td>of own ability1</td>
+      <td>of others’ ability1</td>
+      <td>of own ability1</td>
+      <td>of others’ ability1</td>
+    </tr>
+    <tr>
+      <td>Using mouse</td>
+      <td>0.48∗∗∗</td>
+      <td>0.03</td>
+      <td>0.58∗∗∗</td>
+      <td>0.15∗</td>
+    </tr>
+    <tr>
+      <td>Driving</td>
+      <td>0.75∗∗∗</td>
+      <td>–0.1</td>
+      <td>0.78∗∗∗</td>
+      <td>–0.02</td>
+    </tr>
+    <tr>
+      <td>Riding bicycle</td>
+      <td>0.65∗∗∗</td>
+      <td>0.06</td>
+      <td>0.79∗∗∗</td>
+      <td>0.06</td>
+    </tr>
+    <tr>
+      <td>Saving money</td>
+      <td>0.81∗∗∗</td>
+      <td>–0.03</td>
+      <td>0.78∗∗∗</td>
+      <td>–0.07</td>
+    </tr>
+    <tr>
+      <td>Telling jokes</td>
+      <td>0.70∗∗∗</td>
+      <td>0.10∗</td>
+      <td>0.70∗∗∗</td>
+      <td>0.14∗∗</td>
+    </tr>
+    <tr>
+      <td>Playing chess</td>
+      <td>0.79∗∗∗</td>
+      <td>0.02</td>
+      <td>0.75∗∗∗</td>
+      <td>0.01</td>
+    </tr>
+    <tr>
+      <td>Juggling</td>
+      <td>0.78∗∗∗</td>
+      <td>0.05</td>
+      <td>0.68∗∗∗</td>
+      <td>0.05</td>
+    </tr>
+    <tr>
+      <td>Programming</td>
+      <td>0.85∗∗∗</td>
+      <td>–0.03</td>
+      <td>0.79∗∗∗</td>
+      <td>0.03</td>
+    </tr>
+  </tbody>
+</table>
 
 comparative ability was r(6) = 0.92 (p = .001, 95% CI [0.60, 0.99]); with weaker support found for these correlations as being diﬀerent from each other (Hotelling’s t(5) = 2.24, p = 0.075).
 
@@ -341,21 +771,77 @@ Additionally, also mixed models indicated that own ability was a better predicto
 ### Table 12
 *Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- ditions.*
 
-| changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- |  |  |  |  |
-| --- | --- | --- | --- | --- |
-| ditions. |  |  |  |  |
-| Predictors | B | S.E. | CI | p |
-| Easy condition extension |  |  |  |  |
-| (Intercept) | 15.48 | 1.3 | [12.94, 18.02] | <0.001 |
-| Own | 6.56 | 0.16 | [6.25, 6.88] | <0.001 |
-| Other | –0.04 | 0.2 | [–0.43, 0.36] | 0.861 |
-|  | Diﬃcult condition extension |  |  |  |
-| (Intercept) | 16.53 | 1.49 | [13.61, 19.44] | <0.001 |
-| Own | 6.4 | 0.16 | [6.09, 6.72] | <0.001 |
-| Other | –0.02 | 0.22 | [–0.44, 0.41] | 0.94 |
-|  | Note. Fixed-eﬀects coeﬃcients with all model predictors. Participants represented the |  |  |  |
-| random eﬀect. |  | See supplementary section “Mixed Models” for step-wise regression |  |  |
-| results. |  |  |  |  |
+<table>
+  <thead>
+    <tr>
+      <th>changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con-ditions.</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Predictors</td>
+      <td>B</td>
+      <td>S.E.</td>
+      <td>CI</td>
+      <td>p</td>
+    </tr>
+    <tr><td colspan="5"><strong>Easy condition extension</strong></td></tr>
+    <tr>
+      <td>(Intercept)</td>
+      <td>15.48</td>
+      <td>1.3</td>
+      <td>[12.94, 18.02]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Own</td>
+      <td>6.56</td>
+      <td>0.16</td>
+      <td>[6.25, 6.88]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Other</td>
+      <td>–0.04<br>Diﬃcult condition extension</td>
+      <td>0.2</td>
+      <td>[–0.43, 0.36]</td>
+      <td>0.861</td>
+    </tr>
+    <tr>
+      <td>(Intercept)</td>
+      <td>16.53</td>
+      <td>1.49</td>
+      <td>[13.61, 19.44]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Own</td>
+      <td>6.4</td>
+      <td>0.16</td>
+      <td>[6.09, 6.72]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Other</td>
+      <td>–0.02<br>Note. Fixed-eﬀects coeﬃcients with all model predictors. Participants represented the</td>
+      <td>0.22</td>
+      <td>[–0.44, 0.41]</td>
+      <td>0.94</td>
+    </tr>
+    <tr>
+      <td>random eﬀect.</td>
+      <td></td>
+      <td>See supplementary section “Mixed Models” for step-wise regression</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr><td colspan="5"><strong>results.</strong></td></tr>
+  </tbody>
+</table>
 
 Table 13: Extensions: Mean domain diﬃculty and mean comparative ability estimates
 
@@ -368,20 +854,96 @@ Easy domain condition
 ### Table 13
 *Extensions: Mean domain diﬃculty and mean comparative ability estimates tested against the average (scale midpoint).*
 
-|  | Extensions: Mean domain diﬃculty and mean comparative ability estimates |  |  |  |
-| --- | --- | --- | --- | --- |
-| tested against the average (scale midpoint). |  |  |  |  |
-|  | Easy domain condition |  |  | Diﬃcult domain condition |
-| Ability | Domain | Percentile | Domain | Percentile |
-|  | diﬃculty | estimate1 | diﬃculty | estimate2 |
-| Using mouse | 3.13 (2.90) | 71.27 (20.51)∗∗∗ | 5.77 (2.36) | 55.79 (21.12)∗∗∗ |
-| Driving | 4.58 (2.77) | 66.32 (22.74)∗∗∗ | 7.16 (2.15) | 40.63 (29.28)∗∗∗ |
-| Riding bicycle | 3.88 (2.77) | 65.76 (21.92)∗∗∗ | 7.85 (2.12) | 48.90 (27.54) |
-| Saving money | 5.31 (2.76) | 63.63 (25.55)∗∗∗ | 6.32 (2.60) | 62.68 (25.77)∗∗∗ |
-| Telling jokes | 4.64 (2.67) | 59.74 (20.55)∗∗∗ | 7.67 (1.98) | 40.82 (27.03)∗∗∗ |
-| Playing chess | 6.71 (2.56) | 47.81 (27.55) | 8.34 (1.89) | 41.86 (27.22)∗∗∗ |
-| Juggling | 6.07 (2.60) | 46.76 (27.75) | 7.81 (2.00) | 39.67 (27.66)∗∗∗ |
-| Programming | 7.46 (2.13) | 49.57 (25.71) | 8.15 (1.84) | 45.36 (26.02)∗∗ |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Extensions: Mean domain diﬃculty and mean comparative ability estimates</th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>tested against the average (scale midpoint).</td>
+      <td>Easy domain condition</td>
+      <td></td>
+      <td></td>
+      <td>Diﬃcult domain condition</td>
+    </tr>
+    <tr>
+      <td>Ability</td>
+      <td>Domain</td>
+      <td>Percentile</td>
+      <td>Domain</td>
+      <td>Percentile</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td>diﬃculty</td>
+      <td>estimate1</td>
+      <td>diﬃculty</td>
+      <td>estimate2</td>
+    </tr>
+    <tr>
+      <td>Using mouse</td>
+      <td>3.13 (2.90)</td>
+      <td>71.27 (20.51)∗∗∗</td>
+      <td>5.77 (2.36)</td>
+      <td>55.79 (21.12)∗∗∗</td>
+    </tr>
+    <tr>
+      <td>Driving</td>
+      <td>4.58 (2.77)</td>
+      <td>66.32 (22.74)∗∗∗</td>
+      <td>7.16 (2.15)</td>
+      <td>40.63 (29.28)∗∗∗</td>
+    </tr>
+    <tr>
+      <td>Riding bicycle</td>
+      <td>3.88 (2.77)</td>
+      <td>65.76 (21.92)∗∗∗</td>
+      <td>7.85 (2.12)</td>
+      <td>48.90 (27.54)</td>
+    </tr>
+    <tr>
+      <td>Saving money</td>
+      <td>5.31 (2.76)</td>
+      <td>63.63 (25.55)∗∗∗</td>
+      <td>6.32 (2.60)</td>
+      <td>62.68 (25.77)∗∗∗</td>
+    </tr>
+    <tr>
+      <td>Telling jokes</td>
+      <td>4.64 (2.67)</td>
+      <td>59.74 (20.55)∗∗∗</td>
+      <td>7.67 (1.98)</td>
+      <td>40.82 (27.03)∗∗∗</td>
+    </tr>
+    <tr>
+      <td>Playing chess</td>
+      <td>6.71 (2.56)</td>
+      <td>47.81 (27.55)</td>
+      <td>8.34 (1.89)</td>
+      <td>41.86 (27.22)∗∗∗</td>
+    </tr>
+    <tr>
+      <td>Juggling</td>
+      <td>6.07 (2.60)</td>
+      <td>46.76 (27.75)</td>
+      <td>7.81 (2.00)</td>
+      <td>39.67 (27.66)∗∗∗</td>
+    </tr>
+    <tr>
+      <td>Programming</td>
+      <td>7.46 (2.13)</td>
+      <td>49.57 (25.71)</td>
+      <td>8.15 (1.84)</td>
+      <td>45.36 (26.02)∗∗</td>
+    </tr>
+  </tbody>
+</table>
 
 See OSF supplement: equivalence tests 7–8. See OSF supplement: equivalence tests 9–10.
 
@@ -433,37 +995,184 @@ p Original study
 ### Table 15
 *Comparison of correlational study eﬀect sizes between the original article and replication based on criteria created by LeBel et al. (2019).*
 
-|  | p | Correlation | p | Correlation |  |
-| --- | --- | --- | --- | --- | --- |
-|  |  | coeﬃcient (r) |  | coeﬃcient (r) |  |
-|  |  | and 95% CI |  | and 95% CI |  |
-| Variables | Original study |  | Replication |  | Replication |
-| (across all |  |  | condition |  | evaluation |
-| abilities) |  |  |  |  |  |
-| Own ability | <.001 | r(6) = .95 | <.001 | r(6) = 0.99, | Signal- |
-| and |  | [0.90, 0.97] |  | [0.96, 1.00] | consistent |
-| comparative |  |  |  |  |  |
-| ability |  |  |  |  |  |
-| Inventory | / | / | <.001; <.001 | r(238) = .85 | Additional |
-| mean and |  |  |  | [0.82, 0.89]; | analyses |
-| absolute own |  |  |  | r(1918) = |  |
-| ability and |  |  |  | 0.50, [0.46, |  |
-| comparative |  |  |  | 0.53]; Own (B |  |
-| ability |  |  |  | = 7.18) vs |  |
-|  |  |  |  | others’ ability |  |
-|  |  |  |  | (B = –0.42) |  |
-| Domain | <.001 | r(6) = –.96, | 0.007 | r(6) = –0.85, | Signal- |
-| diﬃculty and |  | [–0.98, –0.92] |  | [–0.97 -0.37] | consistent, |
-| comparative |  |  |  |  | smaller |
-| ability |  |  |  |  |  |
-| Inventory | / | / | .013; <.001 | r(238) = 0.16 | Additional |
-| mean and |  |  |  | [0.04, 0.28]; | analyses |
-| absolute |  |  |  | r(1918) = |  |
-| domain |  |  |  | –0.35, [–0.39, |  |
-| diﬃculty and |  |  |  | –0.31]; |  |
-| comparative |  |  |  | Diﬃculty as |  |
-| ability |  |  |  | predictor of |  |
-|  |  |  |  | comparative |  |
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th>p</th>
+      <th>Correlation<br>coeﬃcient (r)<br>and 95% CI</th>
+      <th>p</th>
+      <th>Correlation<br>coeﬃcient (r)<br>and 95% CI</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Variables</td>
+      <td>Original study</td>
+      <td></td>
+      <td>Replication</td>
+      <td></td>
+      <td>Replication</td>
+    </tr>
+    <tr>
+      <td>(across all</td>
+      <td></td>
+      <td></td>
+      <td>condition</td>
+      <td></td>
+      <td>evaluation</td>
+    </tr>
+    <tr><td colspan="6"><strong>abilities)</strong></td></tr>
+    <tr>
+      <td>Own ability</td>
+      <td>&lt;.001</td>
+      <td>r(6) = .95</td>
+      <td>&lt;.001</td>
+      <td>r(6) = 0.99,</td>
+      <td>Signal-</td>
+    </tr>
+    <tr>
+      <td>and</td>
+      <td></td>
+      <td>[0.90, 0.97]</td>
+      <td></td>
+      <td>[0.96, 1.00]</td>
+      <td>consistent</td>
+    </tr>
+    <tr><td colspan="6"><strong>comparative</strong></td></tr>
+    <tr><td colspan="6"><strong>ability</strong></td></tr>
+    <tr>
+      <td>Inventory</td>
+      <td>/</td>
+      <td>/</td>
+      <td>&lt;.001; &lt;.001</td>
+      <td>r(238) = .85</td>
+      <td>Additional</td>
+    </tr>
+    <tr>
+      <td>mean and</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>[0.82, 0.89];</td>
+      <td>analyses</td>
+    </tr>
+    <tr>
+      <td>absolute own</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>r(1918) =</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ability and</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>0.50, [0.46,</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>comparative</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>0.53]; Own (B</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ability</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>= 7.18) vs<br>others’ ability<br>(B = –0.42)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Domain</td>
+      <td>&lt;.001</td>
+      <td>r(6) = –.96,</td>
+      <td>0.007</td>
+      <td>r(6) = –0.85,</td>
+      <td>Signal-</td>
+    </tr>
+    <tr>
+      <td>diﬃculty and</td>
+      <td></td>
+      <td>[–0.98, –0.92]</td>
+      <td></td>
+      <td>[–0.97 -0.37]</td>
+      <td>consistent,</td>
+    </tr>
+    <tr>
+      <td>comparative</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>smaller</td>
+    </tr>
+    <tr><td colspan="6"><strong>ability</strong></td></tr>
+    <tr>
+      <td>Inventory</td>
+      <td>/</td>
+      <td>/</td>
+      <td>.013; &lt;.001</td>
+      <td>r(238) = 0.16</td>
+      <td>Additional</td>
+    </tr>
+    <tr>
+      <td>mean and</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>[0.04, 0.28];</td>
+      <td>analyses</td>
+    </tr>
+    <tr>
+      <td>absolute</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>r(1918) =</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>domain</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>–0.35, [–0.39,</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>diﬃculty and</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>–0.31];</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>comparative</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Diﬃculty as</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ability</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>predictor of<br>comparative</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
 
 Judgmental Judgmental Judgmental Judgmental weight of own weight of weight of own weight of
 ability1 others’ ability1 ability1 others’ ability1
@@ -471,14 +1180,61 @@ ability1 others’ ability1 ability1 others’ ability1
 ### Table 16
 *Comparison of mean comparative ability estimates and judgmental weight of own versus others’ abilities by domain diﬃculty between the original study and replication condition.*
 
-| Driving | .89∗∗∗∗ | –.25∗ | 0.85∗∗∗ | –0.11∗∗ |
-| --- | --- | --- | --- | --- |
-| Riding bicycle | .61∗∗∗∗ | –0.02 | 0.76∗∗∗ | –0.06 |
-| Saving money | .90∗∗∗∗ | –.25∗∗∗ | 0.79∗∗∗ | –0.05 |
-| Telling jokes | .91∗∗∗∗ | –0.03 | 0.75∗∗∗ | 0.04 |
-| Playing chess | .96∗∗∗∗ | –.22∗∗ | 0.82∗∗∗ | –0.03 |
-| Juggling | .89∗∗∗∗ | –0.16 | 0.59∗∗∗ | 0.18∗∗ |
-| Programming | .85∗∗∗∗ | –0.1 | 0.83∗∗∗ | –0.06 |
+<table>
+  <thead>
+    <tr>
+      <th>Driving</th>
+      <th>.89∗∗∗∗</th>
+      <th>–.25∗</th>
+      <th>0.85∗∗∗</th>
+      <th>–0.11∗∗</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Riding bicycle</td>
+      <td>.61∗∗∗∗</td>
+      <td>–0.02</td>
+      <td>0.76∗∗∗</td>
+      <td>–0.06</td>
+    </tr>
+    <tr>
+      <td>Saving money</td>
+      <td>.90∗∗∗∗</td>
+      <td>–.25∗∗∗</td>
+      <td>0.79∗∗∗</td>
+      <td>–0.05</td>
+    </tr>
+    <tr>
+      <td>Telling jokes</td>
+      <td>.91∗∗∗∗</td>
+      <td>–0.03</td>
+      <td>0.75∗∗∗</td>
+      <td>0.04</td>
+    </tr>
+    <tr>
+      <td>Playing chess</td>
+      <td>.96∗∗∗∗</td>
+      <td>–.22∗∗</td>
+      <td>0.82∗∗∗</td>
+      <td>–0.03</td>
+    </tr>
+    <tr>
+      <td>Juggling</td>
+      <td>.89∗∗∗∗</td>
+      <td>–0.16</td>
+      <td>0.59∗∗∗</td>
+      <td>0.18∗∗</td>
+    </tr>
+    <tr>
+      <td>Programming</td>
+      <td>.85∗∗∗∗</td>
+      <td>–0.1</td>
+      <td>0.83∗∗∗</td>
+      <td>–0.06</td>
+    </tr>
+  </tbody>
+</table>
 
 Note. The original study only provided the standardized betas and p-values. The transformed R2 and F2 values would only represent the eﬀect size of one predictor instead of the overall regression, so only the p-values and directions were compared. 1Standardised betas from multiple regressions predicting participants’ comparative ability (percentile) estimates from their estimates of their own absolute ability and the absolute ability of their peers, respectively.
 ∗p < .05. ∗∗p < .01. ∗∗∗p < .001. ∗∗∗∗p < .0001.
@@ -492,24 +1248,72 @@ Table 17: Comparison of one-sample t-test eﬀect sizes between the original art
 ### Table 17
 *Comparison of one-sample t-test eﬀect sizes between the original article and replication based on criteria created by LeBel et al. (2019).*
 
-| replication based on criteria created by LeBel et al. (2019). |  |  |
-| --- | --- | --- |
-|  | Cohen’s d and 95% CI | Replication outcome |
-| Original study (n=37) |  |  |
-| Each easy ability | 0.90 [0.22, 1.57] |  |
-| Each diﬃcult ability | –1.44 [–2.17, –0.72] |  |
-| (excluding telling jokes) |  |  |
-| Replication condition (n=240) |  |  |
-| Easy abilities |  |  |
-| Using mouse | 1.18 [1.02, 1.35] | Signal-consistent |
-| Driving | 0.69 [0.55, 0.83] | Signal-consistent, smaller |
-| Riding bicycle | 0.54 [0.40, 0.67] | Signal-consistent, smaller |
-| Saving money | 0.61 [0.47, 0.75] | Signal-consistent, smaller |
-| Diﬃcult abilities |  |  |
-| Telling jokes | 0.11 [–0.02, 0.23] | No signal |
-| Playing chess | –0.33 [–0.46, –0.20] | Signal-consistent, smaller |
-| Juggling | –0.65 [–0.79, –0.51] | Signal-consistent, smaller |
-| Programming | –0.32 [–0.45, –0.19] | Signal-consistent, smaller |
+<table>
+  <thead>
+    <tr>
+      <th>replication based on criteria created by LeBel et al. (2019).</th>
+      <th>Cohen’s d and 95% CI</th>
+      <th>Replication outcome</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="3"><strong>Original study (n=37)</strong></td></tr>
+    <tr>
+      <td>Each easy ability</td>
+      <td>0.90 [0.22, 1.57]</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Each diﬃcult ability</td>
+      <td>–1.44 [–2.17, –0.72]</td>
+      <td></td>
+    </tr>
+    <tr><td colspan="3"><strong>(excluding telling jokes)</strong></td></tr>
+    <tr><td colspan="3"><strong>Replication condition (n=240)</strong></td></tr>
+    <tr><td colspan="3"><strong>Easy abilities</strong></td></tr>
+    <tr>
+      <td>Using mouse</td>
+      <td>1.18 [1.02, 1.35]</td>
+      <td>Signal-consistent</td>
+    </tr>
+    <tr>
+      <td>Driving</td>
+      <td>0.69 [0.55, 0.83]</td>
+      <td>Signal-consistent, smaller</td>
+    </tr>
+    <tr>
+      <td>Riding bicycle</td>
+      <td>0.54 [0.40, 0.67]</td>
+      <td>Signal-consistent, smaller</td>
+    </tr>
+    <tr>
+      <td>Saving money</td>
+      <td>0.61 [0.47, 0.75]</td>
+      <td>Signal-consistent, smaller</td>
+    </tr>
+    <tr><td colspan="3"><strong>Diﬃcult abilities</strong></td></tr>
+    <tr>
+      <td>Telling jokes</td>
+      <td>0.11 [–0.02, 0.23]</td>
+      <td>No signal</td>
+    </tr>
+    <tr>
+      <td>Playing chess</td>
+      <td>–0.33 [–0.46, –0.20]</td>
+      <td>Signal-consistent, smaller</td>
+    </tr>
+    <tr>
+      <td>Juggling</td>
+      <td>–0.65 [–0.79, –0.51]</td>
+      <td>Signal-consistent, smaller</td>
+    </tr>
+    <tr>
+      <td>Programming</td>
+      <td>–0.32 [–0.45, –0.19]</td>
+      <td>Signal-consistent, smaller</td>
+    </tr>
+  </tbody>
+</table>
 
 ## Discussion
 
@@ -596,87 +1400,332 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 
 ## Tables (unlocated in body)
 
-### Table 1
-*Kruger’s (1999) ﬁndings: Mean comparative ability estimates and judgmental weight of own and peers’ abilities.*
-
-| weight of own and peers’ abilities. |  |  |  |  |
-| --- | --- | --- | --- | --- |
-| Ability | Domain | Comparative | Judgmental weight | Judgmental weight |
-|  | diﬃculty1 | ability2 | of Own ability3 | of Others’ ability3 |
-| Easy |  |  |  |  |
-| Using a mouse | 3.1 | 58.8∗∗ | 0.21 | 0.06 |
-| Driving | 3.6 | 65.4∗∗∗∗ | .89∗∗∗∗ | –.25∗ |
-| Riding a bicycle | 3.9 | 64.0∗∗∗∗ | .61∗∗∗∗ | –0.02 |
-| Saving money | 4.3 | 61.5∗∗ | .90∗∗∗∗ | –.25∗∗∗ |
-| Diﬃcult |  |  |  |  |
-| Telling jokes | 6.1 | 46.5 | .91∗∗∗∗ | –0.03 |
-| Playing chess | 7.1 | 27.8∗∗∗∗ | .96∗∗∗∗ | –.22∗∗ |
-| Juggling | 8.3 | 26.5∗∗∗∗ | .89∗∗∗∗ | –0.16 |
-| Programming | 8.7 | 24.8∗∗∗∗ | .85∗∗∗∗ | –0.1 |
+<table>
+  <thead>
+    <tr>
+      <th>weight of own and peers’ abilities.</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ability</td>
+      <td>Domain<br>diﬃculty1</td>
+      <td>Comparative<br>ability2</td>
+      <td>Judgmental weight<br>of Own ability3</td>
+      <td>Judgmental weight<br>of Others’ ability3</td>
+    </tr>
+    <tr><td colspan="5"><strong>Easy</strong></td></tr>
+    <tr>
+      <td>Using a mouse</td>
+      <td>3.1</td>
+      <td>58.8∗∗</td>
+      <td>0.21</td>
+      <td>0.06</td>
+    </tr>
+    <tr>
+      <td>Driving</td>
+      <td>3.6</td>
+      <td>65.4∗∗∗∗</td>
+      <td>.89∗∗∗∗</td>
+      <td>–.25∗</td>
+    </tr>
+    <tr>
+      <td>Riding a bicycle</td>
+      <td>3.9</td>
+      <td>64.0∗∗∗∗</td>
+      <td>.61∗∗∗∗</td>
+      <td>–0.02</td>
+    </tr>
+    <tr>
+      <td>Saving money</td>
+      <td>4.3</td>
+      <td>61.5∗∗</td>
+      <td>.90∗∗∗∗</td>
+      <td>–.25∗∗∗</td>
+    </tr>
+    <tr><td colspan="5"><strong>Diﬃcult</strong></td></tr>
+    <tr>
+      <td>Telling jokes</td>
+      <td>6.1</td>
+      <td>46.5</td>
+      <td>.91∗∗∗∗</td>
+      <td>–0.03</td>
+    </tr>
+    <tr>
+      <td>Playing chess</td>
+      <td>7.1</td>
+      <td>27.8∗∗∗∗</td>
+      <td>.96∗∗∗∗</td>
+      <td>–.22∗∗</td>
+    </tr>
+    <tr>
+      <td>Juggling</td>
+      <td>8.3</td>
+      <td>26.5∗∗∗∗</td>
+      <td>.89∗∗∗∗</td>
+      <td>–0.16</td>
+    </tr>
+    <tr>
+      <td>Programming</td>
+      <td>8.7</td>
+      <td>24.8∗∗∗∗</td>
+      <td>.85∗∗∗∗</td>
+      <td>–0.1</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Table 5
 *Classiﬁcation of the replication, based on LeBel et al. (2018).*
 
-| Judgment and Decision Making, Vol. 17, No. 1, January 2022 Above and below average |
-| --- |
-| Table 5: Classiﬁcation of the replication, based on LeBel et al. (2018). |
-| Design facet Replication Details of deviation |
-| IV opera- Same |
-| tionalization |
-| DV opera- Same |
-| tionalization |
-| IV1 ability domains is changed from one condition of 4 easy IV stimuli Similar, with |
-| and 4 diﬃcult abilities, to 3 conditions of the replication an added |
-| group, the easy domain group, and the diﬃcult domain extension |
-| group. Participants were presented with either the original |
+<table>
+  <thead>
+    <tr>
+      <th>Judgment and Decision Making, Vol. 17, No. 1, January 2022 Above and below average</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Table 5: Classiﬁcation of the replication, based on LeBel et al. (2018).</td>
+    </tr>
+    <tr>
+      <td>Design facet Replication Details of deviation</td>
+    </tr>
+    <tr>
+      <td>IV opera- Same</td>
+    </tr>
+    <tr>
+      <td>tionalization</td>
+    </tr>
+    <tr>
+      <td>DV opera- Same</td>
+    </tr>
+    <tr>
+      <td>tionalization</td>
+    </tr>
+    <tr>
+      <td>IV1 ability domains is changed from one condition of 4 easy IV stimuli Similar, with</td>
+    </tr>
+    <tr>
+      <td>and 4 diﬃcult abilities, to 3 conditions of the replication an added</td>
+    </tr>
+    <tr>
+      <td>group, the easy domain group, and the diﬃcult domain extension</td>
+    </tr>
+    <tr>
+      <td>group. Participants were presented with either the original</td>
+    </tr>
+  </tbody>
+</table>
 
-### Table 9
-*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability.*
-
-| 3.2.3 H2: Relationship between comparative ability, domain diﬃculty, and desirabil- |
-| --- |
-| ity. |
-| We conducted one-sample t-tests to examine domain-wise comparative ability ratings using |
-| the 50th percentile estimates of comparative ability to classify above and below average |
-| eﬀects (as in Kruger, 1999). Similar as in Kruger‘s (1999) ﬁndings, participants indicated |
-| to be above-average for all easy ability domains (ps < .001) and below-average for three of |
-| the four diﬃcult ability domains (ps < .001; see Table 8 column 2 for descriptive statistics, |
-| and tables 8.1 and 9.1 in the OSF supplement for test statistics and CI’s). For the above and |
-| below-average eﬀects across all abilities, we found a strong negative correlation between |
-| comparative ability estimates and domain diﬃculty (r(6) = –0.85, p = .0073, 95% CI [– |
+<table>
+  <thead>
+    <tr>
+      <th>3.2.3 H2: Relationship between comparative ability, domain diﬃculty, and desirabil-ity.</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>We conducted one-sample t-tests to examine domain-wise comparative ability ratings using</td>
+    </tr>
+    <tr>
+      <td>the 50th percentile estimates of comparative ability to classify above and below average</td>
+    </tr>
+    <tr>
+      <td>eﬀects (as in Kruger, 1999). Similar as in Kruger‘s (1999) ﬁndings, participants indicated</td>
+    </tr>
+    <tr>
+      <td>to be above-average for all easy ability domains (ps &lt; .001) and below-average for three of</td>
+    </tr>
+    <tr>
+      <td>the four diﬃcult ability domains (ps &lt; .001; see Table 8 column 2 for descriptive statistics,</td>
+    </tr>
+    <tr>
+      <td>and tables 8.1 and 9.1 in the OSF supplement for test statistics and CI’s). For the above and</td>
+    </tr>
+    <tr>
+      <td>below-average eﬀects across all abilities, we found a strong negative correlation between</td>
+    </tr>
+    <tr>
+      <td>comparative ability estimates and domain diﬃculty (r(6) = –0.85, p = .0073, 95% CI [–</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Table 10
 *Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability in the Replication Con- dition.*
 
-| changes in Comparative Ability explained by Others’ and Own Ability in the Replication Con- |  |  |  |  |
-| --- | --- | --- | --- | --- |
-| dition. |  |  |  |  |
-| Predictors | B | S.E. | CI | p |
-| (Intercept) | 8.72 | 2.4 | [4.01, 13.43] | < .001 |
-| Own | 7.07 | 0.18 | [6.73, 7.42] | < .001 |
-| Other | –0.48 | 0.21 | [–0.90, –0.06] | 0.025 |
-| Diﬃculty | –0.04 | 0.16 | [–0.36, 0.28] | 0.817 |
-| Desirability | 0.57 | 0.21 | [0.16, 0.99] | 0.007 |
-| Ambiguity | 0.12 | 0.17 | [–0.21, 0.45] | 0.48 |
+<table>
+  <thead>
+    <tr>
+      <th>changes in Comparative Ability explained by Others’ and Own Ability in the Replication Con-dition.</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Predictors</td>
+      <td>B</td>
+      <td>S.E.</td>
+      <td>CI</td>
+      <td>p</td>
+    </tr>
+    <tr>
+      <td>(Intercept)</td>
+      <td>8.72</td>
+      <td>2.4</td>
+      <td>[4.01, 13.43]</td>
+      <td>&lt; .001</td>
+    </tr>
+    <tr>
+      <td>Own</td>
+      <td>7.07</td>
+      <td>0.18</td>
+      <td>[6.73, 7.42]</td>
+      <td>&lt; .001</td>
+    </tr>
+    <tr>
+      <td>Other</td>
+      <td>–0.48</td>
+      <td>0.21</td>
+      <td>[–0.90, –0.06]</td>
+      <td>0.025</td>
+    </tr>
+    <tr>
+      <td>Diﬃculty</td>
+      <td>–0.04</td>
+      <td>0.16</td>
+      <td>[–0.36, 0.28]</td>
+      <td>0.817</td>
+    </tr>
+    <tr>
+      <td>Desirability</td>
+      <td>0.57</td>
+      <td>0.21</td>
+      <td>[0.16, 0.99]</td>
+      <td>0.007</td>
+    </tr>
+    <tr>
+      <td>Ambiguity</td>
+      <td>0.12</td>
+      <td>0.17</td>
+      <td>[–0.21, 0.45]</td>
+      <td>0.48</td>
+    </tr>
+  </tbody>
+</table>
 
 ### Table 14
 *Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- ditions.*
 
-| changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- |  |  |  |  |
-| --- | --- | --- | --- | --- |
-| ditions. |  |  |  |  |
-| Predictors | B | S.E. | CI | p |
-|  | Comparative Ability Easy Condition |  |  |  |
-| (Intercept) | 18.6 | 2.35 | [13.99, 23.21] | <0.001 |
-| Own | 6.37 | 0.18 | [6.02, 6.71] | <0.001 |
-| Other | –0.13 | 0.21 | [–0.54, 0.28] | 0.546 |
-| Diﬃculty | –0.41 | 0.16 | [–0.72, –0.11] | 0.008 |
-| Desirability | 0.15 | 0.21 | [–0.26, 0.56] | 0.468 |
-| Ambiguity | –0.1 | 0.19 | [–0.47, 0.27] | 0.6 |
-|  | Comparative Ability Diﬃcult Condition |  |  |  |
-| (Intercept) | 25.57 | 2.66 | [20.36, 30.79] | <0.001 |
-| Own | 6.11 | 0.17 | [5.78, 6.45] | <0.001 |
-| Other | –0.16 | 0.22 | [–0.59, 0.26] | 0.451 |
-| Diﬃculty | –1.04 | 0.2 | [–1.43, –0.64] | <0.001 |
-| Desirability | 0.16 | 0.2 | [–0.22, 0.55] | 0.405 |
-| Ambiguity | –0.17 | 0.19 | [–0.55, 0.21] | 0.37 |
+<table>
+  <thead>
+    <tr>
+      <th>changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con-ditions.</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Predictors</td>
+      <td>B<br>Comparative Ability Easy Condition</td>
+      <td>S.E.</td>
+      <td>CI</td>
+      <td>p</td>
+    </tr>
+    <tr>
+      <td>(Intercept)</td>
+      <td>18.6</td>
+      <td>2.35</td>
+      <td>[13.99, 23.21]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Own</td>
+      <td>6.37</td>
+      <td>0.18</td>
+      <td>[6.02, 6.71]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Other</td>
+      <td>–0.13</td>
+      <td>0.21</td>
+      <td>[–0.54, 0.28]</td>
+      <td>0.546</td>
+    </tr>
+    <tr>
+      <td>Diﬃculty</td>
+      <td>–0.41</td>
+      <td>0.16</td>
+      <td>[–0.72, –0.11]</td>
+      <td>0.008</td>
+    </tr>
+    <tr>
+      <td>Desirability</td>
+      <td>0.15</td>
+      <td>0.21</td>
+      <td>[–0.26, 0.56]</td>
+      <td>0.468</td>
+    </tr>
+    <tr>
+      <td>Ambiguity</td>
+      <td>–0.1<br>Comparative Ability Diﬃcult Condition</td>
+      <td>0.19</td>
+      <td>[–0.47, 0.27]</td>
+      <td>0.6</td>
+    </tr>
+    <tr>
+      <td>(Intercept)</td>
+      <td>25.57</td>
+      <td>2.66</td>
+      <td>[20.36, 30.79]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Own</td>
+      <td>6.11</td>
+      <td>0.17</td>
+      <td>[5.78, 6.45]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Other</td>
+      <td>–0.16</td>
+      <td>0.22</td>
+      <td>[–0.59, 0.26]</td>
+      <td>0.451</td>
+    </tr>
+    <tr>
+      <td>Diﬃculty</td>
+      <td>–1.04</td>
+      <td>0.2</td>
+      <td>[–1.43, –0.64]</td>
+      <td>&lt;0.001</td>
+    </tr>
+    <tr>
+      <td>Desirability</td>
+      <td>0.16</td>
+      <td>0.2</td>
+      <td>[–0.22, 0.55]</td>
+      <td>0.405</td>
+    </tr>
+    <tr>
+      <td>Ambiguity</td>
+      <td>–0.17</td>
+      <td>0.19</td>
+      <td>[–0.55, 0.21]</td>
+      <td>0.37</td>
+    </tr>
+  </tbody>
+</table>
