@@ -1,0 +1,7 @@
+16 tables found (thorough=True)
+Target: page=7 bbox=[94.5, 124.7, 524.8, 348.7]
+[korb] 85 words extracted
+[korb] 21 y-clusters (8 asterisk-only)
+[korb] Header: first 3 y-clusters
+[korb] 5 cols: [97.3, 209.4, 275.6, 365.3, 460.0]
+[korb] 1 header row(s), 10 data rows

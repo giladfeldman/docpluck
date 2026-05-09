@@ -1,0 +1,21 @@
+3 tables found
+Target: page=2 label='Table 1'
+[ziano] 420 words extracted
+[ziano] 54 y-clusters (0 asterisk-only)
+[ziano] Side-by-side split at x=288.0
+[left] Header: first 10 y-clusters
+[left] 2 cols: [62.1, 147.3]
+[left] 22 data rows
+  [left] row 0: {0: 'Table 1 Descriptive and Tversky & Shafir', 1: 'omnibus inferential statistics, across o'}
+  [left] row 1: {0: 'subject)'}
+  [left] row 2: {1: 'Not buy 11 8 4 (%) (16%) (12%) Pay $5 20'}
+  [left] row 3: {0: 'Tversky & Shafir,', 1: '1992, / / / / /'}
+  [left] row 4: {0: 'modified gambles'}
+[right] Header: first 13 y-clusters
+[right] 1 cols: [309.7]
+[right] 34 data rows
+  [right] row 0: {0: 'I. Ziano replications. Choice under risk'}
+  [right] row 1: {0: '0.317] [0.144,'}
+  [right] row 2: {0: '0.394]'}
+  [right] row 3: {0: 'Reject 22 31'}
+  [right] row 4: {0: '(%) (31%)1 (43%)1'}
