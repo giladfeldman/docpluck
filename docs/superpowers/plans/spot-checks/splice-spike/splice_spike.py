@@ -181,3 +181,66 @@ def splice_tables_into_text(
         new_pages.append("\n".join(lines))
 
     return "\n".join(new_pages)
+
+
+def _load_tables_for_spike(pdf_path: str) -> tuple[str, list[dict]]:
+    """Load text and tables from a PDF using docpluck's structured extractor.
+
+    Actual schema (discovered 2026-05-09):
+      - ``extract_pdf_structured(bytes)`` returns a TypedDict with ``text`` (str,
+        pages joined by \\f) and ``tables`` (list[Table]).
+      - ``Table`` is a TypedDict with ``page`` (int, **1-indexed**), ``cells``
+        (list[Cell] — **empty** for isolated/whitespace tables, which is the norm
+        for APA psychology papers), ``raw_text`` (str, unstructured table text).
+      - pdfplumber ``extract_tables()`` also returns 0 tables for these papers
+        (no ruled lines), so ``cells`` will always be empty here.
+      - We convert ``raw_text`` → pseudo-rows (one line = one single-cell row)
+        so the token-based location algorithm has something to work with.
+    """
+    from docpluck.extract_structured import extract_pdf_structured  # local import: no cost when running tests
+
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    result = extract_pdf_structured(pdf_bytes)
+    text: str = result["text"]
+
+    out: list[dict] = []
+    for t in result.get("tables", []):
+        page_1indexed: int = t["page"]  # docpluck Table.page is 1-indexed
+        page_0indexed = page_1indexed - 1
+
+        cells = t.get("cells") or []
+        if cells:
+            # Lattice table: reconstruct rows from (r, c, text) cell dicts.
+            n_rows = max(c["r"] for c in cells) + 1
+            n_cols = max(c["c"] for c in cells) + 1
+            grid: list[list[str]] = [[""] * n_cols for _ in range(n_rows)]
+            for c in cells:
+                grid[c["r"]][c["c"]] = c["text"]
+            rows = grid
+        else:
+            # Isolated/whitespace table: use raw_text lines as single-cell rows.
+            raw = t.get("raw_text") or ""
+            rows = [[line] for line in raw.splitlines() if line.strip()]
+
+        out.append({"page": page_0indexed, "rows": rows})
+
+    return text, out
+
+
+def _run_cli(pdf_path: str) -> str:
+    text, tables = _load_tables_for_spike(pdf_path)
+    return splice_tables_into_text(text, tables)
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 2:
+        print("usage: python splice_spike.py <pdf-path>", file=sys.stderr)
+        sys.exit(2)
+    output = _run_cli(sys.argv[1])
+    # Re-open stdout in UTF-8 mode for Windows compatibility (Windows default
+    # is often cp1252 which cannot encode many Unicode chars in PDF text).
+    sys.stdout = open(sys.stdout.fileno(), mode="w", encoding="utf-8", closefd=False)
+    sys.stdout.write(output)
