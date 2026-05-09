@@ -252,26 +252,40 @@ def _find_caption_for_table(
 def _extract_caption_text(raw_text: str, cap: CaptionMatch) -> str:
     """Pull the full caption (label + description) starting at the caption line.
 
-    Termination order (whichever comes first):
-      1. End-of-sentence (`. ` followed by a capitalized non-stat-word) for
-         readable captions like "Descriptive statistics. Note that ..."
-      2. Next blank line (\\n\\n) — paragraph boundary
-      3. ~400-char hard cap
-    Then strip leading punctuation (": ", " — ") and double-spaces.
+    Captions are often line-wrapped by pdftotext, so a single ``\\n\\n``
+    boundary can sit MID-SENTENCE. Walk past such breaks until we find one
+    where the preceding text ends with a real sentence terminator
+    (``.``/``!``/``?``) or we hit the 600-char hard cap.
     """
     start = cap.char_start
     # Hard cap — never read more than 600 chars from the caption start.
     hard_end = min(cap.char_end + 600, len(raw_text))
-    blank_line = raw_text.find("\n\n", cap.char_end)
-    if blank_line != -1 and blank_line < hard_end:
-        hard_end = blank_line
+    pos = cap.char_end
+    while pos < hard_end:
+        nxt = raw_text.find("\n\n", pos)
+        if nxt == -1 or nxt >= hard_end:
+            break
+        # Check the text just before this paragraph break.
+        prev = raw_text[max(start, nxt - 40):nxt].rstrip()
+        # If it ends with a sentence terminator OR is empty/very short, stop.
+        if not prev or len(prev.split()) < 2:
+            hard_end = nxt
+            break
+        if re.search(r"[.!?][\"'\)\]]?$", prev):
+            hard_end = nxt
+            break
+        # Otherwise the caption continues — skip past this break and keep going.
+        pos = nxt + 2
     snippet = raw_text[start:hard_end].replace("\n", " ").strip()
+    # Collapse runs of any whitespace (including U+2002 EN SPACE, etc.) to a
+    # single space; many APA PDFs use unusual spaces between label and caption.
+    snippet = re.sub(r"\s+", " ", snippet)
     # Strip leading orphan punctuation that can occur when the rejoin produced
     # a partial caption (e.g., "Table 1. : Studies 1b and 3...").
     snippet = re.sub(r"^[\s.:\-—–]+", "", snippet)
     # Re-prefix the label if stripping ate it.
     if cap.label and not snippet.startswith(cap.label):
-        snippet = f"{cap.label}: {snippet}".strip()
+        snippet = f"{cap.label}. {snippet}".strip()
     if len(snippet) > 400:
         snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
     return snippet

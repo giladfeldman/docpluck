@@ -56,32 +56,32 @@ Therefore, we manipulated domain diﬃculty. In our replication, we randomly ass
 For the two extension groups, the extension domains aim to be speciﬁcally deﬁned in measurable terms. More context is provided for the domains to be more speciﬁc, such as the hand used (dominant versus non-dominant hand) for using a mouse, the location and type of car (home country and automatic gear car versus foreign country and manual gear car) for driving, and the help received for computer programming (someone very knowledgeable versus someone not very knowledgeable), which is an ability domain most participants may not have experience with. Additionally, an objective measure should be
 
 ### Table 2
-*: Extension: Manipulation of perceived domain diﬃculty in target’s domains.*
+*Extension: Manipulation of perceived domain diﬃculty in target’s domains.*
 
-| Original domain group Easy domain group | Diﬃcult domain group |
+| Original domain groupEasy domain group | Diﬃcult domain group |
 | --- | --- |
-| (replication) (extension) | (extension) |
+| (replication)(extension) | (extension) |
 | Easy domains |  |
-| Using a mouse Using a mouse with your | Using a mouse with your |
+| Using a mouseUsing a mouse with your | Using a mouse with your |
 | dominant hand | non-dominant hand |
-| Driving Driving a car with automatic | Driving a car with manual gear |
+| DrivingDriving a car with automatic | Driving a car with manual gear |
 | gear in your home country | in a foreign country where |
 |  | people drive on the opposite |
 |  | side of the road |
-| Riding a bicycle Riding a bicycle for 10 minutes | Riding a bicycle for an hour up |
+| Riding a bicycleRiding a bicycle for 10 minutes | Riding a bicycle for an hour up |
 | on a ﬂat road | a road with an upwards incline |
 |  | slope |
-| Saving money Saving 3% of your income each | Saving 20% of your income |
+| Saving moneySaving 3% of your income each | Saving 20% of your income |
 | month | each month |
 | Diﬃcult domains |  |
-| Telling jokes Telling a joke to one person | Telling a joke in front of a live |
+| Telling jokesTelling a joke to one person | Telling a joke in front of a live |
 | you know well (e.g., friend, | audience in an improv stand-up |
 | family member, etc.) | comedy club |
-| Playing chess Win a game of chess against an | Win a game of chess against an |
+| Playing chessWin a game of chess against an | Win a game of chess against an |
 | AI (computer) in beginners’ | AI (computer) in advanced |
 | mode | mode |
-| Juggling Juggling 2 balls | Juggling 4 balls |
-| Programming Programming guided by | Programming guided by |
+| JugglingJuggling 2 balls | Juggling 4 balls |
+| ProgrammingProgramming guided by | Programming guided by |
 | someone very knowledgeable | someone not knowledgeable in |
 | in programming | programming |
 
@@ -97,8 +97,18 @@ In the original study, the eight ability domains were divided into two categorie
 Yet, several issues may arise from treating continuous variables as categorical. First, the categorization of continuous variables, especially dichotomization of placing variables into two groups, might lead to misclassiﬁcations, loss of information and power (Naggara
 Although this test was the reason for the preregistration, due to an error, neither hypotheses or tests related to the core questions of the extensions were part of the preregistration. Hence, analyses connected to this question in the extension will be treated as exploratory.
 
+Table 3: Summary of the hypotheses.
+
+Hypothesis Statement
+
+Variables
+
+Conditions
+
+H1
+
 ### Table 3
-*: Summary of the hypotheses.*
+*Summary of the hypotheses.*
 
 | Hypothesis | Statement | Variables | Conditions |
 | --- | --- | --- | --- |
@@ -122,8 +132,9 @@ Although this test was the reason for the preregistration, due to an error, neit
 | H4 | Compared to the replication | Domain | Replication and |
 | (Extension) | condition, the diﬃcult domain | diﬃculty; | diﬃcult domain |
 |  | condition participants assign | ambiguity | conditions |
-|  | higher domain diﬃculty and lower |  |  |
-|  | ambiguity ratings to abilities. |  |  |
+
+et al., 2011). Second, the loss of power by dichotomizing variables at the median is equal to discarding one-third of the data (Cohen, 1983; MacCallum et al., 2002). Third, variation between categorized groups may be underestimated as close response scores divided into diﬀerent groups are deﬁned as being very diﬀerent instead of very similar. It has thus been suggested to keep variables continuous using methods such as linear regressions instead of t-tests (Altman & Royston, 2006).
+For the above reasons, we did not assign ability domains to speciﬁc dichotomic easy/diﬃcult categories. The above- and below-average-eﬀects were tested on a continuous scale: instead of using one-sample t-tests, correlations were used to test the relationship between domain diﬃculty and comparative ability in three diﬀerent ways: item-wise, compiled items in a vector (but not averaging across them), and row-wise averaged for the three conditions. Applying this method is a more direct assessment of perceived diﬃculty with the same sample. For a full overview of diﬀerences between the current and the original study see the OSF supplement, section “Comparisons and deviations”.
 
 1.9 Pre-registration and open science
 Before data collection, the experiment was pre-registered (see the OSF supplement). Preregistrations, power analyses, materials, data, exclusions, manipulations, power analyses, and other details and disclosures are available in the OSF supplement. Data collection was completed before analyses.
@@ -140,7 +151,7 @@ Participants were recruited through MTurk on TurkPrime/CloudResearch (Litman et 
 Table 4: Comparison of original study and replication’s samples.
 
 ### Table 4
-*: Comparison of original study and replication’s samples.*
+*Comparison of original study and replication’s samples.*
 
 |  | Kruger (1999) | MTurk sample | MTurk sample |
 | --- | --- | --- | --- |
@@ -214,7 +225,7 @@ Original domains Easy domains
 (n = 225)
 
 ### Table 6
-*: Mean ratings across all abilities for the three conditions.*
+*Mean ratings across all abilities for the three conditions.*
 
 |  | Original domains |  | Easy domains |  |  | Diﬃcult domains |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -245,7 +256,7 @@ Mean
 Eﬀect
 
 ### Table 7
-*: Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃculty ratings between easy and diﬃcult abilities (within conditions).*
+*Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃculty ratings between easy and diﬃcult abilities (within conditions).*
 
 |  | ratings between easy and diﬃcult abilities (within conditions). |  |  |  |  |  |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -258,8 +269,13 @@ Eﬀect
 | Diﬃcult domain | 1917 | 224 | 1.22 | <.001 | 0.69 | [0.62, 0.75] |
 | (extension) |  |  |  |  |  |  |
 
+Table 8: Replication condition: Mean comparative ability estimates and judgmental weight
+of own versus peers’ abilities.
+
+Ability
+
 ### Table 8
-*: Replication condition: Mean comparative ability estimates and judgmental weight of own versus peers’ abilities.*
+*Replication condition: Mean comparative ability estimates and judgmental weight of own versus peers’ abilities.*
 
 | of own versus peers’ abilities. |  |  |  |  |
 | --- | --- | --- | --- | --- |
@@ -273,31 +289,8 @@ Eﬀect
 | Playing chess | 7.74 (1.75) | 41.0∗∗∗ (27.00) | 0.82∗∗∗ | –0.03 |
 | Juggling | 7.64 (1.97) | 32.0∗∗∗ (27.67) | 0.59∗∗∗ | 0.18∗∗ |
 | Programming | 8.29 (1.74) | 40.7∗∗∗ (29.22) | 0.83∗∗∗ | –0.06 |
-|  | Note: Tablepresented as in original study (Kruger, 1999, Table 2) encompassing descriptive |  |  |  |
-|  | statistics, one-sample t-tests, and regressions. |  |  |  |
-|  | 1 Mean (SD) scores for item-wise domain diﬃculty. Higher numbers reﬂect greater diﬃ- |  |  |  |
-| culty. |  |  |  |  |
-| 2Mean (SD) scores for |  | item-wise comparative ability/percentile estimates. |  | Scores above |
-|  | 50 reﬂect an above-average eﬀect, estimates below 50 reﬂect a below-average eﬀect. See |  |  |  |
-|  | supplementary tables 8.1 and 9.1 for test statistics and CI’s. |  |  |  |
-|  | 3Standardised betas from multiple regressions predicting participants’ comparative ability |  |  |  |
-|  | (percentile) estimates from own absolute ability and peers’ absolute ability, respectively. |  |  |  |
-| ∗∗p < .01. ∗∗∗p < .001. |  |  |  |  |
-|  | and other’s absolute ability, were r(1918) = 0.50 (95% CI |  | [0.46, 0.53]); | and between |
-|  | comparative ability estimates and own absolute ability were r(1918) = 0.81 (95 % CI [0.79, |  |  |  |
-|  | 0.82]); with these correlations being diﬀerent from each other (Hotelling’s (1940) t(1917) |  |  |  |
-|  | = 27.61, p < 0.001). For inventory mean scores, correlations between comparative ability |  |  |  |
-|  | estimates and other’s absolute ability were r(238) = 0.53 (p < .001, 95% CI [0.43, 0.62]); |  |  |  |
-|  | and between own and comparative ability r(238) = 0.85 ( p < .001, 95% CI [0.82, 0.89]); |  |  |  |
-| with these correlations being diﬀerent |  | from each other |  | (Hotelling’s t(237) = 11.75, p < |
-| 0.001). |  |  |  |  |
-|  | However, when using a mixed-eﬀects model with random intercepts at |  |  | the level of |
-|  | participants to explain comparative ability, positive changes in own ability explained positive |  |  |  |
-|  | changes in comparative ability and the relationship between others’ and comparative ability |  |  |  |
-|  | being the opposite (Table 9). The ﬁndings from both replicated and the new analyses present |  |  |  |
-| strong support for H1. |  |  |  |  |
-|  | averaging the 8 domains for each participant (row-wise), resulting in 240 rows. P-values for vector-compiled |  |  |  |
-|  | scores correlations are not provided as those do not account for repeated responses of the same person. |  |  |  |
+
+averaging the 8 domains for each participant (row-wise), resulting in 240 rows. P-values for vector-compiled scores correlations are not provided as those do not account for repeated responses of the same person.
 
 Note. The table presents the ﬁxed-eﬀects coeﬃcients with all the model predictors. See supplementary section “Mixed Models” for step-wise regression results.
 
@@ -323,7 +316,7 @@ See Table 11 in the OSF supplement: equivalence tests 4–5. Not included in the
 We conducted multiple linear regression analyses to test how ratings of both own and others’ ability predict comparative ability judgments across all abilities. Models in both conditions predicted variance in comparative ability judgments (Feasy(2, 222) = 246.6, p < .001, Radj2 = .69, 95% CI [0.62, 0.76]; and Fdiﬃcult(2, 223) = 342.9, p<.001, Radj2 = .75, 95% CI [0.70, 0.81]). Yet, the only signiﬁcant predictors of participants’ own absolute ability were comparative ability judgments in both the easy ( = 0.86, t(222) = 17.32, p < .001) and the diﬃcult domain condition ( = 0.90, t(223) = 15.61, p < .001).
 
 ### Table 11
-*: Extension conditions: Mean comparative ability estimates and judgmental weight of own and peers’ abilities by domain diﬃculty.*
+*Extension conditions: Mean comparative ability estimates and judgmental weight of own and peers’ abilities by domain diﬃculty.*
 
 | of own and peers’ abilities by domain diﬃculty. |  |  |  |  |
 | --- | --- | --- | --- | --- |
@@ -346,7 +339,7 @@ The vector-compiled score correlation for the easy domain condition between own 
 Additionally, also mixed models indicated that own ability was a better predictor of comparative ability than others’ ability (Table 12).
 
 ### Table 12
-*: Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with*
+*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- ditions.*
 
 | changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- |  |  |  |  |
 | --- | --- | --- | --- | --- |
@@ -373,7 +366,7 @@ Ability
 Easy domain condition
 
 ### Table 13
-*: Extensions: Mean domain diﬃculty and mean comparative ability estimates*
+*Extensions: Mean domain diﬃculty and mean comparative ability estimates tested against the average (scale midpoint).*
 
 |  | Extensions: Mean domain diﬃculty and mean comparative ability estimates |  |  |  |
 | --- | --- | --- | --- | --- |
@@ -438,7 +431,7 @@ Variables (across all abilities)
 p Original study
 
 ### Table 15
-*: Comparison of correlational study eﬀect sizes between the original article and*
+*Comparison of correlational study eﬀect sizes between the original article and replication based on criteria created by LeBel et al. (2019).*
 
 |  | p | Correlation | p | Correlation |  |
 | --- | --- | --- | --- | --- | --- |
@@ -476,7 +469,7 @@ Judgmental Judgmental Judgmental Judgmental weight of own weight of weight of ow
 ability1 others’ ability1 ability1 others’ ability1
 
 ### Table 16
-*: Comparison of mean comparative ability estimates and judgmental weight of*
+*Comparison of mean comparative ability estimates and judgmental weight of own versus others’ abilities by domain diﬃculty between the original study and replication condition.*
 
 | Driving | .89∗∗∗∗ | –.25∗ | 0.85∗∗∗ | –0.11∗∗ |
 | --- | --- | --- | --- | --- |
@@ -497,7 +490,7 @@ see oneself as superior fails to account for certain situations, such as for di�
 Table 17: Comparison of one-sample t-test eﬀect sizes between the original article and
 
 ### Table 17
-*: Comparison of one-sample t-test eﬀect sizes between the original article and*
+*Comparison of one-sample t-test eﬀect sizes between the original article and replication based on criteria created by LeBel et al. (2019).*
 
 | replication based on criteria created by LeBel et al. (2019). |  |  |
 | --- | --- | --- |
@@ -604,7 +597,7 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 ## Tables (unlocated in body)
 
 ### Table 1
-*: Kruger’s (1999) ﬁndings: Mean comparative ability estimates and judgmental*
+*Kruger’s (1999) ﬁndings: Mean comparative ability estimates and judgmental weight of own and peers’ abilities.*
 
 | weight of own and peers’ abilities. |  |  |  |  |
 | --- | --- | --- | --- | --- |
@@ -622,7 +615,7 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 | Programming | 8.7 | 24.8∗∗∗∗ | .85∗∗∗∗ | –0.1 |
 
 ### Table 5
-*: Classiﬁcation of the replication, based on LeBel et al.*
+*Classiﬁcation of the replication, based on LeBel et al. (2018).*
 
 | Judgment and Decision Making, Vol. 17, No. 1, January 2022 Above and below average |
 | --- |
@@ -638,7 +631,7 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 | group. Participants were presented with either the original |
 
 ### Table 9
-*: Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with*
+*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability.*
 
 | 3.2.3 H2: Relationship between comparative ability, domain diﬃculty, and desirabil- |
 | --- |
@@ -653,7 +646,7 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 | comparative ability estimates and domain diﬃculty (r(6) = –0.85, p = .0073, 95% CI [– |
 
 ### Table 10
-*: Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with*
+*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability in the Replication Con- dition.*
 
 | changes in Comparative Ability explained by Others’ and Own Ability in the Replication Con- |  |  |  |  |
 | --- | --- | --- | --- | --- |
@@ -665,11 +658,9 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 | Diﬃculty | –0.04 | 0.16 | [–0.36, 0.28] | 0.817 |
 | Desirability | 0.57 | 0.21 | [0.16, 0.99] | 0.007 |
 | Ambiguity | 0.12 | 0.17 | [–0.21, 0.45] | 0.48 |
-|  | Note. The table presents the ﬁxed-eﬀects coeﬃcients with all the model predictors. See |  |  |  |
-|  | supplementary section “Mixed Models” for step-wise regression results. |  |  |  |
 
 ### Table 14
-*: Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with*
+*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- ditions.*
 
 | changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con- |  |  |  |  |
 | --- | --- | --- | --- | --- |

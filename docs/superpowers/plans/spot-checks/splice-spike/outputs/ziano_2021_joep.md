@@ -33,14 +33,14 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 |  | Descriptive and omnibus inferential statistics, across original studies and replications. |  |  |  |  |  |  |  |  |  |  |  |  |
 |  |  | Paying to know |  |  |  |  |  | Choice under risk |  |  |  |  |  |
-|  | N | Choice | Win | Loss | Uncertain  Inferential | ES [95% CI] | N | Choice | Win | Loss | Uncertain | Inferential | ES [95% CI] |
+|  | N | Choice | Win | Loss | Uncertain Inferential | ES [95% CI] | N | Choice | Win | Loss | Uncertain | Inferential | ES [95% CI] |
 |  |  |  |  |  | Statistics |  |  |  |  |  |  | Statistics |  |
-| Tversky & Shafir, 1992, | / | / | / | / | /  / | / | 98 | Accept | 68 | 58 | 35 (34%) |  |  |
+| Tversky & Shafir, 1992, | / | / | / | / | / / | / | 98 | Accept | 68 | 58 | 35 (34%) |  |  |
 | original (within- |  |  |  |  |  |  |  | (%) | (69%) | (59%) |  |  |  |
 | subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | / | / | / | / | /  / | / |  | Reject | 30 | 40 | 63 (66%) |  |  |
+|  | / | / | / | / | / / | / |  | Reject | 30 | 40 | 63 (66%) |  |  |
 |  |  |  |  |  |  |  |  | (%) | (31%) | (41%) |  |  |  |
-| Tversky & Shafir, 1992, | 199 | Buy (%) | 36 | 38 | 21 (32%)  χ2 (4) = 19.02, | Cramer’s V = | 213 | Accept |  | 49 | 40 | χ2 (2) = 13.89, | Cramer’s V |
+| Tversky & Shafir, 1992, | 199 | Buy (%) | 36 | 38 | 21 (32%) χ2 (4) = 19.02, | Cramer’s V = | 213 | Accept |  | 49 | 40 | χ2 (2) = 13.89, | Cramer’s V |
 | original (between- |  |  | (54%) | (57%) | p < .001 | 0.218 [0.137, |  | (%) |  | (69%)1 | (57%)1 | p < .001 | = 0.255 |
 | subject) |  |  |  |  |  | 0.317] |  |  |  |  |  |  | [0.144, |
 |  |  |  |  |  |  |  |  |  |  |  |  |  | 0.394] |
@@ -48,36 +48,36 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
 |  |  | (%) | (16%) | (12%) |  |  |  | (%) |  | (31%)1 | (43%)1 |  |  |
 |  |  | Pay $5 | 20 | 21 | 41 (61%) |  |  |  |  |  |  |  |  |
 |  |  | (%) | (30%) | (31%) |  |  |  |  |  |  |  |  |  |
-| Tversky & Shafir, 1992, | / | / | / | / | /  / | / | 171 | Accept | 42 | 39 | 43 | χ2 (2) = 0.76, | Cramer’s V |
+| Tversky & Shafir, 1992, | / | / | / | / | / / | / | 171 | Accept | 42 | 39 | 43 | χ2 (2) = 0.76, | Cramer’s V |
 | modified gambles |  |  |  |  |  |  |  | (%) | (73%)1 | (69%)1 | (75%)1 | p = .68 | = 0.067 |
 | (between-subject) |  |  |  |  |  |  |  |  |  |  |  |  | [(cid:0) 0.108, |
 |  |  |  |  |  |  |  |  |  |  |  |  |  | 0.218] |
-|  | / | / | / | / | /  / | / |  | Reject | 15 | 18 | 14 |  |  |
+|  | / | / | / | / | / / | / |  | Reject | 15 | 18 | 14 |  |  |
 |  |  |  |  |  |  |  |  | (%) | (27%)1 | (31%)1 | (25%)1 |  |  |
-| Kühberger et al., 2001, | / | / | / | / | /  / | / | 177 | Accept |  |  |  | … | … |
+| Kühberger et al., 2001, | / | / | / | / | / / | / | 177 | Accept |  |  |  | … | … |
 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
-| 2 exp. 1 (between- |  |  |  |  |  |  |  | (%) | (60%)2 | (47%)2 | (47%)2 |  |  |
+| 2exp. 1 (between- |  |  |  |  |  |  |  | (%) | (60%)2 | (47%)2 | (47%)2 |  |  |
 | subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | / | / | / | / | /  / | / |  | Reject |  |  |  | … | … |
+|  | / | / | / | / | / / | / |  | Reject |  |  |  | … | … |
 |  |  |  |  |  |  |  |  | (%) | (40%)2 | (53%)2 | (53%)2 |  |  |
-| Kühberger et al., 2001, | / | / | / | / | /  / | / | 184 | Accept |  |  |  | … | … |
+| Kühberger et al., 2001, | / | / | / | / | / / | / | 184 | Accept |  |  |  | … | … |
 | exp. 2 (between- |  |  |  |  |  |  |  | (%) | (83%)2 | (70%)2 | (62%)2 |  |  |
 | subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | / | / | / | / | /  / | / |  | Reject |  |  |  | … | … |
+|  | / | / | / | / | / / | / |  | Reject |  |  |  | … | … |
 |  |  |  |  |  |  |  |  | (%) | (17%)2 | (30%)2 | (38%)2 |  |  |
-| Kühberger et al., 2001, | / | / | / | / | /  / | / | 35 | Accept | 28 | 13 | 15 | … | … |
+| Kühberger et al., 2001, | / | / | / | / | / / | / | 35 | Accept | 28 | 13 | 15 | … | … |
 | exp. 3 (within- |  |  |  |  |  |  |  | (%) | (80%)1 | (37%)1 | (43%)1 |  |  |
 | subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | / | / | / | / | /  / | / |  | Reject | 7 | 22 | 20 | … | … |
+|  | / | / | / | / | / / | / |  | Reject | 7 | 22 | 20 | … | … |
 |  |  |  |  |  |  |  |  | (%) | (20%)1 | (63%)1 | (57%)1 |  |  |
-| Kühberger et al., 2001, | / | / | / | / | /  / | / | 97 | Accept |  |  |  | … | … |
+| Kühberger et al., 2001, | / | / | / | / | / / | / | 97 | Accept |  |  |  | … | … |
 | exp. 4 (between- |  |  |  |  |  |  |  | (%) | (68%)2 | (32%)2 | (38%)2 |  |  |
 | subject) |  |  |  |  |  |  |  |  |  |  |  |  |  |
-|  | / | / | / | / | /  / | / |  | Reject |  |  |  | … | … |
+|  | / | / | / | / | / / | / |  | Reject |  |  |  | … | … |
 |  |  |  |  |  |  |  |  | (%) | (32%)2 | (68%)2 | (62%)2 |  |  |
-| Lambdin & Burdsal, 2007 | / | / | / | / | /  / | / | 55 | Accept | 35 | 26 | 21 (38%) | … | … |
+| Lambdin & Burdsal, 2007 | / | / | / | / | / / | / | 55 | Accept | 35 | 26 | 21 (38%) | … | … |
 | (within-subject) |  |  |  |  |  |  |  | (%) | (64%) | (47%) |  |  |  |
-|  | / | / | / | / | /  / | / |  | Reject | 20 | 31 | 34 | … | … |
+|  | / | / | / | / | / / | / |  | Reject | 20 | 31 | 34 | … | … |
 |  |  |  |  |  |  |  |  | (%) | (36%) | (53%) | (62%) |  |  |
 | Present work (within- | 445 | Buy (%) | 256 | 127 | 99 (22%) | † | 445 | Accept | 164 | 187 | 165 |  | † |
 | subject) |  |  | (58%) | (29%) |  |  |  | (%) | (37%) | (42%) | (37%) |  |  |
@@ -124,21 +124,7 @@ Effect size [95% CI]
 Cramer’s V = 0.183 [0.08, 0.357]
 −4
 
-### Table 3
-*Attention check results.*
-
-| I. Ziano et al. |  |  |  |  | Journal of Economic Psychology 83 (2021) 102350 |
-| --- | --- | --- | --- | --- | --- |
-| Table 3 |  |  |  |  |  |
-| Attention check results. |  |  |  |  |  |
-| Response alternative |  | “Never answer scales in online studies seriously”* |  | “Always carefully read and answer each item on online surveys”** |  |
-|  | Counts | % of total | Counts | % of total |  |
-| 1 (Not at all characteristic of me) | 834 | 93.7% | 1 | 0.1% |  |
-| 2 (A little characteristic of me) | 19 | 2.1% | 9 | 1.0% |  |
-| 3 (Somewhat characteristic of me) | 19 | 2.1% | 19 | 2.1% |  |
-| 4 (Very characteristic of me) | 14 | 1.6% | 81 | 9.1% |  |
-| 5 (Entirely characteristic of me) | 4 | 0.4% | 780 | 87.6% |  |
-| *M = 1.13; SD = 0.55 (here, lower numbers indicate higher attentiveness). |  |  |  |  |  |
+*M = 1.13; SD = 0.55 (here, lower numbers indicate higher attentiveness). **M = 4.83, SD = 0.51 (here, higher numbers indicate higher attentiveness).
 
 making definitive choices that definitive outcomes provide, compared to uncertain ones. They argued the following: when people envision that they have passed an exam, they could easily come up with reasons to go on vacation (“let’s celebrate!”); when people envision they have failed an exam, they could easily find opposite reasons to go on vacation (“let’s live a little!”); yet, an uncertain outcome does not elicit good reasons to make a definitive decision.
 
@@ -284,7 +270,7 @@ preference for indirect harm effect In press at Meta Psychology . Accepted for p
 
 ## Figures
 
-*Figure 1. Tversky and Shafir (1992) original studies’ results and present replications results. 5*
+*Figure 1. Tversky and Shafir (1992) original studies’ results and present replications results. 5 I. Ziano et al.*
 
 
 ## Tables (unlocated in body)
@@ -356,3 +342,17 @@ preference for indirect harm effect In press at Meta Psychology . Accepted for p
 |  |  | p < .001 | p < .001 | p < .001 |  | p = .221 | p = .025 | p = .31 |
 | Effect size [95% CI] |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |  | Cramer’s V = | Cramer’s V = | Cramer’s V = |
 |  |  | 0.245 | 0.31 [0.207, | 0.503 |  | 0.071 | 0.13 | 0.059 |
+
+### Table 3
+*Attention check results.*
+
+| Table 3 |  |  |  |  |
+| --- | --- | --- | --- | --- |
+| Attention check results. |  |  |  |  |
+| Response alternative |  | “Never answer scales in online studies seriously”* |  | “Always carefully read and answer each item on online surveys”** |
+|  | Counts | % of total | Counts | % of total |
+| 1 (Not at all characteristic of me) | 834 | 93.7% | 1 | 0.1% |
+| 2 (A little characteristic of me) | 19 | 2.1% | 9 | 1.0% |
+| 3 (Somewhat characteristic of me) | 19 | 2.1% | 19 | 2.1% |
+| 4 (Very characteristic of me) | 14 | 1.6% | 81 | 9.1% |
+| 5 (Entirely characteristic of me) | 4 | 0.4% | 780 | 87.6% |

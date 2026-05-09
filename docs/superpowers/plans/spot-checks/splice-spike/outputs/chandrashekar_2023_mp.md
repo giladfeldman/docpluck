@@ -6,6 +6,14 @@ C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\ba
   cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
 C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (98.02008641599998, 370.3743042992, 552.3688980947712, 538.9717645104)
   cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (559.560447648, 562.055489644032) does not lie in column range (293.90999999999997, 558.9599999999999)
+  warnings.warn(
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (576.120460896, 578.615502892032) does not lie in column range (107.52, 575.88)
+  warnings.warn(
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (604.680483744, 607.6804861439999) does not lie in column range (146.4, 604.1999999999999)
+  warnings.warn(
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (604.680483744, 607.6804861439999) does not lie in column range (108.0, 604.68)
+  warnings.warn(
 Meta-Psychology, 2023, vol 7, MP.2022.3108 https://doi.org/10.15626/MP.2022.3108 Article type: Replication Report Published under the CC-BY4.0 license
 
 Open data: Yes Open materials: Yes Open and reproducible analysis: Yes Open reviews and editorial process: Yes Preregistration: Yes
@@ -102,116 +110,63 @@ Opt-Out conditions, the ‘yes’ response was pre-selected. In positively frame
 Extensions
 Extension 1: The effect of choice permanence. Participants in Sample 1 were part of the choicepermanence extension. As such, participants in Sample 1 were randomly assigned to one of two betweenparticipants conditions (temporary or permanent). Participants assigned to the temporary conditions took the same survey as those in the permanent conditions—only they received the following additional instruction at the beginning of part 1 of the study: “Please note: Your organ donor authorization, if granted, would be for 3 years only, meaning that after 3 years you will be asked to reconﬁrm your organ donor decision.” Participants in the permanent conditions had no additional instructions. Extension 2: Conceptual replication of Experimental 2 of Johnson et al. (2002). All the participants in Sample 2 took part in a different extension. Immediately after completing Part 1 of the study but just before Part 2, participants read the following instructions (see Table 3 for details): “Would you like to receive further information about organ donation through MTurk? If you indicate your approval, we’ll contact you through MTurk using your worker ID with further information about organ donation.” These participants were randomly assigned to 1 of 6 conditions in a 2 (framing: Positive vs. Negative) times 3 (default option: Opt-Out vs. Opt-In vs. No-Default) between-participants design (for details, see Table S6 in the supplementary section). After reading the above instruction, participants selected “Yes” or “No” to a question asking for consent to receiving further information on organ donation. Each of the default conditions involved either a positive (“Send me more information about organ donation”) or negative (“Do NOT send me more information about organ donation”) framing. The responses were pre-selected in the Opt-In and Opt-Out default conditions mirroring the experimental design of Experiment 2 of Johnson et al. (2002). In positively framed Opt-Out conditions, the ‘yes’ response was preselected. In positively framed Opt-In conditions, the ‘No’ response was pre-selected. In negatively framed Opt-Out conditions, the ‘no’ response was pre-selected.
 
+Table 2
+Study stimuli for the direct replication of Johnson et al. (2002) [Introduction]: Typically, regardless of your organ donor decision, the state online systems ask you to answer a number of health questions. Please answer the following. All the data will be kept completely conﬁdential.
+You are almost at the end of the survey. Thank you for taking part. Would you be interested in being notiﬁed about other policy/health-related surveys? (If yes, we will contact you through MTurk using your MTurk worker ID) [Positive frame, Opt-out]: Notify me about more health surveys.
+Yes
+No
+[Positive frame, Opt-in]: Notify me about more health surveys.
+Yes
+No
+[Positive frame, No-default]: Notify me about more health surveys.
+Yes
+No
+[Negative frame, Opt-out]: Notify me about more health surveys.
+Yes
+No
+[Negative frame, Opt-in]: Do NOT notify me about more health surveys.
+Yes
+No
+[Negative frame, No-default]: Notify me about more health surveys.
+Yes
+No
+
 ### Table 2
-*Study stimuli for the direct replication of Johnson et al.*
+*Study stimuli for the direct replication of Johnson et al. (2002) [Introduction]: Typically, regardless of your organ donor decision, the state online systems ask you to answer a number of health questions. Please answer the following. All the data will be kept completely conﬁdential.*
 
 | Table 2 |  |
 | --- | --- |
-|  | In negatively framed Opt-In conditions, the ‘yes’ re- |
+|  | In negativelyframed Opt-In conditions,the‘yes’re- |
 |  | sponse was pre-selected. |
-| Study stimuli for the direct replication of Johnson et al. |  |
+| Study stimulifor the direct replication of Johnson et al. |  |
 | (2002) | Data Transformations |
 | [Introduction]: |  |
-|  | Both Part 1 and Part 2 of the replication study col- |
-| Typically, regardless of your organ donor decision, the |  |
-|  | lected the participants’ responses in a binary format |
-| state online systems ask you to answer a number of |  |
-|  | (Yes/No). In the organ donation scenario, we coded |
-| health questions. Please answer the following. All the |  |
-|  | the answer “Yes” (i.e., consenting to donate organs) as |
-| data will be kept completely conﬁdential. |  |
-|  | ‘1’. We coded the response “No” (i.e., dissenting to do- |
-| You are almost at the end of the survey. Thank you | nate organs) as ‘0’. In Part 2, the responses that in- |
-| for taking part. Would you be interested in being noti- | dicate the consent for participation were coded as “1,” |
-| ﬁed about other policy/health-related surveys? (If yes, | whereas non-participation was coded as “0”. Coding of |
-| we will contact you through MTurk using your MTurk | the answers for the choice permanence extension and |
-| worker ID) | the conceptual replication of Johnson et al. (2002) fol- |
-|  | lowed the same response coding procedure as that of |
-| [Positive frame, Opt-out]: |  |
-|  | Part 1 and Part 2, respectively. Consistent with previous |
-| Notify me about more health surveys. |  |
-|  | literature, we deﬁne default effects as the difference in |
-|  | participation rates between the Opt-Out condition ver- |
-| Yes |  |
-|  | sus that in the Opt-In condition. We then calculated the |
-| No | odds-ratio for the regression coefﬁcients as a measure |
-|  | of effect size with a 95% conﬁdence interval. |
-| [Positive frame, Opt-in]: |  |
-| Notify me about more health surveys. |  |
-|  | Analysis |
-| Yes |  |
-|  | Data were analyzed using R. Data were ﬁt to logistic |
-|  | regression models using the glm function (with “bino- |
-| No |  |
-|  | mial("logit")” as the family). In Part 1, we report the |
-| [Positive frame, No-default]: | results from 2-sample test for equality of proportions |
-| Notify me about more health surveys. | (comparing the participation rate across different de- |
-|  | faults). We analyzed the data for Part 2 with a 2 times |
-| Yes | 3 binomial logistic regression, with framing (Positive |
-|  | vs. Negative) and default (Opt-In vs. Opt-Out vs. No- |
-| No |  |
-|  | Default) and interaction terms of framing and defaults |
-|  | as predictors of the respondent’s decision to participate |
-| [Negative frame, Opt-out]: |  |
-|  | (1 = Yes; 0 = No). For testing the effect of choice perma- |
-| Notify me about more health surveys. |  |
-|  | nence on organ donation rate, we conducted chi-square |
-| Yes | tests comparing the participation rate across temporary |
-|  | and permanent conditions. In the second extension, we |
-| No |  |
-|  | conducted the same analysis as for part 2 of the study. |
-| [Negative frame, Opt-in]: |  |
-|  | Replication evaluation |
-| Do NOT notify me about more health surveys. |  |
-|  | We evaluated ﬁndings in our replication effects using |
-| Yes |  |
-|  | (see Table S15 the criteria set by LeBel et al. (2019) |
-|  | and Figure S2 in the supplementary material). Table |
-| No |  |
-|  | 4 provides a classiﬁcation of the replications using the |
-| [Negative frame, No-default]: | LeBel et al. (2019) criteria. We summarize the present |
-| Notify me about more health surveys. | replications as very close. |
 
 ## Results
 
 We provide a summary of the ﬁndings in Table 9. We present complete descriptive statistics across the two samples in Table 5 (also see Table S10 in the supplementary materials).
 
 ### Table 3
+*Table 4 Study stimuli for the on conceptual replication of Johnson et al. (2002) [Introduction]: Typically, regardless of your organ donor decision, the state online systems ask you to answer a number of health questions. Please answer the following.*
+
 | Table 3 | Table 4 |
 | --- | --- |
 | Study stimuli for the on conceptual replication of Johnson | Table 4. Classiﬁcation of replications based on LeBel et al. |
 | et al. (2002) | (2019) |
-|  | Design facet Replication study |
+|  | Design facetReplication study |
 | [Introduction]: |  |
-|  | IV operationalization Same |
-| Typically, regardless of your organ donor decision, the |  |
-|  | DV operationalization Same |
+|  | IV operationalizationSame |
+| Typically,regardless of your organ donor decision,the |  |
+|  | DV operationalizationSame |
 | state online systems ask you to answer a number of |  |
-|  | IV stimuli Same |
-| health questions. Please answer the following. All the |  |
-|  | DV stimuli Same |
+|  | IV stimuliSame |
+| health questions. Please answer the following. Allthe |  |
+|  | DV stimuliSame |
 | data will be kept completely conﬁdential. |  |
-|  | Procedural details Similar |
-|  | Physical settings Different |
-| You are almost at the end of the survey. Thank you |  |
-|  | Contextual variables Different |
-| for taking part. Would you be interested in being noti- |  |
-|  | Replication classiﬁcation Very close replication |
-| ﬁed about other policy/health-related surveys? (If yes, |  |
-| we will contact you through MTurk using your MTurk |  |
-| worker ID) |  |
-|  | Part 1: Replication of Johnson and Goldstein (2003) |
-| [Positive frame, Opt-out]: |  |
-| Send me more information about organ donation. | Consistent with the original study, participants in |
-|  | the Opt-Out condition consented to organ donation at |
-
-Different
-
-Contextual variables
-
-Different
-
-Replication classiﬁcation Very close replication
+|  | Procedural detailsSimilar |
+|  | Physical settingsDifferent |
+| You are almost atthe end ofthe survey.Thank you |  |
+|  | Contextual variablesDifferent |
 
 Part 1: Replication of Johnson and Goldstein (2003)
 Consistent with the original study, participants in the Opt-Out condition consented to organ donation at a higher rate (73.5%) than participants in the Opt-In condition (62.5%) (Chi-squared test: χ2(1) = 12.96, p<.001, Odds ratio (OR) = 1.67, 95% CI [1.27, 2.19] (see Figure 1). This result was consistent across both samples (See Table S11 for complete results). Also, participants in the No-Default condition consented to organ donation at a higher rate (69.7%) than participants in the Opt-In condition (62.5%) (χ2(1) = 5.31, p =.021, OR = 1.38, 95% CI [1.06, 1.80]) with slight deviations between the two samples (See Table S11 for complete results). Also see Table 6 for the results based on logistic regression.
@@ -221,6 +176,8 @@ Default effects
 We failed to ﬁnd support for differences in rates of consent to receive health-related information between the Opt-Out condition (60.5%) and the Opt-In condition (61.1%) (b = -.29, p = .095, OR = 0.75, 95% CI [0.53, 1.05]); that is, we found no support for a default effect. This result was consistent across both samples (See Table S11 for complete results). Participants in the No-Default (59.8%) condition, moreover, consented to receive health-related information at a lower rate than participants in Opt-In (61.1%) condition (b = -0.41, p = .021, OR = 0.67, 95% CI [0.47, 0.94]).
 
 ### Table 5
+*Descriptive table of the participation rates. Replication Study Replication of Experiment 1 from Johnson & Goldstein (2003) Replication of Experiment 2 from Johnson, Bellman & Lohse (2002) Note. N = 1920.*
+
 | Table 5 |  |  |  |  |
 | --- | --- | --- | --- | --- |
 | Descriptive table of the participation rates. |  |  |  |  |
@@ -241,40 +198,23 @@ We failed to ﬁnd support for differences in rates of consent to receive health
 |  |  | Negative Framing | 312 | 25.3% |
 | Note. N = 1920. |  |  |  |  |
 
-001 1.67 [1.27, 2.19] |
+27.6%
+
+93.4%
+
+25.3%
+
+### Table 6
+*Summary of the replication results of Part 1 (Johnson and Goldstein (2003)) based on logistic regression analysis Predictor Estimate SE Z p OR [95% CI] Intercept 0.51 0.09 5.46 <.001 1.67 [1.39, 2.00] Default: No-Default – Opt-In 0.32 0.14 2.37 0.018 1.38 [1.06, 1.80] Default: Opt-Out – Opt-In 0.51…*
+
+| Default: Opt-Out – Opt-In | 0.51 | 0.14 | 3.65 | <.0011.67 [1.27, 2.19] |
 | --- | --- | --- | --- | --- |
 | Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. |  |  |  |  |
 |  |  |  |  | Framing effects |
-|  |  |  |  | Participants in the positive framing condition con- |
-|  |  |  |  | sented to receive health-related information (91.7%) at |
-|  |  |  |  | a higher rate than participants in the negative framing |
-|  |  |  |  | condition (28.9%) (b= 2.74, p < .001, OR = 15.61, |
-|  |  |  |  | 95% CI [10.31, 23.63]). |
-|  |  |  |  | Exploratory: Default effects as a function of frames |
-|  |  |  |  | We proceeded to conduct additional exploratory (not |
-|  |  |  |  | preregistered) analyses examining the interaction be- |
-|  |  |  |  | tween framing and defaults. We found support for an |
-|  |  |  |  | interaction (see Table 7). We considered two sets of in- |
-|  |  |  |  | teractions: 1) (Positive – Negative) times (No-default – |
-|  |  |  |  | Opt-In); 2) (Positive – Negative) times (Opt-Out – Opt- |
-|  |  |  |  | In). |
-|  |  |  |  | For the (Positive – Negative) × (No-default – Opt- |
-|  |  |  |  | In) interaction, we looked at the consent rates between |
-|  |  |  |  | the No-Default and Opt-In conditions across the positive |
-|  |  |  |  | and negative frame (b = 1.01, p = .003, OR = 2.76, |
-|  |  |  |  | 95% CI [1.43, 5.32]). Within positive framing condi- |
-|  |  |  |  | tions, participants in the No-Default condition (93.4%) |
-|  |  |  |  | consented to receive health-related information at a |
-| Figure 1 |  |  |  | higher rate than participants in the Opt-In condition |
-|  |  |  |  | (88.6%) (see Table S12 and Table S13 in the supple- |
-| Results of direct replications of |  | Johnson and Goldstein |  | mentary materials). The pattern of results was in the |
-| (2003). Percentage of participants |  | consenting to organ |  | opposite direction in the negative framing conditions: |
-| donation by condition across both samples. |  |  |  | participants in the No-Default condition (25.3%) con- |
-| Note.* p < .05, ** p< .01, *** p < .001 |  |  |  |  |
-|  |  |  |  | sented to receive health-related information at a lower |
-|  |  |  |  | rate than participants in the Opt-In condition (33.6%). |
 
-## Results
+Figure 1
+
+
 
 of direct replications of Johnson and Goldstein (2003). Percentage of participants consenting to organ donation by condition across both samples. Note.* p < .05, ** p< .01, *** p < .001
 
@@ -304,70 +244,65 @@ The ﬁndings across direct and conceptual replication of Johnson et al. (2002) 
 
 Intercept Framing: Positive – Negative Default: No-Default – Opt-In Default: Opt-Out – Opt-In Interaction term: (Positive – Negative) × (No-Default–Opt-In) (Positive – Negative) × (Opt-Out –Opt-In)
 
--0.84 (0.11) 3.31 (0.14) -0.12 (0.15) -0.05 (0.15)
+0.51 [0.40, 0.64] 15.30 [10.23, 23.40]
+0.66 [0.47, 0.94] 0.75 [0.54, 1.05]
+2.74 [1.43, 5.35] 2.33 [1.23, 4.49]
 
--7.65 24.14 -0.81 -0.35
+Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets.
 
-<.001 <.001 .417 .724
+Table 8
 
-### Table 7
-| Table 7 |  |  |  |  |  |  |  |  |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis |  |  |  |  |  |  |  |  |
-|  |  |  | Model 1 |  |  |  | Model 2 |  |
-| Predictor |  |  |  |  |  |  |  |  |
-|  | Estimate | Z | p | OR [95% CI] | Estimate | Z | p | OR [95% CI] |
-| Intercept | -0.84 (0.11) | -7.65 | <.001 | 0.43 [0.35, 0.53] | -0.68 (0.12) | -5.78 | <.001 | 0.51 [0.40, 0.64] |
-| Framing: Positive – Negative | 3.31 (0.14) | 24.14 | <.001 | 27.27 [20.97, 35.88] | 2.73 (0.21) | 12.96 | <.001 | 15.30 [10.23, 23.40] |
-| Default: No-Default – Opt-In | -0.12 (0.15) | -0.81 | .417 | 0.89 [0.66, 1.19] | -0.40 (0.18) | -2.29 | .021 | 0.66 [0.47, 0.94] |
-| Default: Opt-Out – Opt-In | -0.05 (0.15) | -0.35 | .724 | 0.95 [0.71, 1.27] | -0.29 (0.17) | -1.66 | .096 | 0.75 [0.54, 1.05] |
-| Interaction term: |  |  |  |  |  |  |  |  |
-| (Positive – Negative) × (No-Default–Opt-In) |  |  |  |  | 1.00 (0.33) | 3.02 | .003 | 2.74 [1.43, 5.35] |
-| (Positive – Negative) × (Opt-Out –Opt-In) |  |  |  |  | 0.85 (0.33) | 2.57 | .010 | 2.33 [1.23, 4.49] |
-| Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets. |  |  |  |  |  |  |  |  |
+Summary of the replication results of Extension 2 (conceptual replication of Johnson et al. (2002) based on logistic
 
-### Table 8
-| Summary of | the replication results of Extension 2 (conceptual replication of Johnson et al. (2002) based on logistic |  |  |  |  |  |  |  |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| regression analysis |  |  |  |  |  |  |  |  |
-|  |  |  | Model 1 |  |  |  | Model 2 |  |
-| Predictor |  |  |  |  |  |  |  |  |
-|  | Estimate | Z | p | OR [95% CI] | Estimate | Z | p | OR [95% CI] |
-| Intercept | 0.72 (0.14) | 5.11 | <.001 | 2.05 [1.56, 2.71] | 0.28 (0.16) | 1.79 | 0.072 | 1.33 [0.97, 1.81] |
-| Framing: Positive – Negative | -1.73 (0.14) | -12.06 | <.001 | 0.18 [0.13, 0.23] | -1.82 (0.26) | -7.04 | <.001 | 0.16 [0.09, 0.27] |
-| Default: No-Default – Opt-In | -0.47 (0.17) | -2.67 | 0.007 | 0.62 [0.44, 0.88] | -0.39 (0.23) | 1.68 | 0.091 | 1.48 [0.94, 2.32] |
-| Default: Opt-Out – Opt-In | 0.15 (0.17) | 0.87 | 0.383 | 1.16 [0.83, 1.63] | -0.59 (0.24) | 2.52 | 0.011 | 1.80 [1.14, 2.86] |
-| Interaction terms: |  |  |  |  |  |  |  |  |
-| (Positive – Negative) × (No-Default–Opt-In) |  |  |  |  | 0.18 (0.35) | 0.52 | 0.604 | 1.20 [0.59, 2.41] |
-| (Positive – Negative) × (Opt-Out –Opt-In) |  |  |  |  | 0.07 (0.36) | 0.21 | 0.83 | 1.07 [0.53, 2.17] |
-| Note. Estimates represent the odds of the dependent variable = “1” vs. |  |  |  |  | “0”; N = 966. Standard errors are reported within the |  |  |  |
+regression analysis
+
+Predictor
+Intercept Framing: Positive – Negative Default: No-Default – Opt-In Default: Opt-Out – Opt-In Interaction terms: (Positive – Negative) × (No-Default–Opt-In) (Positive – Negative) × (Opt-Out –Opt-In)
+
+OR [95% CI] 1.33 [0.97, 1.81] 0.16 [0.09, 0.27] 1.48 [0.94, 2.32] 1.80 [1.14, 2.86]
+1.20 [0.59, 2.41] 1.07 [0.53, 2.17]
+
+Note. Estimates represent the odds of the dependent variable = “1” vs. “0”; N = 966. Standard errors are reported within the
 
 brackets.
 
-### Table 9
-| Table 9 |  |  |  |  |
-| --- | --- | --- | --- | --- |
-| Summary and comparison of ﬁndings of the current replication study and the target studies |  |  |  |  |
-| Part | Target effect | Original effect size | Replication effect size | Replication summary |
-|  | Default effects: No-Default vs. Opt-In | 4.72 [2.03 , 10.96] | 1.38 [1.06 , 1.80] | Signal-inconsistent, smaller |
-| Part 1: Johnson and Goldstein (2003) * |  |  |  |  |
-|  | Default effects: Opt-Out vs. Opt-In | 5.93 [2.48 , 14.20] | 1.67 [1.27 , 2.19] | Signal-inconsistent, smaller |
-|  | Default effects: No-Default vs. Opt-In | 3.29 [1.28, 8.45] | 0.66 [0.47, 0.94] | Signal-inconsistent, opposite |
-| Part 2: Johnson et al. (2002) | Default effects: Opt-Out vs Opt-In | 4.31 [1.62, 11.46] | 0.75 [0.53, 1.05] | No signal-inconsistent |
-|  | Framing effects: Positive vs. Negative | 1.86 [0.76, 4.57] | 15.30 [10.23, 23.40] | Signal-inconsistent, stronger |
-| Note. Replication summary based on the criteria by LeBel et al. (2019). (*) The effect size [Odds ratio] for this target study was |  |  |  |  |
+Table 9
+
+Summary and comparison of ﬁndings of the current replication study and the target studies
+
+Part Part 1: Johnson and Goldstein (2003) *
+Part 2: Johnson et al. (2002)
+
+Target effect Default effects: No-Default vs. Opt-In Default effects: Opt-Out vs. Opt-In Default effects: No-Default vs. Opt-In Default effects: Opt-Out vs Opt-In Framing effects: Positive vs. Negative
+
+Original effect size 4.72 [2.03 , 10.96] 5.93 [2.48 , 14.20] 3.29 [1.28, 8.45] 4.31 [1.62, 11.46] 1.86 [0.76, 4.57]
+
+Replication effect size 1.38 [1.06 , 1.80] 1.67 [1.27 , 2.19] 0.66 [0.47, 0.94] 0.75 [0.53, 1.05] 15.30 [10.23, 23.40]
+
+Replication summary Signal-inconsistent, smaller Signal-inconsistent, smaller Signal-inconsistent, opposite No signal-inconsistent Signal-inconsistent, stronger
+
+Note. Replication summary based on the criteria by LeBel et al. (2019). (*) The effect size [Odds ratio] for this target study was
+
+calculated based on 2-sample test for equality of proportions.
+
+Table 10
+
+Summary of the ﬁndings of Johnson et al. (2002) across original, direct replication, and conceptual replication studies
+
+Predictor
+Default condition: No-Default– Opt-In Opt-Out – Opt-In Framing condition: Positive – Negative
 
 Note. Directionality dimension summarizes the directional consistency of results across Default effects and Framing effects; Predicted directionality of framing effects: participants’ consent rates are higher in the positive frame than negative frame condition; Predicted directionality of default effects: consent rates are higher in ‘Opt-Out’ and ‘No-Default’ experimental condition than ‘Opt-In’ experimental condition. Signal, indicates support for the hypothesis using null hypothesis signiﬁcance testing ( p < .05)
 
 Figure 2
 
-## Results
+
 
 of direct replication of Johnson et al. (2002). Percentage of participants who agreed to be notiﬁed about healthrelated surveys in the future. (A) Percentage of participants participating in the health survey by frame. (B) Percentage of participants participating in the health survey by default conditions. (C) Percentage of participants participating in the health survey by frame and conditions.
 
 Figure 3
 
-## Results
+
 
 of Extension 1. Percentage of participants who consented to organ donation between permanent vs. temporary choice scenarios. Note.* p < .05, ** p< .01, *** p < .001
 
@@ -494,7 +429,7 @@ Project Process Outline ........................................................
 Power analyses........................................................................................................................................ 7 Power sensitivity analyses .................................................................................................................... 11 Sample comparison between the original studies and our two studies ................................................. 12 Materials and scales related to replication part ..................................................................................... 13
 Type of study .................................................................................................................................... 13 Experimental design of the original articles ..................................................................................... 13 Materials and scales related to the extensions ...................................................................................... 17 Original articles’ results ........................................................................................................................ 21 The results of Study 1 of Johnson & Goldstein (2003)..................................................................... 21 The results of Study 2 of Johnson, Bellman & Lohse, 2002 ............................................................ 21 Additional Results of Replication ......................................................................................................... 22 Additional Results of Extension hypotheses.........................................................................................29 Framework for evaluation of the replications ....................................................................................... 30 References............................................................................................................................................. 32 Appendix A...........................................................................................................................................33
 
-## Disclosures
+
 
 Data collection Data collection was completed before analyzing the data. Conditions reporting We report all the conditions we collected. Variables reporting All variables collected for this study are reported and included in the provided data.
 
@@ -552,7 +487,7 @@ Power analysis done by GPower 3.1 -- default effect (Opt-out vs. Opt-in) in John
 
 Steps for power analysis (Johnson, Bellman & Lohse, 2002): 1. Conducted a Binomial Logistic Regression analysis in Jamovi based on the reconstructed data file (“OrigHealthSurvey.csv” available on the OSF page of the project). 2. Used the odds ratio from Jamovi output for the power analysis with GPower.
 
-## Supplementary
+
 
 Odds ratio Pr(Y=1|X=1) H0 α err prob Power (1-β err prob) R² other X X distribution X parm μ X parm σ Critical z Total sample size Actual power
 
@@ -787,7 +722,7 @@ Figure S2. Criteria for evaluation of replications by LeBel et al. (2019). A tax
 
 Note: LeBel et al. (2019) suggested a replication evaluation using three factors: (a) whether a signal was detected (i.e., the confidence interval for the replication Effect size (ES) excludes one), (b) consistency of the replication ES with the original study's ES, and (c) precision of the replication's ES estimate (see Figure S# in the supplementary material).
 
-## References
+
 
 Fual, F., Erdfelder, E., Lang, A., & Buchner, A. (2007). G*Power: A flexible statistical power analysis program for the social, behavioral, and biomedical sciences. Behavior Research Methods, 39(2), 175–191. https://doi.org/10.3758/BF03193146
 The jamovi project (2020). jamovi (Version 1.2) [Computer Software]. Retrieved from https://www.jamovi.org
@@ -832,7 +767,7 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 
 *Figure 2. Results of direct replication of Johnson et al.*
 
-*Figure 3. Results of Extension 1. Percentage of participants who consented to organ donation between permanent vs. temporary choice scenarios. Note.* p < .05, ** p< .01, *** p < .001*
+*Figure 3. Results of Extension 1. Percentage of participants who consented to organ donation between permanent vs.*
 
 *Figure 4. Extension 2: Percentage of participants who agreed to be notiﬁed about further information about organ donation in the future.*
 
@@ -842,7 +777,7 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 ## Tables (unlocated in body)
 
 ### Table 1
-*Study stimuli for the direct replication of Johnson and Goldstein (2003) [Introduction for participants in Opt-Out/Opt-in Conditions]: Imagine that you have just moved to a new state and are currently ﬁlling out the required online registration forms when you are asked to indicate your organ donor status.*
+*Study stimuli for the direct replication of Johnson and Goldstein (2003) [Introduction for participants in Opt-Out/Opt-in Conditions]: Imagine that you have just moved to a new state and are currently ﬁlling out the required online registration forms when you are asked to indicate your organ donor s…*
 
 |  | 5 |
 | --- | --- |
@@ -967,3 +902,75 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 | [Positive frame, Opt-out]: |  |
 | Send me more information about organ donation. | Consistent with the original study, participants in |
 |  | the Opt-Out condition consented to organ donation at |
+
+### Table 10
+*Summary of the ﬁndings of Johnson et al. (2002) across original, direct replication, and conceptual replication studies Predictor Default condition: No-Default– Opt-In Opt-Out – Opt-In Framing condition: Positive – Negative Original study’s ﬁndings Signal Directionality Yes Consistent Yes Consistent…*
+
+| Table 7 |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis |  |  |  |  |  |  |  |  |
+|  |  |  | Model 1 |  |  |  | Model 2 |  |
+| Predictor |  |  |  |  |  |  |  |  |
+|  | Estimate | Z | p | OR [95% CI] | Estimate | Z | p | OR [95% CI] |
+| Intercept | -0.84 (0.11) | -7.65 | <.001 | 0.43 [0.35, 0.53] | -0.68 (0.12) | -5.78 | <.001 | 0.51 [0.40, 0.64] |
+| Framing: Positive – Negative | 3.31 (0.14) | 24.14 | <.001 | 27.27 [20.97, 35.88] | 2.73 (0.21) | 12.96 | <.001 | 15.30 [10.23, 23.40] |
+| Default: No-Default – Opt-In | -0.12 (0.15) | -0.81 | .417 | 0.89 [0.66, 1.19] | -0.40 (0.18) | -2.29 | .021 | 0.66 [0.47, 0.94] |
+| Default: Opt-Out – Opt-In | -0.05 (0.15) | -0.35 | .724 | 0.95 [0.71, 1.27] | -0.29 (0.17) | -1.66 | .096 | 0.75 [0.54, 1.05] |
+| Interaction term: |  |  |  |  |  |  |  |  |
+| (Positive – Negative) × (No-Default–Opt-In) |  |  |  |  | 1.00 (0.33) | 3.02 | .003 | 2.74 [1.43, 5.35] |
+| (Positive – Negative) × (Opt-Out –Opt-In) |  |  |  |  | 0.85 (0.33) | 2.57 | .010 | 2.33 [1.23, 4.49] |
+| Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets. |  |  |  |  |  |  |  |  |
+
+### Table 7
+*Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis Predictor Estimate Model 1 Z p OR [95% CI] Estimate Model 2 Z p OR [95% CI] Intercept Framing: Positive – Negative Default: No-Default – Opt-In Default: Opt-Out – Opt-In Interaction term: (Po…*
+
+| Table 7 |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis |  |  |  |  |  |  |  |  |
+|  |  |  | Model 1 |  |  |  | Model 2 |  |
+| Predictor |  |  |  |  |  |  |  |  |
+|  | Estimate | Z | p | OR [95% CI] | Estimate | Z | p | OR [95% CI] |
+| Intercept | -0.84 (0.11) | -7.65 | <.001 | 0.43 [0.35, 0.53] | -0.68 (0.12) | -5.78 | <.001 | 0.51 [0.40, 0.64] |
+| Framing: Positive – Negative | 3.31 (0.14) | 24.14 | <.001 | 27.27 [20.97, 35.88] | 2.73 (0.21) | 12.96 | <.001 | 15.30 [10.23, 23.40] |
+| Default: No-Default – Opt-In | -0.12 (0.15) | -0.81 | .417 | 0.89 [0.66, 1.19] | -0.40 (0.18) | -2.29 | .021 | 0.66 [0.47, 0.94] |
+| Default: Opt-Out – Opt-In | -0.05 (0.15) | -0.35 | .724 | 0.95 [0.71, 1.27] | -0.29 (0.17) | -1.66 | .096 | 0.75 [0.54, 1.05] |
+| Interaction term: |  |  |  |  |  |  |  |  |
+| (Positive – Negative) × (No-Default–Opt-In) |  |  |  |  | 1.00 (0.33) | 3.02 | .003 | 2.74 [1.43, 5.35] |
+| (Positive – Negative) × (Opt-Out –Opt-In) |  |  |  |  | 0.85 (0.33) | 2.57 | .010 | 2.33 [1.23, 4.49] |
+| Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets. |  |  |  |  |  |  |  |  |
+
+### Table 8
+*Summary of the replication results of Extension 2 (conceptual replication of Johnson et al. (2002) based on logistic regression analysis Predictor Intercept Framing: Positive – Negative Default: No-Default – Opt-In Default: Opt-Out – Opt-In Interaction terms: (Positive – Negative) × (No-Default–Opt-…*
+
+| Table 7 |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis |  |  |  |  |  |  |  |  |
+|  |  |  | Model 1 |  |  |  | Model 2 |  |
+| Predictor |  |  |  |  |  |  |  |  |
+|  | Estimate | Z | p | OR [95% CI] | Estimate | Z | p | OR [95% CI] |
+| Intercept | -0.84 (0.11) | -7.65 | <.001 | 0.43 [0.35, 0.53] | -0.68 (0.12) | -5.78 | <.001 | 0.51 [0.40, 0.64] |
+| Framing: Positive – Negative | 3.31 (0.14) | 24.14 | <.001 | 27.27 [20.97, 35.88] | 2.73 (0.21) | 12.96 | <.001 | 15.30 [10.23, 23.40] |
+| Default: No-Default – Opt-In | -0.12 (0.15) | -0.81 | .417 | 0.89 [0.66, 1.19] | -0.40 (0.18) | -2.29 | .021 | 0.66 [0.47, 0.94] |
+| Default: Opt-Out – Opt-In | -0.05 (0.15) | -0.35 | .724 | 0.95 [0.71, 1.27] | -0.29 (0.17) | -1.66 | .096 | 0.75 [0.54, 1.05] |
+| Interaction term: |  |  |  |  |  |  |  |  |
+| (Positive – Negative) × (No-Default–Opt-In) |  |  |  |  | 1.00 (0.33) | 3.02 | .003 | 2.74 [1.43, 5.35] |
+| (Positive – Negative) × (Opt-Out –Opt-In) |  |  |  |  | 0.85 (0.33) | 2.57 | .010 | 2.33 [1.23, 4.49] |
+| Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets. |  |  |  |  |  |  |  |  |
+
+### Table 9
+*Summary and comparison of ﬁndings of the current replication study and the target studies Part Part 1: Johnson and Goldstein (2003) * Part 2: Johnson et al. (2002) Target effect Default effects: No-Default vs. Opt-In Default effects: Opt-Out vs. Opt-In Default effects: No-Default vs.*
+
+| Table 7 |  |  |  |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis |  |  |  |  |  |  |  |  |
+|  |  |  | Model 1 |  |  |  | Model 2 |  |
+| Predictor |  |  |  |  |  |  |  |  |
+|  | Estimate | Z | p | OR [95% CI] | Estimate | Z | p | OR [95% CI] |
+| Intercept | -0.84 (0.11) | -7.65 | <.001 | 0.43 [0.35, 0.53] | -0.68 (0.12) | -5.78 | <.001 | 0.51 [0.40, 0.64] |
+| Framing: Positive – Negative | 3.31 (0.14) | 24.14 | <.001 | 27.27 [20.97, 35.88] | 2.73 (0.21) | 12.96 | <.001 | 15.30 [10.23, 23.40] |
+| Default: No-Default – Opt-In | -0.12 (0.15) | -0.81 | .417 | 0.89 [0.66, 1.19] | -0.40 (0.18) | -2.29 | .021 | 0.66 [0.47, 0.94] |
+| Default: Opt-Out – Opt-In | -0.05 (0.15) | -0.35 | .724 | 0.95 [0.71, 1.27] | -0.29 (0.17) | -1.66 | .096 | 0.75 [0.54, 1.05] |
+| Interaction term: |  |  |  |  |  |  |  |  |
+| (Positive – Negative) × (No-Default–Opt-In) |  |  |  |  | 1.00 (0.33) | 3.02 | .003 | 2.74 [1.43, 5.35] |
+| (Positive – Negative) × (Opt-Out –Opt-In) |  |  |  |  | 0.85 (0.33) | 2.57 | .010 | 2.33 [1.23, 4.49] |
+| Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets. |  |  |  |  |  |  |  |  |

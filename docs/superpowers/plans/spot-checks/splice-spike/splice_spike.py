@@ -344,34 +344,45 @@ def _load_tables_for_spike(pdf_path: str) -> tuple[str, list[dict]]:
 
 
 def _table_caption_short(caption: str | None, label: str | None) -> str:
-    """Pull a short human caption from the docpluck Table.caption field.
+    """Pull a clean human-readable caption description from a Table.caption field.
 
-    docpluck's `caption` for an isolated table includes the label, the short
-    caption sentence, AND the entire flattened cell content (because pdfplumber
-    didn't structure it). We want just the LABEL line + the description sentence.
+    Strategy:
+      - If the caption starts with the label, strip the label (and any
+        trailing punctuation/whitespace).
+      - Otherwise return the caption as-is.
+      - Don't aggressively truncate at first "X." — that destroys legitimate
+        captions like "Jordan et al. (2011) Studies 1b and 3: Summary" by
+        cutting at "Jordan et al.".
+      - Only truncate if the caption is very long (>300 chars), at the last
+        sentence boundary before the cap.
     """
     if not caption:
-        return label or ""
-    lines = [ln.strip() for ln in caption.splitlines() if ln.strip()]
-    if not lines:
-        return label or ""
-    # First line is usually the label. If the label is on its own line, the
-    # second line is the description. If label and description are joined,
-    # split at the first ". " in the first line.
-    first = lines[0]
-    if label and first.startswith(label) and len(first) > len(label) + 2:
-        # Label and description on same line, e.g. "Table 1. Descriptive ..."
-        rest = first[len(label):].lstrip(" .")
-        # Cut at first period+space (end of caption sentence)
-        if ". " in rest:
-            rest = rest.split(". ", 1)[0] + "."
-        return rest
-    if len(lines) >= 2:
-        desc = lines[1]
-        if ". " in desc:
-            desc = desc.split(". ", 1)[0] + "."
-        return desc
-    return ""
+        return ""
+    # Collapse whitespace runs to single spaces; strip surrounding whitespace.
+    text = re.sub(r"\s+", " ", caption).strip()
+    if not text:
+        return ""
+    # Strip the label prefix if present (case-insensitive).
+    if label:
+        # Match optional label-with-period/colon at start.
+        pattern = re.compile(
+            r"^" + re.escape(label) + r"\s*[.:\-—–]?\s*",
+            re.IGNORECASE,
+        )
+        m = pattern.match(text)
+        if m:
+            text = text[m.end():]
+    # Strip any remaining leading orphan punctuation/whitespace.
+    text = re.sub(r"^[\s.:\-—–]+", "", text)
+    # Cap very long captions at the last sentence boundary before 300 chars.
+    if len(text) > 300:
+        snippet = text[:300]
+        last_period = snippet.rfind(". ")
+        if last_period > 100:
+            text = snippet[: last_period + 1]
+        else:
+            text = snippet.rstrip() + "…"
+    return text.strip()
 
 
 def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
@@ -527,6 +538,115 @@ def _join_split_captions(text: str) -> str:
         flags=re.MULTILINE | re.IGNORECASE,
     )
     return text
+
+
+def _strip_orphan_caption_fragments_near_tables(text: str) -> str:
+    """Strip ``Table N. caption ...`` fragments that appear immediately before
+    a ``### Table N`` block.
+
+    When the splice locator finds a tight region for a table inside a wider
+    pdftotext-rendered table block, the parts of the original block OUTSIDE
+    the located region remain as orphan paragraphs (caption line + a few
+    fragmentary paragraphs). This pass removes any paragraph that contains a
+    "Table N." caption line if the same N is the next ``### Table N`` heading.
+
+    Only strips up to 8 lines preceding the heading and only if those lines
+    look like fragments (≤80 chars each, not a section heading or pipe-row).
+    """
+    lines = text.split("\n")
+    out_lines: list[str] = []
+    i = 0
+    n = len(lines)
+    table_heading_re = re.compile(r"^### Table\s+(\d+)\s*$")
+    caption_line_re = re.compile(r"^\s*Table\s+(\d+)\s*[.:]", re.IGNORECASE)
+
+    while i < n:
+        line = lines[i]
+        m = table_heading_re.match(line)
+        if not m:
+            out_lines.append(line)
+            i += 1
+            continue
+        # We are at a `### Table N` heading. Look back over the last ≤8 emitted
+        # lines (skipping blank ones) for a caption-line that mentions the same N.
+        target_num = int(m.group(1))
+        # Walk back through out_lines collecting indices of fragmentary lines
+        # until we find the caption line for the same number (or hit a non-fragment).
+        lookback_indices: list[int] = []
+        j = len(out_lines) - 1
+        steps = 0
+        found_caption_idx = -1
+        while j >= 0 and steps < 12:
+            cand = out_lines[j]
+            steps += 1
+            if cand.strip() == "":
+                lookback_indices.append(j)
+                j -= 1
+                continue
+            cm = caption_line_re.match(cand)
+            if cm and int(cm.group(1)) == target_num:
+                found_caption_idx = j
+                lookback_indices.append(j)
+                # Keep walking back for any short fragment lines also part of
+                # this orphaned block (e.g., header tokens like "No\n\nHypothesis").
+                j -= 1
+                while j >= 0 and steps < 12:
+                    cand2 = out_lines[j]
+                    steps += 1
+                    if cand2.strip() == "":
+                        lookback_indices.append(j)
+                        j -= 1
+                        continue
+                    if cand2.startswith(("#", "|", "```", "*")):
+                        break
+                    if len(cand2) > 80:
+                        break
+                    if re.search(r"[.!?]\)?\s*$", cand2) and len(cand2.split()) >= 6:
+                        break
+                    lookback_indices.append(j)
+                    j -= 1
+                break
+            # Not a caption line — stop the lookback (don't strip arbitrary content).
+            break
+        if found_caption_idx >= 0:
+            # Remove the orphan lines from out_lines.
+            for idx in sorted(set(lookback_indices), reverse=True):
+                out_lines.pop(idx)
+        out_lines.append(line)
+        i += 1
+    return "\n".join(out_lines)
+
+
+def _dedupe_h2_sections(text: str) -> str:
+    """Demote duplicate H2 section headings to plain text.
+
+    docpluck's section detector occasionally misclassifies a figure caption
+    that starts with a section name ("Results of direct replication..."),
+    creating multiple ``## Results`` headings. We keep the first occurrence
+    of each heading text and demote the rest by stripping the ``## ``
+    prefix. The body text under the demoted heading stays.
+
+    The two structural appendix headings (``## Figures``, ``## Tables
+    (unlocated in body)``) are exempt — they're intentional and emitted
+    by the appendix builder.
+    """
+    EXEMPT = {"Figures", "Tables (unlocated in body)"}
+    seen: set[str] = set()
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        m = re.match(r"^(##)(?!#)\s+(.+?)\s*$", line)
+        if not m:
+            continue
+        heading_text = m.group(2).strip()
+        if heading_text in EXEMPT:
+            continue
+        if heading_text in seen:
+            # Demote: drop the heading line entirely so the body text below
+            # flows into the previous section.
+            lines[i] = ""
+            continue
+        seen.add(heading_text)
+    return "\n".join(lines)
 
 
 def _table_block_content_end(text: str, content_start: int, hard_end: int) -> int:
@@ -985,6 +1105,13 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # Final dedupe pass — also covers ``### Table N`` blocks that ended up in
     # the appendix vs. inline.
     out = _dedupe_table_blocks(out)
+    # NOTE: do NOT strip orphan caption fragments preceding Table blocks —
+    # those fragments may contain unique content (per-paper running captions,
+    # additional caption sentences). Showing them twice (once as fragments,
+    # once in the spliced block) is uglier than losing them.
+    # Demote duplicate ## H2 section headings (figure captions starting with
+    # "Results of..." that the section detector misclassified, etc.).
+    out = _dedupe_h2_sections(out)
     return out
 
 
