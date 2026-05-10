@@ -1999,21 +1999,158 @@ def test_merge_sig_marker_preserves_row_when_no_attach_possible():
 
 
 def test_merge_sig_marker_does_not_attach_to_text_anchor_row():
-    """The walk-back skips rows that have only text anchors (like
-    ``Ref.``) without any numeric cell — markers there usually belong
-    to the NEXT row's estimates, not the previous text row. Preserve
-    the marker row in that case rather than wrongly attaching."""
+    """The walk-back stops at a text-anchor row (e.g. ``Ref.``) — text
+    anchors carry no significance, so the markers don't attach there.
+
+    Iteration 24 (Tier A8) extends this: when walk-back is blocked by a
+    text-anchor row AND the immediate-next row is numeric, the markers
+    forward-attach to that next row (social_forces_1 pattern: stars
+    between ``0 ACEs Ref.`` and ``1 ACE 2.25 ...`` belong to ``1 ACE``).
+    """
     rows = [
         ["0 ACEs", "Ref.", "Ref.", "Ref."],
         ["",       "*",    "**",   "*"],
         ["1 ACE",  "2.25", "0.56", "0.74"],
     ]
     out = _merge_significance_marker_rows(rows)
-    # Marker row preserved (no numeric estimate row above).
-    assert len(out) == 3
-    assert out[1] == ["", "*", "**", "*"]
+    # Marker row consumed: forward-attached to "1 ACE" row.
+    assert len(out) == 2
     # The "Ref." row stays clean — no <sup> on it.
     assert out[0] == ["0 ACEs", "Ref.", "Ref.", "Ref."]
+    # Stars now decorate "1 ACE" estimates.
+    assert out[1] == [
+        "1 ACE",
+        f"2.25{_sup('*')}",
+        f"0.56{_sup('**')}",
+        f"0.74{_sup('*')}",
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Iter-24 / Tier A8: forward-attach for orphan marker rows
+# ---------------------------------------------------------------------------
+
+
+def test_a8_forward_attach_after_text_anchor():
+    """Real social_forces_1 pattern: 0 ACEs Ref. / *** / 1 ACE 2.25...
+    Markers between a Ref. row and the next numeric row attach FORWARD
+    to the next row."""
+    rows = [
+        ["0 ACEs", "Ref.", "Ref.", "Ref.", "Ref."],
+        ["",       "***",  "***",  "**",   "**"],
+        ["1 ACE",  "2.25", "0.56", "0.74", "0.76"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 2
+    assert out[0] == ["0 ACEs", "Ref.", "Ref.", "Ref.", "Ref."]
+    assert out[1] == [
+        "1 ACE",
+        f"2.25{_sup('***')}",
+        f"0.56{_sup('***')}",
+        f"0.74{_sup('**')}",
+        f"0.76{_sup('**')}",
+    ]
+
+
+def test_a8_does_not_forward_attach_when_back_attach_works():
+    """Standard pattern: estimate row directly above marker row. Iter-21
+    walk-back wins — markers attach BACK to the estimate row. Forward-
+    attach must not run when back-attach already succeeded."""
+    rows = [
+        ["Var1", "1.0", "2.0", "3.0"],
+        ["",     "*",   "**",  "***"],
+        ["Var2", "4.0", "5.0", "6.0"],  # this row must be untouched
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 2
+    assert out[0] == [
+        "Var1", f"1.0{_sup('*')}", f"2.0{_sup('**')}", f"3.0{_sup('***')}",
+    ]
+    # Var2 row preserved exactly — no forward absorption.
+    assert out[1] == ["Var2", "4.0", "5.0", "6.0"]
+
+
+def test_a8_does_not_forward_attach_when_walk_back_runs_through_stderr():
+    """Estimate / std-err / marker — walk-back skips the parenthetical
+    std-err row and finds the estimate. Forward-attach must NOT fire."""
+    rows = [
+        ["Var1", "1.0",   "2.0",   "3.0"],
+        ["",     "(0.1)", "(0.2)", "(0.3)"],
+        ["",     "*",     "**",    "***"],
+        ["Var2", "9.0",   "8.0",   "7.0"],  # untouched
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 3
+    assert out[0] == [
+        "Var1", f"1.0{_sup('*')}", f"2.0{_sup('**')}", f"3.0{_sup('***')}",
+    ]
+    assert out[1] == ["", "(0.1)", "(0.2)", "(0.3)"]
+    assert out[2] == ["Var2", "9.0", "8.0", "7.0"]
+
+
+def test_a8_does_not_forward_attach_when_no_text_anchor_above():
+    """If walk-back simply runs out of rows (no text-anchor block) the
+    marker row stays as-is; forward-attach is gated on a text-anchor
+    block to avoid grabbing markers that just happen to be at the top
+    of the table."""
+    rows = [
+        ["",       "*",    "**",   "***"],     # orphan marker, top of table
+        ["1 ACE",  "2.25", "0.56", "0.74"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Marker row preserved (no text-anchor above to signal "use forward").
+    assert len(out) == 2
+    assert out[0] == ["", "*", "**", "***"]
+    assert out[1] == ["1 ACE", "2.25", "0.56", "0.74"]
+
+
+def test_a8_does_not_forward_attach_when_next_is_not_numeric():
+    """Text-anchor above + non-numeric next (e.g. another text row).
+    Forward-attach refuses because next has nothing to decorate."""
+    rows = [
+        ["0 ACEs", "Ref.", "Ref.", "Ref."],
+        ["",       "*",    "**",   "*"],
+        ["1 ACE",  "Ref.", "Ref.", "Ref."],  # also text-anchor
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Marker preserved — neither back nor forward has a numeric estimate.
+    assert len(out) == 3
+    assert out[1] == ["", "*", "**", "*"]
+
+
+def test_a8_forward_attach_skips_empty_marker_columns():
+    """Forward-attach respects the per-column guard: only columns with a
+    populated marker get a <sup>; columns with an empty marker stay
+    untouched on the target row."""
+    rows = [
+        ["0 ACEs", "Ref.", "Ref.", "Ref.", "Ref."],
+        ["",       "***",  "",     "**",   ""],  # only cols 1 and 3 have markers
+        ["1 ACE",  "2.25", "0.56", "0.74", "0.76"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 2
+    assert out[1] == [
+        "1 ACE",
+        f"2.25{_sup('***')}",
+        "0.56",  # no marker for this column → unchanged
+        f"0.74{_sup('**')}",
+        "0.76",  # no marker for this column → unchanged
+    ]
+
+
+def test_a8_forward_attach_skips_empty_target_cells():
+    """If the next-row target cell is empty, the marker is not attached
+    there (mirrors back-attach guard) — leaves the marker row preserved
+    when no attach happens."""
+    rows = [
+        ["0 ACEs", "Ref.", "Ref.", "Ref.", "Ref."],
+        ["",       "***",  "***",  "**",   "**"],
+        ["1 ACE",  "",     "",     "",     ""],  # all empty target cells
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # No attachment possible: all forward-target cells are empty.
+    assert len(out) == 3
+    assert out[1] == ["", "***", "***", "**", "**"]
 
 
 from splice_spike import _strip_leader_dots, _MERGE_SEPARATOR

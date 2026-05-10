@@ -637,14 +637,30 @@ def _merge_significance_marker_rows(rows: list[list[str]]) -> list[list[str]]:
     merge the rendered table has an empty-looking row of stars that
     visually disconnects the marker from the estimate.
 
-    Conservative rule:
+    Conservative rules:
       - Row qualifies as marker-only iff every populated cell matches
         ``[*∗†‡§+#]+`` exactly.
-      - Walk-back stops at the first row that has at least one cell
-        that is neither parenthetical (``(0.13)``) nor a marker.
+      - Walk-back skips std-err parenthetical rows; finds the first row
+        that has at least one purely-numeric cell.
+      - Walk-back stops at a text-anchor row (e.g. ``Ref.``, ``Year FE``)
+        — text-anchor rows have no significance and the markers belong
+        to a different row.
       - Per-column merge: only a marker cell merges into the
         corresponding column of the target row; empty marker cells are
         skipped. Does not touch other columns.
+
+    Iteration 24 (Tier A8) — forward-attach. When walk-back is blocked
+    by a text-anchor row AND the immediate-next row carries numeric
+    estimates, attach the markers FORWARD to that next row. This handles
+    the social_forces_1 pattern::
+
+        0 ACEs    Ref.    Ref.    Ref.    Ref.       <- text-anchor
+        ""        ∗∗∗     ∗∗∗     ∗∗      ∗∗         <- marker (FORWARD)
+        1 ACE     2.25    0.56    0.74    0.76       <- gets the markers
+
+    Forward-attach is intentionally narrow: only ONE row ahead, only
+    after a text-anchor block. It cannot misattribute a marker to a
+    distant row later in the table.
 
     Re-runs after row drop so chained markers (e.g. a marker row
     immediately following another marker row) are handled in one pass.
@@ -676,16 +692,77 @@ def _merge_significance_marker_rows(rows: list[list[str]]) -> list[list[str]]:
                 return True
         return False
 
+    def _row_is_text_anchor(row: list[str]) -> bool:
+        """A row whose populated cells include no numeric, but include
+        non-parenthetical / non-marker text — typically a reference-
+        category row like ``['0 ACEs', 'Ref.', 'Ref.', 'Ref.', 'Ref.']``
+        or a labelled row where the data cells are all text anchors.
+
+        Iteration 24 (Tier A8). When a marker row sits below a text-anchor
+        row, the markers BELONG to the next numeric row (the reference
+        category itself has no significance — the next non-reference
+        category does). The walk-back stops at a text-anchor row to
+        signal "fall through to forward-attach".
+        """
+        if _row_has_numeric_estimate(row):
+            return False
+        populated = [(c or "").strip() for c in row if (c or "").strip()]
+        if not populated:
+            return False
+        for s in populated:
+            # Parenthetical std-err cell: ``(0.13)`` / ``[0.13]``.
+            if (
+                s.startswith(("(", "[")) and s.endswith((")", "]"))
+            ):
+                continue
+            # Pure marker cell.
+            if _SIG_MARKER_CHARS.match(s):
+                continue
+            return True  # found a text anchor (Ref., Year FE, etc.)
+        return False
+
     out: list[list[str]] = []
-    for row in rows:
+    input_rows = list(rows)
+    i = 0
+    while i < len(input_rows):
+        row = input_rows[i]
         if _row_marker_only(row):
+            # Step 1 — walk-back: skip std-err parenthetical rows; stop
+            # immediately at a text-anchor row (signals orphan-Ref. case).
             target_idx: int | None = None
+            target_direction = "back"
+            blocked_by_anchor = False
             for k in range(len(out) - 1, -1, -1):
                 if _row_has_numeric_estimate(out[k]):
                     target_idx = k
                     break
+                if _row_is_text_anchor(out[k]):
+                    blocked_by_anchor = True
+                    break
+
+            # Step 2 — forward-attach (iter-24 / A8). Only when walk-back
+            # was blocked by a text-anchor row (Ref., reference category)
+            # AND the immediately-next row carries numeric estimates. This
+            # handles the social_forces_1 pattern where stars between
+            # ``0 ACEs Ref.`` and ``1 ACE 2.25 ...`` belong to the second
+            # row, not the first. Forward-attach is intentionally narrow
+            # (immediate next row only, only after a text-anchor block) so
+            # it cannot misattribute a marker to a far-away later row.
+            if (
+                target_idx is None
+                and blocked_by_anchor
+                and i + 1 < len(input_rows)
+                and _row_has_numeric_estimate(input_rows[i + 1])
+            ):
+                target_idx = i + 1
+                target_direction = "forward"
+
             if target_idx is not None:
-                target = list(out[target_idx])
+                source = (
+                    out[target_idx] if target_direction == "back"
+                    else input_rows[target_idx]
+                )
+                target = list(source)
                 attached = False
                 for col_i in range(min(len(row), len(target))):
                     marker = (row[col_i] or "").strip()
@@ -699,10 +776,15 @@ def _merge_significance_marker_rows(rows: list[list[str]]) -> list[list[str]]:
                     target[col_i] = f"{cur}{_SUP_OPEN}{marker}{_SUP_CLOSE}"
                     attached = True
                 if attached:
-                    out[target_idx] = target
+                    if target_direction == "back":
+                        out[target_idx] = target
+                    else:
+                        input_rows[target_idx] = target
+                    i += 1
                     continue
                 # Else: no markers actually attached — preserve the row.
         out.append(row)
+        i += 1
     return out
 
 

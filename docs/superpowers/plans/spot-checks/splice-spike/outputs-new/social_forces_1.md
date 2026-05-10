@@ -421,18 +421,11 @@ Maternal ACEs and mother-adult child relationships | 235
       <td>Ref.</td>
     </tr>
     <tr>
-      <td></td>
-      <td>∗∗∗</td>
-      <td>∗∗∗</td>
-      <td>∗∗</td>
-      <td>∗∗</td>
-    </tr>
-    <tr>
       <td>1 ACE</td>
-      <td>2.25</td>
-      <td>0.56</td>
-      <td>0.74</td>
-      <td>0.76</td>
+      <td>2.25<sup>∗∗∗</sup></td>
+      <td>0.56<sup>∗∗∗</sup></td>
+      <td>0.74<sup>∗∗</sup></td>
+      <td>0.76<sup>∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -569,10 +562,10 @@ Maternal ACEs and mother-adult child relationships | 235
     </tr>
     <tr>
       <td>Mother’s rural residence at age 14</td>
-      <td>0.91<sup>∗</sup></td>
-      <td>1.10<sup>∗</sup></td>
-      <td>1.07<sup>∗∗∗</sup></td>
-      <td>1.08<sup>∗∗∗</sup></td>
+      <td>0.91</td>
+      <td>1.10</td>
+      <td>1.07</td>
+      <td>1.08</td>
     </tr>
     <tr>
       <td></td>
@@ -591,10 +584,10 @@ Maternal ACEs and mother-adult child relationships | 235
     </tr>
     <tr>
       <td>Non-Hispanic Black</td>
-      <td>0.65</td>
-      <td>1.31</td>
-      <td>1.93</td>
-      <td>1.87<sup>∗∗</sup></td>
+      <td>0.65<sup>∗</sup></td>
+      <td>1.31<sup>∗</sup></td>
+      <td>1.93<sup>∗∗∗</sup></td>
+      <td>1.87<sup>∗∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -608,7 +601,7 @@ Maternal ACEs and mother-adult child relationships | 235
       <td>1.02</td>
       <td>1.01</td>
       <td>1.22</td>
-      <td>1.37</td>
+      <td>1.37<sup>∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -798,18 +791,8 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr><td colspan="8"><strong>Panel A: Estrangement</strong></td></tr>
     <tr><td colspan="8"><strong>Maternal ACEs</strong></td></tr>
     <tr>
-      <td></td>
-      <td>∗∗∗</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>∗∗</td>
-    </tr>
-    <tr>
       <td>Emotional neglect</td>
-      <td>2.99</td>
+      <td>2.99<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
@@ -830,12 +813,12 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr>
       <td>Physical abuse</td>
       <td></td>
-      <td>3.34</td>
+      <td>3.34<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>2.04</td>
+      <td>2.04<sup>∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -848,20 +831,10 @@ Maternal ACEs and mother-adult child relationships | 237
       <td>(0.51)</td>
     </tr>
     <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>∗∗</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
       <td>Alcoholism in home</td>
       <td></td>
       <td></td>
-      <td>1.92</td>
+      <td>1.92<sup>∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
@@ -935,7 +908,7 @@ Maternal ACEs and mother-adult child relationships | 237
       <td></td>
       <td></td>
       <td>1.18</td>
-      <td>1.29<sup>∗∗∗</sup></td>
+      <td>1.29</td>
     </tr>
     <tr>
       <td></td>
@@ -951,7 +924,7 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr><td colspan="8"><strong>Maternal ACEs</strong></td></tr>
     <tr>
       <td>Emotional neglect</td>
-      <td>0.39</td>
+      <td>0.39<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
@@ -972,12 +945,12 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr>
       <td>Physical abuse</td>
       <td></td>
-      <td>0.36</td>
+      <td>0.36<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>0.57</td>
+      <td>0.57<sup>∗∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -990,20 +963,10 @@ Maternal ACEs and mother-adult child relationships | 237
       <td>(0.08)</td>
     </tr>
     <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>∗∗∗</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
       <td>Alcoholism in home</td>
       <td></td>
       <td></td>
-      <td>0.56</td>
+      <td>0.56<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
@@ -1077,7 +1040,7 @@ Maternal ACEs and mother-adult child relationships | 237
       <td></td>
       <td></td>
       <td>0.98</td>
-      <td>0.95<sup>∗∗∗</sup></td>
+      <td>0.95</td>
     </tr>
     <tr>
       <td></td>
@@ -1093,13 +1056,13 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr><td colspan="8"><strong>Maternal ACEs</strong></td></tr>
     <tr>
       <td>Emotional neglect</td>
-      <td>0.48</td>
+      <td>0.48<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>0.60<sup>∗∗</sup></td>
+      <td>0.60<sup>∗∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1114,12 +1077,12 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr>
       <td>Physical abuse</td>
       <td></td>
-      <td>0.46</td>
+      <td>0.46<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>0.66</td>
+      <td>0.66<sup>∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1132,20 +1095,10 @@ Maternal ACEs and mother-adult child relationships | 237
       <td>(0.08)</td>
     </tr>
     <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>∗∗∗</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
       <td>Alcoholism in home</td>
       <td></td>
       <td></td>
-      <td>0.63</td>
+      <td>0.63<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
@@ -1219,7 +1172,7 @@ Maternal ACEs and mother-adult child relationships | 237
       <td></td>
       <td></td>
       <td>0.78</td>
-      <td>0.78<sup>∗∗∗</sup></td>
+      <td>0.78</td>
     </tr>
     <tr>
       <td></td>
@@ -1235,13 +1188,13 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr><td colspan="8"><strong>Maternal ACEs</strong></td></tr>
     <tr>
       <td>Emotional neglect</td>
-      <td>0.47</td>
+      <td>0.47<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>0.54<sup>∗</sup></td>
+      <td>0.54<sup>∗∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1256,12 +1209,12 @@ Maternal ACEs and mother-adult child relationships | 237
     <tr>
       <td>Physical abuse</td>
       <td></td>
-      <td>0.54</td>
+      <td>0.54<sup>∗∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>0.78</td>
+      <td>0.78<sup>∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1274,20 +1227,10 @@ Maternal ACEs and mother-adult child relationships | 237
       <td>(0.09)</td>
     </tr>
     <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>∗∗</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
       <td>Alcoholism in home</td>
       <td></td>
       <td></td>
-      <td>0.73</td>
+      <td>0.73<sup>∗∗</sup></td>
       <td></td>
       <td></td>
       <td></td>
@@ -1420,18 +1363,11 @@ Drawing on our conceptual model shown in figure 1, our study results produce two
       <td>Ref.</td>
     </tr>
     <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>∗</td>
-    </tr>
-    <tr>
       <td>Alcoholism and mental illness</td>
       <td>1.06</td>
       <td>0.67</td>
       <td>0.81</td>
-      <td>0.67</td>
+      <td>0.67<sup>∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1458,8 +1394,8 @@ Drawing on our conceptual model shown in figure 1, our study results produce two
       <td>Alcoholism, mental illness, physical abuse, and</td>
       <td>2.96</td>
       <td>0.32</td>
-      <td>0.36<sup>∗</sup></td>
-      <td>0.44<sup>∗∗</sup></td>
+      <td>0.36</td>
+      <td>0.44</td>
     </tr>
     <tr><td colspan="5"><strong>emotional neglect</strong></td></tr>
     <tr>
@@ -1473,8 +1409,8 @@ Drawing on our conceptual model shown in figure 1, our study results produce two
       <td>Mother’s parents both US born</td>
       <td>0.65</td>
       <td>1.22</td>
-      <td>1.39<sup>∗∗∗</sup></td>
-      <td>1.56</td>
+      <td>1.39<sup>∗</sup><sup>∗∗∗</sup></td>
+      <td>1.56<sup>∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1555,10 +1491,10 @@ Drawing on our conceptual model shown in figure 1, our study results produce two
     </tr>
     <tr>
       <td>Mother’s rural residence at age 14</td>
-      <td>0.90<sup>∗</sup></td>
-      <td>1.12<sup>∗∗</sup></td>
-      <td>1.08<sup>∗∗∗</sup></td>
-      <td>1.09<sup>∗∗∗</sup></td>
+      <td>0.90</td>
+      <td>1.12</td>
+      <td>1.08</td>
+      <td>1.09</td>
     </tr>
     <tr>
       <td></td>
@@ -1577,10 +1513,10 @@ Drawing on our conceptual model shown in figure 1, our study results produce two
     </tr>
     <tr>
       <td>Non-Hispanic Black</td>
-      <td>0.61</td>
-      <td>1.35</td>
-      <td>1.98</td>
-      <td>1.89<sup>∗∗</sup></td>
+      <td>0.61<sup>∗</sup></td>
+      <td>1.35<sup>∗∗</sup></td>
+      <td>1.98<sup>∗∗∗</sup></td>
+      <td>1.89<sup>∗∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
@@ -1594,7 +1530,7 @@ Drawing on our conceptual model shown in figure 1, our study results produce two
       <td>0.99</td>
       <td>1.05</td>
       <td>1.23</td>
-      <td>1.39</td>
+      <td>1.39<sup>∗∗</sup></td>
     </tr>
     <tr>
       <td></td>
