@@ -172,18 +172,11 @@ We failed to ﬁnd support for differences in rates of consent to receive health
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Combined replication sample</th>
-    </tr>
-    <tr>
       <th>Replication Study</th>
       <th>Experimental Conditions<br>Opt-in default</th>
       <th></th>
       <th>n<br>488</th>
-      <th>Participation rate<br>62.5%</th>
+      <th>Combined replication sample<br>Participation rate<br>62.5%</th>
     </tr>
   </thead>
   <tbody>
@@ -1005,25 +998,14 @@ the Opt-Out condition consented to organ donation at
 <table>
   <thead>
     <tr>
-      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</th>
-      <th></th>
-      <th></th>
-      <th>Model 1</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Model 2</th>
-      <th></th>
-    </tr>
-    <tr>
-      <th>Predictor</th>
+      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis<br>Predictor</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 1<br>p</th>
       <th>OR [95% CI]</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 2<br>p</th>
       <th>OR [95% CI]</th>
     </tr>
   </thead>
@@ -1105,25 +1087,14 @@ the Opt-Out condition consented to organ donation at
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Model 1</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Model 2</th>
-      <th></th>
-    </tr>
-    <tr>
       <th>Predictor</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 1<br>p</th>
       <th>OR [95% CI]</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 2<br>p</th>
       <th>OR [95% CI]</th>
     </tr>
   </thead>
@@ -1205,25 +1176,14 @@ the Opt-Out condition consented to organ donation at
 <table>
   <thead>
     <tr>
-      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</th>
-      <th></th>
-      <th></th>
-      <th>Model 1</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Model 2</th>
-      <th></th>
-    </tr>
-    <tr>
-      <th>Predictor</th>
+      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis<br>Predictor</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 1<br>p</th>
       <th>OR [95% CI]</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 2<br>p</th>
       <th>OR [95% CI]</th>
     </tr>
   </thead>
@@ -1305,25 +1265,14 @@ the Opt-Out condition consented to organ donation at
 <table>
   <thead>
     <tr>
-      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</th>
-      <th></th>
-      <th></th>
-      <th>Model 1</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Model 2</th>
-      <th></th>
-    </tr>
-    <tr>
-      <th>Predictor</th>
+      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis<br>Predictor</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 1<br>p</th>
       <th>OR [95% CI]</th>
       <th>Estimate</th>
       <th>Z</th>
-      <th>p</th>
+      <th>Model 2<br>p</th>
       <th>OR [95% CI]</th>
     </tr>
   </thead>

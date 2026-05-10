@@ -423,22 +423,13 @@ Table 6: Mean ratings across all abilities for the three conditions.
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th>Original domains<br>(n = 240)</th>
-      <th></th>
-      <th>Easy domains<br>(n = 225)</th>
-      <th></th>
-      <th>(n = 226)</th>
-      <th>Diﬃcult domains</th>
-    </tr>
-    <tr>
       <th>Variable</th>
-      <th>Mean</th>
+      <th>Original domains<br>(n = 240)<br>Mean</th>
       <th>SD</th>
-      <th>Mean</th>
+      <th>Easy domains<br>(n = 225)<br>Mean</th>
       <th>SD</th>
-      <th>Mean</th>
-      <th>SD</th>
+      <th>(n = 226)<br>Mean</th>
+      <th>Diﬃcult domains<br>SD</th>
     </tr>
   </thead>
   <tbody>
@@ -509,21 +500,12 @@ Table 7: Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃ
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Mean</th>
-      <th></th>
-      <th>Eﬀect</th>
-      <th></th>
-    </tr>
-    <tr>
       <th>Condition</th>
       <th>T-statistic</th>
       <th>df</th>
-      <th>diﬀerence</th>
+      <th>Mean<br>diﬀerence</th>
       <th>p-value</th>
-      <th>size r</th>
+      <th>Eﬀect<br>size r</th>
       <th>95% CI</th>
     </tr>
   </thead>
@@ -760,18 +742,11 @@ Table 11: Extension conditions: Mean comparative ability estimates and judgmenta
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th>Easy domain condition<br>Judgmental weight</th>
-      <th>Judgmental weight</th>
-      <th>Diﬃcult domain condition<br>Judgmental weight</th>
-      <th>Judgmental weight</th>
-    </tr>
-    <tr>
       <th>Ability</th>
-      <th>of own ability<br>1</th>
-      <th>of others’ ability<br>1</th>
-      <th>of own ability<br>1</th>
-      <th>of others’ ability<br>1</th>
+      <th>Easy domain condition<br>Judgmental weight<br>of own ability<br>1</th>
+      <th>Judgmental weight<br>of others’ ability<br>1</th>
+      <th>Diﬃcult domain condition<br>Judgmental weight<br>of own ability<br>1</th>
+      <th>Judgmental weight<br>of others’ ability<br>1</th>
     </tr>
   </thead>
   <tbody>
@@ -924,18 +899,11 @@ T
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th>Easy domain condition</th>
-      <th></th>
-      <th></th>
-      <th>Diﬃcult domain condition</th>
-    </tr>
-    <tr>
       <th>Ability</th>
-      <th>Domain</th>
+      <th>Easy domain condition<br>Domain</th>
       <th>Percentile</th>
       <th>Domain</th>
-      <th>Percentile</th>
+      <th>Diﬃcult domain condition<br>Percentile</th>
     </tr>
     <tr>
       <th></th>

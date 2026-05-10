@@ -423,6 +423,64 @@ def _is_group_separator(row: list[str], n_cols: int) -> bool:
     return True
 
 
+def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
+    """Fold a super-header row into the row directly below it, column-wise.
+
+    Camelot frequently splits a wrapped column header across two header
+    rows, e.g. korbmacher Table 7:
+
+        row 0: ["", "",          "",   "Mean",       "",        "Effect",  ""]
+        row 1: ["Condition", "T-statistic", "df", "difference", "p-value", "size r", "95% CI"]
+
+    The natural rendering is to fold ``Mean`` into ``Mean<br>difference`` (col 3)
+    and ``Effect`` into ``Effect<br>size r`` (col 5), producing a single
+    header row.
+
+    Conservative rule (only fold when ALL of these hold):
+      - There are ≥2 header rows.
+      - The top row has at least one empty cell (genuine 2-row label
+        headers usually have all-populated cells; super-headers have gaps).
+      - Every populated cell in the top row has a populated cell directly
+        below in the next row (no implicit colspan to merge across).
+
+    When the rule passes, returns ``[folded] + header_rows[2:]`` where
+    ``folded[i] = "super[i]<br>sub[i]"`` if super[i] is populated else
+    ``sub[i]``. The fold is applied iteratively top-down — if 3 header
+    rows fold pairwise they collapse to one row.
+
+    The ``<br>`` between super and sub is inserted as the
+    ``_MERGE_SEPARATOR`` placeholder so it survives ``_html_escape``.
+    """
+    if len(header_rows) < 2:
+        return header_rows
+    sup = list(header_rows[0])
+    sub = list(header_rows[1])
+    n = max(len(sup), len(sub))
+    sup += [""] * (n - len(sup))
+    sub += [""] * (n - len(sub))
+    populated_sup_idx = [i for i, c in enumerate(sup) if (c or "").strip()]
+    if not populated_sup_idx:
+        # Empty super row — drop it.
+        return [sub] + header_rows[2:]
+    if len(populated_sup_idx) == n:
+        # No empty cell in super row — likely a real 2-row header, don't fold.
+        return header_rows
+    # Every populated super cell must have a populated sub cell directly below.
+    for i in populated_sup_idx:
+        if not (sub[i] or "").strip():
+            return header_rows
+    # Safe to fold.
+    folded: list[str] = []
+    for i in range(n):
+        if (sup[i] or "").strip():
+            folded.append(f"{sup[i]}{_MERGE_SEPARATOR}{sub[i]}")
+        else:
+            folded.append(sub[i])
+    rest = header_rows[2:]
+    # Recurse: a 3-row super-super-sub may fold pairwise.
+    return _fold_super_header_rows([folded] + rest)
+
+
 def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
     """Render a table (list of rows of cells) as an HTML ``<table>`` block
     suitable for embedding inside Markdown.
@@ -501,6 +559,13 @@ def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
 
     header_rows = merged[:n_header]
     body = merged[n_header:]
+
+    # Fold super-headers (e.g. korbmacher Table 7's ``["", "", "", "Mean",
+    # "", "Effect", ""]`` row over ``["Condition", ..., "difference", ...,
+    # "size r", "95% CI"]``) column-wise when the top row has empty cells
+    # AND every populated top cell has a populated cell directly below.
+    # See ``_fold_super_header_rows`` for the conservative rule.
+    header_rows = _fold_super_header_rows(header_rows)
 
     lines: list[str] = ["<table>"]
     lines.append("  <thead>")

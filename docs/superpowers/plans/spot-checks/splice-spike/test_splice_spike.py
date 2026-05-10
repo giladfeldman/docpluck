@@ -440,24 +440,32 @@ def test_header_like_row_with_long_prose_is_not_header_like():
     assert _is_header_like_row(["H1", long, "Replication"]) is False
 
 
-def test_two_row_header_renders_both_in_thead():
-    """When the first two rows of a grid are both header-like and the third
-    row has numeric data, both rows must end up inside `<thead>` (with
-    `<th>` cells), not `<tbody>`."""
+def test_two_row_header_folds_super_into_sub():
+    """Super-header pattern (top row has empty cells AND every populated top
+    cell has a populated cell directly below) folds column-wise into the
+    next row using ``<br>``. ip_feldman Table 1 pattern.
+
+    Replaces an earlier test that asserted both rows render separately;
+    iteration 9 (commit pending) folds them per Tier A1 of the
+    iteration-3 handoff."""
     grid = [
         ["", "Estimation", "Average estimation", ""],
         ["Experiences", "errora", "error (%)", "t-statistics"],
         ["Negative experiences", "−17.2", "5.47**", ""],
     ]
     result = pdfplumber_table_to_markdown(grid)
-    # Both header rows must be inside <thead>...</thead>, with <th> cells.
     head_block = result.split("<tbody>")[0]
-    assert "<thead>" in head_block
-    assert head_block.count("<tr>") == 2  # two header rows
-    assert "<th>Experiences</th>" in head_block
-    assert "<th>errora</th>" in head_block
-    # Body must NOT contain those header cells as <td>.
     body_block = result.split("<tbody>")[1]
+    # After folding there is exactly one header row.
+    assert head_block.count("<tr>") == 1
+    assert "<th>Experiences</th>" in head_block
+    assert "<th>Estimation<br>errora</th>" in head_block
+    assert "<th>Average estimation<br>error (%)</th>" in head_block
+    assert "<th>t-statistics</th>" in head_block
+    # Original separate cells must NOT appear.
+    assert "<th>errora</th>" not in head_block
+    assert "<th>Estimation</th>" not in head_block
+    # Body unchanged.
     assert "<td>Negative experiences</td>" in body_block
     assert "<th>Experiences</th>" not in body_block
 
@@ -473,6 +481,96 @@ def test_single_row_header_still_renders_one_thead_row():
     result = pdfplumber_table_to_markdown(grid)
     head_block = result.split("<tbody>")[0]
     assert head_block.count("<tr>") == 1
+
+
+from splice_spike import _fold_super_header_rows
+
+
+def test_fold_super_header_korbmacher_table7_pattern():
+    """korbmacher Table 7 shape: 7 columns where ``Mean`` is super-header for
+    ``difference`` (col 3) and ``Effect`` is super-header for ``size r``
+    (col 5). After fold the two header rows collapse to one."""
+    grid = [
+        ["", "", "", "Mean", "", "Effect", ""],
+        ["Condition", "T-statistic", "df", "difference", "p-value", "size r", "95% CI"],
+        ["Original", "668.5", "238", "2.78", "<.001", "0.82", "[0.79, 0.85]"],
+    ]
+    result = pdfplumber_table_to_markdown(grid)
+    head_block = result.split("<tbody>")[0]
+    # One folded header row.
+    assert head_block.count("<tr>") == 1
+    assert "<th>Condition</th>" in head_block
+    assert "<th>Mean<br>difference</th>" in head_block
+    assert "<th>Effect<br>size r</th>" in head_block
+    assert "<th>95% CI</th>" in head_block
+    # Pre-fold separate cells must NOT appear.
+    assert "<th>Mean</th>" not in head_block
+    assert "<th>Effect</th>" not in head_block
+
+
+def test_fold_super_header_does_not_fold_real_two_row_header():
+    """If every cell in the top header row is populated (no empty cells),
+    it's a genuine 2-row label header, not a super-header. Don't fold."""
+    rows = [
+        ["Group A", "Group A", "Group B", "Group B"],
+        ["Mean", "SD", "Mean", "SD"],
+    ]
+    out = _fold_super_header_rows([list(r) for r in rows])
+    assert len(out) == 2
+    assert out[0] == ["Group A", "Group A", "Group B", "Group B"]
+    assert out[1] == ["Mean", "SD", "Mean", "SD"]
+
+
+def test_fold_super_header_does_not_fold_when_sub_below_super_is_empty():
+    """If a populated super cell has an EMPTY cell directly below it, that's
+    likely an implicit colspan we mustn't squash. Don't fold."""
+    rows = [
+        ["", "Statistics", "Statistics", ""],
+        ["Variable", "Mean", "SD", ""],
+    ]
+    # Super "Statistics" at col 1 has sub "Mean" (ok); col 2 has sub "SD"
+    # (ok). Both populated supers have populated subs — fold should fire.
+    out = _fold_super_header_rows([list(r) for r in rows])
+    assert len(out) == 1
+    # Now flip: col 2's sub is empty, breaking the rule.
+    rows2 = [
+        ["", "Statistics", "Statistics", ""],
+        ["Variable", "Mean", "", "t"],
+    ]
+    out2 = _fold_super_header_rows([list(r) for r in rows2])
+    assert len(out2) == 2  # not folded
+
+
+def test_fold_super_header_drops_entirely_empty_super_row():
+    """A header row that is all-empty should be dropped (keep only the
+    populated row below)."""
+    rows = [
+        ["", "", "", ""],
+        ["Variable", "Mean", "SD", "n"],
+    ]
+    out = _fold_super_header_rows([list(r) for r in rows])
+    assert len(out) == 1
+    assert out[0] == ["Variable", "Mean", "SD", "n"]
+
+
+def test_fold_super_header_uses_merge_separator_placeholder():
+    """The fold join must use the ``_MERGE_SEPARATOR`` placeholder so the
+    ``<br>`` survives ``_html_escape``."""
+    from splice_spike import _MERGE_SEPARATOR
+    rows = [
+        ["", "Estimation", ""],
+        ["Var", "error", "t"],
+    ]
+    out = _fold_super_header_rows([list(r) for r in rows])
+    assert len(out) == 1
+    assert out[0][1] == f"Estimation{_MERGE_SEPARATOR}error"
+
+
+def test_fold_super_header_no_op_on_single_row():
+    """One-row header is unchanged."""
+    rows = [["Variable", "Mean", "SD"]]
+    out = _fold_super_header_rows([list(r) for r in rows])
+    assert out == rows
 
 
 from splice_spike import _split_mashed_cell

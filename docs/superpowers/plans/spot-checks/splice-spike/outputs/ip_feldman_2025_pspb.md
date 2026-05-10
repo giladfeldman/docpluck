@@ -56,21 +56,12 @@ Study 3
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th>Estimation</th>
-      <th>Average estimation</th>
-      <th></th>
-      <th>Estimation</th>
-      <th>Average estimation</th>
-      <th></th>
-    </tr>
-    <tr>
       <th>Experiences</th>
-      <th>errora</th>
-      <th>error (%)</th>
+      <th>Estimation<br>errora</th>
+      <th>Average estimation<br>error (%)</th>
       <th>t-statistics</th>
-      <th>error</th>
-      <th>error (%)</th>
+      <th>Estimation<br>error</th>
+      <th>Average estimation<br>error (%)</th>
       <th>t-statistics</th>
     </tr>
   </thead>
@@ -227,11 +218,7 @@ Table 2.  Replication and Extensions: Summary of Hypotheses.
 <table>
   <thead>
     <tr>
-      <th>Replication: prevalence estimations</th>
-      <th></th>
-    </tr>
-    <tr>
-      <th>No</th>
+      <th>Replication: prevalence estimations<br>No</th>
       <th>Hypothesis</th>
     </tr>
   </thead>
@@ -1043,24 +1030,13 @@ Note. df = 592. SCO = social comparison orientation. *p < .05. **p < .01
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th></th>
-      <th>β for negative<br>prevalence</th>
-      <th>β for positive<br>prevalence</th>
-      <th></th>
-      <th>β for negative<br>prevalence</th>
-      <th>β for positive<br>prevalence</th>
-      <th></th>
-      <th></th>
-    </tr>
-    <tr>
       <th>Measure</th>
       <th>Cronbach’s α</th>
-      <th>estimate</th>
-      <th>estimate</th>
+      <th>β for negative<br>prevalence<br>estimate</th>
+      <th>β for positive<br>prevalence<br>estimate</th>
       <th>R2</th>
-      <th>estimate</th>
-      <th>estimate</th>
+      <th>β for negative<br>prevalence<br>estimate</th>
+      <th>β for positive<br>prevalence<br>estimate</th>
       <th>R2</th>
       <th>Interpretation</th>
     </tr>

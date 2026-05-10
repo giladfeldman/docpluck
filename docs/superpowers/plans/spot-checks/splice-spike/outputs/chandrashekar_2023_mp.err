@@ -6,3 +6,11 @@ C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\ba
   cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
 C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (98.02008641599998, 370.3743042992, 552.3688980947712, 538.9717645104)
   cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (559.560447648, 562.055489644032) does not lie in column range (293.90999999999997, 558.9599999999999)
+  warnings.warn(
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (576.120460896, 578.615502892032) does not lie in column range (107.52, 575.88)
+  warnings.warn(
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (604.680483744, 607.6804861439999) does not lie in column range (146.4, 604.1999999999999)
+  warnings.warn(
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (604.680483744, 607.6804861439999) does not lie in column range (108.0, 604.68)
+  warnings.warn(
