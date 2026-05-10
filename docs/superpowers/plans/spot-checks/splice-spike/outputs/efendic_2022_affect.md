@@ -50,6 +50,11 @@ Manipulated attribute
   </tbody>
 </table>
 
+Negative affect Positive affect Positive affect Negative affect
+
+Impact on non-manipulated attribute
+Benefit is low Benefit is high Risk is low Risk is high
+
 efficient—than weighing the pros and cons or retrieving from memory many relevant examples, especially when the required judgment or decision is complex or mental resources are limited’’ (Finucane et al., 2000, p. 3).
 Reliance on affect is a general process and, consistent with an AH, a wide range of findings support the idea that affect provides valuable information that people use to simplify their decision-making. For instance, affect-laden imagery has been shown to predict people’s preferences in investment decisions (MacGregor et al., 2000), smoking (Benthin et al., 1995), information integration (Anderson, 1981; Efendic´ et al., 2019), simple choice gambles (Bateman et al., 2007), and morality judgments (Slovic & Va¨ stfja¨ ll, 2010).
 Risks and Benefits
@@ -108,25 +113,6 @@ The significant effect of Direction shows that, regardless of the manipulated at
 manipulation check (see Figure 2 and Tables S41–S44 for detailed statistics).
 Negative Relationship Between Risks and Benefits. To test whether we observe a negative relationship between risks and benefits, we looked at the effects of the manipulated attribute on the nonmanipulated attribute. Specifically, we regressed change in ratings of nonmanipulated attributes (DV) on Direction, Manipulated Attribute, and their interaction, adjusting for covariates at Level 1 (Pre-rating manipulated attribute; and three-way interaction between pre-rating non-manipulated attribute, Direction, and Manipulated Attribute) and Level 2 (i.e., Technology type and participant’s ID). Table 3 summarizes these results (see Table S20–S24 in the supplementary material for step-bystep regression results and model comparisons).
 The main effect of direction supports the original finding of the negative relationship. In addition, we find that the directionality of pre- and post-treatment changes in the non-manipulated attribute was consistent with the predicted inverse relationship, except in the Low-benefit condition (see Figure 3 and Tables S41–S44 for detailed statistics).
-
-### Table 2
-*Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
-
-```
-Predictors
-DV: Change in non-manipulated attribute
-B
-SE
-95% CI
-Intercept
-Pre-rating manipulated attribute (PMA)
-Direction (high vs. low)
-Manipulated attribute (risk vs. benefit)
-Direction 3 manipulated attribute
-PMA 3direction
-PMA 3 manipulated attribute
-PMA 3 direction 3 manipulated attribute
-```
 
 [20.21, 0.04] [21.15, 21.03] [2.42, 2.69] [20.40, 20.13] [0.22, 0.75] [20.22, 0.02] [20.11, 0.14] [20.08, 0.40]
 
@@ -236,6 +222,10 @@ The interaction between manipulated attribute and CMA (change in manipulated att
     </tr>
   </tbody>
 </table>
+
+Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.
+
+manipulated is mainly driven by participants’ responses within the Low-Benefit condition (see Figure 5). Specifically, we note large differences in change in ratings of non-manipulated attribute across Risk, Mchange = 0.74 (SE = 0.05) and Benefit, Mchange = 20.14, (0.05), manipulation within the low condition. However, those differences are much smaller within the high condition, Risk: Mchange = 21.01 (0.06); Benefit: Mchange = 20.62, (0.05).
 
 ## General Discussion
 
@@ -371,11 +361,7 @@ In two studies, using samples from the United States and the United Kingdom, we 
   </tbody>
 </table>
 
-[20.49, 0.02] [20.65, 20.53] [21.06, 20.95] [20.49, 20.24] [0.31, 0.56] [20.80, 20.68] [21.09, 20.60] [20.23, 20.02] [20.37, 20.16] [0.01, 0.43]
-
-.066 \.001 \.001 \.001 \.001 \.001 \.001
-.022 \.001
-.037
+Note. CI = confidence interval.
 
 Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.
 
@@ -494,6 +480,9 @@ Handling Editor: Lissa Libby
 
 
 ## Tables (unlocated in body)
+
+### Table 2
+*Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
 
 <table>
   <thead>

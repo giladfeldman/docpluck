@@ -286,3 +286,162 @@ def test_table_with_unfindable_region_falls_back_to_page_top():
     assert "<td>gamma</td>" in result
     # Note must accompany unlocated tables so the eyeball reviewer can spot them.
     assert "[splice-spike: table location not found" in result
+
+
+def test_locator_handles_blank_line_interleaved_pdftotext():
+    """When pdftotext renders a table with each row separated by blank lines
+    (a common 2-column page artifact), the locator must still find the
+    region. Counting non-blank lines for the window cap fixes this — the
+    earlier raw-line cap was starved by the doubled line count."""
+    page_text = (
+        "Some intro paragraph.\n"
+        "\n"
+        "T\n"
+        "\n"
+        "1: Findings caption split across paragraphs.\n"
+        "\n"
+        "Ability\n"
+        "\n"
+        "Domain\n"
+        "\n"
+        "Comparative\n"
+        "\n"
+        "Easy\n"
+        "\n"
+        "Using a mouse\n"
+        "\n"
+        "3.1\n"
+        "\n"
+        "Driving\n"
+        "\n"
+        "3.6\n"
+        "\n"
+        "1 Higher numbers reflect difficulty.\n"
+    )
+    table_rows = [
+        ["Ability", "Domain", "Comparative"],
+        ["Easy", "", ""],
+        ["Using a mouse", "3.1", "0.21"],
+        ["Driving", "3.6", "0.65"],
+    ]
+    region = find_table_region_in_text(page_text, table_rows)
+    assert region is not None, "locator should find blank-line-separated table rows"
+    start, end = region
+    lines = page_text.split("\n")
+    region_text = "\n".join(lines[start:end])
+    assert "Ability" in region_text
+    assert "Driving" in region_text
+
+
+from splice_spike import _merge_continuation_rows
+
+
+def test_case_c_label_modifier_merges_into_previous_row():
+    """A 2-row table layout where col 0 carries a parenthetical label
+    modifier ((Extension)) should merge into the row above whose hypothesis
+    statement wraps incompletely (ends with conjunction "and")."""
+    rows = [
+        ["H3", "Compared to the replication", "Domain", "Replication and"],
+        ["(Extension)", "condition participants, the easy", "diﬃculty;", "easy domain"],
+        ["", "domain condition participants", "ambiguity", "conditions"],
+        ["", "assign lower domain diﬃculty.", "", ""],
+    ]
+    merged = _merge_continuation_rows(rows)
+    # Should collapse to ONE logical row (H3's row, with all continuations merged).
+    assert len(merged) == 1
+    parent = merged[0]
+    # Col 0 contains both H3 and (Extension) joined by the merge separator.
+    assert "H3" in parent[0]
+    assert "(Extension)" in parent[0]
+    # Col 1 contains the original hypothesis text plus continuations.
+    assert "Compared to the replication" in parent[1]
+    assert "domain condition participants" in parent[1]
+    # Col 3 contains both 'Replication and' and continuation 'easy domain'.
+    assert "Replication and" in parent[3]
+    assert "easy domain" in parent[3]
+
+
+def test_case_c_does_not_fire_on_complete_data_rows():
+    """A row where the previous row's cells look complete (numeric data,
+    sentence terminators) must NOT be merged into the previous row even if
+    col 0 of the current row is short — they are separate data rows."""
+    rows = [
+        ["Age", "24.3", "3.1", "142"],
+        ["IQ", "100.5", "15.2", "142"],
+    ]
+    merged = _merge_continuation_rows(rows)
+    # Two rows must remain — the second is NOT a continuation of the first.
+    assert len(merged) == 2
+    assert merged[0][0] == "Age"
+    assert merged[1][0] == "IQ"
+
+
+from splice_spike import _dedupe_table_blocks
+
+
+from splice_spike import _extract_footnote_lines
+
+
+def test_footnote_extraction_picks_asterisk_and_note_lines():
+    """Camelot drops prose-y rows from cells; the splice region preserves
+    them. Footnote-marker paragraphs (``*M = 1.13...``, ``†No appropriate
+    omnibus...``, ``Note.``) must be re-emitted after the rendered table so
+    explanations of ``*`` / ``†`` symbols in cells aren't orphaned."""
+    region = (
+        "Some table data row here.\n\n"
+        "More table data.\n\n"
+        "*M = 1.13; SD = 0.55 (lower numbers indicate higher attentiveness).\n\n"
+        "**M = 4.83, SD = 0.51 (higher numbers indicate higher attentiveness).\n\n"
+        "†No appropriate omnibus effect size.\n\n"
+        "Note. Counts above 80% are considered attentive.\n\n"
+        "Some unrelated body prose that should not be picked up."
+    )
+    out = _extract_footnote_lines(region)
+    # Must pick the *, **, †, and Note. lines, but NOT the body prose.
+    joined = " ".join(out)
+    assert "*M = 1.13" in joined
+    assert "**M = 4.83" in joined
+    assert "†No appropriate omnibus effect size." in joined
+    assert "Note. Counts above 80% are considered attentive." in joined
+    assert "Some unrelated body prose" not in joined
+
+
+def test_footnote_extraction_skips_when_no_markers():
+    """Region with no footnote markers returns empty list — don't emit
+    spurious paragraphs after the table."""
+    region = (
+        "Header row\n\n"
+        "Data row 1\n\n"
+        "Data row 2\n\n"
+        "Body prose follows."
+    )
+    assert _extract_footnote_lines(region) == []
+
+
+def test_dedupe_prefers_html_table_over_code_block():
+    """When two ``### Table N`` blocks exist for the same N — one with an
+    HTML ``<table>`` and one with a fragment-wrapped ``\\`\\`\\`` code block —
+    the HTML one must win regardless of order."""
+    text = (
+        "### Table 1\n"
+        "*caption A*\n\n"
+        "```\n"
+        "stray fragment lines\n"
+        "more fragments\n"
+        "```\n\n"
+        "Some prose between blocks.\n\n"
+        "### Table 1\n"
+        "*caption B*\n\n"
+        "<table>\n"
+        "  <thead><tr><th>X</th></tr></thead>\n"
+        "  <tbody><tr><td>1</td></tr></tbody>\n"
+        "</table>\n"
+    )
+    out = _dedupe_table_blocks(text)
+    # The HTML version must survive.
+    assert "<table>" in out
+    assert "<th>X</th>" in out
+    # The code-block version must be removed.
+    assert "stray fragment lines" not in out
+    # Only ONE ### Table 1 heading remains.
+    assert out.count("### Table 1") == 1

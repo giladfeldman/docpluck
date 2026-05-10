@@ -177,6 +177,64 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             return False
         return s.endswith(("/", "-", "—", "–"))
 
+    def _is_label_modifier(s: str) -> bool:
+        """A col-0 value that's a parenthetical label modifier — i.e., a
+        continuation marker like ``(Extension)``, ``(Original)``, ``(cont.)``,
+        ``(continued)`` rather than a new row anchor.
+
+        These appear in 2-row hypothesis tables where the first row's col 0
+        is a hypothesis number (``H3``) and the second row's col 0 carries a
+        condition label that visually belongs with the H-number above.
+        """
+        s = s.strip()
+        if not s:
+            return False
+        if re.fullmatch(r"\([^)]+\)", s):
+            return True
+        if re.fullmatch(r"(?:cont\.?|continued|ctd\.?)", s, re.IGNORECASE):
+            return True
+        return False
+
+    _SENTENCE_END = re.compile(r"[.!?]['\")\]]?\s*$")
+    _WRAP_PUNCT_END = re.compile(r"[/,;:\-—–]\s*$")
+    _CONJUNCTION_END = re.compile(
+        r"\b(?:and|or|but|of|the|in|for|with|to|a|an|on|at|by|from|as|is|are"
+        r"|was|were|be|been|than|that|which|who|when|where|while|during|after"
+        r"|before|because|since|though|although|into|onto|upon)$",
+        re.IGNORECASE,
+    )
+
+    def _cell_looks_incomplete(s: str) -> bool:
+        """A cell whose content suggests it wraps to the next row.
+
+        Signals: doesn't end with sentence terminator AND ends with wrap
+        punctuation (/-,;:—–), a conjunction/preposition/article, or a
+        lowercase letter on a multi-word string. Single-word labels (``M``,
+        ``SD``, ``Variable``) are NOT flagged — they're complete labels.
+        """
+        s = (s or "").strip()
+        if not s:
+            return False
+        if _SENTENCE_END.search(s):
+            return False
+        # Pure numeric data cells are complete.
+        if re.fullmatch(r"[\d.,%*∗+\-−–—]+", s):
+            return False
+        if _WRAP_PUNCT_END.search(s):
+            return True
+        if _CONJUNCTION_END.search(s):
+            return True
+        # Multi-word string ending in lowercase = mid-sentence
+        if len(s.split()) >= 2 and re.search(r"[a-z]\s*$", s):
+            return True
+        return False
+
+    def _row_looks_incomplete(row: list[str]) -> bool:
+        return sum(1 for c in row if _cell_looks_incomplete(c)) >= 2
+
+    def _row_cells_are_short(row: list[str], threshold: int = 60) -> bool:
+        return all(len((c or "").strip()) <= threshold for c in row)
+
     out: list[list[str]] = []
     for row in rows:
         first = row[0].strip() if row else ""
@@ -206,6 +264,31 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
         ):
             parent = out[-1]
             parent[0] = parent[0].rstrip() + first if parent[0].rstrip().endswith(("/", "-")) else parent[0].rstrip() + " " + first
+            continue
+
+        # Case C: row's col 0 is a "label modifier" (parenthetical like
+        # ``(Extension)``) AND previous row's tail cells look incomplete
+        # AND current row's cells are short. Treat the row as a
+        # continuation of the previous logical row's hypothesis text.
+        # This handles 2-row hypothesis layouts where pdftotext stream-
+        # rendering breaks "H3 / Compared..." across two rows where col 0
+        # carries the condition label.
+        if (
+            out
+            and first
+            and _is_label_modifier(first)
+            and _row_looks_incomplete(out[-1])
+            and _row_cells_are_short(row, threshold=60)
+        ):
+            parent = out[-1]
+            for i in range(min(len(row), len(parent))):
+                v = (row[i] or "").strip()
+                if not v:
+                    continue
+                if parent[i].strip():
+                    parent[i] = parent[i] + _MERGE_SEPARATOR + v
+                else:
+                    parent[i] = v
             continue
 
         out.append([(c or "").strip() for c in row])
@@ -338,11 +421,24 @@ def find_table_region_in_text(
     if not table_tokens:
         return None
 
-    lines = page_text.split("\n")
-    if not lines:
+    raw_lines = page_text.split("\n")
+    if not raw_lines:
         return None
 
-    per_line_hits = [len(_tokens(line) & table_tokens) for line in lines]
+    # Search in NON-BLANK-line space. pdftotext often inserts a blank line
+    # between every table row in column-rendered tables, doubling the line
+    # count and starving the window cap. Counting only content lines lets the
+    # algorithm operate on the table's actual row count without runaway.
+    nb_lines: list[str] = []
+    nb_to_raw: list[int] = []
+    for i, ln in enumerate(raw_lines):
+        if ln.strip():
+            nb_lines.append(ln)
+            nb_to_raw.append(i)
+    if not nb_lines:
+        return None
+
+    per_line_hits = [len(_tokens(ln) & table_tokens) for ln in nb_lines]
 
     # Cap window length to ~2x the table's row count + slack. This prevents
     # runaway windows on real PDFs where the page also contains body prose
@@ -354,15 +450,15 @@ def find_table_region_in_text(
     # Among windows meeting the coverage threshold, prefer maximum hit count
     # (tightly packed token matches), tiebreak on shorter length.
     best: Optional[tuple[int, int, int]] = None  # (-hits, length, start)
-    for start in range(len(lines)):
+    for start in range(len(nb_lines)):
         running_token_set: set[str] = set()
         running_hits = 0
-        for end in range(start, len(lines)):
+        for end in range(start, len(nb_lines)):
             length = end - start + 1
             if length > max_window:
                 break
             running_hits += per_line_hits[end]
-            running_token_set |= _tokens(lines[end]) & table_tokens
+            running_token_set |= _tokens(nb_lines[end]) & table_tokens
             coverage = len(running_token_set) / len(table_tokens)
             if coverage < 0.6:
                 continue
@@ -372,8 +468,54 @@ def find_table_region_in_text(
 
     if best is None:
         return None
-    _, length, start = best
-    return (start, start + length)
+    _, length, nb_start = best
+    nb_end = nb_start + length
+
+    # Trim redundant edge lines: the picked window may extend past the actual
+    # table into adjacent body prose whose tokens are *already* covered by
+    # the table rows themselves (e.g., a paragraph that discusses
+    # ``domains`` / ``ability`` after a table about domain difficulty).
+    # Drop a trailing line ONLY if every table-token it carries is redundant
+    # with the rest of the window. This preserves rows that hold unique
+    # tokens (the actual table data) while shedding adjacent prose.
+    line_token_sets: list[set[str]] = [
+        _tokens(nb_lines[k]) & table_tokens for k in range(nb_start, nb_end)
+    ]
+
+    def _line_token_set(local_idx: int) -> set[str]:
+        return line_token_sets[local_idx]
+
+    core_start, core_end = nb_start, nb_end
+    # Trim end while the trailing line's tokens are fully redundant.
+    while core_end > core_start + 1:
+        trailing = _line_token_set(core_end - 1 - nb_start)
+        others: set[str] = set()
+        for k in range(core_start - nb_start, core_end - 1 - nb_start):
+            others |= line_token_sets[k]
+        if trailing and not trailing.issubset(others):
+            break
+        if not trailing:
+            # Empty token line at the edge — definitely safe to trim.
+            core_end -= 1
+            continue
+        core_end -= 1
+    # Trim start similarly.
+    while core_start < core_end - 1:
+        leading = _line_token_set(core_start - nb_start)
+        others = set()
+        for k in range(core_start + 1 - nb_start, core_end - nb_start):
+            others |= line_token_sets[k]
+        if leading and not leading.issubset(others):
+            break
+        if not leading:
+            core_start += 1
+            continue
+        core_start += 1
+    nb_start, nb_end = core_start, core_end
+
+    raw_start = nb_to_raw[nb_start]
+    raw_end = nb_to_raw[nb_end - 1] + 1  # exclusive
+    return (raw_start, raw_end)
 
 
 def splice_tables_into_text(
@@ -807,27 +949,42 @@ def _table_block_content_end(text: str, content_start: int, hard_end: int) -> in
       - italic caption ``*…*``
       - code fence ``\\`\\`\\``` and the lines until the matching close
       - pipe-table rows ``| … |`` and ``| --- | --- |``
+      - HTML ``<table>…</table>`` block (may span paragraphs because the
+        renderer breaks the table across multiple ``\\n``-separated lines
+        but typically with no blank-line gaps inside it; even so, defend
+        against a stray ``\\n\\n`` inside the block).
     The block ends at the first paragraph that doesn't match any of these.
     """
     section = text[content_start:hard_end]
     paragraphs = re.split(r"(\n\s*\n)", section)
     # paragraphs alternates: [text, sep, text, sep, ..., text]
-    in_fence = False
+    in_html_table = False
     consumed = 0
     for chunk in paragraphs:
         if chunk == "" or re.fullmatch(r"\n\s*\n", chunk):
             consumed += len(chunk)
             continue
+        if in_html_table:
+            consumed += len(chunk)
+            if "</table>" in chunk:
+                in_html_table = False
+            continue
         first_line = chunk.lstrip("\n").splitlines()[0] if chunk.strip() else ""
         is_caption = first_line.startswith("*") and first_line.endswith("*")
         is_fence_open = first_line.startswith("```")
         is_pipe_row = first_line.startswith("|")
+        is_html_table_open = first_line.lstrip().startswith("<table")
         # Heuristic: pipe-table BLOCK if MOST lines start with `|`
         chunk_lines = chunk.strip().splitlines()
         pipe_lines = sum(1 for ln in chunk_lines if ln.lstrip().startswith("|"))
         fence_lines = sum(1 for ln in chunk_lines if ln.strip() == "```")
         is_pipe_block = chunk_lines and pipe_lines / max(len(chunk_lines), 1) >= 0.5
         is_fence_block = fence_lines >= 1
+        if is_html_table_open:
+            consumed += len(chunk)
+            if "</table>" not in chunk:
+                in_html_table = True
+            continue
         if is_caption or is_pipe_row or is_pipe_block or is_fence_open or is_fence_block:
             consumed += len(chunk)
             continue
@@ -845,13 +1002,21 @@ def _existing_table_numbers(text: str) -> set[int]:
 
 
 def _dedupe_table_blocks(text: str) -> str:
-    """Among multiple ``### Table N`` blocks with the same N, keep the one with
-    the most pipe-table rows (``| ... |`` lines). Drop the others.
+    """Among multiple ``### Table N`` blocks with the same N, keep the
+    highest-quality block. Quality ranking (best first):
+
+      1. Block contains an HTML ``<table>`` element (Camelot-rendered cells).
+      2. Block has more ``<tr>`` rows (more table content captured).
+      3. Tiebreak: earliest position in the document (likely the body, not
+         the appendix).
 
     A "block" runs from a ``### Table N`` heading to the next ``### `` /
-    ``## `` heading or end of text.
+    ``## `` heading or end of text. The previous metric (``pipe_rows`` from
+    pipe-table lines) is now always 0 since rendering switched to HTML on
+    2026-05-09 — a code-block fragment fallback would beat the real HTML
+    table on the tiebreak. Ranking by ``<table>`` presence corrects this.
     """
-    blocks: list[tuple[int, int, int, int]] = []  # (start, end, num, pipe_rows)
+    blocks: list[tuple[int, int, int, int, int]] = []  # (start, end, num, has_html, n_tr)
     matches = list(re.finditer(r"^### Table\s+(\d+)\s*$", text, re.MULTILINE))
     for i, m in enumerate(matches):
         start = m.start()
@@ -873,19 +1038,21 @@ def _dedupe_table_blocks(text: str) -> str:
         # blank, NOT italic-caption — that's body text starting after the table.
         end = _table_block_content_end(text, heading_line_end, end)
         block_text = text[start:end]
-        pipe_rows = len(re.findall(r"^\| ", block_text, re.MULTILINE))
+        has_html = 1 if "<table>" in block_text else 0
+        n_tr = len(re.findall(r"<tr\b", block_text))
         num = int(m.group(1))
-        blocks.append((start, end, num, pipe_rows))
+        blocks.append((start, end, num, has_html, n_tr))
 
-    # Group by number; pick the block with most pipe_rows; mark others for removal.
-    by_num: dict[int, list[tuple[int, int, int, int]]] = {}
+    # Group by number; pick the highest-quality block; mark others for removal.
+    by_num: dict[int, list[tuple[int, int, int, int, int]]] = {}
     for b in blocks:
         by_num.setdefault(b[2], []).append(b)
     to_remove: list[tuple[int, int]] = []
     for num, group in by_num.items():
         if len(group) <= 1:
             continue
-        group.sort(key=lambda b: (-b[3], b[0]))  # max pipe_rows, then earliest
+        # Sort: prefer has_html=1, then more <tr>, then earliest start.
+        group.sort(key=lambda b: (-b[3], -b[4], b[0]))
         for b in group[1:]:
             to_remove.append((b[0], b[1]))
 
@@ -1032,6 +1199,49 @@ def _wrap_table_fragments(
     return "\n\n".join(p for p in out_parts if p)
 
 
+_FOOTNOTE_MARKER_RE = re.compile(
+    r"^\s*(?:"
+    r"[*†‡§¶]+"            # asterisk / dagger / section / pilcrow markers
+    r"|Note[s]?\s*[.:]"    # "Note." or "Notes:"
+    r"|\*[A-Za-z]"         # *M, *p, *N — common stat-table conventions
+    r"|†[A-Za-z]"
+    r")",
+    re.IGNORECASE,
+)
+_FOOTNOTE_INLINE_NOTE_RE = re.compile(r"^\s*Note\s*[.:]\s", re.IGNORECASE)
+
+
+def _extract_footnote_lines(region_text: str) -> list[str]:
+    """Pick out paragraphs that look like table footnotes from the spliced
+    region. Camelot's ``_trim_prose_tail`` and ``_drop_caption_first_row``
+    deliberately remove prose-y rows from the structured cells, so explanation
+    lines like ``*M = 1.13... attentiveness`` end up nowhere unless preserved
+    here. We collect any paragraph in the region whose first non-blank line
+    starts with a footnote marker (``*``, ``†``, ``‡``, ``§``, ``¶``,
+    ``Note.``, etc.) and keep it for emission after the rendered table.
+
+    Returns the collected paragraphs as plain text (whitespace collapsed).
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for paragraph in re.split(r"\n\s*\n", region_text):
+        first_line = paragraph.lstrip("\n").splitlines()[0] if paragraph.strip() else ""
+        if not first_line:
+            continue
+        if not (
+            _FOOTNOTE_MARKER_RE.match(first_line)
+            or _FOOTNOTE_INLINE_NOTE_RE.match(first_line)
+        ):
+            continue
+        # Collapse internal whitespace; strip surrounding ws.
+        cleaned = re.sub(r"\s+", " ", paragraph).strip()
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        out.append(cleaned)
+    return out
+
+
 def _strip_running_headers(text: str) -> str:
     """Strip lines that appear at the same form-feed-bounded position across
     multiple pages, plus standalone short numeric "page number" lines.
@@ -1149,6 +1359,9 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
         return (start, end)
 
     unlocated: list[dict] = []
+
+    # First pass: locate each table (region or None).
+    located: list[tuple[int, int, dict]] = []
     for t in tables:
         region = _locate_table_per_page(cleaned, page_starts, t)
         if region is None:
@@ -1157,10 +1370,44 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
         char_start, char_end = region
         char_start, char_end = _shrink_to_avoid_section(char_start, char_end)
         if char_start >= char_end:
-            # Region collapsed entirely — defer to the appendix
             unlocated.append(t)
             continue
-        replacement = "\n\n" + _format_table_md(t, pdf_path=pdf_path) + "\n\n"
+        located.append((char_start, char_end, t))
+
+    # Resolve overlaps: when two tables on the same page both locate to
+    # overlapping char regions, trim the earlier-starting one's end to begin
+    # of the next. Without this, applying both edits in reverse char order
+    # corrupts the spliced output. Defer collapsed regions to the appendix.
+    located.sort(key=lambda x: (x[0], x[1]))
+    for i in range(len(located) - 1):
+        s, e, t = located[i]
+        next_s = located[i + 1][0]
+        if e > next_s:
+            located[i] = (s, next_s, t)
+    cleaned_located: list[tuple[int, int, dict]] = []
+    for s, e, t in located:
+        if s >= e - 10:  # too collapsed to be useful
+            unlocated.append(t)
+            continue
+        cleaned_located.append((s, e, t))
+
+    for char_start, char_end, t in cleaned_located:
+        # Preserve footnote-like lines from the original spliced region. The
+        # structured Camelot extraction often drops them via `_trim_prose_tail`,
+        # leaving asterisk / dagger explanations like
+        # ``*M = 1.13... attentiveness`` to be silently consumed when the
+        # region is replaced by HTML. Re-emit them as a plain markdown
+        # paragraph after the table.
+        region_text = cleaned[char_start:char_end]
+        footnote_lines = _extract_footnote_lines(region_text)
+        table_md = _format_table_md(t, pdf_path=pdf_path)
+        if footnote_lines:
+            table_md = (
+                table_md
+                + "\n\n"
+                + "\n\n".join(footnote_lines)
+            )
+        replacement = "\n\n" + table_md + "\n\n"
         edits.append((char_start, char_end, replacement))
 
     # Section heading insertions: replace [char_start, char_end] with

@@ -1,5 +1,3 @@
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (52.92854917, 508.19139674999997, 517.61071455, 683.8643870766667)
-  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
 Journal of Economic Psychology 83 (2021) 102350 Contents lists available at ScienceDirect
 Journal of Economic Psychology
 journal homepage: www.elsevier.com/locate/joep
@@ -482,36 +480,20 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
       <td></td>
     </tr>
     <tr>
-      <td>Lambdin &amp; Burdsal, 2007</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/ /</td>
-      <td>/</td>
+      <td>Lambdin &amp; Burdsal, 2007<br>(within-subject)</td>
+      <td>/<br>/</td>
+      <td>/<br>/</td>
+      <td>/<br>/</td>
+      <td>/<br>/</td>
+      <td>/ /<br>/ /</td>
+      <td>/<br>/</td>
       <td>55</td>
-      <td>Accept</td>
-      <td>35</td>
-      <td>26</td>
-      <td>21 (38%)</td>
-      <td>…</td>
-      <td>…</td>
-    </tr>
-    <tr>
-      <td>(within-subject)</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/ /</td>
-      <td>/</td>
-      <td></td>
-      <td>(%)<br>Reject</td>
-      <td>(64%)<br>20</td>
-      <td>(47%)<br>31</td>
-      <td>34</td>
-      <td>…</td>
-      <td>…</td>
+      <td>Accept<br>(%)<br>Reject</td>
+      <td>35<br>(64%)<br>20</td>
+      <td>26<br>(47%)<br>31</td>
+      <td>21 (38%)<br>34</td>
+      <td>…<br>…</td>
+      <td>…<br>…</td>
     </tr>
     <tr>
       <td></td>
@@ -566,17 +548,6 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
 
 1Reconstructed cell Ns. 2Impossible to recover cell N because no cell size is specified. †No appropriate omnibus effect size. /Absent. - - -Impossible to calculate without original data.
 
-### Table 2
-*Comparison of differences across conditions.*
-
-```
-Paying to know, , difference in % Pay $5 across conditions
-N
-Pass-Fail
-Pass-Uncertain
-Fail-Uncertain
-```
-
 Tversky & Shafir, 1992 (within-subjects)
 Inferential statistics Effect size [95% CI] Tversky & Shafir, 1992
 (between-subjects) Inferential statistics
@@ -589,32 +560,502 @@ Inferential statistics
 χ2 (2) = 12.676, p = .001 Cramer’s V = 0.308 [0.171, 0.484]
 /
 
-Effect size [95% CI] Lambdin & Burdsal, 2007
-(within-subject) Inferential statistics Effect size [95% CI] Present work
-(within-subject) Inferential statistics
-Effect size [95% CI] Present work
-(between-subject) Inferential statistics
-Effect size [95% CI]
+### Table 2
+*Comparison of differences across conditions.*
 
-/
-/
-/ /
-/
-/ /
-/ / /
-/
-/ 9
-… … − 24
-χ2 (3) = 85.72, p < .001
-† − 50
-χ2 (2) = 75.24, p < .001 Cramer’s V = 0.503 [0.394, 0.619]
+<table>
+  <thead>
+    <tr>
+      <th>Table 2</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Comparison of differences across conditions.</td>
+      <td>N</td>
+      <td>Paying to know, , difference in % Pay $5 across conditions<br>Pass-Fail</td>
+      <td>Pass-Uncertain</td>
+      <td>Fail-Uncertain</td>
+      <td>N</td>
+      <td>Choice under risk, difference in % Accept across conditions<br>Win-Loss</td>
+      <td>Win-:</td>
+      <td>Loss-</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>Uncertain</td>
+      <td>Uncertain</td>
+    </tr>
+    <tr>
+      <td>Tversky &amp; Shafir, 1992<br>(within-subjects)</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>98</td>
+      <td>10</td>
+      <td>35</td>
+      <td>25</td>
+    </tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>…</td>
+      <td>…</td>
+      <td>…</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>†</td>
+      <td>†</td>
+      <td>†</td>
+    </tr>
+    <tr>
+      <td>Tversky &amp; Shafir, 1992</td>
+      <td>199</td>
+      <td>(cid:0) 1</td>
+      <td>(cid:0) 31</td>
+      <td>(cid:0) 30</td>
+      <td>213</td>
+      <td>14</td>
+      <td>31</td>
+      <td>17</td>
+    </tr>
+    <tr><td colspan="9"><strong>(between-subjects)</strong></td></tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td></td>
+      <td>χ2 (2) = 0.552,<br>p = .759</td>
+      <td>χ2 (2) = 14.437,<br>p &lt; .001</td>
+      <td>χ2 (2) =<br>12.676, p =</td>
+      <td></td>
+      <td>χ2 (1) = 1.927,<br>p = .165</td>
+      <td>χ2 (1) =<br>12.484, p &lt;</td>
+      <td>χ2 (1) = 4.07,<br>p = .04</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>.001</td>
+      <td></td>
+      <td></td>
+      <td>.001</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td></td>
+      <td>Cramer’s V =</td>
+      <td>Cramer’s V =</td>
+      <td>Cramer’s V =</td>
+      <td></td>
+      <td>Cramer’s V =</td>
+      <td>Cramer’s V =</td>
+      <td>Cramer’s V =</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td>0.064<br>[(cid:0) 0.122,</td>
+      <td>0.329<br>[0.188, 0.505]</td>
+      <td>0.308<br>[0.171, 0.484]</td>
+      <td></td>
+      <td>0.131<br>[(cid:0) 0.083,</td>
+      <td>0.31<br>[0.168, 0.482]</td>
+      <td>0.183<br>[0.08, 0.357]</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td>0.231]</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>0.307]</td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Tversky &amp; Shafir, 1992,</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>171</td>
+      <td>(cid:0) 2</td>
+      <td>1</td>
+      <td>(cid:0) 4</td>
+    </tr>
+    <tr><td colspan="9"><strong>modified gambles</strong></td></tr>
+    <tr><td colspan="9"><strong>(between-subjects)</strong></td></tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>χ2 (1) = 0.171,<br>p = .68</td>
+      <td>χ2 (1) &lt; 0.001,<br>p &gt; .99</td>
+      <td>χ2 (1) =<br>0.391,<br>p = .531</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>Cramer’s V =</td>
+      <td>Cramer’s V =</td>
+      <td>Cramer’s V =</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>0.058<br>[(cid:0) 0.094,</td>
+      <td>0.02<br>[(cid:0) 0.093,</td>
+      <td>0.078<br>[(cid:0) 0.094,</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>0.258]</td>
+      <td>0.207]</td>
+      <td>0.278]</td>
+    </tr>
+    <tr>
+      <td>Kühberger et al., 2001, exp. 1<br>(between-subject)</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>177</td>
+      <td>13</td>
+      <td>13</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>χ2 &lt; 2.14,<br>p &gt; .14</td>
+      <td>χ2 &lt; 2.14,<br>p &gt; .14</td>
+      <td>χ2 &lt; 2.14,<br>p &gt; .14</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>…</td>
+      <td>…</td>
+      <td>…</td>
+    </tr>
+    <tr>
+      <td>Kühberger et al., 2001, exp. 2<br>(between-subject)</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>171</td>
+      <td>18</td>
+      <td>26</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>χ2 (1) = 2.76,<br>p = .10</td>
+      <td>χ2 (1) = 6.50,<br>p = .01</td>
+      <td>χ2 (1) = 0.88,<br>p = .35</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>…</td>
+      <td>…</td>
+      <td>…</td>
+    </tr>
+    <tr>
+      <td>Kühberger et al., 2001, exp. 3<br>(within-subject)</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>184</td>
+      <td>44</td>
+      <td>39</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>p &lt; .001</td>
+      <td>p &lt; .001</td>
+      <td>p = .73</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Kühberger et al., 2001, exp. 4<br>(between-subject)</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>97</td>
+      <td>35</td>
+      <td>30</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>χ2 (1) = 8.02,<br>p = .005</td>
+      <td>χ2 (1) = 6.24,<br>p = .01</td>
+      <td>χ2 (1) = 0.19,<br>p = .66</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td></td>
+      <td>…</td>
+      <td>…</td>
+      <td>…</td>
+    </tr>
+    <tr>
+      <td>Lambdin &amp; Burdsal, 2007<br>(within-subject)</td>
+      <td>35</td>
+      <td>17</td>
+      <td>26</td>
+      <td>9</td>
+      <td></td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td></td>
+      <td>…</td>
+      <td>…</td>
+      <td>…</td>
+      <td></td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td></td>
+      <td>…</td>
+      <td>…</td>
+      <td>…</td>
+      <td></td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+    </tr>
+    <tr>
+      <td>Present work</td>
+      <td>445</td>
+      <td>(cid:0) 5</td>
+      <td>(cid:0) 19</td>
+      <td>(cid:0) 24</td>
+      <td>445</td>
+      <td>(cid:0) 5</td>
+      <td>0</td>
+      <td>(cid:0) 5</td>
+    </tr>
+    <tr><td colspan="9"><strong>(within-subject)</strong></td></tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td></td>
+      <td>χ2 (3) =<br>138.38,<br>p &lt; .001</td>
+      <td>χ2 (3) = 152.08,<br>p &lt; .001</td>
+      <td>χ2 (3) = 85.72,<br>p &lt; .001</td>
+      <td></td>
+      <td>χ2 (1) = 2.989,<br>p = .084</td>
+      <td>χ2 (1) = 0.007,<br>p = .936</td>
+      <td>χ2 (1) =<br>4.481,<br>p = .034</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td></td>
+      <td>†</td>
+      <td>†</td>
+      <td>†</td>
+      <td></td>
+      <td>†</td>
+      <td>†</td>
+      <td>†</td>
+    </tr>
+    <tr>
+      <td>Present work</td>
+      <td>445</td>
+      <td>(cid:0) 20</td>
+      <td>(cid:0) 30</td>
+      <td>(cid:0) 50</td>
+      <td>445</td>
+      <td>(cid:0) 7</td>
+      <td>(cid:0) 13</td>
+      <td>(cid:0) 6</td>
+    </tr>
+    <tr><td colspan="9"><strong>(between-subject)</strong></td></tr>
+    <tr>
+      <td>Inferential statistics</td>
+      <td></td>
+      <td>χ2 (2) = 17.53,<br>p &lt; .001</td>
+      <td>χ2 (2) = 28.88,<br>p &lt; .001</td>
+      <td>χ2 (2) = 75.24,<br>p &lt; .001</td>
+      <td></td>
+      <td>χ2 (1) = 1.496,<br>p = .221</td>
+      <td>χ2 (1) = 4.991,<br>p = .025</td>
+      <td>χ2 (1) = 1.03,<br>p = .31</td>
+    </tr>
+    <tr>
+      <td>Effect size [95% CI]</td>
+      <td></td>
+      <td>Cramer’s V =<br>0.245</td>
+      <td>Cramer’s V =<br>0.31 [0.207,</td>
+      <td>Cramer’s V =<br>0.503</td>
+      <td></td>
+      <td>Cramer’s V =<br>0.071</td>
+      <td>Cramer’s V =<br>0.13</td>
+      <td>Cramer’s V =<br>0.059</td>
+    </tr>
+  </tbody>
+</table>
 
 †No appropriate omnibus effect size. /Absent. - - - Impossible to recalculate from original paper.
 
-… † 17
-χ2 (1) = 4.07, p = .04
-Cramer’s V = 0.183 [0.08, 0.357]
-−4
+†
+
+### Table 3
+*Attention check results.*
+
+<table>
+  <thead>
+    <tr>
+      <th>Table 3</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="5"><strong>Attention check results.</strong></td></tr>
+    <tr>
+      <td>Response alternative</td>
+      <td>Counts</td>
+      <td>“Never answer scales in online studies seriously”*<br>% of total</td>
+      <td>Counts</td>
+      <td>“Always carefully read and answer each item on online surveys”**<br>% of total</td>
+    </tr>
+    <tr>
+      <td>1 (Not at all characteristic of me)</td>
+      <td>834</td>
+      <td>93.7%</td>
+      <td>1</td>
+      <td>0.1%</td>
+    </tr>
+    <tr>
+      <td>2 (A little characteristic of me)</td>
+      <td>19</td>
+      <td>2.1%</td>
+      <td>9</td>
+      <td>1.0%</td>
+    </tr>
+    <tr>
+      <td>3 (Somewhat characteristic of me)</td>
+      <td>19</td>
+      <td>2.1%</td>
+      <td>19</td>
+      <td>2.1%</td>
+    </tr>
+    <tr>
+      <td>4 (Very characteristic of me)</td>
+      <td>14</td>
+      <td>1.6%</td>
+      <td>81</td>
+      <td>9.1%</td>
+    </tr>
+    <tr>
+      <td>5 (Entirely characteristic of me)</td>
+      <td>4</td>
+      <td>0.4%</td>
+      <td>780</td>
+      <td>87.6%</td>
+    </tr>
+  </tbody>
+</table>
 
 *M = 1.13; SD = 0.55 (here, lower numbers indicate higher attentiveness). **M = 4.83, SD = 0.51 (here, higher numbers indicate higher attentiveness).
 
@@ -763,502 +1204,3 @@ preference for indirect harm effect In press at Meta Psychology . Accepted for p
 ## Figures
 
 *Figure 1. Tversky and Shafir (1992) original studies’ results and present replications results. 5 I. Ziano et al.*
-
-
-## Tables (unlocated in body)
-
-<table>
-  <thead>
-    <tr>
-      <th>Table 2</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Comparison of differences across conditions.</td>
-      <td>N</td>
-      <td>Paying to know, , difference in % Pay $5 across conditions<br>Pass-Fail</td>
-      <td>Pass-Uncertain</td>
-      <td>Fail-Uncertain</td>
-      <td>N</td>
-      <td>Choice under risk, difference in % Accept across conditions<br>Win-Loss</td>
-      <td>Win-:</td>
-      <td>Loss-</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Uncertain</td>
-      <td>Uncertain</td>
-    </tr>
-    <tr>
-      <td>Tversky &amp; Shafir, 1992</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>98</td>
-      <td>10</td>
-      <td>35</td>
-      <td>25</td>
-    </tr>
-    <tr><td colspan="9"><strong>(within-subjects)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>…</td>
-      <td>…</td>
-      <td>…</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>†</td>
-      <td>†</td>
-      <td>†</td>
-    </tr>
-    <tr>
-      <td>Tversky &amp; Shafir, 1992</td>
-      <td>199</td>
-      <td>(cid:0) 1</td>
-      <td>(cid:0) 31</td>
-      <td>(cid:0) 30</td>
-      <td>213</td>
-      <td>14</td>
-      <td>31</td>
-      <td>17</td>
-    </tr>
-    <tr><td colspan="9"><strong>(between-subjects)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td></td>
-      <td>χ2 (2) = 0.552,<br>p = .759</td>
-      <td>χ2 (2) = 14.437,<br>p &lt; .001</td>
-      <td>χ2 (2) =<br>12.676, p =</td>
-      <td></td>
-      <td>χ2 (1) = 1.927,<br>p = .165</td>
-      <td>χ2 (1) =<br>12.484, p &lt;</td>
-      <td>χ2 (1) = 4.07,<br>p = .04</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>.001</td>
-      <td></td>
-      <td></td>
-      <td>.001</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td></td>
-      <td>Cramer’s V =</td>
-      <td>Cramer’s V =</td>
-      <td>Cramer’s V =</td>
-      <td></td>
-      <td>Cramer’s V =</td>
-      <td>Cramer’s V =</td>
-      <td>Cramer’s V =</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td>0.064<br>[(cid:0) 0.122,</td>
-      <td>0.329<br>[0.188, 0.505]</td>
-      <td>0.308<br>[0.171, 0.484]</td>
-      <td></td>
-      <td>0.131<br>[(cid:0) 0.083,</td>
-      <td>0.31<br>[0.168, 0.482]</td>
-      <td>0.183<br>[0.08, 0.357]</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td>0.231]</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>0.307]</td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Tversky &amp; Shafir, 1992,</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>171</td>
-      <td>(cid:0) 2</td>
-      <td>1</td>
-      <td>(cid:0) 4</td>
-    </tr>
-    <tr><td colspan="9"><strong>modified gambles</strong></td></tr>
-    <tr><td colspan="9"><strong>(between-subjects)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>χ2 (1) = 0.171,<br>p = .68</td>
-      <td>χ2 (1) &lt; 0.001,<br>p &gt; .99</td>
-      <td>χ2 (1) =<br>0.391,<br>p = .531</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>Cramer’s V =</td>
-      <td>Cramer’s V =</td>
-      <td>Cramer’s V =</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>0.058<br>[(cid:0) 0.094,</td>
-      <td>0.02<br>[(cid:0) 0.093,</td>
-      <td>0.078<br>[(cid:0) 0.094,</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>0.258]</td>
-      <td>0.207]</td>
-      <td>0.278]</td>
-    </tr>
-    <tr>
-      <td>Kühberger et al., 2001, exp. 1</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>177</td>
-      <td>13</td>
-      <td>13</td>
-      <td>0</td>
-    </tr>
-    <tr><td colspan="9"><strong>(between-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>χ2 &lt; 2.14,<br>p &gt; .14</td>
-      <td>χ2 &lt; 2.14,<br>p &gt; .14</td>
-      <td>χ2 &lt; 2.14,<br>p &gt; .14</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>…</td>
-      <td>…</td>
-      <td>…</td>
-    </tr>
-    <tr>
-      <td>Kühberger et al., 2001, exp. 2</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>171</td>
-      <td>18</td>
-      <td>26</td>
-      <td>6</td>
-    </tr>
-    <tr><td colspan="9"><strong>(between-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>χ2 (1) = 2.76,<br>p = .10</td>
-      <td>χ2 (1) = 6.50,<br>p = .01</td>
-      <td>χ2 (1) = 0.88,<br>p = .35</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>…</td>
-      <td>…</td>
-      <td>…</td>
-    </tr>
-    <tr>
-      <td>Kühberger et al., 2001, exp. 3</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>184</td>
-      <td>44</td>
-      <td>39</td>
-      <td>5</td>
-    </tr>
-    <tr><td colspan="9"><strong>(within-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>p &lt; .001</td>
-      <td>p &lt; .001</td>
-      <td>p = .73</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Kühberger et al., 2001, exp. 4</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>97</td>
-      <td>35</td>
-      <td>30</td>
-      <td>5</td>
-    </tr>
-    <tr><td colspan="9"><strong>(between-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>χ2 (1) = 8.02,<br>p = .005</td>
-      <td>χ2 (1) = 6.24,<br>p = .01</td>
-      <td>χ2 (1) = 0.19,<br>p = .66</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td></td>
-      <td>…</td>
-      <td>…</td>
-      <td>…</td>
-    </tr>
-    <tr>
-      <td>Lambdin &amp; Burdsal, 2007</td>
-      <td>35</td>
-      <td>17</td>
-      <td>26</td>
-      <td>9</td>
-      <td></td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-    </tr>
-    <tr><td colspan="9"><strong>(within-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td></td>
-      <td>…</td>
-      <td>…</td>
-      <td>…</td>
-      <td></td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td></td>
-      <td>…</td>
-      <td>…</td>
-      <td>…</td>
-      <td></td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-    </tr>
-    <tr>
-      <td>Present work</td>
-      <td>445</td>
-      <td>(cid:0) 5</td>
-      <td>(cid:0) 19</td>
-      <td>(cid:0) 24</td>
-      <td>445</td>
-      <td>(cid:0) 5</td>
-      <td>0</td>
-      <td>(cid:0) 5</td>
-    </tr>
-    <tr><td colspan="9"><strong>(within-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td></td>
-      <td>χ2 (3) =<br>138.38,<br>p &lt; .001</td>
-      <td>χ2 (3) = 152.08,<br>p &lt; .001</td>
-      <td>χ2 (3) = 85.72,<br>p &lt; .001</td>
-      <td></td>
-      <td>χ2 (1) = 2.989,<br>p = .084</td>
-      <td>χ2 (1) = 0.007,<br>p = .936</td>
-      <td>χ2 (1) =<br>4.481,<br>p = .034</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td></td>
-      <td>†</td>
-      <td>†</td>
-      <td>†</td>
-      <td></td>
-      <td>†</td>
-      <td>†</td>
-      <td>†</td>
-    </tr>
-    <tr>
-      <td>Present work</td>
-      <td>445</td>
-      <td>(cid:0) 20</td>
-      <td>(cid:0) 30</td>
-      <td>(cid:0) 50</td>
-      <td>445</td>
-      <td>(cid:0) 7</td>
-      <td>(cid:0) 13</td>
-      <td>(cid:0) 6</td>
-    </tr>
-    <tr><td colspan="9"><strong>(between-subject)</strong></td></tr>
-    <tr>
-      <td>Inferential statistics</td>
-      <td></td>
-      <td>χ2 (2) = 17.53,<br>p &lt; .001</td>
-      <td>χ2 (2) = 28.88,<br>p &lt; .001</td>
-      <td>χ2 (2) = 75.24,<br>p &lt; .001</td>
-      <td></td>
-      <td>χ2 (1) = 1.496,<br>p = .221</td>
-      <td>χ2 (1) = 4.991,<br>p = .025</td>
-      <td>χ2 (1) = 1.03,<br>p = .31</td>
-    </tr>
-    <tr>
-      <td>Effect size [95% CI]</td>
-      <td></td>
-      <td>Cramer’s V =<br>0.245</td>
-      <td>Cramer’s V =<br>0.31 [0.207,</td>
-      <td>Cramer’s V =<br>0.503</td>
-      <td></td>
-      <td>Cramer’s V =<br>0.071</td>
-      <td>Cramer’s V =<br>0.13</td>
-      <td>Cramer’s V =<br>0.059</td>
-    </tr>
-  </tbody>
-</table>
-
-### Table 3
-*Attention check results.*
-
-<table>
-  <thead>
-    <tr>
-      <th>Table 3</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td colspan="5"><strong>Attention check results.</strong></td></tr>
-    <tr>
-      <td>Response alternative</td>
-      <td>Counts</td>
-      <td>“Never answer scales in online studies seriously”*<br>% of total</td>
-      <td>Counts</td>
-      <td>“Always carefully read and answer each item on online surveys”**<br>% of total</td>
-    </tr>
-    <tr>
-      <td>1 (Not at all characteristic of me)</td>
-      <td>834</td>
-      <td>93.7%</td>
-      <td>1</td>
-      <td>0.1%</td>
-    </tr>
-    <tr>
-      <td>2 (A little characteristic of me)</td>
-      <td>19</td>
-      <td>2.1%</td>
-      <td>9</td>
-      <td>1.0%</td>
-    </tr>
-    <tr>
-      <td>3 (Somewhat characteristic of me)</td>
-      <td>19</td>
-      <td>2.1%</td>
-      <td>19</td>
-      <td>2.1%</td>
-    </tr>
-    <tr>
-      <td>4 (Very characteristic of me)</td>
-      <td>14</td>
-      <td>1.6%</td>
-      <td>81</td>
-      <td>9.1%</td>
-    </tr>
-    <tr>
-      <td>5 (Entirely characteristic of me)</td>
-      <td>4</td>
-      <td>0.4%</td>
-      <td>780</td>
-      <td>87.6%</td>
-    </tr>
-  </tbody>
-</table>

@@ -44,6 +44,12 @@ In Study 1b, they examined whether people would accurately predict the prevalenc
 
 Ip and Feldman
 
+Table 1.  Jordan et al. (2011) Studies 1b and 3: Summary of Findings.
+
+Study 1b
+
+Study 3
+
 ### Table 1
 *Jordan et al. (2011) Studies 1b and 3: Summary of Findings.*
 
@@ -200,16 +206,20 @@ Ip and Feldman
   </tbody>
 </table>
 
+Source. The table was adopted from Jordan et al. (2011, pp. 126, 130). aA positive number indicates an overestimation and a negative number indicates an underestimation. **p < .01. ***p < .001.
+
+interaction hypothesis: (b-reframed) underestimation errors are stronger for negative experiences than for positive experiences. Study 2 showed similar results using a re-analysis of a dataset by Srivastava et al. (2009) with an underestimation of negative emotions and an overestimation of positive emotions.
+In Study 3, the researchers examined the associations between prevalence estimations and psychological wellbeing. Participants completed scales regarding loneliness, rumination, depressive symptoms, life satisfaction, subjective happiness, and self-reported their number of friends, in addition to rating the same emotional events from Study 1b. They hypothesized that (c) higher prevalence estimates of others’ negative emotional experiences are associated with poorer psychological outcomes: greater loneliness, rumination, depressive symptoms, and lower life satisfaction and subjective happiness. They also hypothesized that (d) having fewer peers is associated with stronger misestimation.
+We summarized the findings of Study 1b and Study 3 in Table 1 and the hypotheses of the target article in Table 2 (under “Replication: Prevalence estimations”).
+Extensions
+Intensity of Emotional Experiences.  The authors of the target article acknowledged a limitation in their design, specifically that they did not differentiate between prevalence and intensity. For instance, participants were asked to rate the prevalence of their peers “receiving a bad grade and felt really bad about it,” making it difficult to distinguish between their
+
+estimation of the prevalence of receiving a bad grade and their estimation of the intensity of the emotions associated with that event. As such, we were unsure whether participants underestimated the prevalence of their peers’ negative emotions because they believed their peers rarely experienced such events (prevalence), or because they believed they these events would not elicit strong emotional responses (intensity).
+Therefore, we revised the questions to inquire about both the prevalence of the events and the intensity of the emotional experiences. By expanding upon the original article, our aim was to examine the interplay between prevalence and intensity estimates and gain a clearer understanding of the source of the misestimation.
 Social Comparison Orientation (Exploratory). We aimed to investigate the role of social comparison orientation, the tendency to compare oneself with others, as a potential predictor of misestimation and well-being measures. Gibbons and Buunk (1999) found that individuals with a higher social comparison orientation exhibited greater uncertainty and instability regarding their self-worth. Consequently, they tended to evaluate themselves based on how others were faring in public. This has the potential to be even more pronounced in an era in which social media provides ample opportunities for social comparison.
 Accumulating evidence suggests a positive link between social comparison orientation and threats to psychological wellbeing online, as many social media users tend to selectively present mostly positive aspects of their lives (Vogel et al., 2014).
 
 Table 2.  Replication and Extensions: Summary of Hypotheses.
-
-Replication: prevalence estimations
-
-No
-
-Hypothesis
 
 ### Table 2
 *Replication and Extensions: Summary of Hypotheses.*
@@ -261,13 +271,7 @@ Hypothesis
   </tbody>
 </table>
 
-2d People overestimate the intensity of others’ positive emotional experiences.c
-
-Social comparison orientation interacts with misestimation in predicting well-being:
-
-The higher the social comparison orientation, the stronger the associations in Hypothesis 4
-
-(Hypotheses 4-1a to 4-5b).
+4-5b) There is a negative association between the estimation of the prevalence of negative emotional experiences and subjective happiness.b
 
 Social comparison orientation is negatively associated with well-being.
 
@@ -316,12 +320,6 @@ Table 3.  Comparison of Target Article Versus Replication: Differences and Sim
 
 Study
 
-Jordan et al. (2011) Study 1b
-
-Jordan et al. (2011) Study 3
-
-Replication
-
 ### Table 3
 *Comparison of Target Article Versus Replication: Differences and Similarities.*
 
@@ -364,6 +362,8 @@ Replication
   </tbody>
 </table>
 
+We conducted the study using Qualtrics. All participants first indicated their consent. They then rated the prevalence of six positive and six negative emotional experiences for themselves and for other U.S. student participants taking this survey, in counterbalanced order.
+Prior to each rating task, we added comprehension checks to ensure that participants were paying attention to the type of rating (prevalence or intensity) and who they are rating (self vs. other). Participants had to answer these checks correctly in order to proceed to the rating task. We note that this is a deviation from the target article’s procedure to ensure that participants were attentive and knew who and what they were rating.
 For exploratory purposes, we included three questions that asked participants to provide short sentences regarding their perceptions of the test items they had previously rated, to help us better understand participants’ mindsets when answering some of the items from the target article, to address the possibility of puzzling or surprising findings using these items.
 Participants then completed measures assessing their loneliness, rumination tendency, depressive symptoms, life satisfaction, subjective happiness, and social comparison orientation. We randomized the order of the six well-being and trait measures. Finally, participants answered a funneling section, provided demographic information, and were debriefed.
 Measures
@@ -382,28 +382,41 @@ This means that for both prevalence and intensity, a misestimation score higher 
 
 Ip and Feldman
 
+Table 4.  Replication and Extension: Experimental Design and Measures.
+
 ### Table 4
 *Replication and Extension: Experimental Design and Measures.*
 
-```
-IV1: estimation of positive emotional events IV1: estimation of negative emotional events
-“Felt happy because they. . .”
-“Felt sad because they. . .”
-1.  Received high grades
-1.  Had a fight or argument
-2.  Attended fun party
-2.  Thought about distant friends or family
-3.  Participated in athletics
-3.  Thought about enormous workload
-4.  They went out with friends
-4.  Were rejected by someone
-5.  They talked to distant friends or family
-5.  Received a low grade
-6.  Had great meal
-6.  Thought about bad personal health habits
-DV1: prevalence and intensity of own emotional experiences [replication + extension]
-“For each of the following emotional experiences, please indicate whether you have experienced those
-```
+<table>
+  <thead>
+    <tr>
+      <th>Ip and Feldman</th>
+      <th>7</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IV1: positive vs. negative</td>
+      <td>IV1: estimation of negative emotional eventsIV1: estimation of positive emotional events</td>
+    </tr>
+    <tr>
+      <td>emotions (within; all</td>
+      <td>“Felt sad because they. . .”“Felt happy because they. . .”</td>
+    </tr>
+    <tr>
+      <td>participants rated both)</td>
+      <td>1.  Had a fight or argument1. Received high grades</td>
+    </tr>
+    <tr>
+      <td>IV2: self vs. others rating (within; all</td>
+      <td>2. Thought about distant friends or family2. Attended fun party</td>
+    </tr>
+    <tr>
+      <td>participants rated both)</td>
+      <td>3. Thought about enormous workload3. Participated in athletics</td>
+    </tr>
+  </tbody>
+</table>
 
 sometime in the past 2 weeks and if you have—the intensity of the emotion.
 
@@ -578,6 +591,14 @@ Close to far replication
   </tbody>
 </table>
 
+Ensuring participants read and understood the instructions and to rate accordingly.
+Address order effects Address possibility of diverging
+perceptions of our test items.
+Target’s Studies 1b and 3 had similar designs that can be combined and extended.
+
+Misestimations were determined based on estimate-actual comparisons.
+To examine the effect of social comparison orientation.
+
 whether SCO interacts with estimation error in predicting well-being measures.
 Outliers and Exclusions.  We followed the preregistered plan to only include responses from participants who completed the
 
@@ -642,12 +663,6 @@ friends/ family    Had great meal
 Note. One-sample t-tests, N = 594, participant level df = 593, 95% CI (confidence intervals). The interpretation of the outcome is based on LeBel et al. (2019). We summarized whether we found a signal (p < alpha), whether the signal or lack of was expected, and whether it was in the same direction as that of the target’s per the singular item. We did not summarize effect size consistency (target’s effect within replication confidence intervals) given that we conducted analyses on participant level whereas the target conducted analysis on item-level.
 
 Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.
-
-Participant-level analyses
-
-Experiences
-
-Actual Intensity
 
 ### Table 7
 *Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.*
@@ -928,6 +943,8 @@ Actual Intensity
   </tbody>
 </table>
 
+Note. One-sample t-tests, N = 594, participant level df = 593, 95% CI (confidence intervals).
+
 Table 8.  Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.
 
 Variable
@@ -1023,55 +1040,171 @@ Note. df = 592. SCO = social comparison orientation. *p < .05. **p < .01
 ### Table 9
 *Prevalence Estimates Regression Coefficients with Outcomes: Comparison Between Jordan et al. (2011)’s Study 3 Versus Replication.*
 
-```
-Jordan et al. (2011)
-Replication
-Measure
-β for negative β for positive
-β for negative β for positive
-prevalence prevalence
-prevalence prevalence
-Cronbach’s α estimate
-estimate R2
-estimate
-estimate R2
-Interpretation
-Negative
-Loneliness
-.81
-Rumination/brooding
-.72
-Depressive symptoms
-.73
-Positive
-Satisfaction with life
-.84
-Subjective Happiness
-.80
-Number of confidants
-/
-Social orientation scale
-/
-(extension)
-```
+<table>
+  <thead>
+    <tr>
+      <th></th>
+      <th></th>
+      <th>β for negative<br>prevalence</th>
+      <th>β for positive<br>prevalence</th>
+      <th></th>
+      <th>β for negative<br>prevalence</th>
+      <th>β for positive<br>prevalence</th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Measure</td>
+      <td>Cronbach’s α</td>
+      <td>estimate</td>
+      <td>estimate</td>
+      <td>R2</td>
+      <td>estimate</td>
+      <td>estimate</td>
+      <td>R2</td>
+      <td>Interpretation</td>
+    </tr>
+    <tr><td colspan="9"><strong>Negative</strong></td></tr>
+    <tr>
+      <td>Loneliness</td>
+      <td>.81</td>
+      <td>−.30**</td>
+      <td>.08</td>
+      <td>.08</td>
+      <td>.33***</td>
+      <td>−.25***</td>
+      <td>.08</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Rumination/brooding</td>
+      <td>.72</td>
+      <td>−.28**</td>
+      <td>.17</td>
+      <td>.08</td>
+      <td>.37***</td>
+      <td>−.15**</td>
+      <td>.10</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Depressive symptoms</td>
+      <td>.73</td>
+      <td>.00</td>
+      <td>−.02</td>
+      <td>.00</td>
+      <td>.41***</td>
+      <td>−.22***</td>
+      <td>.12</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr><td colspan="9"><strong>Positive</strong></td></tr>
+    <tr>
+      <td>Satisfaction with life</td>
+      <td>.84</td>
+      <td>.23*</td>
+      <td>−.37***</td>
+      <td>.15</td>
+      <td>−.23***</td>
+      <td>.25***</td>
+      <td>.05</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Subjective Happiness</td>
+      <td>.80</td>
+      <td>.19</td>
+      <td>−.16</td>
+      <td>.05</td>
+      <td>−.26***</td>
+      <td>.32***</td>
+      <td>.08</td>
+      <td>Signal; inconsistent</td>
+    </tr>
+    <tr>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td>opposite</td>
+    </tr>
+    <tr>
+      <td>Number of confidants</td>
+      <td>/</td>
+      <td>N/A</td>
+      <td>N/A</td>
+      <td>N/A</td>
+      <td>−.11*</td>
+      <td>.19***</td>
+      <td>.03</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Social orientation scale<br>(extension)</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>/</td>
+      <td>.26***</td>
+      <td>−.10*</td>
+      <td>.05</td>
+      <td>Supported</td>
+    </tr>
+  </tbody>
+</table>
 
-−.30** −.28**
-.00
-.23* .19 N/A
-/
+Note. Linear regression, N = 594. N/A = not reported. Source. The “original” column was adopted from Jordan et al. (2011, p. 130). The interpretation of the outcome is based on LeBel et al. (2019). *p < .05. **p < .01. ***p < .001.
 
-.08 Signal; inconsistent opposite
-.10 Signal; inconsistent opposite
-.12 Signal; inconsistent opposite
-.05 Signal; inconsistent opposite
-.08 Signal; inconsistent opposite
-.03   .05 Supported
-
-Note. Linear regression, N = 594. N/A = not reported. Source. The “original” column was adopted from Jordan et al. (2011, p. 130). The interpretation of the outcome is based on LeBel et al. (2019). *p < .05. **p < .01. ***p < .001.
-
-We conclude that our findings are in the opposite direction to that reported in the target article, for both negative and positive emotional experiences prevalence estimates.
-Intensity Estimates Associations with Well-Being (Extension)
-We conducted the same analyses on intensity estimates as the ones reported above for prevalence, and summarized those in Tables 8 and 10. We found a similar pattern, with support for a positive association between negative emotional experiences intensity estimates and loneliness (β = .29, t(591) = 6.21, p < .001), brooding (β = .22, t(591) = 4.74, p < .001), and depressive symptoms (β = .29, t(591) = 6.31, p < .001), and negative association with life satisfaction (β = −.18, t(591) = −3.79, p < .001), and subjective happiness (β = −.28, t(591) = −6.07, p < .001).
 On the other hand, we found that positive emotional experiences intensity had a negative association with loneliness (β = −.21, t(591) = −4.63, p < .001) and depressive symptoms (β = −.20, t(591) = −4.23, p < .001).
 Complementary Analysis: Self-Reports Associations with Well-Being (Exploratory Extension)
 We explored the associations between self-reports of emotional experiences and well-being measures. We found that reporting more of the negative emotional experiences was positively correlated with loneliness (r = .16 [0.08, 0.23]),
@@ -1123,6 +1256,8 @@ Negative well-being  Loneliness  Rumination/brooding  Depressive symptoms 
     </tr>
   </tbody>
 </table>
+
+Note. Linear regression, N = 594. *p < .05. **p < .01. ***p < .001.
 
 ## Discussion
 
@@ -1215,37 +1350,6 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
 
 
 ## Tables (unlocated in body)
-
-<table>
-  <thead>
-    <tr>
-      <th>Ip and Feldman</th>
-      <th>7</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>IV1: positive vs. negative</td>
-      <td>IV1: estimation of negative emotional eventsIV1: estimation of positive emotional events</td>
-    </tr>
-    <tr>
-      <td>emotions (within; all</td>
-      <td>“Felt sad because they. . .”“Felt happy because they. . .”</td>
-    </tr>
-    <tr>
-      <td>participants rated both)</td>
-      <td>1.  Had a fight or argument1. Received high grades</td>
-    </tr>
-    <tr>
-      <td>IV2: self vs. others rating (within; all</td>
-      <td>2. Thought about distant friends or family2. Attended fun party</td>
-    </tr>
-    <tr>
-      <td>participants rated both)</td>
-      <td>3. Thought about enormous workload3. Participated in athletics</td>
-    </tr>
-  </tbody>
-</table>
 
 ### Table 6
 *Prevalence of Emotional Experiences (Replication and Extension): One-Sample t-Tests of Estimation Error.*
@@ -1725,169 +1829,5 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
       <td>.002</td>
       <td>1.20 [0.43, 1.90]</td>
     </tr>
-  </tbody>
-</table>
-
-<table>
-  <thead>
-    <tr>
-      <th></th>
-      <th></th>
-      <th>β for negative<br>prevalence</th>
-      <th>β for positive<br>prevalence</th>
-      <th></th>
-      <th>β for negative<br>prevalence</th>
-      <th>β for positive<br>prevalence</th>
-      <th></th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Measure</td>
-      <td>Cronbach’s α</td>
-      <td>estimate</td>
-      <td>estimate</td>
-      <td>R2</td>
-      <td>estimate</td>
-      <td>estimate</td>
-      <td>R2</td>
-      <td>Interpretation</td>
-    </tr>
-    <tr><td colspan="9"><strong>Negative</strong></td></tr>
-    <tr>
-      <td>Loneliness</td>
-      <td>.81</td>
-      <td>−.30**</td>
-      <td>.08</td>
-      <td>.08</td>
-      <td>.33***</td>
-      <td>−.25***</td>
-      <td>.08</td>
-      <td>Signal; inconsistent</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>opposite</td>
-    </tr>
-    <tr>
-      <td>Rumination/brooding</td>
-      <td>.72</td>
-      <td>−.28**</td>
-      <td>.17</td>
-      <td>.08</td>
-      <td>.37***</td>
-      <td>−.15**</td>
-      <td>.10</td>
-      <td>Signal; inconsistent</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>opposite</td>
-    </tr>
-    <tr>
-      <td>Depressive symptoms</td>
-      <td>.73</td>
-      <td>.00</td>
-      <td>−.02</td>
-      <td>.00</td>
-      <td>.41***</td>
-      <td>−.22***</td>
-      <td>.12</td>
-      <td>Signal; inconsistent</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>opposite</td>
-    </tr>
-    <tr><td colspan="9"><strong>Positive</strong></td></tr>
-    <tr>
-      <td>Satisfaction with life</td>
-      <td>.84</td>
-      <td>.23*</td>
-      <td>−.37***</td>
-      <td>.15</td>
-      <td>−.23***</td>
-      <td>.25***</td>
-      <td>.05</td>
-      <td>Signal; inconsistent</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>opposite</td>
-    </tr>
-    <tr>
-      <td>Subjective Happiness</td>
-      <td>.80</td>
-      <td>.19</td>
-      <td>−.16</td>
-      <td>.05</td>
-      <td>−.26***</td>
-      <td>.32***</td>
-      <td>.08</td>
-      <td>Signal; inconsistent</td>
-    </tr>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>opposite</td>
-    </tr>
-    <tr>
-      <td>Number of confidants</td>
-      <td>/</td>
-      <td>N/A</td>
-      <td>N/A</td>
-      <td>N/A</td>
-      <td>−.11*</td>
-      <td>.19***</td>
-      <td>.03</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Social orientation scale</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>/</td>
-      <td>.26***</td>
-      <td>−.10*</td>
-      <td>.05</td>
-      <td>Supported</td>
-    </tr>
-    <tr><td colspan="9"><strong>(extension)</strong></td></tr>
   </tbody>
 </table>

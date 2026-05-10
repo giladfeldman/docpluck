@@ -1,19 +1,3 @@
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (62.010457608320294, 132.0927936741439, 535.6944618512331, 727.610002087536)
-  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (85.78447662752001, 665.4845403872002, 190.33598470867238, 804.392865736)
-  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (98.01908641520001, 576.5644692512, 548.1160891325269, 730.7985846384)
-  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (98.02008641599998, 370.3743042992, 552.3688980947712, 538.9717645104)
-  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (559.560447648, 562.055489644032) does not lie in column range (293.90999999999997, 558.9599999999999)
-  warnings.warn(
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (576.120460896, 578.615502892032) does not lie in column range (107.52, 575.88)
-  warnings.warn(
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (604.680483744, 607.6804861439999) does not lie in column range (146.4, 604.1999999999999)
-  warnings.warn(
-C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\utils.py:1217: UserWarning:   (604.680483744, 607.6804861439999) does not lie in column range (108.0, 604.68)
-  warnings.warn(
 Meta-Psychology, 2023, vol 7, MP.2022.3108 https://doi.org/10.15626/MP.2022.3108 Article type: Replication Report Published under the CC-BY4.0 license
 
 Open data: Yes Open materials: Yes Open and reproducible analysis: Yes Open reviews and editorial process: Yes Preregistration: Yes
@@ -260,12 +244,6 @@ We failed to ﬁnd support for differences in rates of consent to receive health
   </tbody>
 </table>
 
-27.6%
-
-93.4%
-
-25.3%
-
 ### Table 6
 *Summary of the replication results of Part 1 (Johnson and Goldstein (2003)) based on logistic regression analysis Predictor Estimate SE Z p OR [95% CI] Intercept 0.51 0.09 5.46 <.001 1.67 [1.39, 2.00] Default: No-Default – Opt-In 0.32 0.14 2.37 0.018 1.38 [1.06, 1.80] Default: Opt-Out – Opt-In 0.51…*
 
@@ -290,7 +268,7 @@ We failed to ﬁnd support for differences in rates of consent to receive health
   </tbody>
 </table>
 
-Figure 1
+Note. Estimates represent the odds of the dependent variable = “1” vs. “0”.
 
 
 
@@ -319,22 +297,6 @@ In the ﬁrst extension, we predicted that people would be more inclined to beco
 In the second extension, we conducted a conceptual replication of Experiment 2 of Johnson et al. (2002) using the scenario from Part 1 in which participants consented to receive additional information about organ donation. We found support for the default effect: participants who had to opt out consented at higher rates than those who had to opt in. Deviating from the original study where they found no support for framing effects, we found that people in positively framed scenarios consented to receive health-related information at a lower rate than participants in negatively framed scenarios. Framing effects in our extension is opposite to those found in our direct replication of the original study scenario (Johnson et al. 2002).
 Summary of ﬁndings of Johnson et al. (2002) across original, direct replication, and conceptual replication studies
 The ﬁndings across direct and conceptual replication of Johnson et al. (2002) provide mixed support to the original study’s assertion. We summarize the comparison of the ﬁndings in Table 10. Both direct and conceptual replication failed to ﬁnd differences in consent rates between the No-Default condition and the Opt-In condition. Only the conceptual replication found that consent rates were higher in Opt-out condition than in the Opt-In condition. Regarding the framing effects, we
-
-### Table 7
-*Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis*
-
-```
-Predictor
-Estimate
-Model 1
-Z
-p
-OR [95% CI] Estimate
-Model 2
-Z
-p
-OR [95% CI]
-```
 
 Intercept Framing: Positive – Negative Default: No-Default – Opt-In Default: Opt-Out – Opt-In Interaction term: (Positive – Negative) × (No-Default–Opt-In) (Positive – Negative) × (Opt-Out –Opt-In)
 
@@ -1232,6 +1194,9 @@ We reproduce the results reported as part of Group B’s pre-registration docume
     <tr><td colspan="9"><strong>Note. Estimates represent the odds of the dependent variable = “1” vs. “0”. Standard errors are reported within the brackets.</strong></td></tr>
   </tbody>
 </table>
+
+### Table 7
+*Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis Predictor Estimate Model 1 Z p OR [95% CI] Estimate Model 2 Z p OR [95% CI] Intercept Framing: Positive – Negative Default: No-Default – Opt-In Default: Opt-Out – Opt-In Interaction term: (Po…*
 
 <table>
   <thead>
