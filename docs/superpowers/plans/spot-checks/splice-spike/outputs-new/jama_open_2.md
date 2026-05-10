@@ -1,4 +1,3 @@
-Original Investigation | Public Health
 Urinary Albumin-to-Creatinine Ratio in Normal Range, Cardiovascular Health, and All-Cause Mortality
 Nayili Mahemuti, MBBS; Jiao Zou, MBBS; Chuanlang Liu, MBBS; Zhiyi Xiao, MS; Fengchao Liang, PhD; Xueli Yang, PhD
 
@@ -226,13 +225,11 @@ SUPPLEMENT 2. Data Sharing Statement
 
 December 19, 2023 12/12
 
-
 ## Figures
 
 *Figure 1. Association of Cardiovascular Health (CVH) Scores and Urinary Albumin-to-Creatinine Ratios (UACRs) With All-Cause Mortality Using Restricted Cubic Spline Models A CVH score 3 Nonlinear P = .34 B UACR 3 Nonlinear P = .14 2 2 Hazard ratio Hazard ratio 1 1 0 25 50 75 CVH scores 0 100 0 10 20 30 UACR, mg/g Hazard ratios (solid lines) and 95% CIs (shaded areas) were estimated after adjusting…*
 
 *Figure 2. Joint Effect Analysis of Urinary Albumin-to-Creatinine Ratio (UACR) and Cardiovascular Health (CVH) Groups With Risks of All-Cause Mortality Subgroup CVH 80-100 UACR low UACR medium UACR high CVH 50-79 UACR low UACR medium UACR high CVH 0-49 UACR low UACR medium UACR high No.*
-
 
 ## Tables (unlocated in body)
 

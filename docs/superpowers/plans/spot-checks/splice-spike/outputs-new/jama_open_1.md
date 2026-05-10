@@ -1,4 +1,3 @@
-Original Investigation | Nutrition, Obesity, and Exercise
 Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes A Randomized Clinical Trial
 Vasiliki Pavlou, MS, RD; Sofia Cienfuegos, PhD; Shuhao Lin, MS, RD; Mark Ezpeleta, PhD; Kathleen Ready, MS, RD; Sarah Corapi, MS; Jackie Wu, MS, RD; Jason Lopez, BS; Kelsey Gabel, PhD, RD; Lisa Tussing-Humphreys, PhD, RD; Vanessa M. Oddo, PhD; Shaina J. Alexandria, PhD; Julienne Sanchez, MD; Terry Unterman, MD; Lisa S. Chow, MD, MS; Alaina P. Vidmar, MD; Krista A. Varady, PhD
 
@@ -31,8 +30,6 @@ Author affiliations and article information are listed at the end of this articl
 Open Access. This is an open access article distributed under the terms of the CC-BY-NC-ND License. JAMA Network Open. 2023;6(10):e2339337. doi:10.1001/jamanetworkopen.2023.39337 (Reprinted)
 
 October 27, 2023 1/13
-
-
 
 (continued)
 daily calorie counting in a sample of adults with T2D. These findings will need to be confirmed by larger RCTs with longer follow-up.
@@ -150,8 +147,6 @@ October 27, 2023 8/13
 
 ## Discussion
 
-
-
 of this randomized clinical trial show that 8-hour TRE produced greater weight loss when compared with CR and a control condition. Despite the greater weight loss achieved by the TRE group, reductions in HbA1c levels were similar in the TRE and CR groups compared with the control group. Participants in the TRE group found it easier to adhere to their intervention and achieved greater overall energy restriction compared with the CR group. Medication effect score did not change in any group, and no serious adverse events were reported.
 Only 2 clinical trials7,8 to date have examined how TRE affects body weight in patients with T2D. Che and colleagues8 demonstrated that 12 weeks of 10-hour TRE (without calorie counting) reduced body weight by 3.5% compared with controls in 120 adults with obesity and T2D. Likewise, Andriessen et al7 showed that 9-hour TRE produced 1.1% weight loss after 3 weeks compared with controls among 14 men and women with obesity and T2D. The weight loss produced by our 8-hour TRE intervention was slightly greater (4.3% from baseline) than that of previous reports,7,8 but this was most likely due to the longer intervention period (6 months). In contrast, the weight loss by the CR group was not significant relative to the control or TRE group. This is surprising, as CR generally reduces body weight by 4% to 7% after 6 months in people with T2D.17-19 However, the participants in the CR group in our trial reported more difficulty with adhering to their intervention, relative to TRE. Since CR is commonly prescribed as a first-line intervention in T2D, it is likely that our participants had already tried calorie counting in the past, without success. Time-restricted eating may have served as a refreshing alternative to CR, in that it only required patients to count time instead of calories, which may have bolstered overall adherence and weight loss in the TRE group.
 Reductions in HbA1c levels were similar for participants in the TRE (−0.91%) and CR (−0.94%) groups, relative to controls. Our findings for HbA1c levels are comparable to other TRE trials in T2D7,8 and the Look AHEAD (Action for Health in Diabetes) study, which implemented daily CR.20 The improvements in HbA1c levels by CR are somewhat unexpected, since only the TRE group lost weight relative to controls. However, both TRE and CR led to comparable reductions in waist circumference (a surrogate marker of visceral fat mass). Evidence suggests that visceral fat mass may be a stronger factor associated with changes in glycemic control than body weight alone.21,22 Moreover, both the TRE and CR groups received individualized diabetes nutrition counseling, which has been shown
@@ -246,13 +241,11 @@ SUPPLEMENT 3. Data Sharing Statement
 
 October 27, 2023 13/13
 
-
 ## Figures
 
 *Figure 1. Study Flowchart 127 Individuals screened 52 Excluded 38 Did not meet 1 or more inclusion criteria 14 Declined to participate 75 Randomized 25 Randomized to timerestricted eating 25 Randomized to daily calorie restriction 25 Randomized to control group 2 Withdrew 1 Personal reasons 1 Unable to contact 3 Withdrew 1 Motor vehicle crash 2 Unable to contact 1 Withdrew 1 Did not want to be in…*
 
 *Figure 2. Change in Body Composition and Glycemic Control in the Study Groups A Body weight 2 0 Weight loss, % –2 –4 –6 Control CR TRE –8 0 1 2 3 4 5 6 Study month B Mean HbA1c level 1.0 C Mean glucose level 80 Change from baseline, % Change from baseline, % 60 0.5 40 0 20 –0.5 0 –1.0 –20 –1.5 TRE CR Control –40 TRE CR Control JAMA Network Open. 2023;6(10):e2339337.…*
-
 
 ## Tables (unlocated in body)
 

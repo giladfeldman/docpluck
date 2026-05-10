@@ -1,5 +1,3 @@
-r Academy of Management Journal 2020, Vol. 63, No. 2, 584–612. https://doi.org/10.5465/amj.2016.1196
-
 ## Abstract
 
 DOES NEGATIVE FEEDBACK BENEFIT (OR HARM) RECIPIENT CREATIVITY? THE ROLE OF THE DIRECTION OF
@@ -283,8 +281,6 @@ To ensure that the participants understood the manipulation of the direction of 
 Task processes and meta-processes. Task processes (a 5 .96) and meta-processes (a 5 .96) were measured by the same scales that were used in Study 1. The participants rated the two scales between the first and second rounds of their idea generation and evaluation tasks. All items are listed in Appendix A. The participants reported the extent to which they agreed with the items on a 7-point scale ranging from “1” (not at all) to “7” (very much).
 Creativity. The three ideas generated in the second round of the idea generation and evaluation tasks served as our dependent variable: recipient creativity. Two independent judges were trained to evaluate the extent to which the three ideas were creative using a scale ranging from “1” (not at all creative) to “7” (very creative). The judges showed substantial agreement in the evaluation of the levels of creativity of the ideas: ICC 1 5 .80 (p , .001) and ICC 2 5 .89, (p , .001). Thus, the final creativity scores were obtained by averaging the scores of the two judges on each idea and then averaging the scores of the three ideas.
 
-
-
 of Study 2
 Feedback manipulation check. A 2 (feedback: negative vs. neutral) by 3 (direction of feedback flow: bottom up vs. top down vs. lateral) analysis of variance (ANOVA) with the feedback manipulation check item as the dependent variable showed a significant main effect of the feedback condition. The participants who received negative feedback reported that the feedback they received was more negative (M 5 3.34, SD 5 1.85) than those who received the neutral feedback (M 5 4.20, SD 5 1.38), F(1, 350) 5 27.71, p , .001, hp2 5 .07. Thus, our feedback manipulation was successful.
 Direction of feedback flow manipulation check. We checked this manipulation in two ways, as previously described. First, we checked whether the participants accurately identified their and their partners’ roles. Three hundred and forty-nine of the 356 participants (98.03%) accurately identified the roles. Second, we conducted a 2 (feedback: negative vs. neutral) by 3 (direction of feedback flow: bottom up vs. top down vs. lateral) ANOVA with the manipulation check scale as the dependent variable. The results showed that the participants in the bottom-up feedback flow condition reported it higher (M 5 6.32, SD 5 1.21) than those in the lateral feedback flow condition (M 5 2.01, SD 5 2.02) and those in the top-down feedback flow condition (M 5 1.88, SD 5 1.55), F(2, 350) 5 298.93, p , .001, hp2 5 .63. The participants in the lateral feedback flow condition and top-down feedback flow condition did not differ, t(231) 5 0.54, p 5 .587. Thus, our manipulation was successful.
@@ -367,8 +363,6 @@ Finally, to test the full moderated mediation model, we used Hayes’s (2013) PR
 6 In the F test of overall significance, the DF of these interactions was marginally significant, p 5 .051 (see Table 5).
 
 with 10,000 bias-corrected bootstrapping resamples. In the bottom-up feedback flow condition, consistent with the results of Study 1, the positive effect of negative feedback on recipient creativity was mediated by task processes (estimated size of the indirect effect 5 .28, SE 5 0.10, LLCI 5 0.093, ULCI 5 0.484) but not by meta-processes (estimated size of the indirect effect 5 0.01, SE 5 0.06, LLCI 5 20.104, ULCI 5 0.128). In the top-down feedback flow condition, the negative effect of negative feedback on creativity was mediated by both task processes (estimated size of the indirect effect 5 20.22, SE 5 0.10, LLCI 5 20.421, ULCI 5 20.039) and meta-processes (estimated size of the indirect effect 5 20.18, SE 5 0.07, LLCI 5 20.336, ULCI 5 20.066). In the lateral feedback flow condition, the negative effect of negative feedback on creativity was also mediated by both task processes (estimated size of the indirect effect 5 20.27, SE 5 0.13, LLCI 5 20.545, ULCI 5 20.026) and meta-processes (estimated size of the indirect effect 5 20.21, SE 5 0.10, LLCI 5 20.427, ULCI 5 20.040). Thus, the results supported Hypothesis 2.
-
-
 
 of Study 2
 In the laboratory experiment, we again found that the direction of feedback flow moderates the relationship between negative feedback and recipient creativity. Specifically, negative feedback increased recipient creativity when the feedback

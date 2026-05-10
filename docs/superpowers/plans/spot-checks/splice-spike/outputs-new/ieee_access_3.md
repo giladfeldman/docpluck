@@ -1,10 +1,7 @@
-Digital Object Identifier 10.1109/ACCESS.2024.3358206
 Socially Aware Synthetic Data Generation for Suicidal Ideation Detection Using Large Language Models
 HAMIDEH GHANADIAN1, ISAR NEJADGHOLI2, HUSSEIN AL OSMAN3
 1University of Ottawa, Ottawa, Canada (e-mail: Hghan053@uottawa.ca) 2National Research Council Canada, Ottawa, Canada (e-mail: Isar.nejadgholi@nrc-cnrc.gc.ca) 3University of Ottawa, Ottawa, Canada (e-mail: Hussein.alosman@uottawa.ca)
 Corresponding author: Hamideh Ghanadian (e-mail: Hghan053@ uOttawa.ca)
-
-arXiv:2402.01712v1 [cs.CL] 25 Jan 2024
 
 ## ABSTRACT
 

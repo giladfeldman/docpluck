@@ -1,7 +1,4 @@
-Article
 Risky Therefore Not Beneficial: Replication and Extension of Finucane et al.’s (2000) Affect Heuristic Experiment
-
-Social Psychological and Personality Science 2022, Vol. 13(7) 1173–1184 Ó The Author(s) 2021 Article reuse guidelines: sagepub.com/journals-permissions DOI: 10.1177/19485506211056761 journals.sagepub.com/home/spp
 
 Emir Efendic´1*, Subramanya Prasad Chandrashekar2*, Cheong Shing Lee3*, Lok Yan Yeung3*, Min Ji Kim3*, Ching Yee Lee3*, and Gilad Feldman3
 
@@ -469,7 +466,6 @@ Ching Yee Lee is a student at the University of Hong Kong during the academic ye
 Gilad Feldman is an assistant professor with the University of Hong Kong psychology department. His research focuses on judgment and decision-making.
 Handling Editor: Lissa Libby
 
-
 ## Figures
 
 *Figure 1. t-Values for Manipulated Versus Non-Manipulated Attributes.*
@@ -481,7 +477,6 @@ Handling Editor: Lissa Libby
 *Figure 4. The Interaction Between Change in Manipulated Attribute and Pleasure on Change in Non-Manipulated Attribute strength of the negative relationship between the manipulated and non-manipulated attribute was stronger when risks, as opposed to benefits, were manipulated.*
 
 *Figure 5. Relationship Between Manipulated and Non-Manipulated Attributes as a Function of Risk/Benefit Manipulations Table S41–S44; the original findings seem to show this as well; see Table S34 and Table S35 in the supplementary material for detailed results).*
-
 
 ## Tables (unlocated in body)
 

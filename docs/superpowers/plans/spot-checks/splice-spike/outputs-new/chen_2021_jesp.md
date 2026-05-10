@@ -1,6 +1,4 @@
-Journal of Experimental Social Psychology 96 (2021) 104154 Contents lists available at ScienceDirect
 Journal of Experimental Social Psychology
-journal homepage: www.elsevier.com/locate/jesp
 
 Retrospective and prospective hindsight bias: Replications and extensions of Fischhoff (1975) and Slovic and Fischhoff (1977)☆
 Jieying Chen a,*,1, Lok Ching Kwan (Roxane)b,1, Lok Yeung Ma (Loren)b,1, Hiu Yee Choi (HayleyAnne)b,1, Ying Ching Lo (Lita)b,1, Shin Yee Au (Sarah)b,1, Chi Ho Tsang (Toby)b,1, Bo Ley Cheng b, Gilad Feldman b,*
@@ -604,8 +602,6 @@ Note. IV = Independent variable, DV = dependent variable.
 (H6a) In prospective judgments, compared with participants in the fore­ sight condition, participants in the hindsight condition report lower levels of task difficulty.
 (H6b) Task difficulty mediates the relationship between hindsight con­ dition and probability estimates.
 (H6c) Task difficulty moderates the relationship between hindsight con­ dition and probability estimates, such that hindsight bias is stronger among those who perceive the task to be easy than among those who perceive the task to be difficult.
-
-
 
 7.3.1. Power analysis The planned sample size for the replication study was estimated from
 the target experiment (see Supplementary Materials for details). We estimated the effect sizes based on p values, because they were the only statistics available from the target experiment. The p values of pairwise comparisons ranged from 0.001, 0.01, to 0.05. We chose p = .05, which lead to d = 0.36, 95% CI [0.00, 0.72]. We conducted a power analysis using G-Power (Faul et al., 2009). In order to achieve a statistical power of 95% with alpha of 0.05 (one-tailed), a sample size of at least 168 people would be required for each condition, totaling a sample size of 504 for three conditions: foresight, hindsight outcome A, hindsight outcome B. In anticipation of unexpected situations such as careless responses and to make sure that our study would be over-powered, we planned to recruit about ten more participants per comparison.
@@ -1617,8 +1613,6 @@ Note. Bolded options indicate the pairs of comparisons of interest. a Levene’s
 
 “Places in Area C,” so that outcome A and outcome B were symmetric. For DV stimuli, we removed the request for writing down the reasons for why the outcome had occurred, in order to reduce the time required for the experiment in an online setting where participants might have shorter focus than when they were in a physical laboratory. These ad­ justments were necessary and did not fundamentally change the stimuli used in the replication study. We therefore consider this replication a very close replication of the original study. See Table 8 for a summary of classification, necessary adjustments, and theoretical extensions.
 
-
-
 7.4.1. Probability estimates We summarized the descriptive statistics of probability estimates in
 Table 9. Violin plots of the probability estimates are available in Sup­ plementary Materials. As there were four scenarios (virgin rat, hurricane seeding, gosling imprinting, Y-test), two possible outcomes (A or B) for the initial trial, and three possible outcomes of future trials (all, some, none for the first three scenarios; A, B, C for the Y-test scenario), we conducted 24 sets of independent samples Student's t-tests.
 These eight key sets of comparisons are bolded in Tables 9 and 10. For the virgin rat, hurricane seeding, and gosling imprinting scenarios, among the three options (i.e., all, some, and none repetition), we were particularly interested in the probability estimates for repetition in all future trials. For the Y-test scenario with only one future trial, we were interested in the probability estimate of the dot being placed in the same area as in the initial trial.
@@ -1914,8 +1908,6 @@ To examine the robustness of the findings, we conducted additional analyses (see
 8.6. Exploratory extensions
 We found some support for the mediating role and the moderating role of surprise over the alternative outcome for the relationship be­ tween Hindsight Outcome Success condition and probability estimates of Outcome A. However, there was no support for any other hypothe­ sized mediating or moderating effects, and we concluded weak to no support for the mediating or moderating effects. Hypotheses, analyses, and results are provided in the supplementary.
 
-
-
 We found strong support of hindsight bias for the replicability of hindsight bias. First, being presented with an outcome of Fischhoff's (1975) original study, participants' probability estimates of a successful replication were higher than chance. Second, participants' probability estimates of a certain outcome were higher when they knew the
 
 outcome than when they did not know the outcome.
@@ -2066,13 +2058,11 @@ Journal of Experimental Social Psychology 96 (2021) 104154
 Bo Ley Cheng was the teaching assistant at the University of Hong Kong psychology department during the academic year 2018–9.
 Gilad Feldman is an assistant professor with the University of Hong Kong psychology department. His research focuses on judgment and decision-making.
 
-
 ## Figures
 
 *Figure 1. Study 1: forest plot for probability estimates.*
 
 *Figure 2. Study 2: Forest Plot of the Effect Size of Probability Estimates.*
-
 
 ## Tables (unlocated in body)
 

@@ -1,10 +1,3 @@
-rsos.royalsocietypublishing.org
-Research
-Cite this article: Shibasaki M, Isomura T, Masataka N. 2014 Viewing images of snakes accelerates making judgements of their colour in humans: red snake effect as an instance of ‘emotional Stroop facilitation’. R. Soc. open sci. 1: 140066. http://dx.doi.org/10.1098/rsos.140066
-Received: 30 May 2014 Accepted: 7 October 2014
-Subject Areas: behaviour/cognition/evolution Keywords: snake fear, colour perception, emotional Stroop interference, pictorial Stroop paradigm, enhancement of perception
-Author for correspondence: Nobuo Masataka e-mail: masataka.nobuo.7r@kyoto-u.ac.jp
-
 ## Abstract
 
 Viewing images of snakes accelerates making judgements of their colour in humans: red snake effect as an instance of ‘emotional Stroop facilitation’
@@ -45,8 +38,6 @@ Figure 2a,b presents mean RTs of the adult and child participants to the six dif
 image, F2,262 = 12.23, p < 0.001, ηp2 = 0.086 for colour). The interaction between participant and image was 4 also signiﬁcant (F1,131 = 8.05, p < 0.005, ηp2 = 0.059). However, the interaction between participant and colour was not signiﬁcant (F2,262 = 0.26, p = 0.772, ηp2 = 0.002). The interaction between image and colour was not signiﬁcant (F2,262 = 1.35, p = 0.260, ηp2 = 0.009) either. The interaction among participant, image and colour was not signiﬁcant (F2,262 = 1.13, p = 0.323, ηp2 = 0.009). Subsequent analyses of simple main effects (Bonferroni correction), which were performed because of the signiﬁcant interactions between participant and image, revealed that the RT to snake images was shorter than the RT to ﬂower images both in adults (p < 0.001) and in children (p < 0.05) although the difference was more robust in the adults than in the children. The RT to red images was shorter than that to green images (p < 0.001) or to blue images (p < 0.001), whereas the RT to green images was not signiﬁcantly different from the RT to blue images (p > 0.10).
 
 ## Discussion
-
-
 
 of this study apparently present evidence against the prediction that viewing images of snakes interferes with making judgements of their colour. The data are consistent with the ﬁndings of the previous study [18,19] obtained using the textual Stroop paradigm and were found to ﬁt the opposite prediction. The RT required to name the colour of an image of snakes was decreased when compared with when naming the colour of an image of ﬂowers. In addition, the RT to name the colour of red images was shorter when compared with that for naming the colour of green or blue images. These ﬁndings about the relationship between RT and the colour of the stimuli were predictable because accumulating evidence has indicated that a stimulus presented in red draws attention more readily than the same stimulus presented in other colours, such as green or blue [28]. Nevertheless, in this study, viewing snake images, which can capture attention more readily than ﬂower images, has facilitated naming the colour of those images. As a result, the participants had the most rapid responses to images of red snakes.
 Apparently, the observed phenomenon could not be explained by ‘emotional Stroop interference’ [3], but rather can be referred to as ‘emotional Stroop facilitation’, and is consistent with the recent argument that emotion facilitates perception [29]. While that argument was based upon the results of a study in which a prior exposure to an image of a fearful face enhanced subsequent visual processing, the present ﬁndings indicate that this is the case for concurrent processing of the target as a threatening stimulus and making a judgement of its colour.
@@ -89,7 +80,6 @@ Ethics statement. This investigation was conducted according to the principles e
 28. Elliot A, Aarts H. 2011 Perception of the color red enhances the force and velocity of motor output. Emotion 11, 445–449. (doi:10.1037/a0022599)
 29. Phelps EA, Ling S, Carrasco M. 2006 Emotion facilitates perception and potentiates the perceptual benefits of attention. Psychol. Sci. 17, 292–299. (doi:10.1111/j.1467-9280.2006.01701.x)
 30. Fanselow MS. 1994 Neural organization of the defensive behavior system responsible for fear. Psychonom. Bull. Rev. 1, 429–438. (doi:10.3758/BF03210947)
-
 
 ## Figures
 

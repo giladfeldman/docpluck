@@ -2966,7 +2966,167 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # Iteration 23: join FIGURE/TABLE captions that wrapped into a separate
     # short paragraph (e.g. ``FIGURE 2 ... on Creativity`` + ``(Study 1)``).
     out = _join_multiline_caption_paragraphs(out)
+    # Iteration 25 (F6): strip publisher banner / running-header / mangled-
+    # DOI lines from the document header zone (everything before the first
+    # ``##`` heading). Targets the lines a reader sees first — biggest
+    # perceived-quality win per line of code.
+    out = _strip_document_header_banners(out)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Iteration 25 (F6): document-header banner / running-header strip
+# ---------------------------------------------------------------------------
+
+# Each pattern matches a FULL LINE that is publisher / journal / repository
+# masthead junk. Patterns are matched ONLY in the document header zone
+# (everything before the first ``##`` heading or the first ~30 lines,
+# whichever comes first) so we cannot accidentally chop body content that
+# happens to mention an arXiv ID or DOI mid-paragraph.
+#
+# Conservative rule: a line is dropped ONLY if it matches an EXPLICIT
+# pattern. Anything that doesn't match (titles, authors, affiliations,
+# unknown text) stays. This rules out ever damaging the title block.
+_HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
+    # Bare URL line (publisher landing page).
+    re.compile(r"^(?:https?://)?(?:www\.)?\S+\.(?:com|org|edu|gov|net|fr|uk|jp|cn|de|ch|nl)(?:/\S*)?$"),
+    # NCBI / HHS / PMC manuscript banner (3-line block).
+    re.compile(r"^HHS Public Access$"),
+    re.compile(r"^Author manuscript$"),
+    re.compile(r"^Published in final edited form as:.*$"),
+    # Royal Society Open Science masthead.
+    re.compile(r"^Cite this article:.*$"),
+    re.compile(r"^Subject (?:Category|Areas):.*$"),
+    re.compile(r"^Author for correspondence:.*$"),
+    re.compile(r"^Received:\s+\d{1,2}\s+\w+\s+\d{4}.*$"),
+    re.compile(r"^Accepted:\s+\d{1,2}\s+\w+\s+\d{4}.*$"),
+    # Elsevier / ScienceDirect masthead.
+    re.compile(r"^Contents lists available at\s+\S+.*$"),
+    re.compile(r"^journal homepage:.*$", re.IGNORECASE),
+    # Tandfonline / Taylor & Francis masthead.
+    re.compile(r"^ISSN:\s*\S+.*$"),
+    re.compile(r"^To cite this article:.*$"),
+    re.compile(r"^To link to this article:.*$"),
+    re.compile(r"^View supplementary material.*$"),
+    re.compile(r"^Full Terms.*Conditions of access.*$"),
+    # arXiv preprint banner.
+    re.compile(r"^arXiv:\d+\.\d+(?:v\d+)?\s+\[[\w\.-]+\]\s+\d{1,2}\s+\w+\s+\d{4}\s*$"),
+    # Article-type / category single-word labels.
+    re.compile(r"^Article$"),
+    re.compile(r"^ARTICLE$"),
+    re.compile(r"^Research$"),
+    re.compile(r"^Empirical Research Paper$"),
+    re.compile(r"^Original (?:Investigation|Article|Research)(?:\s*\|\s*.+)?$"),
+    re.compile(r"^Article\s+type[:.]\s*.*$", re.IGNORECASE),
+    # AOM "r Academy of Management ..." masthead.
+    re.compile(r"^r\s+Academy of Management\s+\S.*\d{4},.*$"),
+    # SAGE / generic journal volume + page-range banner.
+    # (Matches: "Journal Name YYYY, Vol. X(Y) pages" with optional copyright tail.)
+    re.compile(
+        r"^[A-Z][A-Za-z &\-‐-―]{4,60}\s+\d{4},\s+Vol\.\s+\d+(?:\(\d+\))?[\s,].+$"
+    ),
+    # Chicago / Demography / similar: "Journal Name. YYYY Month DD; Vol(Iss): pages. doi:..."
+    re.compile(
+        r"^[A-Z][A-Za-z &]{3,40}\.\s+\d{4}.*\d+[:;].+doi:.*$"
+    ),
+    # SAGE / Cambridge / generic: "British Journal of Political Science (YYYY), Vol, pages doi:..."
+    re.compile(
+        r"^[A-Z][A-Za-z &]{4,60}\s+\(\d{4}\),\s+\d+,\s+\d+.{0,200}$"
+    ),
+    # Mangled DOI lines from publishers that overlay two PDF text runs.
+    # Recognized by the literal "DhttOpsI" prefix or 30+ digit-letter mash.
+    re.compile(r"^Dhtt[Oo]ps[Ii]:.*$"),
+    # Manuscript-ID gibberish like "1253268 ASRXXX10.1177/00031224241253268..."
+    re.compile(r"^\d{6,}\s+[A-Z]{2,}[A-Z0-9]*\d+\.\d{4,}/.+$"),
+    # Generic journal-citation banner with DOI suffix
+    # ("Meta-Psychology, 2023, vol 7, MP.2022.3108 https://doi.org/...").
+    re.compile(r"^[A-Z][A-Za-z\-]+,\s+\d{4},\s+vol(?:ume)?\s+\d+.*https?://doi\.org/.*$", re.IGNORECASE),
+    # ScienceDirect issue line: "Journal Name 96 (2021) 104154 Contents lists..."
+    re.compile(r"^[A-Z][A-Za-z &]+\s+\d+\s+\(\d{4}\)\s+\d+(?:\s+Contents.*)?$"),
+    # Standalone Digital Object Identifier line.
+    re.compile(r"^Digital Object Identifier\s+10\.\d+/.+$"),
+]
+
+
+def _strip_document_header_banners(text: str) -> str:
+    """Strip publisher / journal / repository banner lines from the
+    document HEADER ZONE (everything before the first ``##`` heading).
+
+    Iteration 25 (Tier A / F6 from TRIAGE_2026-05-10). Most paper PDFs
+    open with several lines of journal masthead, citation banner,
+    archive notices, mangled DOIs, and category labels. Examples from
+    the corpus::
+
+        HHS Public Access
+        Author manuscript
+        Published in final edited form as: Demography. 2023 ...
+
+        r Academy of Management Journal 2020, Vol. 63, No. 2, ...
+
+        Cognition and Emotion
+        ISSN: 0269-9931 (Print) 1464-0600 (Online) Journal homepage:
+        ...
+
+        1253268 ASRXXX10.1177/00031224241253268American Sociological ...
+        DhttOpsI::/1/d0o.i1.o1rg7/710/.0107073/...
+
+    These lines are the FIRST thing a reader sees in the .md file. They
+    don't add information, are visually disruptive, and (for the mangled
+    DOI lines) actively confuse the eye.
+
+    Conservative rules:
+      - Strip ONLY in the header zone: everything before the first line
+        that begins with ``##`` (i.e. the first markdown heading), capped
+        at the first 30 lines.
+      - A line is dropped ONLY if it matches an EXPLICIT pattern in
+        ``_HEADER_BANNER_PATTERNS``. Lines that don't match (titles,
+        authors, affiliations, unknown text) are preserved verbatim.
+        This makes it impossible to accidentally remove the article title
+        even though it sits among banner lines.
+      - Blank lines around dropped banners are collapsed so the cleaned
+        header doesn't have trailing whitespace.
+
+    Word-level audit guarantee: dropped lines never contain
+    article-content words. Banner / DOI / citation strings carry zero
+    semantic value for a reader of the body. Char ratio will go DOWN
+    on affected papers but word-loss audit must show only matched
+    banner-pattern tokens disappearing.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    # Find the boundary of the header zone.
+    header_end = len(lines)
+    cap = min(len(lines), 30)
+    for idx in range(cap):
+        if lines[idx].lstrip().startswith("##"):
+            header_end = idx
+            break
+    else:
+        header_end = cap
+
+    out_lines: list[str] = []
+    dropped_any = False
+    for idx, line in enumerate(lines):
+        if idx < header_end:
+            stripped = line.strip()
+            if stripped and any(
+                p.match(stripped) for p in _HEADER_BANNER_PATTERNS
+            ):
+                dropped_any = True
+                continue
+        out_lines.append(line)
+
+    if not dropped_any:
+        return text
+
+    cleaned = "\n".join(out_lines)
+    # Collapse 3+ blank lines (a banner block surrounded by blanks
+    # leaves a triple-blank gap once the banner is removed).
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    # Strip leading whitespace if the very first lines were all banners.
+    cleaned = cleaned.lstrip("\n") if cleaned.startswith("\n") else cleaned
+    return cleaned
 
 
 def _run_cli(pdf_path: str) -> str:

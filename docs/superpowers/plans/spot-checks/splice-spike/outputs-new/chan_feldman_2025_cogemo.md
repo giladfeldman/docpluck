@@ -1,10 +1,6 @@
 Cognition and Emotion
-ISSN: 0269-9931 (Print) 1464-0600 (Online) Journal homepage: www.tandfonline.com/journals/pcem20
 The link between Empathy and Forgiveness: Replication and extensions Registered Report of McCullough et al. (1997)'s Study 1
 Chi Fung Chan & Gilad Feldman
-To cite this article: Chi Fung Chan & Gilad Feldman (2025) The link between Empathy and Forgiveness: Replication and extensions Registered Report of McCullough et al. (1997)'s Study 1, Cognition and Emotion, 39:6, 1227-1249, DOI: 10.1080/02699931.2024.2434156 To link to this article: https://doi.org/10.1080/02699931.2024.2434156
-View supplementary material Published online: 10 Dec 2024. Submit your article to this journal Article views: 206 View related articles View Crossmark data Citing articles: 1 View citing articles
-Full Terms & Conditions of access and use can be found at https://www.tandfonline.com/action/journalInformation?journalCode=pcem20
 
 COGNITION AND EMOTION 2025, VOL. 39, NO. 6, 1227–1249 https://doi.org/10.1080/02699931.2024.2434156
 
@@ -687,7 +683,6 @@ Záhorcová, L., Enright, R., & Halama, P. (2021). The effectiveness of a forgiv
 Zou, G. Y. (2007). Toward using confidence intervals to compare correlations. Psychological Methods, 12(4), 399. https://doi. org/10.1037/1082-989X.12.4.399
 Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replication mainstream. Behavioral and Brain Sciences, 41, 1e120. https://doi.org/10.1017/S0140525X17001972
 
-
 ## Figures
 
 *Figure 1. Empathy model of forgiveness reconstructed from McCullough et al. (1997).*
@@ -709,7 +704,6 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
 *Figure 10. Exploratory mediation analyses in the control condition. Note: a b and c are regression coefficients between variables. ***p < .001. (Average direct effect).*
 
 *Figure 9. Perceived apology: Comparison of empathy conditions. Note: Perceived apology scale is from 2 to 10, higher values indicate a stronger perceived apology from the offender.*
-
 
 ## Tables (unlocated in body)
 

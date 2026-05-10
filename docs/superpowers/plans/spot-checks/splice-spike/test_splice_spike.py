@@ -2508,3 +2508,251 @@ def test_intra_paragraph_fold_at_interior_line_pair():
     assert "Corporate Social Responsibility Research" in out
     # The numbered list line is long (>80 chars), so it stays separate.
     assert "Research\n1. Definition" in out
+
+
+# ---------------------------------------------------------------------------
+# Iter-25 / Tier F6: document-header banner strip
+# ---------------------------------------------------------------------------
+
+from splice_spike import _strip_document_header_banners
+
+
+def test_banner_strip_hhs_three_line_block():
+    """``HHS Public Access`` / ``Author manuscript`` / ``Published in
+    final edited form as: ...`` — all three lines at the document head
+    are dropped (demography_1, ieee_access_2 pattern)."""
+    text = (
+        "HHS Public Access\n"
+        "Author manuscript\n"
+        "Published in final edited form as: Demography. 2023 October 01; 60(5): 1415-1440. doi:10.1215/00703370-10924116.\n"
+        "The Economic Assimilation of Second-Generation Men\n"
+        "Andres Villarreal\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body text starts here.\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "HHS Public Access" not in out
+    assert "Author manuscript" not in out
+    assert "Published in final edited form" not in out
+    # Title and author preserved.
+    assert "The Economic Assimilation" in out
+    assert "Andres Villarreal" in out
+    # Body unchanged.
+    assert "Body text starts here." in out
+    assert "## Abstract" in out
+
+
+def test_banner_strip_aom_masthead():
+    """``r Academy of Management ... YYYY, Vol. N, ...`` is dropped."""
+    text = (
+        "r Academy of Management Collections 2024, Vol. 3, No. 1, 1-16. https://doi.org/10.5465/amc.2022.0006\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body.\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "Academy of Management Collections 2024" not in out
+    assert "## Abstract" in out
+
+
+def test_banner_strip_sage_volume_banner():
+    """SAGE/Cambridge journal volume banners ('Journal Name YYYY, Vol. X(Y) pages').
+    Drop these but keep title/authors."""
+    text = (
+        "American Sociological Review 2024, Vol. 89(4) 708-734 (c) The Author(s) 2024\n"
+        "The Dark Side of Community Ties\n"
+        "Enzo Nussio\n"
+        "\n"
+        "## Abstract\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "American Sociological Review 2024" not in out
+    assert "The Dark Side" in out
+    assert "Enzo Nussio" in out
+
+
+def test_banner_strip_mangled_doi_line():
+    """Lines starting with ``DhttOpsI:`` are mangled DOI from PDF text-run
+    overlap and carry no information for the reader."""
+    text = (
+        "DhttOpsI::/1/d0o.i1.o1rg7/710/.0107073/010202314222442142152353226688 journals.sagepub.com/home/asr\n"
+        "Author Name\n"
+        "\n"
+        "## Abstract\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "DhttOpsI" not in out
+    assert "Author Name" in out
+
+
+def test_banner_strip_manuscript_id_gibberish():
+    """Manuscript-ID strings like ``1253268 ASRXXX10.1177/...American
+    Sociological ReviewNussio research-article2024`` are stripped."""
+    text = (
+        "1253268 ASRXXX10.1177/00031224241253268American Sociological ReviewNussio research-article2024\n"
+        "\n"
+        "## Abstract\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "ASRXXX" not in out
+    assert "## Abstract" in out
+
+
+def test_banner_strip_arxiv_preprint_banner():
+    """``arXiv:NNNN.NNNNNvN [cs.XX] DD Mon YYYY`` line dropped from header."""
+    text = (
+        "Latent Denoising Diffusion GAN: Faster sampling\n"
+        "\n"
+        "arXiv:2406.11713v1 [cs.CV] 17 Jun 2024\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body mentions arXiv:1234.5678v2 in passing — preserved.\n"
+    )
+    out = _strip_document_header_banners(text)
+    # Banner gone.
+    lines = out.split("\n")
+    assert not any(l.strip().startswith("arXiv:2406.11713") for l in lines)
+    # Title preserved.
+    assert "Latent Denoising Diffusion GAN" in out
+    # Body mention preserved.
+    assert "Body mentions arXiv:1234.5678v2" in out
+
+
+def test_banner_strip_elsevier_sciencedirect_block():
+    """Elsevier banner: 'Journal Name 96 (2021) 104154 Contents lists ...' /
+    'journal homepage: www.elsevier.com/...'."""
+    text = (
+        "Journal of Experimental Social Psychology 96 (2021) 104154 Contents lists available at ScienceDirect\n"
+        "Journal of Experimental Social Psychology\n"
+        "journal homepage: www.elsevier.com/locate/jesp\n"
+        "\n"
+        "Retrospective and prospective hindsight bias\n"
+        "Author Name\n"
+        "\n"
+        "## ABSTRACT\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "Contents lists available at ScienceDirect" not in out
+    assert "journal homepage:" not in out
+    assert "Retrospective and prospective hindsight bias" in out
+    assert "Author Name" in out
+
+
+def test_banner_strip_royal_society_block():
+    """Royal Society Open Science: 'rsos.royalsocietypublishing.org' /
+    'Cite this article: ...' / 'Subject Areas: ...' all dropped."""
+    text = (
+        "rsos.royalsocietypublishing.org\n"
+        "Research\n"
+        "Cite this article: Shibasaki M, Isomura T, Masataka N. 2014 Viewing images.\n"
+        "Subject Areas: behaviour/cognition/evolution\n"
+        "Author for correspondence: Nobuo Masataka\n"
+        "Received: 30 May 2014\n"
+        "Accepted: 7 October 2014\n"
+        "\n"
+        "## Abstract\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "rsos.royalsocietypublishing.org" not in out
+    assert "Cite this article:" not in out
+    assert "Subject Areas:" not in out
+    assert "Author for correspondence:" not in out
+    assert "Received: 30 May 2014" not in out
+    assert "Accepted: 7 October 2014" not in out
+    assert "## Abstract" in out
+
+
+def test_banner_strip_only_in_header_zone():
+    """Patterns that match banner text in BODY (after the first ##
+    heading) are NOT stripped — only the document header zone is touched."""
+    text = (
+        "Title\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "We tried Article reuse guidelines and ISSN: 0269-9931 in our analysis.\n"
+        "Cite this article: shows up legitimately in this body sentence.\n"
+        "arXiv:2406.11713v1 [cs.CV] 17 Jun 2024 — body mention.\n"
+    )
+    out = _strip_document_header_banners(text)
+    # Body lines preserved verbatim.
+    assert "ISSN: 0269-9931" in out
+    assert "Cite this article: shows up legitimately" in out
+    assert "arXiv:2406.11713v1 [cs.CV] 17 Jun 2024" in out
+
+
+def test_banner_strip_preserves_title_among_banners():
+    """The CORE safety guarantee: a title line that doesn't match any
+    banner pattern is preserved even when it's surrounded by banner
+    lines that are dropped."""
+    text = (
+        "HHS Public Access\n"
+        "Author manuscript\n"
+        "The Real Title Of The Paper That Should Survive\n"
+        "Published in final edited form as: Some Journal. 2024.\n"
+        "\n"
+        "## Abstract\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "The Real Title Of The Paper That Should Survive" in out
+    assert "HHS Public Access" not in out
+    assert "Published in final edited form" not in out
+
+
+def test_banner_strip_when_no_heading_in_first_30_lines():
+    """If the first ## heading is past line 30, the header zone is
+    capped at line 30 — banners after line 30 are NOT stripped (they're
+    body content at that point)."""
+    body_lines = ["Body sentence number {}.".format(i) for i in range(40)]
+    # Plant a banner-pattern line at body line 35 (well past cap).
+    body_lines[35] = "HHS Public Access"
+    text = "\n".join(body_lines) + "\n## Abstract\n"
+    out = _strip_document_header_banners(text)
+    # The line at body index 35 is preserved (past header zone cap).
+    assert "HHS Public Access" in out
+
+
+def test_banner_strip_idempotent():
+    """Running the strip twice should produce the same output as running
+    it once (no double-collapsing of blank lines)."""
+    text = (
+        "HHS Public Access\n"
+        "Author manuscript\n"
+        "Title Line\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body.\n"
+    )
+    once = _strip_document_header_banners(text)
+    twice = _strip_document_header_banners(once)
+    assert once == twice
+
+
+def test_banner_strip_no_banners_returns_unchanged():
+    """If no banner pattern matches in the header zone, return the
+    original text unchanged (no spurious whitespace fiddling)."""
+    text = "Just A Title\n\nAuthor Name\n\n## Abstract\n\nBody.\n"
+    out = _strip_document_header_banners(text)
+    assert out == text
+
+
+def test_banner_strip_empty_input_safe():
+    assert _strip_document_header_banners("") == ""
+
+
+def test_banner_strip_drops_arxiv_banner_only_when_format_matches():
+    """The arXiv banner regex is strict (NUMBER.NUMBER vN [category]
+    DD Mon YYYY). A loose mention of arXiv is NOT stripped."""
+    text = (
+        "arXiv reference in metadata\n"
+        "\n"
+        "## Abstract\n"
+    )
+    out = _strip_document_header_banners(text)
+    # "arXiv reference in metadata" doesn't match the strict banner regex.
+    assert "arXiv reference in metadata" in out

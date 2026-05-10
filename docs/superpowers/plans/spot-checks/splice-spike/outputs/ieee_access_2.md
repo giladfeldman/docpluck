@@ -1,6 +1,3 @@
-HHS Public Access
-Author manuscript
-Published in final edited form as: IEEE Access. 2026 ; 14: 14286–14301. doi:10.1109/access.2025.3645087.
 A Numerical Comparison of Petri Net and Ordinary Differential Equation SIR Component Models
 TREVOR RECKELL1, BRIGHT KWAKU MANU2, BECKETT STERNER3 [Member, IEEE], PETAR JEVTIĆ1, REGGIE DAVIDRAJUH4 [Senior Member, IEEE] 1School of Mathematical and Statistical Sciences, Arizona State University, Tempe, AZ 85287, USA 2School of Computing and Augmented Intelligence, Arizona State University, Tempe, AZ 85287, USA 3School of Life Sciences, Arizona State University, Tempe, AZ 85287, USA 4Faculty of Science and Technology, University of Stavanger, 4021 Stavanger, Norway
 

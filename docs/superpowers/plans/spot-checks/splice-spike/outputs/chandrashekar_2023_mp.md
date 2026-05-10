@@ -1,5 +1,3 @@
-Meta-Psychology, 2023, vol 7, MP.2022.3108 https://doi.org/10.15626/MP.2022.3108 Article type: Replication Report Published under the CC-BY4.0 license
-
 Open data: Yes Open materials: Yes Open and reproducible analysis: Yes Open reviews and editorial process: Yes Preregistration: Yes
 
 Edited by: Rickard Carlsson Reviewed by: Streamlined Peer Review Analysis reproduced by: Haojiang Ying All supplementary ﬁles can be accessed at OSF: https://doi.org/10.17605/OSF.IO/RDZJT
@@ -221,8 +219,6 @@ We failed to ﬁnd support for differences in rates of consent to receive health
 
 Note. Estimates represent the odds of the dependent variable = “1” vs. “0”.
 
-
-
 of direct replications of Johnson and Goldstein (2003). Percentage of participants consenting to organ donation by condition across both samples. Note.* p < .05, ** p< .01, *** p < .001
 
 Framing effects
@@ -303,13 +299,9 @@ Note. Directionality dimension summarizes the directional consistency of results
 
 Figure 2
 
-
-
 of direct replication of Johnson et al. (2002). Percentage of participants who agreed to be notiﬁed about healthrelated surveys in the future. (A) Percentage of participants participating in the health survey by frame. (B) Percentage of participants participating in the health survey by default conditions. (C) Percentage of participants participating in the health survey by frame and conditions.
 
 Figure 3
-
-
 
 of Extension 1. Percentage of participants who consented to organ donation between permanent vs. temporary choice scenarios. Note.* p < .05, ** p< .01, *** p < .001
 
@@ -436,8 +428,6 @@ Project Process Outline ........................................................
 Power analyses........................................................................................................................................ 7 Power sensitivity analyses .................................................................................................................... 11 Sample comparison between the original studies and our two studies ................................................. 12 Materials and scales related to replication part ..................................................................................... 13
 Type of study .................................................................................................................................... 13 Experimental design of the original articles ..................................................................................... 13 Materials and scales related to the extensions ...................................................................................... 17 Original articles’ results ........................................................................................................................ 21 The results of Study 1 of Johnson & Goldstein (2003)..................................................................... 21 The results of Study 2 of Johnson, Bellman & Lohse, 2002 ............................................................ 21 Additional Results of Replication ......................................................................................................... 22 Additional Results of Extension hypotheses.........................................................................................29 Framework for evaluation of the replications ....................................................................................... 30 References............................................................................................................................................. 32 Appendix A...........................................................................................................................................33
 
-
-
 Data collection Data collection was completed before analyzing the data. Conditions reporting We report all the conditions we collected. Variables reporting All variables collected for this study are reported and included in the provided data.
 
 Author bios Subramanya Prasad Chandrashekar is a research assistant professor with the Lee Shau Kee School of Business and Administration at the Open University of Hong Kong. His research focuses on social status, lay-beliefs, and judgment and decision-making.
@@ -493,8 +483,6 @@ Generating Odds ratios of the Binomial Logistic Regression results in Jamovi
 Power analysis done by GPower 3.1 -- default effect (Opt-out vs. Opt-in) in Johnson & Goldstein, 2003
 
 Steps for power analysis (Johnson, Bellman & Lohse, 2002): 1. Conducted a Binomial Logistic Regression analysis in Jamovi based on the reconstructed data file (“OrigHealthSurvey.csv” available on the OSF page of the project). 2. Used the odds ratio from Jamovi output for the power analysis with GPower.
-
-
 
 Odds ratio Pr(Y=1|X=1) H0 α err prob Power (1-β err prob) R² other X X distribution X parm μ X parm σ Critical z Total sample size Actual power
 
@@ -735,8 +723,6 @@ Figure S2. Criteria for evaluation of replications by LeBel et al. (2019). A tax
 
 Note: LeBel et al. (2019) suggested a replication evaluation using three factors: (a) whether a signal was detected (i.e., the confidence interval for the replication Effect size (ES) excludes one), (b) consistency of the replication ES with the original study's ES, and (c) precision of the replication's ES estimate (see Figure S# in the supplementary material).
 
-
-
 Fual, F., Erdfelder, E., Lang, A., & Buchner, A. (2007). G*Power: A flexible statistical power analysis program for the social, behavioral, and biomedical sciences. Behavior Research Methods, 39(2), 175–191. https://doi.org/10.3758/BF03193146
 The jamovi project (2020). jamovi (Version 1.2) [Computer Software]. Retrieved from https://www.jamovi.org
 Johnson, E. J., Bellman, S., & Lohse, G. L. (2002). Defaults, framing and privacy: Why opting in-opting out. Marketing Letters, 13(1), 5-15.
@@ -775,7 +761,6 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 
 Notes: OSF links: Group A = https://osf.io/5e3r8 ; Group B = https://osf.io/3kdqb
 
-
 ## Figures
 
 *Figure 1. Results of direct replications of Johnson and Goldstein (2003).*
@@ -787,7 +772,6 @@ Notes: OSF links: Group A = https://osf.io/5e3r8 ; Group B = https://osf.io/3kdq
 *Figure 4. Extension 2: Percentage of participants who agreed to be notiﬁed about further information about organ donation in the future.*
 
 *Figure 5. Effect sizes in Johnson and Goldstein (2003), Johnson et al. (2002), and the current replication. Estimates and conﬁdence intervals are plotted on a natural logarithmic scale.*
-
 
 ## Tables (unlocated in body)
 

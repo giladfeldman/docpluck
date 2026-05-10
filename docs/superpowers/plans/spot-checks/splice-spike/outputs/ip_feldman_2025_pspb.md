@@ -1,5 +1,3 @@
-1327169 PSPXXX10.1177/01461672251327169Personality and Social Psychology BulletinIp and Feldman research-article2025
-Empirical Research Paper
 The Complex Misestimation of Others’ Emotions: Underestimation of Emotional Prevalence Versus Overestimation of Emotional Intensity and Their Associations with Well-Being
 
 Personality and Social Psychology Bulletin ﻿1–­ 19 © 2025 by the Society for Personality and Social Psychology, Inc Article reuse guidelines: sagepub.com/journals-permissions DhttOpsI://1d0o.i1.o1rg7/71/00.11147671/06174262165712322571132679169 journals.sagepub.com/home/pspb
@@ -1298,7 +1296,6 @@ Yonelinas, A. P., & Ritchey, M. (2015). The slow forgetting of emotional episodi
 Young, S. D., & Jordan, A. H. (2013). The influence of social networking photos on social norms and sexual health behaviors. Cyberpsychology, Behavior, and Social Networking, 16(4), 243–247. https://doi.org/10.1089/cyber.2012.0080
 Yu, E., & Kim, H. (2020). Is she really happy? A dual-path model of narcissistic self-presentation outcomes for female Facebook users. Computers in Human Behavior, 108, 106328. https://doi. org/10.1016/j.chb.2020.106328
 Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replication mainstream. Behavioral and Brain Sciences, 41, e120.
-
 
 ## Tables (unlocated in body)
 

@@ -1,5 +1,3 @@
-British Journal of Political Science (2024), 54, 892–916 doi:10.1017/S0007123424000024
-ARTICLE
 The Populist Backlash Against Globalization: A Meta-Analysis of the Causal Evidence
 Gábor Scheiring1 , Manuel Serrano-Alarcón2 , Alexandru Moise3 , Courtney McNamara4 and David Stuckler5
 1Georgetown University Qatar, Doha, Qatar, 2Dondena Research Centre on Social Dynamics and Public Policy, Bocconi University, Milan, Italy, 3Department of Political and Social Sciences, European University Institute, Florence, Italy, 4Population Health Sciences Institute, Newcastle University, Newcastle, UK and 5Department of Social and Political Sciences, Bocconi University, Milan, Italy Corresponding author: Gábor Scheiring; Email: gs1098@georgetown.edu
@@ -1174,7 +1172,6 @@ among different social groups. West European Politics 45, 24–49. Walter S (202
 European community. International Journal of Comparative Sociology 46, 215–39.
 Cite this article: Scheiring G, Serrano-Alarcón M, Moise A, McNamara C, Stuckler D (2024). The Populist Backlash Against Globalization: A Meta-Analysis of the Causal Evidence. British Journal of Political Science 54, 892–916. https://doi.org/ 10.1017/S0007123424000024
 
-
 ## Figures
 
 *Figure 1. The explosion of populism in Europe.*
@@ -1186,7 +1183,6 @@ Cite this article: Scheiring G, Serrano-Alarcón M, Moise A, McNamara C, Stuckle
 *Figure 4. Density discontinuity of the t-statistics.*
 
 *Figure 5. Inverse funnel plot. Notes: Each circle represents the different estimates included in the meta-analysis (n = 144).*
-
 
 ## Tables (unlocated in body)
 

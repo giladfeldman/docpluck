@@ -1,5 +1,3 @@
-r Academy of Management Learning & Education 2019, Vol. 18, No. 1, 11–42. https://doi.org/10.5465/amle.2017.0488
-
 A PLURALIST CONCEPTUALIZATION OF SCHOLARLY IMPACT IN MANAGEMENT EDUCATION: STUDENTS AS STAKEHOLDERS
 
 HERMAN AGUINIS The George Washington University, Washington, DC
@@ -256,8 +254,6 @@ Note: WoS 5 Web of Science. na 5 Not Applicable. Book citations 5 number of text
 a We were unable to locate the Web of Citation counts for this article.
 
 Implications for the Science–Practice Gap and Students as Stakeholders
-
-
 
 based on the top-50 most frequently cited sources in textbooks showed that the percentage of non-academic sources is about 46% in GM and HRM textbooks, 27% in OB textbooks, and 25% in SM textbooks. Moreover, there are non-academic sources among the top-5 most cited sources in GM (e.g., Wall Street Journal is #1 and Bloomberg BusinessWeek is #3), HRM (e.g., HR Magazine is #3 and Wall Street Journal is #4), OB (e.g., Bloomberg BusinessWeek is #5), and SM (e.g., Wall Street Journal is #3 and Bloomberg BusinessWeek is #5). These results are encouraging regarding the science–practice gap because they show that although textbooks rely mostly on knowledge published in academic sources, they also rely on non-academic sources. As such, these results are a far cry from concerns about a science–practice gap because they suggest that students, who are for the most part future practitioners, are exposed to knowledge and content originating in both academic and non-academic outlets.
 In terms of specific publications, Journal of Applied Psychology is the #1 most frequently cited source in OB and HRM textbooks, Strategic Management Journal is the #1 cited source in SM, and Academy of Management Journal is the mostcited academic source in GM (#4, after Wall Street Journal, Harvard Business Review, and Bloomberg
@@ -580,8 +576,6 @@ Virginia Tech
 Note: Universities are ranked in decreasing order of number of people among the list of non-deceased most cited authors in in OB, HRM, SM, and GM textbooks, and then alphabetically by university name.
 
 impact factors (e.g., Academy of Management Journal: 11.25; Journal of Applied Psychology: 7.12) made the list of most cited sources in textbooks, the list also includes journals with substantially lower 5-year JCR impact factors (e.g., Small Group Research: 1.67; Industrial & Labor Relations Review: 2.27), as well as numerous practitioner-oriented and bridging journals (e.g., Organizational Dynamics) and news sources (e.g., Bloomberg BusinessWeek).
-
-
 
 regarding individual items were consistent with those based on sources. Specifically, Spearman correlations between an article’s number of citations in other articles and the number of citations it receives in textbooks was statistically indistinguishable from zero in HRM and GM (but, there was about 12% of variance overlap in OB and 32% of variance overlap in SM). Results of a literature review by Carlson and Herdman (2012) showed that a correlation of at least .70 (i.e., 49% variance
 

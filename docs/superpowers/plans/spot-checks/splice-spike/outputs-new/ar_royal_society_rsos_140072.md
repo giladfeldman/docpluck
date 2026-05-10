@@ -1,10 +1,3 @@
-rsos.royalsocietypublishing.org
-Research
-Cite this article: Reddon AR, O’Connor CM, Marsh-Rollo SE, Balshine S, Gozdowska M, Kulczykowska E. 2015 Brain nonapeptide levels are related to social status and affiliative behaviour in a cooperatively breeding cichlid fish. R. Soc. open sci. 2: 140072. http://dx.doi.org/10.1098/rsos.140072
-Received: 1 June 2014 Accepted: 7 January 2015
-Subject Category: Biology (whole organism)
-Subject Areas: behaviour
-
 ## Keywords
 
 isotocin, arginine vasotocin, oxytocin, vasopressin, dominance, Neolamprologus pulcher
@@ -245,13 +238,11 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
 
 (doi:10.1016/j.yfrne.2014.04.005)
 
-
 ## Figures
 
 *Figure 1. The relationship between (a) brain arginine vasotocin (AVT) and (b) brain isotocin (IT) concentration, and sex and dominance status in Neolamprologus pulcher.*
 
 *Figure 2. The relationship between brain arginine vasotocin (AVT) and brain isotocin (IT) concentration and overtly aggressive (a,b), restrained aggressive (c,d), submissive (e,f ), and affiliative (g,h) behaviours in Neolamprologus pulcher.*
-
 
 ## Tables (unlocated in body)
 

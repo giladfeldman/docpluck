@@ -1,9 +1,4 @@
-1253268 ASRXXX10.1177/00031224241253268American Sociological ReviewNussio research-article2024
-
 The “Dark Side” of Community Ties: Collective Action and Lynching in Mexico
-
-American Sociological Review 2024, Vol. 89(4) 708–­ 734 © The Author(s) 2024
-DhttOpsI::/1/d0o.i1.o1rg7/710/.01107073/010202314222442142152353226688 journals.sagepub.com/home/asr
 
 Enzo Nussioa
 
@@ -721,7 +716,6 @@ Wood, George, Tom R. Tyler, and Andrew V. Papachristos. 2020. “Procedural Just
 
 Officers.” Proceedings of the National Academy of Sciences 117(18):9815–21. Wyatt-Brown, Bertram. 1982. Southern Honor: Ethics and Behavior in the Old South. Oxford, UK: Oxford University Press. Yamamura, Eiji. 2016. “Natural Disasters and Social Capital Formation: The Impact of the Great HanshinAwaji Earthquake.” Papers in Regional Science 95(S1):S143–64. Zizumbo-Colunga, Daniel. 2015. “Taking the Law into Our Hands: Trust, Social Capital and Vigilante Justice.” PhD thesis, Vanderbilt University, Nashville, TN. Zizumbo-Colunga, Daniel. 2017. “Community, Authorities, and Support for Vigilantism: Experimental Evidence.” Political Behavior 39(4):989–1015. Zizumbo-Colunga, Daniel. 2019. “Confronting Crime by Ourselves: Trust in Neighbors, Trust in Authorities, and Anti-Crime Organization.” Latin American Research Review 54(3):574–90.
 Enzo Nussio is a Senior Researcher at the Center for Security Studies (CSS), ETH Zurich. His research focuses on peace and violence in Colombia, the consequences of terrorism in Europe, and lynching in Latin America. It has appeared in the American Journal of Political Science, International Security, Comparative Political Studies, and other venues. Prior to his work at ETH Zurich, he lived and worked in Colombia at the Universidad de los Andes and the Universidad Nacional. He holds a PhD in political science from the University of St. Gallen and a master’s degree in history from the University of Basel.
-
 
 ## Figures
 

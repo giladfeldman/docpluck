@@ -1,5 +1,3 @@
-www.nature.com/scientificreports
-
 ## Abstract
 
 OPEN The association between dietary
@@ -984,7 +982,6 @@ Open Access  This article is licensed under a Creative Commons Attribution 4.0
 © The Author(s) 2024
 
 11 Vol.:(0123456789)
-
 
 ## Figures
 

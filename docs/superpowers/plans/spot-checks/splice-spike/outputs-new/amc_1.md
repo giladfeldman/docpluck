@@ -1,5 +1,3 @@
-r Academy of Management Collections 2024, Vol. 3, No. 1, 1–16. https://doi.org/10.5465/amc.2022.0006
-
 ## Abstract
 
 CORPORATE SOCIAL RESPONSIBILITY RESEARCH: AN ONGOING AND WORTHWHILE JOURNEY

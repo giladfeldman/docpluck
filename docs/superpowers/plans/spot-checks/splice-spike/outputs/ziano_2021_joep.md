@@ -1,6 +1,4 @@
-Journal of Economic Psychology 83 (2021) 102350 Contents lists available at ScienceDirect
 Journal of Economic Psychology
-journal homepage: www.elsevier.com/locate/joep
 
 Replication: Revisiting Tversky and Shafir’s (1992) Disjunction Effect with an extension comparing between and within subject designs
 Ignazio Ziano a,1, Man Fai Kong b,1, Hong Joo Kim b,1, Chit Yu Liu b,1, Sze Chai Wong b,1, Bo Ley Cheng b, Gilad Feldman b,*
@@ -1168,7 +1166,6 @@ Sunstein, C. R. (2018). On preferring A to B, while also preferring B to A. Rati
 psyarxiv.com/2zngf/. Ziano, I., & Pandelaere, M. (2020). Late-Action Bias: Perceived Outcome Reversibility and Heightened Counterfactual Thinking Make Actions Closer to a Definitive
 Outcome Seem More Impactful. https://doi.org/10.1017/CBO9781107415324.004. Ziano, I., Wang, Y. J., Sany, S. S., Feldman, G., Ngai, L. H., Lau, Y. K., … Chan, C. (2020). Perceived morality of direct versus indirect harm : Replications of the
 preference for indirect harm effect In press at Meta Psychology . Accepted for publication on Jan 30, 2020. Meta-Psychology. Retrieved from https://psyarxiv.com/ bs7jf. Ziano, I., Mok, P. Y., & Feldman, G. (2020). Replication and Extension of Alicke (1985) Better-Than-Average Effect for Desirable and Controllable Traits. Social Psychological and Personality Science, 1948550620948973. Ziano, I., Jie, L., Man, T. S., Ching, L. H., Anil, K. A., Cheng, B. L., & Feldman, G. (2020). Revisiting “Money Illusion”: Replication and Extension of Shafir, Diamond, and Tversky (1997). Journal of Economic Psychology, 102349. Zwaan, R. A., Pecher, D., Paolacci, G., Bouwmeester, S., Verkoeijen, P., Dijkstra, K., & Zeelenberg, R. (2018). Participant Nonnaivet´e and the reproducibility of cognitive psychology. Psychonomic Bulletin and Review, 25(5), 1968–1972. https://doi.org/10.3758/s13423-017-1348-y
-
 
 ## Figures
 

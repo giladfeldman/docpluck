@@ -1,6 +1,3 @@
-HHS Public Access
-Author manuscript
-Published in final edited form as: Demography. 2023 October 01; 60(5): 1415–1440. doi:10.1215/00703370-10924116.
 The Economic Assimilation of Second-Generation Men: An Analysis of Earnings Trajectories Using Administrative Records
 Andrés Villarreal1, Christopher R. Tamborini2 1Department of Sociology, University of California, Los Angeles, Los Angeles, CA, USA. 2U.S. Social Security Administration, Washington, DC, USA.
 
@@ -609,7 +606,6 @@ Table 2
 </table>
 
 *p < .05 **p < .01 (two-tailed tests)
-
 
 ## Figures
 

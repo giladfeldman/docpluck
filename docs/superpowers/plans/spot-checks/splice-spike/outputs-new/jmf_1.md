@@ -1,6 +1,3 @@
-HHS Public Access
-Author manuscript
-Published in final edited form as: J Marriage Fam. 2025 April ; 87(2): 437–459. doi:10.1111/jomf.13036.
 Early-life disadvantage and parent-to-child financial transfers
 Kent Jason Go Cheng Center for Healthy Aging, The Pennsylvania State University, University Park, Pennsylvania, USA
 

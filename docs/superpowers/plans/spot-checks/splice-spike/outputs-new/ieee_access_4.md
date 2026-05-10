@@ -2,8 +2,6 @@ Latent Denoising Diffusion GAN: Faster sampling, Higher image quality
 Luan Thanh Trinh, Tomoki Hamagami Yokohama National University
 tt.luan.ynu@gmail.com, hamagami@ynu.ac.jp
 
-arXiv:2406.11713v1 [cs.CV] 17 Jun 2024
-
 ## Abstract
 
 Diffusion models are emerging as powerful solutions for generating high-fidelity and diverse images, often surpassing GANs under many circumstances. However, their slow inference speed hinders their potential for real-time applications. To address this, DiffusionGAN leveraged a conditional GAN to drastically reduce the denoising steps and speed up inference. Its advancement, Wavelet Diffusion, further accelerated the process by converting data into wavelet space, thus enhancing efficiency. Nonetheless, these models still fall short of GANs in terms of speed and image quality. To bridge these gaps, this paper introduces the Latent Denoising Diffusion GAN, which employs pretrained autoencoders to compress images into a compact latent space, significantly improving inference speed and image quality. Furthermore, we propose a Weighted Learning strategy to enhance diversity and image quality. Experimental results on the CIFAR-10, CelebA-HQ, and LSUNChurch datasets prove that our model achieves state-ofthe-art running speed among diffusion models. Compared to its predecessors, DiffusionGAN and Wavelet Diffusion, our model shows remarkable improvements in all evaluation metrics. Code and pre-trained checkpoints: https: //github.com/thanhluantrinh/LDDGAN.git
@@ -719,7 +717,6 @@ Figure 6. Additional qualitative samples and qualitative comparision on CelebA-H
 (c) Ours
 Figure 7. Additional qualitative samples and qualitative comparision on LSUN Church.
 
-
 ## Figures
 
 *Figure 1. The training process of Latent Denoising Diffusion GAN (LDDGAN) 4.1.*
@@ -735,7 +732,6 @@ Figure 7. Additional qualitative samples and qualitative comparision on LSUN Chu
 *Figure 6. Additional qualitative samples and qualitative comparision on CelebA-HQ.*
 
 *Figure 7. Additional qualitative samples and qualitative comparision on LSUN Church.*
-
 
 ## Tables (unlocated in body)
 
