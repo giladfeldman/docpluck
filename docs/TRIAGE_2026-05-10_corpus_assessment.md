@@ -1,12 +1,15 @@
 # Corpus Assessment & Triage — 2026-05-10
 
-**Last update:** 2026-05-10 after iter-25 landed at `fca6f61` (banner strip).
+**Last update:** 2026-05-10 after iter-26+27 landed at `3b24041` (TOC strip + page-footer strip).
 
-**Scope:** AI-verification read of all 27 .md outputs in `docs/superpowers/plans/spot-checks/splice-spike/outputs{,-new}/`, after iter-23 (caption-fold) landed at `6e8d266`. Iter-24 (forward-attach for orphan markers) committed at `768a942`. Iter-25 (banner / running-header strip) committed at `fca6f61`.
+**Scope:** AI-verification read of 26 .md outputs in `docs/superpowers/plans/spot-checks/splice-spike/outputs{,-new}/`. Corpus reduced from 27 → 26 papers: nathumbeh_2 removed (was Nature Hum Behav supplementary materials, not an article — user decision 2026-05-10).
 
-## Status log
-
-- ✅ **F6 RESOLVED** by iter-25 (`fca6f61`). 16 papers had banner junk stripped from header zone. Document START is now title or first author block instead of HHS / arXiv / Cite this article / mangled-DOI / manuscript-ID gibberish. Zero real-content word loss confirmed via word-token audit.
+## Iteration log
+- ✅ **iter-23** `6e8d266` — caption-fold across consecutive lines (FIGURE/TABLE N + tail).
+- ✅ **iter-24** `768a942` — forward-attach for orphan marker rows (social_forces stars).
+- ✅ **iter-25 / F6 RESOLVED** `fca6f61` — banner / running-header strip in header zone. 16 papers cleaned. Document START is now title or first author block instead of HHS / arXiv / Cite this article / mangled-DOI / manuscript-ID gibberish.
+- ✅ **iter-26 / F5 RESOLVED** `3b24041` — TOC dot-leader strip in head zone (+ false-promoted-heading drop). General-purpose; main beneficiary (nathumbeh_2) was removed from corpus per user direction, but function stays in case other supplementary docs enter.
+- ✅ **iter-27 / F1 RESOLVED (cheap variant)** `3b24041` — page-footer line strip across whole document. Page-N markers, JAMA `October 27, 2023 X/13` footers, `(continued)` page-break markers, `Corresponding Author:` lines, bare email lines, JAMA citation/category running headers, `Open Access. ... (Reprinted)` compound, `© YYYY` lines, `aETH Zurich` affiliation footnotes, JAMA Visual Abstract sidebar all dropped. 13+ papers visibly cleaner. Big visible-quality win: jama_open_1 abstract → trial registration → introduction now flows clean. The user's headline complaint about page-footer interleave is RESOLVED for the cheap-variant scope; the underlying sentence-stitching at page boundaries (C3 cost) is unfixed but the JUNK between halves is gone.
 
 **Method:** three parallel agent reads of paper subsets (Nature+IEEE / APA+AOM / JAMA+ASA+Chicago+Harvard) plus my own targeted re-reads of `sci_rep_1`, `am_sociol_rev_3`, `chen_2021_jesp`, `jama_open_1`, `nathumbeh_2`. Categorical labels per issue (SECTION, TITLE, BODY, JUNK, etc.).
 
@@ -34,12 +37,12 @@ Cost scale:
 
 | # | Failure mode | Severity | Papers affected (visible) | Cost | Notes |
 |---|---|---|---|---|---|
-| **F1** | **Page-footer interleave**: page-bottom non-body content (affiliations, "Corresponding Author:", copyright/DOI line, page numbers, "(continued)") gets placed between two halves of a body sentence that span the page break. | **S1** | am_sociol_rev_3, chen_2021_jesp, jama_open_1, jama_open_2, demography_1, jmf_1, sci_rep_1, social_forces_1, bjps_1, ar_royal_society_rsos_140072, nat_comms_2, ip_feldman_2025_pspb, korbmacher_2022_kruger | **C3** | This is the user's headline. Needs a "junk-line classifier" running on raw pdftotext page output BEFORE section detection. The classifier knows: "Corresponding Author:", "© 20xx", "doi:10.", "Page N/M", "(continued)", "All rights reserved", journal-name banners. |
-| **F2** | **Section heading appears AFTER its content**: `## Introduction` printed at line N+5 while the introduction's first paragraph already started at line N. Caused by F1 (page footer pushes the heading down past content) and by section-detector misordering. | **S1** | am_sociol_rev_3, sci_rep_1, jama_open_1 (`AND RELEVANCE` orphan), amc_1 (1980s section), nat_comms_2 | **C2** if F1 first | Largely a downstream symptom of F1; fixing F1 fixes most cases. Remainder (jama_open_1's `## CONCLUSIONS / AND RELEVANCE` split) is a heading-tokenization bug — heading should match `CONCLUSIONS AND RELEVANCE`, not split mid-phrase. |
+| ~~F1~~ | ~~**Page-footer interleave** (cheap variant)~~ | ~~S1~~ | ~~13 papers~~ | ~~C3 / C2 cheap~~ | **RESOLVED iter-27** (`3b24041`). Curated `_PAGE_FOOTER_LINE_PATTERNS` line-level strip. JUNK between sentence halves removed. The structural fix to RE-STITCH the body sentence across page boundaries is unfixed (deferred to a future C3 iter that needs page-bbox awareness). |
+| **F2** | **Section heading appears AFTER its content**: `## Introduction` printed at line N+5 while the introduction's first paragraph already started at line N. Caused partly by F1 (page footer pushed heading down past content — now fixed) and by section-detector misordering. | **S1** | am_sociol_rev_3 (still — `## Introduction` between body sentence halves), sci_rep_1, jama_open_1 (`AND RELEVANCE` orphan), amc_1 (1980s section), nat_comms_2 | **C2** | Iter-27 removed the F1 component; remaining cases are pure section-detector misorderings. jama_open_1's `## CONCLUSIONS / AND RELEVANCE` split is a heading-tokenization bug — multi-word headings (`CONCLUSIONS AND RELEVANCE`, `DESIGN, SETTING, AND PARTICIPANTS`) should be tokenized as a unit. |
 | **F3** | **Title + authors dumped into Abstract section**: the title block ends up nested under `## Abstract` instead of being the document's `# Title` block. Affiliations sometimes follow. | **S1** | sci_rep_1 (worst), nat_comms_2, ar_royal_society_rsos_140066 | **C2** | Section-detector treats the first heading-like word ("Abstract", "OPEN", "ARTICLE") as the document opener. Needs an explicit pre-pass that finds the article title (large-font line, multi-line wrap) and sets it as the doc title before any `##` is emitted. |
-| **F4** | **Sidebar / Key Points / Visual Abstract content interleaved into body**: JAMA-style "Key Points Question/Findings/Meaning" boxes get inlined into the abstract. "Visual Abstract" / "Supplemental content" labels appear as body. | **S1** | jama_open_1, jama_open_2 | **C2** | Layout-channel-aware: these boxes have their own bbox column. Could be detected by reading-order anomaly (text from a different x-column wedged between body lines) using the existing `extract_pdf_layout` channel. |
-| **F5** | **TOC dot-leader lines parsed as headings / body fragments**: `Background ____________ 17` style entries leak into body and confuse downstream passes. | **S1** | nathumbeh_2 (worst — entire ToC of supplementary materials at top), nat_comms_1 (List of Supplementary Figures) | **C1** | Recognize lines matching `^\s*[\w\.]+(\s\w+)*\s*_{3,}\s*\d+\s*$` (or with `…`/`.`-fill) as ToC entries; either drop them or wrap in a `<!-- toc -->` block. Iter-22 stripped table-cell leader-dots; this is the body equivalent. |
-| ~~F6~~ | ~~**Running headers / journal banners at the start of the doc**~~ | ~~S2~~ | ~~sci_rep_1, jama_open_1, jama_open_2, amc_1, am_sociol_rev_3, social_forces_1, ar_royal_society_rsos_140066, demography_1~~ | ~~**C1**~~ | **RESOLVED iter-25** (`fca6f61`). Curated `_HEADER_BANNER_PATTERNS` strip pass restricted to header zone (everything before first `##` heading, capped at line 30). 16 papers cleaned. |
+| **F4** | **Sidebar / Key Points / Visual Abstract content interleaved into body**: JAMA-style "Key Points Question/Findings/Meaning" boxes get inlined into the abstract. "Visual Abstract" / "Supplemental content" labels appear as body. | **S1** | jama_open_1, jama_open_2 (sidebar labels now mostly stripped by iter-27; KEY POINTS box content still inlined) | **C2** | Layout-channel-aware: these boxes have their own bbox column. Could be detected by reading-order anomaly (text from a different x-column wedged between body lines) using the existing `extract_pdf_layout` channel. |
+| ~~F5~~ | ~~**TOC dot-leader lines parsed as headings / body fragments**~~ | ~~S1~~ | ~~nathumbeh_2 (removed from corpus), nat_comms_1~~ | ~~**C1**~~ | **RESOLVED iter-26** (`3b24041`). Function strips TOC paragraphs containing `_{3,}` runs in head zone, also drops false `## Headings` immediately preceding TOC paragraphs. nathumbeh_2 main beneficiary was dropped from corpus. |
+| ~~F6~~ | ~~**Running headers / journal banners at the start of the doc**~~ | ~~S2~~ | ~~16 papers~~ | ~~**C1**~~ | **RESOLVED iter-25** (`fca6f61`). |
 | **F7** | **DOI / manuscript-ID character-mash**: `DhttOpsI::/1/d0o.i1.o1rg/710/.01107073/010202314222442142152353226688` — pdftotext reading-order corruption when DOI bbox is interleaved with another text run. | **S2** | am_sociol_rev_3 | **C2** | Specific to bicolumn-publisher-template overlap. Hard to fix in a generic way — narrowest fix is to recognize "looks like a corrupted DOI" by digit/letter density and strip the line entirely. Affects only 1-2 papers. |
 | **F8** | **Numbered ToC headings printed without a preceding line**: `1. Hindsight bias`, `2. Reasons for hindsight bias` rendered as flat body text rather than `### 1. Hindsight bias`. | **S2** | chen_2021_jesp, korbmacher_2022_kruger (visibly), most replication papers | **C2** | Section detector doesn't recognize the journal's own numbered subsection style. Could be promoted to `###` headings with a pattern + paragraph-position guard. |
 
@@ -133,15 +136,20 @@ The **per-iteration ratio of effort-to-perceived-quality** would now be MUCH hig
 
 ## Concrete recommendation (next 2-3 iterations)
 
-Updated 2026-05-10 after iter-25 landed:
+Updated 2026-05-10 after iter-25/26/27 landed:
 
 1. ~~**Iter-25 (F6)**~~ ✅ DONE at `fca6f61`.
-2. **Iter-26 (F5) — ToC dot-leader strip.** Recognize `Background _________ 17` style lines and either drop or fence as `<!-- toc -->`. Touches nathumbeh_2 (worst — entire TOC of supplementary materials at top) and nat_comms_1 supplementary list. ~45 mins.
-3. **Iter-27 (F1 cheap variant) — page-footer pattern strip.** Curated regex pass for `^Corresponding Author:`, bare email lines, `(continued)`, JAMA `October 27, 2023 1/13` footers, etc. Won't fix the underlying sentence-splitting at page boundaries but removes the JUNK between halves. ~1.5 hr. Touches 13 papers. Still the big visible-quality win for the user's headline complaint.
+2. ~~**Iter-26 (F5)**~~ ✅ DONE at `3b24041`.
+3. ~~**Iter-27 (F1 cheap variant)**~~ ✅ DONE at `3b24041`.
 
-Then re-evaluate. If F3 (title rescue using layout-channel font sizes) and F4 (sidebar detection) still feel high-value after the Tier-A push, those become iter-28/29 (C2 each).
+**Next candidates (priority-ordered by impact × cost):**
 
-After this push the spike will have meaningfully improved on the user's headline complaint (Nature .md "basically useless"), and we'll have a cleaner picture of what's left for library-level work.
+4. **Iter-28 (F3) — title rescue from Abstract.** Layout-channel pre-pass that finds the large-font multi-line block at the top of page 1 and emits it as `# Title` before any `##` heading. Then the section detector won't sweep title + authors into the first `## Abstract`. Affects sci_rep_1, nat_comms_1/2, ar_royal_society_rsos_140066. C2, ~2 hr.
+5. **Iter-29 (F2 residual) — multi-word heading tokenization.** Recognize known compound section headings as units: `CONCLUSIONS AND RELEVANCE`, `DESIGN, SETTING, AND PARTICIPANTS`, `MAIN OUTCOMES AND MEASURES`. Affects jama_open_1/2 abstract structure. C1, ~30 min.
+6. **Iter-30 (F4) — sidebar Key-Points box detection.** Layout-aware: identify text-block geometrically isolated from the body column (different x-column at same y-range). Preserve as a separate `<aside>` block rather than inlining into the abstract. Affects jama_open_1/2. C2-C3, may need page-bbox awareness similar to F1 structural fix.
+7. **Future (F1 structural)** — page-bbox-aware sentence stitching at page boundaries. Threads page geometry through `extract_pdf` to detect bottom-N% non-body bbox content and skip it BEFORE pdftotext linearizes. C3 / multi-iter. The cheap variant (iter-27) handled the JUNK; this would handle the SENTENCE-SPLIT itself.
+
+After iter-28/29 the user-visible quality should be meaningfully cleaner across most of the 26-paper corpus. Remaining work after that is largely library-level (Camelot table detection, multi-page table assembly).
 
 ---
 
