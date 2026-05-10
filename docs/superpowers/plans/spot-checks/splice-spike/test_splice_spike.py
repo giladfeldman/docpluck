@@ -1869,3 +1869,161 @@ def test_spurious_body_prose_detector_passes_numeric_heavy_grid():
     ]
     # Half of cells are numeric → not body prose.
     assert not _is_spurious_body_prose_grid(rows)
+
+
+from splice_spike import (
+    _merge_significance_marker_rows,
+    _SUP_OPEN,
+    _SUP_CLOSE,
+    _html_escape,
+)
+
+
+def _sup(marker: str) -> str:
+    return f"{_SUP_OPEN}{marker}{_SUP_CLOSE}"
+
+
+def test_merge_sig_marker_row_attaches_to_estimate_row():
+    """social_forces_1 Table 3 pattern: 3 rows per variable
+    (estimate / SE / stars). The stars row gets eaten and its markers
+    attach as ``<sup>...</sup>`` on the estimate row's cells. The SE
+    row stays in place."""
+    rows = [
+        ["Mother born in USA", "3.02", "0.54", "0.64", "0.67"],
+        ["",                    "(1.34)", "(0.13)", "(0.12)", "(0.12)"],
+        ["",                    "∗",      "∗∗",     "∗",      "∗"],
+        ["Mother age 14 rural", "0.91", "1.10", "1.07", "1.08"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Marker-only row absorbed.
+    assert len(out) == 3
+    # Estimate row got markers as superscripts.
+    assert out[0] == [
+        "Mother born in USA",
+        f"3.02{_sup('∗')}",
+        f"0.54{_sup('∗∗')}",
+        f"0.64{_sup('∗')}",
+        f"0.67{_sup('∗')}",
+    ]
+    # SE row untouched (just stripped/passed through).
+    assert out[1] == ["", "(1.34)", "(0.13)", "(0.12)", "(0.12)"]
+    # Verify the placeholders survive HTML escaping and become real <sup> tags.
+    escaped = _html_escape(out[0][1])
+    assert escaped == "3.02<sup>∗</sup>"
+
+
+def test_merge_sig_marker_skips_non_marker_row():
+    """A row with mixed marker + real-text cells doesn't qualify as
+    marker-only — preserve."""
+    rows = [
+        ["Variable", "1.0", "2.0"],
+        ["",         "*",   "footnote text"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Both rows preserved.
+    assert len(out) == 2
+    assert out[1] == ["", "*", "footnote text"]
+
+
+def test_merge_sig_marker_handles_no_target_above():
+    """A marker-only row at the very top of a table has no row above
+    to merge into — just preserve it as-is."""
+    rows = [
+        ["", "*", "**"],
+        ["Header A", "Header B", "Header C"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 2
+    assert out[0] == ["", "*", "**"]
+
+
+def test_merge_sig_marker_walks_past_se_row():
+    """The walk-back skips intermediate SE rows (whose only populated
+    cells are parenthetical numbers like ``(0.13)``) until it finds
+    the actual estimate row."""
+    rows = [
+        ["Variable", "1.0", "2.0", "3.0"],
+        ["",         "(0.1)", "(0.2)", "(0.3)"],
+        ["",         "(extra notes)", "", ""],
+        ["",         "*",     "**",    "*"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Marker row absorbed into the estimate row (skipping both SE-style rows).
+    assert len(out) == 3
+    assert out[0] == [
+        "Variable",
+        f"1.0{_sup('*')}",
+        f"2.0{_sup('**')}",
+        f"3.0{_sup('*')}",
+    ]
+
+
+def test_merge_sig_marker_preserves_dagger_markers():
+    """Dagger and double-dagger markers (``†``, ``‡``) are valid
+    significance markers in some journals — should also merge."""
+    rows = [
+        ["Var", "1.0", "2.0"],
+        ["",    "†",   "‡"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 1
+    assert out[0] == ["Var", f"1.0{_sup('†')}", f"2.0{_sup('‡')}"]
+
+
+def test_merge_sig_marker_skips_empty_target_cell():
+    """If the target estimate row's cell is EMPTY in a column where the
+    marker row has a star, don't attach — markers shouldn't appear in
+    isolation. Prevents ``<td><sup>**</sup></td>`` orphans where the
+    estimate column was missing data."""
+    rows = [
+        ["Var", "1.0", "", "3.0"],
+        ["",    "*",   "**", "*"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 1
+    assert out[0] == ["Var", f"1.0{_sup('*')}", "", f"3.0{_sup('*')}"]
+
+
+def test_merge_sig_marker_preserves_row_when_no_attach_possible():
+    """If walking back finds an estimate row but every marker column is
+    empty in that target, fall back to preserving the marker row
+    rather than silently dropping it (would lose the markers)."""
+    rows = [
+        ["Var", "", "", ""],
+        ["",    "*", "**", "*"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Marker row preserved because target had no non-empty cells to attach to.
+    assert len(out) == 2
+    assert out[1] == ["", "*", "**", "*"]
+
+
+def test_merge_sig_marker_does_not_attach_to_text_anchor_row():
+    """The walk-back skips rows that have only text anchors (like
+    ``Ref.``) without any numeric cell — markers there usually belong
+    to the NEXT row's estimates, not the previous text row. Preserve
+    the marker row in that case rather than wrongly attaching."""
+    rows = [
+        ["0 ACEs", "Ref.", "Ref.", "Ref."],
+        ["",       "*",    "**",   "*"],
+        ["1 ACE",  "2.25", "0.56", "0.74"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    # Marker row preserved (no numeric estimate row above).
+    assert len(out) == 3
+    assert out[1] == ["", "*", "**", "*"]
+    # The "Ref." row stays clean — no <sup> on it.
+    assert out[0] == ["0 ACEs", "Ref.", "Ref.", "Ref."]
+
+
+def test_merge_sig_marker_only_merges_columns_with_markers():
+    """If the marker row has stars only in some columns and others
+    empty, only those columns gain the superscript. Columns without a
+    marker stay unchanged."""
+    rows = [
+        ["Var", "1.0", "2.0", "3.0"],
+        ["",    "*",   "",    "**"],
+    ]
+    out = _merge_significance_marker_rows(rows)
+    assert len(out) == 1
+    assert out[0] == ["Var", f"1.0{_sup('*')}", "2.0", f"3.0{_sup('**')}"]

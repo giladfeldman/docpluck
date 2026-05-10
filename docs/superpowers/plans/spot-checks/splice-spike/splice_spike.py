@@ -125,7 +125,8 @@ def _camelot_cells_for_table(pdf_path: str, table: dict) -> list[list[str]] | No
 
 def _html_escape(s: str | None) -> str:
     """Escape HTML special characters for safe inclusion in cell content,
-    then convert merge-separator placeholders to ``<br>``."""
+    then convert merge-separator placeholders to ``<br>`` and
+    superscript placeholders to ``<sup>``/``</sup>``."""
     if s is None:
         return ""
     return (
@@ -133,10 +134,14 @@ def _html_escape(s: str | None) -> str:
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace(_MERGE_SEPARATOR, "<br>")
+        .replace(_SUP_OPEN, "<sup>")
+        .replace(_SUP_CLOSE, "</sup>")
     )
 
 
 _MERGE_SEPARATOR = "\x00BR\x00"  # placeholder swapped to <br> after escaping
+_SUP_OPEN = "\x00SUP\x00"  # placeholder swapped to <sup> after escaping
+_SUP_CLOSE = "\x00/SUP\x00"  # placeholder swapped to </sup> after escaping
 
 
 def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
@@ -571,6 +576,96 @@ def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
 
 
 
+
+
+_SIG_MARKER_CHARS = re.compile(r"^[*∗†‡§+#]+$")
+
+
+def _merge_significance_marker_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Merge rows whose only populated cells are significance markers
+    (``*``, ``**``, ``∗∗∗``, ``†``, etc.) into the most recent row above
+    that carries substantive estimate content. The markers attach as
+    ``<sup>...</sup>`` superscripts on the corresponding cells.
+
+    Iteration 21 (Tier A5). Camelot occasionally splits regression-
+    style tables into 3 rows per variable:
+
+        ['Mother born in USA', '3.02',   '0.54',   '0.64',   '0.67']
+        ['',                    '(1.34)', '(0.13)', '(0.12)', '(0.12)']
+        ['',                    '∗',      '∗∗',     '∗',      '∗']    <-- this row
+
+    The third row (significance stars) belongs WITH the estimates above
+    — bbox detection put the stars on a separate baseline. Without the
+    merge the rendered table has an empty-looking row of stars that
+    visually disconnects the marker from the estimate.
+
+    Conservative rule:
+      - Row qualifies as marker-only iff every populated cell matches
+        ``[*∗†‡§+#]+`` exactly.
+      - Walk-back stops at the first row that has at least one cell
+        that is neither parenthetical (``(0.13)``) nor a marker.
+      - Per-column merge: only a marker cell merges into the
+        corresponding column of the target row; empty marker cells are
+        skipped. Does not touch other columns.
+
+    Re-runs after row drop so chained markers (e.g. a marker row
+    immediately following another marker row) are handled in one pass.
+    """
+    def _row_marker_only(row: list[str]) -> bool:
+        populated = [(c or "").strip() for c in row]
+        populated = [s for s in populated if s]
+        if not populated:
+            return False
+        return all(_SIG_MARKER_CHARS.match(s) for s in populated)
+
+    _NUMERIC_CELL = re.compile(r"^[+\-−–—]?\d+(?:\.\d+)?[%]?$")
+
+    def _row_has_numeric_estimate(row: list[str]) -> bool:
+        """Stricter: row qualifies as an estimate target only if it has
+        at least one PURELY NUMERIC cell (e.g. ``2.25``, ``-0.34``,
+        ``45.2%``). This prevents stars from attaching to text-content
+        cells like ``Ref.`` (reference category) or ``Year FE`` — in
+        those cases the markers usually belong to the NEXT row's
+        estimates, not the row above. We only walk back to a numeric
+        row, never to a text-anchor row, so a misplaced marker stays
+        as its own row rather than being silently misattributed.
+        """
+        for c in row:
+            s = (c or "").strip()
+            if not s:
+                continue
+            if _NUMERIC_CELL.match(s):
+                return True
+        return False
+
+    out: list[list[str]] = []
+    for row in rows:
+        if _row_marker_only(row):
+            target_idx: int | None = None
+            for k in range(len(out) - 1, -1, -1):
+                if _row_has_numeric_estimate(out[k]):
+                    target_idx = k
+                    break
+            if target_idx is not None:
+                target = list(out[target_idx])
+                attached = False
+                for col_i in range(min(len(row), len(target))):
+                    marker = (row[col_i] or "").strip()
+                    if not marker or not _SIG_MARKER_CHARS.match(marker):
+                        continue
+                    cur = (target[col_i] or "").rstrip()
+                    if not cur:
+                        # Don't put a sup on an empty cell — the marker
+                        # has no estimate to attach to in that column.
+                        continue
+                    target[col_i] = f"{cur}{_SUP_OPEN}{marker}{_SUP_CLOSE}"
+                    attached = True
+                if attached:
+                    out[target_idx] = target
+                    continue
+                # Else: no markers actually attached — preserve the row.
+        out.append(row)
+    return out
 
 
 def _fold_suffix_continuation_columns(
@@ -1365,6 +1460,7 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
             grid[c["r"]][c["c"]] = c["text"]
         grid = _drop_caption_leading_rows(grid, label, caption)
         grid = _drop_running_header_rows(grid)
+        grid = _merge_significance_marker_rows(grid)
         if len(grid) >= 2:
             sbs_col = _detect_side_by_side_merge(grid, label)
             if sbs_col is not None:
@@ -1392,6 +1488,7 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
         if cam_rows:
             cam_rows = _drop_caption_leading_rows(cam_rows, label, caption)
             cam_rows = _drop_running_header_rows(cam_rows)
+            cam_rows = _merge_significance_marker_rows(cam_rows)
             if len(cam_rows) >= 2:
                 sbs_col = _detect_side_by_side_merge(cam_rows, label)
                 if sbs_col is not None:
