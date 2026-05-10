@@ -55,10 +55,10 @@ We aimed to extend the replication study by considering the ambiguities in the d
   <thead>
     <tr>
       <th>Ability</th>
-      <th>Domain<br>diﬃculty1</th>
-      <th>Comparative<br>ability2</th>
-      <th>Judgmental weight<br>of Own ability3</th>
-      <th>Judgmental weight<br>of Others’ ability3</th>
+      <th>Domain<br>diﬃculty<br>1</th>
+      <th>Comparative<br>ability<br>2</th>
+      <th>Judgmental weight<br>of Own ability<br>3</th>
+      <th>Judgmental weight<br>of Others’ ability<br>3</th>
     </tr>
   </thead>
   <tbody>
@@ -137,7 +137,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
 <table>
   <thead>
     <tr>
-      <th>Original domain groupEasy domain group</th>
+      <th>Original domain group<br>Easy domain group</th>
       <th>Diﬃcult domain group</th>
     </tr>
   </thead>
@@ -151,7 +151,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td></td>
     </tr>
     <tr>
-      <td>Using a mouseUsing a mouse with your</td>
+      <td>Using a mouse<br>Using a mouse with your</td>
       <td>Using a mouse with your</td>
     </tr>
     <tr>
@@ -159,7 +159,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td>non-dominant hand</td>
     </tr>
     <tr>
-      <td>DrivingDriving a car with automatic</td>
+      <td>Driving<br>Driving a car with automatic</td>
       <td>Driving a car with manual gear</td>
     </tr>
     <tr>
@@ -167,7 +167,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td>in a foreign country where<br>people drive on the opposite<br>side of the road</td>
     </tr>
     <tr>
-      <td>Riding a bicycleRiding a bicycle for 10 minutes</td>
+      <td>Riding a bicycle<br>Riding a bicycle for 10 minutes</td>
       <td>Riding a bicycle for an hour up</td>
     </tr>
     <tr>
@@ -179,7 +179,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td>slope</td>
     </tr>
     <tr>
-      <td>Saving moneySaving 3% of your income each</td>
+      <td>Saving money<br>Saving 3% of your income each</td>
       <td>Saving 20% of your income</td>
     </tr>
     <tr>
@@ -191,7 +191,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td></td>
     </tr>
     <tr>
-      <td>Telling jokesTelling a joke to one person</td>
+      <td>Telling jokes<br>Telling a joke to one person</td>
       <td>Telling a joke in front of a live</td>
     </tr>
     <tr>
@@ -203,7 +203,7 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td>comedy club</td>
     </tr>
     <tr>
-      <td>Playing chessWin a game of chess against an</td>
+      <td>Playing chess<br>Win a game of chess against an</td>
       <td>Win a game of chess against an</td>
     </tr>
     <tr>
@@ -215,11 +215,11 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <td>mode</td>
     </tr>
     <tr>
-      <td>JugglingJuggling 2 balls</td>
+      <td>Juggling<br>Juggling 2 balls</td>
       <td>Juggling 4 balls</td>
     </tr>
     <tr>
-      <td>ProgrammingProgramming guided by</td>
+      <td>Programming<br>Programming guided by</td>
       <td>Programming guided by</td>
     </tr>
     <tr>
@@ -584,10 +584,10 @@ Table 8: Replication condition: Mean comparative ability estimates and judgmenta
   <thead>
     <tr>
       <th>Ability</th>
-      <th>Domain<br>diﬃculty1</th>
-      <th>Percentile<br>estimate2</th>
-      <th>Judgment weight:<br>Own ability3</th>
-      <th>Judgment weight:<br>Others’ ability3</th>
+      <th>Domain<br>diﬃculty<br>1</th>
+      <th>Percentile<br>estimate<br>2</th>
+      <th>Judgment weight:<br>Own ability<br>3</th>
+      <th>Judgment weight:<br>Others’ ability<br>3</th>
     </tr>
   </thead>
   <tbody>
@@ -761,10 +761,10 @@ Table 11: Extension conditions: Mean comparative ability estimates and judgmenta
   <tbody>
     <tr>
       <td>Ability</td>
-      <td>of own ability1</td>
-      <td>of others’ ability1</td>
-      <td>of own ability1</td>
-      <td>of others’ ability1</td>
+      <td>of own ability<br>1</td>
+      <td>of others’ ability<br>1</td>
+      <td>of own ability<br>1</td>
+      <td>of others’ ability<br>1</td>
     </tr>
     <tr>
       <td>Using mouse</td>
@@ -940,9 +940,9 @@ T
     <tr>
       <td></td>
       <td>diﬃculty</td>
-      <td>estimate1</td>
+      <td>estimate<br>1</td>
       <td>diﬃculty</td>
-      <td>estimate2</td>
+      <td>estimate<br>2</td>
     </tr>
     <tr>
       <td>Using mouse</td>

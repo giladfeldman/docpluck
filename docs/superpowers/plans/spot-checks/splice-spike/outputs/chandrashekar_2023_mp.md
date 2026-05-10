@@ -162,31 +162,31 @@ We provide a summary of the ﬁndings in Table 9. We present complete descriptiv
     </tr>
     <tr>
       <td>et al. (2002)</td>
-      <td>(2019)<br>Design facetReplication study</td>
+      <td>(2019)<br>Design facet<br>Replication study</td>
     </tr>
     <tr>
       <td>[Introduction]:</td>
-      <td>IV operationalizationSame</td>
+      <td>IV operationalization<br>Same</td>
     </tr>
     <tr>
       <td>Typically,regardless of your organ donor decision,the</td>
-      <td>DV operationalizationSame</td>
+      <td>DV operationalization<br>Same</td>
     </tr>
     <tr>
       <td>state online systems ask you to answer a number of</td>
-      <td>IV stimuliSame</td>
+      <td>IV stimuli<br>Same</td>
     </tr>
     <tr>
       <td>health questions. Please answer the following. Allthe</td>
-      <td>DV stimuliSame</td>
+      <td>DV stimuli<br>Same</td>
     </tr>
     <tr>
       <td>data will be kept completely conﬁdential.</td>
-      <td>Procedural detailsSimilar<br>Physical settingsDifferent</td>
+      <td>Procedural details<br>Similar<br>Physical settings<br>Different</td>
     </tr>
     <tr>
       <td>You are almost atthe end ofthe survey.Thank you</td>
-      <td>Contextual variablesDifferent</td>
+      <td>Contextual variables<br>Different</td>
     </tr>
   </tbody>
 </table>

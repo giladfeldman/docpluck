@@ -40,7 +40,7 @@ Manipulated attribute
   </thead>
   <tbody>
     <tr>
-      <td>Benefit is highPositive affect</td>
+      <td>Benefit is high<br>Positive affect</td>
       <td>Risk is low</td>
     </tr>
     <tr>
@@ -214,7 +214,7 @@ The interaction between manipulated attribute and CMA (change in manipulated att
       <td>\.001</td>
     </tr>
     <tr>
-      <td>PNMA 3 Direction3 Attribute</td>
+      <td>PNMA 3 Direction<br>3 Attribute</td>
       <td>0.13</td>
       <td>0.11</td>
       <td>[20.08, 0.35]</td>
@@ -247,7 +247,7 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <td>SE95% CIp</td>
     </tr>
     <tr>
-      <td>Intercept20.59</td>
+      <td>Intercept<br>20.59</td>
       <td>0.15[20.88, 20.29]\.001</td>
     </tr>
     <tr>
@@ -259,11 +259,11 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <td>0.04[21.13, 20.97]\.001</td>
     </tr>
     <tr>
-      <td>Pleasure0.03</td>
+      <td>Pleasure<br>0.03</td>
       <td>0.05[20.07, 0.13].557</td>
     </tr>
     <tr>
-      <td>Arousal20.06</td>
+      <td>Arousal<br>20.06</td>
       <td>0.05[20.16, 0.04].266</td>
     </tr>
     <tr>
@@ -279,7 +279,7 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <td>0.08[0.23, 0.56]\.001</td>
     </tr>
     <tr>
-      <td>Pleasure 3 Arousal20.02</td>
+      <td>Pleasure 3 Arousal<br>20.02</td>
       <td>0.03[20.08, 0.04].536</td>
     </tr>
     <tr>
@@ -315,7 +315,7 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <td>SE95% CIp</td>
     </tr>
     <tr>
-      <td>Intercept20.24</td>
+      <td>Intercept<br>20.24</td>
       <td>0.13[20.49, 0.02].066</td>
     </tr>
     <tr>
@@ -339,7 +339,7 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <td>0.03[20.80, 20.68]\.001</td>
     </tr>
     <tr>
-      <td>Direction 3 Manipulated Attribute20.85</td>
+      <td>Direction 3 Manipulated Attribute<br>20.85</td>
       <td>0.12[21.09, 20.60]\.001</td>
     </tr>
     <tr>
@@ -347,7 +347,7 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <td>0.05[20.23, 20.02].022</td>
     </tr>
     <tr>
-      <td>CMA 3 Manipulated Attribute20.27</td>
+      <td>CMA 3 Manipulated Attribute<br>20.27</td>
       <td>0.05[20.37, 20.16]\.001</td>
     </tr>
     <tr>

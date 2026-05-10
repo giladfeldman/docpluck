@@ -326,21 +326,21 @@ Study
 <table>
   <thead>
     <tr>
-      <th>StudyJordan et al. (2011) Study 1b</th>
+      <th>Study<br>Jordan et al. (2011) Study 1b</th>
       <th>Jordan et al. (2011) Study 3Replication</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>Sample size80</td>
+      <td>Sample size<br>80</td>
       <td>104594</td>
     </tr>
     <tr>
-      <td>Geographic originU.S. American studentsU.S. American students</td>
+      <td>Geographic origin<br>U.S. American students<br>U.S. American students</td>
       <td>U.S. American students on prolific</td>
     </tr>
     <tr>
-      <td>Gender35 males, 45 females, 0 other/did</td>
+      <td>Gender<br>35 males, 45 females, 0 other/did</td>
       <td>51 males, 54 females, 0 other/did 290 males, 285 females, 19 other/did not</td>
     </tr>
     <tr>
@@ -352,11 +352,11 @@ Study
       <td>Computer (online)</td>
     </tr>
     <tr>
-      <td>CompensationN/ANominal payment</td>
+      <td>Compensation<br>N/ANominal payment</td>
       <td>Nominal payment (2 British pounds for an<br>estimated 12 min completion time)</td>
     </tr>
     <tr>
-      <td>Year2011 or earlier2011 or earlier</td>
+      <td>Year<br>2011 or earlier<br>2011 or earlier</td>
       <td>2023</td>
     </tr>
   </tbody>
@@ -397,7 +397,7 @@ Table 4.  Replication and Extension: Experimental Design and Measures.
   <tbody>
     <tr>
       <td>IV1: positive vs. negative</td>
-      <td>IV1: estimation of negative emotional eventsIV1: estimation of positive emotional events</td>
+      <td>IV1: estimation of negative emotional events<br>IV1: estimation of positive emotional events</td>
     </tr>
     <tr>
       <td>emotions (within; all</td>
@@ -405,15 +405,15 @@ Table 4.  Replication and Extension: Experimental Design and Measures.
     </tr>
     <tr>
       <td>participants rated both)</td>
-      <td>1.  Had a fight or argument1. Received high grades</td>
+      <td>1.  Had a fight or argument<br>1. Received high grades</td>
     </tr>
     <tr>
       <td>IV2: self vs. others rating (within; all</td>
-      <td>2. Thought about distant friends or family2. Attended fun party</td>
+      <td>2. Thought about distant friends or family<br>2. Attended fun party</td>
     </tr>
     <tr>
       <td>participants rated both)</td>
-      <td>3. Thought about enormous workload3. Participated in athletics</td>
+      <td>3. Thought about enormous workload<br>3. Participated in athletics</td>
     </tr>
   </tbody>
 </table>
@@ -1243,7 +1243,7 @@ Negative well-being  Loneliness  Rumination/brooding  Depressive symptoms 
       <td></td>
     </tr>
     <tr>
-      <td>MeasureestimateR2estimate</td>
+      <td>Measureestimate<br>R2estimate</td>
       <td></td>
     </tr>
     <tr>

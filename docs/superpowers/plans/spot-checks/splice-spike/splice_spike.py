@@ -295,6 +295,80 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
     return out
 
 
+def _split_mashed_cell(s: str) -> str:
+    """Insert ``<br>`` at apparent column-undercount boundaries inside a cell.
+
+    Camelot stream's whitespace-based column detection occasionally fails on
+    tightly packed columns and concatenates two columns' content into one
+    cell — e.g., ``Original domain groupEasy domain group``. This function
+    detects the boundary with a conservative rule and inserts a visible line
+    break so the cell is at least readable, even if the table's column count
+    is still off.
+
+    Two boundary types, each with its own length rule:
+
+    - Camel-case (``[a-z][A-Z]``): the LOWERCASE-only run preceding the
+      boundary must be ≥ 4 chars. Walks back only while lowercase, so a
+      preceding capital stops the count. Rules out ``macOS``, ``iPhone``,
+      ``WiFi``, ``JavaScript`` — none have a 4-char lowercase run before
+      the boundary. ``WordPress`` (``ord`` = 3) is also safe; ``groupEasy``
+      (``group`` = 5) splits.
+
+    - Letter→digit (``[a-zA-Z]\\d``): the any-letter WORD preceding the
+      boundary must be ≥ 4 chars (counting both upper and lower). This
+      catches column-mash like ``Year2011``, ``size80``, ``Gender35`` —
+      where the LEFT word starts with a capital but is short enough that a
+      lowercase-only rule would miss it. Additionally requires the digit
+      to be followed by another digit, end-of-string, or punctuation
+      (rules out ordinals like ``2a`` or labels like ``H1``).
+
+    Uses the same merge-separator placeholder as the cell-continuation
+    merger, so the placeholder survives HTML escaping and renders as
+    ``<br>``.
+    """
+    if not s or len(s) < 6:
+        return s
+    out: list[str] = []
+    i = 0
+    n = len(s)
+    while i < n:
+        out.append(s[i])
+        if i + 1 < n:
+            cur, nxt = s[i], s[i + 1]
+            split_here = False
+
+            if cur.islower() and nxt.isupper():
+                # Walk back collecting LOWERCASE only.
+                left = i
+                while left > 0 and s[left - 1].islower():
+                    left -= 1
+                run_len = i - left + 1
+                if run_len >= 4:
+                    split_here = True
+
+            elif (
+                cur.isalpha()
+                and nxt.isdigit()
+                and (
+                    i + 2 >= n
+                    or s[i + 2].isdigit()
+                    or s[i + 2] in " .,"
+                )
+            ):
+                # Walk back collecting ANY letter.
+                left = i
+                while left > 0 and s[left - 1].isalpha():
+                    left -= 1
+                word_len = i - left + 1
+                if word_len >= 4:
+                    split_here = True
+
+            if split_here:
+                out.append(_MERGE_SEPARATOR)
+        i += 1
+    return "".join(out)
+
+
 def _is_group_separator(row: list[str], n_cols: int) -> bool:
     """A "group separator" row has content in only the first cell AND
     the table has ≥3 columns AND the label looks like a section header
@@ -360,6 +434,14 @@ def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
     for r in merged:
         while len(r) < n_cols:
             r.append("")
+
+    # Split apparent column-undercount mash inside individual cells. This
+    # doesn't add columns to the row — it just inserts ``<br>`` between the
+    # mashed parts so the cell is readable. The placeholder survives HTML
+    # escaping and renders as ``<br>``.
+    for row in merged:
+        for ci in range(len(row)):
+            row[ci] = _split_mashed_cell(row[ci])
 
     header = merged[0]
     body = merged[1:]

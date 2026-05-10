@@ -418,6 +418,67 @@ def test_footnote_extraction_skips_when_no_markers():
     assert _extract_footnote_lines(region) == []
 
 
+from splice_spike import _split_mashed_cell
+
+
+def test_mash_split_camel_case_with_long_left_word():
+    """`groupEasy` splits into `group<br>Easy` because LEFT word ``group``
+    is ≥ 4 chars."""
+    out = _split_mashed_cell("Original domain groupEasy domain group")
+    # The MERGE_SEPARATOR placeholder is what survives to <br> in HTML render.
+    # Convert to readable form for assertion.
+    rendered = out.replace("\x00BR\x00", "<br>")
+    assert rendered == "Original domain group<br>Easy domain group"
+
+
+def test_mash_split_letter_digit_with_long_left_word():
+    """`size80` splits because ``size`` is a 4-letter word."""
+    out = _split_mashed_cell("Sample size80")
+    rendered = out.replace("\x00BR\x00", "<br>")
+    assert rendered == "Sample size<br>80"
+
+
+def test_mash_split_does_not_split_short_left_word():
+    """`macOS` must NOT split — LEFT word ``mac`` is only 3 chars."""
+    out = _split_mashed_cell("macOS Big Sur")
+    assert "\x00BR\x00" not in out
+    assert out == "macOS Big Sur"
+
+
+def test_mash_split_does_not_split_iphone_or_ordinal():
+    """`iPhone`, `WiFi`, and ordinals like `2a`/`H1` must NOT split."""
+    assert "\x00BR\x00" not in _split_mashed_cell("iPhone")
+    assert "\x00BR\x00" not in _split_mashed_cell("WiFi")
+    assert "\x00BR\x00" not in _split_mashed_cell("Hypothesis 2a")
+    assert "\x00BR\x00" not in _split_mashed_cell("H1")
+
+
+def test_mash_split_does_not_split_camel_case_brand_names():
+    """Camel-case boundaries use lowercase-only run length, so brand names
+    like ``JavaScript`` (run ``ava`` = 3) and ``WordPress`` (run ``ord`` =
+    3) don't false-split."""
+    assert "\x00BR\x00" not in _split_mashed_cell("JavaScript")
+    assert "\x00BR\x00" not in _split_mashed_cell("WordPress")
+
+
+def test_mash_split_letter_digit_with_capital_start_word():
+    """`Year2011` splits — letter→digit boundaries use any-letter word
+    length, so a capital-start short word like ``Year`` (4 chars) catches
+    column-mash that lowercase-only would miss."""
+    out = _split_mashed_cell("Year2011 or earlier")
+    rendered = out.replace("\x00BR\x00", "<br>")
+    assert rendered == "Year<br>2011 or earlier"
+
+
+def test_mash_split_handles_us_initials_after_long_word():
+    """The pattern from ip_feldman Table 3:
+    ``students`` → 8 chars, then ``U`` → split. Boundary is between
+    ``s`` and ``U``."""
+    out = _split_mashed_cell("U.S. American studentsU.S. American students")
+    rendered = out.replace("\x00BR\x00", "<br>")
+    assert rendered == "U.S. American students<br>U.S. American students"
+
+
 from splice_spike import _drop_caption_leading_rows
 
 
