@@ -34,7 +34,7 @@ Manipulated attribute
 <table>
   <thead>
     <tr>
-      <th>Risk is lowPositive affect</th>
+      <th>Risk is low<br>Positive affect</th>
       <th>Benefit is high</th>
     </tr>
   </thead>
@@ -44,7 +44,7 @@ Manipulated attribute
       <td>Risk is low</td>
     </tr>
     <tr>
-      <td>Benefit is lowNegative affect</td>
+      <td>Benefit is low<br>Negative affect</td>
       <td>Risk is high</td>
     </tr>
   </tbody>

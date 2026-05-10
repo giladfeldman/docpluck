@@ -307,12 +307,21 @@ def _split_mashed_cell(s: str) -> str:
 
     Two boundary types, each with its own length rule:
 
-    - Camel-case (``[a-z][A-Z]``): the LOWERCASE-only run preceding the
-      boundary must be ≥ 4 chars. Walks back only while lowercase, so a
-      preceding capital stops the count. Rules out ``macOS``, ``iPhone``,
-      ``WiFi``, ``JavaScript`` — none have a 4-char lowercase run before
-      the boundary. ``WordPress`` (``ord`` = 3) is also safe; ``groupEasy``
-      (``group`` = 5) splits.
+    - Camel-case (``[a-z][A-Z]``):
+        - **Strict rule:** the LOWERCASE-only run preceding the boundary
+          must be ≥ 4 chars. Walks back only while lowercase, so a
+          preceding capital stops the count. Rules out ``macOS``,
+          ``iPhone``, ``WiFi``, ``JavaScript``, ``WordPress``;
+          ``groupEasy`` (``group`` = 5) splits.
+        - **Relaxed rule (iteration 10):** the lowercase run is ≥ 3 chars
+          AND is anchored on the LEFT by a whitespace character or the
+          start of the cell, AND the camel-case Capital is followed by a
+          lowercase letter (so it's a real word, not an all-caps token
+          like ``OS`` or ``CI``). Catches ``lowPositive`` /
+          ``lowNegative`` / ``highRisk`` inside multi-word cells (e.g.,
+          ``Risk is lowPositive affect``) without false-splitting brand
+          names like ``macOS`` (no whitespace anchor) or ``WordPress``
+          (``ord`` is preceded by uppercase ``W``, not whitespace).
 
     - Letter→digit (``[a-zA-Z]\\d``): the any-letter WORD preceding the
       boundary must be ≥ 4 chars (counting both upper and lower). This
@@ -343,7 +352,18 @@ def _split_mashed_cell(s: str) -> str:
                 while left > 0 and s[left - 1].islower():
                     left -= 1
                 run_len = i - left + 1
+                # Strict rule: 4+ char lowercase run.
                 if run_len >= 4:
+                    split_here = True
+                # Relaxed rule (iteration 10): 3-char run anchored by
+                # whitespace/start AND right-side Capital followed by a
+                # lowercase letter (not all-caps token like ``OS``).
+                elif (
+                    run_len >= 3
+                    and (left == 0 or s[left - 1].isspace())
+                    and i + 2 < n
+                    and s[i + 2].islower()
+                ):
                     split_here = True
 
             elif (

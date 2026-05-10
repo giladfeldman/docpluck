@@ -614,6 +614,50 @@ def test_mash_split_does_not_split_camel_case_brand_names():
     3) don't false-split."""
     assert "\x00BR\x00" not in _split_mashed_cell("JavaScript")
     assert "\x00BR\x00" not in _split_mashed_cell("WordPress")
+    # Brand names embedded in prose still don't split — the lowercase run
+    # is preceded by an UPPER letter, not whitespace.
+    assert "\x00BR\x00" not in _split_mashed_cell("the JavaScript runtime")
+    assert "\x00BR\x00" not in _split_mashed_cell("uses WordPress on macOS")
+
+
+def test_mash_split_relaxed_3char_with_whitespace_anchor():
+    """Iteration 10 relaxed rule: 3-char lowercase run anchored by
+    whitespace AND followed by Capital+lowercase splits.
+
+    Catches efendic Table 1's ``Risk is lowPositive affect`` where ``low``
+    is only 3 chars but is clearly a complete word due to the preceding
+    space and the trailing lowercase ``ositive``."""
+    out = _split_mashed_cell("Risk is lowPositive affect")
+    rendered = out.replace("\x00BR\x00", "<br>")
+    assert rendered == "Risk is low<br>Positive affect"
+
+    out2 = _split_mashed_cell("Benefit is lowNegative affect")
+    rendered2 = out2.replace("\x00BR\x00", "<br>")
+    assert rendered2 == "Benefit is low<br>Negative affect"
+
+
+def test_mash_split_relaxed_anchored_at_string_start():
+    """Cell starting with a 3-char word + Capital+lowercase splits at the
+    string start (no preceding whitespace required)."""
+    out = _split_mashed_cell("lowPositive affect")
+    rendered = out.replace("\x00BR\x00", "<br>")
+    assert rendered == "low<br>Positive affect"
+
+
+def test_mash_split_relaxed_does_not_split_macos_in_prose():
+    """Brand names like ``macOS`` even with a leading whitespace anchor
+    don't split because the right-side Capital is followed by an UPPER
+    letter (``S``), not lowercase — so it's an all-caps token, not a word."""
+    out = _split_mashed_cell("running on macOS daily")
+    assert "\x00BR\x00" not in out
+
+
+def test_mash_split_relaxed_does_not_split_two_caps_in_a_row():
+    """Pattern like ``CI`` after a 3-char word should NOT split — the
+    Capital after the boundary must be followed by a lowercase letter to
+    qualify as a real word start."""
+    out = _split_mashed_cell("the lowCI bound")
+    assert "\x00BR\x00" not in out
 
 
 def test_mash_split_letter_digit_with_capital_start_word():
