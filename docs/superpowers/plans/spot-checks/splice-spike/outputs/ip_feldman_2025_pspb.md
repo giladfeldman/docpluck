@@ -1306,204 +1306,92 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
 ### Table 6
 *Prevalence of Emotional Experiences (Replication and Extension): One-Sample t-Tests of Estimation Error.*
 
-<table>
-  <thead>
-    <tr>
-      <th>10</th>
-      <th>Personality and Social Psychology Bulletin 00(0)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>analyses (alpha = .005). We found support for misestimation</td>
-      <td>analyses on the emotional intensity measures. We began with</td>
-    </tr>
-    <tr>
-      <td>effects  (see  below)  using  the  full  sample  (N  =  594)  and</td>
-      <td>item-level  one-sample  t-tests  and  found  support  for</td>
-    </tr>
-    <tr>
-      <td>therefore did not proceed to conduct or report the analyses</td>
-      <td>Hypothesis  2d  with  an  overestimation  of  positive  experi-</td>
-    </tr>
-    <tr>
-      <td>with exclusions.</td>
-      <td>ences  (t(5)  =  2.97,  p  =  .031,  d  =  1.21,  95%  CI  [0.099,<br>2.26]), yet contrary to our expectations in Hypothesis 2c, we<br>also found an overestimation for negative experiences (t(5)</td>
-    </tr>
-    <tr>
-      <td>Results</td>
-      <td>= 3.51, p = .017, d = 1.43, [0.23, 2.58]).</td>
-    </tr>
-    <tr>
-      <td>Prevalence Estimate Errors (Replication)</td>
-      <td>The participant-level analyses showed a similar trend, as<br>we found support for the expected overestimation of positive</td>
-    </tr>
-    <tr>
-      <td>We summarized descriptives in Tables 6 (prevalence) and 7</td>
-      <td>emotional experiences (M = 5.60; t(593) = 8.45, p &lt; .001, d</td>
-    </tr>
-    <tr>
-      <td>(intensity), and correlations in Table 8.</td>
-      <td>=  0.35,  95%  CI  [0.26,  0.43]),  and  again  the  unexpected</td>
-    </tr>
-    <tr>
-      <td>Consistent with Hypothesis 2a and the original findings,</td>
-      <td>overestimation  of  negative  emotional  experiences  (M  =</td>
-    </tr>
-    <tr>
-      <td>we found support for an underestimation of others’ negative</td>
-      <td>12.54; t(593) = 19.42, p &lt; .001, d = 0.80, [0.70, 0.89]). We</td>
-    </tr>
-    <tr>
-      <td>emotional experiences. Mirroring the analyses conducted in</td>
-      <td>ran one-sample t-tests for each of the experiences and found</td>
-    </tr>
-    <tr>
-      <td>the  original  article,  we  computed  the  estimation  error  for</td>
-      <td>that  participants  overestimated  five  out  of  the  six  negative</td>
-    </tr>
-    <tr>
-      <td>each item of positive and negative experiences by comparing</td>
-      <td>emotional experiences and five out of the six positive emo-</td>
-    </tr>
-    <tr>
-      <td>the self-rating with ratings for their peers. We conducted an</td>
-      <td>tional experiences.</td>
-    </tr>
-    <tr>
-      <td>item-level  one-sample  t-test  on  the  estimation  errors  to</td>
-      <td>Mirroring the target’s analyses for item-level prevalence</td>
-    </tr>
-    <tr>
-      <td>examine  if  they  differed  from  0. We  found  support  for  the</td>
-      <td>comparing positive and negative, we ran the same analysis</td>
-    </tr>
-    <tr>
-      <td>expected  underestimation  of  negative  (t(5)  =  −4.30,  p  =</td>
-      <td>for intensity estimates and found no signal for difference in</td>
-    </tr>
-    <tr>
-      <td>.008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for</td>
-      <td>overestimation  error  between  negative  and  positive  emo-</td>
-    </tr>
-    <tr>
-      <td>an unexpected underestimation of positive experiences (t(5)</td>
-      <td>tional experiences, though large effect size (t(10) = 1.72, p</td>
-    </tr>
-    <tr>
-      <td>= −3.67, p = .014, d = −1.50, [−2.67, −0.26]).</td>
-      <td>= .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most</td>
-    </tr>
-    <tr>
-      <td>We  further  extended  our  analyses  to  a  series  of  partici-pant-level one-sample t-tests on the estimation error of emo-tional experiences, summarized in Table 6. Overall, we found</td>
-      <td>likely due to the small number of items a power analysis of<br>which  shows  an  unreasonably  large  effect  in  order  to  be<br>detectable with null hypothesis significance testing. We sup-</td>
-    </tr>
-    <tr>
-      <td>support for participants’ underestimation of all six negative</td>
-      <td>plemented  the  item-level  analysis  by  conducting  a  partici-</td>
-    </tr>
-    <tr>
-      <td>emotional experiences  and of  five of  the six positive emo-tional  experiences.  The  participant-level  analyses  mirrored</td>
-      <td>pant-level paired sample t-test, which was far better powered,<br>and  indeed  found  support  for  stronger  overestimation  for</td>
-    </tr>
-    <tr>
-      <td>that of the item-level analyses, with support for the expected</td>
-      <td>negative experiences than for positive experiences (t(593) =</td>
-    </tr>
-    <tr>
-      <td>underestimation  of  negative  emotional  experiences  (M  =</td>
-      <td>10.63, p &lt; .001, d = 0.44, [0.35, 0.52]).</td>
-    </tr>
-    <tr>
-      <td>23.56; t(593) = −35.02, p &lt; .001, d = −1.44, 95% CI [−1.55,</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>−1.32]),  yet  again  with  the  unexpected  underestimation  of</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>positive emotional experiences (M = 15.97; t(593) = −24.17,</td>
-      <td>Prevalence Estimates Associations with Well-</td>
-    </tr>
-    <tr>
-      <td>p &lt; .001, d = −0.99, [−1.09, −0.89]).</td>
-      <td>Being (Replication)</td>
-    </tr>
-    <tr>
-      <td>Partially consistent with Hypothesis 2b, the underestima-</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>tion of negative experiences was stronger than positive experi-</td>
-      <td>We  summarized  the  Pearson’s  correlations  in  Table  8,  and</td>
-    </tr>
-    <tr>
-      <td>ences, yet only for the participant-level analysis. Specifically,</td>
-      <td>the  regression  model  findings  predicting  well-being  from</td>
-    </tr>
-    <tr>
-      <td>for  the  item-level  analyses,  we  ran  an  independent  samples</td>
-      <td>negative and positive prevalence estimates in Table 9 (com-</td>
-    </tr>
-    <tr>
-      <td>t-test comparing negative and positive emotional experiences</td>
-      <td>paring with the target’s).</td>
-    </tr>
-    <tr>
-      <td>and did not find support for Hypothesis 2b in estimation error</td>
-      <td>Inconsistent  with  and  opposite  to  Hypothesis  4,  preva-</td>
-    </tr>
-    <tr>
-      <td>(t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We</td>
-      <td>lence  estimations  of  negative  emotional  experiences  were</td>
-    </tr>
-    <tr>
-      <td>anticipated this in advance, given that the item-level analysis</td>
-      <td>negatively associated with well-being, as indicated by a neg-</td>
-    </tr>
-    <tr>
-      <td>had too few items and therefore power to detect such differ-</td>
-      <td>ative association with life satisfaction (β = −.23, t(591) =</td>
-    </tr>
-    <tr>
-      <td>ences, which is why we planned and preregistered to also run</td>
-      <td>−4.87, p &lt; .001), and subjective happiness (β = −.26, t(591)</td>
-    </tr>
-    <tr>
-      <td>participant-level analyses, which we felt were more appropri-</td>
-      <td>=  −5.59,  p &lt; .001),  and  a  positive  association  with  loneli-</td>
-    </tr>
-    <tr>
-      <td>ate  and  accurate.  The  participant-level  paired-samples  t-test</td>
-      <td>ness (β = .33, t(591) = 7.04, p &lt; .001), brooding (β = .37,</td>
-    </tr>
-    <tr>
-      <td>analysis allowed us to find support for a larger estimation error</td>
-      <td>t(591)  =  8.08,  p &lt; .001),  depressive  symptoms  (β  =  .41,</td>
-    </tr>
-    <tr>
-      <td>for  negative  compared  to  positive  experiences  (t(593)  =</td>
-      <td>t(591) = 9.01, p &lt; .001). On the other hand, positive preva-</td>
-    </tr>
-    <tr>
-      <td>−11.90, p &lt; .001, d = −0.49, [−0.57, −0.40]).</td>
-      <td>lence estimates were negatively associated with loneliness (β<br>= −.25, t(591) = −5.40, p &lt; .001), and depressive symptoms<br>(β = −.22, t(591) = −4.69, p &lt; .001), and positively associ-</td>
-    </tr>
-    <tr>
-      <td>Intensity Estimate Errors (Extension)</td>
-      <td>ated with life satisfaction (β = .25, t(591) = 5.35, p &lt; .001),</td>
-    </tr>
-    <tr>
-      <td>To  test  whether  underestimation  of  emotional  experiences</td>
-      <td>subjective happiness (β = .32, t(591) = 6.73, p &lt; .001), and</td>
-    </tr>
-    <tr>
-      <td>also  extends  to  emotional  intensity,  we  conducted  similar</td>
-      <td>the number of confidants (β = .19, t(591) = 3.98, p &lt; .001).</td>
-    </tr>
-  </tbody>
-</table>
+```
+Personality and Social Psychology Bulletin 00(0)
+analyses (alpha = .005). We found support for misestimation analyses on the emotional intensity measures. We began with
+effects  (see  below)  using  the  full  sample  (N  =  594)  and item-level  one-sample  t-tests  and  found  support  for
+therefore did not proceed to conduct or report the analyses Hypothesis  2d  with  an  overestimation  of  positive  experi-
+with exclusions. ences  (t(5)  =  2.97,  p  =  .031,  d  =  1.21,  95%  CI  [0.099,
+2.26]), yet contrary to our expectations in Hypothesis 2c, we
+also found an overestimation for negative experiences (t(5)
+Results
+= 3.51, p = .017, d = 1.43, [0.23, 2.58]).
+Prevalence Estimate Errors (Replication) The participant-level analyses showed a similar trend, as
+we found support for the expected overestimation of positive
+We summarized descriptives in Tables 6 (prevalence) and 7
+emotional experiences (M = 5.60; t(593) = 8.45, p < .001, d
+(intensity), and correlations in Table 8.
+=  0.35,  95%  CI  [0.26,  0.43]),  and  again  the  unexpected
+Consistent with Hypothesis 2a and the original findings,
+overestimation  of  negative  emotional  experiences  (M  =
+we found support for an underestimation of others’ negative
+12.54; t(593) = 19.42, p < .001, d = 0.80, [0.70, 0.89]). We
+emotional experiences. Mirroring the analyses conducted in
+ran one-sample t-tests for each of the experiences and found
+the  original  article,  we  computed  the  estimation  error  for
+that  participants  overestimated  five  out  of  the  six  negative
+each item of positive and negative experiences by comparing
+emotional experiences and five out of the six positive emo-
+the self-rating with ratings for their peers. We conducted an
+tional experiences.
+item-level  one-sample  t-test  on  the  estimation  errors  to
+Mirroring the target’s analyses for item-level prevalence
+examine  if  they  differed  from  0. We  found  support  for  the
+comparing positive and negative, we ran the same analysis
+expected  underestimation  of  negative  (t(5)  =  −4.30,  p  =
+for intensity estimates and found no signal for difference in
+.008, d = −1.76, 95% CI [−3.06, −0.41]), yet also support for
+overestimation  error  between  negative  and  positive  emo-
+an unexpected underestimation of positive experiences (t(5)
+tional experiences, though large effect size (t(10) = 1.72, p
+= −3.67, p = .014, d = −1.50, [−2.67, −0.26]).
+= .117, d = 0.99, 95% CI [−0.24, 2.18]). Again, this is most
+We  further  extended  our  analyses  to  a  series  of  partici-
+likely due to the small number of items a power analysis of
+pant-level one-sample t-tests on the estimation error of emo-
+which  shows  an  unreasonably  large  effect  in  order  to  be
+tional experiences, summarized in Table 6. Overall, we found
+detectable with null hypothesis significance testing. We sup-
+support for participants’ underestimation of all six negative
+plemented  the  item-level  analysis  by  conducting  a  partici-
+emotional experiences  and of  five of  the six positive emo-
+pant-level paired sample t-test, which was far better powered,
+tional  experiences.  The  participant-level  analyses  mirrored
+and  indeed  found  support  for  stronger  overestimation  for
+that of the item-level analyses, with support for the expected
+negative experiences than for positive experiences (t(593) =
+underestimation  of  negative  emotional  experiences  (M  =
+10.63, p < .001, d = 0.44, [0.35, 0.52]).
+23.56; t(593) = −35.02, p < .001, d = −1.44, 95% CI [−1.55,
+−1.32]),  yet  again  with  the  unexpected  underestimation  of
+positive emotional experiences (M = 15.97; t(593) = −24.17,
+Prevalence Estimates Associations with Well-
+p < .001, d = −0.99, [−1.09, −0.89]).
+Being (Replication)
+Partially consistent with Hypothesis 2b, the underestima-
+tion of negative experiences was stronger than positive experi- We  summarized  the  Pearson’s  correlations  in  Table  8,  and
+ences, yet only for the participant-level analysis. Specifically, the  regression  model  findings  predicting  well-being  from
+for  the  item-level  analyses,  we  ran  an  independent  samples negative and positive prevalence estimates in Table 9 (com-
+t-test comparing negative and positive emotional experiences paring with the target’s).
+and did not find support for Hypothesis 2b in estimation error Inconsistent  with  and  opposite  to  Hypothesis  4,  preva-
+(t(10) = 0.31, p = .31, d = −0.62, 95% CI [−1.79, 0.60]). We lence  estimations  of  negative  emotional  experiences  were
+anticipated this in advance, given that the item-level analysis negatively associated with well-being, as indicated by a neg-
+had too few items and therefore power to detect such differ- ative association with life satisfaction (β = −.23, t(591) =
+ences, which is why we planned and preregistered to also run −4.87, p < .001), and subjective happiness (β = −.26, t(591)
+participant-level analyses, which we felt were more appropri- =  −5.59,  p < .001),  and  a  positive  association  with  loneli-
+ate  and  accurate.  The  participant-level  paired-samples  t-test ness (β = .33, t(591) = 7.04, p < .001), brooding (β = .37,
+analysis allowed us to find support for a larger estimation error t(591)  =  8.08,  p < .001),  depressive  symptoms  (β  =  .41,
+for  negative  compared  to  positive  experiences  (t(593)  = t(591) = 9.01, p < .001). On the other hand, positive preva-
+−11.90, p < .001, d = −0.49, [−0.57, −0.40]). lence estimates were negatively associated with loneliness (β
+= −.25, t(591) = −5.40, p < .001), and depressive symptoms
+(β = −.22, t(591) = −4.69, p < .001), and positively associ-
+Intensity Estimate Errors (Extension)
+ated with life satisfaction (β = .25, t(591) = 5.35, p < .001),
+To  test  whether  underestimation  of  emotional  experiences subjective happiness (β = .32, t(591) = 6.73, p < .001), and
+also  extends  to  emotional  intensity,  we  conducted  similar the number of confidants (β = .19, t(591) = 3.98, p < .001).
+```
+
+### Table 8
 *Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.*
 
 <table>

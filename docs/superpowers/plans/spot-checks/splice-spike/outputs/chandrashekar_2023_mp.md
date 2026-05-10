@@ -795,180 +795,98 @@ Notes: OSF links: Group A = https://osf.io/5e3r8 ; Group B = https://osf.io/3kdq
 ### Table 1
 *Study stimuli for the direct replication of Johnson and Goldstein (2003) [Introduction for participants in Opt-Out/Opt-in Conditions]: Imagine that you have just moved to a new state and are currently ﬁlling out the required online registration forms when you are asked to indicate your organ donor s…*
 
-<table>
-  <thead>
-    <tr>
-      <th></th>
-      <th>Opt-Out conditions, the ‘yes’ response was pre-selected.<br>In positively framed Opt-In conditions, the ‘No’ response</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Study stimuli for the direct replication of Johnson and</td>
-      <td>was pre-selected. In negatively framed Opt-Out condi-</td>
-    </tr>
-    <tr>
-      <td>Goldstein (2003)</td>
-      <td>tions, the ‘No’ response was pre-selected. In negatively</td>
-    </tr>
-    <tr>
-      <td>[Introduction for participants in Opt-Out/Opt-in</td>
-      <td>framed Opt-in conditions, the ‘yes’ response was pre-</td>
-    </tr>
-    <tr>
-      <td>Conditions]:</td>
-      <td>selected.</td>
-    </tr>
-    <tr>
-      <td>Imagine that you have just moved to a new state and</td>
-      <td>Extensions</td>
-    </tr>
-    <tr>
-      <td>are currently ﬁlling out the required online registration</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>forms when you are asked to indicate your organ donor</td>
-      <td>Extension 1: The effect of choice permanence.</td>
-    </tr>
-    <tr>
-      <td>status. The default in this state is that you ARE automat-ically enrolled to be an organ donor. You are given the</td>
-      <td>Participants in Sample 1 were part of the choice-<br>permanence extension. As such, participants in Sam-</td>
-    </tr>
-    <tr>
-      <td>choice of whether to conﬁrm or to change this status.</td>
-      <td>ple 1 were randomly assigned to one of two between-</td>
-    </tr>
-    <tr>
-      <td>Please select an option</td>
-      <td>participants conditions (temporary or permanent). Par-<br>ticipants assigned to the temporary conditions took the</td>
-    </tr>
-    <tr>
-      <td>[Opt-out]:</td>
-      <td>same survey as those in the permanent conditions—only</td>
-    </tr>
-    <tr>
-      <td>Assume you moved to a new state in which the default</td>
-      <td>they received the following additional instruction at the</td>
-    </tr>
-    <tr>
-      <td>is that you are an organ donor, you are therefore by</td>
-      <td>beginning of part 1 of the study:</td>
-    </tr>
-    <tr>
-      <td>default enrolled as an organ donor. Please choose your</td>
-      <td>“Please note: Your organ donor authorization, if</td>
-    </tr>
-    <tr>
-      <td>preferred organ donor status:</td>
-      <td>granted, would be for 3 years only, meaning that after<br>3 years you will be asked to reconﬁrm your organ donor</td>
-    </tr>
-    <tr>
-      <td>Yes-I want to be an organ donor</td>
-      <td>decision.”</td>
-    </tr>
-    <tr>
-      <td>No- I do not want to be an organ donor</td>
-      <td>Participants in the permanent conditions had no ad-<br>ditional instructions.</td>
-    </tr>
-    <tr>
-      <td>[Opt-in]:</td>
-      <td>Extension 2: Conceptual replication of Experimental 2</td>
-    </tr>
-    <tr>
-      <td>Assume you moved to a new state in which the default</td>
-      <td>of Johnson et al. (2002).</td>
-    </tr>
-    <tr>
-      <td>is that you are not an organ donor, you are therefore by</td>
-      <td>All the participants in Sample 2 took part in a differ-</td>
-    </tr>
-    <tr>
-      <td>default not enrolled as an organ donor. Please choose</td>
-      <td>ent extension. Immediately after completing Part 1 of</td>
-    </tr>
-    <tr>
-      <td>your preferred organ donor status:</td>
-      <td>the study but just before Part 2, participants read the<br>following instructions (see Table 3 for details):</td>
-    </tr>
-    <tr>
-      <td>Yes-I want to be an organ donor</td>
-      <td>“Would you like to receive further information about</td>
-    </tr>
-    <tr>
-      <td>No- I do not want to be an organ donor</td>
-      <td>organ donation through MTurk? If you indicate your<br>approval, we’ll contact you through MTurk using your</td>
-    </tr>
-    <tr>
-      <td>[No-default]:</td>
-      <td>worker ID with further information about organ dona-</td>
-    </tr>
-    <tr>
-      <td>Assume you moved to a new state, therefore, you need</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td></td>
-      <td>tion.”</td>
-    </tr>
-    <tr>
-      <td>to select enrollment as an organ donor. Please choose</td>
-      <td>These participants were randomly assigned to 1 of 6</td>
-    </tr>
-    <tr>
-      <td>your preferred organ donor status:</td>
-      <td>conditions in a 2 (framing: Positive vs. Negative) times<br>3 (default option: Opt-Out vs. Opt-In vs. No-Default)</td>
-    </tr>
-    <tr>
-      <td>Yes-I want to be an organ donor</td>
-      <td>between-participants design (for details, see Table S6 in</td>
-    </tr>
-    <tr>
-      <td>No- I do not want to be an organ donor</td>
-      <td>the supplementary section). After reading the above in-<br>struction, participants selected “Yes” or “No” to a ques-<br>tion asking for consent to receiving further information<br>on organ donation. Each of the default conditions in-</td>
-    </tr>
-    <tr>
-      <td>Participants then answered four generic questions on</td>
-      <td>volved either a positive (“Send me more information</td>
-    </tr>
-    <tr>
-      <td>their health in general (for details, see Table S4 supple-mentary section). Participants then read:</td>
-      <td>about organ donation”) or negative (“Do NOT send me<br>more information about organ donation”) framing. The</td>
-    </tr>
-    <tr>
-      <td>“You are almost at the end of the survey. Thank you</td>
-      <td>responses were pre-selected in the Opt-In and Opt-Out</td>
-    </tr>
-    <tr>
-      <td>for taking part. Would you be interested in being notiﬁed</td>
-      <td>default conditions mirroring the experimental design of</td>
-    </tr>
-    <tr>
-      <td>about other policy/health-related surveys? (If yes, we will</td>
-      <td>Experiment 2 of Johnson et al. (2002). In positively</td>
-    </tr>
-    <tr>
-      <td>contact you through MTurk using your MTurk worker ID)”</td>
-      <td>framed Opt-Out conditions, the ‘yes’ response was pre-</td>
-    </tr>
-    <tr>
-      <td>Participants answered by selecting “Yes” or “No.”</td>
-      <td>selected. In positively framed Opt-In conditions, the</td>
-    </tr>
-    <tr>
-      <td>Each condition had a positive (“Notify me about more</td>
-      <td>‘No’ response was pre-selected. In negatively framed</td>
-    </tr>
-    <tr>
-      <td>health surveys.”) or negative (“Do NOT notify me about</td>
-      <td>Opt-Out conditions, the ‘no’ response was pre-selected.</td>
-    </tr>
-    <tr>
-      <td>more health surveys.”) framing. In positively framed</td>
-      <td></td>
-    </tr>
-  </tbody>
-</table>
+```
+Opt-Out conditions, the ‘yes’ response was pre-selected.
+In positively framed Opt-In conditions, the ‘No’ response
+Study stimuli for the direct replication of Johnson and
+was pre-selected. In negatively framed Opt-Out condi-
+Goldstein (2003)
+tions, the ‘No’ response was pre-selected. In negatively
+[Introduction for participants in Opt-Out/Opt-in framed Opt-in conditions, the ‘yes’ response was pre-
+Conditions]: selected.
+Imagine that you have just moved to a new state and
+Extensions
+are currently ﬁlling out the required online registration
+forms when you are asked to indicate your organ donor
+Extension 1: The effect of choice permanence.
+status. The default in this state is that you ARE automat-
+Participants in Sample 1 were part of the choice-
+ically enrolled to be an organ donor. You are given the
+permanence extension. As such, participants in Sam-
+choice of whether to conﬁrm or to change this status.
+ple 1 were randomly assigned to one of two between-
+Please select an option
+participants conditions (temporary or permanent). Par-
+ticipants assigned to the temporary conditions took the
+[Opt-out]:
+same survey as those in the permanent conditions—only
+Assume you moved to a new state in which the default
+they received the following additional instruction at the
+is that you are an organ donor, you are therefore by
+beginning of part 1 of the study:
+default enrolled as an organ donor. Please choose your
+“Please note: Your organ donor authorization, if
+preferred organ donor status:
+granted, would be for 3 years only, meaning that after
+3 years you will be asked to reconﬁrm your organ donor
+Yes-I want to be an organ donor
+decision.”
+No- I do not want to be an organ donor Participants in the permanent conditions had no ad-
+ditional instructions.
+[Opt-in]:
+Extension 2: Conceptual replication of Experimental 2
+Assume you moved to a new state in which the default
+of Johnson et al. (2002).
+is that you are not an organ donor, you are therefore by
+All the participants in Sample 2 took part in a differ-
+default not enrolled as an organ donor. Please choose
+ent extension. Immediately after completing Part 1 of
+your preferred organ donor status:
+the study but just before Part 2, participants read the
+following instructions (see Table 3 for details):
+Yes-I want to be an organ donor
+“Would you like to receive further information about
+No- I do not want to be an organ donor organ donation through MTurk? If you indicate your
+approval, we’ll contact you through MTurk using your
+[No-default]:
+worker ID with further information about organ dona-
+Assume you moved to a new state, therefore, you need
+tion.”
+to select enrollment as an organ donor. Please choose
+These participants were randomly assigned to 1 of 6
+your preferred organ donor status:
+conditions in a 2 (framing: Positive vs. Negative) times
+3 (default option: Opt-Out vs. Opt-In vs. No-Default)
+Yes-I want to be an organ donor
+between-participants design (for details, see Table S6 in
+No- I do not want to be an organ donor the supplementary section). After reading the above in-
+struction, participants selected “Yes” or “No” to a ques-
+tion asking for consent to receiving further information
+on organ donation. Each of the default conditions in-
+Participants then answered four generic questions on
+volved either a positive (“Send me more information
+their health in general (for details, see Table S4 supple-
+about organ donation”) or negative (“Do NOT send me
+mentary section). Participants then read:
+more information about organ donation”) framing. The
+“You are almost at the end of the survey. Thank you
+responses were pre-selected in the Opt-In and Opt-Out
+for taking part. Would you be interested in being notiﬁed
+default conditions mirroring the experimental design of
+about other policy/health-related surveys? (If yes, we will
+Experiment 2 of Johnson et al. (2002). In positively
+contact you through MTurk using your MTurk worker ID)”
+framed Opt-Out conditions, the ‘yes’ response was pre-
+Participants answered by selecting “Yes” or “No.”
+selected. In positively framed Opt-In conditions, the
+Each condition had a positive (“Notify me about more
+‘No’ response was pre-selected. In negatively framed
+health surveys.”) or negative (“Do NOT notify me about
+Opt-Out conditions, the ‘no’ response was pre-selected.
+more health surveys.”) framing. In positively framed
+```
+
+### Table 4
 *Classiﬁcation of replications based on LeBel et al.*
 
 ```

@@ -1521,3 +1521,137 @@ def test_drop_running_header_rows_skips_empty_top_row():
     ]
     out = _drop_running_header_rows(grid)
     assert out == grid
+
+
+def test_drop_running_header_rows_blanks_in_row_strong_rh_cell():
+    """Iter 17: chan_feldman T5 pattern. Top row has a strong-RH cell
+    (page number 1236) mixed with real header content. The cell-level
+    cleanup blanks out the strong-RH cell while keeping real headers."""
+    grid = [
+        ["1236", "Target article", "Replication", "Reason for change"],
+        ["Study design", "between", "between", "—"],
+        ["Sample size",  "100",     "200",      "+100"],
+    ]
+    out = _drop_running_header_rows(grid)
+    # Row 0 kept (it has real header content) but col 0 ("1236") blanked.
+    assert len(out) == 3
+    assert out[0] == ["", "Target article", "Replication", "Reason for change"]
+
+
+def test_drop_running_header_rows_does_not_blank_when_no_real_content():
+    """If top row has only strong/weak RH and no non-RH cells, don't
+    blank — that's already handled by the row-drop logic, no additional
+    cell-blanking needed."""
+    grid = [
+        ["1236", "726"],
+        ["Variable", "Mean"],
+        ["x", "1.5"],
+    ]
+    # Both cells of row 0 are strong RH, no real content, so the row
+    # itself is dropped.
+    out = _drop_running_header_rows(grid)
+    assert out[0] == ["Variable", "Mean"]
+
+
+def test_drop_running_header_rows_blanks_strong_in_real_header_row():
+    """In-row strip when top row has strong RH (1236) mixed with cells
+    that are clearly non-RH (multi-word headers with punctuation /
+    numerics nearby).
+
+    Note on the limitation: a synthetic row like
+    ``["Variable", "Mean", "725"]`` would be ROW-DROPPED instead of
+    cell-stripped — single-cap-word cells qualify as weak-RH and the
+    weak+strong combo triggers row drop. Real-world header cells almost
+    always have multi-word labels (``Reason for change``,
+    ``Target article``) or short labels with punctuation (``p-value``,
+    ``95% CI``) that disambiguate from name-like weak signals."""
+    grid = [
+        ["1236", "Target article", "Replication", "Reason for change"],
+        ["Study design", "between", "between", "—"],
+        ["Sample size",  "100",     "200",      "+100"],
+    ]
+    out = _drop_running_header_rows(grid)
+    assert len(out) == 3
+    # Real headers preserved; the page-number cell blanked.
+    assert out[0] == ["", "Target article", "Replication", "Reason for change"]
+
+
+from splice_spike import _is_spurious_body_prose_grid
+
+
+def test_spurious_body_prose_detector_flags_2col_running_text():
+    """ar_apa_j Table 1 pattern: 80+ rows of running body prose split
+    across 2 columns. Every cell is long, multi-word, lowercase-rich."""
+    rows = [
+        ["had to cover support for graduate students so there is more",
+         "Assessments following the initial and final confederate proposals"],
+        ["need. The confederate then was invited to put forward his own",
+         "Did this large between condition difference in rates of agreement"],
+        ["counterproposal which the experimenter indicated would have",
+         "reflect a grudging acceptance by Positive Expectations condition"],
+        ["be the final proposal considered because the available time for",
+         "participants of a proposal that they deemed unfair and unattractive"],
+        ["the negotiation had been exhausted. This proposal effectively",
+         "Participants in the Positive Expectations condition rated the"],
+    ]
+    assert _is_spurious_body_prose_grid(rows)
+
+
+def test_spurious_body_prose_detector_passes_real_stat_table():
+    """A normal stat table with short labels + numeric data isn't body prose."""
+    rows = [
+        ["Variable", "Mean", "SD", "N"],
+        ["Age",      "24.3", "3.1", "100"],
+        ["IQ",       "100.5", "15.2", "100"],
+        ["Score",    "85.1",  "8.7", "98"],
+        ["Rating",   "5.2",   "1.4", "100"],
+    ]
+    assert not _is_spurious_body_prose_grid(rows)
+
+
+def test_spurious_body_prose_detector_passes_definition_table():
+    """A real definition table (term + short definition) is NOT prose
+    because the definitions don't reach 35 chars on average AND the
+    terms aren't 4+ words."""
+    rows = [
+        ["Term",        "Definition"],
+        ["Replication", "Repeating an experiment to verify findings."],
+        ["Extension",   "Building on prior work with new conditions."],
+        ["Pre-reg",     "Registering hypotheses and methods upfront."],
+        ["OSF",         "Open Science Framework, a project repository."],
+    ]
+    # The "Term" column has 1-word entries — not prose-like (need ≥4 words).
+    assert not _is_spurious_body_prose_grid(rows)
+
+
+def test_spurious_body_prose_detector_passes_short_grid():
+    """Need ≥4 populated rows to qualify."""
+    rows = [
+        ["Some long prose-like cell that easily passes the prose check.",
+         "Another long prose-like cell that also passes the prose check."],
+        ["Second row of prose-like content with ample length and words.",
+         "Matching prose-like cell on the right that has lots of words."],
+        ["Third row of similar prose content with enough length and words.",
+         "Right side cell with prose pattern enough length and word count."],
+    ]
+    # Only 3 rows, doesn't qualify.
+    assert not _is_spurious_body_prose_grid(rows)
+
+
+def test_spurious_body_prose_detector_passes_numeric_heavy_grid():
+    """Even with some prose, if numeric cells are >10% it's a stat
+    table not body prose."""
+    rows = [
+        ["Long cell with body prose content of various words and length",
+         "12.5"],
+        ["Another long body prose row with sufficient text and word count",
+         "13.7"],
+        ["Yet more long body prose with enough text and four-plus words",
+         "14.2"],
+        ["Continuation of body prose with sufficient length and word count",
+         "15.8"],
+        ["Final row of body prose with enough text words and length here",
+         "16.3"],
+    ]
+    # Half of cells are numeric → not body prose.
+    assert not _is_spurious_body_prose_grid(rows)

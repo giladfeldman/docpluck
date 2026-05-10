@@ -492,7 +492,7 @@ Handling Editor: Lissa Libby
 <table>
   <thead>
     <tr>
-      <th>1180</th>
+      <th></th>
       <th>Social Psychological and Personality Science 13(7)</th>
     </tr>
   </thead>

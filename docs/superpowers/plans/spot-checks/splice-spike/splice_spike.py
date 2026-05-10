@@ -545,6 +545,28 @@ def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
         if not has_real_below:
             break
         out = out[1:]
+    # Iteration 17 add-on: cell-level RH cleanup. After fully-RH row
+    # removal, the (new) top row may STILL contain a strong-RH cell
+    # mixed with real header content (e.g. chan_feldman T5:
+    # ``["1236", "Target article", "Replication", "Reason for change"]``).
+    # If at least one strong-RH cell coexists with a non-RH populated
+    # cell in the same row, blank out the strong-RH cells. Conservative:
+    # only blanks cells matching STRONG patterns (not weak), and only on
+    # the very first row.
+    if out:
+        top = list(out[0])
+        has_strong = any(_is_strong_running_header(c) for c in top)
+        has_real = any(
+            (c or "").strip()
+            and not _is_strong_running_header(c)
+            and not _is_weak_running_header(c)
+            for c in top
+        )
+        if has_strong and has_real:
+            for i, c in enumerate(top):
+                if _is_strong_running_header(c):
+                    top[i] = ""
+            out = [top] + out[1:]
     return out
 
 
@@ -1161,6 +1183,64 @@ def _drop_caption_leading_rows(
     return grid
 
 
+_PROSE_CELL_NUMERIC_RE = re.compile(r"^[-−–]?\d+(?:[.,]\d+)*[%]?$")
+
+
+def _is_spurious_body_prose_grid(grid: list[list[str]]) -> bool:
+    """A grid that is ostensibly multi-column but whose cells are running
+    body prose, not table data — Camelot misclassified a multi-column
+    page layout (or interleaved body paragraphs) as a table.
+
+    Iteration 16. Worst offender: ar_apa_j_jesp_2009_12_010 Table 1, an
+    80+ row "table" where every cell is a slice of running text from the
+    Methods section. Char ratio inflated to 1.453 by the duplication.
+
+    A grid qualifies as "spurious body prose" when ALL of:
+      - ≥ 4 populated rows;
+      - ≥ 80% of populated cells are "prose-like" — ≥ 30 chars, ≥ 4
+        words, contains ≥ 2 lowercase letters;
+      - < 10% of populated cells are pure numeric (so we don't strip
+        a real stat table whose cells happen to be slightly long);
+      - average prose cell length ≥ 35 chars (real definition tables
+        have shorter labels).
+
+    Returns False for the iter-6 spurious-1col case (handled separately)
+    and for any grid where row 0 looks like a real header (≥1 numeric or
+    short-label cell pattern).
+    """
+    populated_rows = 0
+    populated_cells = 0
+    prose_cells = 0
+    numeric_cells = 0
+    prose_lengths: list[int] = []
+    for row in grid:
+        non_empty = [c.strip() for c in row if c and c.strip()]
+        if not non_empty:
+            continue
+        populated_rows += 1
+        for c in non_empty:
+            populated_cells += 1
+            if _PROSE_CELL_NUMERIC_RE.match(c):
+                numeric_cells += 1
+                continue
+            n_lower = sum(1 for ch in c if ch.islower())
+            n_words = len(c.split())
+            if len(c) >= 30 and n_words >= 4 and n_lower >= 2:
+                prose_cells += 1
+                prose_lengths.append(len(c))
+    if populated_rows < 4 or populated_cells == 0:
+        return False
+    if numeric_cells / populated_cells > 0.10:
+        return False
+    if prose_cells / populated_cells < 0.80:
+        return False
+    if not prose_lengths:
+        return False
+    if sum(prose_lengths) / len(prose_lengths) < 35:
+        return False
+    return True
+
+
 def _is_spurious_single_column_grid(grid: list[list[str]]) -> bool:
     """A grid is "spurious 1-column" when every populated row has exactly one
     non-empty cell AND there are ≥ 4 such rows. Camelot/pdfplumber sometimes
@@ -1298,6 +1378,11 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
                 if code:
                     block_parts.append(code)
                 return "\n".join(block_parts)
+            if _is_spurious_body_prose_grid(grid):
+                code = _render_grid_as_code_block(grid)
+                if code:
+                    block_parts.append(code)
+                return "\n".join(block_parts)
             block_parts.append(pdfplumber_table_to_markdown(grid).rstrip("\n"))
             return "\n".join(block_parts)
 
@@ -1316,6 +1401,11 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
                         block_parts.append(code)
                     return "\n".join(block_parts)
                 if _is_spurious_single_column_grid(cam_rows):
+                    code = _render_grid_as_code_block(cam_rows)
+                    if code:
+                        block_parts.append(code)
+                    return "\n".join(block_parts)
+                if _is_spurious_body_prose_grid(cam_rows):
                     code = _render_grid_as_code_block(cam_rows)
                     if code:
                         block_parts.append(code)
