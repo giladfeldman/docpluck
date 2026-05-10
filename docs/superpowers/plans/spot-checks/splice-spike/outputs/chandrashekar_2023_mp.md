@@ -210,15 +210,15 @@ We failed to ﬁnd support for differences in rates of consent to receive health
       <th></th>
       <th>Combined replication sample</th>
     </tr>
+    <tr>
+      <th>Replication Study</th>
+      <th>Experimental Conditions<br>Opt-in default</th>
+      <th></th>
+      <th>n<br>488</th>
+      <th>Participation rate<br>62.5%</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Replication Study</td>
-      <td>Experimental Conditions<br>Opt-in default</td>
-      <td></td>
-      <td>n<br>488</td>
-      <td>Participation rate<br>62.5%</td>
-    </tr>
     <tr>
       <td>Replication of Experiment 1 from Johnson &amp; Goldstein (2003)</td>
       <td>Opt-out default<br>No-default (no default)<br>Opt-in default</td>
@@ -1085,19 +1085,19 @@ We reproduce the results reported as part of Group B’s pre-registration docume
       <th>Model 2</th>
       <th></th>
     </tr>
+    <tr>
+      <th>Predictor</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictor</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-    </tr>
     <tr>
       <td>Intercept</td>
       <td>-0.84 (0.11)</td>
@@ -1185,19 +1185,19 @@ We reproduce the results reported as part of Group B’s pre-registration docume
       <th>Model 2</th>
       <th></th>
     </tr>
+    <tr>
+      <th>Predictor</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictor</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-    </tr>
     <tr>
       <td>Intercept</td>
       <td>-0.84 (0.11)</td>
@@ -1285,19 +1285,19 @@ We reproduce the results reported as part of Group B’s pre-registration docume
       <th>Model 2</th>
       <th></th>
     </tr>
+    <tr>
+      <th>Predictor</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictor</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-    </tr>
     <tr>
       <td>Intercept</td>
       <td>-0.84 (0.11)</td>
@@ -1385,19 +1385,19 @@ We reproduce the results reported as part of Group B’s pre-registration docume
       <th>Model 2</th>
       <th></th>
     </tr>
+    <tr>
+      <th>Predictor</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+      <th>Estimate</th>
+      <th>Z</th>
+      <th>p</th>
+      <th>OR [95% CI]</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictor</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-      <td>Estimate</td>
-      <td>Z</td>
-      <td>p</td>
-      <td>OR [95% CI]</td>
-    </tr>
     <tr>
       <td>Intercept</td>
       <td>-0.84 (0.11)</td>

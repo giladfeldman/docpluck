@@ -140,16 +140,16 @@ Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s do
       <th>Original domain group<br>Easy domain group</th>
       <th>Diﬃcult domain group</th>
     </tr>
+    <tr>
+      <th>(replication)(extension)</th>
+      <th>(extension)</th>
+    </tr>
+    <tr>
+      <th>Easy domains</th>
+      <th></th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>(replication)(extension)</td>
-      <td>(extension)</td>
-    </tr>
-    <tr>
-      <td>Easy domains</td>
-      <td></td>
-    </tr>
     <tr>
       <td>Using a mouse<br>Using a mouse with your</td>
       <td>Using a mouse with your</td>
@@ -431,17 +431,17 @@ Table 6: Mean ratings across all abilities for the three conditions.
       <th>(n = 226)</th>
       <th>Diﬃcult domains</th>
     </tr>
+    <tr>
+      <th>Variable</th>
+      <th>Mean</th>
+      <th>SD</th>
+      <th>Mean</th>
+      <th>SD</th>
+      <th>Mean</th>
+      <th>SD</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Variable</td>
-      <td>Mean</td>
-      <td>SD</td>
-      <td>Mean</td>
-      <td>SD</td>
-      <td>Mean</td>
-      <td>SD</td>
-    </tr>
     <tr>
       <td>Mean domain diﬃculty</td>
       <td>6.05</td>
@@ -517,26 +517,26 @@ Table 7: Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃ
       <th></th>
       <th></th>
     </tr>
+    <tr>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>Mean</th>
+      <th></th>
+      <th>Eﬀect</th>
+      <th></th>
+    </tr>
+    <tr>
+      <th>Condition</th>
+      <th>T-statistic</th>
+      <th>df</th>
+      <th>diﬀerence</th>
+      <th>p-value</th>
+      <th>size r</th>
+      <th>95% CI</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Mean</td>
-      <td></td>
-      <td>Eﬀect</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Condition</td>
-      <td>T-statistic</td>
-      <td>df</td>
-      <td>diﬀerence</td>
-      <td>p-value</td>
-      <td>size r</td>
-      <td>95% CI</td>
-    </tr>
     <tr>
       <td>Original</td>
       <td>668.5</td>
@@ -757,15 +757,15 @@ Table 11: Extension conditions: Mean comparative ability estimates and judgmenta
       <th>Diﬃcult domain condition<br>Judgmental weight</th>
       <th>Judgmental weight</th>
     </tr>
+    <tr>
+      <th>Ability</th>
+      <th>of own ability<br>1</th>
+      <th>of others’ ability<br>1</th>
+      <th>of own ability<br>1</th>
+      <th>of others’ ability<br>1</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Ability</td>
-      <td>of own ability<br>1</td>
-      <td>of others’ ability<br>1</td>
-      <td>of own ability<br>1</td>
-      <td>of others’ ability<br>1</td>
-    </tr>
     <tr>
       <td>Using mouse</td>
       <td>0.48∗∗∗</td>
@@ -921,22 +921,22 @@ T
       <th></th>
       <th></th>
     </tr>
+    <tr>
+      <th>tested against the average (scale midpoint).</th>
+      <th>Easy domain condition</th>
+      <th></th>
+      <th></th>
+      <th>Diﬃcult domain condition</th>
+    </tr>
+    <tr>
+      <th>Ability</th>
+      <th>Domain</th>
+      <th>Percentile</th>
+      <th>Domain</th>
+      <th>Percentile</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>tested against the average (scale midpoint).</td>
-      <td>Easy domain condition</td>
-      <td></td>
-      <td></td>
-      <td>Diﬃcult domain condition</td>
-    </tr>
-    <tr>
-      <td>Ability</td>
-      <td>Domain</td>
-      <td>Percentile</td>
-      <td>Domain</td>
-      <td>Percentile</td>
-    </tr>
     <tr>
       <td></td>
       <td>diﬃculty</td>
@@ -1164,24 +1164,24 @@ replication based on criteria created by LeBel et al. (2019).
       <th>Correlation<br>coeﬃcient (r)<br>and 95% CI</th>
       <th></th>
     </tr>
+    <tr>
+      <th>Variables</th>
+      <th>Original study</th>
+      <th></th>
+      <th>Replication</th>
+      <th></th>
+      <th>Replication</th>
+    </tr>
+    <tr>
+      <th>(across all</th>
+      <th></th>
+      <th></th>
+      <th>condition</th>
+      <th></th>
+      <th>evaluation</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Variables</td>
-      <td>Original study</td>
-      <td></td>
-      <td>Replication</td>
-      <td></td>
-      <td>Replication</td>
-    </tr>
-    <tr>
-      <td>(across all</td>
-      <td></td>
-      <td></td>
-      <td>condition</td>
-      <td></td>
-      <td>evaluation</td>
-    </tr>
     <tr><td colspan="6"><strong>abilities)</strong></td></tr>
     <tr>
       <td>Own ability</td>

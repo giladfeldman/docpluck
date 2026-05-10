@@ -576,19 +576,19 @@ Inferential statistics
       <th>Win-:</th>
       <th>Loss-</th>
     </tr>
+    <tr>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th>Uncertain</th>
+      <th>Uncertain</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Uncertain</td>
-      <td>Uncertain</td>
-    </tr>
     <tr>
       <td>Tversky &amp; Shafir, 1992<br>(within-subjects)</td>
       <td>/</td>

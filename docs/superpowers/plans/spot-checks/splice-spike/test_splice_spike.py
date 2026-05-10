@@ -418,6 +418,63 @@ def test_footnote_extraction_skips_when_no_markers():
     assert _extract_footnote_lines(region) == []
 
 
+from splice_spike import _is_header_like_row
+
+
+def test_header_like_row_label_only():
+    """A row of short text labels with zero numeric cells is header-like."""
+    assert _is_header_like_row(["Variable", "Mean", "SD"]) is True
+    assert _is_header_like_row(["", "Estimation", "Average estimation", ""]) is True
+
+
+def test_header_like_row_data_with_numbers_is_not_header_like():
+    """A data row with numeric cells fails the ≤30% numeric threshold."""
+    assert _is_header_like_row(["Age", "24.3", "3.1"]) is False
+    assert _is_header_like_row(["IQ", "100.5", "15.2"]) is False
+
+
+def test_header_like_row_with_long_prose_is_not_header_like():
+    """A hypothesis-statement row with one long cell exceeds the avg-length
+    threshold and is recognized as data."""
+    long = "Compared to judgments of others' abilities, participants' judgments of their own abilities better predict their comparative ability judgments."
+    assert _is_header_like_row(["H1", long, "Replication"]) is False
+
+
+def test_two_row_header_renders_both_in_thead():
+    """When the first two rows of a grid are both header-like and the third
+    row has numeric data, both rows must end up inside `<thead>` (with
+    `<th>` cells), not `<tbody>`."""
+    grid = [
+        ["", "Estimation", "Average estimation", ""],
+        ["Experiences", "errora", "error (%)", "t-statistics"],
+        ["Negative experiences", "−17.2", "5.47**", ""],
+    ]
+    result = pdfplumber_table_to_markdown(grid)
+    # Both header rows must be inside <thead>...</thead>, with <th> cells.
+    head_block = result.split("<tbody>")[0]
+    assert "<thead>" in head_block
+    assert head_block.count("<tr>") == 2  # two header rows
+    assert "<th>Experiences</th>" in head_block
+    assert "<th>errora</th>" in head_block
+    # Body must NOT contain those header cells as <td>.
+    body_block = result.split("<tbody>")[1]
+    assert "<td>Negative experiences</td>" in body_block
+    assert "<th>Experiences</th>" not in body_block
+
+
+def test_single_row_header_still_renders_one_thead_row():
+    """When only the first row is header-like (rest is data), thead has
+    exactly one <tr> — backward-compat with the simpler tables."""
+    grid = [
+        ["Variable", "Mean", "SD"],
+        ["Age", "24.3", "3.1"],
+        ["IQ", "100.5", "15.2"],
+    ]
+    result = pdfplumber_table_to_markdown(grid)
+    head_block = result.split("<tbody>")[0]
+    assert head_block.count("<tr>") == 1
+
+
 from splice_spike import _split_mashed_cell
 
 

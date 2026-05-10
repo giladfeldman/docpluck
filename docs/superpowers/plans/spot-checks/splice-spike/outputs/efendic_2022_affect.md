@@ -240,16 +240,16 @@ In two studies, using samples from the United States and the United Kingdom, we 
       <th>Predictors</th>
       <th>DV: Change in non-manipulated attribute</th>
     </tr>
+    <tr>
+      <th>B</th>
+      <th>SE95% CIp</th>
+    </tr>
+    <tr>
+      <th>Intercept<br>20.59</th>
+      <th>0.15[20.88, 20.29]\.001</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>B</td>
-      <td>SE95% CIp</td>
-    </tr>
-    <tr>
-      <td>Intercept<br>20.59</td>
-      <td>0.15[20.88, 20.29]\.001</td>
-    </tr>
     <tr>
       <td>Pre-rating non-manipulated attribute (PNMA)20.63</td>
       <td>0.05[20.72, 20.54]\.001</td>

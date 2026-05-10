@@ -64,17 +64,17 @@ Study 3
       <th>Average estimation</th>
       <th></th>
     </tr>
+    <tr>
+      <th>Experiences</th>
+      <th>errora</th>
+      <th>error (%)</th>
+      <th>t-statistics</th>
+      <th>error</th>
+      <th>error (%)</th>
+      <th>t-statistics</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Experiences</td>
-      <td>errora</td>
-      <td>error (%)</td>
-      <td>t-statistics</td>
-      <td>error</td>
-      <td>error (%)</td>
-      <td>t-statistics</td>
-    </tr>
     <tr>
       <td>Negative experiences</td>
       <td></td>
@@ -230,12 +230,12 @@ Table 2.  Replication and Extensions: Summary of Hypotheses.
       <th>Replication: prevalence estimations</th>
       <th></th>
     </tr>
+    <tr>
+      <th>No</th>
+      <th>Hypothesis</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>No</td>
-      <td>Hypothesis</td>
-    </tr>
     <tr>
       <td>2a</td>
       <td>People underestimate the prevalence of others’ negative emotional experiences.</td>
@@ -556,20 +556,20 @@ Close to far replication
       <th>Details of deviation</th>
       <th>Reasons for change</th>
     </tr>
+    <tr>
+      <th>IV construct</th>
+      <th>Same, with an</th>
+      <th></th>
+      <th></th>
+    </tr>
+    <tr>
+      <th></th>
+      <th>extension</th>
+      <th></th>
+      <th></th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>IV construct</td>
-      <td>Same, with an</td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td></td>
-      <td>extension</td>
-      <td></td>
-      <td></td>
-    </tr>
     <tr>
       <td>DV construct</td>
       <td>Similar, with an added<br>extension</td>
@@ -683,36 +683,36 @@ Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests o
       <th>Item-level analyses</th>
       <th></th>
     </tr>
+    <tr>
+      <th></th>
+      <th>Actual</th>
+      <th>Intensity</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+    <tr>
+      <th></th>
+      <th>intensity</th>
+      <th>estimate</th>
+      <th>Error</th>
+      <th>Error</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td></td>
-      <td>Actual</td>
-      <td>Intensity</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td></td>
-      <td>intensity</td>
-      <td>estimate</td>
-      <td>Error</td>
-      <td>Error</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
     <tr>
       <td>Experiences</td>
       <td>average</td>
@@ -1053,19 +1053,19 @@ Note. df = 592. SCO = social comparison orientation. *p < .05. **p < .01
       <th></th>
       <th></th>
     </tr>
+    <tr>
+      <th>Measure</th>
+      <th>Cronbach’s α</th>
+      <th>estimate</th>
+      <th>estimate</th>
+      <th>R2</th>
+      <th>estimate</th>
+      <th>estimate</th>
+      <th>R2</th>
+      <th>Interpretation</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Measure</td>
-      <td>Cronbach’s α</td>
-      <td>estimate</td>
-      <td>estimate</td>
-      <td>R2</td>
-      <td>estimate</td>
-      <td>estimate</td>
-      <td>R2</td>
-      <td>Interpretation</td>
-    </tr>
     <tr><td colspan="9"><strong>Negative</strong></td></tr>
     <tr>
       <td>Loneliness</td>
@@ -1572,36 +1572,36 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
       <th>Item-level analyses</th>
       <th></th>
     </tr>
+    <tr>
+      <th></th>
+      <th>Actual</th>
+      <th>Intensity</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+    <tr>
+      <th></th>
+      <th>intensity</th>
+      <th>estimate</th>
+      <th>Error</th>
+      <th>Error</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td></td>
-      <td>Actual</td>
-      <td>Intensity</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-    <tr>
-      <td></td>
-      <td>intensity</td>
-      <td>estimate</td>
-      <td>Error</td>
-      <td>Error</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
     <tr>
       <td>Experiences</td>
       <td>average</td>

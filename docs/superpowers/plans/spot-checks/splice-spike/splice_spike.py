@@ -369,6 +369,38 @@ def _split_mashed_cell(s: str) -> str:
     return "".join(out)
 
 
+_NUMERIC_CELL_RE = re.compile(
+    r"^[-−–]?\d+(?:[.,]\d+)*(?:[%∗*]+)?(?:\s*\([^)]*\))?$"
+)
+
+
+def _is_header_like_row(row: list[str]) -> bool:
+    """Heuristic: a row that looks like part of a header rather than data.
+
+    Used to detect multi-row headers — common in academic tables where two
+    or three rows of column labels stack above the data (e.g., a study-name
+    row above a metric-name row above the data). Rules:
+
+    - The row has at least one non-empty cell.
+    - At most 30% of the non-empty cells look numeric (number + optional
+      sign / decimals / asterisks / parenthetical CI). A genuine header row
+      usually has zero numeric cells; the threshold tolerates one stray
+      footnote ref or sample-size annotation.
+    - The average length of non-empty cells is ≤ 30 chars. Header cells are
+      short labels; data rows often carry long hypothesis statements.
+    """
+    nonempty = [c.strip() for c in row if (c or "").strip()]
+    if not nonempty:
+        return False
+    numeric = sum(1 for c in nonempty if _NUMERIC_CELL_RE.match(c))
+    if numeric / len(nonempty) > 0.3:
+        return False
+    avg_len = sum(len(c) for c in nonempty) / len(nonempty)
+    if avg_len > 30:
+        return False
+    return True
+
+
 def _is_group_separator(row: list[str], n_cols: int) -> bool:
     """A "group separator" row has content in only the first cell AND
     the table has ≥3 columns AND the label looks like a section header
@@ -443,15 +475,40 @@ def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
         for ci in range(len(row)):
             row[ci] = _split_mashed_cell(row[ci])
 
-    header = merged[0]
-    body = merged[1:]
+    # Detect multi-row header: count consecutive header-like rows from the
+    # top, capped at 3 (real-world tables don't stack more headers than
+    # that without a structural marker). This rescues the second row of
+    # tables like ip_feldman Table 1 where Camelot produces:
+    #   row 0: ['', 'Estimation', 'Average estimation', '', ...]
+    #   row 1: ['Experiences', 'errora', 'error (%)', 't-statistics', ...]
+    # — both header rows. Without this, row 1 was rendering as `<td>` data.
+    #
+    # A group separator (only-col-0 row spanning the full width) must NOT
+    # be promoted to header — it's an in-body section divider that gets
+    # rendered as a single <td colspan="N"> below.
+    n_header = 1
+    for k in range(1, min(3, len(merged))):
+        if _is_group_separator(merged[k], n_cols):
+            break
+        if _is_header_like_row(merged[k]):
+            n_header = k + 1
+        else:
+            break
+    # Sanity: don't promote multiple header rows if the body has fewer than 1
+    # data row left (would leave the table with no <tbody> rows).
+    if len(merged) - n_header < 1:
+        n_header = 1
+
+    header_rows = merged[:n_header]
+    body = merged[n_header:]
 
     lines: list[str] = ["<table>"]
     lines.append("  <thead>")
-    lines.append("    <tr>")
-    for c in header:
-        lines.append(f"      <th>{_html_escape(c)}</th>")
-    lines.append("    </tr>")
+    for hrow in header_rows:
+        lines.append("    <tr>")
+        for c in hrow:
+            lines.append(f"      <th>{_html_escape(c)}</th>")
+        lines.append("    </tr>")
     lines.append("  </thead>")
     lines.append("  <tbody>")
     for row in body:
