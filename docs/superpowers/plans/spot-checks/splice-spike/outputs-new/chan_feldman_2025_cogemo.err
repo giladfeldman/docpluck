@@ -1,0 +1,4 @@
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (87.1, 470.72499878, 539.6599999999997, 711.1063154794738)
+  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
+C:\Users\filin\AppData\Roaming\Python\Python314\site-packages\camelot\parsers\base.py:238: UserWarning: No tables found in table area (121.79999999999998, 157.52100044, 289.09400000000005, 489.2473162294737)
+  cols, rows, v_s, h_s = self._generate_columns_and_rows(bbox, user_cols)
