@@ -30,7 +30,7 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
 <table>
   <thead>
     <tr>
-      <th>Table 1</th>
+      <th></th>
       <th>Descriptive and omnibus inferential statistics, across original studies and replications.<br>N</th>
       <th>Paying to know<br>Choice</th>
       <th>Win</th>
@@ -566,29 +566,18 @@ Inferential statistics
 <table>
   <thead>
     <tr>
-      <th>Table 2</th>
       <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>N</th>
+      <th>Paying to know, , difference in % Pay $5 across conditions<br>Pass-Fail</th>
+      <th>Pass-Uncertain</th>
+      <th>Fail-Uncertain</th>
+      <th>N</th>
+      <th>Choice under risk, difference in % Accept across conditions<br>Win-Loss</th>
+      <th>Win-:</th>
+      <th>Loss-</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Comparison of differences across conditions.</td>
-      <td>N</td>
-      <td>Paying to know, , difference in % Pay $5 across conditions<br>Pass-Fail</td>
-      <td>Pass-Uncertain</td>
-      <td>Fail-Uncertain</td>
-      <td>N</td>
-      <td>Choice under risk, difference in % Accept across conditions<br>Win-Loss</td>
-      <td>Win-:</td>
-      <td>Loss-</td>
-    </tr>
     <tr>
       <td></td>
       <td></td>
@@ -1003,22 +992,14 @@ Inferential statistics
 <table>
   <thead>
     <tr>
-      <th>Table 3</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Response alternative</th>
+      <th>Counts</th>
+      <th>“Never answer scales in online studies seriously”*<br>% of total</th>
+      <th>Counts</th>
+      <th>“Always carefully read and answer each item on online surveys”**<br>% of total</th>
     </tr>
   </thead>
   <tbody>
-    <tr><td colspan="5"><strong>Attention check results.</strong></td></tr>
-    <tr>
-      <td>Response alternative</td>
-      <td>Counts</td>
-      <td>“Never answer scales in online studies seriously”*<br>% of total</td>
-      <td>Counts</td>
-      <td>“Always carefully read and answer each item on online surveys”**<br>% of total</td>
-    </tr>
     <tr>
       <td>1 (Not at all characteristic of me)</td>
       <td>834</td>

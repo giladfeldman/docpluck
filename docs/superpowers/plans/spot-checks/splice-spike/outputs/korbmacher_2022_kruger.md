@@ -54,21 +54,14 @@ We aimed to extend the replication study by considering the ambiguities in the d
 <table>
   <thead>
     <tr>
-      <th>weight of own and peers’ abilities.</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Ability</th>
+      <th>Domain<br>diﬃculty1</th>
+      <th>Comparative<br>ability2</th>
+      <th>Judgmental weight<br>of Own ability3</th>
+      <th>Judgmental weight<br>of Others’ ability3</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Ability</td>
-      <td>Domain<br>diﬃculty1</td>
-      <td>Comparative<br>ability2</td>
-      <td>Judgmental weight<br>of Own ability3</td>
-      <td>Judgmental weight<br>of Others’ ability3</td>
-    </tr>
     <tr><td colspan="5"><strong>Easy</strong></td></tr>
     <tr>
       <td>Using a mouse</td>
@@ -590,21 +583,14 @@ Table 8: Replication condition: Mean comparative ability estimates and judgmenta
 <table>
   <thead>
     <tr>
-      <th>of own versus peers’ abilities.</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Ability</th>
+      <th>Domain<br>diﬃculty1</th>
+      <th>Percentile<br>estimate2</th>
+      <th>Judgment weight:<br>Own ability3</th>
+      <th>Judgment weight:<br>Others’ ability3</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Ability</td>
-      <td>Domain<br>diﬃculty1</td>
-      <td>Percentile<br>estimate2</td>
-      <td>Judgment weight:<br>Own ability3</td>
-      <td>Judgment weight:<br>Others’ ability3</td>
-    </tr>
     <tr>
       <td>Using mouse</td>
       <td>2.70 (2.63)</td>
@@ -686,21 +672,14 @@ See Table 11 in the OSF supplement: equivalence tests 1–2. See Table 11 in the
 <table>
   <thead>
     <tr>
-      <th>changes in Comparative Ability explained by Others’ and Own Ability in the Replication Con-dition.</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Predictors</th>
+      <th>B</th>
+      <th>S.E.</th>
+      <th>CI</th>
+      <th>p</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictors</td>
-      <td>B</td>
-      <td>S.E.</td>
-      <td>CI</td>
-      <td>p</td>
-    </tr>
     <tr>
       <td>(Intercept)</td>
       <td>8.72</td>
@@ -772,7 +751,7 @@ Table 11: Extension conditions: Mean comparative ability estimates and judgmenta
 <table>
   <thead>
     <tr>
-      <th>of own and peers’ abilities by domain diﬃculty.</th>
+      <th></th>
       <th>Easy domain condition<br>Judgmental weight</th>
       <th>Judgmental weight</th>
       <th>Diﬃcult domain condition<br>Judgmental weight</th>
@@ -864,21 +843,14 @@ Additionally, also mixed models indicated that own ability was a better predicto
 <table>
   <thead>
     <tr>
-      <th>changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con-ditions.</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Predictors</th>
+      <th>B</th>
+      <th>S.E.</th>
+      <th>CI</th>
+      <th>p</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictors</td>
-      <td>B</td>
-      <td>S.E.</td>
-      <td>CI</td>
-      <td>p</td>
-    </tr>
     <tr><td colspan="5"><strong>Easy condition extension</strong></td></tr>
     <tr>
       <td>(Intercept)</td>
@@ -1046,21 +1018,14 @@ See OSF supplement: equivalence tests 7–8. See OSF supplement: equivalence tes
 <table>
   <thead>
     <tr>
-      <th>changes in Comparative Ability explained by Others’ and Own Ability in the Extension Con-ditions.</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Predictors</th>
+      <th>B<br>Comparative Ability Easy Condition</th>
+      <th>S.E.</th>
+      <th>CI</th>
+      <th>p</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictors</td>
-      <td>B<br>Comparative Ability Easy Condition</td>
-      <td>S.E.</td>
-      <td>CI</td>
-      <td>p</td>
-    </tr>
     <tr>
       <td>(Intercept)</td>
       <td>18.6</td>
@@ -1453,7 +1418,7 @@ Table 17: Comparison of one-sample t-test eﬀect sizes between the original art
 <table>
   <thead>
     <tr>
-      <th>replication based on criteria created by LeBel et al. (2019).</th>
+      <th></th>
       <th>Cohen’s d and 95% CI</th>
       <th>Replication outcome</th>
     </tr>

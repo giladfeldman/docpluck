@@ -237,15 +237,11 @@ In two studies, using samples from the United States and the United Kingdom, we 
 <table>
   <thead>
     <tr>
-      <th>in Non-Manipulated Attribute as DV.</th>
-      <th></th>
+      <th>Predictors</th>
+      <th>DV: Change in non-manipulated attribute</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Predictors</td>
-      <td>DV: Change in non-manipulated attribute</td>
-    </tr>
     <tr>
       <td>B</td>
       <td>SE95% CIp</td>

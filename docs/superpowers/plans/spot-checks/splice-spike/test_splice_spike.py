@@ -418,6 +418,79 @@ def test_footnote_extraction_skips_when_no_markers():
     assert _extract_footnote_lines(region) == []
 
 
+from splice_spike import _drop_caption_leading_rows
+
+
+def test_drop_caption_leading_label_only_row():
+    """A leading row whose first cell is exactly ``Table N`` (with all
+    other cells empty) is a caption-label fragment, not a header."""
+    grid = [
+        ["Table 5", "", "", "", ""],
+        ["Variable", "Mean", "SD", "Mean", "SD"],
+        ["Age", "24.3", "3.1", "25.1", "2.9"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 5",
+        caption="Table 5 Descriptive table of the participation rates.",
+    )
+    assert out[0][0] == "Variable"
+    assert len(out) == 2
+
+
+def test_drop_caption_leading_caption_tail_row():
+    """A row with content only in col 0, whose content appears verbatim in
+    the caption text, is a caption-tail line picked up by Camelot."""
+    grid = [
+        ["Descriptive table of the participation rates.", "", "", "", ""],
+        ["Variable", "Mean", "SD", "Mean", "SD"],
+        ["Age", "24.3", "3.1", "25.1", "2.9"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 5",
+        caption="Table 5 Descriptive table of the participation rates. Note: ...",
+    )
+    assert out[0][0] == "Variable"
+
+
+def test_drop_caption_leading_page_number_row():
+    """A row with col 0 empty and col 1 a small number (1-3 digits) and no
+    other content is a page-number row Camelot picked up off-table."""
+    grid = [
+        ["", "5"],
+        ["Variable", "Mean"],
+        ["Age", "24.3"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 1",
+        caption="Table 1: Mean age across conditions.",
+    )
+    assert out[0][0] == "Variable"
+
+
+def test_drop_caption_does_not_drop_legitimate_header():
+    """A row with multiple non-empty cells must NEVER be dropped — it's a
+    real header even if col 0 is short or appears in caption."""
+    grid = [
+        ["Variable", "Mean", "SD"],
+        ["Age", "24.3", "3.1"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 1",
+        caption="Table 1: Mean age, SD, and Variable analysis across conditions.",
+    )
+    # All three rows preserved (the original 2 + nothing dropped).
+    assert len(out) == 2
+    assert out[0][0] == "Variable"
+
+
+def test_drop_caption_empty_grid_returns_empty():
+    assert _drop_caption_leading_rows([], "Table 1", "caption") == []
+
+
 def test_dedupe_prefers_html_table_over_code_block():
     """When two ``### Table N`` blocks exist for the same N — one with an
     HTML ``<table>`` and one with a fragment-wrapped ``\\`\\`\\`` code block —

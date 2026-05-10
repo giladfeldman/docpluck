@@ -676,6 +676,81 @@ def _table_caption_short(caption: str | None, label: str | None) -> str:
     return text.strip()
 
 
+_LABEL_ONLY_RE = re.compile(
+    r"^(?:Table|Tab\.?|Figure|Fig\.?)\s+\d+(?:[.:]?)?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _drop_caption_leading_rows(
+    grid: list[list[str]],
+    label: str,
+    caption: str,
+) -> list[list[str]]:
+    """Trim leading grid rows that are caption fragments rather than table data.
+
+    Camelot's ``_drop_caption_first_row`` removes ONE row whose first cell
+    matches the caption's first line, but real PDFs frequently render the
+    caption across several lines (label + multi-line description) AND insert
+    page-number rows above the table. The result is a Camelot grid whose
+    first 1–4 rows are caption tail / label / page number — and rendering
+    them as the table's header is visually broken.
+
+    Drop rules (each conservative; only fires on near-certain caption noise):
+      1. Row whose only-cell content is exactly ``Table N`` / ``Figure N``
+         (the label by itself).
+      2. Row with content ONLY in col 0, where col 0 is ≥ 5 chars and
+         appears verbatim somewhere in the caption text (caption tail).
+      3. Row with col 0 empty and col 1 = ``\\d{{1,3}}`` and all other cols
+         empty (a page-number-only row Camelot picked up from the page).
+
+    The function never deletes a row whose other columns hold real data
+    (numerics, multi-cell content), so it cannot strip a legitimate header.
+    """
+    if not grid:
+        return grid
+    label_norm = label.strip().lower()
+    cap_norm = re.sub(r"\s+", " ", caption or "").strip()
+
+    while grid:
+        first_row = grid[0]
+        first_cell = (first_row[0] if first_row else "").strip()
+        rest_nonempty = [c for c in first_row[1:] if (c or "").strip()]
+
+        # Rule 1: row is just the label.
+        if first_cell.lower() == label_norm and not rest_nonempty:
+            grid = grid[1:]
+            continue
+        if _LABEL_ONLY_RE.match(first_cell) and not rest_nonempty:
+            grid = grid[1:]
+            continue
+
+        # Rule 2: only col 0 has content AND col 0 looks like a caption-tail
+        # line (≥5 chars, has a letter, appears in caption).
+        if (
+            first_cell
+            and not rest_nonempty
+            and len(first_cell) >= 5
+            and re.search(r"[a-z]", first_cell, re.IGNORECASE)
+            and cap_norm
+            and first_cell in cap_norm
+        ):
+            grid = grid[1:]
+            continue
+
+        # Rule 3: col 0 empty, col 1 is a small page number, no other content.
+        if not first_cell and len(first_row) >= 2:
+            v1 = (first_row[1] or "").strip()
+            other_after = [c for c in first_row[2:] if (c or "").strip()]
+            if re.fullmatch(r"\d{1,3}", v1) and not other_after:
+                grid = grid[1:]
+                continue
+
+        break
+
+    return grid
+
+
 def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
     """Render a docpluck Table as a self-contained markdown block.
 
@@ -683,9 +758,13 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
       1. ``cells`` populated by docpluck (lattice tables) → render directly.
       2. Camelot stream extraction (whitespace tables, the APA case) → render.
       3. Raw text in a fenced code block (last-resort fallback if Camelot fails).
+
+    Before rendering, leading caption-fragment / label / page-number rows are
+    stripped from the grid via ``_drop_caption_leading_rows``.
     """
     label = table.get("label") or "Table"
-    short_caption = _table_caption_short(table.get("caption"), label)
+    caption = table.get("caption") or ""
+    short_caption = _table_caption_short(caption, label)
 
     block_parts = [f"### {label}"]
     if short_caption and short_caption != label:
@@ -700,7 +779,8 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
         grid: list[list[str]] = [[""] * n_cols for _ in range(n_rows)]
         for c in cells:
             grid[c["r"]][c["c"]] = c["text"]
-        if n_rows >= 2:
+        grid = _drop_caption_leading_rows(grid, label, caption)
+        if len(grid) >= 2:
             block_parts.append(pdfplumber_table_to_markdown(grid).rstrip("\n"))
             return "\n".join(block_parts)
 
@@ -708,8 +788,10 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
     if pdf_path:
         cam_rows = _camelot_cells_for_table(pdf_path, table)
         if cam_rows:
-            block_parts.append(pdfplumber_table_to_markdown(cam_rows).rstrip("\n"))
-            return "\n".join(block_parts)
+            cam_rows = _drop_caption_leading_rows(cam_rows, label, caption)
+            if len(cam_rows) >= 2:
+                block_parts.append(pdfplumber_table_to_markdown(cam_rows).rstrip("\n"))
+                return "\n".join(block_parts)
 
     # 3. Last-resort fallback: raw_text in a code block
     raw = (table.get("raw_text") or "").rstrip()

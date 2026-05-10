@@ -121,7 +121,7 @@ No
 <table>
   <thead>
     <tr>
-      <th>Table 2</th>
+      <th></th>
       <th>In negativelyframed Opt-In conditions,the‘yes’re-<br>sponse was pre-selected.</th>
     </tr>
   </thead>
@@ -204,21 +204,14 @@ We failed to ﬁnd support for differences in rates of consent to receive health
 <table>
   <thead>
     <tr>
-      <th>Table 5</th>
       <th></th>
       <th></th>
       <th></th>
       <th></th>
+      <th>Combined replication sample</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Descriptive table of the participation rates.</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Combined replication sample</td>
-    </tr>
     <tr>
       <td>Replication Study</td>
       <td>Experimental Conditions<br>Opt-in default</td>
@@ -839,14 +832,10 @@ We reproduce the results reported as part of Group B’s pre-registration docume
   <thead>
     <tr>
       <th></th>
-      <th>5</th>
+      <th>Opt-Out conditions, the ‘yes’ response was pre-selected.<br>In positively framed Opt-In conditions, the ‘No’ response</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Table 1</td>
-      <td>Opt-Out conditions, the ‘yes’ response was pre-selected.<br>In positively framed Opt-In conditions, the ‘No’ response</td>
-    </tr>
     <tr>
       <td>Study stimuli for the direct replication of Johnson and</td>
       <td>was pre-selected. In negatively framed Opt-Out condi-</td>
@@ -1020,15 +1009,11 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th>7</th>
+      <th>Table 3</th>
+      <th>Table 4</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Table 3</td>
-      <td>Table 4</td>
-    </tr>
     <tr>
       <td>Study stimuli for the on conceptual replication of Johnson</td>
       <td>Table 4. Classiﬁcation of replications based on LeBel et al.</td>
@@ -1090,29 +1075,18 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 <table>
   <thead>
     <tr>
-      <th>Table 7</th>
+      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</th>
+      <th></th>
+      <th></th>
+      <th>Model 1</th>
       <th></th>
       <th></th>
       <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Model 2</th>
       <th></th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</td>
-      <td></td>
-      <td></td>
-      <td>Model 1</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Model 2</td>
-      <td></td>
-    </tr>
     <tr>
       <td>Predictor</td>
       <td>Estimate</td>
@@ -1201,29 +1175,18 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 <table>
   <thead>
     <tr>
-      <th>Table 7</th>
       <th></th>
       <th></th>
       <th></th>
+      <th>Model 1</th>
       <th></th>
       <th></th>
       <th></th>
-      <th></th>
+      <th>Model 2</th>
       <th></th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</td>
-      <td></td>
-      <td></td>
-      <td>Model 1</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Model 2</td>
-      <td></td>
-    </tr>
     <tr>
       <td>Predictor</td>
       <td>Estimate</td>
@@ -1312,29 +1275,18 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 <table>
   <thead>
     <tr>
-      <th>Table 7</th>
+      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</th>
+      <th></th>
+      <th></th>
+      <th>Model 1</th>
       <th></th>
       <th></th>
       <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Model 2</th>
       <th></th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</td>
-      <td></td>
-      <td></td>
-      <td>Model 1</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Model 2</td>
-      <td></td>
-    </tr>
     <tr>
       <td>Predictor</td>
       <td>Estimate</td>
@@ -1423,29 +1375,18 @@ We reproduce the results reported as part of Group B’s pre-registration docume
 <table>
   <thead>
     <tr>
-      <th>Table 7</th>
+      <th>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</th>
+      <th></th>
+      <th></th>
+      <th>Model 1</th>
       <th></th>
       <th></th>
       <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>Model 2</th>
       <th></th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Summary of the replication results of Part 1 (Johnson Goldstein, 2003) based on logistic regression analysis</td>
-      <td></td>
-      <td></td>
-      <td>Model 1</td>
-      <td></td>
-      <td></td>
-      <td></td>
-      <td>Model 2</td>
-      <td></td>
-    </tr>
     <tr>
       <td>Predictor</td>
       <td>Estimate</td>
