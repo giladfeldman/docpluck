@@ -1,4 +1,4 @@
-Early-life disadvantage and parent-to-child financial transfers
+# Early-life disadvantage and parent-to-child financial transfers
 Kent Jason Go Cheng Center for Healthy Aging, The Pennsylvania State University, University Park, Pennsylvania, USA
 
 ## Abstract

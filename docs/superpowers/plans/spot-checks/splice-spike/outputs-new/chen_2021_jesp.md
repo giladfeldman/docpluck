@@ -1,5 +1,3 @@
-Journal of Experimental Social Psychology
-
 # Retrospective and prospective hindsight bias: Replications and extensions of Fischhoff (1975) and Slovic and Fischhoff (1977)
 Jieying Chen a,*,1, Lok Ching Kwan (Roxane)b,1, Lok Yeung Ma (Loren)b,1, Hiu Yee Choi (HayleyAnne)b,1, Ying Ching Lo (Lita)b,1, Shin Yee Au (Sarah)b,1, Chi Ho Tsang (Toby)b,1, Bo Ley Cheng b, Gilad Feldman b,*
 a Department of Business Administration, University of Manitoba, Canada b Department of Psychology, University of Hong Kong, Hong Kong SAR, China

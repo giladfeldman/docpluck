@@ -1,4 +1,3 @@
-Cognition and Emotion
 # The link between Empathy and Forgiveness: Replication and extensions Registered Report of McCullough et al. (1997)'s Study 1
 Chi Fung Chan & Gilad Feldman
 

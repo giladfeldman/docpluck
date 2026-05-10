@@ -3071,6 +3071,32 @@ _HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^[A-Z][A-Za-z &]+\s+\d+\s+\(\d{4}\)\s+\d+(?:\s+Contents.*)?$"),
     # Standalone Digital Object Identifier line.
     re.compile(r"^Digital Object Identifier\s+10\.\d+/.+$"),
+    # Iter-31: bare journal-name-only lines that sit above the title block on
+    # papers where the publisher PDF prints the journal name at small font as
+    # a running banner. Each is a curated EXACT title-cased journal name; we
+    # avoid a generic "any title-cased phrase" pattern to preserve true
+    # body / heading content that happens to be title-cased.
+    re.compile(r"^Journal of Economic Psychology$"),
+    re.compile(r"^Cognition and Emotion$"),
+    re.compile(
+        r"^Journal of Experimental Social Psychology"
+        r"(?:\s+\d+(?:\s*\(\d{4}\))?\s+\d+[‐-―\-]\d+)?$"
+    ),
+    # Iter-31: "Judgment and Decision Making, Vol. 17, No. 1, January 2022, pp. 449–486"
+    # — Sage-style cite-line banner. Inner words may be lowercase (and, of,
+    # the, for) so the inner-word pattern is case-insensitive.
+    re.compile(
+        r"^[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){1,8},\s+"
+        r"Vol\.\s+\d+,\s+No\.\s+\d+,\s+\w+\s+\d{4},\s+pp\.\s+\d+[‐-―\-]\d+\s*$"
+    ),
+    # Iter-31: "Social Forces, 2025, 104, 224–249" — Oxford-journals format
+    # ("Journal Name, YYYY, Volume, page-range"). Inner words may be lower.
+    re.compile(
+        r"^[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){0,3},\s+\d{4},\s+\d+,\s+\d+[‐-―\-]\d+\s*$"
+    ),
+    # Iter-31: Oxford-journals supplementary doi banner: "https://doi.org/...
+    # Advance access publication date 19 February 2025".
+    re.compile(r"^https?://doi\.org/\S+\s+Advance access.*$"),
 ]
 
 
@@ -3478,6 +3504,66 @@ _TITLE_REJECT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^Author manuscript", re.IGNORECASE),
 ]
 
+# Iter-31: patterns matched against INDIVIDUAL SPAN TEXTS to drop them from
+# the candidate pool BEFORE dominant-font selection. Distinct from
+# _TITLE_REJECT_PATTERNS which only fires once a full candidate title text
+# has been assembled — too late on PMC papers where the banner is the
+# largest-font span and a smaller-font real title sits below it. Several
+# Elsevier-template papers (ziano, chen_2021_jesp, ar_apa_j_jesp) also have
+# the bare journal name at the LARGEST font on page 1, with the real title
+# at a slightly smaller font below — same defensive pattern needed.
+_BANNER_SPAN_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"^HHS Public Access\s*$", re.IGNORECASE),
+    re.compile(r"^Author manuscript\s*$", re.IGNORECASE),
+    re.compile(r"^Published in final edited form as:?\s*$", re.IGNORECASE),
+    re.compile(r"^arXiv:\d", re.IGNORECASE),
+    re.compile(r"^https?://"),
+    re.compile(r"^www\."),
+    re.compile(r"^Cite this article", re.IGNORECASE),
+    re.compile(r"^Original Investigation\b", re.IGNORECASE),
+    re.compile(r"^Original Article\b", re.IGNORECASE),
+    re.compile(r"^Original Research\b", re.IGNORECASE),
+    re.compile(r"^ARTICLE\s*$"),
+    re.compile(r"^Article\s*$"),
+    re.compile(r"^Research\s*$"),
+    re.compile(r"^OPEN\s*$"),
+    # PMC running-header citation: "IEEE Access. Author manuscript; ..." /
+    # "Demography. Author manuscript; ..." / "J Marriage Fam. Author manuscript; ..."
+    re.compile(r"^[A-Z][A-Za-z\s\.&]{2,60}\.\s+Author manuscript", re.IGNORECASE),
+    # Iter-31: bare journal-name lines also fire as banner spans so the
+    # title-rescue's dominant-font selector skips them. Elsevier-template
+    # PDFs (Journal of Economic Psychology / Cognition and Emotion /
+    # Journal of Experimental Social Psychology) have these at the LARGEST
+    # font on page 1 with the real title in a slightly smaller font below.
+    # Match with optional trailing whitespace to be robust to pdfplumber's
+    # tendency to leave a trailing space in span text.
+    re.compile(r"^Journal of Economic Psychology\s*$"),
+    re.compile(r"^Cognition and Emotion\s*$"),
+    re.compile(
+        r"^Journal\s*of\s*Experimental\s*Social\s*Psychology"
+        r"(?:\s*\d+(?:\s*\(\d{4}\))?\s+\d+[‐-―\-]\d+)?\s*$"
+    ),
+    re.compile(r"^Contents lists available at\s+\S", re.IGNORECASE),
+    re.compile(r"^journal homepage:", re.IGNORECASE),
+]
+
+
+def _is_banner_span_text(text: str) -> bool:
+    """Return ``True`` when the span text matches a known banner / masthead
+    pattern (HHS Public Access, Author manuscript, arXiv:.., etc.).
+
+    Used by :func:`_compute_layout_title` to filter banner spans out of the
+    page-1 candidate pool before the dominant-font selector runs, so that
+    PMC-archived papers (where ``HHS Public Access`` is the largest-font
+    span on the page) can still find the real title below.
+    """
+    if not text:
+        return False
+    for pat in _BANNER_SPAN_PATTERNS:
+        if pat.match(text):
+            return True
+    return False
+
 
 def _title_text_from_chars(page1, y_min: float, y_max: float, title_size: float) -> str | None:
     """Reconstruct title text from per-character pdfplumber records using
@@ -3583,9 +3669,24 @@ def _compute_layout_title(layout_doc) -> str | None:
     if not upper_spans:
         return None
 
+    # Pre-filter spans whose text matches an obvious masthead/banner pattern
+    # (HHS Public Access, Author manuscript, arXiv preprint banner, www.
+    # URLs, etc.). PMC-archived journals print these at LARGER font than the
+    # title — e.g. ieee_access_2 / demography_1 / jmf_1 have ``HHS Public
+    # Access`` at 22pt above a 14pt title. Without this filter the dominant-
+    # font selector picks the banner, the title-text rejection check then
+    # bails the whole rescue, and the real title goes unrescued.
+    upper_spans = [
+        s for s in upper_spans
+        if not _is_banner_span_text(s.text.strip() if s.text else "")
+    ]
+    if not upper_spans:
+        return None
+
     # Find the dominant title font size: the LARGEST size that appears
     # 2+ times AND is >= 12pt (multi-line wrapped title); fall back to a
-    # single span only if it is >= 18pt (single-line large-display title).
+    # single span at >= 14pt for single-line titles (most PMC and standalone
+    # papers where the title fits on one wrapped line at 14pt).
     from collections import Counter
     size_counts: Counter[float] = Counter(
         round(float(s.font_size) * 2) / 2 for s in upper_spans
@@ -3595,7 +3696,7 @@ def _compute_layout_title(layout_doc) -> str | None:
         if sz >= 12.0 and count >= 2:
             title_size = sz
             break
-        if sz >= 18.0 and count >= 1:
+        if sz >= 14.0 and count >= 1:
             title_size = sz
             break
     if title_size is None:

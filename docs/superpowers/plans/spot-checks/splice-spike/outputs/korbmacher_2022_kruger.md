@@ -1,4 +1,3 @@
-Judgment and Decision Making, Vol. 17, No. 1, January 2022, pp. 449–486
 # Both better and worse than others depending on difficulty: Replication and extensions of Kruger’s (1999) above and below average effects
 Max Korbmacher∗ Ching (Isabelle) Kwan† Gilad Feldman‡
 

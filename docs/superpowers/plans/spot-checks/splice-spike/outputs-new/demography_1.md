@@ -1,4 +1,4 @@
-The Economic Assimilation of Second-Generation Men: An Analysis of Earnings Trajectories Using Administrative Records
+# The Economic Assimilation of Second-Generation Men: An Analysis of Earnings Trajectories Using Administrative Records
 Andrés Villarreal1, Christopher R. Tamborini2 1Department of Sociology, University of California, Los Angeles, Los Angeles, CA, USA. 2U.S. Social Security Administration, Washington, DC, USA.
 
 ## Abstract

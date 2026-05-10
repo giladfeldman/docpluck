@@ -3492,3 +3492,210 @@ def test_compute_layout_title_handles_empty_doc_safely():
     assert _compute_layout_title(_StubDoc(pages=[])) is None
     page = _StubPage(height=800, spans=[], words=[])
     assert _compute_layout_title(_StubDoc(pages=[page])) is None
+
+
+# ---------------------------------------------------------------------------
+# Iter-31 / Tier F6-residual + title rescue improvement
+# ---------------------------------------------------------------------------
+
+from splice_spike import (
+    _is_banner_span_text,
+    _strip_document_header_banners,
+)
+
+
+def test_banner_span_filter_matches_hhs_and_author_manuscript():
+    """Spans that pdfplumber finds at the top of a PMC PDF should be
+    recognized as banner spans so the title-rescue's dominant-font selector
+    can skip them."""
+    assert _is_banner_span_text("HHS Public Access") is True
+    assert _is_banner_span_text("Author manuscript") is True
+    assert _is_banner_span_text("Published in final edited form as:") is True
+    assert _is_banner_span_text("arXiv:2103.12345v1") is True
+    assert _is_banner_span_text("Cite this article: ...") is True
+    assert _is_banner_span_text("Original Investigation | Public Health") is True
+    assert _is_banner_span_text("OPEN") is True
+    assert _is_banner_span_text("ARTICLE") is True
+    # PMC running-header citation forms.
+    assert _is_banner_span_text("IEEE Access. Author manuscript; available in PMC 2026 February 25.") is True
+    assert _is_banner_span_text("Demography. Author manuscript; available in PMC 2025 January 31.") is True
+    assert _is_banner_span_text("J Marriage Fam. Author manuscript; available in PMC 2025 September 24.") is True
+
+
+def test_banner_span_filter_does_not_eat_normal_text():
+    """A real title or body line is NOT a banner span — the filter must be
+    narrow."""
+    assert _is_banner_span_text("The association between dietary patterns and BMD") is False
+    assert _is_banner_span_text("Both better and worse than others") is False
+    assert _is_banner_span_text("Effect of Time-Restricted Eating on Weight Loss") is False
+    assert _is_banner_span_text("") is False
+    assert _is_banner_span_text("Abstract") is False
+
+
+def test_compute_layout_title_picks_smaller_title_when_banner_at_largest_font():
+    """The PMC case: a 22pt ``HHS Public Access`` banner sits above a 14pt
+    real title. With the banner-span filter, the title size selector
+    should skip the banner and pick 14pt as the title font."""
+    spans = [
+        # 22pt banner (largest font, but rejected as banner).
+        _StubSpan("HHS Public Access", 100, 740, 350, 760, font_size=22.0),
+        # 14pt secondary banner — also rejected.
+        _StubSpan("Author manuscript", 100, 720, 250, 735, font_size=14.0),
+        # 14pt title (two lines).
+        _StubSpan("A Numerical Comparison of Petri Net", 100, 648, 500, 668, font_size=14.0),
+        _StubSpan("Equation SIR Component Models",       100, 628, 450, 648, font_size=14.0),
+        # 11pt running-header citation (also rejected as banner).
+        _StubSpan("IEEE Access. Author manuscript; available in PMC 2026.",
+                  100, 700, 500, 712, font_size=11.0),
+        # 10pt body below.
+        _StubSpan("body 1", 100, 400, 200, 410, font_size=10.0),
+    ]
+    # Words within the title's y-range (top-origin). title y0=628..668
+    # corresponds to top=132..172 on an 800-height page.
+    words = [
+        {"text": "A",           "x0": 100, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "Numerical",   "x0": 110, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "Comparison",  "x0": 175, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "of",          "x0": 245, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "Petri",       "x0": 262, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "Net",         "x0": 300, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "Equation",    "x0": 100, "top": 154, "bottom": 170, "height": 14.0},
+        {"text": "SIR",         "x0": 158, "top": 154, "bottom": 170, "height": 14.0},
+        {"text": "Component",   "x0": 185, "top": 154, "bottom": 170, "height": 14.0},
+        {"text": "Models",      "x0": 256, "top": 154, "bottom": 170, "height": 14.0},
+    ]
+    page = _StubPage(height=800, spans=spans, words=words)
+    doc = _StubDoc(pages=[page])
+    title = _compute_layout_title(doc)
+    assert title is not None, "expected title rescue to skip HHS banner and find the 14pt title"
+    assert "A Numerical Comparison" in title
+    assert "Equation SIR Component Models" in title
+    # Banners must NOT have been concatenated into the title.
+    assert "HHS" not in title
+    assert "Author manuscript" not in title
+
+
+def test_compute_layout_title_accepts_single_line_14pt_title():
+    """jmf_1 pattern: title fits on a single 14pt line; no other 14pt
+    spans on the page. The relaxed single-span >=14pt threshold should
+    still find it (PMC banner filtered out)."""
+    spans = [
+        _StubSpan("HHS Public Access", 100, 740, 350, 760, font_size=22.0),
+        _StubSpan("Author manuscript", 100, 720, 250, 735, font_size=14.0),
+        _StubSpan("Early-life disadvantage and parent-to-child financial transfers",
+                  100, 648, 530, 668, font_size=14.0),
+        _StubSpan("body 1", 100, 400, 200, 410, font_size=10.0),
+    ]
+    words = [
+        {"text": "Early-life",   "x0": 100, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "disadvantage", "x0": 165, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "and",          "x0": 245, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "parent-to-child", "x0": 270, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "financial",    "x0": 360, "top": 134, "bottom": 150, "height": 14.0},
+        {"text": "transfers",    "x0": 420, "top": 134, "bottom": 150, "height": 14.0},
+    ]
+    page = _StubPage(height=800, spans=spans, words=words)
+    doc = _StubDoc(pages=[page])
+    title = _compute_layout_title(doc)
+    assert title is not None
+    assert "Early-life disadvantage" in title
+    assert "parent-to-child financial transfers" in title
+
+
+def test_strip_document_header_banners_drops_judgment_decision_making_cite_line():
+    """Sage-style cite-line banner above the title is dropped."""
+    text = (
+        "Judgment and Decision Making, Vol. 17, No. 1, January 2022, pp. 449–486\n"
+        "Real title text on the next line\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body paragraph.\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "Judgment and Decision Making, Vol. 17" not in out
+    # Title and Abstract content survive.
+    assert "Real title text on the next line" in out
+    assert "## Abstract" in out
+    assert "Body paragraph." in out
+
+
+def test_strip_document_header_banners_drops_journal_name_only_lines():
+    """Bare journal-name single-line banners are dropped from the
+    document-header zone."""
+    for banner in [
+        "Journal of Economic Psychology",
+        "Cognition and Emotion",
+        "Journal of Experimental Social Psychology",
+        "Journal of Experimental Social Psychology 46 (2010) 494–504",
+    ]:
+        text = f"{banner}\n\n# The actual title\n\n## Abstract\n\nBody.\n"
+        out = _strip_document_header_banners(text)
+        assert banner not in out, f"banner {banner!r} survived strip"
+        assert "# The actual title" in out
+        assert "## Abstract" in out
+
+
+def test_strip_document_header_banners_drops_oxford_journals_cite_line():
+    """`Social Forces, 2025, 104, 224–249` style Oxford-journals banner is
+    dropped."""
+    text = (
+        "Social Forces, 2025, 104, 224–249\n"
+        "# An unbreakable bond?\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body.\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "Social Forces, 2025" not in out
+    assert "# An unbreakable bond?" in out
+
+
+def test_strip_document_header_banners_drops_advance_access_doi_compound_line():
+    """`https://doi.org/... Advance access publication date ...` compound
+    line (Oxford-journals supplementary banner) is dropped."""
+    text = (
+        "https://doi.org/10.1093/sf/soaf022 Advance access publication date 19 February 2025\n"
+        "# An unbreakable bond?\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body.\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "Advance access publication date" not in out
+    assert "# An unbreakable bond?" in out
+
+
+def test_strip_document_header_banners_journal_name_only_in_header_zone():
+    """The same journal-name pattern in BODY text (after the first ## heading)
+    must NOT be stripped — the strip is header-zone-only."""
+    text = (
+        "# A Real Title\n"
+        "\n"
+        "## Introduction\n"
+        "\n"
+        "We cited Journal of Economic Psychology in a sentence about prior work.\n"
+        "\n"
+        "## Methods\n"
+        "\n"
+        "More body content here.\n"
+    )
+    out = _strip_document_header_banners(text)
+    # The journal name inside a body sentence is preserved.
+    assert "Journal of Economic Psychology in a sentence" in out
+
+
+def test_strip_document_header_banners_does_not_match_random_capitalized_phrase():
+    """A short title-cased phrase that isn't a known journal-name pattern
+    must NOT be dropped by the curated list."""
+    text = (
+        "Some Real Title At The Top\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body.\n"
+    )
+    out = _strip_document_header_banners(text)
+    assert "Some Real Title At The Top" in out

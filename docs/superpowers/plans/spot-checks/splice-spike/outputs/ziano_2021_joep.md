@@ -1,5 +1,3 @@
-Journal of Economic Psychology
-
 # Replication: Revisiting Tversky and (1992) Disjunction Effect with an extension comparing between and within subject designs
 Ignazio Ziano a,1, Man Fai Kong b,1, Hong Joo Kim b,1, Chit Yu Liu b,1, Sze Chai Wong b,1, Bo Ley Cheng b, Gilad Feldman b,*
 a Grenoble Ecole de Management, F-38000 Grenoble, France b Department of Psychology, University of Hong Kong, Hong Kong Special Administrative Region
