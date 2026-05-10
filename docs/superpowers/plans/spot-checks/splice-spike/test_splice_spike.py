@@ -2084,3 +2084,290 @@ def test_merge_sig_marker_only_merges_columns_with_markers():
     out = _merge_significance_marker_rows(rows)
     assert len(out) == 1
     assert out[0] == ["Var", f"1.0{_sup('*')}", "2.0", f"3.0{_sup('**')}"]
+
+
+# ---------------------------------------------------------------------------
+# _join_multiline_caption_paragraphs (iteration 23 / Tier A7)
+# ---------------------------------------------------------------------------
+
+from splice_spike import _join_multiline_caption_paragraphs
+
+
+def test_inter_paragraph_caption_split_is_NOT_merged():
+    """Inter-paragraph (blank-line separated) caption + tail is intentionally
+    NOT merged. The joiner is line-local so it cannot accidentally absorb
+    the table header row that typically follows a caption in its own
+    paragraph (see amc_1 TABLE 1 / TABLE 4 incident from iter-23 v1)."""
+    text = (
+        "TABLE 1 Summary of How Articles Published in Academy of Management Journals and Included in Our Collection Have\n"
+        "\n"
+        "Shaped the Definition of CSR\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    # Two paragraphs preserved.
+    assert "\n\n" in out
+    assert "Have\n\nShaped" in out
+
+
+def test_skip_caption_with_terminator():
+    """Captions ending in ``.``, ``!``, ``?``, or ``)`` are already complete
+    and must NOT swallow the next line into the caption."""
+    cases = [
+        ("FIGURE 1 A long enough title that meets the sixty character guard requirement.\n(Study X)\n", "(Study X)"),
+        ("TABLE 3 A long enough title that meets the sixty character guard (Continued)\nDavis 1973 ...\n", "Davis"),
+        ("FIGURE 7 A long enough title that meets the sixty character guard (Study 2)\nMeta-Processes label\n", "Meta-Processes label"),
+    ]
+    for text, marker in cases:
+        out = _join_multiline_caption_paragraphs(text)
+        # Caption + tail still on separate lines (not folded).
+        assert "\n" + marker in out, f"unexpected fold: {text!r} → {out!r}"
+
+
+def test_skip_when_next_line_is_long():
+    """If the candidate continuation line is long (>80 chars), do not fold."""
+    long_next = "This is a long body paragraph that goes well past eighty characters and should certainly not be slurped into a caption."
+    text = (
+        "FIGURE 5 A long enough caption that clears the sixty character line guard for testing\n"
+        + long_next + "\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert long_next in out
+    # Long body line still on its own line under the caption.
+    assert "testing\n" + long_next in out
+
+
+def test_skip_when_next_line_is_another_caption():
+    """Two adjacent caption lines never fold into each other."""
+    text = (
+        "FIGURE 5 A long enough caption that clears the sixty character line guard\n"
+        "FIGURE 6 Another caption\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "guard\nFIGURE 6" in out
+
+
+def test_skip_when_next_line_is_heading():
+    """Never absorb a markdown heading into a caption."""
+    text = (
+        "TABLE 2 A long enough caption that clears the sixty character line guard\n"
+        "## Methods\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "guard\n## Methods" in out
+
+
+def test_skip_when_next_line_is_html():
+    """Never absorb an HTML opener (e.g. ``<table>``) into a caption."""
+    text = (
+        "TABLE 2 A long enough caption that clears the sixty character line guard\n"
+        "<table>\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "guard\n<table>" in out
+
+
+def test_skip_when_next_line_is_numbered_reference():
+    """Numbered references like ``[1]`` should not be merged."""
+    text = (
+        "TABLE 2 A long enough caption that clears the sixty character line guard\n"
+        "[3] Some reference\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "guard\n[3] Some reference" in out
+
+
+def test_skip_when_next_line_is_table_footer_note():
+    """``Note: ...`` table footers should not be merged into a caption."""
+    text = (
+        "TABLE 2 A long enough caption that clears the sixty character line guard\n"
+        "Note: significance markers below.\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "guard\nNote: significance markers" in out
+
+
+def test_skip_when_paragraph_does_not_start_with_caption_marker():
+    """Random short-line splits unrelated to a FIGURE/TABLE caption are
+    untouched."""
+    text = "Some title without label\nshort next\n"
+    out = _join_multiline_caption_paragraphs(text)
+    assert out == text
+
+
+def test_lowercase_figure_table_keyword_is_matched():
+    """Caption keyword match is case-insensitive (some PDFs emit ``Figure``
+    or ``Table`` rather than all-caps). Caption length must clear the
+    >=60-char line-1 guard."""
+    text = (
+        "Table 1 Summary of Studies linking negative feedback and recipient creativity with\n"
+        "Results across three samples\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "with Results across three samples" in out
+
+
+def test_skip_caption_too_short_for_line_guard():
+    """A bare label like ``FIGURE 1 Theoretical Framework`` (30 chars) does
+    NOT trigger the joiner. The next line is typically figure data, not a
+    caption continuation. The >=60-char line-0 guard prevents false joins."""
+    text = "FIGURE 1 Theoretical Framework\nResults summary.\n"
+    out = _join_multiline_caption_paragraphs(text)
+    assert "FIGURE 1 Theoretical Framework\nResults summary." in out
+
+
+# ---- Pass A: intra-paragraph fold (caption + tail on consecutive lines) ----
+
+
+def test_intra_paragraph_fold_amj_figure_2():
+    """``FIGURE 2 ... Creativity\\n(Study 1)`` (single paragraph, two lines)
+    folds to a single line."""
+    text = (
+        "FIGURE 2 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Creativity\n"
+        "(Study 1)\n"
+        "\n"
+        "Body paragraph follows.\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    first_para = out.split("\n\n")[0]
+    assert first_para == (
+        "FIGURE 2 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Creativity (Study 1)"
+    )
+
+
+def test_intra_paragraph_fold_amj_figure_3():
+    """``FIGURE 3 ... Task\\nProcesses (Study 1)`` folds to one line."""
+    text = (
+        "FIGURE 3 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task\n"
+        "Processes (Study 1)\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "Direction of Feedback Flow on Task Processes (Study 1)" in out
+    # The folded paragraph is a single line.
+    first_para = out.split("\n\n")[0].rstrip()
+    assert "\n" not in first_para
+
+
+def test_intra_paragraph_fold_amc_table_1():
+    """``TABLE 1 ... Have\\nShaped the Definition of CSR`` folds to one
+    line."""
+    text = (
+        "TABLE 1 Summary of How Articles Published in Academy of Management Journals and Included in Our Collection Have\n"
+        "Shaped the Definition of CSR\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert "Have Shaped the Definition of CSR" in out
+    first_para = out.split("\n\n")[0].rstrip()
+    assert "\n" not in first_para
+
+
+def test_intra_paragraph_fold_preserves_subsequent_data_lines():
+    """A caption + tail folds, but later figure-data lines in the same
+    paragraph stay where they are (no cascade beyond what the heuristic
+    permits)."""
+    text = (
+        "FIGURE 5 Regression Slopes for the Interaction of Negative Feedback on Recipient\n"
+        "Creativity (Study 2)\n"
+        "Bottom-up Flow 4\n"
+        "Top-down Flow Lateral Flow 3\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    # Caption + tail merged into one line.
+    assert "on Recipient Creativity (Study 2)" in out
+    # Figure-data lines preserved (not absorbed into caption since the new
+    # line-0 ends in ``)`` terminator after fold).
+    assert "Bottom-up Flow 4" in out
+    assert "\nBottom-up Flow 4" in out  # still on its own line
+
+
+def test_intra_paragraph_fold_skips_short_label_caption():
+    """A bare label like ``FIGURE 1 Theoretical Framework`` (30 chars) +
+    a longer figure-data first line is NOT folded, because line-0 fails the
+    >=60-char guard."""
+    text = (
+        "FIGURE 1 Theoretical Framework\n"
+        "Direction of Feedback Flow\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    # Two lines preserved.
+    assert out.count("\n") >= 1
+    assert "FIGURE 1 Theoretical Framework\nDirection of Feedback Flow" in out
+
+
+def test_intra_paragraph_fold_skips_long_continuation():
+    """If line 1 is itself a long body paragraph (>80 chars), don't fold."""
+    long_body = (
+        "Direction of Feedback Flow 1. Bottom-up Feedback Flow 2. Top-down Feedback Flow 3. Lateral Feedback Flow"
+    )
+    assert len(long_body) > 80
+    text = (
+        "FIGURE 1 A long enough caption to clear the sixty character line guard\n"
+        + long_body
+        + "\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    # Long line 1 still on its own line.
+    assert long_body in out
+    assert "guard\n" + long_body in out
+
+
+def test_intra_paragraph_fold_chains_for_three_line_caption():
+    """A caption wrapped onto 3 lines (caption + tail-1 + tail-2) chain-folds
+    while the line-0 still has no terminator and each tail stays short."""
+    text = (
+        "TABLE 9 A long caption that wraps over three lines because the column was narrow with\n"
+        "Recommendations for Future\n"
+        "Research (Detailed).\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    assert (
+        "TABLE 9 A long caption that wraps over three lines because the column was narrow with Recommendations for Future Research (Detailed)."
+        in out
+    )
+
+
+def test_empty_input_is_safe():
+    assert _join_multiline_caption_paragraphs("") == ""
+
+
+def test_no_blank_separated_paragraphs_is_safe():
+    """A text with no blank lines is returned unchanged."""
+    text = "FIGURE 5 Title\nMore on next line\n"
+    out = _join_multiline_caption_paragraphs(text)
+    assert out == text
+
+
+def test_real_amj_1_figure_3_pattern():
+    """Reproduce the exact amj_1 FIGURE 3 case (intra-paragraph fold)."""
+    text = (
+        "However, negative feedback reduced ... .\n"
+        "\n"
+        "FIGURE 3 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task\n"
+        "Processes (Study 1)\n"
+        "\n"
+        "FIGURE 4 ... on Meta-Processes (Study 1)\n"
+        "\n"
+        "performance appraisal, employees received both numerical and written feedback ...\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    # FIGURE 3 caption is now on one line.
+    assert "Direction of Feedback Flow on Task Processes (Study 1)" in out
+    # FIGURE 4 caption already had a closing ``)`` so it stays alone, and the
+    # body paragraph after the blank line is preserved.
+    assert "FIGURE 4 ... on Meta-Processes (Study 1)\n\nperformance appraisal" in out
+
+
+def test_intra_paragraph_fold_at_interior_line_pair():
+    """Caption can appear MID-paragraph when the prior body sentence has no
+    blank-line break (amc_1 TABLE 2 pattern). Pass A scans every adjacent
+    line pair, not just lines[0]."""
+    text = (
+        "investigated. Second, regarding integration, given the highly multidisciplinary nature of CSR, we considered ...\n"
+        "TABLE 2 Criteria for Selecting Collection Articles and Evaluating the Status Quo of Corporate Social\n"
+        "Responsibility Research\n"
+        "1. Definition and operationalizations and content domain and dimensionality and measurement and methodological rigor\n"
+    )
+    out = _join_multiline_caption_paragraphs(text)
+    # Caption + tail folded.
+    assert "Corporate Social Responsibility Research" in out
+    # The numbered list line is long (>80 chars), so it stays separate.
+    assert "Research\n1. Definition" in out

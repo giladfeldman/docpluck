@@ -69,43 +69,35 @@ List of Supplementary Figures
 
 ## Supplementary
 
-Figure 1. Distribution of latest occupational prestige measured by ISEI from both the UK Biobank
-sample and the ONS sample
+Figure 1. Distribution of latest occupational prestige measured by ISEI from both the UK Biobank sample and the ONS sample
 
 
 
-Figure 2. Distribution of latest occupational prestige measured by SIOPS from both the UK
-Biobank sample and the ONS sample
+Figure 2. Distribution of latest occupational prestige measured by SIOPS from both the UK Biobank sample and the ONS sample
 
 
 
-Figure 3. Phenotypic correlation (upper right triangle) versus Genetic correlation (lower left
-triangle) of occupational prestige and status measures
+Figure 3. Phenotypic correlation (upper right triangle) versus Genetic correlation (lower left triangle) of occupational prestige and status measures
 
 
 
-Figure 4. Path diagram of Confirmatory Factor Analysis (CFA) for a general factor of occupational
-status
+Figure 4. Path diagram of Confirmatory Factor Analysis (CFA) for a general factor of occupational status
 
 
 
-Figure 5. Phenotypic correlation (upper right triangle) versus Genetic correlation (lower left
-triangle) of occupational status measures and other SES indicators
+Figure 5. Phenotypic correlation (upper right triangle) versus Genetic correlation (lower left triangle) of occupational status measures and other SES indicators
 
 
 
-Figure 6. Path diagram of Confirmatory Factor Analysis (CFA) for a general factor of
-socioeconomic status (using CAMSIS as the occupational indicator)
+Figure 6. Path diagram of Confirmatory Factor Analysis (CFA) for a general factor of socioeconomic status (using CAMSIS as the occupational indicator)
 
 
 
-Figure 7. Incremental R-square of polygenic score predictions of occupational status over the life
-course, NCDS
+Figure 7. Incremental R-square of polygenic score predictions of occupational status over the life course, NCDS
 
 
 
-Figure 8. Mediation results of polygenic prediction of occupational status (controlling for parental
-SES), NCDS
+Figure 8. Mediation results of polygenic prediction of occupational status (controlling for parental SES), NCDS
 
 
 
@@ -128,28 +120,23 @@ education measured as Low = No Qualifications, Medium = Lower Secondary, High = 
 
 
 
-Figure 12. Mean Percentile of the occupational status (CAMSIS) distribution across the career
-stratified by career start and the CAMSIS PGS.
+Figure 12. Mean Percentile of the occupational status (CAMSIS) distribution across the career stratified by career start and the CAMSIS PGS.
 
 
 
-Figure 13. Mean Percentile of the occupational status (ISEI) distribution across the career
-stratified by career start and the ISEI PGS.
+Figure 13. Mean Percentile of the occupational status (ISEI) distribution across the career stratified by career start and the ISEI PGS.
 
 
 
-Figure 14. Mean Percentile of the occupational status (SIOPS) distribution across the career
-stratified by career start and the SIOPS PGS.
+Figure 14. Mean Percentile of the occupational status (SIOPS) distribution across the career stratified by career start and the SIOPS PGS.
 
 
 
-Figure 15. Genetic confounding of correlations from respondent’s occupational status to general
-health
+Figure 15. Genetic confounding of correlations from respondent’s occupational status to general health
 
 
 
-Figure 16. Genetic confounding of correlations from respondent’s occupational status to mental
-health
+Figure 16. Genetic confounding of correlations from respondent’s occupational status to mental health
 
 List of Supplementary Tables
 
@@ -172,13 +159,11 @@ Table 5. Results of multivariate genetic regression models – ISEI and potentia
 
 
 
-Table 6. Effect size reduction when controlling for parental SES
-Supplementary Table 7. Spousal correlations of occupational status scores.
+Table 6. Effect size reduction when controlling for parental SES Supplementary Table 7. Spousal correlations of occupational status scores.
 
 
 
-Table 8. Spousal polygenic scores correlations of occupational status scores. PGS calculated with
-SBayesR weights.
+Table 8. Spousal polygenic scores correlations of occupational status scores. PGS calculated with SBayesR weights.
 
 
 
@@ -188,8 +173,7 @@ course, NCDS (95% Cis). N = 5,389; 5,312; 5,211; 4,902; 4,263 for CAMSIS at age 
 
 
 
-Table 10. Variables used to construct general cognitive ability measure with corresponding
-loadings.
+Table 10. Variables used to construct general cognitive ability measure with corresponding loadings.
 
 
 
@@ -197,18 +181,15 @@ Table 11. Variables used to construct scholastic motivation measure with corresp
 
 
 
-Table 12. Variables used to construct externalizing behavior measure with corresponding
-loadings.
+Table 12. Variables used to construct externalizing behavior measure with corresponding loadings.
 
 
 
-Table 13. Variables used to construct internalising behavior measure with corresponding
-loadings.
+Table 13. Variables used to construct internalising behavior measure with corresponding loadings.
 
 
 
-Table 14. Associations between occupational status PGS and general health at various ages,
-controlling for sex and first 10 PCs.
+Table 14. Associations between occupational status PGS and general health at various ages, controlling for sex and first 10 PCs.
 
 
 
@@ -220,8 +201,7 @@ individuals for which paternal occupational status information was available.
 
 
 
-Table 16. Associations between occupational status PGS and mental health at various ages,
-controlling for sex and first 10 PCs.
+Table 16. Associations between occupational status PGS and mental health at various ages, controlling for sex and first 10 PCs.
 
 
 
@@ -849,13 +829,11 @@ the UK Biobank and UK population sample are highly correlated.
 
 
 
-Figure 1. Distribution of latest occupational prestige measured by ISEI
-from both the UK Biobank sample and the ONS sample
+Figure 1. Distribution of latest occupational prestige measured by ISEI from both the UK Biobank sample and the ONS sample
 
 
 
-Figure 2. Distribution of latest occupational prestige measured by SIOPS
-from both the UK Biobank sample and the ONS sample
+Figure 2. Distribution of latest occupational prestige measured by SIOPS from both the UK Biobank sample and the ONS sample
 7. Overview of GWAS analyses
 For discovery, we followed the analysis plan first uploaded by Brazel, Ding, and Mills to the
 open science framework on February 2nd, 2021, which was updated including CAMSIS
@@ -1054,9 +1032,7 @@ plays a role in the observed high genetic correlations and substantial differenc
 
 
 
-Figure 4. Path diagram of Confirmatory Factor Analysis (CFA) for a general
-factor of occupational status
-11.2 General factor of socioeconomic status (SES)
+Figure 4. Path diagram of Confirmatory Factor Analysis (CFA) for a general factor of occupational status 11.2 General factor of socioeconomic status (SES)
 In addition to exhibiting strong genetic commonality, Supplementary Figure 5 shows that
 genetic correlations of CAMSIS, ISEI and SIOPS with educational attainment and household
 income (lower triangle) are without exception in the extreme as well. This is in particular
@@ -1074,8 +1050,7 @@ Darker blue circles indicate stronger positive correlations.
 
 
 
-Figure 6. Path diagram of Confirmatory Factor Analysis (CFA) for a general
-factor of socioeconomic status (using CAMSIS as the occupational indicator)
+Figure 6. Path diagram of Confirmatory Factor Analysis (CFA) for a general factor of socioeconomic status (using CAMSIS as the occupational indicator)
 11.3 Mediators between polygenic signals and occupational status
 What biologically proximal traits are responsible for the common factor underlying genetic
 variation in socioeconomic status? Evidence from twin studies points to the direction of
@@ -1196,8 +1171,7 @@ SIOPS 18,093 0.703 0.753 0.798
 
 
 
-Table 6. Effect size reduction when controlling for parental SES
-12.2 Adoption design
+Table 6. Effect size reduction when controlling for parental SES 12.2 Adoption design
 We conducted another GWAS analysis for occupational status, this time omitting the 3,398
 (SIOPS, ISEI) to 3,414 (CAMSIS) participants of British-European genetic ancestry from the UK
 Biobank who reported being adopted and had available occupational data. We used MTAG
@@ -1300,8 +1274,7 @@ SIOPS 0.08797762 0.06752393 0.1083574 9,074
 
 
 
-Table 8. Spousal polygenic scores correlations of occupational status
-scores. PGS calculated with SBayesR weights
+Table 8. Spousal polygenic scores correlations of occupational status scores. PGS calculated with SBayesR weights
 13. Polygenic score prediction over the life course
 For SIOPS, ISEI and CAMSIS, the incremental R-square was calculated by looking at the increase
 in variance explained when adding the corresponding PGS to a regression including sex and 10
@@ -1411,8 +1384,7 @@ Proportion of Variance Explained 0.537
 
 
 
-Table 11. Variables used to construct scholastic motivation measure with
-corresponding loadings.
+Table 11. Variables used to construct scholastic motivation measure with corresponding loadings.
 Externalizing Behavior: A wide range of items at age 16 taken from the Rutter scale was used
 to construct measures of externalizing behavior. Each represents agreement of a teacher with
 a statement on a scale from one (“Does not apply”) to three (“Certainly applies”) to a
@@ -1437,8 +1409,7 @@ Proportion of Variance Explained 0.723
 
 
 
-Table 12. Variables used to construct externalizing behavior measure with
-corresponding loadings.
+Table 12. Variables used to construct externalizing behavior measure with corresponding loadings.
 Internalizing Behavior: A further subset of items (Supplementary Table 13) collected at age
 16 was used to construct measures of internalizing behavior. Each again represents agreement
 of a teacher with a statement on a scale from one ("Does not apply") to three ("Certainly
@@ -1458,8 +1429,7 @@ Proportion of Variance Explained 0.54
 
 
 
-Table 13. Variables used to construct internalising behavior measure with
-corresponding loadings.
+Table 13. Variables used to construct internalising behavior measure with corresponding loadings.
 
 
 
@@ -1595,8 +1565,7 @@ General Health at Age 55 (0.013) (0.013) (0.013)
 
 
 
-Table 14. Associations between occupational status PGS and general
-health at various ages, controlling for sex and first 10 PCs.
+Table 14. Associations between occupational status PGS and general health at various ages, controlling for sex and first 10 PCs.
 17.1a Controlling for parental occupational status
 Controlling for paternal occupational status at age 11 - and therefore partly for social
 stratification in the GWAS - does attenuate the associations; however, significant associations
@@ -1645,9 +1614,7 @@ is confounded by the polygenic score (Supplementary Figure 15).
 
 
 
-Figure 15. Genetic confounding of correlations from respondent’s
-occupational status to general health
-17.2 Mental health
+Figure 15. Genetic confounding of correlations from respondent’s occupational status to general health 17.2 Mental health
 Mental health in the NCDS is measured using the Malaise Inventory,62 a commonly used self-completion scale for the assessment of psychiatric distress. Validation studies (partially
 conducted within the NCDS) show high reliability and validity of the instrument.63
 The instrument is comprised of 24 questions. Each item has the response options yes or no:
@@ -1702,8 +1669,7 @@ Mental Health at Age 50
 
 
 
-Table 16. Associations between occupational status PGS and mental
-health at various ages, controlling for sex and first 10 PCs.
+Table 16. Associations between occupational status PGS and mental health at various ages, controlling for sex and first 10 PCs.
 17.2a Controlling for parental occupational status
 
 
@@ -1756,8 +1722,7 @@ which paternal occupational status information was available.
 
 
 
-Figure 16. Genetic confounding of correlations from respondent’s
-occupational status to mental health
+Figure 16. Genetic confounding of correlations from respondent’s occupational status to mental health
 
 
 

@@ -2251,8 +2251,7 @@ IV stimuli  Same   • Changed the word “Negro” into “African   6.3.1. Rep
 American” in the passage of Event A
 We  summarized  the  descriptives  of  the  probability  estimates  in
 DV stimuli  Same   • Added surprise measure after the
-Table 2. Violin plots of the probability estimates are available in Sup-
-replication.
+Table 2. Violin plots of the probability estimates are available in Sup- replication.
 plementary Materials. The numbers of interest are the probability esti-
 Procedural details  Similar   • Used a larger sample size: Original study:
 mate of an outcome in the Before condition, and probability estimate of  172; Replication study: 890

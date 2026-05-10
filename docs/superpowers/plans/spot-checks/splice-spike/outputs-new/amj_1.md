@@ -248,15 +248,13 @@ Lastly, we tested the full moderated mediation model using a conditional indirec
 of Study 1
 Using a quasi-field experimental design, Study 1 found that the relationship between negative feedback and creativity depends on the direction of feedback flow. Bottom-up feedback flow was the only case in which negative feedback increased recipient creativity; top-down and lateral feedback flows of negative feedback were detrimental to recipient creativity. The two mechanisms—task processes and meta-processes—accounted for these interactional relationships. In the bottom-up feedback flow condition, negative feedback increased creativity because recipients attempted to improve the ways of performing their creativity tasks, and they did not feel threatened by negative feedback. However, in the top-down and lateral feedback flow conditions, recipients failed to generate diverse strategies to perform their creativity tasks. Instead,
 
-FIGURE 2 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Creativity
-(Study 1)
+FIGURE 2 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Creativity (Study 1)
 
 they felt threatened by negative feedback, which in turn decreased their creativity. Although our primary focus was to investigate the relationship between negative feedback and creativity, we also examined how positive feedback relates to creativity. The result shown in Table 3 reveals that positive feedback had a nonsignificant relationship with creativity (b 5 20.04, SE 5 0.06, t 5 20.63, p 5 .528). We discuss this relationship in the General Discussion.
 
 Although the results of Study 1 supported our hypotheses, some limitations should be noted. First, Study 1 quasi-randomly assigned employees to the three feedback flow conditions using the natural field setting, and we did not manipulate negative feedback. This raises a question of the potential influences that spurious third variables might have on our findings. Second, we measured the recipients’ subjective impression of feedback. In the quarterly
 
-FIGURE 3 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task
-Processes (Study 1)
+FIGURE 3 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task Processes (Study 1)
 
 FIGURE 4 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Meta-Processes (Study 1)
 
@@ -340,8 +338,7 @@ full moderated mediation model, we tested the interactions between negative feed
 condition, negative feedback led to greater attention to task processes (MNeutral 5 4.79, SDNeutral 5 1.50; MNegative 5 5.61, SDNegative 5 1.46; b 5 0.82, SE 5 0.29, t 5 2.86, p 5 .005, LLCI 5 0.257, ULCI 5 1.392).
 However, negative feedback reduced the participants’ attention to task processes in both the topdown feedback flow condition (MNeutral 5 5.08, SDNeutral 5 1.27; MNegative 5 4.45, SDNegative 5 1.71; b 5 20.63, SE 5 0.28, t 5 22.28, p 5 .023, LLCI 5 21.182, ULCI 5 20.088) and lateral feedback
 
-FIGURE 5 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Recipient
-Creativity (Study 2)
+FIGURE 5 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Recipient Creativity (Study 2)
 
 Recipient Creativity
 
@@ -352,8 +349,7 @@ Top-down Flow Lateral Flow 3
 
 Negative Feedback
 
-FIGURE 6 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task
-Processes (Study 2)
+FIGURE 6 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task Processes (Study 2)
 
 Task Processes
 

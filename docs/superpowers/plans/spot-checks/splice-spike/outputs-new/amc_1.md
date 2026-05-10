@@ -21,8 +21,7 @@ Our analysis reveals that there has been significant theory development in CSR r
 
 Copyright of the Academy of Management, all rights reserved. Contents may not be copied, emailed, posted to a listserv, or otherwise transmitted without the copyright holder's express written permission. Users may print, download, or email articles for individual use only.
 
-TABLE 1 Summary of How Articles Published in Academy of Management Journals and Included in Our Collection Have
-Shaped the Definition of CSR
+TABLE 1 Summary of How Articles Published in Academy of Management Journals and Included in Our Collection Have Shaped the Definition of CSR
 
 Source (in Chronological Order)
 
@@ -43,8 +42,7 @@ In the following sections, we describe our approach to curating the CSR Collecti
 CURATION PROCESS AND EVALUATIVE CRITERIA
 Once our team was assembled, we developed criteria for identifying articles for the CSR Collection and evaluating the contribution of each article to the evolution of CSR research. These criteria are presented in Table 2. They reflect well-known characteristics of the CSR literature, extended to an aspirational level, capturing the potential of CSR research to have a maximal impact both within and outside the Academy.
 First, we considered the definition and operationalizations of CSR. This included mapping the full CSR content domain, the validation of measures of CSR, the documentation of its dimensionality, and the methodological rigor with which CSR has been
-TABLE 2 Criteria for Selecting Collection Articles and Evaluating the Status Quo of Corporate Social
-Responsibility Research
+TABLE 2 Criteria for Selecting Collection Articles and Evaluating the Status Quo of Corporate Social Responsibility Research
 1. Definition and operationalizations ᭺ Content domain and dimensionality ᭺ Measurement ᭺ Methodological rigor
 2. Integration ᭺ Levels of analysis ᭺ Disciplinary perspectives ᭺ Cross-national and comparative approaches
 3. Impact ᭺ Stakeholders considered ᭺ Evaluation of initiatives in terms of intended beneficiaries ᭺ Translation of results for practice, education, policy, and sustainable development
@@ -141,8 +139,7 @@ A third approach has treated CSR as an independent variable in experimental rese
 4 The KLD index is a publicly available listing of firms, which indexes social, environmental, and corporate governance characteristics, created for the purpose of aiding the decision-making of socially conscious investors. The index is currently referred to as the MSCI KLD 400 Social Index.
 5 Refinitiv Eikon (previously Asset4 Thomson Reuters) compiles an ESG score for almost 9,000 publicly traded firms worldwide. The score includes over 630 firm-level ESG data points, out of which 186 are aggregated to the firm level of analysis and compared to industry peers in order to assign an ESG score.
 
-TABLE 4 A Synthesis and Evaluation of the CSR Literature, Including Favorable (1) and Less Favorable (–) Features, with
-Recommendations for Future Research
+TABLE 4 A Synthesis and Evaluation of the CSR Literature, Including Favorable (1) and Less Favorable (–) Features, with Recommendations for Future Research
 
 Criteria
 

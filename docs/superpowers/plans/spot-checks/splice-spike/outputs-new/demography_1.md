@@ -295,15 +295,7 @@ Page 25
 *Ratio of predicted earnings of second-generation Hispanic men interviewed at ages 25–35 relative to third-plus-generation Whites, using a baseline model and models controlling for education and education with occupation fixed effects*
 
 ```
-Table 1 Selected characteristics of the CPS sample and CPS–SSA matched sample with adjusted weights
-All
-White
-Black
-Hispanic
-Asian
-CPS Matched CPS Matched CPS Matched CPS Matched CPS Matched
-Immigrant Generation
-Second generation
+Table 1 Selected characteristics of the CPS sample and CPS–SSA matched sample with adjusted weights All White Black Hispanic Asian CPS Matched CPS Matched CPS Matched CPS Matched CPS Matched Immigrant Generation Second generation
 ```
 
 ### Table 1

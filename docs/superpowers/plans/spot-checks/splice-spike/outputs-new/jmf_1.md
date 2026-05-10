@@ -362,8 +362,7 @@ Note: Data came from the Panel Study of Income Dynamics Childhood Retrospective 
 
 Page 24
 
-TABLE 4 Zero-inflated negative binomial regressions estimating the association of each childhood disadvantage domain
-and financial transfers for school (N = 2364).
+TABLE 4 Zero-inflated negative binomial regressions estimating the association of each childhood disadvantage domain and financial transfers for school (N = 2364).
 
 No disadvantage (reference)
 3+
@@ -397,8 +396,7 @@ Note: Data came from the Panel Study of Income Dynamics Childhood Retrospective 
 
 Page 26
 
-TABLE 5 Zero-inflated negative binomial regressions estimating the association of each childhood disadvantage domain
-and financial transfers for other unspecified purposes (N = 3618).
+TABLE 5 Zero-inflated negative binomial regressions estimating the association of each childhood disadvantage domain and financial transfers for other unspecified purposes (N = 3618).
 
 1.064 (0.138)
 0.862 (0.131)

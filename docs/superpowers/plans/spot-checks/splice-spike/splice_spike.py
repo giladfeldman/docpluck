@@ -2170,6 +2170,119 @@ def _fix_hyphenated_line_breaks(text: str) -> str:
     return "\n".join(lines)
 
 
+_MULTILINE_CAPTION_START_RE = re.compile(r"^(?:FIGURE|TABLE)\s+\d+", re.IGNORECASE)
+_MULTILINE_CAPTION_TERMINATOR_RE = re.compile(r"[.!?)]\s*$")
+_MULTILINE_CAPTION_BLOCK_NEXT_RE = re.compile(
+    r"^(?:"
+    r"#{1,6}\s|"           # markdown heading
+    r"<|"                   # HTML / table tag
+    r"```|"                 # fenced code block
+    r"(?:FIGURE|TABLE|FIG\.?)\s+\d+\b|"  # another caption
+    r"Note\s*[.:]|"        # table footer note
+    r"\[\d+\]|"            # numbered reference like [3]
+    r"\d+[.)]\s|"          # numbered list item
+    r"[*+\-]\s"            # bullet
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _join_multiline_caption_paragraphs(text: str) -> str:
+    """Fold FIGURE / TABLE captions that pdftotext split across lines.
+
+    Iteration 23 (Tier A7). When a caption wraps in the source PDF column,
+    pdftotext emits it as two consecutive lines inside ONE paragraph (no
+    blank-line break between caption and tail), e.g.::
+
+        FIGURE 2 Regression Slopes for ... on Creativity
+        (Study 1)
+
+    or::
+
+        TABLE 1 Summary of How Articles ... Have
+        Shaped the Definition of CSR
+
+    The two lines visually fragment the caption block in the rendered ``.md``
+    file. Markdown renders them as one paragraph anyway, but folding them
+    onto a single line keeps the file clean and lets downstream passes
+    treat the caption as a single token.
+
+    Implementation scans every adjacent line pair within each paragraph
+    (the caption may appear at ``lines[0]`` or mid-paragraph after a
+    body sentence with no blank-line break, as in amc_1 TABLE 2).
+
+    Conditions for folding ``lines[i]`` + ``lines[i+1]`` (all required):
+      - ``lines[i]`` starts with ``FIGURE N`` / ``TABLE N`` (case-insensitive).
+      - ``lines[i]`` is at least 60 chars — bare labels like
+        ``FIGURE 1 Theoretical Framework`` (~30 chars) are skipped because
+        what follows them is usually figure data, not a tail.
+      - ``lines[i]`` does NOT end with a sentence terminator
+        (``.``, ``!``, ``?``) or a closing parenthesis ``)`` — terminators
+        mean the caption is already complete (e.g. ``...(Study 1).`` or
+        ``TABLE 3 (Continued)``).
+      - ``lines[i+1]`` (stripped) is short: ``len(s) <= 80`` AND
+        ``len(s.split()) <= 15``.
+      - ``lines[i+1]`` does NOT itself look like a caption start / heading /
+        HTML opener / fenced code / numbered reference / list item / table
+        footer note.
+
+    Folding is line-local — it never crosses a blank-line paragraph
+    boundary. This deliberately rules out absorbing the table header row
+    (which usually sits in its OWN paragraph after the caption) into the
+    caption text. After a successful fold the same index is re-evaluated
+    so a 3-line wrap collapses chain-wise.
+
+    Affects amj_1 (5 figure captions), amc_1 (3 table captions including
+    one mid-paragraph TABLE 2), and similar multi-line caption splits
+    across the corpus.
+    """
+    if not text:
+        return text
+    paragraphs = re.split(r"(\n\n+)", text)
+    # Alternating list: [para, sep, para, sep, ..., para]. Para chunks may
+    # carry a leading / trailing newline (especially the final element when
+    # the source text ends with ``\n``); preserve those when re-emitting.
+
+    for idx in range(0, len(paragraphs), 2):
+        para = paragraphs[idx]
+        if not para or "\n" not in para:
+            continue
+        lead_len = len(para) - len(para.lstrip("\n"))
+        trail_len = len(para) - len(para.rstrip("\n"))
+        lead = para[:lead_len]
+        trail = para[len(para) - trail_len:] if trail_len else ""
+        body = para[lead_len:len(para) - trail_len]
+        lines = body.split("\n")
+        # Scan every (i, i+1) line pair. The caption may appear at lines[0]
+        # (typical case) OR mid-paragraph (e.g. amc_1 TABLE 2 which sits
+        # right after a body sentence with no blank line separating them).
+        # Re-check the same index after a successful fold so a 3-line
+        # caption ("TABLE N foo\nbar\nbaz") collapses chain-wise — but the
+        # check is line-local so it cannot run away into table-header rows
+        # that follow at separate paragraph boundaries.
+        i = 0
+        while i + 1 < len(lines):
+            line0 = lines[i]
+            line1 = lines[i + 1]
+            line1_s = line1.strip()
+            if (
+                len(line0) >= 60
+                and _MULTILINE_CAPTION_START_RE.match(line0)
+                and not _MULTILINE_CAPTION_TERMINATOR_RE.search(line0)
+                and line1_s
+                and len(line1_s) <= 80
+                and len(line1_s.split()) <= 15
+                and not _MULTILINE_CAPTION_BLOCK_NEXT_RE.match(line1_s)
+            ):
+                lines[i] = line0 + " " + line1_s
+                del lines[i + 1]
+                continue  # re-evaluate same i for chained fold
+            i += 1
+        paragraphs[idx] = lead + "\n".join(lines) + trail
+
+    return "".join(paragraphs)
+
+
 def _table_block_content_end(text: str, content_start: int, hard_end: int) -> int:
     """Find the end of a `### Table N` block's actual content within
     [content_start, hard_end].
@@ -2768,6 +2881,9 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # wrap). Catches captions like ``... on Meta-\nProcesses`` rendering as
     # ``Meta- Processes`` instead of the correct ``Meta-Processes``.
     out = _fix_hyphenated_line_breaks(out)
+    # Iteration 23: join FIGURE/TABLE captions that wrapped into a separate
+    # short paragraph (e.g. ``FIGURE 2 ... on Creativity`` + ``(Study 1)``).
+    out = _join_multiline_caption_paragraphs(out)
     return out
 
 
