@@ -291,7 +291,7 @@ Figure 5. Ratio of predicted earnings of second-generation Asian and Hispanic me
 
 Page 25
 
-### Figureure 6
+### Figure 6
 *Ratio of predicted earnings of second-generation Hispanic men interviewed at ages 25–35 relative to third-plus-generation Whites, using a baseline model and models controlling for education and education with occupation fixed effects*
 
 ```

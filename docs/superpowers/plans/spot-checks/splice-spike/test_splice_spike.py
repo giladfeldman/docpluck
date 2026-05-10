@@ -1112,6 +1112,43 @@ def test_wrap_fragments_skips_marker_only_paragraphs():
     assert "Note. The actual footnote prose" in out
 
 
+def test_wrap_fragments_label_norm_preserves_full_figure_word():
+    """Regression: previous code had ``re.sub(r"^Fig\\.?", "Figure", ...)``
+    which on a caption_label of ``Figure 6`` would match the ``Fig``
+    prefix and prepend a second ``ure`` → ``Figureure 6``. Seen in
+    demography_1 Figure 6. Negative lookahead ``(?!ure)`` blocks the
+    rewrite when the full word ``Figure`` is already present.
+    """
+    text = (
+        "Figure 6 baseline caption text on this line\n\n"
+        "X1\n\nX2\n\nX3\n\nX4\n\nX5\n\nX6\n\n"
+        "Final non-fragment paragraph long enough to break the run, with several real words so it is not detected as a fragment line itself."
+    )
+    out = _wrap_table_fragments(text, existing_table_nums=set())
+    # The corrupt label must NOT appear.
+    assert "Figureure" not in out
+    # If a labeled block was emitted, it should use the normal label.
+    if "###" in out:
+        assert "### Figure 6" in out
+
+
+def test_wrap_fragments_label_norm_still_rewrites_short_fig():
+    """Sanity: the ``Fig`` / ``Fig.`` → ``Figure`` rewrite still fires
+    for inputs like ``Fig 7`` / ``Fig. 7`` (real shortcuts that need
+    expansion). Only ``Figure`` is left alone."""
+    text = (
+        "Fig. 7 baseline caption text on this line\n\n"
+        "X1\n\nX2\n\nX3\n\nX4\n\nX5\n\nX6\n\n"
+        "Final non-fragment paragraph long enough to break the run, with several real words so it is not detected as a fragment line itself."
+    )
+    out = _wrap_table_fragments(text, existing_table_nums=set())
+    # Bug-corrupt label must NOT appear.
+    assert "Figureure" not in out
+    if "###" in out:
+        # Fig / Fig. should normalize to Figure.
+        assert "### Figure" in out
+
+
 def test_wrap_fragments_uncaptioned_run_drops_pure_noise():
     """An un-captioned fragment-run with NO footnote markers stays dropped —
     that's the existing dedup-vs-Camelot behavior we're preserving. Only

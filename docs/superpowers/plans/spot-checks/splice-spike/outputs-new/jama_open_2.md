@@ -86,7 +86,7 @@ The potential joint effects of UACR and CVH on all-cause mortality were further 
 
 Subgroup and Sensitivity Analyses Subgroup analyses by sex (male vs female), age (<60 years vs Ն60 years), hypertension (yes vs no), and diabetes (yes vs no) revealed similar patterns for associations between continuous UACR measurements and all-cause mortality across the CVH groups (eTables 5-8 in Supplement 1). In the sensitivity analyses, the results were similar to the main result when we fully adjusted all components of Life’s Essential 8 metrics as covariates (eTable 9 in Supplement 1), excluding participants with eGFR of less than 60 mL/min/1.73 m2 (eTable 10 in Supplement 1) and death during the first 2 years
 
-### Figureure 1
+### Figure 1
 *Association of Cardiovascular Health (CVH) Scores and Urinary Albumin-to-Creatinine Ratios (UACRs) With All-Cause Mortality Using Restricted Cubic Spline Models*
 
 ```
@@ -149,7 +149,7 @@ Abbreviation: HR, hazard ratio. a Grouped by tertiles into low (<4.67 mg/g), med
 (4.67-7.67 mg/g), high (7.68 to <30 mg/g). b No covariates were adjusted. c Adjusted for age, sex, race and ethnicity, education
 level, marital status, poverty income ratio, and estimated glomerular filtration rate. d Adjusted for age; sex; race and ethnicity; education level; marital status; poverty income ratio; estimated glomerular filtration rate; and history of heart disease, stroke, and cancer.
 
-### Figureure 2
+### Figure 2
 *Joint Effect Analysis of Urinary Albumin-to-Creatinine Ratio (UACR) and Cardiovascular Health (CVH) Groups With Risks of All-Cause Mortality Subgroup CVH 80-100
 UACR low UACR medium UACR high CVH 50-79 UACR low UACR medium UACR high CVH 0-49 UACR low UACR medium UACR high*
 

@@ -92,7 +92,7 @@ Glycemic Control and Medication Effect Score By month 6, mean HbA1c levels were 
 
 Sensitivity Analysis Using Multiple Imputation Conclusions for body weight and HbA1c level did not change from the primary analyses to the sensitivity analyses (eTable 2 in Supplement 2), demonstrating that the results are robust to misspecification of the missingness mechanism. However, sensitivity analyses differed from primary analyses for some secondary outcomes: fat mass decreased in both the TRE and the CR groups by month 6 relative to controls (rather than in the TRE group alone), and mean glucose levels decreased in the CR group only. Conclusions did not change between the primary analysis and sensitivity analysis for any other secondary outcome.
 
-### Figureure 1
+### Figure 1
 *Study Flowchart 127 Individuals screened
 52 Excluded 38 Did not meet 1 or more inclusion criteria 14 Declined to participate*
 

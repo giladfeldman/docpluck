@@ -2179,9 +2179,14 @@ def _wrap_table_fragments(
             block_parts: list[str] = []
             suppressed = False
             if caption_label:
-                # Normalize the label: "T 1" → "Table 1", "Fig 2" → "Figure 2"
+                # Normalize the label: "T 1" → "Table 1", "Fig 2" → "Figure 2".
+                # Negative lookahead ``(?!ure)`` prevents ``Figure 6`` →
+                # ``Figureure 6`` (the regex would otherwise match the
+                # "Fig" prefix and prepend a second "ure").
                 norm_label = re.sub(r"^T\b", "Table", caption_label, flags=re.IGNORECASE)
-                norm_label = re.sub(r"^Fig\.?", "Figure", norm_label, flags=re.IGNORECASE)
+                norm_label = re.sub(
+                    r"^Fig\.?(?!ure)", "Figure", norm_label, flags=re.IGNORECASE
+                )
                 # If a real ``### Table N`` already exists for this number from
                 # a Camelot splice, drop this fragment-wrap synthesis to avoid
                 # a duplicate `### Table N` block.
