@@ -21,8 +21,7 @@ The framing of the options may also affect people’s choices. In this example, 
 
 ## Introduction
 
-Goldstein, 2003). Default effects and framing effects have been very in-
-ﬂuential across many academic disciplines and in public policy (Araña and León, 2013; Evans et al., 2011; Johnson and Goldstein, 2003; Mintz and Redd, 2003; Tversky and Kahneman, 1981). The use of default effects is a well-known effective example of leveraging behavioral insights to inﬂuence people or to nudge them toward speciﬁc socially desirable choices. Governments and public policy organizations worldwide have set-up Nudge Units that implemented interventions using default effects to encourage desired behavior encouraging organ donations and pension savings (Halpern, 2015).
+Goldstein, 2003). Default effects and framing effects have been very in-ﬂuential across many academic disciplines and in public policy (Araña and León, 2013; Evans et al., 2011; Johnson and Goldstein, 2003; Mintz and Redd, 2003; Tversky and Kahneman, 1981). The use of default effects is a well-known effective example of leveraging behavioral insights to inﬂuence people or to nudge them toward speciﬁc socially desirable choices. Governments and public policy organizations worldwide have set-up Nudge Units that implemented interventions using default effects to encourage desired behavior encouraging organ donations and pension savings (Halpern, 2015).
 There is, however, some evidence for an overestimation of the size of nudge effects. For instance, DellaVigna and Linos (2022) recently found that there were larger effect sizes for nudge interventions reported in
 
 published literature than those reported by Nudge Units in the United States. This ﬁnding suggests that selective reporting may lead to inﬂated meta-analytic effect sizes (Kvarven et al., 2020). Moreover, in some cases, nudge effects did not replicate with larger samples (Bohner and Schlüter, 2014;Kettle et al., 2017; Kristal et al., 2020).

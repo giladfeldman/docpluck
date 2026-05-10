@@ -64,13 +64,9 @@ sampling issue for diffusion models.
 Denoising Diffusion GAN and Wavelet Diffusion
 
 To reduce the inference time of diffusion models, it’s
-crucial to significantly decrease the number of denoising diffusion steps T required for the reverse process. Addi-
-tionally, a new denoising method is required because us-
-ing large denoising steps causes the denoising distributions pθ(xt−1|xt) to become more complex and multimodal, unlike the existing diffusion models ( [30, 45, 47]) where the
+crucial to significantly decrease the number of denoising diffusion steps T required for the reverse process. Addi-tionally, a new denoising method is required because us-ing large denoising steps causes the denoising distributions pθ(xt−1|xt) to become more complex and multimodal, unlike the existing diffusion models ( [30, 45, 47]) where the
 denoising distributions follow a Gaussian distribution. To
-overcome this challenge, DiffusionGAN models the denois-
-ing distribution with an complex and multimodal distribu-
-tion by using conditional GANs. Whereas existing diffusion models predict noise ϵ added to xt−1 at timestep t using xt, the generator Gθ(xt, z, t) in DiffusionGAN predicts the input data x0 with random latent variable z ∼ N (0, I). This crucial distinction allows DiffusionGAN’s denoising distribution pθ(xt−1|xt) to become multimodal and complex, unlike the unimodal denoising model of existing approaches. The perturbed sample x′t−1 is then acquired using pre-defined q(xt−1|xt, x0). The discriminator Dϕ performs judgment on fake pairts Dϕ(xt′−1, xt, t) and real pairs Dϕ(xt−1, xt, t).
+overcome this challenge, DiffusionGAN models the denois-ing distribution with an complex and multimodal distribu-tion by using conditional GANs. Whereas existing diffusion models predict noise ϵ added to xt−1 at timestep t using xt, the generator Gθ(xt, z, t) in DiffusionGAN predicts the input data x0 with random latent variable z ∼ N (0, I). This crucial distinction allows DiffusionGAN’s denoising distribution pθ(xt−1|xt) to become multimodal and complex, unlike the unimodal denoising model of existing approaches. The perturbed sample x′t−1 is then acquired using pre-defined q(xt−1|xt, x0). The discriminator Dϕ performs judgment on fake pairts Dϕ(xt′−1, xt, t) and real pairs Dϕ(xt−1, xt, t).
 
 Building upon Diffusion GAN, Wavelet Diffusion fur-
 
@@ -118,8 +114,7 @@ LG = LDadv + λLGrec
 
 As investigated in [29], using reconstruction loss helps
 WDDGAN improve image fidelity. This enhancement can
-be attributed to the fact that when only adversarial loss is used, the generator learns to produce x′0 that is similar to the reference input x0 indirectly, through feedback from the discriminator. However, reconstruction loss provides the gen-
-erator with direct feedback through the similarity between
+be attributed to the fact that when only adversarial loss is used, the generator learns to produce x′0 that is similar to the reference input x0 indirectly, through feedback from the discriminator. However, reconstruction loss provides the gen-erator with direct feedback through the similarity between
 
 x0 and x0′ , calculated using L1 loss. Therefore, employing reconstruction loss in conjunction with adversarial loss facilitates the training of the generator easier and achieve better convergence. There is also evidence in [29] that WDDGAN converges faster than DDGAN. However, we postulate that simply employing a linear combination of the two loss functions, as presented in Eq. 8, to construct the overall loss function proves ineffective and potentially reduces the diversity of generated images. This hypothesis stems from two primary considerations. Firstly, at a certain training stage, the generator acquires the ability to produce data closely resembling the input data solely through the guidance of the discriminator’s feedback, effectively negating the necessity of reconstruction loss. Secondly, reconstruction loss may cause the generator to tend to generate data that is identical to the training data for any given input noise, thereby restricting its capacity for creative exploration and diverse generation.
 In this study, we also apply reconstruction loss. However, instead of using a simple linear combination, we propose a method called Weighted Learning to combine the overall loss function of the generator, which is detailed as follows:

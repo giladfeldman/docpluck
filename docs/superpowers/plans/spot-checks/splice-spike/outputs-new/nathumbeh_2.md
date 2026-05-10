@@ -32,8 +32,7 @@ _______________________________________________________________________ 21
 10. Polygenic score calculation and prediction ________________________________ 24
 10.1 Calculation of polygenic scores ________________________________________________ 24
 10.2 Out-of-sample prediction _____________________________________________________ 24
-11. Uncovering genetic communality of occupational status and prestige with socio-
-economic and other measures using Genomic SEM ____________________________ 24
+11. Uncovering genetic communality of occupational status and prestige with socio-economic and other measures using Genomic SEM ____________________________ 24
 11.1 General factor of occupational status __________________________________________ 24
 11.2 General factor of socioeconomic status (SES) __________________________________ 26
 11.3 Mediators between polygenic signals and occupational status __________________ 28
@@ -236,8 +235,7 @@ individuals for which paternal occupational status information was available.
 KEY-POINTS
 This study examines occupational status (see Glossary) through a multidisciplinary lens to
 uncover the complex interplay between genetics and social environment.
-The primary method to measure genetic associations with occupational status is a Genome-
-Wide Association Study (GWAS (see Glossary) in which a polygenic score is derived. From this,
+The primary method to measure genetic associations with occupational status is a Genome-Wide Association Study (GWAS (see Glossary) in which a polygenic score is derived. From this,
 we construct polygenic scores and implement sibling family and adoption models to separate
 genetic and social environment associations. Crucially, the use of a GWAS is not an agenda to
 reduce occupational status to solely a genetic basis, but rather to examine the complex
@@ -396,8 +394,7 @@ Heritability. A population measure defining the proportion of variance in a
 exploration of factors through which
 phenotype explained by genetic variance within a population. We can
 social and biological predictors are differentiate between broad-sense heritability, including both additive and
-non-additive genetic effects such as epistasis and dominance, and narrow-
-linked enhances our understanding of
+non-additive genetic effects such as epistasis and dominance, and narrow-linked enhances our understanding of
 sense heritability focusing on additive genetic effects only.
 the nature of the links between the
 Indirect genetic effects. Refers to situations when environmental influences
@@ -424,8 +421,7 @@ determinist approach, focusing only the
 role of social and contextual factors on Phenotype or trait. The observable characteristic of an individual, ranging
 from physical traits (hair colour, height) to disease status (diabetic) to
 prediction. More recently, however, behavior (risk-taker, age at first sexual intercourse, educational attainment).
-researchers have conducted genome-
-Polygenic score (PGS). A single quantitative variable that summarizes genetic
+researchers have conducted genome-Polygenic score (PGS). A single quantitative variable that summarizes genetic
 wide association studies (GWASs), association to a phenotype by combining multiple genetic variants and their
 associated weights, derived from a GWAS. Polygenic scores for social
 which scans the entire genome to
@@ -650,8 +646,7 @@ by social and environmental influences which also filter the types of behavior t
 in the historical environment (e.g., via legislation, labor market structure, social norms).
 What are the limitations of this study?
 Although we open up new avenues of research, there are limitations that are not exhaustive
-or exclusive to this type of study, with the central ones are listed here. First, we focus on British-
-European genetic ancestry individuals only, a problem we have highlighted elsewhere. We
+or exclusive to this type of study, with the central ones are listed here. First, we focus on British-European genetic ancestry individuals only, a problem we have highlighted elsewhere. We
 conducted a scientometric review of all GWAS and found that 72% of genetic discoveries come
 from 3 countries, and therefore set up the GWASDiversityMonitor described in our Nature
 
@@ -846,8 +841,7 @@ representative of the national population. It is categorized into eight (ISEI) a
 groups.
 We also compare the sex ratio of each occupational group in the two samples. Supplementary
 Figure 1 and Supplementary Figure 2 demonstrate that the UK Biobank sample is largely in line
-with the general population. However, we found that the UK Biobank sample in general under-
-represents individuals in the lower end of the occupational prestige and over-represents those
+with the general population. However, we found that the UK Biobank sample in general under-represents individuals in the lower end of the occupational prestige and over-represents those
 in the higher end of the occupational prestige. In addition to potential sample selectivity of the
 UK Biobank, this is also attributed to the fact that the UK Biobank sample covers individuals
 over 40 years old whereas the ONS data source samples the entire labor force. The sex ratio of
@@ -1208,8 +1202,7 @@ We conducted another GWAS analysis for occupational status, this time omitting t
 (SIOPS, ISEI) to 3,414 (CAMSIS) participants of British-European genetic ancestry from the UK
 Biobank who reported being adopted and had available occupational data. We used MTAG
 again (SIOPS, ISEI, CAMSIS, income, and education, excluding the adoptee sample) to enhance
-our discovery and SBayesR to optimize the PGS's predictive capacity. In comparison to our best-
-performing PGS, effect sizes reduced 23.3%, 22.6%, and 27.3% respectively (R%= 0.043, 0.031,
+our discovery and SBayesR to optimize the PGS's predictive capacity. In comparison to our best-performing PGS, effect sizes reduced 23.3%, 22.6%, and 27.3% respectively (R%= 0.043, 0.031,
 0.027 for CAMSIS, ISEI, SIOPS).
 12.3 Sibling design
 In order to identify direct genetic effects, we use the sibship sample from UK Biobank and
@@ -1239,8 +1232,7 @@ lim
 
 +→- . %",$ $!0'1
 where ℎ% denotes the narrow sense heritability under assortative mating. Assuming a PGS to
-be a noisy measure of effect size weighted alleles of independent causal SNPs (or their LD-
-based proxies), this formula should provide an approximation to the expected PGS-effect
+be a noisy measure of effect size weighted alleles of independent causal SNPs (or their LD-based proxies), this formula should provide an approximation to the expected PGS-effect
 reduction under the assumption of spousal phenotypic assortment, that can be estimated by
 plugging in plausible values for ℎ% and r from the literature. The former can be found in the
 recent behavior genetics literature: Hootegem et al. (2023)54 estimate the narrow sense
@@ -1648,8 +1640,7 @@ PGS when controlling for father’s occupational status in the same sample of in
 which paternal occupational status information was available.
 17.1b Confounding of phenotypical effect of occupational status
 The association between phenotypical occupational status and general health is only weakly
-confounded by the polygenic signal. Even when we scale the polygenic score to the SNP-
-heritability using the method proposed in section 12, at maximum one third of the association
+confounded by the polygenic signal. Even when we scale the polygenic score to the SNP-heritability using the method proposed in section 12, at maximum one third of the association
 is confounded by the polygenic score (Supplementary Figure 15).
 
 
@@ -1657,8 +1648,7 @@ is confounded by the polygenic score (Supplementary Figure 15).
 Figure 15. Genetic confounding of correlations from respondent’s
 occupational status to general health
 17.2 Mental health
-Mental health in the NCDS is measured using the Malaise Inventory,62 a commonly used self-
-completion scale for the assessment of psychiatric distress. Validation studies (partially
+Mental health in the NCDS is measured using the Malaise Inventory,62 a commonly used self-completion scale for the assessment of psychiatric distress. Validation studies (partially
 conducted within the NCDS) show high reliability and validity of the instrument.63
 The instrument is comprised of 24 questions. Each item has the response options yes or no:
 1. Do you often have backache?
@@ -1804,8 +1794,7 @@ classifications for social survey research. Methodological Innovations 9,
 Journal of Economics and Political Science 24, 519-525 (1958).
 14. Duncan, O.D. A socioeconomic index for all occupations. Class: Critical Concepts 1,
 388-426 (1961).
-15. Ganzeboom, H.B.G., De Graaf, P.M. & Treiman, D.J. A standard international socio-
-economic index of occupational status. Social Science Research 21, 1-56 (1992).
+15. Ganzeboom, H.B.G., De Graaf, P.M. & Treiman, D.J. A standard international socio-economic index of occupational status. Social Science Research 21, 1-56 (1992).
 16. Nakao, K. & Treas, J. The 1989 socioeconomic index of occupations: Construction
 from the 1989 occupational prestige scores, (National Opinion Research Center
 Chicago, IL, 1992).
@@ -1832,14 +1821,11 @@ wide range of complex diseases of middle and old age. PLoS Med 12, e1001779
 and stratification scales. (https://www.camsis.stir.ac.uk/, 2012).
 25. Hermans, M. The Strat Package: Tools for Social Stratification Research. (2010).
 26. Office, I.L. International Standard Classification of Occupations: ISCO-88. (1990).
-27. Lambert, P.S. An illustrative guide: Using GEODE to link data from SOC-2000 to NS-
-SEC and other occupation-based social classifications. (Citeseer, 2007).
-28. Jiang, L. et al. A resource-efficient tool for mixed model association analysis of large-
-scale data. Nature genetics 51, 1749-1755 (2019).
+27. Lambert, P.S. An illustrative guide: Using GEODE to link data from SOC-2000 to NS-SEC and other occupation-based social classifications. (Citeseer, 2007).
+28. Jiang, L. et al. A resource-efficient tool for mixed model association analysis of large-scale data. Nature genetics 51, 1749-1755 (2019).
 29. Okbay, A. et al. Genome-wide association study identifies 74 loci associated with
 educational attainment. Nature 533, 539-42 (2016).
-30. Finucane, H.K. et al. Partitioning heritability by functional annotation using genome-
-wide association summary statistics. Nature genetics 47, 1228-1235 (2015).
+30. Finucane, H.K. et al. Partitioning heritability by functional annotation using genome-wide association summary statistics. Nature genetics 47, 1228-1235 (2015).
 31. Bulik-Sullivan, B. et al. An atlas of genetic correlations across human diseases and
 traits. Nature Genetics 47, 1236-1241 (2015).
 32. Bulik-Sullivan, B.K. et al. LD Score regression distinguishes confounding from
@@ -1869,8 +1855,7 @@ rather than environmental reasons. Psychological Science 20, 753-762 (2009).
 42. Klassen, L., Eifler, E.F., Hufer, A. & Riemann, R. Why do people differ in their
 achievement motivation? A nuclear twin family study. Primenjena psihologija 11,
 433-450 (2018).
-43. Willems, Y., Boesen, N., Li, J., Finkenauer, C. & Bartels, M. The heritability of self-
-control: A meta-analysis. Neuroscience & Biobehavioral Reviews 100, 324-334 (2019).
+43. Willems, Y., Boesen, N., Li, J., Finkenauer, C. & Bartels, M. The heritability of self-control: A meta-analysis. Neuroscience & Biobehavioral Reviews 100, 324-334 (2019).
 44. Demontis, D. et al. Discovery of the first genome-wide significant risk loci for
 attention deficit/hyperactivity disorder. Nature genetics 51, 63-75 (2019).
 45. Loh, P.-R., Kichaev, G., Gazal, S., Schoech, A.P. & Price, A.L. Mixed-model association
@@ -1881,8 +1866,7 @@ genetic influences. Nature genetics 51, 245-257 (2019).
 47. Hill, W.D. et al. Genetic contributions to two special factors of neuroticism are
 associated with affluence, higher intelligence, better health, and longer life.
 Molecular psychiatry 25, 3034-3052 (2020).
-48. Nieuwboer, H.A., Pool, R., Dolan, C.V., Boomsma, D.I. & Nivard, M.G. GWIS: genome-
-wide inferred statistics for functions of multiple phenotypes. The American Journal of
+48. Nieuwboer, H.A., Pool, R., Dolan, C.V., Boomsma, D.I. & Nivard, M.G. GWIS: genome-wide inferred statistics for functions of multiple phenotypes. The American Journal of
 Human Genetics 99, 917-927 (2016).
 49. Bates, T.C. et al. The nature of nurture: Using a virtual-parent design to test
 parenting effects on children's educational attainment in genotyped families. Twin
@@ -1893,8 +1877,7 @@ Research and Human Genetics 21, 73-83 (2018).
 prediction of complex human traits. arXiv preprint arXiv:2101.05870 (2021).
 52. Selzam, S. et al. Comparing within-and between-family polygenic score prediction.
 The American Journal of Human Genetics 105, 351-363 (2019).
-53. Wang, B. et al. Genetic nurture effects on education: a systematic review and meta-
-analysis. bioRxiv (2021).
+53. Wang, B. et al. Genetic nurture effects on education: a systematic review and meta-analysis. bioRxiv (2021).
 54. Van Hootegem, A., Rogne, A.F. & Lyngstad, T.H. Heritability of class: Implications for
 theory and research on social mobility. (2023).
 55. Erola, J., Lehti, H., Baier, T. & Karhula, A. Socioeconomic background and gene–

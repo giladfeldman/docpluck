@@ -581,8 +581,7 @@ ti ti2 + dki
 (1)
 
 where ti is the t-statistic from the causal estimate, and dki is the degrees of freedom in the model from which the estimate is derived. Since the number of covariates is not reported in most of the
-models, we substitute dki by the number of observations minus one, following Filomena and Picchio (2023). The partial correlation coefficient pi varies from −1 to 1. A pi greater (lower) than zero means that populism increases (decreases) because of economic insecurity. pi measures the strength of the statistical significance of the effect, although it does not have a direct quan-
-titative meaning of the effect size (Filomena and Picchio 2023; Gechert and Heimberger 2022; Stanley and Doucouliagos 2014).8
+models, we substitute dki by the number of observations minus one, following Filomena and Picchio (2023). The partial correlation coefficient pi varies from −1 to 1. A pi greater (lower) than zero means that populism increases (decreases) because of economic insecurity. pi measures the strength of the statistical significance of the effect, although it does not have a direct quan-titative meaning of the effect size (Filomena and Picchio 2023; Gechert and Heimberger 2022; Stanley and Doucouliagos 2014).8
 
 8The partial correlation coefficient is also a measure of the strength and direction correlation between two variables but holds other variables constant. The value of the Pearson Correlation Coefficient (PCC) implies a stronger correlation, but it carries no substantive meaning; i.e., it is not a regression coefficient and does not imply a bigger effect in the sense of a steeper regression slope. Instead, it implies that observations are distributed more or less closely around the regression line representing the ‘true’
 
@@ -1095,8 +1094,7 @@ British Journal of Political Science 52, 221–37. Anelli M et al. (2021) Indivi
 of the National Academy of Sciences 118, e2111611118. Autor DH et al. (2020) Importing political polarization? The Electoral Consequences of Rising Trade Exposure. American
 Economic Review 110, 3139–83. Baccini L and Sattler T (2021) Austerity, Economic Vulnerability, and Populism; Unpublished Manuscript, Available from
 SSRN https://ssrn.com/abstract=3766022, http://dx.doi.org/10.2139/ssrn.3766022 (accessed 6 April 2021). Baccini L and Weymouth S (2021) Gone for good: Deindustrialization, white voter backlash, and US presidential voting.
-American Political Science Review 115, 550–67. Bagashka T et al. (2022) Populism’s rise in post-communist countries: Breaking electoral promises and incumbent left par-
-ties’ vote losses. European Journal of Political Research 61, 134–53. Barone G and Kreuter H (2021) Low-wage import competition and populist backlash: The case of Italy. European Journal of
+American Political Science Review 115, 550–67. Bagashka T et al. (2022) Populism’s rise in post-communist countries: Breaking electoral promises and incumbent left par-ties’ vote losses. European Journal of Political Research 61, 134–53. Barone G and Kreuter H (2021) Low-wage import competition and populist backlash: The case of Italy. European Journal of
 Political Economy 67, 101970. Barr RR (2009) Populists, outsiders and anti-establishment politics. Party Politics 15, 29–48. Barros L and Santos Silva M (2019) #EleNão: Economic Crisis, the Political Gender Gap, and the Election of Bolsonaro; IAI
 
 ## Discussion
@@ -1148,8 +1146,7 @@ Hall/CRC. Jin Z-C et al. (2015) Statistical methods for dealing with publication
 2023, 204–19. Kriesi H et al. (2006) Globalization and the transformation of the national political space: Six European countries compared.
 European Journal of Political Research 45, 921–56. Kurer T (2020) The declining middle: Occupational change, social status, and the populist right. Comparative Political
 Studies 53, 1798–1835. Kurer T and Van Staalduinen B (2022) Disappointed expectations: Downward mobility and electoral change. American
-Political Science Review 116, 1340–56. Lechler M (2019) Employment shocks and anti-EU sentiment. European Journal of Political Economy 59, 266–95. Lin Y and Xi T (2022) Trade shock, refugee, and the rise of right-wing populism: Evidence from European parliament elec-
-tions. China Economic Quarterly International 2, 124–37. Malgouyres C (2017) Trade Shocks and Far-Right Voting: Evidence from French Presidential Elections; Robert Schuman
+Political Science Review 116, 1340–56. Lechler M (2019) Employment shocks and anti-EU sentiment. European Journal of Political Economy 59, 266–95. Lin Y and Xi T (2022) Trade shock, refugee, and the rise of right-wing populism: Evidence from European parliament elec-tions. China Economic Quarterly International 2, 124–37. Malgouyres C (2017) Trade Shocks and Far-Right Voting: Evidence from French Presidential Elections; Robert Schuman
 Centre for Advanced Studies, Working Paper 2017/21, Florence, European University Institute. Mansfield ED et al. (2021) The globalization backlash: Exploring new perspectives. Comparative Political Studies 54, 2267–85. Margalit Y (2019) Economic insecurity and the causes of populism, reconsidered. Journal of Economic Perspectives 33, 152–70. Milner HV (2021) Voting for populism in Europe: Globalization, technological change, and the extreme right. Comparative
 Political Studies 54, 2286–320. Mudde C (2007) Populist Radical Right Parties in Europe. Cambridge: Cambridge University Press. Mudge SL (2018) Leftism Reinvented: Western Parties from Socialism to Neoliberalism. Cambridge, MA: Harvard University
 Press. Mughan A and Lacy D (2002) Economic performance, job insecurity and electoral choice. British Journal of Political Science
@@ -1159,8 +1156,7 @@ University Press.
 916 Gábor Scheiring et al.
 Obinger H and Petersen K (2017) Mass warfare and the welfare state – causal mechanisms and effects. British Journal of Political Science 47, 203–27.
 Page MJ et al. (2021) The Prisma 2020 statement: An updated guideline for reporting systematic reviews. BMJ 372, n 71. Ranci C et al. (2021) New measures of economic insecurity reveal its expansion into EU middle classes and welfare states.
-Social Indicators Research 158, 539–62. Rhodes-Purdy M et al. (2021) Populist psychology: Economics, culture, and emotions. Journal of Politics 83, 1559–72. Rico G and Anduiza E (2019) Economic correlates of populist attitudes: An analysis of nine European countries in the after-
-math of the great recession. Acta Politica 54, 371–97. Rodríguez-Pose A (2018) The revenge of the places that don’t matter (and what to do about It). Cambridge Journal of
+Social Indicators Research 158, 539–62. Rhodes-Purdy M et al. (2021) Populist psychology: Economics, culture, and emotions. Journal of Politics 83, 1559–72. Rico G and Anduiza E (2019) Economic correlates of populist attitudes: An analysis of nine European countries in the after-math of the great recession. Acta Politica 54, 371–97. Rodríguez-Pose A (2018) The revenge of the places that don’t matter (and what to do about It). Cambridge Journal of
 Regions, Economy and Society 11, 189–209. Rodrik D (2021) Why does globalization fuel populism? Economics, culture, and the rise of right-wing populism. Annual
 Review of Economics 13, 133–70. Schäfer A (2022) Cultural backlash? How (not) to explain the rise of authoritarian populism. British Journal of Political
 Science 52, 1977–93. Scheiring G (2020) Left behind in the Hungarian rustbelt: The cultural political economy of working-class neo-nationalism.

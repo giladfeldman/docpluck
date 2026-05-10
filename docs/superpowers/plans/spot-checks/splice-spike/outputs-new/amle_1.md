@@ -483,8 +483,7 @@ Groningen University, Netherlands
 University of Illinois, UrbanaChampaign
 University of Iowa
 na na
-University of Michigan University of Illinois, Urbana-
-Champaign na
+University of Michigan University of Illinois, Urbana-Champaign na
 
 Note: Authors are listed in decreasing order of number of citations in General Management textbooks, and then in decreasing order of number of Web of Science citations. Authors with equal numbers of textbook citations are assigned the same rank. Text 5 General Management textbook citations. WoS 5 Web of Science. na 5 not applicable. The entire database including all 11,558 authors is available upon request. Web of Science data are as of July 8, 2018.
 

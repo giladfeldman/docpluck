@@ -417,8 +417,7 @@ The supplemental material is available in the online version of the article.
 Notes
 1. We would like to thank the original authors for providing
 the materials.
-2. Note that the preregistrations follow a registered report for-
-mat. This means that a manuscript-like document was produced reporting simulated random data results. Please see also the Read-me document in the wiki page on the OSF preregistrations here: https://osf.io/pg3ae/ for a detailed guide on where to find information on preregistered materials, design, and analysis plan.
+2. Note that the preregistrations follow a registered report for-mat. This means that a manuscript-like document was produced reporting simulated random data results. Please see also the Read-me document in the wiki page on the OSF preregistrations here: https://osf.io/pg3ae/ for a detailed guide on where to find information on preregistered materials, design, and analysis plan.
 3. Indicating a low proficiency of English, self-report not
 being serious about filling in the survey, who guessed the hypothesis, have done the survey before, who failed to complete the survey, and those not from the United States/
 

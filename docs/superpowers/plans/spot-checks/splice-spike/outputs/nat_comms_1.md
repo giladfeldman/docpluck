@@ -33,8 +33,7 @@ statistical results in Supplementary Table 2, signiﬁcant differences were calc
 
 infected ants (ADONIS: R2 = 0.19; F(1,23) = 5.4; P = 0.007). Eleven hours after injury, the CHC proﬁle of sterile ants had converged again to the proﬁle at 0 h (ADONIS: R2 = 0.03; F(1,17) = 0.53; P = 0.45), while the CHC proﬁle of injured ants remained signiﬁcantly different (ADONIS: R2 = 0.19; F(1,17) = 3.82; P = 0.008).
 Consistent with the idea that changes in CHC proﬁles could provide cues on the health status of ants9, the observed differences in the
-CHC proﬁles mostly stemmed from differences in the relative abun-
-dance of alkadienes (Supplementary Fig. 6 and Supplementary
+CHC proﬁles mostly stemmed from differences in the relative abun-dance of alkadienes (Supplementary Fig. 6 and Supplementary
 
 Table 9), which are among the CHC compounds most relevant for communication in social insects19. These changes in the CHC proﬁle are generally regulated by differentially expressed genes in the fat bodies20. To identify the genes likely responsible for the observed CHC changes between infected and sterile ants, we conducted transcriptomic analyses of the fat bodies of the same individuals. A total of 18 genes related to CHC synthesis were differentially expressed between infected and sterile ants 11 h after exposure to P. aeruginosa (in addition, 17 genes out of 378 that were differentially expressed were
 

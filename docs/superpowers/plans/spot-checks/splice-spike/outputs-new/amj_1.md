@@ -258,8 +258,7 @@ Although the results of Study 1 supported our hypotheses, some limitations shoul
 FIGURE 3 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Task
 Processes (Study 1)
 
-FIGURE 4 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Meta-
-Processes (Study 1)
+FIGURE 4 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Meta-Processes (Study 1)
 
 performance appraisal, employees received both numerical and written feedback. Rather than using the numerical and written feedback directly, we asked the employees to rate their subjective evaluation of the performance appraisal with an assumption that the same feedback could be perceived differently by employees. For example, two employees who receive 60% in the numerical appraisal may interpret the same number differently; one may interpret it as negative feedback, while another may perceive it as neutral feedback. In addition, methodologically speaking, it was difficult to quantify the negativity of the written feedback objectively. Third, there could be a confounding effect of feedback recipient positions. We collected data from supervisors in the bottom-up feedback flow, but, in the topdown and lateral feedback flows, our data collection was done with team members. Ideally, the data should have been collected from employees at the same position across the three conditions (e.g., middle managers who receive feedback from their followers, supervisors, and peers). This limitation is less likely to hurt the validity of the top-down and bottomup feedback flows because those two flows presuppose positional differences between feedback givers and recipients. However, there could be an unexpected confounding effect of position in the lateral feedback flow. For example, the underlying psychology of middle managers receiving feedback from
 
@@ -378,8 +377,7 @@ with 10,000 bias-corrected bootstrapping resamples. In the bottom-up feedback fl
 of Study 2
 In the laboratory experiment, we again found that the direction of feedback flow moderates the relationship between negative feedback and recipient creativity. Specifically, negative feedback increased recipient creativity when the feedback
 
-FIGURE 7 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Meta-
-Processes (Study 2)
+FIGURE 7 Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Meta-Processes (Study 2)
 
 Meta-Processes
 

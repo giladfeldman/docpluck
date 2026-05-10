@@ -1959,6 +1959,81 @@ def _dedupe_h2_sections(text: str) -> str:
     return "\n".join(lines)
 
 
+def _fix_hyphenated_line_breaks(text: str) -> str:
+    """Join lines split mid-word at a hyphen by pdftotext column wrap.
+
+    Iteration 20 (Tier A4). pdftotext occasionally breaks a word across a
+    column-wrap line in body text or a figure / table caption, leaving the
+    line ending in ``-`` and the continuation on the next line. Rendered
+    markdown preserves both lines, and most renderers turn ``-\\n`` into
+    ``- `` (hyphen + space) which corrupts the word.
+
+    Pattern handled (amj_1 Figure 4 caption):
+        FIGURE 4 Regression Slopes for ... on Meta-
+        Processes (Study 1)
+
+    Conservative rule: ALWAYS keep the hyphen, only remove the newline.
+    Both cases below produce a valid form:
+      - Real compound word ``Meta-\\nProcesses`` → ``Meta-Processes``.
+      - Line-wrap artifact ``socio-\\neconomic`` → ``socio-economic`` (still
+        a valid hyphenated form; slightly less canonical than
+        ``socioeconomic`` but content-preserving).
+
+    Dropping the hyphen for the lowercase case erodes real compound words
+    (``self-control`` → ``selfcontrol``, ``meta-analysis`` → ``metaanalysis``)
+    far more often than it helps, since pdftotext rarely emits soft-hyphens
+    for word-internal breaks but compounds with line-end hyphens are common.
+
+    Skips:
+      - Inside ``<table>...</table>`` (cell breaks use ``<br>``, not ``\\n``).
+      - Inside fenced code blocks ``` ... ``` (raw content; preserve).
+      - Markdown headings (``#``, ``##``, ``###`` lines).
+      - Lines whose char before the hyphen is non-alpha (e.g. ``1990-`` ranges).
+      - Continuation lines whose first char is non-alpha (markers, brackets).
+
+    Re-processes the merged line so chained joins (``a-\\nb-\\nc``) work in
+    one pass.
+    """
+    lines = text.split("\n")
+    in_table = False
+    in_fence = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        ls = line.strip()
+        if ls.startswith("```"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        if not in_fence:
+            if "<table" in ls:
+                in_table = True
+            if "</table>" in ls:
+                in_table = False
+                i += 1
+                continue
+        if in_fence or in_table:
+            i += 1
+            continue
+        if ls.startswith("#"):
+            i += 1
+            continue
+        if (
+            i + 1 < len(lines)
+            and len(line) >= 3
+            and line.endswith("-")
+            and line[-2].isalpha()
+        ):
+            next_line = lines[i + 1]
+            ns = next_line.strip()
+            if ns and ns[0].isalpha():
+                lines[i] = line + ns
+                del lines[i + 1]
+                continue
+        i += 1
+    return "\n".join(lines)
+
+
 def _table_block_content_end(text: str, content_start: int, hard_end: int) -> int:
     """Find the end of a `### Table N` block's actual content within
     [content_start, hard_end].
@@ -2553,6 +2628,10 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # Demote duplicate ## H2 section headings (figure captions starting with
     # "Results of..." that the section detector misclassified, etc.).
     out = _dedupe_h2_sections(out)
+    # Iteration 20: join lines split mid-word at a hyphen (pdftotext column
+    # wrap). Catches captions like ``... on Meta-\nProcesses`` rendering as
+    # ``Meta- Processes`` instead of the correct ``Meta-Processes``.
+    out = _fix_hyphenated_line_breaks(out)
     return out
 
 

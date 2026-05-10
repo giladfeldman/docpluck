@@ -1468,6 +1468,120 @@ def test_strip_post_table_caption_echo_only_matching_table_number():
     assert "Table 2. Baseline characteristics" in out
 
 
+from splice_spike import _fix_hyphenated_line_breaks
+
+
+def test_fix_hyphenated_compound_word_join():
+    """amj_1 Figure 4 pattern: caption ends with ``Meta-`` and the next
+    line starts with ``Processes``. Compound word — keep hyphen, drop
+    newline + leading whitespace on next line."""
+    text = (
+        "FIGURE 4 Regression Slopes for the Interaction on Meta-\n"
+        "Processes (Study 1)\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    assert "Meta-Processes (Study 1)" in out
+    # No leftover stray ``Meta-\n`` or ``Meta- Processes``.
+    assert "Meta-\nProcesses" not in out
+    assert "Meta- Processes" not in out
+
+
+def test_fix_hyphenated_lowercase_keeps_hyphen():
+    """Conservative rule: keep the hyphen even for lowercase
+    continuations. Real compound words (``self-control``,
+    ``meta-analysis``) are far more common than pdftotext word-internal
+    breaks, so dropping the hyphen erodes content more than it helps."""
+    text = (
+        "the multi-\n"
+        "step approach is widely used.\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    # Hyphen preserved, newline removed.
+    assert "multi-step approach" in out
+    assert "multi-\nstep" not in out
+
+
+def test_fix_hyphenated_skips_inside_html_table():
+    """Cell breaks use ``<br>`` inside HTML tables — never literal ``\\n``.
+    But if the table-row text happens to contain ``\\n`` because the
+    rendering is multi-line, the hyphen-join must NOT fire while inside
+    ``<table>...</table>``."""
+    text = (
+        "<table>\n"
+        "  <thead><tr><th>Meta-</th><th>data</th></tr></thead>\n"
+        "  <tbody><tr><td>Meta-</td><td>2</td></tr></tbody>\n"
+        "</table>\n"
+        "Meta-\n"
+        "Processes joined here\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    # Inside the table, lines are untouched.
+    assert "<th>Meta-</th>" in out
+    # Outside the table, hyphen-join fires.
+    assert "Meta-Processes joined here" in out
+
+
+def test_fix_hyphenated_skips_inside_fenced_code():
+    """Fenced code blocks preserve raw content."""
+    text = (
+        "```\n"
+        "first-\n"
+        "line\n"
+        "```\n"
+        "outside-\n"
+        "Block\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    # Inside the fence: untouched.
+    assert "first-\nline" in out
+    # Outside: joined.
+    assert "outside-Block" in out
+
+
+def test_fix_hyphenated_skips_heading_line():
+    """A heading line ending in ``-`` is not a body-text wrap. Skip."""
+    text = (
+        "### Section-\n"
+        "Continued\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    # Heading preserved as-is.
+    assert "### Section-\nContinued" in out
+
+
+def test_fix_hyphenated_skips_numeric_range():
+    """``1990-\\n2000`` is a date range, not a word break. Char before
+    the hyphen is a digit → no join."""
+    text = (
+        "from 1990-\n"
+        "2000 the trend was clear.\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    # Untouched.
+    assert "1990-\n2000" in out
+
+
+def test_fix_hyphenated_chained_joins():
+    """``a-\\nb-\\nc`` should chain-join in one pass."""
+    text = "FIGURE 1 some-\nMore-\nWords here\n"
+    out = _fix_hyphenated_line_breaks(text)
+    assert "some-More-Words here" in out
+
+
+def test_fix_hyphenated_skips_blank_continuation():
+    """Paragraph break (blank line) means the next paragraph's first line
+    is NOT a wrapped continuation. Don't join across paragraph
+    boundaries."""
+    text = (
+        "End of caption-\n"
+        "\n"
+        "Start of next paragraph.\n"
+    )
+    out = _fix_hyphenated_line_breaks(text)
+    # Hyphen + paragraph break preserved (blank line is non-alpha first char).
+    assert "End of caption-\n\nStart of next" in out
+
+
 from splice_spike import _format_figure_md
 
 
