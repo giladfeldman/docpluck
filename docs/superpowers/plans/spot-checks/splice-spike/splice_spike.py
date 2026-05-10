@@ -445,6 +445,111 @@ def _is_group_separator(row: list[str], n_cols: int) -> bool:
 
 _SUFFIX_OPEN_PUNCT_RE = re.compile(r"[-—–:]\s*$")
 
+_STRONG_RH_PATTERNS = [
+    # Pure page number: "725", "1236"
+    re.compile(r"^\d{1,4}$"),
+    # Pipe-prefixed page header: "|232", "|232 Stacey et al."
+    re.compile(r"^\s*\|\s*\d{1,4}\b"),
+    # Page-number-with-vol: "Vol. 17", "Vol.:(0123456789)"
+    re.compile(r"^Vol\.?[\s:]", re.IGNORECASE),
+    # Journal-title-CAPS + page number: "COGNITION AND EMOTION 1231"
+    re.compile(r"^[A-Z][A-Z\s&]{6,}\s+\d{2,5}$"),
+    # Author "et al." cite: "Stacey et al.", "Smith et al"
+    re.compile(r".*\bet\s+al\.?\s*$"),
+    # DOI / URL header
+    re.compile(r"^(?:doi|https?)\b", re.IGNORECASE),
+]
+
+_WEAK_RH_PATTERNS = [
+    # Single short cap-cased word: "Nussio"
+    re.compile(r"^[A-Z][A-Za-z'’]{1,15}$"),
+    # "Smith and Jones"
+    re.compile(r"^[A-Z][A-Za-z'’]{1,15}\s+and\s+[A-Z][A-Za-z'’]{1,15}$"),
+    # Pure number repeated above
+    re.compile(r"^\d{1,4}$"),
+]
+
+
+def _is_strong_running_header(s: str) -> bool:
+    """Strong unambiguous running-header signal — a real column header
+    almost never looks like this (pure page number, ``et al.``, journal
+    CAPS line, ``Vol.``, DOI/URL)."""
+    s = (s or "").strip()
+    if not s or len(s) > 40:
+        return False
+    return any(p.match(s) for p in _STRONG_RH_PATTERNS)
+
+
+def _is_weak_running_header(s: str) -> bool:
+    """Weak signal — could plausibly be a real header word but matches
+    common running-header layouts (single cap-cased word like ``Nussio``,
+    or ``Smith and Jones``). Only counted as RH when it co-occurs with a
+    STRONG signal in the same row."""
+    s = (s or "").strip()
+    if not s or len(s) > 40:
+        return False
+    return any(p.match(s) for p in _WEAK_RH_PATTERNS)
+
+
+def _is_running_header_cell(s: str) -> bool:
+    """Backwards-compat alias used in tests — strong OR weak signal."""
+    return _is_strong_running_header(s) or _is_weak_running_header(s)
+
+
+def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Drop top rows of the grid that look like leaked running headers /
+    page numbers rather than real column labels.
+
+    Iteration 15. Camelot occasionally captures the page running-header
+    as the first row of an extracted table (e.g. social_forces_1 Table 1
+    where row 0 is ``[ "|232Stacey et al." ]``, am_sociol_rev_3 Table 4
+    where row 0 is ``[ "Nussio", "725" ]``). The real column headers are
+    on row 1. Dropping the running-header row promotes the actual headers.
+
+    A row qualifies for dropping when ALL of:
+      - it has ≥1 populated cell;
+      - at least one populated cell is a STRONG running-header signal
+        (pure page number, ``et al.``, journal CAPS line, ``Vol.``,
+        DOI/URL) — this anchor disambiguates from real header rows;
+      - every populated cell is a strong-or-weak running-header signal.
+
+    Iterates from the top until a non-qualifying row is reached. Stops if
+    fewer than 2 rows would remain (preserve grid structure). An entirely
+    blank top row is left alone (different artifact, not RH).
+    """
+    if not rows:
+        return rows
+    out = list(rows)
+    while len(out) >= 2:
+        top = out[0]
+        populated = [c for c in top if (c or "").strip()]
+        if not populated:
+            break
+        if not any(_is_strong_running_header(c) for c in populated):
+            break
+        if not all(
+            _is_strong_running_header(c) or _is_weak_running_header(c)
+            for c in populated
+        ):
+            break
+        # Don't drop if every remaining row is also pure RH content —
+        # that suggests we'd be killing a real (numeric-only) table
+        # rather than stripping an RH artifact.
+        has_real_below = any(
+            (c or "").strip()
+            and not _is_strong_running_header(c)
+            and not _is_weak_running_header(c)
+            for row in out[1:]
+            for c in row
+        )
+        if not has_real_below:
+            break
+        out = out[1:]
+    return out
+
+
+
+
 
 def _fold_suffix_continuation_columns(
     header_rows: list[list[str]],
@@ -1179,6 +1284,7 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
         for c in cells:
             grid[c["r"]][c["c"]] = c["text"]
         grid = _drop_caption_leading_rows(grid, label, caption)
+        grid = _drop_running_header_rows(grid)
         if len(grid) >= 2:
             sbs_col = _detect_side_by_side_merge(grid, label)
             if sbs_col is not None:
@@ -1200,6 +1306,7 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
         cam_rows = _camelot_cells_for_table(pdf_path, table)
         if cam_rows:
             cam_rows = _drop_caption_leading_rows(cam_rows, label, caption)
+            cam_rows = _drop_running_header_rows(cam_rows)
             if len(cam_rows) >= 2:
                 sbs_col = _detect_side_by_side_merge(cam_rows, label)
                 if sbs_col is not None:

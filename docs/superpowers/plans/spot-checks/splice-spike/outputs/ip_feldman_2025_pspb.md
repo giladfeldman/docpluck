@@ -363,15 +363,11 @@ Ip and Feldman
 <table>
   <thead>
     <tr>
-      <th>Ip and Feldman</th>
-      <th>7</th>
+      <th>IV1: positive vs. negative</th>
+      <th>IV1: estimation of negative emotional events<br>IV1: estimation of positive emotional events</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>IV1: positive vs. negative</td>
-      <td>IV1: estimation of negative emotional events<br>IV1: estimation of positive emotional events</td>
-    </tr>
     <tr>
       <td>emotions (within; all</td>
       <td>“Felt sad because they. . .”“Felt happy because they. . .”</td>
@@ -1185,15 +1181,11 @@ Negative well-being  Loneliness  Rumination/brooding  Depressive symptoms 
 <table>
   <thead>
     <tr>
-      <th>Ip and Feldman</th>
-      <th>15</th>
+      <th>Outcomes (Extension).</th>
+      <th>ported and documented below p &lt; .05, yet we strongly cau-<br>tion against over-interpreting those and recommend focusing</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <td>Outcomes (Extension).</td>
-      <td>ported and documented below p &lt; .05, yet we strongly cau-<br>tion against over-interpreting those and recommend focusing</td>
-    </tr>
     <tr>
       <td>β for negative β for positive</td>
       <td>on the much stronger and clearer main effects.</td>

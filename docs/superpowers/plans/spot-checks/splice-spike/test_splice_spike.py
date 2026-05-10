@@ -1410,3 +1410,114 @@ def test_format_figure_md_short_caption_unchanged():
     fig = {"label": "Figure 2", "caption": "Figure 2. Short caption."}
     out = _format_figure_md(fig)
     assert out == "*Figure 2. Short caption.*"
+
+
+from splice_spike import _drop_running_header_rows, _is_running_header_cell
+
+
+def test_running_header_cell_pure_page_number():
+    """Pure 1-4 digit numbers like '725', '1236' are running-header pages."""
+    assert _is_running_header_cell("725")
+    assert _is_running_header_cell("1236")
+    assert _is_running_header_cell(" 232 ")
+    assert not _is_running_header_cell("12345")  # too long for a page number
+    assert not _is_running_header_cell("0.5")    # not pure digits
+
+
+def test_running_header_cell_pipe_prefixed():
+    """social_forces_1 pattern: ``|232 Stacey et al.``"""
+    assert _is_running_header_cell("|232 Stacey et al.")
+    assert _is_running_header_cell("| 232")
+
+
+def test_running_header_cell_journal_caps():
+    """chan_feldman pattern: ``COGNITION AND EMOTION 1231``"""
+    assert _is_running_header_cell("COGNITION AND EMOTION 1231")
+    assert _is_running_header_cell("JOURNAL OF SCIENCE 42")
+
+
+def test_running_header_cell_author_only():
+    """am_sociol_rev_3 pattern: ``Nussio``, ``Stacey et al.``"""
+    assert _is_running_header_cell("Nussio")
+    assert _is_running_header_cell("Stacey et al.")
+    assert _is_running_header_cell("Smith and Jones")
+
+
+def test_running_header_cell_does_not_match_punctuated_headers():
+    """Real column headers with punctuation (%, /, multi-word phrases)
+    aren't even WEAK running header signals.
+
+    Note: ``Mean`` and ``Variable`` look like weak signals (single
+    cap-cased word) at the cell level — the row-level rule disambiguates
+    by requiring a STRONG signal to be present in the same row before
+    treating any cell as RH content."""
+    assert not _is_running_header_cell("p-value")
+    assert not _is_running_header_cell("95% CI")
+    assert not _is_running_header_cell("T-statistic")
+    assert not _is_running_header_cell("Sample size")
+    # These would look like weak signals individually, but the row-level
+    # rule protects them in real header rows (no STRONG anchor → keep).
+    from splice_spike import _is_weak_running_header, _is_strong_running_header
+    assert _is_weak_running_header("Mean")
+    assert not _is_strong_running_header("Mean")
+
+
+def test_drop_running_header_rows_drops_top_row_with_pure_numbers():
+    """A top header row of all running-header cells is dropped; the next
+    row becomes the new header."""
+    grid = [
+        ["Nussio", "725"],
+        ["Variable", "Mean"],
+        ["Trust", "1.5"],
+    ]
+    out = _drop_running_header_rows(grid)
+    assert len(out) == 2
+    assert out[0] == ["Variable", "Mean"]
+    assert out[1] == ["Trust", "1.5"]
+
+
+def test_drop_running_header_rows_drops_multiple_top_rows():
+    """Iterates from the top — drops as many fully-running-header rows
+    as there are."""
+    grid = [
+        ["725", "726"],
+        ["COGNITION AND EMOTION 1231", ""],
+        ["Variable", "Mean"],
+        ["Trust", "1.5"],
+    ]
+    out = _drop_running_header_rows(grid)
+    assert len(out) == 2
+    assert out[0] == ["Variable", "Mean"]
+
+
+def test_drop_running_header_rows_preserves_row_with_real_content():
+    """A row that has any non-running-header populated cell is kept."""
+    grid = [
+        ["Variable", "Mean"],
+        ["Trust", "1.5"],
+    ]
+    out = _drop_running_header_rows(grid)
+    assert out == grid
+
+
+def test_drop_running_header_rows_does_not_drop_below_2_rows():
+    """Refuse to leave the grid with fewer than 2 rows — preserves
+    table structure even if every remaining row looks running-header-y."""
+    grid = [
+        ["725", ""],
+        ["726", ""],
+    ]
+    out = _drop_running_header_rows(grid)
+    # Both look like running-header rows but we don't drop both.
+    assert len(out) == 2
+
+
+def test_drop_running_header_rows_skips_empty_top_row():
+    """An entirely-empty top row stops the loop (it's a structural
+    artifact, not a running-header row)."""
+    grid = [
+        ["", ""],
+        ["Variable", "Mean"],
+    ]
+    out = _drop_running_header_rows(grid)
+    assert out == grid

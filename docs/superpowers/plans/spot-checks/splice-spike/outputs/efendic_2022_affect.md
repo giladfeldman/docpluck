@@ -158,22 +158,14 @@ The interaction between manipulated attribute and CMA (change in manipulated att
 <table>
   <thead>
     <tr>
-      <th>Efendic´ et al.</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>1179</th>
+      <th>DV.<br>Predictors</th>
+      <th>B</th>
+      <th>SE</th>
+      <th>DV: Change in non-manipulated attribute<br>95% CI</th>
+      <th>p</th>
     </tr>
   </thead>
   <tbody>
-    <tr><td colspan="5"><strong>DV.</strong></td></tr>
-    <tr>
-      <td>Predictors</td>
-      <td>B</td>
-      <td>SE</td>
-      <td>DV: Change in non-manipulated attribute<br>95% CI</td>
-      <td>p</td>
-    </tr>
     <tr>
       <td>Intercept</td>
       <td>20.26</td>
