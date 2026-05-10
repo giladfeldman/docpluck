@@ -31,7 +31,7 @@ https://doi.org/10.1016/j.joep.2020.102350 Received 2 April 2020; Received in re
   <thead>
     <tr>
       <th></th>
-      <th>Descriptive and omnibus inferential statistics, across original studies and replications.<br>N</th>
+      <th>N</th>
       <th>Paying to know<br>Choice</th>
       <th>Win</th>
       <th>Loss</th>

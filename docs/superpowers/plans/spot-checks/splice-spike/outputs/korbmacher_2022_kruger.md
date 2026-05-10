@@ -510,15 +510,6 @@ Table 7: Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃ
   <thead>
     <tr>
       <th></th>
-      <th>ratings between easy and diﬃcult abilities (within conditions).</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-    <tr>
-      <th></th>
       <th></th>
       <th></th>
       <th>Mean</th>
@@ -934,13 +925,6 @@ T
   <thead>
     <tr>
       <th></th>
-      <th>Extensions: Mean domain diﬃculty and mean comparative ability estimates</th>
-      <th></th>
-      <th></th>
-      <th></th>
-    </tr>
-    <tr>
-      <th>tested against the average (scale midpoint).</th>
       <th>Easy domain condition</th>
       <th></th>
       <th></th>
@@ -953,15 +937,15 @@ T
       <th>Domain</th>
       <th>Percentile</th>
     </tr>
+    <tr>
+      <th></th>
+      <th>diﬃculty</th>
+      <th>estimate<br>1</th>
+      <th>diﬃculty</th>
+      <th>estimate<br>2</th>
+    </tr>
   </thead>
   <tbody>
-    <tr>
-      <td></td>
-      <td>diﬃculty</td>
-      <td>estimate<br>1</td>
-      <td>diﬃculty</td>
-      <td>estimate<br>2</td>
-    </tr>
     <tr>
       <td>Using mouse</td>
       <td>3.13 (2.90)</td>

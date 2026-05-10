@@ -842,6 +842,10 @@ def _drop_caption_leading_rows(
          appears verbatim somewhere in the caption text (caption tail).
       3. Row with col 0 empty and col 1 = ``\\d{{1,3}}`` and all other cols
          empty (a page-number-only row Camelot picked up from the page).
+      4. Row with EXACTLY ONE populated cell (in any column), where that
+         cell is ≥ 5 chars and appears verbatim in the caption — covers the
+         common Camelot quirk of placing the second line of a wrapped caption
+         into a non-zero column when the first line was already absorbed.
 
     The function never deletes a row whose other columns hold real data
     (numerics, multi-cell content), so it cannot strip a legitimate header.
@@ -882,6 +886,26 @@ def _drop_caption_leading_rows(
             v1 = (first_row[1] or "").strip()
             other_after = [c for c in first_row[2:] if (c or "").strip()]
             if re.fullmatch(r"\d{1,3}", v1) and not other_after:
+                grid = grid[1:]
+                continue
+
+        # Rule 4: caption-tail in any column. Exactly one populated cell that
+        # appears verbatim in the caption text — Camelot sometimes drops the
+        # second line of a wrapped caption into a middle column rather than
+        # col 0 (e.g., korbmacher Table 7 puts "ratings between easy..." in
+        # col 1 with all other cells empty).
+        if cap_norm:
+            populated = [
+                (idx, (cell or "").strip())
+                for idx, cell in enumerate(first_row)
+                if (cell or "").strip()
+            ]
+            if (
+                len(populated) == 1
+                and len(populated[0][1]) >= 5
+                and re.search(r"[a-z]", populated[0][1], re.IGNORECASE)
+                and populated[0][1] in cap_norm
+            ):
                 grid = grid[1:]
                 continue
 

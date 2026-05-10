@@ -609,6 +609,65 @@ def test_drop_caption_empty_grid_returns_empty():
     assert _drop_caption_leading_rows([], "Table 1", "caption") == []
 
 
+def test_drop_caption_leading_caption_tail_in_non_zero_column():
+    """Camelot sometimes places the second line of a wrapped caption into
+    column 1 (or higher) instead of column 0. korbmacher Table 7's first row
+    is ``["", "ratings between easy and diﬃcult abilities (within conditions).",
+    "", "", "", "", ""]`` — the caption-tail leak. Rule 4 drops it."""
+    grid = [
+        ["", "ratings between easy and diﬃcult abilities (within conditions).", "", "", "", "", ""],
+        ["", "", "", "Mean", "", "Eﬀect", ""],
+        ["Condition", "T-statistic", "df", "diﬀerence", "p-value", "size r", "95% CI"],
+        ["Original", "668.5", "238", "2.78", "<.001", "0.82", "[0.79, 0.85]"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 7",
+        caption=(
+            "Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃculty "
+            "ratings between easy and diﬃcult abilities (within conditions)."
+        ),
+    )
+    # The caption-tail row drops; the actual two header rows + data row remain.
+    assert len(out) == 3
+    assert out[0][3] == "Mean"
+    assert out[1][0] == "Condition"
+
+
+def test_drop_caption_rule4_does_not_fire_when_text_not_in_caption():
+    """Rule 4 ONLY drops when the populated cell appears verbatim in the
+    caption — random single-cell rows must not be dropped."""
+    grid = [
+        ["", "Subgroup A", "", "", ""],
+        ["x1", "x2", "x3", "x4", "x5"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 1",
+        caption="Some caption that does not mention Subgroup at all.",
+    )
+    # Subgroup A row stays (it's not in caption).
+    assert len(out) == 2
+    assert out[0][1] == "Subgroup A"
+
+
+def test_drop_caption_rule4_does_not_fire_on_multi_populated_row():
+    """Rule 4 requires EXACTLY one populated cell — a multi-cell row, even
+    if some content overlaps caption, must stay."""
+    grid = [
+        # Two populated cells; "Mean" is in caption but row has > 1 populated cell.
+        ["Variable", "Mean", "", "", ""],
+        ["Age", "24.3", "3.1", "0.5", "1.0"],
+    ]
+    out = _drop_caption_leading_rows(
+        grid,
+        label="Table 1",
+        caption="Mean values across conditions.",
+    )
+    assert len(out) == 2
+    assert out[0][0] == "Variable"
+
+
 from splice_spike import (
     _wrap_table_fragments,
     _is_spurious_single_column_grid,
