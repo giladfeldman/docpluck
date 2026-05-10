@@ -197,8 +197,6 @@ We failed to ﬁnd support for differences in rates of consent to receive health
     <tr><td colspan="5"><strong>Note. N = 1920.</strong></td></tr>
   </tbody>
 </table>
-
-### Table 6
 *Summary of the replication results of Part 1 (Johnson and Goldstein (2003)) based on logistic regression analysis Predictor Estimate SE Z p OR [95% CI] Intercept 0.51 0.09 5.46 <.001 1.67 [1.39, 2.00] Default: No-Default – Opt-In 0.32 0.14 2.37 0.018 1.38 [1.06, 1.80] Default: Opt-Out – Opt-In 0.51…*
 
 <table>
@@ -971,8 +969,6 @@ Notes: OSF links: Group A = https://osf.io/5e3r8 ; Group B = https://osf.io/3kdq
     </tr>
   </tbody>
 </table>
-
-### Table 4
 *Classiﬁcation of replications based on LeBel et al.*
 
 ```

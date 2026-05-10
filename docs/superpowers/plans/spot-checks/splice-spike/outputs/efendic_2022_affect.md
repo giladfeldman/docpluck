@@ -50,8 +50,6 @@ Manipulated attribute
   </tbody>
 </table>
 
-Negative affect Positive affect Positive affect Negative affect
-
 Impact on non-manipulated attribute
 Benefit is low Benefit is high Risk is low Risk is high
 

@@ -1552,6 +1552,138 @@ def _strip_redundant_caption_echo_before_tables(text: str) -> str:
     return "\n".join(out_lines)
 
 
+def _strip_redundant_fragments_after_tables(text: str) -> str:
+    """Strip leaked-cell fragment lines that appear immediately AFTER a
+    ``</table>`` block when every word stem in those lines is already
+    present in the table's caption + cells.
+
+    Iteration 13. Symmetric to ``_strip_redundant_caption_echo_before_tables``
+    but for the post-table side. Camelot occasionally drops row/column
+    axis labels that pdftotext then renders as orphan paragraphs right
+    after the rendered table block. Example from efendic Table 1:
+
+        </table>
+
+        Negative affect Positive affect Positive affect Negative affect
+
+        Impact on non-manipulated attribute
+        Benefit is low Benefit is high Risk is low Risk is high
+
+    The first / fourth lines are subsets of the rendered table content
+    (every word maps to a header/cell stem). The 3rd line ``Impact on
+    non-manipulated attribute`` contains ``impact`` which is NOT in
+    the rendered table and so is preserved (no content loss).
+
+    Only fires when the line:
+      - ≤80 chars
+      - ≤12 words
+      - has no terminal sentence punctuation (``.``/``!``/``?``)
+      - every 4-char stem of every ≥3-char word is in the rendered table
+
+    Walks forward up to ~6 non-blank lines after ``</table>`` and stops
+    on the first non-subset content. Blank lines between candidate
+    fragment lines are allowed and collapsed.
+    """
+    lines = text.split("\n")
+    n = len(lines)
+    table_end_re = re.compile(r"^</table>\s*$")
+    table_start_re = re.compile(r"^\s*<table[^>]*>\s*$")
+    italic_caption_re = re.compile(r"^\*(.+)\*\s*$")
+    th_cell_re = re.compile(r"<th[^>]*>(.*?)</th>", re.DOTALL)
+    td_cell_re = re.compile(r"<td[^>]*>(.*?)</td>", re.DOTALL)
+    sentence_end_re = re.compile(r"[.!?]\s*$")
+    word_re = re.compile(r"[A-Za-z]{3,}")
+
+    def _stem(w: str) -> str:
+        return w[:4] if len(w) >= 4 else w
+
+    def _line_is_post_table_fragment(s: str) -> bool:
+        s = s.strip()
+        if not s or len(s) > 80:
+            return False
+        if len(s.split()) > 12:
+            return False
+        if sentence_end_re.search(s):
+            return False
+        return True
+
+    drop_indices: set[int] = set()
+
+    for i in range(n):
+        if not table_end_re.match(lines[i].strip()):
+            continue
+        # Walk back to find the matching <table> opener and collect cells.
+        cells_text: list[str] = []
+        caption_text = ""
+        j = i - 1
+        steps = 0
+        while j >= 0 and steps < 400:
+            steps += 1
+            ln = lines[j]
+            cells_text.append(" ".join(th_cell_re.findall(ln)))
+            cells_text.append(" ".join(td_cell_re.findall(ln)))
+            if table_start_re.match(ln.strip()):
+                # The italic caption sits 1-2 non-blank lines before <table>.
+                k = j - 1
+                k_steps = 0
+                while k >= 0 and k_steps < 4:
+                    k_steps += 1
+                    s = lines[k].strip()
+                    if not s:
+                        k -= 1
+                        continue
+                    cap_m = italic_caption_re.match(s)
+                    if cap_m:
+                        caption_text = cap_m.group(1)
+                    break
+                break
+            j -= 1
+        if not cells_text and not caption_text:
+            continue
+        rendered_words = set(
+            w.lower() for w in word_re.findall(" ".join(cells_text) + " " + caption_text)
+        )
+        if not rendered_words:
+            continue
+        rendered_stems = {_stem(w) for w in rendered_words}
+
+        # Walk forward from i+1 collecting leaked-fragment candidates.
+        cand: list[int] = []
+        forward_steps = 0
+        nonblank_steps = 0
+        k = i + 1
+        while k < n and forward_steps < 12 and nonblank_steps < 6:
+            forward_steps += 1
+            stripped = lines[k].strip()
+            if not stripped:
+                cand.append(k)
+                k += 1
+                continue
+            nonblank_steps += 1
+            if not _line_is_post_table_fragment(stripped):
+                break
+            frag_words = set(w.lower() for w in word_re.findall(stripped))
+            if not frag_words:
+                break
+            frag_stems = {_stem(w) for w in frag_words}
+            if not frag_stems.issubset(rendered_stems):
+                break
+            cand.append(k)
+            k += 1
+
+        # Trim trailing blank-only candidates so we don't collapse a real
+        # blank between tables.
+        while cand and lines[cand[-1]].strip() == "":
+            cand.pop()
+        if cand:
+            drop_indices.update(cand)
+
+    if not drop_indices:
+        return text
+    out_lines = [ln for idx, ln in enumerate(lines) if idx not in drop_indices]
+    return "\n".join(out_lines)
+
+
 def _dedupe_h2_sections(text: str) -> str:
     """Demote duplicate H2 section headings to plain text.
 
@@ -2166,6 +2298,10 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # are word-set subsets of the rendered caption directly below. Narrower
     # than the older blanket strip — preserves any unique content.
     out = _strip_redundant_caption_echo_before_tables(out)
+    # Iteration 13: strip leaked fragment lines that appear AFTER the
+    # ``</table>`` close, when every word stem is already in the table's
+    # caption + cells (symmetric to the iter-11 pre-table strip).
+    out = _strip_redundant_fragments_after_tables(out)
     # Demote duplicate ## H2 section headings (figure captions starting with
     # "Results of..." that the section detector misclassified, etc.).
     out = _dedupe_h2_sections(out)

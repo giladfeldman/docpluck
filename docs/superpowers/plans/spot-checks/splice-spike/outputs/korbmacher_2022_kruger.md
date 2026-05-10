@@ -231,8 +231,6 @@ For the two extension groups, the extension domains aim to be speciﬁcally de�
   </tbody>
 </table>
 
-programming
-
 quantitatively determined in units that can be measured (e.g., length of time, amount of money) or counted (e.g., number of people; Roth et al., 2008). Therefore, the extension domains also use criteria such as time (10 minutes versus 1 hour), number of people (one person versus a live audience in an improv stand-up comedy club), and diﬃculty (beginner mode versus advanced mode).
 1.6.2 Extension 2: Measuring domain diﬃculty
 For the second extension, we added an additional dependent variable measuring domain diﬃculty. In the original study, domain diﬃculty was determined in a pretest by a separate group of participants (n = 39). They rated their absolute ability – the extent of how skilled they are – on the eight abilities on a 10-point scale (higher number indicates higher
@@ -353,8 +351,6 @@ Participants were recruited through MTurk on TurkPrime/CloudResearch (Litman et 
     </tr>
   </tbody>
 </table>
-
-Nominal payment 2020
 
 Based on the categorization in the original study, of the eight ability domains, four were categorized as easy and the other four as diﬃcult (see Table2), presented in randomized order.
 2.4 Measures
@@ -1286,10 +1282,6 @@ replication based on criteria created by LeBel et al. (2019).
     </tr>
   </tbody>
 </table>
-
-comparative
-
-ability B =
 
 -0.04
 

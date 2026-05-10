@@ -1512,8 +1512,6 @@ Zwaan, R. A., Etz, A., Lucas, R. E., & Donnellan, M. B. (2018). Making replicati
     </tr>
   </tbody>
 </table>
-
-### Table 8
 *Correlations Between Prevalence and Intensity Estimates with Well-Being and Social Comparison Measures.*
 
 <table>

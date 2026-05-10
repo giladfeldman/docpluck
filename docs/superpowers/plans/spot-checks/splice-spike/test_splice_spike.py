@@ -1284,3 +1284,85 @@ def test_strip_caption_echo_does_not_strip_unrelated_short_lines():
     assert "Table 2: Caption text matches" not in out
     # Unrelated short line stays — not a subset.
     assert "Some unrelated short line." in out
+
+
+from splice_spike import _strip_redundant_fragments_after_tables
+
+
+def test_strip_post_table_fragment_when_all_words_in_table():
+    """efendic Table 1 pattern: ``Negative affect Positive affect ...``
+    leaked right after </table>. Every word stem is in the table's
+    cells, so it gets stripped."""
+    text = (
+        "### Table 1\n"
+        "*Summary of the Affect Heuristic.*\n\n"
+        "<table>\n"
+        "  <thead><tr><th>Risk is low<br>Positive affect</th><th>Benefit is high</th></tr></thead>\n"
+        "  <tbody>\n"
+        "    <tr><td>Benefit is high<br>Positive affect</td><td>Risk is low</td></tr>\n"
+        "    <tr><td>Benefit is low<br>Negative affect</td><td>Risk is high</td></tr>\n"
+        "  </tbody>\n"
+        "</table>\n\n"
+        "Negative affect Positive affect Positive affect Negative affect\n\n"
+        "Real body paragraph that has actual prose content and ends in a period.\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # The leaked line is gone.
+    assert "Negative affect Positive affect Positive affect" not in out
+    # The body paragraph stays.
+    assert "Real body paragraph" in out
+    # The table itself stays.
+    assert "<table>" in out
+
+
+def test_strip_post_table_fragment_preserves_lines_with_unique_words():
+    """If a post-table line contains a word NOT in the table, it stays."""
+    text = (
+        "<table>\n"
+        "  <thead><tr><th>Apple</th></tr></thead>\n"
+        "  <tbody><tr><td>Banana</td></tr></tbody>\n"
+        "</table>\n\n"
+        "Cherry orange grape\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # 'cherry'/'orange'/'grape' aren't in table — preserve.
+    assert "Cherry orange grape" in out
+
+
+def test_strip_post_table_stops_at_real_paragraph():
+    """Walk-forward stops on the first non-fragment line (e.g. one with a
+    terminal period or > 12 words). Subsequent leaked lines don't get
+    stripped because we stopped early."""
+    text = (
+        "<table>\n"
+        "  <thead><tr><th>Apple</th><th>Banana</th></tr></thead>\n"
+        "  <tbody><tr><td>data</td><td>data</td></tr></tbody>\n"
+        "</table>\n\n"
+        "Apple banana data data\n\n"
+        "This is a real paragraph that ends in a period.\n\n"
+        "Apple banana again\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # First leaked line stripped.
+    assert "Apple banana data data\n" not in out
+    # Real paragraph preserved.
+    assert "This is a real paragraph" in out
+    # Post-paragraph "Apple banana again" preserved (stop-on-paragraph).
+    assert "Apple banana again" in out
+
+
+def test_strip_post_table_preserves_long_lines():
+    """A line >80 chars is not considered a fragment, even if all words
+    are in the rendered table."""
+    long_repeat = "Apple Banana Cherry " * 6  # ~120 chars
+    text = (
+        "<table>\n"
+        "  <thead><tr><th>Apple Banana Cherry</th></tr></thead>\n"
+        "  <tbody><tr><td>data</td></tr></tbody>\n"
+        "</table>\n\n"
+        + long_repeat
+        + "\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # Long line stays.
+    assert "Apple Banana Cherry Apple Banana Cherry" in out
