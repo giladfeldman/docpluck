@@ -1249,9 +1249,15 @@ def _format_figure_md(fig: dict) -> str:
     # cut at the first newline + double-space or at first ".\f" / page break artifact.
     caption = caption.split("\f")[0].strip()
     # Cut at first ". " after >40 chars to keep just the figure description.
-    if len(caption) > 200 and ". " in caption[:300]:
-        idx = caption.index(". ", 40)
-        caption = caption[: idx + 1]
+    # Use find() (returns -1 on miss) rather than index() — the previous
+    # `". " in caption[:300]` guard was wrong: it triggered for any "." in
+    # 0-300 but the index() searched from 40, which raised ValueError when
+    # the only "." sat in 0-39. Crash nuked the whole document for
+    # jama_open_1 / jama_open_2.
+    if len(caption) > 200:
+        idx = caption.find(". ", 40, 300)
+        if idx >= 0:
+            caption = caption[: idx + 1]
     if caption.startswith(label):
         caption = caption[len(label):].lstrip(" .")
     return f"*{label}. {caption}*" if caption else f"*{label}.*"

@@ -1366,3 +1366,47 @@ def test_strip_post_table_preserves_long_lines():
     out = _strip_redundant_fragments_after_tables(text)
     # Long line stays.
     assert "Apple Banana Cherry Apple Banana Cherry" in out
+
+
+from splice_spike import _format_figure_md
+
+
+def test_format_figure_md_long_caption_with_period_only_in_first_40_chars():
+    """Regression: previous code did `". " in caption[:300]` then
+    `caption.index(". ", 40)` — when the only ". " sat in chars 0-39,
+    the index() raised ValueError and crashed the entire render. Crash
+    nuked output for jama_open_1 / jama_open_2 (0 bytes).
+
+    Confirm that a long caption whose only early ". " is at e.g. char
+    20 doesn't crash and falls through to the no-cut branch."""
+    # Caption: 250 chars, only ". " is at char 20, then a long tail with
+    # no further ". ".
+    cap = "Figure 1. Short note " + ("x" * 230)
+    fig = {"label": "Figure 1", "caption": cap}
+    # Must not raise.
+    out = _format_figure_md(fig)
+    assert out.startswith("*Figure 1.")
+    assert "x" in out  # tail preserved (no cut applied because no ". " ≥40)
+
+
+def test_format_figure_md_long_caption_with_period_after_40_cuts():
+    """Long caption with a ". " after position 40 still gets cut at that
+    position, preserving original behavior."""
+    cap = (
+        "Figure 1: Some short caption text describing the chart shown above. "
+        "Subsequent body text that should be cut off here goes on and on for "
+        "another two hundred chars worth of irrelevant prose to trigger the "
+        "len > 200 path."
+    )
+    fig = {"label": "Figure 1", "caption": cap}
+    out = _format_figure_md(fig)
+    # The cut should remove the "Subsequent body text..." portion.
+    assert "Some short caption text" in out
+    assert "Subsequent body text" not in out
+
+
+def test_format_figure_md_short_caption_unchanged():
+    """A caption ≤200 chars is never cut."""
+    fig = {"label": "Figure 2", "caption": "Figure 2. Short caption."}
+    out = _format_figure_md(fig)
+    assert out == "*Figure 2. Short caption.*"
