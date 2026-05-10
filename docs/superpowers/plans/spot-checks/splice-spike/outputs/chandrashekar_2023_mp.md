@@ -1,11 +1,11 @@
+# Defaults versus framing: Revisiting Default Effect and Framing Effect with a replication and extension of Johnson and Goldstein (2003) and Johnson, Bellman, and Lohse (2002)
+
 Open data: Yes Open materials: Yes Open and reproducible analysis: Yes Open reviews and editorial process: Yes Preregistration: Yes
 
 Edited by: Rickard Carlsson Reviewed by: Streamlined Peer Review Analysis reproduced by: Haojiang Ying All supplementary ﬁles can be accessed at OSF: https://doi.org/10.17605/OSF.IO/RDZJT
 
 ## Abstract
 
-Defaults versus framing: Revisiting Default Effect and Framing Effect with a replication and extension of Johnson and Goldstein
-(2003) and Johnson, Bellman, and Lohse (2002)
 Subramanya Prasad Chandrashekar*1, Nadia Adelina*2, Shiyuan Zeng*2, Yan Ying Esther Chiu*2, Grace Yat Sum Leung*2, Paul Henne3, Boley Cheng2, and Gilad Feldman2
 1Department of Psychology, Norwegian University of Science and Technology (NTNU) 2Department of Psychology, University of Hong Kong, Hong Kong SAR 3Department of Philosophy, Lake Forest College
 *Joint ﬁrst authors People tend to stick with a default option instead of switching to another option. For instance, Johnson and Goldstein (2003) found a default effect in an organ donation scenario: if organ donation is the default option, people are more inclined to consent to it. Johnson et al. (2002) found a similar default effect in health-survey scenarios: if receiving more information about your health is the default, people are more inclined to consent to it. Much of the highly cited, impactful work on these default effects, however, has not been replicated in well-powered samples. In two well-powered samples (N = 1920), we conducted a close replication of the default effect in Johnson and Goldstein (2003) and in Johnson et al. (2002). We successfully replicated Johnson and Goldstein (2003). In an extension of the original ﬁndings, we also show that default effects are unaffected by the permanence of these selections. We, however, failed to replicate the ﬁndings of Johnson et al. (2002)’s study; we did not ﬁnd evidence for a default effect. We did, however, ﬁnd a framing effect: participants who read a positively-framed scenario consented to receive health-related information at a higher rate than participants who read a negatively framed scenario. We also conducted a conceptual replication of Johnson et al. (2002) that was based on an organ-donation scenario, but this attempt failed to ﬁnd a default effect. Our results suggest that default effects depend on framing and context. Materials, data, and code are available on: https://osf.io/8wd2b/.

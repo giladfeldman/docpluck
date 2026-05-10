@@ -1,4 +1,4 @@
-Urinary Albumin-to-Creatinine Ratio in Normal Range, Cardiovascular Health, and All-Cause Mortality
+# Urinary Albumin-to-Creatinine Ratio in Normal Range, Cardiovascular Health, and All-Cause Mortality
 Nayili Mahemuti, MBBS; Jiao Zou, MBBS; Chuanlang Liu, MBBS; Zhiyi Xiao, MS; Fengchao Liang, PhD; Xueli Yang, PhD
 
 ## Abstract
@@ -13,9 +13,9 @@ MAIN OUTCOMES AND MEASURES Multivariable Cox proportional hazards regression was
 
 The study included 23 697 participants (mean [SD] age, 45.58 [15.44] years; 11 806 women [49.7%] and 11 891 men [50.3%]). During the median 7.8 years (range, 4.5-11.1 years) of follow-up, 1403 deaths were recorded. Near-linear associations were observed for continuous UACR and CVH with all-cause mortality. Compared with the low UACR group, high UACR in the normal range showed an increased mortality risk in the moderate and poor CVH groups (CVH [50-79]: HR, 1.54 [95% CI, 1.26-1.89]; CVH [0-49]: HR, 1.56 [95% CI, 1.10-2.20]), with a significant multiplicative interaction of UACR and CVH (P < .001).
 
-## CONCLUSIONS
+## CONCLUSIONS AND RELEVANCE
 
-AND RELEVANCE The findings suggest that high UACR within the normal range is associated with a significantly increased risk of all-cause mortality, with the association more pronounced in adults with poor CVH status. These findings highlight the importance of risk management for early kidney dysfunction, particularly among individuals with poor CVH.
+The findings suggest that high UACR within the normal range is associated with a significantly increased risk of all-cause mortality, with the association more pronounced in adults with poor CVH status. These findings highlight the importance of risk management for early kidney dysfunction, particularly among individuals with poor CVH.
 
 Key Points Question Does cardiovascular health (CVH) modify the association of all-cause mortality with elevated urinary albumin-to-creatinine ratio (UACR) within the normal range (<30 mg/g)?
 

@@ -1,4 +1,4 @@
-Latent Denoising Diffusion GAN: Faster sampling, Higher image quality
+# Latent Denoising Diffusion GAN: Faster sampling, Higher image quality
 Luan Thanh Trinh, Tomoki Hamagami Yokohama National University
 
 ## Abstract

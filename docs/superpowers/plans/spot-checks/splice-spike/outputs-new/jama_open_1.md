@@ -1,4 +1,4 @@
-Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes A Randomized Clinical Trial
+# Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes A Randomized Clinical Trial
 Vasiliki Pavlou, MS, RD; Sofia Cienfuegos, PhD; Shuhao Lin, MS, RD; Mark Ezpeleta, PhD; Kathleen Ready, MS, RD; Sarah Corapi, MS; Jackie Wu, MS, RD; Jason Lopez, BS; Kelsey Gabel, PhD, RD; Lisa Tussing-Humphreys, PhD, RD; Vanessa M. Oddo, PhD; Shaina J. Alexandria, PhD; Julienne Sanchez, MD; Terry Unterman, MD; Lisa S. Chow, MD, MS; Alaina P. Vidmar, MD; Krista A. Varady, PhD
 
 ## Abstract
@@ -13,9 +13,9 @@ MAIN OUTCOMES AND MEASURES The primary outcome measure was change in body weight
 
 Seventy-five participants were enrolled with a mean (SD) age of 55 (12) years. The mean (SD) body mass index (calculated as weight in kilograms divided by height in meters squared) was 39 (7) and the mean (SD) HbA1c level was 8.1% (1.6%). A total of 53 participants (71%) were women. One participant (1%) was Asian, 30 (40%) were Hispanic White, 40 (53%) were non-Hispanic Black, and 4 (5%) were non-Hispanic White. Participants in the TRE group were adherent with their eating window on a mean (SD) of 6.1 (0.8) days per week, and 17 (68%) in the CR group were adherent with their prescribed calorie goals over 6 months. The mean (SD) reduction in energy intake was −313 (509) kcal/d for TRE, −197 (426) kcal/d for CR, and −16 (439) kcal/d for controls. By month 6, body weight decreased significantly in the TRE group (−3.56% [95% CI, −5.92% to −1.20%]; P = .004) but not the CR group (−1.78% [95% CI, −3.67% to 0.11%]; P = .06), relative to controls. Levels of HbA1c decreased in the TRE (−0.91% [95% CI, −1.61% to −0.20%]) and CR (−0.94% [95% CI, −1.59% to −0.30%]) groups, relative to controls, with no differences between the TRE and CR groups. Time in euglycemic range, medication effect score, blood pressure, and plasma lipid levels did not differ among groups. No serious adverse events were reported.
 
-## CONCLUSIONS
+## CONCLUSIONS AND RELEVANCE
 
-AND RELEVANCE This randomized clinical trial found that a TRE diet strategy without calorie counting was effective for weight loss and lowering of HbA1c levels compared with
+This randomized clinical trial found that a TRE diet strategy without calorie counting was effective for weight loss and lowering of HbA1c levels compared with
 
 Key Points Question Is time-restricted eating (TRE) without calorie counting more effective for weight loss and lowering of hemoglobin A1c (HbA1c) levels compared with daily calorie restriction (CR) in adults with type 2 diabetes (T2D)?
 

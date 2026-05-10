@@ -1,4 +1,4 @@
-The Populist Backlash Against Globalization: A Meta-Analysis of the Causal Evidence
+# The Populist Backlash Against Globalization: A Meta-Analysis of the Causal Evidence
 Gábor Scheiring1 , Manuel Serrano-Alarcón2 , Alexandru Moise3 , Courtney McNamara4 and David Stuckler5
 1Georgetown University Qatar, Doha, Qatar, 2Dondena Research Centre on Social Dynamics and Public Policy, Bocconi University, Milan, Italy, 3Department of Political and Social Sciences, European University Institute, Florence, Italy, 4Population Health Sciences Institute, Newcastle University, Newcastle, UK and 5Department of Social and Political Sciences, Bocconi University, Milan, Italy Corresponding author: Gábor Scheiring; Email: gs1098@georgetown.edu
 (Received 21 February 2023; revised 24 October 2023; accepted 3 January 2024; first published online 22 February 2024)

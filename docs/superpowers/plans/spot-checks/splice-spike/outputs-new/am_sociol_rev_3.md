@@ -1,4 +1,4 @@
-The “Dark Side” of Community Ties: Collective Action and Lynching in Mexico
+# The “Dark Side” of Community Ties: Collective Action and Lynching in Mexico
 
 Enzo Nussioa
 

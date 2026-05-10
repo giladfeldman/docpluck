@@ -1,14 +1,11 @@
+# Brain nonapeptide levels are related to social status and affiliative behaviour in a cooperatively breeding cichlid fish
+
 ## Keywords
 
 isotocin, arginine vasotocin, oxytocin, vasopressin, dominance, Neolamprologus pulcher
 †Present address: Department of Biology, McGill University, 845 Sherbrooke Street West, Montreal, Quebec, Canada H3A 0G4.
 Electronic supplementary material is available at http://dx.doi.org/10.1098/rsos.140072 or via http://rsos.royalsocietypublishing.org.
 
-Brain nonapeptide levels
-are related to social status
-and affiliative behaviour
-in a cooperatively breeding
-cichlid fish
 Adam R. Reddon1,†, Constance M. O’Connor1,
 Susan E. Marsh-Rollo1, Sigal Balshine1,
 Magdalena Gozdowska2 and Ewa Kulczykowska2

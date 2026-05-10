@@ -2984,6 +2984,19 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # inside a multi-line paragraph is removed without touching the body
     # text around it.
     out = _strip_page_footer_lines(out)
+    # Iteration 29 (F2 residual): re-attach orphaned multi-word JAMA
+    # structured-abstract heading tails — e.g. ``## CONCLUSIONS`` followed
+    # by an orphaned body paragraph starting with ``AND RELEVANCE`` should
+    # become ``## CONCLUSIONS AND RELEVANCE`` with the rest as body.
+    out = _merge_compound_heading_tails(out)
+    # Iteration 28 (F3): rescue the article title from inside ``## Abstract``
+    # using layout-channel font-size analysis on page 1. Some publishers
+    # (Nature scientific reports, Royal Society) place the abstract label
+    # in a column that pdftotext reads BEFORE the title block, sweeping the
+    # title under ``## Abstract``. Use pdfplumber's per-character font sizes
+    # to identify the largest-font multi-line block in the upper portion of
+    # page 1, and emit it as a ``# Title`` h1 at the top of the document.
+    out = _rescue_title_from_layout(out, pdf_path)
     return out
 
 
@@ -3361,6 +3374,450 @@ def _strip_page_footer_lines(text: str) -> str:
     cleaned = "\n".join(out_lines)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Iteration 29 (F2 residual): multi-word JAMA structured-abstract heading tail
+# re-attachment.
+# ---------------------------------------------------------------------------
+#
+# Some publishers print structured-abstract sections with multi-word headings
+# in ALL CAPS, like::
+#
+#     CONCLUSIONS AND RELEVANCE This randomized clinical trial found that ...
+#
+# The library section detector promotes the FIRST all-caps token (``CONCLUSIONS``)
+# to a ``## CONCLUSIONS`` heading and leaves the trailing ``AND RELEVANCE`` plus
+# the rest of the sentence as body, producing::
+#
+#     ## CONCLUSIONS
+#
+#     AND RELEVANCE This randomized clinical trial ...
+#
+# This pass re-attaches the orphaned tail. Curated to known multi-word JAMA
+# headings only — narrow blast radius.
+
+# Each entry is (heading_prefix_already_promoted, orphaned_tail_in_body).
+_COMPOUND_HEADING_TAILS: list[tuple[str, str]] = [
+    ("CONCLUSIONS", "AND RELEVANCE"),
+]
+
+
+def _merge_compound_heading_tails(text: str) -> str:
+    """Merge orphaned heading-tail body paragraphs back onto the heading.
+
+    For each ``(prefix, tail)`` in :data:`_COMPOUND_HEADING_TAILS`,
+    rewrite::
+
+        ## {prefix}
+
+        {tail} {body...}
+
+    as::
+
+        ## {prefix} {tail}
+
+        {body...}
+
+    Conservative: only matches when the heading line is EXACTLY ``## {prefix}``
+    (no other text on the heading line) and the body paragraph starts with
+    ``{tail}`` followed by whitespace + non-empty content. Uses MULTILINE
+    so it works at any document position.
+    """
+    if not text:
+        return text
+    for prefix, tail in _COMPOUND_HEADING_TAILS:
+        # ``^## CONCLUSIONS\s*\n\nAND RELEVANCE\s+`` (optionally allow leading
+        # whitespace before ``##`` — but our pipeline never produces it).
+        pattern = re.compile(
+            rf"^## {re.escape(prefix)}[ \t]*\n\n{re.escape(tail)}[ \t]+",
+            re.MULTILINE,
+        )
+        text = pattern.sub(f"## {prefix} {tail}\n\n", text)
+    return text
+
+
+# ---------------------------------------------------------------------------
+# Iteration 28 (F3): rescue article title from layout channel
+# ---------------------------------------------------------------------------
+#
+# When a PDF places the abstract column to the LEFT or ABOVE the title block
+# in PDF reading order (Nature scientific-reports, Royal Society Open Science,
+# some Harvard journals), pdftotext linearizes the page so the literal word
+# ``Abstract`` appears BEFORE the title. The library's section detector
+# treats ``Abstract`` as the document's first heading and sweeps every line
+# above it (including the title and authors) into that section. The reader
+# then sees::
+#
+#     ## Abstract
+#
+#     OPEN The association between dietary
+#     approaches to stop hypertension
+#     ...
+#     This study aimed to investigate ...
+#
+# Layout channel (pdfplumber) gives per-character font size, which makes the
+# title block easy to find: it is the largest-font multi-line block in the
+# upper portion of page 1. We extract its text via :func:`extract_words`
+# (which preserves spaces even on PDFs whose char-encoding concatenates
+# adjacent glyphs) and either UPGRADE an existing in-place plain-text title
+# to ``# Title`` or PREPEND ``# Title`` if the title is buried/missing.
+#
+# Conservative thresholds — only act when the dominant title font is >=12pt
+# and at least 2 spans (multi-line wrap) OR a single span at >=18pt. Reject
+# obvious banner text (HHS Public Access, www., etc.). Cap title length at
+# 500 chars.
+
+_TITLE_REJECT_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"^HHS Public Access", re.IGNORECASE),
+    re.compile(r"^arXiv:", re.IGNORECASE),
+    re.compile(r"^www\.", re.IGNORECASE),
+    re.compile(r"^https?://"),
+    re.compile(r"^Article\s+https?://", re.IGNORECASE),
+    re.compile(r"^Cite this article", re.IGNORECASE),
+    re.compile(r"^Author manuscript", re.IGNORECASE),
+]
+
+
+def _title_text_from_chars(page1, y_min: float, y_max: float, title_size: float) -> str | None:
+    """Reconstruct title text from per-character pdfplumber records using
+    an absolute x-gap rule for word boundaries.
+
+    Used as a fallback when ``extract_words`` returned concatenated tokens
+    for tight-kerned PDFs (JAMA, AOM, some Sage templates) where the
+    publisher's kerning is below pdfplumber's default 3pt x_tolerance.
+    """
+    chars = getattr(page1, "chars", ()) or ()
+    height = float(getattr(page1, "height", 0) or 0.0)
+    if not chars or height <= 0:
+        return None
+    rows: list[dict] = []
+    for c in chars:
+        try:
+            sz = float(c.get("size") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if abs(sz - title_size) > 0.6:
+            continue
+        ct = c.get("top")
+        cb = c.get("bottom")
+        if ct is None or cb is None:
+            continue
+        try:
+            c_y0 = height - float(cb)
+            c_y1 = height - float(ct)
+            x0 = float(c.get("x0", 0) or 0)
+            x1 = float(c.get("x1", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if c_y0 < y_min - 1.5 or c_y1 > y_max + 1.5:
+            continue
+        text = c.get("text") or ""
+        if not text:
+            continue
+        rows.append({
+            "top": float(ct), "x0": x0, "x1": x1, "text": text,
+            "width": max(x1 - x0, 0.0),
+        })
+    if not rows:
+        return None
+    # Group into lines by top y (within 2pt).
+    rows.sort(key=lambda r: (round(r["top"]), r["x0"]))
+    lines: list[list[dict]] = []
+    current: list[dict] = []
+    current_top: float | None = None
+    for r in rows:
+        if current_top is None or abs(r["top"] - current_top) > 2.0:
+            if current:
+                lines.append(current)
+            current = [r]
+            current_top = r["top"]
+        else:
+            current.append(r)
+    if current:
+        lines.append(current)
+    # Render each line: insert " " when the gap from prev char's x1 to
+    # current char's x0 exceeds 1.5pt (catches tight kerning that
+    # pdfplumber's default 3pt x_tolerance misses).
+    line_texts: list[str] = []
+    for line in lines:
+        line.sort(key=lambda r: r["x0"])
+        out_chars: list[str] = []
+        prev_x1: float | None = None
+        for r in line:
+            if prev_x1 is not None:
+                gap = r["x0"] - prev_x1
+                if gap > 1.5:
+                    out_chars.append(" ")
+            out_chars.append(r["text"])
+            prev_x1 = r["x1"]
+        line_texts.append("".join(out_chars).strip())
+    line_texts = [lt for lt in line_texts if lt]
+    if not line_texts:
+        return None
+    return " ".join(line_texts)
+
+
+def _compute_layout_title(layout_doc) -> str | None:
+    """Identify the article title from page-1 layout spans.
+
+    Returns the best-guess title text (with proper word spacing recovered
+    via ``extract_words``) or ``None`` if no candidate was confidently
+    identified. Conservative: returns ``None`` rather than risk emitting
+    a banner / running-header line as the title.
+    """
+    if layout_doc is None or not getattr(layout_doc, "pages", ()):
+        return None
+    page1 = layout_doc.pages[0]
+    spans = getattr(page1, "spans", ())
+    if not spans:
+        return None
+    height = float(getattr(page1, "height", 0) or 0.0)
+    if height <= 0:
+        return None
+
+    # Restrict to spans in the upper 60% of page 1 (rules out body / table /
+    # footnote material that might happen to be set in a large display font).
+    upper_threshold = height * 0.40  # spans with y0 > this are upper-60%.
+    upper_spans = [s for s in spans if s.y0 > upper_threshold]
+    if not upper_spans:
+        return None
+
+    # Find the dominant title font size: the LARGEST size that appears
+    # 2+ times AND is >= 12pt (multi-line wrapped title); fall back to a
+    # single span only if it is >= 18pt (single-line large-display title).
+    from collections import Counter
+    size_counts: Counter[float] = Counter(
+        round(float(s.font_size) * 2) / 2 for s in upper_spans
+    )
+    title_size: float | None = None
+    for sz, count in sorted(size_counts.items(), reverse=True):
+        if sz >= 12.0 and count >= 2:
+            title_size = sz
+            break
+        if sz >= 18.0 and count >= 1:
+            title_size = sz
+            break
+    if title_size is None:
+        return None
+
+    title_spans = [
+        s for s in upper_spans if abs(float(s.font_size) - title_size) < 0.3
+    ]
+    if not title_spans:
+        return None
+
+    # bbox y-range (pdfplumber bottom-origin coords) of all title spans.
+    y_min = min(s.y0 for s in title_spans)
+    y_max = max(s.y1 for s in title_spans)
+
+    # Pull words from page1.words within that y-range AND matching the title
+    # font size (pdfplumber's word `height` equals the glyph height ≈ font
+    # size for normal text). Filtering by height rejects nearby
+    # different-size glyphs that share the title y-band — e.g. Nature's
+    # ``OPEN`` 18pt label sitting to the left of a 26pt title's first line.
+    # words.top / words.bottom are top-origin distances (smaller = higher);
+    # convert to bottom-origin so we can compare directly against y_min /
+    # y_max from spans.
+    title_word_recs: list[tuple[float, float, str]] = []  # (top, x0, text)
+    words = getattr(page1, "words", ()) or ()
+    for w in words:
+        wt = w.get("top")
+        wb = w.get("bottom")
+        if wt is None or wb is None:
+            continue
+        try:
+            w_height = float(w.get("height") or 0.0)
+            w_y0 = height - float(wb)
+            w_y1 = height - float(wt)
+        except (TypeError, ValueError):
+            continue
+        # Word height (≈ font size) must match the dominant title size.
+        # 0.5pt tolerance handles the half-point rounding from size_counts.
+        if w_height > 0 and abs(w_height - title_size) > 0.6:
+            continue
+        # Word fully inside title y-range with 1pt tolerance for rounding.
+        if w_y0 >= y_min - 1.5 and w_y1 <= y_max + 1.5:
+            text = (w.get("text") or "").strip()
+            if not text:
+                continue
+            try:
+                x0 = float(w.get("x0", 0) or 0)
+            except (TypeError, ValueError):
+                x0 = 0.0
+            title_word_recs.append((float(wt), x0, text))
+
+    # Build candidate title from words. Some PDFs (e.g. JAMA, AOM templates)
+    # use tight kerning that pdfplumber's default ``extract_words`` collapses
+    # into single concatenated tokens like ``EffectofTime-RestrictedEating``.
+    # We reconstruct from words first; if the result is suspicious (no
+    # whitespace at all or too few tokens for a multi-line title), fall
+    # back to a char-level gap-based tokenizer below.
+    if title_word_recs:
+        title_word_recs.sort(key=lambda t: (round(t[0]), t[1]))
+        lines: list[list[str]] = []
+        current_line: list[str] = []
+        current_top: float | None = None
+        for top, _x0, text in title_word_recs:
+            if current_top is None or abs(top - current_top) > 2.0:
+                if current_line:
+                    lines.append(current_line)
+                current_line = [text]
+                current_top = top
+            else:
+                current_line.append(text)
+        if current_line:
+            lines.append(current_line)
+        title_text = " ".join(" ".join(line) for line in lines).strip()
+    else:
+        title_text = ""
+
+    # Char-level fallback when words came back concatenated (no/few spaces).
+    # Heuristic: if the joined title text has fewer than 4 whitespace-separated
+    # tokens but its character length suggests a multi-word title (>= 25 chars),
+    # rebuild from page1.chars with an absolute gap rule.
+    space_token_count = len(title_text.split())
+    if space_token_count < 4 and len(title_text) >= 25:
+        char_text = _title_text_from_chars(page1, y_min, y_max, title_size)
+        if char_text and len(char_text.split()) >= 4:
+            title_text = char_text
+
+    # Final fallback: if still empty, use raw span text (always concatenated
+    # for tight-kerned PDFs but better than emitting nothing).
+    if not title_text:
+        title_spans_sorted = sorted(title_spans, key=lambda s: (-s.y0, s.x0))
+        title_text = " ".join(s.text for s in title_spans_sorted).strip()
+
+    title_text = re.sub(r"\s+", " ", title_text).strip()
+    if len(title_text) < 10 or len(title_text) > 500:
+        return None
+    # Reject obvious banner / running-header strings.
+    for pat in _TITLE_REJECT_PATTERNS:
+        if pat.match(title_text):
+            return None
+    # Require at least 50% letter density (rules out things like "1:140066").
+    letters = sum(1 for c in title_text if c.isalpha())
+    if letters < len(title_text) * 0.5:
+        return None
+    # Require at least 2 alphabetic words.
+    if len(re.findall(r"[A-Za-z]{2,}", title_text)) < 2:
+        return None
+    return title_text
+
+
+def _apply_title_rescue(out: str, title_text: str) -> str:
+    """Place ``# {title_text}`` correctly at the top of ``out``.
+
+    Three cases:
+      1. ``out`` already has an h1 (``# ...``) within the first 30 lines:
+         leave alone.
+      2. The title's tokens contiguously match a block of plain-text lines
+         in the document head:
+           - if the match lies BEFORE the first ``## `` heading,
+             upgrade those lines in place to ``# Title``.
+           - if the match lies INSIDE / AFTER the first ``## `` heading
+             (typical for sci_rep_1 / nat_comms_2 / ar_royal_society_rsos_140066
+             where title got swept into ``## Abstract``), strip the matching
+             lines and prepend ``# Title`` at the top of the document.
+      3. No match: prepend ``# Title``.
+    """
+    if not out or not title_text:
+        return out
+
+    out_lines = out.split("\n")
+    # Case 1: existing h1 within first 30 lines — bail.
+    head_30 = out_lines[:30]
+    if any(re.match(r"^# [^#\s]", line) for line in head_30):
+        return out
+
+    title_block = f"# {title_text}\n"
+
+    title_tokens = re.findall(r"\w+", title_text.lower())
+    if len(title_tokens) < 3:
+        # Token alignment unsafe with too few words — just prepend.
+        return title_block + "\n" + out
+    title_token_set = set(title_tokens)
+
+    head_lines = out_lines[:50]
+    first_h2_idx = next(
+        (k for k, l in enumerate(head_lines) if l.lstrip().startswith("## ")),
+        None,
+    )
+
+    # Walk windows looking for a contiguous-line span whose tokens align with
+    # the title's tokens.
+    best: tuple[int, int, float] | None = None  # (start, end_inclusive, score)
+    for i in range(len(head_lines)):
+        line_i = head_lines[i].strip()
+        if not line_i:
+            continue
+        if line_i.startswith("#"):  # don't match into existing headings
+            continue
+        accumulated: list[str] = []
+        for j in range(i, min(i + 12, len(head_lines))):
+            line_j = head_lines[j].strip()
+            if not line_j:
+                # blank line breaks the window — only allow contiguous text
+                break
+            if line_j.startswith("#"):
+                break
+            tokens = re.findall(r"\w+", head_lines[j].lower())
+            accumulated.extend(tokens)
+            if len(accumulated) > len(title_tokens) * 2.5:
+                break
+            covered = sum(1 for t in title_tokens if t in accumulated)
+            recall = covered / len(title_tokens)
+            if recall >= 0.85 and accumulated:
+                in_title = sum(1 for t in accumulated if t in title_token_set)
+                precision = in_title / len(accumulated)
+                if precision >= 0.6:
+                    score = recall + precision
+                    if best is None or score > best[2]:
+                        best = (i, j, score)
+
+    if best is None:
+        # No match — title is missing entirely (e.g. nat_comms_1). Prepend.
+        return title_block + "\n" + out
+
+    s_idx, e_idx, _ = best
+    if first_h2_idx is not None and s_idx > first_h2_idx:
+        # Title was swept into the first ``## `` section. Strip it from there
+        # and prepend the title block at the top of the document.
+        new_lines = out_lines[:s_idx] + out_lines[e_idx + 1:]
+        new_text = "\n".join(new_lines)
+        new_text = re.sub(r"\n{3,}", "\n\n", new_text)
+        return title_block + "\n" + new_text
+
+    # Title block found before any ## heading — upgrade to ``# Title`` in place.
+    new_lines = out_lines[:s_idx] + [title_block.rstrip("\n")] + out_lines[e_idx + 1:]
+    new_text = "\n".join(new_lines)
+    new_text = re.sub(r"\n{3,}", "\n\n", new_text)
+    return new_text
+
+
+def _rescue_title_from_layout(out: str, pdf_path: str | None) -> str:
+    """Top-level pass: read PDF layout, compute title, place it.
+
+    Failure-tolerant: any ImportError, IO error, or layout-extraction
+    exception causes the function to return ``out`` unchanged. We never
+    want a title-rescue failure to corrupt an otherwise-good document.
+    """
+    if not out or not pdf_path:
+        return out
+    try:
+        from docpluck.extract_layout import extract_pdf_layout
+    except ImportError:
+        return out
+    try:
+        with open(pdf_path, "rb") as fh:
+            pdf_bytes = fh.read()
+        layout_doc = extract_pdf_layout(pdf_bytes)
+    except Exception:
+        return out
+    title_text = _compute_layout_title(layout_doc)
+    if not title_text:
+        return out
+    return _apply_title_rescue(out, title_text)
 
 
 def _run_cli(pdf_path: str) -> str:

@@ -1,4 +1,4 @@
-The Complex Misestimation of Others’ Emotions: Underestimation of Emotional Prevalence Versus Overestimation of Emotional Intensity and Their Associations with Well-Being
+# The Complex Misestimation of Others’ Emotions: Underestimation of Emotional Prevalence Versus Overestimation of Emotional Intensity and Their Associations with Well-Being
 
 Personality and Social Psychology Bulletin ﻿1–­ 19 © 2025 by the Society for Personality and Social Psychology, Inc Article reuse guidelines: sagepub.com/journals-permissions DhttOpsI://1d0o.i1.o1rg7/71/00.11147671/06174262165712322571132679169 journals.sagepub.com/home/pspb
 

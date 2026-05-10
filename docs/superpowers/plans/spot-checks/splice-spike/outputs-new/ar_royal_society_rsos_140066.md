@@ -1,6 +1,7 @@
+# Viewing images of snakes accelerates making judgements of their colour in humans: red snake effect as an instance of ‘emotional Stroop facilitation’
+
 ## Abstract
 
-Viewing images of snakes accelerates making judgements of their colour in humans: red snake effect as an instance of ‘emotional Stroop facilitation’
 Masahiro Shibasaki, Tomoko Isomura and
 Nobuo Masataka
 Primate Research Institute, Kyoto University, Kanrin, Inuyama, Aichi, Japan

@@ -1,4 +1,4 @@
-Risky Therefore Not Beneficial: Replication and Extension of Finucane et al.’s (2000) Affect Heuristic Experiment
+# Risky Therefore Not Beneficial: Replication and Extension of Finucane et al.’s (2000) Affect Heuristic Experiment
 
 Emir Efendic´1*, Subramanya Prasad Chandrashekar2*, Cheong Shing Lee3*, Lok Yan Yeung3*, Min Ji Kim3*, Ching Yee Lee3*, and Gilad Feldman3
 

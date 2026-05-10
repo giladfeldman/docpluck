@@ -1,6 +1,5 @@
 Judgment and Decision Making, Vol. 17, No. 1, January 2022, pp. 449–486
-Both better and worse than others depending on diﬃculty: Replication and extensions of Kruger’s
-(1999) above and below average eﬀects
+# Both better and worse than others depending on difficulty: Replication and extensions of Kruger’s (1999) above and below average effects
 Max Korbmacher∗ Ching (Isabelle) Kwan† Gilad Feldman‡
 
 ## Abstract
@@ -1506,7 +1505,6 @@ Taylor, S. E., & Brown, J. D. (1988). Illusion and well-being: A social psycholo
 Walsh, E., & Ayton, P. (2009). My imagination versus your feelings: Can personal aﬀective forecasts be improved by knowing other peoples’ emotions? Journal of Experimental
 
 Psychology: Applied, 15(4), 351–360. http://dx.doi.org/10.1037/a0017984. Weinstein, N. D. (1980). Unrealistic optimism about future life events. Journal of Per-sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-3514.39. 5.806. Weinstein, N. D. (1983). Reducing unrealistic optimism about illness susceptibility. Health Psychology, 2(1), 11–20. http://dx.doi.org/10.1037/0278-6133.2.1.11. Whillans, A. V., Jordan, A. H., & Chen, F. S. (2020). The upside to feeling worse than average (WTA): A conceptual framework to understand when, how, and for whom WTA beliefs have long-term beneﬁts. Frontiers in Psychology, 11, 642. http://dx.doi.org/10. 3389/fpsyg.2020.00642. Wilson, A. E., & Ross, M. (2001). From chump to champ: People’s appraisals of their earlier and present selves. Journal of Personality and Social Psychology, 80(4), 572–584. https://psycnet.apa.org/doi/10.1037/0022-3514.80.4.572. Windschitl, P. D., Rose, J. P., Stalkﬂeet, M. T., & Smith, A. R. (2008a). Are people excessive or judicious in their egocentrism? A modeling approach to understanding bias and accuracy in people’s optimism. Journal of Personality and Social Psychology, 95(2), 253–273. https://psycnet.apa.org/doi/10.1037/0022-3514.95.2.253. Windschitl, P. D., Conybeare, D., & Krizan, Z. (2008b). Direct-comparison judgments: When and why above- and below-average eﬀects reverse. Journal of Experimental Psychology: General, 137(1), 182–200. https://doi.org/10.1037/0096-3445.137.1.182. Zell, E., & Alicke, M. D. (2011). Age and the better-than-average eﬀect. Journal of Applied Social Psychology, 41(5), 1175–1188. https://doi.org/10.1111/j.1559-1816.2011.00752. x. Zell, E., Strickhouser, J. E., Sedikides, C., & Alicke, M. D. (2020). The better-than-average eﬀect in comparative self-evaluation: A comprehensive review and meta-analysis. Psychological Bulletin, 146(2), 118–149. https://psycnet.apa.org/doi/10.1037/bul0000218. Ziano, I., Mok, P. Y., & Feldman, G. (2021). Replication and extension of Alicke (1985) better-than-average eﬀect for desirable and controllable traits. Social Psychological and Personality Science, 12(6), 1005–1017. https://doi.org/10.1177/1948550620948973.
-
 
 ## Tables (unlocated in body)
 

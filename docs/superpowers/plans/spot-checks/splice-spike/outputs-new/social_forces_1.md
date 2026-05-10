@@ -1,6 +1,6 @@
 Social Forces, 2025, 104, 224–249
 https://doi.org/10.1093/sf/soaf022 Advance access publication date 19 February 2025
-An unbreakable bond? Maternal adverse childhood experiences and mothers’ relationships with adult children
+# An unbreakable bond? Maternal adverse childhood experiences and mothers’ relationships with adult children
 Lawrence Stacey 1,*, Rin Reczek2, Kristi Williams 2, Jake Hays 3, Mieke Beth Thomeer4
 1Department of Sociology, Vanderbilt University, Nashville, TN 37235, USA 2Department of Sociology, Ohio State University, Columbus, OH 43210, USA 3Survey Research Center, University of Michigan, Ann Arbor, MI 48109, USA 4Department of Sociology, University of Alabama at Birmingham, Birmingham, AL 35294, USA *Corresponding author: Department of Sociology, Vanderbilt University, 200 Center Building, 2014 Broadway, Nashville, TN 37235-1811, USA. Email: lawrence.stacey@vanderbilt.edu
 

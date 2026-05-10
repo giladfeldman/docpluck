@@ -1,7 +1,7 @@
+# DOES NEGATIVE FEEDBACK BENEFIT (OR HARM) RECIPIENT CREATIVITY? THE ROLE OF THE DIRECTION OF FEEDBACK FLOW
+
 ## Abstract
 
-DOES NEGATIVE FEEDBACK BENEFIT (OR HARM) RECIPIENT CREATIVITY? THE ROLE OF THE DIRECTION OF
-FEEDBACK FLOW
 YEUN JOON KIM University of Cambridge
 JUNHA KIM Ohio State University
 Negative feedback alerts recipients to a creativity–standard gap, and thus may offer an opportunity to improve creativity. However, existing theories and empirical evidence are contradictory, with the literature containing evidence of positive, negative, and null relationships between negative feedback and recipient creativity. The goal of our research is twofold: first, to organize the contradictory theories under a comprehensive theoretical framework, and, second, to resolve the inconsistency between negative feedback and recipient creativity. Across two studies—a quasi-field experiment and a laboratory experiment—we find that the direction of feedback flow determines the nature of the relationship between negative feedback and recipient creativity, via two distinct mechanisms: task processes and meta-processes. Negative feedback increases recipient creativity in the bottom-up feedback flow (from followers to supervisors), because it heightens the recipients’ focus on task processes, whereby the recipients focus on the generation of better task strategies to close the creativity–standard gap. In contrast, in the top-down (from supervisors to followers) or lateral (between peers) feedback flows, negative feedback heightens the recipients’ focus on meta-processes—a psychological state in which recipients feel threatened by negative feedback—and thus hinders recipient creativity.

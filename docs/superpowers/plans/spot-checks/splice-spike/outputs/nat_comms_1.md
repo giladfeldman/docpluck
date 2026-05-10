@@ -1,3 +1,5 @@
+# Targeted treatment of injured nestmates with antimicrobial compounds in an ant society
+
 ## Abstract
 
 Erik. T. Frank 1,2 , Lucie Kesner 3, Joanito Liberti 1,3, Quentin Helleu 1,4, Adria C. LeBoeuf 5, Andrei Dascalu1, Douglas B. Sponsler2, Fumika Azuma6, Evan P. Economo6,7, Patrice Waridel 8, Philipp Engel 3, Thomas Schmitt 2 & Laurent Keller1

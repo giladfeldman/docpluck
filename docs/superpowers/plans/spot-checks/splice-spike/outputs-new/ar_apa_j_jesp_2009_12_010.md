@@ -1,7 +1,7 @@
 Journal of Experimental Social Psychology 46 (2010) 494–504
 Journal of Experimental Social Psychology
 
-Achieving difﬁcult agreements: Effects of Positive Expectations on negotiation processes and outcomes q
+# Achieving difficult agreements: Effects of Positive Expectations on negotiation processes and outcomes
 Varda Liberman a,*, Nicholas R. Anderson b, Lee Ross b
 a The Interdisciplinary Center Herzliya, P.O.B. 167, Herzliya 46150, Israel b Stanford University, USA
 

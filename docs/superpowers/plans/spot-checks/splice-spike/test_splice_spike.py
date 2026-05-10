@@ -3139,3 +3139,356 @@ def test_footer_strip_does_not_drop_real_capitalized_phrase():
     text = "Body about New York Times article.\n"
     out = _strip_page_footer_lines(text)
     assert "New York Times article" in out
+
+
+# ---------------------------------------------------------------------------
+# Iter-29 / Tier F2-residual: multi-word JAMA heading tail re-attachment
+# ---------------------------------------------------------------------------
+
+from splice_spike import _merge_compound_heading_tails
+
+
+def test_compound_heading_merges_conclusions_and_relevance():
+    """The classic JAMA case: ``## CONCLUSIONS`` with ``AND RELEVANCE``
+    orphan in the next paragraph (jama_open_1, jama_open_2)."""
+    text = (
+        "## RESULTS\n"
+        "\n"
+        "Seventy-five participants were enrolled.\n"
+        "\n"
+        "## CONCLUSIONS\n"
+        "\n"
+        "AND RELEVANCE This randomized clinical trial found that a TRE diet "
+        "strategy was effective.\n"
+    )
+    out = _merge_compound_heading_tails(text)
+    assert "## CONCLUSIONS AND RELEVANCE" in out
+    # The orphaned tail must NOT remain as standalone body.
+    assert "AND RELEVANCE This randomized" not in out
+    # Body content survives intact, starting with the original first body word.
+    assert "This randomized clinical trial found that a TRE diet strategy was effective." in out
+    # The other heading is untouched.
+    assert "## RESULTS" in out
+
+
+def test_compound_heading_preserves_unrelated_headings():
+    """Other ## headings and body content must not be modified."""
+    text = (
+        "## Introduction\n"
+        "\n"
+        "Background paragraph one.\n"
+        "\n"
+        "## Methods\n"
+        "\n"
+        "Methodology details.\n"
+    )
+    out = _merge_compound_heading_tails(text)
+    assert out == text
+
+
+def test_compound_heading_no_match_when_tail_missing():
+    """``## CONCLUSIONS`` followed by body that does NOT start with
+    ``AND RELEVANCE`` is left alone (not all JAMA papers split this way)."""
+    text = (
+        "## CONCLUSIONS\n"
+        "\n"
+        "These findings support the hypothesis that fasting helps.\n"
+    )
+    out = _merge_compound_heading_tails(text)
+    assert out == text
+
+
+def test_compound_heading_idempotent():
+    """Running the merge twice produces no further change."""
+    text = (
+        "## CONCLUSIONS\n"
+        "\n"
+        "AND RELEVANCE This randomized clinical trial found a benefit.\n"
+    )
+    once = _merge_compound_heading_tails(text)
+    twice = _merge_compound_heading_tails(once)
+    assert once == twice
+    assert "## CONCLUSIONS AND RELEVANCE" in once
+
+
+def test_compound_heading_empty_input_safe():
+    assert _merge_compound_heading_tails("") == ""
+
+
+def test_compound_heading_does_not_rewrite_already_correct_heading():
+    """If the heading is already ``## CONCLUSIONS AND RELEVANCE`` we should
+    NOT find a body paragraph starting with ``AND RELEVANCE`` — make sure
+    a properly-formed heading is preserved."""
+    text = (
+        "## CONCLUSIONS AND RELEVANCE\n"
+        "\n"
+        "This randomized clinical trial found that a TRE diet strategy was effective.\n"
+    )
+    out = _merge_compound_heading_tails(text)
+    assert out == text
+
+
+def test_compound_heading_does_not_match_when_heading_has_extra_text():
+    """``## CONCLUSIONS:`` (with trailing colon) is NOT a bare heading
+    and the merge should not fire."""
+    text = (
+        "## CONCLUSIONS:\n"
+        "\n"
+        "AND RELEVANCE This study found a benefit.\n"
+    )
+    out = _merge_compound_heading_tails(text)
+    # Heading unchanged.
+    assert "## CONCLUSIONS:" in out
+    # Body unchanged (orphan stays — out of scope for this narrow merge).
+    assert "AND RELEVANCE This study" in out
+
+
+# ---------------------------------------------------------------------------
+# Iter-28 / Tier F3: title rescue from inside ## Abstract
+# ---------------------------------------------------------------------------
+
+from splice_spike import _apply_title_rescue
+
+
+def test_title_rescue_strips_title_swept_into_abstract():
+    """sci_rep_1 / nat_comms_2 pattern: title block was swept INSIDE
+    ``## Abstract`` by the section detector. Rescue must strip those
+    lines from the abstract and prepend ``# Title`` at top."""
+    title_text = (
+        "The association between dietary approaches to stop hypertension "
+        "diet and bone mineral density in US adults"
+    )
+    out = (
+        "## Abstract\n"
+        "\n"
+        "OPEN The association between dietary\n"
+        "approaches to stop hypertension\n"
+        "diet and bone mineral density in US\n"
+        "adults\n"
+        "Xiang-Long Zhai, Mo-Yao Tan, Gao-Peng Wang\n"
+        "This study aimed to investigate the relationship between DASH and BMD.\n"
+    )
+    rescued = _apply_title_rescue(out, title_text)
+    assert rescued.startswith(f"# {title_text}\n"), rescued[:200]
+    # The original 4-line title block (with the "OPEN" leader-token) must
+    # have been stripped from INSIDE ``## Abstract`` — there should be no
+    # ``OPEN The association`` literal line in the rescued output.
+    assert "OPEN The association between dietary" not in rescued
+    # The Abstract section now contains ONLY the author line + abstract body.
+    abstract_idx = rescued.index("## Abstract")
+    abstract_body = rescued[abstract_idx:]
+    assert "approaches to stop hypertension" not in abstract_body
+    assert "diet and bone mineral density in US" not in abstract_body
+    # Authors line is NOT part of the title token-match window (different
+    # tokens) so it stays put under ## Abstract — author rescue is
+    # intentionally out of scope for iter-28.
+    assert "Xiang-Long Zhai" in abstract_body
+    # Abstract-body sentence survives.
+    assert "This study aimed to investigate" in abstract_body
+
+
+def test_title_rescue_upgrades_inplace_when_title_already_before_abstract():
+    """korbmacher pattern: title is already on its own lines BEFORE
+    ``## Abstract`` as plain text. The rescue should upgrade those lines
+    to ``# Title`` in place — not duplicate the title at the top."""
+    title_text = (
+        "Both better and worse than others depending on difficulty: "
+        "Replication and extensions of Kruger's (1999) effects"
+    )
+    out = (
+        "Both better and worse than others depending on difficulty: "
+        "Replication and extensions of Kruger's\n"
+        "(1999) effects\n"
+        "Max Korbmacher Ching Kwan Gilad Feldman\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Above-and-below-average effects are well-known phenomena.\n"
+    )
+    rescued = _apply_title_rescue(out, title_text)
+    assert rescued.startswith(f"# {title_text}\n"), rescued[:200]
+    # The plain-text title block was replaced (so the un-escaped title text
+    # should appear at most ONCE — once as the # heading).
+    assert rescued.count(title_text) == 1
+    # Authors and Abstract section survive.
+    assert "Max Korbmacher" in rescued
+    assert "## Abstract" in rescued
+    assert "Above-and-below-average effects" in rescued
+
+
+def test_title_rescue_prepends_when_title_missing_from_doc():
+    """nat_comms_1 pattern: title got dropped completely upstream and the
+    rendered doc starts directly with ``## Abstract`` + body. Rescue must
+    prepend ``# Title`` at the top without touching anything else."""
+    title_text = (
+        "Targeted treatment of injured nestmates with antimicrobial "
+        "compounds in an ant society"
+    )
+    out = (
+        "## Abstract\n"
+        "\n"
+        "Erik T. Frank, Lucie Kesner, Joanito Liberti et al.\n"
+        "Infected wounds pose a major mortality risk in animals.\n"
+    )
+    rescued = _apply_title_rescue(out, title_text)
+    assert rescued.startswith(f"# {title_text}\n"), rescued[:200]
+    # Original content preserved.
+    assert "## Abstract" in rescued
+    assert "Erik T. Frank" in rescued
+    assert "Infected wounds pose a major mortality risk" in rescued
+
+
+def test_title_rescue_does_not_double_prepend_when_h1_already_present():
+    """If the document already has an ``# `` h1 in the first 30 lines, the
+    rescue is a no-op (we never want two title lines)."""
+    out = (
+        "# Some Existing Title\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Body sentence.\n"
+    )
+    rescued = _apply_title_rescue(out, "A Different Computed Title From Layout")
+    assert rescued == out
+
+
+def test_title_rescue_no_match_short_title_just_prepends():
+    """A 2-token title is too short to confidently locate; we just prepend."""
+    out = "## Abstract\n\nBody one.\n"
+    rescued = _apply_title_rescue(out, "Short Title")
+    # Token count is 2, below the >=3 threshold — we just prepend.
+    assert rescued.startswith("# Short Title\n"), rescued
+    assert "## Abstract" in rescued
+
+
+def test_title_rescue_empty_inputs_safe():
+    assert _apply_title_rescue("", "Title") == ""
+    out = "## Abstract\n\nBody.\n"
+    assert _apply_title_rescue(out, "") == out
+
+
+def test_title_rescue_no_token_match_means_just_prepend():
+    """If the computed title's tokens don't appear in the first 50 lines of
+    the document, we should still place the title at the top (no in-place
+    replacement)."""
+    out = (
+        "## Methods\n"
+        "\n"
+        "We surveyed 100 participants about their lunch preferences.\n"
+        "## Results\n"
+        "\n"
+        "Half preferred soup.\n"
+    )
+    rescued = _apply_title_rescue(out, "An Entirely Unrelated Title String About Astrophysics Galaxies")
+    assert rescued.startswith("# An Entirely Unrelated Title String About Astrophysics Galaxies\n")
+    # Original content preserved.
+    assert "## Methods" in rescued
+    assert "## Results" in rescued
+    assert "Half preferred soup" in rescued
+
+
+# Layout-side title computation tests — exercise _compute_layout_title with a
+# synthetic LayoutDoc-shaped object. We use lightweight stand-ins for the
+# pdfplumber layout dataclasses to avoid spinning up pdfplumber in tests.
+
+from splice_spike import _compute_layout_title
+
+
+class _StubSpan:
+    """Mimics the attributes of docpluck.extract_layout.TextSpan."""
+    def __init__(self, text, x0, y0, x1, y1, font_size, bold=False, font_name=""):
+        self.text = text
+        self.x0 = x0
+        self.y0 = y0
+        self.x1 = x1
+        self.y1 = y1
+        self.font_size = font_size
+        self.font_name = font_name
+        self.bold = bold
+
+
+class _StubPage:
+    def __init__(self, height, spans, words=()):
+        self.height = height
+        self.width = 595.0
+        self.spans = spans
+        self.words = tuple(words)
+
+
+class _StubDoc:
+    def __init__(self, pages):
+        self.pages = tuple(pages)
+
+
+def test_compute_layout_title_picks_dominant_largest_font_block():
+    """Three lines at 26pt (title) above two lines at 9pt (body) — the
+    title is identified, not the body."""
+    spans = [
+        # Title spans at 26pt (bottom-origin y0; larger = higher on page).
+        _StubSpan("ignored span text 1", 100, 720, 400, 740, font_size=26.0),
+        _StubSpan("ignored span text 2", 100, 690, 400, 710, font_size=26.0),
+        _StubSpan("ignored span text 3", 100, 660, 400, 680, font_size=26.0),
+        # Body at 9pt below.
+        _StubSpan("body 1", 100, 400, 400, 410, font_size=9.0),
+        _StubSpan("body 2", 100, 390, 400, 400, font_size=9.0),
+    ]
+    words = [
+        # Words have top-origin coords. y0_from_bottom = height - bottom.
+        # height=800, title at y0=660..740 → bottom=60..140 (top=60..140).
+        # We'll seed words inside the title y-range:
+        {"text": "Targeted",   "x0": 100, "top": 60,  "bottom": 80},
+        {"text": "treatment",  "x0": 200, "top": 60,  "bottom": 80},
+        {"text": "of",         "x0": 320, "top": 60,  "bottom": 80},
+        {"text": "wounds",     "x0": 100, "top": 90,  "bottom": 110},
+        {"text": "in",         "x0": 200, "top": 90,  "bottom": 110},
+        {"text": "ants",       "x0": 240, "top": 90,  "bottom": 110},
+        # Body word should NOT be matched (outside y-range).
+        {"text": "BodyWord",   "x0": 100, "top": 390, "bottom": 400},
+    ]
+    page = _StubPage(height=800, spans=spans, words=words)
+    doc = _StubDoc(pages=[page])
+    title = _compute_layout_title(doc)
+    assert title is not None, "expected a title to be found"
+    # Multi-line title must concatenate with proper word spacing.
+    assert "Targeted treatment of" in title
+    assert "wounds in ants" in title
+    assert "BodyWord" not in title
+
+
+def test_compute_layout_title_returns_none_when_no_large_font_present():
+    """A page with only small font (<12pt) should not yield a title — too
+    risky to upgrade body text to a title heading."""
+    spans = [
+        _StubSpan("body line 1", 100, 700, 400, 710, font_size=10.0),
+        _StubSpan("body line 2", 100, 690, 400, 700, font_size=10.0),
+    ]
+    page = _StubPage(height=800, spans=spans, words=[])
+    doc = _StubDoc(pages=[page])
+    assert _compute_layout_title(doc) is None
+
+
+def test_compute_layout_title_rejects_obvious_banner():
+    """If the largest-font upper-page-1 block is publisher banner text
+    (e.g. ``HHS Public Access``), reject it as a title candidate."""
+    spans = [
+        _StubSpan("HHS Public Access", 100, 700, 300, 720, font_size=20.0),
+        _StubSpan("HHS Public Access", 100, 670, 300, 690, font_size=20.0),
+    ]
+    words = [
+        {"text": "HHS",    "x0": 100, "top": 80,  "bottom": 100},
+        {"text": "Public", "x0": 150, "top": 80,  "bottom": 100},
+        {"text": "Access", "x0": 220, "top": 80,  "bottom": 100},
+        {"text": "HHS",    "x0": 100, "top": 110, "bottom": 130},
+        {"text": "Public", "x0": 150, "top": 110, "bottom": 130},
+        {"text": "Access", "x0": 220, "top": 110, "bottom": 130},
+    ]
+    page = _StubPage(height=800, spans=spans, words=words)
+    doc = _StubDoc(pages=[page])
+    assert _compute_layout_title(doc) is None
+
+
+def test_compute_layout_title_handles_empty_doc_safely():
+    assert _compute_layout_title(None) is None
+    assert _compute_layout_title(_StubDoc(pages=[])) is None
+    page = _StubPage(height=800, spans=[], words=[])
+    assert _compute_layout_title(_StubDoc(pages=[page])) is None

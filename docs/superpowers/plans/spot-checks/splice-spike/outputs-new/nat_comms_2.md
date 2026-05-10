@@ -1,3 +1,5 @@
+# Para-infectious brain injury in COVID-19 persists at follow-up despite attenuated cytokine and autoantibody responses
+
 ## Abstract
 
 A list of authors and their afﬁliations appears at the end of the paper

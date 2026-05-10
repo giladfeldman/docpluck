@@ -1,4 +1,4 @@
-Socially Aware Synthetic Data Generation for Suicidal Ideation Detection Using Large Language Models
+# Socially Aware Synthetic Data Generation for Suicidal Ideation Detection Using Large Language Models
 HAMIDEH GHANADIAN1, ISAR NEJADGHOLI2, HUSSEIN AL OSMAN3
 1University of Ottawa, Ottawa, Canada (e-mail: Hghan053@uottawa.ca) 2National Research Council Canada, Ottawa, Canada (e-mail: Isar.nejadgholi@nrc-cnrc.gc.ca) 3University of Ottawa, Ottawa, Canada (e-mail: Hussein.alosman@uottawa.ca)
 
