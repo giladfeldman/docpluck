@@ -1,6 +1,12 @@
 # Corpus Assessment & Triage — 2026-05-10
 
-**Scope:** AI-verification read of all 27 .md outputs in `docs/superpowers/plans/spot-checks/splice-spike/outputs{,-new}/`, after iter-23 (caption-fold) landed at `6e8d266`. Iter-24 (forward-attach for orphan markers) is implemented but uncommitted (parked while this assessment runs).
+**Last update:** 2026-05-10 after iter-25 landed at `fca6f61` (banner strip).
+
+**Scope:** AI-verification read of all 27 .md outputs in `docs/superpowers/plans/spot-checks/splice-spike/outputs{,-new}/`, after iter-23 (caption-fold) landed at `6e8d266`. Iter-24 (forward-attach for orphan markers) committed at `768a942`. Iter-25 (banner / running-header strip) committed at `fca6f61`.
+
+## Status log
+
+- ✅ **F6 RESOLVED** by iter-25 (`fca6f61`). 16 papers had banner junk stripped from header zone. Document START is now title or first author block instead of HHS / arXiv / Cite this article / mangled-DOI / manuscript-ID gibberish. Zero real-content word loss confirmed via word-token audit.
 
 **Method:** three parallel agent reads of paper subsets (Nature+IEEE / APA+AOM / JAMA+ASA+Chicago+Harvard) plus my own targeted re-reads of `sci_rep_1`, `am_sociol_rev_3`, `chen_2021_jesp`, `jama_open_1`, `nathumbeh_2`. Categorical labels per issue (SECTION, TITLE, BODY, JUNK, etc.).
 
@@ -33,7 +39,7 @@ Cost scale:
 | **F3** | **Title + authors dumped into Abstract section**: the title block ends up nested under `## Abstract` instead of being the document's `# Title` block. Affiliations sometimes follow. | **S1** | sci_rep_1 (worst), nat_comms_2, ar_royal_society_rsos_140066 | **C2** | Section-detector treats the first heading-like word ("Abstract", "OPEN", "ARTICLE") as the document opener. Needs an explicit pre-pass that finds the article title (large-font line, multi-line wrap) and sets it as the doc title before any `##` is emitted. |
 | **F4** | **Sidebar / Key Points / Visual Abstract content interleaved into body**: JAMA-style "Key Points Question/Findings/Meaning" boxes get inlined into the abstract. "Visual Abstract" / "Supplemental content" labels appear as body. | **S1** | jama_open_1, jama_open_2 | **C2** | Layout-channel-aware: these boxes have their own bbox column. Could be detected by reading-order anomaly (text from a different x-column wedged between body lines) using the existing `extract_pdf_layout` channel. |
 | **F5** | **TOC dot-leader lines parsed as headings / body fragments**: `Background ____________ 17` style entries leak into body and confuse downstream passes. | **S1** | nathumbeh_2 (worst — entire ToC of supplementary materials at top), nat_comms_1 (List of Supplementary Figures) | **C1** | Recognize lines matching `^\s*[\w\.]+(\s\w+)*\s*_{3,}\s*\d+\s*$` (or with `…`/`.`-fill) as ToC entries; either drop them or wrap in a `<!-- toc -->` block. Iter-22 stripped table-cell leader-dots; this is the body equivalent. |
-| **F6** | **Running headers / journal banners at the start of the doc**: `www.nature.com/scientificreports`, `Original Investigation \| Public Health`, `r Academy of Management Collections 2024`, `1253268 ASRXXX10.1177/...` — manuscript-ID strings as line 1. | **S2** | sci_rep_1, jama_open_1, jama_open_2, amc_1, am_sociol_rev_3, social_forces_1, ar_royal_society_rsos_140066, demography_1 | **C1** | Pure pattern strip pass. Add to a curated `_BANNER_PATTERNS` list in `splice_spike` (URL-only line, "HHS Public Access", journal-volume strings). Cosmetic but VERY visible. |
+| ~~F6~~ | ~~**Running headers / journal banners at the start of the doc**~~ | ~~S2~~ | ~~sci_rep_1, jama_open_1, jama_open_2, amc_1, am_sociol_rev_3, social_forces_1, ar_royal_society_rsos_140066, demography_1~~ | ~~**C1**~~ | **RESOLVED iter-25** (`fca6f61`). Curated `_HEADER_BANNER_PATTERNS` strip pass restricted to header zone (everything before first `##` heading, capped at line 30). 16 papers cleaned. |
 | **F7** | **DOI / manuscript-ID character-mash**: `DhttOpsI::/1/d0o.i1.o1rg/710/.01107073/010202314222442142152353226688` — pdftotext reading-order corruption when DOI bbox is interleaved with another text run. | **S2** | am_sociol_rev_3 | **C2** | Specific to bicolumn-publisher-template overlap. Hard to fix in a generic way — narrowest fix is to recognize "looks like a corrupted DOI" by digit/letter density and strip the line entirely. Affects only 1-2 papers. |
 | **F8** | **Numbered ToC headings printed without a preceding line**: `1. Hindsight bias`, `2. Reasons for hindsight bias` rendered as flat body text rather than `### 1. Hindsight bias`. | **S2** | chen_2021_jesp, korbmacher_2022_kruger (visibly), most replication papers | **C2** | Section detector doesn't recognize the journal's own numbered subsection style. Could be promoted to `###` headings with a pattern + paragraph-position guard. |
 
@@ -125,15 +131,15 @@ The **per-iteration ratio of effort-to-perceived-quality** would now be MUCH hig
 
 ---
 
-## Concrete recommendation
+## Concrete recommendation (next 2-3 iterations)
 
-Three iterations in order, all C1-C2:
+Updated 2026-05-10 after iter-25 landed:
 
-1. **Iter-25 (F6) — banner/running-header strip pass.** Easiest possible win. ~30 mins. Touches sci_rep_1, jama_open_*, amc_1, am_sociol_rev_3, social_forces_1, ar_royal_society_rsos_140066, demography_1.
-2. **Iter-26 (F5) — ToC dot-leader strip.** Touches nathumbeh_2 mainly but also nat_comms_1 supplementary list. ~45 mins.
-3. **Iter-27 (F1 cheap variant) — page-footer pattern strip.** ~1.5 hr. Touches 13 papers. The big visible-quality win.
+1. ~~**Iter-25 (F6)**~~ ✅ DONE at `fca6f61`.
+2. **Iter-26 (F5) — ToC dot-leader strip.** Recognize `Background _________ 17` style lines and either drop or fence as `<!-- toc -->`. Touches nathumbeh_2 (worst — entire TOC of supplementary materials at top) and nat_comms_1 supplementary list. ~45 mins.
+3. **Iter-27 (F1 cheap variant) — page-footer pattern strip.** Curated regex pass for `^Corresponding Author:`, bare email lines, `(continued)`, JAMA `October 27, 2023 1/13` footers, etc. Won't fix the underlying sentence-splitting at page boundaries but removes the JUNK between halves. ~1.5 hr. Touches 13 papers. Still the big visible-quality win for the user's headline complaint.
 
-Then re-evaluate. If F3 (title rescue) and F4 (sidebar detection) still feel high-value, those become iter-28/29 (C2 each).
+Then re-evaluate. If F3 (title rescue using layout-channel font sizes) and F4 (sidebar detection) still feel high-value after the Tier-A push, those become iter-28/29 (C2 each).
 
 After this push the spike will have meaningfully improved on the user's headline complaint (Nature .md "basically useless"), and we'll have a cleaner picture of what's left for library-level work.
 
