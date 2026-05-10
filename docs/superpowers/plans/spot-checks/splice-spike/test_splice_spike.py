@@ -673,6 +673,8 @@ from splice_spike import (
     _is_spurious_single_column_grid,
     _render_grid_as_code_block,
     _format_table_md,
+    _detect_side_by_side_merge,
+    _extract_column_subgrid,
 )
 
 
@@ -733,6 +735,90 @@ def test_render_grid_as_code_block_joins_cells_per_row():
     assert "First line of prose" in out
     assert "Second line of prose" in out
     assert "Third line" in out
+
+
+def test_side_by_side_detector_fires_on_two_table_labels():
+    """A header row of [Table 3, Table 4] is the chandrashekar pattern: two
+    independent tables that Camelot stitched into one grid. Returns the
+    column index of the matching label."""
+    grid = [
+        ["Table 3", "Table 4"],
+        ["row 1 col 0 prose", "row 1 col 1 prose"],
+        ["row 2 col 0 prose", "row 2 col 1 prose"],
+    ]
+    assert _detect_side_by_side_merge(grid, label="Table 3") == 0
+    assert _detect_side_by_side_merge(grid, label="Table 4") == 1
+    # Label not in header → None (we'd render the full grid as fallback).
+    assert _detect_side_by_side_merge(grid, label="Table 5") is None
+
+
+def test_side_by_side_detector_skips_when_labels_repeat():
+    """Two ``Table 1`` cells side-by-side aren't a stitch — they're a
+    legitimate (if unusual) repeat-header. Don't fire."""
+    grid = [
+        ["Table 1", "Table 1"],
+        ["A", "B"],
+    ]
+    assert _detect_side_by_side_merge(grid, label="Table 1") is None
+
+
+def test_side_by_side_detector_skips_when_first_row_has_real_headers():
+    """A normal header row is NOT all Table-N labels."""
+    grid = [
+        ["Variable", "Mean", "SD"],
+        ["Age", "24.3", "3.1"],
+    ]
+    assert _detect_side_by_side_merge(grid, label="Table 1") is None
+
+
+def test_side_by_side_detector_supports_supplement_labels():
+    """``Table S7`` / ``Table S8`` is a valid two-different-label pair."""
+    grid = [
+        ["Table S7", "Table S8"],
+        ["A", "B"],
+    ]
+    assert _detect_side_by_side_merge(grid, label="Table S7") == 0
+
+
+def test_extract_column_subgrid_picks_target_column():
+    grid = [
+        ["Table 3", "Table 4"],
+        ["3a", "4a"],
+        ["3b", "4b"],
+        ["3c", ""],
+    ]
+    out = _extract_column_subgrid(grid, col_idx=0)
+    assert out == [["3a"], ["3b"], ["3c"]]
+    out2 = _extract_column_subgrid(grid, col_idx=1)
+    assert out2 == [["4a"], ["4b"], [""]]
+
+
+def test_format_table_md_splits_side_by_side_merged_table():
+    """End-to-end: a side-by-side-merged grid for ``Table 3`` renders only
+    Table 3's column content, dropped to a code block (1-col after split)."""
+    fake_table = {
+        "label": "Table 3",
+        "caption": "Study stimuli for conceptual replication.",
+        "cells": [
+            {"r": 0, "c": 0, "text": "Table 3"},
+            {"r": 0, "c": 1, "text": "Table 4"},
+            {"r": 1, "c": 0, "text": "Stimuli for Johnson 2002"},
+            {"r": 1, "c": 1, "text": "LeBel classification: replication"},
+            {"r": 2, "c": 0, "text": "Introduction prose"},
+            {"r": 2, "c": 1, "text": "Design facet: Same"},
+            {"r": 3, "c": 0, "text": "More body text"},
+            {"r": 3, "c": 1, "text": "Procedural details: Similar"},
+        ],
+    }
+    out = _format_table_md(fake_table)
+    # Code block with Table 3's column content only.
+    assert "<table>" not in out
+    assert "```" in out
+    assert "Stimuli for Johnson 2002" in out
+    assert "Introduction prose" in out
+    # Table 4's cells must NOT leak into Table 3's render.
+    assert "LeBel classification" not in out
+    assert "Procedural details" not in out
 
 
 def test_format_table_md_demotes_spurious_1col_to_code_block():

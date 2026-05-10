@@ -148,48 +148,16 @@ We provide a summary of the ﬁndings in Table 9. We present complete descriptiv
 ### Table 3
 *Table 4 Study stimuli for the on conceptual replication of Johnson et al. (2002) [Introduction]: Typically, regardless of your organ donor decision, the state online systems ask you to answer a number of health questions. Please answer the following.*
 
-<table>
-  <thead>
-    <tr>
-      <th>Table 3</th>
-      <th>Table 4</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Study stimuli for the on conceptual replication of Johnson</td>
-      <td>Table 4. Classiﬁcation of replications based on LeBel et al.</td>
-    </tr>
-    <tr>
-      <td>et al. (2002)</td>
-      <td>(2019)<br>Design facet<br>Replication study</td>
-    </tr>
-    <tr>
-      <td>[Introduction]:</td>
-      <td>IV operationalization<br>Same</td>
-    </tr>
-    <tr>
-      <td>Typically,regardless of your organ donor decision,the</td>
-      <td>DV operationalization<br>Same</td>
-    </tr>
-    <tr>
-      <td>state online systems ask you to answer a number of</td>
-      <td>IV stimuli<br>Same</td>
-    </tr>
-    <tr>
-      <td>health questions. Please answer the following. Allthe</td>
-      <td>DV stimuli<br>Same</td>
-    </tr>
-    <tr>
-      <td>data will be kept completely conﬁdential.</td>
-      <td>Procedural details<br>Similar<br>Physical settings<br>Different</td>
-    </tr>
-    <tr>
-      <td>You are almost atthe end ofthe survey.Thank you</td>
-      <td>Contextual variables<br>Different</td>
-    </tr>
-  </tbody>
-</table>
+```
+Study stimuli for the on conceptual replication of Johnson
+et al. (2002)
+[Introduction]:
+Typically,regardless of your organ donor decision,the
+state online systems ask you to answer a number of
+health questions. Please answer the following. Allthe
+data will be kept completely conﬁdential.
+You are almost atthe end ofthe survey.Thank you
+```
 
 Part 1: Replication of Johnson and Goldstein (2003)
 Consistent with the original study, participants in the Opt-Out condition consented to organ donation at a higher rate (73.5%) than participants in the Opt-In condition (62.5%) (Chi-squared test: χ2(1) = 12.96, p<.001, Odds ratio (OR) = 1.67, 95% CI [1.27, 2.19] (see Figure 1). This result was consistent across both samples (See Table S11 for complete results). Also, participants in the No-Default condition consented to organ donation at a higher rate (69.7%) than participants in the Opt-In condition (62.5%) (χ2(1) = 5.31, p =.021, OR = 1.38, 95% CI [1.06, 1.80]) with slight deviations between the two samples (See Table S11 for complete results). Also see Table 6 for the results based on logistic regression.
@@ -1014,68 +982,22 @@ Notes: OSF links: Group A = https://osf.io/5e3r8 ; Group B = https://osf.io/3kdq
 ### Table 4
 *Classiﬁcation of replications based on LeBel et al.*
 
-<table>
-  <thead>
-    <tr>
-      <th>Table 3</th>
-      <th>Table 4</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Study stimuli for the on conceptual replication of Johnson</td>
-      <td>Table 4. Classiﬁcation of replications based on LeBel et al.</td>
-    </tr>
-    <tr>
-      <td>et al. (2002)</td>
-      <td>(2019)<br>Design facet Replication study</td>
-    </tr>
-    <tr>
-      <td>[Introduction]:</td>
-      <td>IV operationalization Same</td>
-    </tr>
-    <tr>
-      <td>Typically, regardless of your organ donor decision, the</td>
-      <td>DV operationalization Same</td>
-    </tr>
-    <tr>
-      <td>state online systems ask you to answer a number of</td>
-      <td>IV stimuli Same</td>
-    </tr>
-    <tr>
-      <td>health questions. Please answer the following. All the</td>
-      <td>DV stimuli Same</td>
-    </tr>
-    <tr>
-      <td>data will be kept completely conﬁdential.</td>
-      <td>Procedural details Similar<br>Physical settings Different</td>
-    </tr>
-    <tr>
-      <td>You are almost at the end of the survey. Thank you</td>
-      <td>Contextual variables Different</td>
-    </tr>
-    <tr>
-      <td>for taking part. Would you be interested in being noti-ﬁed about other policy/health-related surveys? (If yes,</td>
-      <td>Replication classiﬁcation Very close replication</td>
-    </tr>
-    <tr>
-      <td>we will contact you through MTurk using your MTurk</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>worker ID)</td>
-      <td>Part 1: Replication of Johnson and Goldstein (2003)</td>
-    </tr>
-    <tr>
-      <td>[Positive frame, Opt-out]:</td>
-      <td></td>
-    </tr>
-    <tr>
-      <td>Send me more information about organ donation.</td>
-      <td>Consistent with the original study, participants in<br>the Opt-Out condition consented to organ donation at</td>
-    </tr>
-  </tbody>
-</table>
+```
+Table 4. Classiﬁcation of replications based on LeBel et al.
+(2019)
+Design facet Replication study
+IV operationalization Same
+DV operationalization Same
+IV stimuli Same
+DV stimuli Same
+Procedural details Similar
+Physical settings Different
+Contextual variables Different
+Replication classiﬁcation Very close replication
+Part 1: Replication of Johnson and Goldstein (2003)
+Consistent with the original study, participants in
+the Opt-Out condition consented to organ donation at
+```
 
 ### Table 10
 *Summary of the ﬁndings of Johnson et al. (2002) across original, direct replication, and conceptual replication studies Predictor Default condition: No-Default– Opt-In Opt-Out – Opt-In Framing condition: Positive – Negative Original study’s ﬁndings Signal Directionality Yes Consistent Yes Consistent…*

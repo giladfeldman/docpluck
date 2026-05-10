@@ -950,6 +950,61 @@ def _render_grid_as_code_block(grid: list[list[str]]) -> str:
     return "```\n" + "\n".join(lines) + "\n```"
 
 
+_SIDEBYSIDE_LABEL_RE = re.compile(r"^Table\s+\S+$", re.IGNORECASE)
+
+
+def _detect_side_by_side_merge(
+    grid: list[list[str]],
+    label: str,
+) -> int | None:
+    """Detect when Camelot has stitched two adjacent independent tables into
+    one grid — signaled by a header row whose cells are EACH a different
+    ``Table N`` label (e.g., ``["Table 3", "Table 4"]``). When detected,
+    return the column index of THIS table's label so the caller can extract
+    just that column's content.
+
+    Returns the column index, or None when the grid is a real merged-cell
+    table (not a side-by-side stitch).
+
+    Conservative: requires ALL non-empty cells in the first row to look like
+    Table-N labels AND the labels to be DISTINCT. A real header that happens
+    to contain "Table 1" / "Table 2" as repeated literal text won't fire
+    because the labels would not all be distinct OR not all match the pattern.
+    """
+    if not grid or not grid[0]:
+        return None
+    first_row = [(c or "").strip() for c in grid[0]]
+    nonempty = [c for c in first_row if c]
+    if len(nonempty) < 2:
+        return None
+    if not all(_SIDEBYSIDE_LABEL_RE.match(c) for c in nonempty):
+        return None
+    if len(set(c.lower() for c in nonempty)) < 2:
+        return None  # all labels identical — not a side-by-side stitch
+    label_norm = (label or "").strip().lower()
+    for col_idx, cell in enumerate(first_row):
+        if cell.lower() == label_norm:
+            return col_idx
+    return None
+
+
+def _extract_column_subgrid(
+    grid: list[list[str]],
+    col_idx: int,
+) -> list[list[str]]:
+    """Return a 1-column subgrid containing the cells of `col_idx` from the
+    rows BELOW the header row at index 0. Used to extract a single sub-table
+    from a side-by-side-merged grid (see ``_detect_side_by_side_merge``)."""
+    sub: list[list[str]] = []
+    for row in grid[1:]:
+        if col_idx < len(row):
+            cell = (row[col_idx] or "").strip()
+        else:
+            cell = ""
+        sub.append([cell])
+    return sub
+
+
 def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
     """Render a docpluck Table as a self-contained markdown block.
 
@@ -983,6 +1038,13 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
             grid[c["r"]][c["c"]] = c["text"]
         grid = _drop_caption_leading_rows(grid, label, caption)
         if len(grid) >= 2:
+            sbs_col = _detect_side_by_side_merge(grid, label)
+            if sbs_col is not None:
+                sub = _extract_column_subgrid(grid, sbs_col)
+                code = _render_grid_as_code_block(sub)
+                if code:
+                    block_parts.append(code)
+                return "\n".join(block_parts)
             if _is_spurious_single_column_grid(grid):
                 code = _render_grid_as_code_block(grid)
                 if code:
@@ -997,6 +1059,13 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
         if cam_rows:
             cam_rows = _drop_caption_leading_rows(cam_rows, label, caption)
             if len(cam_rows) >= 2:
+                sbs_col = _detect_side_by_side_merge(cam_rows, label)
+                if sbs_col is not None:
+                    sub = _extract_column_subgrid(cam_rows, sbs_col)
+                    code = _render_grid_as_code_block(sub)
+                    if code:
+                        block_parts.append(code)
+                    return "\n".join(block_parts)
                 if _is_spurious_single_column_grid(cam_rows):
                     code = _render_grid_as_code_block(cam_rows)
                     if code:
