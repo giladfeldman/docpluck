@@ -2016,6 +2016,63 @@ def test_merge_sig_marker_does_not_attach_to_text_anchor_row():
     assert out[0] == ["0 ACEs", "Ref.", "Ref.", "Ref."]
 
 
+from splice_spike import _strip_leader_dots, _MERGE_SEPARATOR
+
+
+def test_strip_leader_dots_removes_long_run():
+    """A long run of space-separated dots is the classic PDF
+    leader-dot filler used to visually align label/value columns."""
+    s = "behaviour" + _MERGE_SEPARATOR + ". " * 50 + "."
+    out = _strip_leader_dots(s)
+    assert out == "behaviour"
+
+
+def test_strip_leader_dots_preserves_short_dot_runs():
+    """``e.g.``, ``i.e.``, sentence-end ``..`` should be preserved —
+    only ≥4 dot-space pairs trigger the strip."""
+    cases = [
+        "e.g. some example",
+        "i.e. another",
+        "5. Numbered list item",
+        "Hello. World!",
+        ". . one two",  # only 2 pairs — keep
+        ". . . three",  # 3 pairs — keep (threshold is 4)
+    ]
+    for c in cases:
+        assert _strip_leader_dots(c) == c.strip(), f"changed: {c!r}"
+
+
+def test_strip_leader_dots_handles_inline_run():
+    """A leader-dot run between real text on a single cell line
+    is collapsed but the surrounding text is preserved."""
+    s = "label . . . . . . . . . . . . . . value"
+    out = _strip_leader_dots(s)
+    assert out == "label  value" or out == "label value"
+
+
+def test_strip_leader_dots_cleans_doubled_br_placeholders():
+    """If stripping a leader-dot run leaves two adjacent ``<br>``
+    placeholders, collapse them so the rendered HTML doesn't have
+    double line breaks."""
+    s = "chase" + _MERGE_SEPARATOR + ". " * 50 + _MERGE_SEPARATOR + "ram"
+    out = _strip_leader_dots(s)
+    # Single <br> separator between the surviving labels.
+    assert out == "chase" + _MERGE_SEPARATOR + "ram"
+
+
+def test_strip_leader_dots_strips_trailing_br():
+    """Trailing ``<br>`` placeholders left by removed dot-rows are
+    cleaned up."""
+    s = "bite" + _MERGE_SEPARATOR + ". " * 50
+    out = _strip_leader_dots(s)
+    assert out == "bite"
+
+
+def test_strip_leader_dots_empty_input():
+    assert _strip_leader_dots("") == ""
+    assert _strip_leader_dots(None) is None
+
+
 def test_merge_sig_marker_only_merges_columns_with_markers():
     """If the marker row has stars only in some columns and others
     empty, only those columns gain the superscript. Columns without a

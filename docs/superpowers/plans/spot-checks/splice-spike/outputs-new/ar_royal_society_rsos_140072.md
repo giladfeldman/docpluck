@@ -64,30 +64,30 @@ Our procedure allowed us to determine the concentration of free AVT and IT after
   <thead>
     <tr>
       <th>context</th>
-      <th>behaviour<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</th>
+      <th>behaviour</th>
       <th>description</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>overt aggression</td>
-      <td>chase<br>ram<br>bite<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
-      <td>focal fish quickly darts towards another fish<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>focal fish makes contact with another fish using the<br>head or mouth region, but no obvious bite is taken<br>and jaws remain closed<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>focal fish bites another fish</td>
+      <td>chase<br>ram<br>bite</td>
+      <td>focal fish quickly darts towards another fish<br>focal fish makes contact with another fish using the<br>head or mouth region, but no obvious bite is taken<br>and jaws remain closed<br>focal fish bites another fish</td>
     </tr>
     <tr>
       <td>restrained aggression</td>
-      <td>aggressive posture<br>frontal displays<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
-      <td>focal fish lowers its head and raises its tail in front of<br>its opponent. Unpaired fins are held erect<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>also called a puffed throat or an opercular flare.<br>Focal fish extends out its opercula and lower jaw.<br>Often associated with a posture where the head is<br>pointed downwards</td>
+      <td>aggressive posture<br>frontal displays</td>
+      <td>focal fish lowers its head and raises its tail in front of<br>its opponent. Unpaired fins are held erect<br>also called a puffed throat or an opercular flare.<br>Focal fish extends out its opercula and lower jaw.<br>Often associated with a posture where the head is<br>pointed downwards</td>
     </tr>
     <tr>
       <td>submission</td>
-      <td>submissive posture<br>submissive display<br>hook display<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
-      <td>the head ofthefocal fish is directed upwards,<br>sometimes the body is held entirely vertical, and the<br>tail is downwards<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>focal fish is positioned with a submissive posture<br>accompanied by a quivering tail. Sometimesthe<br>entire body quivers<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>also known as a J-display. Focal fish swims towards<br>another fish, and then turns sharply away at the last<br>moment and quivers</td>
+      <td>submissive posture<br>submissive display<br>hook display</td>
+      <td>the head ofthefocal fish is directed upwards,<br>sometimes the body is held entirely vertical, and the<br>tail is downwards<br>focal fish is positioned with a submissive posture<br>accompanied by a quivering tail. Sometimesthe<br>entire body quivers<br>also known as a J-display. Focal fish swims towards<br>another fish, and then turns sharply away at the last<br>moment and quivers</td>
     </tr>
     <tr>
       <td>affiliation</td>
       <td>following<br>parallel swim<br>soft touch</td>
-      <td>focal fish follows another closely<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>both fish swim upwardstogetherin aparallel<br>fashion in close proximity<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .<br>focal fish nips or softly contacts another individual</td>
+      <td>focal fish follows another closely<br>both fish swim upwardstogetherin aparallel<br>fashion in close proximity<br>focal fish nips or softly contacts another individual</td>
     </tr>
   </tbody>
 </table>
@@ -261,34 +261,22 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th></th>
-      <th>sample</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>overt aggression</th>
-      <th>restrained aggression</th>
-      <th>submission</th>
-      <th>affiliation</th>
+      <th>status</th>
+      <th>sex</th>
+      <th>sample<br>size</th>
+      <th>mass (g)</th>
+      <th>SL (mm)</th>
+      <th>brain mass (mg)</th>
+      <th>overt aggression<br>(acts · 10 min−1)</th>
+      <th>restrained aggression<br>(acts · 10 min−1)</th>
+      <th>submission<br>(acts · 10 min−1)</th>
+      <th>affiliation<br>(acts · 10 min−1)</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>status</td>
-      <td>sex<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
-      <td>size</td>
-      <td>mass (g)</td>
-      <td>SL (mm)</td>
-      <td>brain mass (mg)</td>
-      <td>(acts · 10 min−1)</td>
-      <td>(acts · 10 min−1)</td>
-      <td>(acts · 10 min−1)</td>
-      <td>(acts · 10 min−1)</td>
-    </tr>
-    <tr>
       <td>breeder</td>
-      <td>male<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>male</td>
       <td>9</td>
       <td>10.0 (9.6–11.2)</td>
       <td>71.6 (69.6–72.4)</td>
@@ -300,7 +288,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     </tr>
     <tr>
       <td>breeder</td>
-      <td>female<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>female</td>
       <td>9</td>
       <td>7.9 (7.4–8.9)</td>
       <td>64.9 (62.4–68.8)</td>
@@ -312,7 +300,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     </tr>
     <tr>
       <td>subordinate</td>
-      <td>male<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>male</td>
       <td>9</td>
       <td>3.4 (1.8–3.6)</td>
       <td>47.6 (40.5–51.1)</td>
@@ -343,27 +331,19 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
 <table>
   <thead>
     <tr>
-      <th></th>
-      <th>(α = 0.05), and so these were dropped from the final models presented here. Values in italics indicate non-significant trends (0.1 &lt;<br>p &gt; 0.05). Values in bold-italics indicate model terms that significantly contribute to significant models (p &lt; 0.05).)</th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
+      <th>nonapeptide</th>
+      <th>(α = 0.05), and so these were dropped from the final models presented here. Values in italics indicate non-significant trends (0.1 &lt;<br>p &gt; 0.05). Values in bold-italics indicate model terms that significantly contribute to significant models (p &lt; 0.05).)<br>model term</th>
+      <th>estimate</th>
+      <th>standard error</th>
+      <th>t-ratio</th>
+      <th>p-value</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>nonapeptide</td>
-      <td>model term<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
-      <td>estimate</td>
-      <td>standard error</td>
-      <td>t-ratio</td>
-      <td>p-value</td>
-    </tr>
-    <tr>
       <td>AVT</td>
       <td>overt aggression</td>
-      <td>0.19<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.19</td>
       <td>0.17</td>
       <td>1.13</td>
       <td>0.27</td>
@@ -371,7 +351,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.20<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.20</td>
       <td>0.18</td>
       <td>1.10</td>
       <td>0.28</td>
@@ -387,7 +367,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>restrained aggression</td>
-      <td>0.59<br>0.002<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.59<br>0.002</td>
       <td>0.19<br>0.03</td>
       <td>3.11<br>0.08</td>
       <td>0.004<br>0.93</td>
@@ -395,7 +375,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.25<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.25</td>
       <td>0.18</td>
       <td>1.38</td>
       <td>1.18</td>
@@ -411,7 +391,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>submission</td>
-      <td>0.05<br>−0.03<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.05<br>−0.03</td>
       <td>0.23<br>0.02</td>
       <td>2.19<br>−1.93</td>
       <td>0.03<br>0.06</td>
@@ -419,7 +399,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.18<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.18</td>
       <td>0.17</td>
       <td>1.07</td>
       <td>0.29</td>
@@ -435,7 +415,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>affiliation</td>
-      <td>0.66<br>−0.04<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.66<br>−0.04</td>
       <td>0.18<br>0.04</td>
       <td>3.62<br>−0.91</td>
       <td>0.001<br>0.37</td>
@@ -443,7 +423,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.24<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.24</td>
       <td>0.18</td>
       <td>1.35</td>
       <td>0.19</td>
@@ -467,7 +447,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td>IT</td>
       <td>overt aggression</td>
-      <td>−0.03<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>−0.03</td>
       <td>0.18</td>
       <td>−0.21</td>
       <td>0.83</td>
@@ -475,7 +455,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.33<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.33</td>
       <td>0.19</td>
       <td>1.71</td>
       <td>0.09</td>
@@ -483,7 +463,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>status<br>restrained aggression</td>
-      <td>0.25<br>−0.05<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.25<br>−0.05</td>
       <td>0.20<br>0.03</td>
       <td>1.21<br>−1.89</td>
       <td>0.24<br>0.07</td>
@@ -491,7 +471,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.37<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.37</td>
       <td>0.18</td>
       <td>2.09</td>
       <td>0.05</td>
@@ -499,7 +479,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>status<br>submission</td>
-      <td>−0.02<br>−0.02<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>−0.02<br>−0.02</td>
       <td>0.23<br>0.02</td>
       <td>−0.10<br>−1.01</td>
       <td>0.92<br>0.32</td>
@@ -507,7 +487,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>−0.29<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>−0.29</td>
       <td>0.18</td>
       <td>1.58</td>
       <td>0.13</td>
@@ -531,7 +511,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td></td>
-      <td>−0.09<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>−0.09</td>
       <td>0.04</td>
       <td>−2.41</td>
       <td>0.02</td>
@@ -539,7 +519,7 @@ helpers ‘pay to stay’ by pre-emptive appeasement.
     <tr>
       <td></td>
       <td>sex</td>
-      <td>0.28<br>. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .</td>
+      <td>0.28</td>
       <td>0.17</td>
       <td>1.65</td>
       <td>0.11</td>

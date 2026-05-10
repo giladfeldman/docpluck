@@ -300,6 +300,44 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
     return out
 
 
+_LEADER_DOTS = re.compile(r"(?:\.\s+){4,}\.?")
+
+
+def _strip_leader_dots(s: str) -> str:
+    """Strip long runs of leader-dots (``. . . . . . .``) from cell content.
+
+    Iteration 22 (Tier C1). Some PDF tables use space-separated dots
+    as visual alignment fillers between a label column and a value
+    column (common in ethograms and tables of contents). When Camelot
+    captures the dots into a cell, they survive as e.g.
+    ``chase<br>ram<br>bite<br>. . . . . . . . . . . . . . . . . . . . .``
+    which renders as a useless visual clutter in HTML.
+
+    Conservative rule: strip sequences of ≥4 dot-space pairs. Single
+    or double dots (``e.g.``, ``i.e.``, ``5.`` numbered list,
+    sentence terminators followed by quoted text) are preserved.
+    Trailing/leading whitespace and orphan ``<br>`` placeholders are
+    cleaned up after the strip.
+
+    Operates on cell text AFTER ``_merge_continuation_rows`` joins
+    multi-line cells with the ``_MERGE_SEPARATOR`` (``<br>``)
+    placeholder, so leader-dot runs that originally lived on their
+    own physical line are still strippable.
+    """
+    if not s:
+        return s
+    out = _LEADER_DOTS.sub("", s)
+    # Clean up dangling ``\x00BR\x00`` sequences left by removed lines.
+    while _MERGE_SEPARATOR + _MERGE_SEPARATOR in out:
+        out = out.replace(_MERGE_SEPARATOR + _MERGE_SEPARATOR, _MERGE_SEPARATOR)
+    out = out.strip()
+    if out.startswith(_MERGE_SEPARATOR):
+        out = out[len(_MERGE_SEPARATOR):]
+    if out.endswith(_MERGE_SEPARATOR):
+        out = out[: -len(_MERGE_SEPARATOR)]
+    return out.strip()
+
+
 def _split_mashed_cell(s: str) -> str:
     """Insert ``<br>`` at apparent column-undercount boundaries inside a cell.
 
@@ -827,6 +865,7 @@ def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
     # escaping and renders as ``<br>``.
     for row in merged:
         for ci in range(len(row)):
+            row[ci] = _strip_leader_dots(row[ci])
             row[ci] = _split_mashed_cell(row[ci])
 
     # Detect multi-row header: count consecutive header-like rows from the
