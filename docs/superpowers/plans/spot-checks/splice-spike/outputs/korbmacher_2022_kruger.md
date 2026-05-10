@@ -129,8 +129,6 @@ diﬀerent meanings, depending on how participants interpret the domains. For in
 Therefore, we manipulated domain diﬃculty. In our replication, we randomly assigned participants to one of the three conditions receiving diﬀerent deﬁnitions of the ability domains, either: 1) original domain condition (replication); 2) easy domain condition (extension) with an easy reinterpretation of the original domains; or 3) diﬃcult domain condition (extension) with a diﬃcult reinterpretation of the original domains (Table 2).
 For the two extension groups, the extension domains aim to be speciﬁcally deﬁned in measurable terms. More context is provided for the domains to be more speciﬁc, such as the hand used (dominant versus non-dominant hand) for using a mouse, the location and type of car (home country and automatic gear car versus foreign country and manual gear car) for driving, and the help received for computer programming (someone very knowledgeable versus someone not very knowledgeable), which is an ability domain most participants may not have experience with. Additionally, an objective measure should be
 
-Table 2: Extension: Manipulation of perceived domain diﬃculty in target’s domains.
-
 ### Table 2
 *Extension: Manipulation of perceived domain diﬃculty in target’s domains.*
 
@@ -249,8 +247,6 @@ In the original study, the eight ability domains were divided into two categorie
 Yet, several issues may arise from treating continuous variables as categorical. First, the categorization of continuous variables, especially dichotomization of placing variables into two groups, might lead to misclassiﬁcations, loss of information and power (Naggara
 Although this test was the reason for the preregistration, due to an error, neither hypotheses or tests related to the core questions of the extensions were part of the preregistration. Hence, analyses connected to this question in the extension will be treated as exploratory.
 
-Table 3: Summary of the hypotheses.
-
 ### Table 3
 *Summary of the hypotheses.*
 
@@ -305,10 +301,6 @@ We conducted power analyses in R using the pwr package (Champely et al., 2018). 
 The original study used a within-subject design with one-sample analyses conducted for each condition (easy versus diﬃcult domains), yet in the current replication, we used a 3 (between diﬃcult conditions: original, easy, diﬃcult) x 2 (within diﬃculty conditions: easy, diﬃcult) mixed-design. All participants were presented with eight items (within-subjects; see Table2). We used the same methods as in the original study for within-group analyses and added additional analyses for the between-group comparisons (see the OSF supplement for more details and full measures).
 2.3 Procedure
 Participants were recruited through MTurk on TurkPrime/CloudResearch (Litman et al., 2017) and completed questionnaires via a provided “Qualtrics” link after giving consent. Participants were randomly assigned to one of three conditions: 1) Original domains (8 original domains; 4 easy and 4 diﬃcult domains), 2) Easy domains extension (easy reinterpretations of the 8 original domains), or 3) Diﬃcult domains extension (diﬃcult reinterpretations of the 8 original domains).
-
-Table 4: Comparison of original study and replication’s samples.
-
-Kruger (1999)
 
 ### Table 4
 *Comparison of original study and replication’s samples.*
@@ -415,8 +407,6 @@ With two added extensions.
 
 were generally better in explaining changes in comparative ability judgments than others’ skills, which supports H1.
 
-Table 6: Mean ratings across all abilities for the three conditions.
-
 ### Table 6
 *Mean ratings across all abilities for the three conditions.*
 
@@ -492,8 +482,6 @@ Table 6: Mean ratings across all abilities for the three conditions.
 
 ∗ Ambiguity scores were reversed to indicate increasing ambiguity from 1 to 10.
 
-Table 7: Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃculty
-
 ### Table 7
 *Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain diﬃculty ratings between easy and diﬃcult abilities (within conditions).*
 
@@ -547,8 +535,6 @@ For the relationship between absolute and comparative ability ratings across all
 3.2.2 H1: Additional correlation analyses for the relationship between absolute and comparative ability
 When adding two modes of analysis, namely, vector-compiled scores and inventory mean scores , Pearson’s rs, calculated for vector-compiled scores of comparative ability estimates
 Vector-compiled scores were each participant (in the replication condition) scores in all 8 domains lined up in one vector with 8 (domains) * 240 (participants) = 1920 rows. Inventory mean scores were calculated by
-
-Table 8: Replication condition: Mean comparative ability estimates and judgmental weight
 
 ### Table 8
 *Replication condition: Mean comparative ability estimates and judgmental weight of own versus peers’ abilities.*
@@ -733,8 +719,6 @@ See Table 11 in the OSF supplement: equivalence tests 4–5. Not included in the
 
 3.3.2 Relationship between absolute and comparative ability
 We conducted multiple linear regression analyses to test how ratings of both own and others’ ability predict comparative ability judgments across all abilities. Models in both conditions predicted variance in comparative ability judgments (Feasy(2, 222) = 246.6, p < .001, Radj2 = .69, 95% CI [0.62, 0.76]; and Fdiﬃcult(2, 223) = 342.9, p<.001, Radj2 = .75, 95% CI [0.70, 0.81]). Yet, the only signiﬁcant predictors of participants’ own absolute ability were comparative ability judgments in both the easy ( = 0.86, t(222) = 17.32, p < .001) and the diﬃcult domain condition ( = 0.90, t(223) = 15.61, p < .001).
-
-Table 11: Extension conditions: Mean comparative ability estimates and judgmental weight
 
 ### Table 11
 *Extension conditions: Mean comparative ability estimates and judgmental weight of own and peers’ abilities by domain diﬃculty.*
@@ -1379,8 +1363,6 @@ Note. The original study only provided the standardized betas and p-values. The 
 diﬃculty ratings were right-skewed. In other words, the Simpson paradox was produced by the above-average-eﬀect being stronger than the below-average-eﬀect in the replication and the easy conditions. Overall, this shows the contextual eﬀects of the inventory’s diﬃculty on participants’ ratings of tasks diﬃculty and comparative ability. Using both one-sample Wilcoxon and t-tests, both above-and-below-average eﬀects replicated with smaller eﬀects, whereas above-average eﬀect sizes replicated closer to the original study (Table 17). Despite smaller eﬀect sizes, the observed results support above-and-below-average eﬀects. The prevalence of the below-average-eﬀect also demonstrates that motivated reasoning to
 
 see oneself as superior fails to account for certain situations, such as for diﬃcult abilities in the replication.
-
-Table 17: Comparison of one-sample t-test eﬀect sizes between the original article and
 
 ### Table 17
 *Comparison of one-sample t-test eﬀect sizes between the original article and replication based on criteria created by LeBel et al. (2019).*

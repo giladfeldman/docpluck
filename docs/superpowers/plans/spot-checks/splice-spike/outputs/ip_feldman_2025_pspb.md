@@ -44,12 +44,6 @@ In Study 1b, they examined whether people would accurately predict the prevalenc
 
 Ip and Feldman
 
-Table 1.  Jordan et al. (2011) Studies 1b and 3: Summary of Findings.
-
-Study 1b
-
-Study 3
-
 ### Table 1
 *Jordan et al. (2011) Studies 1b and 3: Summary of Findings.*
 
@@ -210,8 +204,6 @@ Therefore, we revised the questions to inquire about both the prevalence of the 
 Social Comparison Orientation (Exploratory). We aimed to investigate the role of social comparison orientation, the tendency to compare oneself with others, as a potential predictor of misestimation and well-being measures. Gibbons and Buunk (1999) found that individuals with a higher social comparison orientation exhibited greater uncertainty and instability regarding their self-worth. Consequently, they tended to evaluate themselves based on how others were faring in public. This has the potential to be even more pronounced in an era in which social media provides ample opportunities for social comparison.
 Accumulating evidence suggests a positive link between social comparison orientation and threats to psychological wellbeing online, as many social media users tend to selectively present mostly positive aspects of their lives (Vogel et al., 2014).
 
-Table 2.  Replication and Extensions: Summary of Hypotheses.
-
 ### Table 2
 *Replication and Extensions: Summary of Hypotheses.*
 
@@ -303,10 +295,6 @@ Design and Procedure
 We summarized the experimental design and all measures in Table 4 (more details are available in the Supplemental Materials).
 Participants rated their own emotional experiences and others’ emotional experiences in random order. Misestimations were measured as participants’ estimates of others’ emotional experiences minus the average of all participants’ own emotional experiences. In the target article’s Study 1b, the prevalence and intensity were confounded, which we adjusted to measure prevalence and intensity separately (see “Measures” subsection).
 
-Table 3.  Comparison of Target Article Versus Replication: Differences and Similarities.
-
-Study
-
 ### Table 3
 *Comparison of Target Article Versus Replication: Differences and Similarities.*
 
@@ -368,8 +356,6 @@ We calculated the actual intensity of emotional experience by calculating the av
 This means that for both prevalence and intensity, a misestimation score higher than zero indicates an overestimation, and a score lower than zero indicates an underestimation.
 
 Ip and Feldman
-
-Table 4.  Replication and Extension: Experimental Design and Measures.
 
 ### Table 4
 *Replication and Extension: Experimental Design and Measures.*
@@ -648,8 +634,6 @@ friends   Talked to distant
 friends/ family    Had great meal
 
 Note. One-sample t-tests, N = 594, participant level df = 593, 95% CI (confidence intervals). The interpretation of the outcome is based on LeBel et al. (2019). We summarized whether we found a signal (p < alpha), whether the signal or lack of was expected, and whether it was in the same direction as that of the target’s per the singular item. We did not summarize effect size consistency (target’s effect within replication confidence intervals) given that we conducted analyses on participant level whereas the target conducted analysis on item-level.
-
-Table 7.  Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.
 
 ### Table 7
 *Intensity of Emotional Experiences [Extension]: One-Sample t-Tests of Estimation Error.*

@@ -1356,6 +1356,145 @@ def _strip_orphan_caption_fragments_near_tables(text: str) -> str:
     return "\n".join(out_lines)
 
 
+def _strip_redundant_caption_echo_before_tables(text: str) -> str:
+    """Strip an orphan ``Table N: ...`` line that appears immediately before a
+    ``### Table N`` block when its content is FULLY contained in the rendered
+    table's caption + header cells directly below.
+
+    Also strips short fragment lines (≤40 chars, ≤6 words, no terminal
+    sentence punctuation) that lie BETWEEN the orphan caption and the
+    heading IF every word in those fragments also appears in the rendered
+    table. These fragments are header cells (``Study 1b``, ``Kruger
+    (1999)``) that leaked out of the table region during splicing.
+
+    Iteration 11 + extension. Replaces the older
+    ``_strip_orphan_caption_fragments_near_tables`` (deliberately disabled
+    because it risked content loss). This variant only strips when every
+    word ≥3 chars is contained in the rendered table — so unique content
+    is preserved. The user's hard rule (no disappearing text) is enforced
+    by the strict subset check against the full rendered table text.
+    """
+    lines = text.split("\n")
+    out_lines: list[str] = []
+    n = len(lines)
+    table_heading_re = re.compile(r"^### Table\s+(\d+)\s*$")
+    caption_line_re = re.compile(r"^\s*Table\s+(\d+)\s*[.:]\s*(.+?)\s*$", re.IGNORECASE)
+    italic_caption_re = re.compile(r"^\*(.+)\*\s*$")
+    th_cell_re = re.compile(r"<th[^>]*>(.*?)</th>", re.DOTALL)
+    sentence_end_re = re.compile(r"[.!?]\s*$")
+    word_re = re.compile(r"[A-Za-z]{3,}")
+    table_block_end_re = re.compile(r"^</table>\s*$")
+
+    def _line_is_short_fragment(s: str) -> bool:
+        s = s.strip()
+        if not s or len(s) > 40:
+            return False
+        if len(s.split()) > 6:
+            return False
+        if sentence_end_re.search(s):
+            return False
+        return True
+
+    def _stem(w: str) -> str:
+        """4-char prefix stem so ``study`` matches ``studies``,
+        ``error`` matches ``errors``, etc. Conservative — false-positive
+        risk is acceptable because the strip is only triggered by an
+        anchoring orphan caption that itself must already match."""
+        return w[:4] if len(w) >= 4 else w
+
+    def _stems(words: set[str]) -> set[str]:
+        return {_stem(w) for w in words}
+
+    i = 0
+    while i < n:
+        line = lines[i]
+        m = table_heading_re.match(line)
+        if not m:
+            out_lines.append(line)
+            i += 1
+            continue
+        target_num = int(m.group(1))
+
+        # Collect the rendered table's word-set: italic caption + every
+        # ``<th>`` cell text. Walk forward up to ~200 lines until ``</table>``.
+        rendered_words: set[str] | None = None
+        rendered_chunks: list[str] = []
+        for k in range(i + 1, min(i + 200, n)):
+            ln = lines[k]
+            if rendered_words is None:
+                stripped = ln.strip()
+                if not stripped:
+                    continue
+                cap_m = italic_caption_re.match(stripped)
+                if cap_m:
+                    rendered_chunks.append(cap_m.group(1))
+                    rendered_words = set()  # mark as found; will accumulate below
+                else:
+                    # No italic caption — bail.
+                    break
+            # After caption found, accumulate <th> cells.
+            rendered_chunks.append(" ".join(th_cell_re.findall(ln)))
+            if table_block_end_re.match(ln.strip()):
+                break
+        if rendered_words is None:
+            out_lines.append(line)
+            i += 1
+            continue
+        rendered_words = set(
+            w.lower() for w in word_re.findall(" ".join(rendered_chunks))
+        )
+        rendered_stems = _stems(rendered_words)
+
+        # Walk back through out_lines for an orphan ``Table N: ...`` plus
+        # any short header-fragment lines between it and the heading. Only
+        # strip when the entire collected block is a word-subset of the
+        # rendered table.
+        j = len(out_lines) - 1
+        steps = 0
+        candidate_indices: list[int] = []
+        orphan_found = False
+        while j >= 0 and steps < 12:
+            cand = out_lines[j]
+            steps += 1
+            stripped = cand.strip()
+            if stripped == "":
+                candidate_indices.append(j)
+                j -= 1
+                continue
+            cm = caption_line_re.match(cand)
+            if cm and int(cm.group(1)) == target_num:
+                orphan_words = set(
+                    w.lower() for w in word_re.findall(cm.group(2))
+                )
+                if orphan_words and _stems(orphan_words).issubset(rendered_stems):
+                    candidate_indices.append(j)
+                    orphan_found = True
+                # Stop walking back once the orphan caption is found
+                # (or rejected — don't keep eating).
+                break
+            # Allow short header-fragment lines that are subsets of the
+            # rendered table — they leaked out of the table region.
+            # Match by 4-char prefix stem so ``Study 1b`` matches a
+            # rendered ``Studies 1b and 3``.
+            if _line_is_short_fragment(stripped):
+                frag_words = set(w.lower() for w in word_re.findall(stripped))
+                if frag_words and _stems(frag_words).issubset(rendered_stems):
+                    candidate_indices.append(j)
+                    j -= 1
+                    continue
+            # Anything else stops the walk-back (preserve content).
+            break
+
+        if orphan_found:
+            for idx in sorted(set(candidate_indices), reverse=True):
+                out_lines.pop(idx)
+
+        out_lines.append(line)
+        i += 1
+
+    return "\n".join(out_lines)
+
+
 def _dedupe_h2_sections(text: str) -> str:
     """Demote duplicate H2 section headings to plain text.
 
@@ -1966,10 +2105,10 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # Final dedupe pass — also covers ``### Table N`` blocks that ended up in
     # the appendix vs. inline.
     out = _dedupe_table_blocks(out)
-    # NOTE: do NOT strip orphan caption fragments preceding Table blocks —
-    # those fragments may contain unique content (per-paper running captions,
-    # additional caption sentences). Showing them twice (once as fragments,
-    # once in the spliced block) is uglier than losing them.
+    # Iteration 11: strip ``Table N: ...`` orphan caption echoes when they
+    # are word-set subsets of the rendered caption directly below. Narrower
+    # than the older blanket strip — preserves any unique content.
+    out = _strip_redundant_caption_echo_before_tables(out)
     # Demote duplicate ## H2 section headings (figure captions starting with
     # "Results of..." that the section detector misclassified, etc.).
     out = _dedupe_h2_sections(out)

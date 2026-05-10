@@ -1090,3 +1090,125 @@ def test_dedupe_prefers_html_table_over_code_block():
     assert "stray fragment lines" not in out
     # Only ONE ### Table 1 heading remains.
     assert out.count("### Table 1") == 1
+
+
+from splice_spike import _strip_redundant_caption_echo_before_tables
+
+
+def test_strip_caption_echo_when_orphan_is_subset_of_rendered():
+    """Iteration 11: orphan ``Table N: ...`` line whose words are all in
+    the rendered caption gets stripped."""
+    text = (
+        "Some preceding paragraph.\n\n"
+        "Table 2: Extension: Manipulation of perceived domain difficulty.\n\n"
+        "### Table 2\n"
+        "*Extension: Manipulation of perceived domain difficulty in target's domains.*\n\n"
+        "<table><tr><td>data</td></tr></table>\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    # The orphan caption line must be removed.
+    assert "Table 2: Extension: Manipulation" not in out
+    # Heading and rendered caption stay.
+    assert "### Table 2" in out
+    assert "*Extension: Manipulation" in out
+    # Preceding paragraph stays.
+    assert "Some preceding paragraph." in out
+
+
+def test_strip_caption_echo_preserves_orphan_with_unique_content():
+    """When the orphan caption contains a word NOT in the rendered caption,
+    the orphan stays — content preservation is the hard rule."""
+    text = (
+        "Table 2: Mentions the unique-word XYLOPHONE here.\n\n"
+        "### Table 2\n"
+        "*Different rendered caption text here.*\n\n"
+        "<table></table>\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    assert "XYLOPHONE" in out
+    assert "Table 2: Mentions" in out
+
+
+def test_strip_caption_echo_only_strips_matching_table_number():
+    """Orphan ``Table 5: ...`` near a ``### Table 6`` heading is NOT
+    stripped — wrong number."""
+    text = (
+        "Table 5: Some leftover orphan here.\n\n"
+        "### Table 6\n"
+        "*Real caption for table six.*\n\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    assert "Table 5: Some leftover orphan" in out
+
+
+def test_strip_caption_echo_handles_truncated_orphan():
+    """A typical case: pdftotext renders a wrapped caption truncated. As
+    long as every word in the truncated line is in the full rendered
+    caption, strip it."""
+    text = (
+        "Table 7: Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain difficulty\n\n"
+        "### Table 7\n"
+        "*Asymptotic Wilcoxon-Mann-Whitney tests comparing perceived domain difficulty ratings between easy and difficult abilities.*\n\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    assert "Table 7: Asymptotic" not in out
+    assert "*Asymptotic Wilcoxon-Mann-Whitney" in out
+
+
+def test_strip_caption_echo_does_not_strip_when_no_rendered_caption():
+    """If there's no italic ``*caption*`` directly after the heading,
+    don't strip — we can't verify content containment."""
+    text = (
+        "Table 2: Some echo.\n\n"
+        "### Table 2\n\n"
+        "<table></table>\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    assert "Table 2: Some echo" in out
+
+
+def test_strip_caption_echo_walks_past_header_fragments_in_table():
+    """ip_feldman Table 1 pattern: orphan caption + leaked header-cell
+    fragments (``Study 1b``, ``Study 3``) appear between the orphan and
+    the ``### Table 1`` heading. Both the caption AND the fragments are
+    stripped because every word is in the rendered table."""
+    text = (
+        "Body paragraph text here that is not a header fragment.\n\n"
+        "Table 1.  Jordan et al. (2011) Studies 1b and 3: Summary of Findings.\n\n"
+        "Study 1b\n\n"
+        "Study 3\n\n"
+        "### Table 1\n"
+        "*Jordan et al. (2011) Studies 1b and 3: Summary of Findings.*\n\n"
+        "<table>\n"
+        "  <thead><tr><th>Study 1b</th><th>Study 3</th></tr></thead>\n"
+        "  <tbody><tr><td>data</td><td>data</td></tr></tbody>\n"
+        "</table>\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    # Orphan caption stripped.
+    assert "Table 1.  Jordan et al" not in out
+    # Standalone leaked header fragments stripped.
+    assert "\nStudy 1b\n\n" not in out
+    assert "\nStudy 3\n\n" not in out
+    # Body paragraph preserved.
+    assert "Body paragraph text here" in out
+    # Heading + table preserved.
+    assert "### Table 1" in out
+    assert "<th>Study 1b</th>" in out
+
+
+def test_strip_caption_echo_does_not_strip_unrelated_short_lines():
+    """A short line that is NOT a subset of the rendered table stays put
+    — we don't have evidence it's a leaked fragment."""
+    text = (
+        "Some unrelated short line.\n\n"
+        "Table 2: Caption text matches.\n\n"
+        "### Table 2\n"
+        "*Caption text matches.*\n\n"
+        "<table><tr><td>x</td></tr></table>\n"
+    )
+    out = _strip_redundant_caption_echo_before_tables(text)
+    # Orphan is stripped (subset of caption).
+    assert "Table 2: Caption text matches" not in out
+    # Unrelated short line stays — not a subset.
+    assert "Some unrelated short line." in out
