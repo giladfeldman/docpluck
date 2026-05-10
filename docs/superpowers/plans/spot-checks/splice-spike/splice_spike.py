@@ -1410,6 +1410,23 @@ def _wrap_table_fragments(
                 block_parts.append("\n".join(fragment_lines))
                 block_parts.append("```")
                 out_parts.append("\n".join(block_parts))
+            elif caption_label is None:
+                # No caption matched, so the run is being dropped. But the
+                # "Unlabeled fragment-wraps are noise" assumption fails when
+                # the run contains footnote-marker paragraphs ("Note.", "*M=…",
+                # "†p<.05") that won't be re-emitted by anything else — this
+                # is real content loss against the source PDF. Rescue those
+                # paragraphs and emit them as plain text. Numeric / single-word
+                # noise still drops (preserves the dedup-vs-Camelot behavior).
+                # Skip marker-only paragraphs (single ``†`` / ``*`` chars):
+                # those carry no content and only add visual noise.
+                fragment_blob = "\n\n".join(
+                    paragraphs[j] for j in range(run_start, i)
+                )
+                for note in _extract_footnote_lines(fragment_blob):
+                    if len(note.strip()) < 8:
+                        continue
+                    out_parts.append(note)
         else:
             for j in range(run_start, i):
                 out_parts.append(paragraphs[j])

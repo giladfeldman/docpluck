@@ -696,6 +696,8 @@ We reproduced the results of the original study to help us accurately pin-point 
 The results of Study 1 of Johnson & Goldstein (2003)
 Table S7. The results of Binomial Logistic Regression
 
+Note. N =161; Estimates represent the log odds of "DV = 1" vs. "DV = 0";
+
 The results of Study 2 of Johnson, Bellman & Lohse, 2002
 Table S8. The results of Binomial Logistic Regression
 
@@ -704,6 +706,8 @@ Intercept
 Framing: Positive vs. Negative
 Default Condition: No-default vs. Opt-in Opt-out – Opt-in
 Framing ✻ Default Condition: (Positive vs. Negative ) ✻ (Nodefault vs. Opt-in) (Positive vs. Negative ) ✻ (Optout vs. Opt-in)
+
+Note. N =235;Estimates represent the log odds of " DV = 1" vs. " DV = 0"
 
 Table S9. Descriptive table of the participation rates.
 
@@ -723,6 +727,8 @@ Opt-in default Opt-out default No-default (no default)
 Positive Framing Negative Framing Positive Framing Negative Framing Positive Framing Negative Framing
 
 Positive Framing Negative Framing Positive Framing Negative Framing Positive Framing Negative Framing
+
+Note. Sample 1 (N) = 954; Sample 2 (N) = 966;
 
 Summary of the replication results: Logistic regression analysis conducted separately for Sample 1 and Sample 2
 
@@ -808,6 +814,8 @@ We reproduce the results reported as part of Group A’s pre-registration docume
 
 Power analysis related to effect size reported in Group B Pre-registration document: (https://osf.io/3kdqb; Page 19)
 We reproduce the results reported as part of Group B’s pre-registration document. The reference level set were: (DV= 0; default condition = Opt-out; Framing = positive). Please note the group B reconstructed the data of the original study and used different labels (data is identical) as presented below (Reference level guide: Opt-out = subscribed; Neutral = No default; Opt-in = unsubscribed).
+
+Notes: OSF links: Group A = https://osf.io/5e3r8 ; Group B = https://osf.io/3kdqb
 
 
 ## Figures

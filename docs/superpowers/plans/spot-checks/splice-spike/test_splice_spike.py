@@ -609,6 +609,88 @@ def test_drop_caption_empty_grid_returns_empty():
     assert _drop_caption_leading_rows([], "Table 1", "caption") == []
 
 
+from splice_spike import _wrap_table_fragments
+
+
+def test_wrap_fragments_rescues_note_lines_from_uncaptioned_run():
+    """A fragment-run of 5+ short paragraphs whose preceding caption does NOT
+    match ``CAPTION_RE`` (e.g. ``Table S7. ...`` — supplement label with
+    non-digit prefix) is otherwise silently dropped. Any ``Note.``, ``*M=…``,
+    ``†p<.05`` lines inside that run must still be re-emitted as paragraphs —
+    they're real source content, not duplicate-of-Camelot noise."""
+    text = (
+        "Table S7. The results of Binomial Logistic Regression\n\n"
+        "Predictor\n\n"
+        "Estimate SE\n\n"
+        "Z\n\n"
+        "p Odds ratio Lower\n\n"
+        "Upper\n\n"
+        "Intercept Conditions\n\n"
+        "-0.298 0.275\n\n"
+        "1.638 1.780\n\n"
+        "Note. N =161; Estimates represent the log odds of \"DV = 1\" vs. \"DV = 0\";\n\n"
+        "Some non-fragment body paragraph that has more than one hundred characters in it so it is not a fragment."
+    )
+    out = _wrap_table_fragments(text, existing_table_nums=set())
+    # The ``Note.`` line must survive even though the surrounding numeric rows
+    # are dropped (caption_label is None, so no ``### Table S7`` block emitted).
+    assert "Note. N =161" in out
+    assert 'log odds of "DV = 1"' in out
+    # The non-fragment body paragraph still emits.
+    assert "Some non-fragment body paragraph" in out
+
+
+def test_wrap_fragments_skips_marker_only_paragraphs():
+    """A stray ``†`` / ``*`` paragraph (just the marker, no content) is noise
+    — its real footnote text lives elsewhere as prose. Don't re-emit it."""
+    text = (
+        "Some long preceding paragraph that is not classified as a fragment because it is too long over hundred chars.\n\n"
+        "X1\n\n"
+        "X2\n\n"
+        "X3\n\n"
+        "X4\n\n"
+        "†\n\n"
+        "X5\n\n"
+        "Some other paragraph long enough to break out of being considered a fragment by the heuristic.\n\n"
+        "Note. The actual footnote prose is preserved as it is substantive content here.\n\n"
+        "X6\n\n"
+        "X7\n\n"
+        "X8\n\n"
+        "X9\n\n"
+        "X10\n\n"
+        "Final non-fragment paragraph that is long enough to break the run, otherwise the run would never end."
+    )
+    out = _wrap_table_fragments(text, existing_table_nums=set())
+    # The marker-only "†" paragraph drops (under 8 chars after strip).
+    assert "\n†\n" not in out
+    assert "\n\n†\n\n" not in out
+    # The substantive Note. line in the next dropped run is rescued.
+    assert "Note. The actual footnote prose" in out
+
+
+def test_wrap_fragments_uncaptioned_run_drops_pure_noise():
+    """An un-captioned fragment-run with NO footnote markers stays dropped —
+    that's the existing dedup-vs-Camelot behavior we're preserving. Only
+    footnote-bearing paragraphs are rescued, not numeric noise."""
+    text = (
+        "Some prefix paragraph that is long enough to be classified as real prose by the fragment heuristic.\n\n"
+        "X1\n\n"
+        "X2\n\n"
+        "X3\n\n"
+        "X4\n\n"
+        "X5\n\n"
+        "X6\n\n"
+        "Some non-fragment body paragraph that has more than one hundred characters in it so it is not a fragment."
+    )
+    out = _wrap_table_fragments(text, existing_table_nums=set())
+    # The pure-noise fragments still drop (no footnote markers to rescue).
+    assert "X1" not in out
+    assert "X6" not in out
+    # The flanking paragraphs survive.
+    assert "Some prefix paragraph" in out
+    assert "Some non-fragment body paragraph" in out
+
+
 def test_dedupe_prefers_html_table_over_code_block():
     """When two ``### Table N`` blocks exist for the same N — one with an
     HTML ``<table>`` and one with a fragment-wrapped ``\\`\\`\\`` code block —
