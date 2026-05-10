@@ -443,6 +443,60 @@ def _is_group_separator(row: list[str], n_cols: int) -> bool:
     return True
 
 
+_SUFFIX_OPEN_PUNCT_RE = re.compile(r"[-—–:]\s*$")
+
+
+def _fold_suffix_continuation_columns(
+    header_rows: list[list[str]],
+) -> list[list[str]]:
+    """Fold per-column suffix continuations in 2-row headers.
+
+    Iteration 12 (handoff Tier A5). Camelot occasionally splits a single
+    column label like ``Win-Uncertain`` across two header rows, with the
+    suffix fragment in row 1 and the prefix (ending in ``-`` or ``:``)
+    in row 0. Example from ziano Table 2:
+
+        row 0: [..., "Win-:", "Loss-"]
+        row 1: [...,  "Uncertain", "Uncertain"]
+
+    Per-column rule: for each column where row1 is non-empty AND row0
+    ends with ``-`` / ``—`` / ``–`` / ``:`` AND row1 starts with a
+    letter, merge into row0 (no separator — the dash IS the separator)
+    and clear row1's cell.
+
+    If row1 is entirely empty after the per-column merges, drop it.
+
+    Conservative: only fires on 2-row headers (so it doesn't interact
+    weirdly with the iteration-9 super-header fold, which always runs
+    first); preserves all other cells unchanged.
+    """
+    if len(header_rows) != 2:
+        return header_rows
+    sup = list(header_rows[0])
+    sub = list(header_rows[1])
+    n = max(len(sup), len(sub))
+    sup += [""] * (n - len(sup))
+    sub += [""] * (n - len(sub))
+    new_sup = list(sup)
+    new_sub = list(sub)
+    merged_any = False
+    for i in range(n):
+        s = (sub[i] or "").strip()
+        if not s or not s[0].isalpha():
+            continue
+        top = (sup[i] or "").rstrip()
+        if not top or not _SUFFIX_OPEN_PUNCT_RE.search(top):
+            continue
+        new_sup[i] = top + s
+        new_sub[i] = ""
+        merged_any = True
+    if not merged_any:
+        return header_rows
+    if all(not c.strip() for c in new_sub):
+        return [new_sup]
+    return [new_sup, new_sub]
+
+
 def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
     """Fold a super-header row into the row directly below it, column-wise.
 
@@ -586,6 +640,9 @@ def pdfplumber_table_to_markdown(rows: Sequence[Sequence[str | None]]) -> str:
     # AND every populated top cell has a populated cell directly below.
     # See ``_fold_super_header_rows`` for the conservative rule.
     header_rows = _fold_super_header_rows(header_rows)
+    # Per-column suffix-continuation fold for 2-row headers where individual
+    # columns have ``Win-`` / ``Loss-`` over ``Uncertain`` / ``Uncertain``.
+    header_rows = _fold_suffix_continuation_columns(header_rows)
 
     lines: list[str] = ["<table>"]
     lines.append("  <thead>")

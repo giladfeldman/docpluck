@@ -573,19 +573,8 @@ Inferential statistics
       <th>Fail-Uncertain</th>
       <th>N</th>
       <th>Choice under risk, difference in % Accept across conditions<br>Win-Loss</th>
-      <th>Win-:</th>
-      <th>Loss-</th>
-    </tr>
-    <tr>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th></th>
-      <th>Uncertain</th>
-      <th>Uncertain</th>
+      <th>Win-:Uncertain</th>
+      <th>Loss-Uncertain</th>
     </tr>
   </thead>
   <tbody>

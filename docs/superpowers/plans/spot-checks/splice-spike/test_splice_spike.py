@@ -573,6 +573,78 @@ def test_fold_super_header_no_op_on_single_row():
     assert out == rows
 
 
+from splice_spike import _fold_suffix_continuation_columns
+
+
+def test_suffix_fold_ziano_table2_pattern():
+    """ziano Table 2: ``Win-:`` / ``Loss-`` over ``Uncertain`` /
+    ``Uncertain`` merges per column to ``Win-:Uncertain`` /
+    ``Loss-Uncertain``. Row 1 becomes empty and is dropped."""
+    rows = [
+        ["", "N", "Pass-Fail", "Win-:", "Loss-"],
+        ["", "",  "",          "Uncertain", "Uncertain"],
+    ]
+    out = _fold_suffix_continuation_columns([list(r) for r in rows])
+    assert len(out) == 1
+    assert out[0] == ["", "N", "Pass-Fail", "Win-:Uncertain", "Loss-Uncertain"]
+
+
+def test_suffix_fold_does_not_fire_when_top_does_not_end_open_punct():
+    """Top cell ``Mean`` (no trailing ``-`` or ``:``) doesn't fold even if
+    bottom is ``difference``. The super-header fold (different rule)
+    handles that case."""
+    rows = [
+        ["", "Mean"],
+        ["X", "difference"],
+    ]
+    out = _fold_suffix_continuation_columns([list(r) for r in rows])
+    assert out == rows
+
+
+def test_suffix_fold_does_not_fire_when_bottom_starts_with_digit():
+    """Bottom cell starting with a digit/symbol isn't a word continuation
+    — don't merge."""
+    rows = [
+        ["", "Section-"],
+        ["", "1.2"],
+    ]
+    out = _fold_suffix_continuation_columns([list(r) for r in rows])
+    assert out == rows
+
+
+def test_suffix_fold_keeps_row1_when_some_cells_dont_merge():
+    """Per-column rule: cols that meet the rule merge, cols that don't
+    keep their bottom-row cell intact."""
+    rows = [
+        ["", "Win-",      "Real header A"],
+        ["", "Uncertain", "Real header B"],
+    ]
+    out = _fold_suffix_continuation_columns([list(r) for r in rows])
+    # Col 1 merged; col 2 untouched. Row 1 still has "Real header B"
+    # so it stays.
+    assert len(out) == 2
+    assert out[0] == ["", "Win-Uncertain", "Real header A"]
+    assert out[1] == ["", "", "Real header B"]
+
+
+def test_suffix_fold_no_op_for_single_row_header():
+    """Doesn't apply to 1-row headers."""
+    rows = [["Win-:", "Loss-"]]
+    out = _fold_suffix_continuation_columns([list(r) for r in rows])
+    assert out == rows
+
+
+def test_suffix_fold_no_op_for_3_row_header():
+    """Conservative — only fires on exactly 2-row headers."""
+    rows = [
+        ["", "A-", "B-"],
+        ["", "X",  "Y"],
+        ["", "Z",  "W"],
+    ]
+    out = _fold_suffix_continuation_columns([list(r) for r in rows])
+    assert out == rows
+
+
 from splice_spike import _split_mashed_cell
 
 
