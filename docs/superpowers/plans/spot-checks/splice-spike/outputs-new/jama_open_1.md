@@ -16,7 +16,6 @@ Seventy-five participants were enrolled with a mean (SD) age of 55 (12) years. T
 ## CONCLUSIONS
 
 AND RELEVANCE This randomized clinical trial found that a TRE diet strategy without calorie counting was effective for weight loss and lowering of HbA1c levels compared with
-(continued)
 
 Key Points Question Is time-restricted eating (TRE) without calorie counting more effective for weight loss and lowering of hemoglobin A1c (HbA1c) levels compared with daily calorie restriction (CR) in adults with type 2 diabetes (T2D)?
 
@@ -24,19 +23,10 @@ Key Points Question Is time-restricted eating (TRE) without calorie counting mor
 
 In a 6-month randomized clinical trial involving 75 adults with T2D, TRE was more effective for weight loss (−3.6%) than CR (−1.8%) compared with controls. However, changes in HbA1c levels did not differ between the TRE (−0.91%) and CR (−0.94%) groups compared with controls.
 Meaning These findings suggest that time-restricted eating may be an effective alternative strategy to CR for lowering body weight and HbA1c levels in T2D.
-+ Visual Abstract + Supplemental content
-Author affiliations and article information are listed at the end of this article.
 
-Open Access. This is an open access article distributed under the terms of the CC-BY-NC-ND License. JAMA Network Open. 2023;6(10):e2339337. doi:10.1001/jamanetworkopen.2023.39337 (Reprinted)
-
-October 27, 2023 1/13
-
-(continued)
 daily calorie counting in a sample of adults with T2D. These findings will need to be confirmed by larger RCTs with longer follow-up.
 
 TRIAL REGISTRATION ClinicalTrials.gov Identifier: NCT05225337
-
-JAMA Network Open. 2023;6(10):e2339337. doi:10.1001/jamanetworkopen.2023.39337
 
 ## Introduction
 
@@ -48,8 +38,6 @@ Accordingly, we conducted a 6-month, randomized clinical trial comparing the eff
 
 The protocol for this randomized clinical trial was approved by the Office for the Protection of Research Subjects at the University of Illinois Chicago, and written informed consent was obtained from all participants. The full trial protocol and statistical analysis plan are provided in Supplement 1. This study followed the Consolidated Standards of Reporting Trials (CONSORT) reporting guidelines.
 Trial Participants The trial was a 6-month, single-center, randomized clinical trial conducted at the University of Illinois Chicago between January 25, 2022, and April 1, 2023 (eFigure 1 in Supplement 2). Inclusion criteria were as follows: previous diagnosis of T2D, HbA1c levels between 6.5% and 11.0% (to convert to proportion of total hemoglobin, multiply by 0.01), 18 to 80 years of age, and body mass index (BMI; calculated as weight in kilograms divided by height in meters squared) between 30 and 50. Exclusion criteria consisted of unstable weight for 3 months prior to the beginning of the study (>4% weight loss or gain), history of eating disorders, eating within less than a 10-hour window at baseline, nightshift work, pregnant or trying to become pregnant, and current smoking. Self-reported race and
-
-October 27, 2023 2/13
 
 ethnicity data (including Asian, Hispanic White, non-Hispanic Black, and non-Hispanic White) were collected given that Hispanic and non-Hispanic Black adults have a high prevalence of T2D in the US.
 
@@ -66,8 +54,6 @@ Blood Glucose Level Monitoring All participants wore a continuous glucose monito
 
 Outcome Measures The primary outcome of the study was percentage change in body weight among the TRE, CR, and control groups by month 6. Secondary outcomes included changes in HbA1c levels, time in
 
-October 27, 2023 3/13
-
 euglycemic range (glucose levels 70-180 mg/dL), mean glucose level (measured by CGM), medication effect score,12 body composition (measured by dual-energy x-ray absorptiometry), blood pressure and heart rate, plasma lipid levels, dietary intake (measured by the ASA-24 [automated self-administered 24-hour] dietary assessment tool13), dietary adherence, physical activity (steps per day), and weekly adverse events among the TRE, CR, and control groups by month 6. Analytical methods are detailed in Supplement 1. Reporting of serious adverse events followed requirements mandated by the University of Illinois Office for Protection of Research Subjects (Supplement 1).
 
 Statistical Analysis For the sample size calculation, we estimated that TRE and CR groups would reduce body weight by 7% and 3%, respectively, by month 6 compared with controls (estimated no change in body weight). We calculated that 21 participants per group would provide 80% power to detect a significant difference in body weight among the TRE, CR, and control groups by month 6, using an overall F test from a 1-way analysis of variance with α = .05, effect size of 0.4096, and a common SD of 7%. We anticipated a dropout rate of 15%.4 Thus, we aimed to recruit 75 participants (25 per group), assuming that 63 participants (21 per group) would complete the trial.
@@ -78,8 +64,6 @@ For each outcome variable, linear modeling assumptions were assessed with residu
 ## Results
 
 Trial Participants We screened 127 people and enrolled 75 participants (Figure 1). Participants had a mean (SD) age of 55 (12) years, mean (SD) BMI of 39 (7), and mean (SD) HbA1c level of 8.1% (1.6%). Fifty-three participants (71%) were women and 22 (29%) were men. One participant (1%) was Asian, 30 (40%) were Hispanic White, 40 (53%) were non-Hispanic Black, and 4 (5%) were non-Hispanic White
-
-October 27, 2023 4/13
 
 (Table 1). The attrition rate (ie, participants lost to follow-up) was 2 (8%) in the TRE group, 3 (12%) in the CR group, and 1 (4%) in the control group. The reasons for participant attrition included personal reasons, inability to contact, not wanting to be in the control group, and motor vehicle crash.
 
@@ -104,7 +88,6 @@ Sensitivity Analysis Using Multiple Imputation Conclusions for body weight and H
 23 Completed 6 mo of intervention
 22 Completed 6 mo of intervention
 24 Completed 6 mo of intervention
-October 27, 2023 5/13
 ```
 
 Plasma Lipid Levels and Blood Pressure Changes in blood pressure, heart rate, total cholesterol, LDL cholesterol, HDL cholesterol, and triglyceride concentrations were observed. However, these changes were not associated with treatment group in any pairwise comparisons at month 6 (Table 2).
@@ -116,8 +99,6 @@ SI conversion factors: To convert cholesterol to mmol/L, multiply by 0.0258; glu
 a Unless otherwise indicated, data are expressed as mean (SD).
 
 b Calculated as (actual drug dose/maximum drug dose) × drug mean adjustment factor. A higher score corresponded to a higher dose of diabetes medication, and a reduction corresponded to a reduction in diabetes medication.
-
-October 27, 2023 6/13
 
 Adherence and Energy Intake The mean (SD) caloric deficit was −313 (509) kcal/d for the TRE group, −197 (426) kcal/d for the CR group, and −16 (439) kcal/d for the control group over 6 months. Differences in dietary intake among groups are given in Table 3. The TRE group reported being adherent with their eating window a mean (SD) of 6.1 (0.8) days per week (87% of days) over 6 months (eFigure 2 in Supplement 2). In the CR group, 17 participants (68%) reported being adherent with their prescribed calorie goals during the 6-month trial (eFigure 2 in Supplement 2). Participants in the TRE group reported finding their diet intervention easier to adhere to compared with CR group participants (eFigure 3 in Supplement 2).
 
@@ -131,7 +112,6 @@ Adverse Events No serious adverse events were reported. Occurrences of hypoglyce
 –1.0 –20
 
 Data were included for 75 participants; means were estimated using an intention-to-treat analysis using a linear mixed model. Error bars indicate 95% CIs for each parameter from baseline by diet group. CR indicates calorie restriction; TRE, time-restricted eating.
-October 27, 2023 7/13
 
 −15.43 (−37.92 to 7.06) −9.53 (−25.14 to 6.08) 3.70 (−13.32 to 20.73) −5.90 (−32.3 to 20.59) −19.13 (−46.42 to 8.16) −13.23 (−35.62 to 9.15)
 
@@ -142,8 +122,6 @@ SI conversion factors: To convert cholesterol to mmol/L, multiply by 0.0258; glu
 b Indicates statistical significance using Bonferroni-adjusted 2-tailed P < .017.
 
 c Indicates statistical significance using P < .05.
-
-October 27, 2023 8/13
 
 ## Discussion
 
@@ -157,8 +135,6 @@ a Only observed values are included. A total of 20 of 25 participants in the TRE
 
 b Significantly different from baseline (P < .05).
 
-October 27, 2023 9/13
-
 significantly improve HbA1c levels.23,24 These factors may explain why similar improvements in HbA1c levels were noted in the TRE and CR groups, even though only the TRE group lost weight relative to controls.
 Our findings also show that TRE is safe in patients who are using either diet alone or medications to control their T2D. However, for people using sulfonylureas and/or insulin, adopting a TRE regimen will require medication changes and regular monitoring, particularly in the initial stages of the diet.
 Hispanic and non-Hispanic Black adults are among the racial and ethnic groups with the highest prevalence of T2D in the US.25 Our results show that TRE is effective for weight loss and HbA1c level reductions in a sample population that was representative of these 2 groups. Time-restricted eating is an appealing approach to weight loss in that it can be adopted at no cost, allows patients to continue consuming familiar foods, and does not require complicated calorie counting. Since the literature on TRE is still quite limited,26 our trial may help to improve the health of groups with a high prevalence of T2D by filling in these critical knowledge gaps.
@@ -170,8 +146,6 @@ Limitations Our study has some limitations, which include the relatively short t
 This randomized clinical trial found that 8-hour TRE without calorie counting was an effective alternative diet strategy for weight loss and lowering of HbA1c levels compared with daily calorie counting in a sample of adults with T2D and obesity. These findings will need to be confirmed by larger RCTs with longer follow-up.
 
 ARTICLE INFORMATION Accepted for Publication: September 9, 2023. Published: October 27, 2023. doi:10.1001/jamanetworkopen.2023.39337 Open Access: This is an open access article distributed under the terms of the CC-BY-NC-ND License. © 2023 Pavlou V et al. JAMA Network Open. Corresponding Author: Krista A. Varady, PhD, Department of Kinesiology and Nutrition, University of Illinois Chicago, 1919 W Taylor St, Chicago, IL 60612 (varady@uic.edu). Author Affiliations: Department of Kinesiology and Nutrition, University of Illinois Chicago (Pavlou, Cienfuegos, Lin, Ezpeleta, Ready, Corapi, Wu, Lopez, Gabel, Tussing-Humphreys, Oddo, Varady); University of Illinois Cancer Center, University of Illinois Chicago (Tussing-Humphreys, Varady); Department of Preventative Medicine (Biostatistics), Northwestern University, Chicago, Illinois (Alexandria); College of Medicine (Endocrinology), University of Illinois Chicago (Sanchez, Unterman); Department of Endocrinology, Jesse Brown Veterans Affairs Medical Center, Chicago, Illinois (Unterman); Division of Diabetes, Endocrinology and Metabolism, Department of Medicine, University of Minnesota, Minneapolis (Chow); Center for Endocrinology, Diabetes and Metabolism, Department of Pediatrics, Children’s Hospital Los Angeles and Keck School of Medicine of the University of
-
-October 27, 2023 10/13
 
 Southern California, Los Angeles (Vidmar).
 
@@ -209,8 +183,6 @@ Data Sharing Statement: See Supplement 3.
 8. Che T, Yan C, Tian D, Zhang X, Liu X, Wu Z. Time-restricted feeding improves blood glucose and insulin sensitivity in overweight patients with type 2 diabetes: a randomised controlled trial. Nutr Metab (Lond). 2021; 18(1):88. doi:10.1186/s12986-021-00613-9
 9. Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. A new predictive equation for resting energy expenditure in healthy individuals. Am J Clin Nutr. 1990;51(2):241-247. doi:10.1093/ajcn/51.2.241
 
-October 27, 2023 11/13
-
 10. Carter S, Clifton PM, Keogh JB. Effect of intermittent compared with continuous energy restricted diet on glycemic control in patients with type 2 diabetes: a randomized noninferiority trial. JAMA Netw Open. 2018;1(3): e180756. doi:10.1001/jamanetworkopen.2018.0756
 11. Grajower MM, Horne BD. Clinical management of intermittent fasting in patients with diabetes mellitus. Nutrients. 2019;11(4):873. doi:10.3390/nu11040873
 12. Mayer SB, Jeffreys AS, Olsen MK, McDuffie JR, Feinglos MN, Yancy WS Jr. Two diets with different haemoglobin A1c and antiglycaemic medication effects despite similar weight loss in type 2 diabetes. Diabetes Obes Metab. 2014;16(1):90-93. doi:10.1111/dom.12191
@@ -233,13 +205,9 @@ October 27, 2023 11/13
 
 SUPPLEMENT 1. Trial Protocol
 
-October 27, 2023 12/13
-
 SUPPLEMENT 2. eTable 1. Medication Use at Baseline and Month 6 eTable 2. Multiple Imputation Sensitivity Analysis Results eTable 3. Adverse Events During the Intervention eFigure 1. Experimental Design eFigure 2. Adherence to the Diet Interventions eFigure 3. Difficulty in Adhering to the Time-Restricted Eating vs Calorie Restriction Intervention
 
 SUPPLEMENT 3. Data Sharing Statement
-
-October 27, 2023 13/13
 
 ## Figures
 
@@ -827,7 +795,6 @@ October 27, 2023 13/13
 *Dietary Intake and Physical Activity Participant group, mean (SD)a TRE CR Control Variable Baseline 6 mo Baseline 6 mo Baseline 6 mo Daily eating window Energy intake, kcal/d 11 h 55 min (1 h 37 min) 1978 (582) 8 h 3 min (1 h 54 min)b 1665 (468)b 10 h 29 min (1 h 36 min) 1707 (319) 10 h 23 min (1 h…*
 
 ```
-JAMA Network Open | Nutrition, Obesity, and Exercise Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes
 Discussion
 Findings of this randomized clinical trial show that 8-hour TRE produced greater weight loss when
 compared with CR and a control condition. Despite the greater weight loss achieved by the TRE

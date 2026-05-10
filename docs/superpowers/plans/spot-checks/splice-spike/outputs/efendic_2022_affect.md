@@ -19,7 +19,6 @@ Affect is a crucial component of people’s decision-making (Kahneman, 2003, 201
 affect is often a much quicker, easier, and more efficient way to navigate the complexities of everyday decisionmaking (Damasio, 1994; Schwarz & Clore, 1983) and that affect informs many judgments and decisions (Albarracı´ n & Kumkale, 2003; Peters et al., 2006; Schwarz, 2012; Slovic et al., 2002; Wyer et al., 1999).
 Early studies of risk perception have shown that feelings of dread are major determinants of public perception and acceptance of risk for a wide range of hazards (Slovic, 1987). Focusing on this link, Finucane et al. (2000) proposed that people use an affect heuristic (AH) when making risk judgments. According to this view, people may use their affective response to a risk (e.g., ‘‘How do I feel about nuclear energy?’’) to infer how large they consider the risk to be. The argument is that: ‘‘Using an overall, readily available affective impression can be far easier—more
 1Maastricht University, School of Business and Economics, Department of Marketing and Supply Chain Management, the Netherlands 2Hong Kong Metropolitan University, Hong Kong 3The University of Hong Kong, Hong Kong *Contributed equally, joint first authors.
-Corresponding Author: Gilad Feldman, Department of Psychology, The University of Hong Kong, Pok Fo Lam Road, Hong Kong 999077. Email: gfeldman@hku.hk
 
 Table 1. Summary of the Predictions According to the Affect Heuristic (AH).
 

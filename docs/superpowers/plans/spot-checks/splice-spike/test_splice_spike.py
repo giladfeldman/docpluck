@@ -2756,3 +2756,386 @@ def test_banner_strip_drops_arxiv_banner_only_when_format_matches():
     out = _strip_document_header_banners(text)
     # "arXiv reference in metadata" doesn't match the strict banner regex.
     assert "arXiv reference in metadata" in out
+
+
+# ---------------------------------------------------------------------------
+# Iter-26 / Tier F5: TOC dot-leader strip
+# ---------------------------------------------------------------------------
+
+from splice_spike import _strip_toc_dot_leader_block
+
+
+def test_toc_strip_drops_paragraph_with_dot_leader():
+    """A paragraph containing dot-leader runs (``___``) near the doc top
+    is dropped (TOC entry)."""
+    text = (
+        "Title line\n"
+        "\n"
+        "Table of Contents\n"
+        "List of figures _________________ 3\n"
+        "List of tables __________________ 4\n"
+        "\n"
+        "## Real Body Section\n"
+        "\n"
+        "Body paragraph text.\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    assert "List of figures" not in out
+    assert "Table of Contents" not in out
+    assert "## Real Body Section" in out
+    assert "Body paragraph text." in out
+
+
+def test_toc_strip_drops_false_promoted_heading():
+    """A ``## Heading`` immediately followed by a TOC dot-leader paragraph
+    is itself dropped (it's a misparsed TOC entry, not a real section)."""
+    text = (
+        "Title line\n"
+        "\n"
+        "## Background\n"
+        "\n"
+        "_________________________________ 17\n"
+        "3. Measuring something ____________ 17\n"
+        "4. Research plan __________________ 18\n"
+        "\n"
+        "## Findings\n"
+        "\n"
+        "________________________________ 21\n"
+        "7.4 Replication ________________________ 21\n"
+        "\n"
+        "## Real Section\n"
+        "\n"
+        "Real body content here without any underscore runs at all.\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    # False headings dropped.
+    assert "## Background" not in out
+    assert "## Findings" not in out
+    # TOC entries dropped.
+    assert "Research plan" not in out
+    assert "Replication" not in out
+    # Real section preserved.
+    assert "## Real Section" in out
+    assert "Real body content here" in out
+
+
+def test_toc_strip_preserves_real_heading_followed_by_body():
+    """A ``## Background`` followed by REAL body prose (no dot-leader)
+    is preserved — only the TOC pattern triggers the false-heading drop."""
+    text = (
+        "## Background\n"
+        "\n"
+        "Real body intro paragraph with no underscores.\n"
+        "\n"
+        "Followup paragraph also fine.\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    assert "## Background" in out
+    assert "Real body intro paragraph" in out
+
+
+def test_toc_strip_only_in_first_100_lines():
+    """A paragraph with dot-leaders deep in the body (past line 100) is
+    NOT stripped — this prevents accidentally removing body content that
+    happens to mention long underscore runs."""
+    body = "\n".join([f"Body paragraph {i}." for i in range(50)])  # 50 lines
+    body += "\n" + ("\n".join([f"Para {i}\n" for i in range(60)]))  # more lines
+    text = (
+        "## Real Section\n"
+        "\n"
+        + body
+        + "\n\nDeep paragraph that has __________ 200 a fake leader inside.\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    # Deep paragraph preserved.
+    assert "fake leader inside" in out
+
+
+def test_toc_strip_drops_table_of_contents_label():
+    """The literal ``Table of Contents`` label is dropped even if alone
+    on its own paragraph."""
+    text = "Title\n\nTable of Contents\n\n## Body\n\nBody.\n"
+    out = _strip_toc_dot_leader_block(text)
+    assert "Table of Contents" not in out
+    assert "## Body" in out
+
+
+def test_toc_strip_drops_list_of_supplementary_figures_label():
+    """Generic 'List of Supplementary Figures/Tables' labels are dropped
+    when they appear as standalone paragraphs in the head zone."""
+    text = (
+        "Title\n"
+        "\n"
+        "List of Supplementary Tables\n"
+        "\n"
+        "## Body\n"
+        "\n"
+        "Body content.\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    assert "List of Supplementary Tables" not in out
+    assert "## Body" in out
+
+
+def test_toc_strip_no_underscores_returns_unchanged():
+    """If the input contains no underscore runs at all, return verbatim
+    (no spurious whitespace fiddling)."""
+    text = "Title\n\n## Abstract\n\nBody text.\n"
+    out = _strip_toc_dot_leader_block(text)
+    assert out == text
+
+
+def test_toc_strip_empty_input_safe():
+    assert _strip_toc_dot_leader_block("") == ""
+
+
+def test_toc_strip_idempotent():
+    text = (
+        "Title\n"
+        "\n"
+        "## Background\n"
+        "\n"
+        "________________ 17\n"
+        "3. Section ______ 17\n"
+        "\n"
+        "## Real\n"
+        "\n"
+        "Body.\n"
+    )
+    once = _strip_toc_dot_leader_block(text)
+    twice = _strip_toc_dot_leader_block(once)
+    assert once == twice
+
+
+def test_toc_strip_preserves_normal_underscores_in_body():
+    """Single or double underscores (variable names, italic markers)
+    are NOT triggered — only runs of 3+ underscores qualify as leader."""
+    text = (
+        "## Section\n"
+        "\n"
+        "We use the variable my_var_name for the analysis.\n"
+        "Italic text with single _underscore_ markers stays.\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    assert "my_var_name" in out
+    assert "_underscore_" in out
+    assert "## Section" in out
+
+
+def test_toc_strip_does_not_drop_real_body_heading_above_toc():
+    """If a real ``## Heading`` is followed by REAL body, then a TOC
+    paragraph, the heading is preserved (only the heading IMMEDIATELY
+    above the TOC paragraph is dropped)."""
+    text = (
+        "## Real Section\n"
+        "\n"
+        "Real body content with no leaders.\n"
+        "\n"
+        "Old TOC ____________________ 5 leaks here in the early head zone.\n"
+        "\n"
+        "## Body Continues\n"
+    )
+    out = _strip_toc_dot_leader_block(text)
+    # Real Section heading preserved (not adjacent to TOC).
+    assert "## Real Section" in out
+    assert "Real body content" in out
+    # TOC leak dropped.
+    assert "Old TOC" not in out
+    # Subsequent heading preserved.
+    assert "## Body Continues" in out
+
+
+# ---------------------------------------------------------------------------
+# Iter-27 / Tier F1 (cheap variant): page-footer line strip
+# ---------------------------------------------------------------------------
+
+from splice_spike import _strip_page_footer_lines
+
+
+def test_footer_strip_drops_bare_page_number():
+    """`Page 7` lines (bare page-N markers) are stripped wherever they
+    appear in the document (demography_1, jmf_1 pattern)."""
+    text = (
+        "Body sentence one.\n"
+        "Page 2\n"
+        "Body sentence two.\n"
+        "Page 27\n"
+        "Body sentence three.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Page 2" not in out
+    assert "Page 27" not in out
+    assert "Body sentence one." in out
+    assert "Body sentence two." in out
+    assert "Body sentence three." in out
+
+
+def test_footer_strip_drops_jama_date_pageofm():
+    """`October 27, 2023 1/13` JAMA page footer dropped."""
+    text = (
+        "Body line A.\n"
+        "October 27, 2023 1/13\n"
+        "Body line B.\n"
+        "December 19, 2023 5/12\n"
+        "Body line C.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "October 27, 2023 1/13" not in out
+    assert "December 19, 2023 5/12" not in out
+    assert "Body line A." in out
+    assert "Body line C." in out
+
+
+def test_footer_strip_drops_continued_marker():
+    """Bare `(continued)` / `(Continued)` page-break markers dropped."""
+    text = "First half.\n(continued)\nSecond half.\n(Continued)\nThird half.\n"
+    out = _strip_page_footer_lines(text)
+    assert "(continued)" not in out
+    assert "(Continued)" not in out
+    assert "First half." in out
+    assert "Second half." in out
+
+
+def test_footer_strip_drops_corresponding_author_line():
+    """Single line starting with `Corresponding Author:` (the page-bottom
+    footnote variant) dropped — a body sentence half above is preserved."""
+    text = (
+        "...lynch mobs do not usually count\n"
+        "aETH Zurich\n"
+        "Corresponding Author: Enzo Nussio, Center for Security Studies, ETH Zurich, ...\n"
+        "Email: enzo.nussio@sipo.gess.ethz.ch\n"
+        "\n"
+        "## Introduction\n"
+        "\n"
+        "on standing organizational structures...\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Corresponding Author:" not in out
+    assert "aETH Zurich" not in out
+    assert "Email: enzo.nussio@sipo.gess.ethz.ch" not in out
+    # Body halves preserved.
+    assert "lynch mobs do not usually count" in out
+    assert "## Introduction" in out
+    assert "on standing organizational" in out
+
+
+def test_footer_strip_drops_bare_email_line():
+    """A line that's just one or more email addresses is dropped."""
+    text = (
+        "Body.\n"
+        "author@example.com\n"
+        "More body.\n"
+        "first@uni.edu, second@uni.edu\n"
+        "Even more body.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "author@example.com" not in out
+    assert "first@uni.edu" not in out
+    assert "Body." in out
+
+
+def test_footer_strip_does_NOT_drop_email_inside_sentence():
+    """An email mentioned inside a longer sentence is preserved (the
+    pattern matches whole-line emails only)."""
+    text = "Please contact author@example.com for the dataset.\n"
+    out = _strip_page_footer_lines(text)
+    assert "author@example.com" in out
+
+
+def test_footer_strip_drops_jama_running_header():
+    """The JAMA citation running header (`JAMA Network Open. 2023;...`) and
+    category banner (`JAMA Network Open | Public Health ...`) dropped."""
+    text = (
+        "Body.\n"
+        "JAMA Network Open. 2023;6(10):e2339337. doi:10.1001/jamanetworkopen.2023.39337\n"
+        "JAMA Network Open | Nutrition, Obesity, and Exercise Effect of Time-Restricted Eating\n"
+        "More body.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "JAMA Network Open." not in out
+    assert "Body." in out
+
+
+def test_footer_strip_drops_open_access_compound_line():
+    """`Open Access. This is an open access article ... doi:... (Reprinted)`
+    compound footer dropped."""
+    text = (
+        "Body.\n"
+        "Open Access. This is an open access article distributed under the terms of the CC-BY-NC-ND License. JAMA Network Open. 2023;6(10):e2339337. doi:10.1001/jamanetworkopen.2023.39337 (Reprinted)\n"
+        "More body.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Open Access. This is an open access article" not in out
+    assert "Body." in out
+
+
+def test_footer_strip_drops_copyright_year_line():
+    """Standalone `© 2024 Some Publisher` line dropped."""
+    text = "Body.\n© 2024 Informa UK Limited, trading as Taylor & Francis Group\nMore body.\n"
+    out = _strip_page_footer_lines(text)
+    assert "Informa UK Limited" not in out
+    assert "Body." in out
+
+
+def test_footer_strip_drops_jama_visual_abstract_marker():
+    """`+ Visual Abstract + Supplemental content` JAMA sidebar dropped."""
+    text = "Body.\n+ Visual Abstract + Supplemental content\nMore body.\n"
+    out = _strip_page_footer_lines(text)
+    assert "Visual Abstract" not in out
+
+
+def test_footer_strip_drops_jama_author_affil_pointer():
+    """`Author affiliations and article information are listed at the end
+    of this article.` JAMA pointer dropped."""
+    text = (
+        "Body.\n"
+        "Author affiliations and article information are listed at the end of this article.\n"
+        "More body.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Author affiliations and article information" not in out
+
+
+def test_footer_strip_preserves_normal_body():
+    """A document with no footer-pattern lines is returned verbatim."""
+    text = "## Title\n\nBody text.\n\nMore body text.\n"
+    out = _strip_page_footer_lines(text)
+    assert out == text
+
+
+def test_footer_strip_idempotent():
+    text = (
+        "Body line.\n"
+        "Page 5\n"
+        "(continued)\n"
+        "Body continuation.\n"
+        "© 2024 Publisher\n"
+        "End body.\n"
+    )
+    once = _strip_page_footer_lines(text)
+    twice = _strip_page_footer_lines(once)
+    assert once == twice
+
+
+def test_footer_strip_empty_input_safe():
+    assert _strip_page_footer_lines("") == ""
+
+
+def test_footer_strip_drops_aETH_affiliation_marker():
+    """`aETH Zurich` footnote-anchor pattern (single lowercase letter +
+    institution acronym) dropped."""
+    text = "Body.\naETH Zurich\nbCambridge University\nMore body.\n"
+    out = _strip_page_footer_lines(text)
+    assert "aETH Zurich" not in out
+    # bCambridge University also matches the pattern.
+    assert "bCambridge University" not in out
+    assert "Body." in out
+
+
+def test_footer_strip_does_not_drop_real_capitalized_phrase():
+    """A real two-word capitalized phrase like `New York Times` does NOT
+    match the affiliation-marker pattern (no leading lowercase letter +
+    ALL-CAPS acronym)."""
+    text = "Body about New York Times article.\n"
+    out = _strip_page_footer_lines(text)
+    assert "New York Times article" in out

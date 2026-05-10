@@ -14,8 +14,6 @@ More than 100 countries around the globe have registered instances of lynching i
 
 (Goldstein 2003), akin to Thompson’s (1971) food riots and Scott’s (1976) peasant rebellions. Lynching can thus be classified as a form of political violence (Kalyvas 2019).
 Unlike more commonly studied actors of political violence like insurgents, terrorists, and militias, lynch mobs do not usually count
-aETH Zurich
-Corresponding Author: Enzo Nussio, Center for Security Studies, ETH Zurich, Haldeneggsteig 4, Zürich, 8092, Switzerland Email: enzo.nussio@sipo.gess.ethz.ch
 
 ## Introduction
 

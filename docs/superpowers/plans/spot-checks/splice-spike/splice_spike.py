@@ -2971,6 +2971,19 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # ``##`` heading). Targets the lines a reader sees first — biggest
     # perceived-quality win per line of code.
     out = _strip_document_header_banners(out)
+    # Iteration 26 (F5): strip TOC dot-leader entries near the top of the
+    # document. Catches papers (esp. supplementary-info documents) whose
+    # ToC has dot-leader page-number trails like
+    # ``Background ____________ 17`` and where individual TOC entries get
+    # promoted to false ``## Headings`` by the section detector.
+    out = _strip_toc_dot_leader_block(out)
+    # Iteration 27 (F1 cheap variant): strip page-footer LINES that
+    # pdftotext interleaves into the body when a sentence spans a page
+    # break. Each pattern matches a complete line and is matched against
+    # individual lines (not whole paragraphs) so a footer line embedded
+    # inside a multi-line paragraph is removed without touching the body
+    # text around it.
+    out = _strip_page_footer_lines(out)
     return out
 
 
@@ -3126,6 +3139,227 @@ def _strip_document_header_banners(text: str) -> str:
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     # Strip leading whitespace if the very first lines were all banners.
     cleaned = cleaned.lstrip("\n") if cleaned.startswith("\n") else cleaned
+    return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Iteration 26 (F5): TOC dot-leader strip
+# ---------------------------------------------------------------------------
+
+# A run of 3+ underscores indicates a dot-leader (PDF "..." filler chars
+# normalize to underscores in pdftotext output for some publishers).
+_TOC_DOT_LEADER_RE = re.compile(r"_{3,}")
+# A standalone TOC dot-leader (mostly underscores + optional page number).
+_PURE_TOC_LEADER_RE = re.compile(r"^\s*_{3,}\s*\d{0,4}\s*$")
+# Explicit TOC heading lines.
+_TOC_HEADING_RE = re.compile(
+    r"^\s*(?:Table\s+of\s+Contents|List\s+of\s+(?:Supplementary\s+)?(?:Figures?|Tables?))\s*$",
+    re.IGNORECASE,
+)
+
+
+def _strip_toc_dot_leader_block(text: str) -> str:
+    """Drop TOC paragraphs that use dot-leader page-number trails.
+
+    Iteration 26 (Tier F5 from TRIAGE_2026-05-10). Some papers (especially
+    "Supplementary Information" PDFs from Nature) emit their table of
+    contents using dot-leader fillers that pdftotext renders as runs of
+    ``___``. The result in the .md file is unreadable — a 50-line block of
+    ``Background ____________ 17`` style entries at the top, and worse,
+    individual TOC headings get PROMOTED to false ``## Background`` /
+    ``## Findings`` / ``## Results`` markdown headings by the section
+    detector, which then competes with the real body sections later.
+
+    What gets dropped:
+      - Any paragraph (in the first ~100 lines) that contains ``_{3,}``.
+      - Explicit TOC label lines: "Table of Contents", "List of
+        Supplementary Figures/Tables".
+      - A ``## Heading`` that is IMMEDIATELY followed by a TOC dot-leader
+        paragraph (these headings are misparsed TOC entries, not real
+        section markers).
+
+    Conservative scope:
+      - Only operates within the document head zone (cap at line 100).
+        TOCs always live near the top; this prevents accidentally
+        stripping a body paragraph that happens to mention a long
+        underscore run later in the file.
+      - A ``## Heading`` is dropped ONLY when its immediate next paragraph
+        is a TOC dot-leader paragraph. A real ``## Background`` followed
+        by body prose is preserved.
+    """
+    if not text:
+        return text
+    # Cheap early-out: if neither dot-leader runs nor explicit TOC label
+    # words appear in the head of the document, nothing to do.
+    head_zone = text[:8000]  # generous slice
+    if "_" not in head_zone and not re.search(
+        r"\b(?:Table\s+of\s+Contents|List\s+of\s+(?:Supplementary\s+)?(?:Figures?|Tables?))\b",
+        head_zone,
+        re.IGNORECASE,
+    ):
+        return text
+    parts = re.split(r"(\n\n+)", text)
+    n = len(parts)
+
+    # Compute a paragraph cap: drop only paragraphs whose first character
+    # is in the first 100 lines of the input.
+    cum_lines = 0
+    last_para_idx_in_zone = -1
+    for i in range(0, n, 2):
+        if cum_lines >= 100:
+            break
+        last_para_idx_in_zone = i
+        cum_lines += parts[i].count("\n") + 1
+        if i + 1 < n:
+            cum_lines += parts[i + 1].count("\n")
+
+    drop_idx: set[int] = set()
+    for i in range(0, last_para_idx_in_zone + 1, 2):
+        para = parts[i]
+        para_s = para.strip()
+        if not para_s:
+            continue
+        # TOC paragraph if it contains any dot-leader run OR is an
+        # explicit TOC label line.
+        is_toc = (
+            _TOC_DOT_LEADER_RE.search(para)
+            or _TOC_HEADING_RE.match(para_s)
+        )
+        if is_toc:
+            drop_idx.add(i)
+            # Also drop the immediately preceding ``## ...`` heading
+            # paragraph (false promoted TOC entry).
+            if i >= 2 and parts[i - 2].strip().startswith("## "):
+                drop_idx.add(i - 2)
+
+    if not drop_idx:
+        return text
+
+    # Reassemble: keep paragraphs not in drop_idx, joined with ``\n\n``.
+    # Paragraphs that originally had whitespace-only contents are kept
+    # only if they're outside the drop zone.
+    kept: list[str] = []
+    for i in range(0, n, 2):
+        if i in drop_idx:
+            continue
+        kept.append(parts[i])
+
+    # Strip empty leading/trailing paragraphs from the dropped zone, but
+    # preserve overall document spacing.
+    while kept and not kept[0].strip():
+        kept.pop(0)
+    cleaned = "\n\n".join(kept)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Iteration 27 (F1 cheap variant): page-footer line strip
+# ---------------------------------------------------------------------------
+
+# Each pattern matches a single COMPLETE line that is page-footer junk.
+# Matched against every line in the document (not just header zone).
+# Conservative: only patterns with a very specific shape are included;
+# anything ambiguous is left for a later iteration.
+_PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
+    # Bare page number: "Page 1", "Page 27".
+    re.compile(r"^Page\s+\d+\s*$"),
+    # Page-N-of-M with date prefix: "October 27, 2023 1/13".
+    re.compile(
+        r"^(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*20\d{2}\s+\d+/\d+\s*$"
+    ),
+    # Bare "(continued)" / "(Continued)" page-break marker.
+    re.compile(r"^\([Cc]ontinued\)\s*$"),
+    # Affiliation footnote markers like "aETH Zurich" (single lowercase
+    # letter prefix then ALL-CAPS institution acronym + words). Single line.
+    re.compile(r"^[a-z][A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*\s*$"),
+    # "Corresponding Author:" / "Corresponding author:" lines.
+    re.compile(r"^Corresponding\s+[Aa]uthor[s]?:.*$"),
+    # "Author for correspondence:" Royal Society style.
+    re.compile(r"^Author\s+for\s+correspondence:.*$", re.IGNORECASE),
+    # Email metadata lines.
+    re.compile(r"^E-?mail(?:s)?:\s*\S+@.+$", re.IGNORECASE),
+    re.compile(r"^Tel(?:\.|ephone)?:\s*\S.*$", re.IGNORECASE),
+    re.compile(r"^Fax:\s*\S.*$", re.IGNORECASE),
+    # Bare email line (one or more emails separated by whitespace/punct).
+    re.compile(
+        r"^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,6}(?:[\s,;]+[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,6})*\s*$"
+    ),
+    # JAMA running header: "JAMA Network Open. 2023;6(10):e2339337. doi:10.1001/...".
+    re.compile(
+        r"^JAMA\s+Network\s+Open\.\s+20\d{2};\d+\(\d+\):e\d+\.\s*doi:10\.\d+/.+$"
+    ),
+    # JAMA category banner: "JAMA Network Open | Public Health ...".
+    re.compile(r"^JAMA\s+Network\s+Open\s+\|\s+\S.*$"),
+    # "Open Access. This is an open access article ... doi:10.X/X (Reprinted)"
+    # (compound license + citation footer in one line).
+    re.compile(
+        r"^Open\s+Access\.\s+This is an open access article.*doi:10\.\d+/.+$"
+    ),
+    # Standalone copyright line "© 20YY ...".
+    re.compile(r"^©\s*20\d{2}\b.*$"),
+    re.compile(r"^\(c\)\s*20\d{2}\b.*$", re.IGNORECASE),
+    # "Author affiliations and article information are listed at the end
+    # of this article." — JAMA sidebar pointer.
+    re.compile(
+        r"^Author affiliations and article information are listed at the end of (?:this article|the article)\.?\s*$"
+    ),
+    # "+ Visual Abstract + Supplemental content" — JAMA sidebar.
+    re.compile(r"^\+\s*Visual Abstract.*Supplemental content\s*$"),
+]
+
+
+def _strip_page_footer_lines(text: str) -> str:
+    """Strip page-footer / running-header LINES anywhere in the document.
+
+    Iteration 27 (Tier F1 cheap variant from TRIAGE_2026-05-10). When a
+    body sentence spans a page boundary, pdftotext linearizes the page
+    footer text BETWEEN the two halves of the sentence. The result is a
+    .md paragraph that has body text → page-footer junk → body text.
+
+    Example (am_sociol_rev_3.md before iter-27)::
+
+        Unlike more commonly studied actors of political violence
+        like insurgents, terrorists, and militias, lynch mobs do not
+        usually count
+        aETH Zurich
+        Corresponding Author: Enzo Nussio, Center for Security Studies,
+        ETH Zurich, Haldeneggsteig 4, Zürich, 8092, Switzerland
+        Email: enzo.nussio@sipo.gess.ethz.ch
+
+    The footer block (3 lines) is interleaved INSIDE one paragraph, not
+    on a separate paragraph boundary. So we strip at LINE level, not at
+    paragraph level — each line is checked against the curated pattern
+    list and dropped if it matches.
+
+    Conservative rules:
+      - A line is dropped ONLY if it matches an EXPLICIT pattern in the
+        ``_PAGE_FOOTER_LINE_PATTERNS`` list. Anything else is preserved.
+      - This is a CHEAP variant of F1 — it removes the JUNK between
+        sentence halves but does not stitch the halves back together.
+        The reader sees the body sentence resume after a paragraph
+        break instead of after a page-footer block. The structural fix
+        for sentence-stitching at page boundaries is a separate
+        (C3-cost) iteration that needs page-bbox awareness.
+
+    Idempotent: running the pass twice yields the same output.
+    """
+    if not text:
+        return text
+    out_lines: list[str] = []
+    dropped_any = False
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped and any(
+            p.match(stripped) for p in _PAGE_FOOTER_LINE_PATTERNS
+        ):
+            dropped_any = True
+            continue
+        out_lines.append(line)
+    if not dropped_any:
+        return text
+    cleaned = "\n".join(out_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
 
 

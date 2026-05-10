@@ -7,8 +7,6 @@ Petri nets are an increasingly used modeling framework for the spread of disease
 INDEX TERMS Petri nets; differential equations; ODE; epidemiology; modeling; RRMSE; RMSE
 This work is licensed under a Creative Commons Attribution 4.0 License. For more information, see https://creativecommons.org/ licenses/by/4.0/ Corresponding author: Beckett Sterner (beckett.sterner@asu.edu). CONFLICT OF INTEREST The authors declare no conflict of interest.
 
-Page 2
-
 I. 
 
 ## INTRODUCTION
@@ -16,8 +14,6 @@ I.
 Petri nets (PNs) are a discrete event mathematical formalism that has become an increasingly popular modeling tool in epidemiology and other areas of the life sciences. Recent applications include models of Covid-19 spread within and across countries [1], [2], pertussis vaccination [3], social-ecological systems [4], rumor propagation in social networks [5], and the behavior of network motifs [6]. Key features of the Petri net formalism include the ability to construct modular, combinatorial models [6], [7], [8]; the ease of visualizing and interpreting Petri net models for those without a strong background in mathematics; and advances in software implementations that enable large-scale simulation including deterministic and stochastic behaviors [9], [10], [11], [12]. Furthermore, recent work has highlighted the importance of statistical sensitivity analysis and stochastic stability in epidemic models, reinforcing the need for rigorous comparison between modeling frameworks [13], [14]. Recent studies have also expanded the scope of Petri net modeling to capture the complex, multi-scale dynamics of immune responses within individuals [15], highlighting the versatility of Petri nets beyond traditional population-level compartmental models. However, some essential questions remain about how Petri net implementations of basic epidemiological models such as Susceptible-Infectious-Recovered (SIR) models relate to their standard formulations using Ordinary Differential Equations (ODEs) in epidemiology. While prior theoretical results indicate that Petri net SIR models can be made to converge asymptotically to the behavior of ODE and Stochastic Differential Equation (SDE) counterparts [16], there has been little systematic investigation of the numerical conditions under which this occurs using contemporary software tools. For example, the fitting and forecasting abilities of Petri nets compared to ODEs are not considered in [8], [17], [18], and [19]. Recent theoretical frameworks have established Petri nets as a rigorous foundation for deriving key epidemiological metrics like the basic reproduction number [20], while others have successfully applied Coloured Petri Nets to model stratified pandemics with complex spatial dynamics [2]. These advances underscore the urgency of validating the numerical fidelity of Petri nets against the ODE standards used in mainstream epidemiology. Understanding precisely when and how Petri net SIR models may diverge from ODE or SDE systems is critical for large-scale combinatorial modeling efforts [6], [7], [8], [21].
 In this work, we investigate the numerical convergence of two Petri net implementations to an ODE SIRS model. The second S in SIRS indicates that individuals may become susceptible again after recovering from an infection. We present a novel implementation of SIR-type models using variable arc weights for transitions in a Petri net model with deterministic time steps using the GPenSIM toolkit. We also analyze a Continuous-Time Markov Chain (CTMC) Petri net with stochastic time steps using the Spike toolkit. We evaluate the behaviors of these Petri net models to numerical solutions of ODE model using a standard MatLab differential equation solver.
 We find that both Petri net models can be made to converge to within 1% relative root mean squared error (RRMSE) of the ODE using appropriate rescaling of population size in the case of the CTMC Petri Model and a combination of population size and time step in the variable arc weight model. We also find that the choice of numerical rounding procedures
-
-Page 3
 
 has a significant impact on the RRMSE of the variable arc weight model when the infected population is close to zero. Our results, therefore, provide a valuable guide for the numerical simulation of SIR dynamics under biologically realistic parameter values.
 
@@ -69,8 +65,6 @@ Petri nets implemented by GPenSIM are fundamentally deterministic, and GPenSIM a
 
 2) SPIKE: Spike is a Petri net simulation framework designed to model dynamic systems using stochastic and deterministic approaches. It emphasizes reproducibility for stochastic simulations by using repeatable configuration files, denoted by the “.spc” file type [12]. Spike also supports diverse simulation methods for Continuous-Time Markov Chain (CTMC) processes, including Gillespie’s direct method for exact stochastic modeling [31], tau-leaping and delta-leaping for efficient approximations [32], and deterministic ODE
 
-Page 6
-
 solvers for large-scale systems. By definition, a CTMC describes a discrete set of system states where the future state of a system depends only on its current state (memoryless), and the time between transitions to another state follows an exponential distribution.
 Spike also has multiple notable features and capabilities [12]. Efficient simulation is one important feature, since Spike supports the automated execution of large sets of simulations, which can be run sequentially or in parallel. Spike also supports the simulation of stochastic, continuous, and hybrid Petri nets, accommodates colored and uncolored variants, and leverages its integration with the broader PetriNuts software framework. Spike is also designed to support various use cases, including benchmarking, adaptive model simulations, parameter scans, and model optimization. However, the underlying code of Spike is not publicly available, which limits one ability to inspect and debug the exact steps being executed by different functions.
 
@@ -92,8 +86,6 @@ can mitigate the effect this issue has on overall results as seen in Section III
 
 2) INTEGER ARC WEIGHTS: Petri net simulation software, as a whole, does not have a standardized method for rounding dynamic arc weights, also called repetition arc expressions in some software documentation [35], [36]. Using the standard PN approach, rounding the arc weight is necessary to have the arc weights be positive integers. If positive integer arc weights is difficult or unreasonable for the Petri net application, one could use continuous weights and token values. Unfortunately, the software options for building scalable, complex models with continuous value arc weights are minimal. Among dynamic arc weight PN software with discrete arc weight values, there is no standardized rounding system for the dynamic arc weights. With this in mind, the question arises about what rounding system should be used. The initial functions we will explore are the ceiling function (weights are rounded up to the nearest positive integer), floor function (weights are rounded down to the nearest positive integer), and standard rounding (weights are rounded
 
-Page 8
-
 down to the nearest positive integer when the tenths place is less than five and up to the nearest positive integer when the tenths place is greater than or equal to five).
 In addition, we propose another rounding method that utilizes standard rounding with the addition of carrying the residual of the rounding process to the next time step. In the next time step, the residual is added to the same arc’s weight before that weight is rounded again. This process is repeated each time the dynamic arc weight is recalculated. This process could be done with other rounding functions, like ceiling or floor functions, and we will compare this “standard + residual” method with many other possible rounding methods more rigorously in future work. These rounding methods will each likely have their own drawbacks in terms of computation time and memory, but our primary goal here is for the resulting PN to most closely mimic that of the reference ODE.
 
@@ -103,8 +95,6 @@ E. COMPARISON OF PETRI NET TO ODE MODELS
 We will compare the behaviors of both PN models to the ODE system under the full permitted range of the rate parameters β, γ, and δ. For simplicity, our code follows the notation for root mean square error used in MATLAB. We denote the observed data vector as A, where Ai is a single vector entry indexed by the time point i. The forecasted data is denoted as F, where Fi is a single forecasted vector entry indexed by the time point i. Finally, n represents the total number of time points being compared. The RRMSE formula is:
 
 where Ai is the ODE model data, and Fi is the forecasted PN model data in our application. We aim to understand how the RRMSE is affected by rescaling key model parameters, specifically the total population size N in both models and the base time step τ in
-
-Page 9
 
 the deterministic model specifically. These parameters are known to control the relative asymptotic convergence of PN, ODE, and SDE systems for the SIR model [16]. Since the deterministic, dynamic arc weight implementation of the SIRS model is novel in the PN literature, we give more attention to the details of its implementation than the Spike CTMC model. In particular, we will discuss different rounding strategies for the variable arc weights.
 
@@ -120,8 +110,6 @@ B. RESCALING OF BASE TIME STEP IN GPENSIM MODEL
 The PN model, as seen in Figure 3, with different PN time steps per unit time τ are compared to the ODE model Equations 1–3 with the same parameters values using RRMSE. The parameter grid chosen was a linearly spaced grid of size ten between [0,1] for parameters β and γ. These are the x-axis and y-axis, respectively, for all of the sub-figures in Figures 6–27. Then for δ there is a logarithmic spaced grid of size five between [0,1] going from the top to bottom row of Figures 6–27.
 When the τ = 1, in Figure 6 the RRMSE performance is relatively poor, especially for higher values of β, γ, and δ. This low τ value displays the problem of comparing a discrete versus a continuous time system with large swings in population happening instantly at the time step, not allowing the dynamics of the PN to come close to matching that of an ODE continuous system. These sharp dynamics combined with the additional firing mechanisms of PN means the RRMSE values produced are relatively large.
 
-Page 10
-
 Figure 7 shows the vast improvement in RRMSE with utilizing higher PN time steps per unit time. With this one change, the maximum RRMSE becomes approximately 4.3, and the visual improvement at extreme values is considerable.
 As τ increases from one to eighty, there is an overall reduction of RRMSE with each subsequent increase of the PN time steps per unit time, which can be more clearly seen in Figure 9. This can be seen for each run in Figures 6,7,8 and Figures 26,27 in the appendix.
 
@@ -136,8 +124,6 @@ When fitting parameters to a Petri net model using data and wanting to maintain 
 For Spike, we can not directly alter the τ value, but we can directly alter the initial population size. Given Spike’s relatively low computation time for the SPN, we were able to raise the population scalar to much higher values, starting at one and going up by order of magnitude each time. We stopped when we reached a level of less than 1% RRMSE across all parameter values for the direct and tau-leaping method for SPNs. Though Spike demonstrates significantly better computational efficiency relative to GPenSIM, we limited all SPN simulations in Spike to 500 trials. This ensures manageable computation times while maintaining the accuracy and statistical robustness needed for meaningful results.
 In Figures 16–18 we see the RRMSE drop as the population scalar increases, to a level where for all parameter values are less than 1% RRMSE with a population scalar of 100 for the direct method. Beyond a population scalar of 100, the regions of less than 0.1% RRMSE remain nearly identical when the population scalar is raised by an order of magnitude. This likely indicates that either an asymptotic convergence of the means is occurring or some other factor is limiting the RRMSE from decreasing further.
 
-Page 11
-
 We note that the computing demand for single runs of these simulations are low enough to run on a laptop and do not require a supercomputer cluster. However, when running large sets of parameters, with large population scalars and large τ values parallelization, a supercomputer, or both, will allow for the simulations to be run in a reasonable time. For Figures 10,14,19, and 24 the values were found while being run in MATLAB 2024b, using GPenSIM v. 10 software and Spike v1.6 respectively, on a computer with a 2.3 GHz 8-Core processor, with 64 GB of memory. These models were also run on the Arizona State University SOL supercomputer, where even when allocated four cores and 32 GB of memory, the models only had a maximum memory used value of 5.6 GB.
 
 IV. 
@@ -147,8 +133,6 @@ IV.
 Petri nets are increasingly used to model the dynamics of infectious disease spread, building on a deep literature of ODE models. However, few studies have examined the numerical equivalency of Petri net models to reference ODE systems, especially beyond the most basic SIR model. In this paper, we introduced a novel PN implementation of SIR-type models using a discrete-time, variable arc weight framework in the software package GPenSIM. We explored the numerical equivalency of this variable arc weight model to an SIRS ODE model, and we found that several choices in implementation are important for matching the ODE dynamics, including the rounding method used for non-integer arc weights and rescaling of the time step for large arc weight values. We also compared the behavior of a continuous-time Markov Chain PN using the software package Spike. For both types of PN, we found that rescaling the population size led to major improvements in the relative root mean square error comparing the PN trajectories to the reference ODE behavior. This indicates that PN models do not necessarily generate identical dynamics to their ODE counterparts, and that prior numerical studies are an important tool for ensuring similarity.
 Variable arc weight Petri nets using GPenSIM software represent a useful technical breakthrough in Petri net modeling by allowing dynamic adjustments to the arc weights based on real-time conditions or external state changes rather than static values. This numerical flexibility is complemented by recent theoretical advancements. For instance, Reckell et al. [20] demonstrated that the basic reproduction number R0 can be rigorously derived for Petri net models using a Next-Generation Matrix approach. Together, these findings ensure that Petri net models are grounded in the same fundamental epidemiological metrics as their ODE counterparts while offering distinct modeling advantages. GPenSIM’s ability to incorporate variable arc weights yields an additional PN modeling option beyond the CTMC framework. Furthermore, the flexibility of this framework extends beyond the SIRS model presented here. The modular nature of Petri nets allows for the straightforward addition of compartments, such as an Exposed (E) state for SEIRS models, or stratification by age and risk groups. As explored in Reckell et al. [20], this framework supports complex SEIR models, demonstrating that metrics like R0 remain derivable even with variable arc weights. This adaptability makes the numerical convergence findings presented here relevant for a broad class of compartmental epidemiological models.
 Our results demonstrate that parameter optimization is key to balancing accuracy and computational cost. As shown in Figure 15, the relationship between population scalars
-
-Page 12
 
 and time steps τ reveals a clear optimization surface where computational efficiency can be maximized while maintaining a low RRMSE. Furthermore, the convergence behavior detailed in Figures 20 and 25 for the Spike implementation highlights that while stochastic noise is present at lower populations, both the direct and tau-leaping methods consistently converge to the ODE solution as the population scalar increases. This validates the robustness of the approach across different simulation methodologies, even when initialized with parameters outside the primary grid search as seen in Figures 20 and 25.
 The demonstrated convergence has practical implications for modeling real-world disease networks, such as zoonotic spillover events or COVID-19 transmission in heterogeneous populations. In these scenarios, the ability of Petri nets to handle discrete events and individual-level stochasticity while maintaining numerical fidelity to population-level ODEs provides a robust tool for capturing dynamics that purely continuous models may miss.
@@ -164,8 +148,6 @@ Biographies
 TREVOR RECKELL received the B.S. degree in mathematics and the M.S. degree in applied mathematics from Arizona State University (ASU), Tempe, AZ, USA, in 2018 and 2020, respectively, where he is currently pursuing the Ph.D. degree in applied mathematics.
 He was an Undergraduate Researcher with the National Science Foundation (NSF), from May 2018 to August 2018, a Graduate Research Consultant, in May 2021, and has been a Graduate Research Associate with the School of Life Sciences, ASU, under the National
 
-Page 13
-
 Institute of Health (NIH) Grant, since August 2023. His research interests largely revolve around mathematical modeling, bio-mathematics, and differential equations.
 
 BRIGHT KWAKU MANU received the B.Ed. degree in mathematics from the University of Cape Coast, Cape Coast, Ghana, in 2018, and the M.S. degree in mathematical science from East Tennessee State University (ETSU), Johnson City, TN, USA, in 2023. He is currently pursuing the Ph.D. degree in data science, analytics, and engineering with Arizona State University, Tempe, AZ, USA.
@@ -178,8 +160,6 @@ Dr. Sterner was a recipient of many notable awards, including but not limited to
 
 PETAR JEVTIĆ received the Dipl.-Ing. degree in computer science and engineering from the University of Belgrade, Serbia, in 2004, the joint M.S. degree in economics from the University of Belgrade and HEC Paris, in 2006, and the Ph.D. degree in economics with a specialization in statistics and applied mathematics from the University of Turin, Italy, in 2013.
 
-Page 14
-
 From 2013 to 2014, he was a Postdoctoral Fellow with the Department of Mathematics and Statistics, McMaster University, Canada, where he later held a faculty position as an Assistant Professor, from 2014 to 2017. He joined the School of Mathematics and Statistical Sciences, Arizona State University, in 2017, as an Assistant Professor, and has been a tenured Associate Professor, since 2023. He is currently the author of more than 20 peer-reviewed articles and two book chapters. His research focuses on actuarial science, risk modeling, and mathematical finance, with applications in longevity risk, cyber risk, autonomous systems, and climate-induced uncertainty.
 
 Dr. Jevtić has received several distinguished awards and research grants, including the National Science Foundation (NSF) Grant, in 2021, for foundational work in cyber risk modeling, the National Institutes of Health (NIH) R01 Grant, in 2023, for zoonotic disease forecasting using spatial Petri nets, two Department of Homeland Security (CINA) Grants focused on crime and cyber risk, multiple society of actuaries research grants, and a grant from the Casualty Actuarial Society supporting projects in risk and insurance.
@@ -190,8 +170,6 @@ Dr. Davidrajuh was a recipient of several notable awards, including the Best Pap
 
 V.: SUPPLEMENTARY INDEX
 The Supplementary or Appendix section (Figure 26–37) shows additional plots from our simulations including τ runs in GPENSIM, rounding methods in GPENSIM, pop scalar/τ runs in GPENSIM, spike simulations for Layout 1 and 2 and spike simulations with population scalars.
-
-Page 15
 
 A. ADDITIONAL τ RUNS IN GPENSIM
 Figures 26 and 27 are additional runs of GPenSim with different τ values of 40 and 80 respectively (population scalar remains 1).
@@ -217,8 +195,6 @@ Figures 36 and 37 show Direct and Tau leaping method within Spike with populatio
 [8]. Libkind S, Baas A, Halter M, Patterson E, and Fairbanks JP, “An algebraic framework for structured epidemic modelling,” Phil. Trans. Roy. Soc. A: Math., Phys. Eng. Sci, vol. 380, no. 2233, Oct. 2022, Art. no. 20210309.
 [9]. Davidrajuh R, Modeling Discrete-Event Systems With GPenSIM. Cham, Switzerland: Springer, 2018.
 
-Page 16
-
 [10]. Davidrajuh R, Petri Nets for Modeling of Large Discrete Systems. Cham, Switzerland: Springer, 2021.
 [11]. Davidrajuh R, Colored Petri Nets for Modeling of Discrete Systems: A Practical Approach With GPenSIM. Cham, Switzerland: Springer, 2023.
 [12]. Chodak J, “Spike—A tool for reproducible simulation experiments,” Ph.D. dissertation, Dept. Comput. Sci, BTU Cottbus-Senftenberg, Senftenberg, Germany, 2021.
@@ -242,163 +218,85 @@ Page 16
 [30]. Thong WJ and Ameedeen MA, “A survey of Petri net tools,” in Proc. 1st Int. Conf. Commun. Comput. Eng. Adv. Comput. Commun. Eng. Technol Cham, Switzerland: Springer, 2014, pp. 537–551.
 [31]. Gillespie DT, “Exact stochastic simulation of coupled chemical reactions,” J. Phys. Chem, vol. 81, no. 25, pp. 2340–2361, Dec. 1977.
 
-Page 17
-
 [32]. Rohr C, “Discrete-time leap method for stochastic simulation,” Fundamenta Informaticae, vol. 160, nos. 1–2, pp. 181–198, Apr. 2018.
 [33]. Segovia C, “Petri nets in epidemiology,” 2022, arXiv:2206.03269.
 [34]. Baez JC and Biamonte J, “Quantum techniques for stochastic mechanics,” 2012, arXiv:1209.3632.
 [35]. Melberg R and Davidrajuh R, “Dynamic arc weight in Petri nets,” in Proc. IASTED Int. Conf. Appl. Simulation Modelling (ASM), vol. 682, 2009, pp. 83–89.
 [36]. Liu F and Heiner M, “Colored Petri nets to model and simulate biological systems,” Recent Adv. Petri Nets Concurrency, vol. 827, pp. 71–85, Jun. 2010.
 
-Page 18
-
 FIGURE 1. Petri nets model formalism elements.
-
-Page 19
 
 FIGURE 2. Continuous-time, Markov Chain SIRS model with stochastic firing times and fixed arc weights, as implemented in Spike.
 
-Page 20
-
 FIGURE 3. Discrete-time, deterministic SIRS model using fixed time steps and variable arc weights, as implemented in GPenSIM.
-
-Page 21
 
 FIGURE 4. Two options for addressing arcs that become disabled in the deterministic PN model in biologically implausible ways. In (a), this can be achieved with a simple “if else” logic statement. In (b), an additional transition needs to be installed.
 
-Page 22
-
 FIGURE 5. Comparison of rounding method performance on simulated data. Left column has β = 1, γ = 1, δ = 1. Right column has β = 0.05, γ = 0.05, δ = 0.05. Susceptible, infected, and recovered populations are shown on top, middle, and bottom rows, respectively. The legend applies to all figures. All rounding method comparisons were conducted at a time step of 20 PN time steps per unit time per 1 ODE time interval.
-
-Page 23
 
 FIGURE 6. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 24
-
 FIGURE 7. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 20. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
-
-Page 25
 
 FIGURE 8. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 60. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1 %, and dark green is RRMSE ≤ 0.1%.
 
-Page 26
-
 FIGURE 9. Mean RRMSE in percentage across parameter ranges of γ range of [0,1] with 10 linearly spaced points, β range of [0,1] with 10 linearly spaced points, and δ range of [0,1] with 5 logarithmically spaced points.
-
-Page 27
 
 FIGURE 10. Mean computation time for one dynamic arc weight PN model run in GPenSIM for various times steps as seen in Figures 6, 7, 8, 26, and 27.
 
-Page 28
-
 FIGURE 11. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 60. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
-
-Page 29
 
 FIGURE 12. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 60. Note that light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
 
-Page 30
-
 FIGURE 13. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 60. Note that light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
-
-Page 31
 
 FIGURE 14. Mean computation time for one dynamic arc weight PN model run in GPenSIM for increasing population scalars as seen in Figures 8,11,12, and 13.
 
-Page 32
-
 FIGURE 15. RRMSE percentage for a fixed parameter set β = 0.1, γ = 0.5, δ = 0.001 with population scalar on the y-axis and time steps τ on the x-axis. Note that light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
-
-Page 33
 
 FIGURE 16. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 34
-
 FIGURE 17. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 35
 
 FIGURE 18. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 36
-
 FIGURE 19. Mean computation time for one dynamic arc weight PN model run in Spike using the Direct method for increasing population scalars as seen in Figures 16–18.
-
-Page 37
 
 FIGURE 20. Mean RRMSE in percentage for selected parameters values, γ = 0.5320, β = 0.0500, and δ = 0.0025. These values were not included in the parameter grid used in the main experiment.
 
-Page 38
-
 FIGURE 21. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 39
 
 FIGURE 22. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 40
-
 FIGURE 23. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 41
 
 FIGURE 24. Mean computation time for one dynamic arc weight PN model run in Spike using the tauLeaping method for increasing population scalars as seen in Figures 21–23.
 
-Page 42
-
 FIGURE 25. Mean RRMSE in percentage for selected parameters values, γ = 0.5320, β = 0.0500, and δ = 0.0025. These values were not included in the parameter grid used in the main experiment.
-
-Page 43
 
 FIGURE 26. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 40. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
 
-Page 44
-
 FIGURE 27. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 80. Note that yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ 0.1%.
-
-Page 45
 
 FIGURE 28. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 46
-
 FIGURE 29. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 47
 
 FIGURE 30. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 48
-
 FIGURE 31. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 49
 
 FIGURE 32. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 50
-
 FIGURE 33. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 51
 
 FIGURE 34. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 52
-
 FIGURE 35. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. PN Time Step Per Unit of Time parameter τ = 1. Note that red is RRMSE ≤ 44% (43.75% being the max observed RRMSE across all simulations), dark orange is RRMSE ≤ 20%, light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 53
 
 FIGURE 36. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
 
-Page 54
-
 FIGURE 37. RRMSE percentage across parameter ranges of [0, 1] for each respective parameter with γ the y-axis of each subfigure, β the x-axis of each subfigure, and δ set at a different fixed value for each subfigure. Note that light orange is RRMSE ≤ 10%, yellow is RRMSE ≤ 5%, light green is RRMSE ≤ 1%, and dark green is RRMSE ≤ .1%.
-
-Page 55
 
 TABLE 1. This table provides reference for ODE and PN parameters and initial conditions. These initial populations levels can be scaled as explained in Section III-C.
 

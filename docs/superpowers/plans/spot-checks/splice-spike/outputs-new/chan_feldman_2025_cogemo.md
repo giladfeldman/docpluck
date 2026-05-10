@@ -19,7 +19,6 @@ ARTICLE HISTORY Received 8 November 2023 Revised 25 June 2024 Accepted 18 July 2
 forgiveness; empathy; motivational change; registered report; replication
 
 CONTACT Gilad Feldman gfeldman@hku.hk 627 Jockey Club Tower, University of Hong Kong, Pokfulam Road, Hong Kong SAR Supplemental data for this article can be accessed online at https://doi.org/10.1080/02699931.2024.2434156.
-© 2024 Informa UK Limited, trading as Taylor & Francis Group
 
 ## Theory
 
