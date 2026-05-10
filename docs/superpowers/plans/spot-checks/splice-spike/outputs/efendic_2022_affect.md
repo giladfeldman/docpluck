@@ -114,6 +114,25 @@ manipulation check (see Figure 2 and Tables S41–S44 for detailed statistics).
 Negative Relationship Between Risks and Benefits. To test whether we observe a negative relationship between risks and benefits, we looked at the effects of the manipulated attribute on the nonmanipulated attribute. Specifically, we regressed change in ratings of nonmanipulated attributes (DV) on Direction, Manipulated Attribute, and their interaction, adjusting for covariates at Level 1 (Pre-rating manipulated attribute; and three-way interaction between pre-rating non-manipulated attribute, Direction, and Manipulated Attribute) and Level 2 (i.e., Technology type and participant’s ID). Table 3 summarizes these results (see Table S20–S24 in the supplementary material for step-bystep regression results and model comparisons).
 The main effect of direction supports the original finding of the negative relationship. In addition, we find that the directionality of pre- and post-treatment changes in the non-manipulated attribute was consistent with the predicted inverse relationship, except in the Low-benefit condition (see Figure 3 and Tables S41–S44 for detailed statistics).
 
+### Table 2
+*Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
+
+```
+Predictors
+DV: Change in non-manipulated attribute
+B
+SE
+95% CI
+Intercept
+Pre-rating manipulated attribute (PMA)
+Direction (high vs. low)
+Manipulated attribute (risk vs. benefit)
+Direction 3 manipulated attribute
+PMA 3direction
+PMA 3 manipulated attribute
+PMA 3 direction 3 manipulated attribute
+```
+
 [20.21, 0.04] [21.15, 21.03] [2.42, 2.69] [20.40, 20.13] [0.22, 0.75] [20.22, 0.02] [20.11, 0.14] [20.08, 0.40]
 
 Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.
@@ -476,166 +495,6 @@ Handling Editor: Lissa Libby
 
 
 ## Tables (unlocated in body)
-
-### Table 2
-*Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute as the DV.*
-
-<table>
-  <thead>
-    <tr>
-      <th>1178 Social Psychological and Personality Science 13(7)</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Table 2. Estimated Fixed-Effects Coefficients of the Mixed-Effects Regression Model With Change in the Manipulated Attribute</td>
-    </tr>
-    <tr>
-      <td>as the DV.</td>
-    </tr>
-    <tr>
-      <td>Predictors DV: Change in non-manipulated attribute</td>
-    </tr>
-    <tr>
-      <td>B SE 95% CI p</td>
-    </tr>
-    <tr>
-      <td>Intercept 20.09 0.06 [20.21, 0.04] .185</td>
-    </tr>
-    <tr>
-      <td>Pre-rating manipulated attribute (PMA) 21.09 0.03 [21.15, 21.03] \.001</td>
-    </tr>
-    <tr>
-      <td>Direction (high vs. low) 2.56 0.07 [2.42, 2.69] \.001</td>
-    </tr>
-    <tr>
-      <td>Manipulated attribute (risk vs. benefit) 20.27 0.07 [20.40, 20.13] \.001</td>
-    </tr>
-    <tr>
-      <td>Direction 3 manipulated attribute 0.49 0.14 [0.22, 0.75] \.001</td>
-    </tr>
-    <tr>
-      <td>PMA 3direction 20.10 0.06 [20.22, 0.02] .109</td>
-    </tr>
-    <tr>
-      <td>PMA 3 manipulated attribute 0.01 0.06 [20.11, 0.14] .819</td>
-    </tr>
-    <tr>
-      <td>PMA 3 direction 3 manipulated attribute 0.16 0.12 [20.08, 0.40] .199</td>
-    </tr>
-    <tr>
-      <td>Note. Variables were coded as follows—direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk. CI = confidence interval.</td>
-    </tr>
-    <tr>
-      <td>Exploratory Analysis: Mediation Effects. We also tested whether</td>
-    </tr>
-    <tr>
-      <td>the effect of the experimental manipulation on change in</td>
-    </tr>
-    <tr>
-      <td>the non-manipulated attributes was mediated by the</td>
-    </tr>
-    <tr>
-      <td>changes in the manipulated attribute as the analytic rea-soning would suggest. To do this, we conducted a multile-vel mediation analysis (this analysis was not part of the</td>
-    </tr>
-    <tr>
-      <td>pre-registration). Bayesian estimation of the multilevel</td>
-    </tr>
-    <tr>
-      <td>mediation model was performed using the bmlm R package</td>
-    </tr>
-    <tr>
-      <td>(Vuorre &amp; Bolger, 2018). Because our experimental design</td>
-    </tr>
-    <tr>
-      <td>involved two directions (High vs. Low), we conducted two</td>
-    </tr>
-    <tr>
-      <td>independent mediation analyses that looked at the</td>
-    </tr>
-    <tr>
-      <td>responses within High and Low separately. Indeed, both</td>
-    </tr>
-    <tr>
-      <td>sets of mediation analysis show a significant indirect</td>
-    </tr>
-    <tr>
-      <td>effect of manipulation on non-manipulated attribute rating</td>
-    </tr>
-    <tr>
-      <td>through manipulated attribute rating (High only media-tion: Mposterior = 20.54, SD=0.04, CI = [20.61, 20.47];</td>
-    </tr>
-    <tr>
-      <td>Figure 2. Distribution of Ratings on Change in Manipulated SD=0.04, CI= Low only mediation: Mposterior=0.55,</td>
-    </tr>
-    <tr>
-      <td>Attribute as DV by Experimental Conditions. [0.48, 0.62]). For details results see Table S25–S26 in the</td>
-    </tr>
-    <tr>
-      <td>Note. Figure includes violin plots displaying the distribution of responses,</td>
-    </tr>
-    <tr>
-      <td>supplementary material.</td>
-    </tr>
-    <tr>
-      <td>boxplots displaying the median, first, and third quartiles, while the mean value</td>
-    </tr>
-    <tr>
-      <td>is identified by the red circle.</td>
-    </tr>
-    <tr>
-      <td>Extensions</td>
-    </tr>
-    <tr>
-      <td>Naturally Occurring Incidental Mood and the Negative Relationship Specifically, the negative relationship was stronger among</td>
-    </tr>
-    <tr>
-      <td>Between Risks and Benefits. We conducted an analysis where participants who reported higher incidental pleasure in</td>
-    </tr>
-    <tr>
-      <td>the change in ratings of manipulated attributes, level of</td>
-    </tr>
-    <tr>
-      <td>comparison to participants who reported lower incidental</td>
-    </tr>
-    <tr>
-      <td>pleasure, level of arousal, and their interaction were set as</td>
-    </tr>
-    <tr>
-      <td>pleasure.</td>
-    </tr>
-    <tr>
-      <td>predictors of change in the ratings of the non-manipulated</td>
-    </tr>
-    <tr>
-      <td>attributes. Table 4 and Figure 4 summarize the results. As</td>
-    </tr>
-    <tr>
-      <td>a representation of the negative relationship between risks Risk/Benefit Strength. We also examined whether there was a</td>
-    </tr>
-    <tr>
-      <td>stronger negative relationship when risks, as opposed to and benefits, we looked at predicting change in non-benefits were manipulated and the extent to which it may manipulated attribute with change in manipulated attri-depend on the manipulated conditions. For the analysis, bute. Indeed, a negative correlation between these two vari-similar to above, we again used the change in ratings of ables represents the negative relationship. We decided to</td>
-    </tr>
-    <tr>
-      <td>manipulated attributes, Manipulated Attribute (Risk vs. use this (rather than an interaction between the dummy</td>
-    </tr>
-    <tr>
-      <td>Benefit), Direction, and their interaction as predictors of coded direction and manipulated attribute), as it is easier</td>
-    </tr>
-    <tr>
-      <td>change in the ratings of the non-manipulated attributes. to represent and interpret a potential two-way interaction</td>
-    </tr>
-    <tr>
-      <td>Table 5 and Figure 5 summarize the results. with pleasure or arousal.</td>
-    </tr>
-    <tr>
-      <td>The interaction between manipulated attribute and We found some support that the negative relationship is</td>
-    </tr>
-    <tr>
-      <td>CMA (change in manipulated attribute) indicates that the moderated by incidental pleasure (see Figure 4).</td>
-    </tr>
-  </tbody>
-</table>
 
 ### Table 5
 *Estimated Fixed-Effects Coefficients From the Mixed-Effects Regression Model Looking at Moderation of the Negative Relationship by Risks/Benefits.*

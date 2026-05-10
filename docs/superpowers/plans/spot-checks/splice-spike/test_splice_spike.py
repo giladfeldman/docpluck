@@ -609,7 +609,92 @@ def test_drop_caption_empty_grid_returns_empty():
     assert _drop_caption_leading_rows([], "Table 1", "caption") == []
 
 
-from splice_spike import _wrap_table_fragments
+from splice_spike import (
+    _wrap_table_fragments,
+    _is_spurious_single_column_grid,
+    _render_grid_as_code_block,
+    _format_table_md,
+)
+
+
+def test_spurious_1col_detector_flags_long_prose_run():
+    """A grid with 5+ rows where each row has only one populated cell is
+    almost certainly prose misclassified as a table."""
+    grid = [
+        ["Page header line"],
+        ["Table caption echo"],
+        ["Body paragraph A"],
+        ["Body paragraph B"],
+        ["Body paragraph C"],
+    ]
+    assert _is_spurious_single_column_grid(grid) is True
+
+
+def test_spurious_1col_detector_passes_real_2col_table():
+    """A real 2-column table must NOT be flagged."""
+    grid = [
+        ["Header 1", "Header 2"],
+        ["A", "B"],
+        ["C", "D"],
+        ["E", "F"],
+        ["G", "H"],
+    ]
+    assert _is_spurious_single_column_grid(grid) is False
+
+
+def test_spurious_1col_detector_passes_short_1col_grid():
+    """A short 1-column grid (e.g., 3 rows) might be a legitimate small list,
+    so don't downgrade it."""
+    grid = [["Item A"], ["Item B"], ["Item C"]]
+    assert _is_spurious_single_column_grid(grid) is False
+
+
+def test_spurious_1col_detector_passes_grid_with_some_multicol_rows():
+    """A grid where AT LEAST one row has 2+ populated cells is a real table
+    — the 1-col rows are likely just sparse cells."""
+    grid = [
+        ["Header 1", "Header 2"],
+        ["Sparse row"],
+        ["Sparse row 2"],
+        ["Sparse row 3"],
+        ["Sparse row 4"],
+    ]
+    assert _is_spurious_single_column_grid(grid) is False
+
+
+def test_render_grid_as_code_block_joins_cells_per_row():
+    grid = [
+        ["First line of prose"],
+        ["Second line of prose"],
+        ["", "Third line", ""],  # multi-cell row joined with spaces
+    ]
+    out = _render_grid_as_code_block(grid)
+    assert out.startswith("```\n")
+    assert out.endswith("\n```")
+    assert "First line of prose" in out
+    assert "Second line of prose" in out
+    assert "Third line" in out
+
+
+def test_format_table_md_demotes_spurious_1col_to_code_block():
+    """End-to-end: a fake 1-column "table" of prose renders as a code block,
+    not as ``<table>``."""
+    fake_table = {
+        "label": "Table 5",
+        "caption": "Classification of the replication.",
+        "cells": [
+            {"r": 0, "c": 0, "text": "Page header"},
+            {"r": 1, "c": 0, "text": "Table 5: Classification of the replication."},
+            {"r": 2, "c": 0, "text": "Design facet Replication"},
+            {"r": 3, "c": 0, "text": "IV operationalization Same"},
+            {"r": 4, "c": 0, "text": "DV operationalization Same"},
+        ],
+    }
+    out = _format_table_md(fake_table)
+    assert "<table>" not in out
+    assert "```" in out
+    assert "### Table 5" in out
+    assert "IV operationalization Same" in out
 
 
 def test_wrap_fragments_rescues_note_lines_from_uncaptioned_run():

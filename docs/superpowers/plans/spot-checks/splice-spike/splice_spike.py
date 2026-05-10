@@ -890,6 +890,42 @@ def _drop_caption_leading_rows(
     return grid
 
 
+def _is_spurious_single_column_grid(grid: list[list[str]]) -> bool:
+    """A grid is "spurious 1-column" when every populated row has exactly one
+    non-empty cell AND there are ≥ 4 such rows. Camelot/pdfplumber sometimes
+    misclassify a stretch of body prose (page header + caption echo + body
+    paragraphs) as a 1-column "table" — rendering them as ``<table>`` lies
+    about the structure to the reader. Check the populated-cell count, not the
+    grid width: a 5-column grid with all content stuffed into column 0 is
+    just as spurious as a literal 1-column grid.
+    """
+    populated_rows = 0
+    for row in grid:
+        non_empty = sum(1 for cell in row if cell and cell.strip())
+        if non_empty == 0:
+            continue
+        if non_empty >= 2:
+            return False  # at least one row has multi-column content
+        populated_rows += 1
+    return populated_rows >= 4
+
+
+def _render_grid_as_code_block(grid: list[list[str]]) -> str:
+    """Emit a 1-column grid as a fenced code block, joining each row's
+    non-empty cells with single spaces. Used as a fallback for grids whose
+    "tabular" structure is spurious (see ``_is_spurious_single_column_grid``).
+    """
+    lines: list[str] = []
+    for row in grid:
+        text_cells = [cell.strip() for cell in row if cell and cell.strip()]
+        if not text_cells:
+            continue
+        lines.append(" ".join(text_cells))
+    if not lines:
+        return ""
+    return "```\n" + "\n".join(lines) + "\n```"
+
+
 def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
     """Render a docpluck Table as a self-contained markdown block.
 
@@ -899,7 +935,10 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
       3. Raw text in a fenced code block (last-resort fallback if Camelot fails).
 
     Before rendering, leading caption-fragment / label / page-number rows are
-    stripped from the grid via ``_drop_caption_leading_rows``.
+    stripped from the grid via ``_drop_caption_leading_rows``. If the resulting
+    grid is a "spurious 1-column" run of prose (≥ 4 rows, no row has >1
+    populated cell), render as a code block rather than ``<table>`` —
+    pretending such content is tabular misleads the reader.
     """
     label = table.get("label") or "Table"
     caption = table.get("caption") or ""
@@ -920,6 +959,11 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
             grid[c["r"]][c["c"]] = c["text"]
         grid = _drop_caption_leading_rows(grid, label, caption)
         if len(grid) >= 2:
+            if _is_spurious_single_column_grid(grid):
+                code = _render_grid_as_code_block(grid)
+                if code:
+                    block_parts.append(code)
+                return "\n".join(block_parts)
             block_parts.append(pdfplumber_table_to_markdown(grid).rstrip("\n"))
             return "\n".join(block_parts)
 
@@ -929,6 +973,11 @@ def _format_table_md(table: dict, pdf_path: str | None = None) -> str:
         if cam_rows:
             cam_rows = _drop_caption_leading_rows(cam_rows, label, caption)
             if len(cam_rows) >= 2:
+                if _is_spurious_single_column_grid(cam_rows):
+                    code = _render_grid_as_code_block(cam_rows)
+                    if code:
+                        block_parts.append(code)
+                    return "\n".join(block_parts)
                 block_parts.append(pdfplumber_table_to_markdown(cam_rows).rstrip("\n"))
                 return "\n".join(block_parts)
 

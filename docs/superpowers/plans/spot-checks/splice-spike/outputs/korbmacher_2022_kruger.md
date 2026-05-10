@@ -657,6 +657,24 @@ and other’s absolute ability, were r(1918) = 0.50 (95% CI [0.46, 0.53]); and b
 However, when using a mixed-eﬀects model with random intercepts at the level of participants to explain comparative ability, positive changes in own ability explained positive changes in comparative ability and the relationship between others’ and comparative ability being the opposite (Table 9). The ﬁndings from both replicated and the new analyses present strong support for H1.
 averaging the 8 domains for each participant (row-wise), resulting in 240 rows. P-values for vector-compiled scores correlations are not provided as those do not account for repeated responses of the same person.
 
+### Table 9
+*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability.*
+
+```
+Predictors
+B
+S.E.
+CI
+p
+(Intercept) Own Ability Others’ Ability
+12.56 7.18 –0.42
+[9.95, 15.18]
+< 0.001
+[6.86, 7.50]
+< 0.001
+[–0.84, –0.01]
+```
+
 Note. The table presents the ﬁxed-eﬀects coeﬃcients with all the model predictors. See supplementary section “Mixed Models” for step-wise regression results.
 
 3.2.3 H2: Relationship between comparative ability, domain diﬃculty, and desirability.
@@ -1570,79 +1588,17 @@ sonality and Social Psychology, 39, 806–820. http://dx.doi.org/10.1037/0022-35
 ### Table 5
 *Classiﬁcation of the replication, based on LeBel et al. (2018).*
 
-<table>
-  <thead>
-    <tr>
-      <th>Judgment and Decision Making, Vol. 17, No. 1, January 2022 Above and below average</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Table 5: Classiﬁcation of the replication, based on LeBel et al. (2018).</td>
-    </tr>
-    <tr>
-      <td>Design facet Replication Details of deviation</td>
-    </tr>
-    <tr>
-      <td>IV opera- Same</td>
-    </tr>
-    <tr>
-      <td>tionalization</td>
-    </tr>
-    <tr>
-      <td>DV opera- Same</td>
-    </tr>
-    <tr>
-      <td>tionalization</td>
-    </tr>
-    <tr>
-      <td>IV1 ability domains is changed from one condition of 4 easy IV stimuli Similar, with</td>
-    </tr>
-    <tr>
-      <td>and 4 diﬃcult abilities, to 3 conditions of the replication an added</td>
-    </tr>
-    <tr>
-      <td>group, the easy domain group, and the diﬃcult domain extension</td>
-    </tr>
-    <tr>
-      <td>group. Participants were presented with either the original</td>
-    </tr>
-  </tbody>
-</table>
+```
+Judgment and Decision Making, Vol. 17, No. 1, January 2022 Above and below average
+Table 5: Classiﬁcation of the replication, based on LeBel et al. (2018).
+Design facet Replication Details of deviation
+IV opera- Same
+tionalization
+DV opera- Same
+tionalization
+IV1 ability domains is changed from one condition of 4 easy IV stimuli Similar, with
+and 4 diﬃcult abilities, to 3 conditions of the replication an added
+group, the easy domain group, and the diﬃcult domain extension
+group. Participants were presented with either the original
+```
 
-### Table 9
-*Estimated ﬁxed-eﬀects coeﬃcients of the mixed-eﬀects regression model with changes in Comparative Ability explained by Others’ and Own Ability.*
-
-<table>
-  <thead>
-    <tr>
-      <th>3.2.3 H2: Relationship between comparative ability, domain diﬃculty, and desirabil-ity.</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>We conducted one-sample t-tests to examine domain-wise comparative ability ratings using</td>
-    </tr>
-    <tr>
-      <td>the 50th percentile estimates of comparative ability to classify above and below average</td>
-    </tr>
-    <tr>
-      <td>eﬀects (as in Kruger, 1999). Similar as in Kruger‘s (1999) ﬁndings, participants indicated</td>
-    </tr>
-    <tr>
-      <td>to be above-average for all easy ability domains (ps &lt; .001) and below-average for three of</td>
-    </tr>
-    <tr>
-      <td>the four diﬃcult ability domains (ps &lt; .001; see Table 8 column 2 for descriptive statistics,</td>
-    </tr>
-    <tr>
-      <td>and tables 8.1 and 9.1 in the OSF supplement for test statistics and CI’s). For the above and</td>
-    </tr>
-    <tr>
-      <td>below-average eﬀects across all abilities, we found a strong negative correlation between</td>
-    </tr>
-    <tr>
-      <td>comparative ability estimates and domain diﬃculty (r(6) = –0.85, p = .0073, 95% CI [–</td>
-    </tr>
-  </tbody>
-</table>
