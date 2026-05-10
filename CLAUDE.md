@@ -35,6 +35,17 @@ When this library releases a new version, the app's `requirements.txt` git pin m
 
 Skipping step 5 is the most common failure mode. The deploy skill catches it.
 
+## Spike work queue (table-rendering iteration)
+
+> **The canonical work queue for the splice-spike is the most recent `docs/TRIAGE_<date>_corpus_assessment.md`.** Always read it first and pick the next iteration from its top-3 candidates. The handoff doc (`docs/HANDOFF_<date>_table_rendering_iteration_<N>.md`) is one input but goes stale across sessions; the triage is the *living* priority list, recomputed each broad-read of the corpus.
+
+**Iteration discipline (set 2026-05-10 after a long run of patches missed bigger structural issues):**
+
+1. Start each session by reading the active `TRIAGE_*.md`'s top-3 candidates.
+2. Every 3-5 iterations OR when a new pattern emerges, run a fresh broad-read across 8-10 random `.md` outputs *as a reader, not a diff* — sample the document START (first 30 lines) where most user-visible issues live. Update `TRIAGE.md` in place: strike resolved items, add new ones, re-rank by severity × cost.
+3. Verification (post-fix) catches regressions; audit (periodic broad-read) catches new structural issues. **Char-ratio + word-delta metrics are blind to "right words in wrong order under wrong heading"** — they will pass a broken-section paper. The reader-pass is required.
+4. If 3-4 iters in a row produce only small char-ratio shifts on isolated papers, surface "diminishing returns; should we shift focus?" to the user proactively.
+
 ## Critical hard rules (from project history)
 
 > **READ [`LESSONS.md`](./LESSONS.md) BEFORE TOUCHING `extract*.py`, `normalize.py`, or `sections/`.**
