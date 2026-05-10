@@ -1786,12 +1786,24 @@ def _strip_redundant_fragments_after_tables(text: str) -> str:
     Walks forward up to ~6 non-blank lines after ``</table>`` and stops
     on the first non-subset content. Blank lines between candidate
     fragment lines are allowed and collapsed.
+
+    Iteration 18 extension: also strips a full ``Table N. ...`` caption
+    echo line that follows ``</table>`` (regardless of length / terminal
+    period) when its table-number matches the preceding ``### Table N``
+    heading AND every word stem after the ``Table N.`` prefix is already
+    present in the rendered table's caption + cells. Catches sci_rep_1
+    Table 1 where the full italic caption is restated as plain text after
+    ``</table>``.
     """
     lines = text.split("\n")
     n = len(lines)
     table_end_re = re.compile(r"^</table>\s*$")
     table_start_re = re.compile(r"^\s*<table[^>]*>\s*$")
     italic_caption_re = re.compile(r"^\*(.+)\*\s*$")
+    table_heading_re = re.compile(r"^###\s+Table\s+(\d+)\s*$", re.IGNORECASE)
+    caption_echo_re = re.compile(
+        r"^\s*Table\s+(\d+)\s*[.:]\s*(.+?)\s*$", re.IGNORECASE
+    )
     th_cell_re = re.compile(r"<th[^>]*>(.*?)</th>", re.DOTALL)
     td_cell_re = re.compile(r"<td[^>]*>(.*?)</td>", re.DOTALL)
     sentence_end_re = re.compile(r"[.!?]\s*$")
@@ -1818,6 +1830,7 @@ def _strip_redundant_fragments_after_tables(text: str) -> str:
         # Walk back to find the matching <table> opener and collect cells.
         cells_text: list[str] = []
         caption_text = ""
+        table_num: int | None = None
         j = i - 1
         steps = 0
         while j >= 0 and steps < 400:
@@ -1826,10 +1839,12 @@ def _strip_redundant_fragments_after_tables(text: str) -> str:
             cells_text.append(" ".join(th_cell_re.findall(ln)))
             cells_text.append(" ".join(td_cell_re.findall(ln)))
             if table_start_re.match(ln.strip()):
-                # The italic caption sits 1-2 non-blank lines before <table>.
+                # Walk above the <table> opener through blank lines /
+                # italic caption / ``### Table N`` heading to capture
+                # both the caption text and the heading number.
                 k = j - 1
                 k_steps = 0
-                while k >= 0 and k_steps < 4:
+                while k >= 0 and k_steps < 8:
                     k_steps += 1
                     s = lines[k].strip()
                     if not s:
@@ -1838,6 +1853,12 @@ def _strip_redundant_fragments_after_tables(text: str) -> str:
                     cap_m = italic_caption_re.match(s)
                     if cap_m:
                         caption_text = cap_m.group(1)
+                        k -= 1
+                        continue
+                    h_m = table_heading_re.match(s)
+                    if h_m:
+                        table_num = int(h_m.group(1))
+                        break
                     break
                 break
             j -= 1
@@ -1863,6 +1884,25 @@ def _strip_redundant_fragments_after_tables(text: str) -> str:
                 k += 1
                 continue
             nonblank_steps += 1
+            # Caption-echo branch: a line beginning ``Table N. ...`` /
+            # ``Table N: ...`` that matches THIS table's heading number
+            # AND whose payload words are a subset of the rendered
+            # caption + cells. Allowed to be long / end in a period.
+            ce_m = caption_echo_re.match(stripped)
+            if (
+                ce_m
+                and table_num is not None
+                and int(ce_m.group(1)) == table_num
+            ):
+                payload_words = set(
+                    w.lower() for w in word_re.findall(ce_m.group(2))
+                )
+                if payload_words:
+                    payload_stems = {_stem(w) for w in payload_words}
+                    if payload_stems.issubset(rendered_stems):
+                        cand.append(k)
+                        k += 1
+                        continue
             if not _line_is_post_table_fragment(stripped):
                 break
             frag_words = set(w.lower() for w in word_re.findall(stripped))

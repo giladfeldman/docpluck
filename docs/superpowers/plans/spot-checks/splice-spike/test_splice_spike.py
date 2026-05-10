@@ -1368,6 +1368,69 @@ def test_strip_post_table_preserves_long_lines():
     assert "Apple Banana Cherry Apple Banana Cherry" in out
 
 
+def test_strip_post_table_caption_echo_when_words_subset():
+    """sci_rep_1 Table 1 pattern: full italic caption restated as plain
+    text after </table>. Long, ends in period — the regular fragment
+    rule rejects it. Iter-18 caption-echo branch strips it because all
+    payload words are subsets of the rendered caption."""
+    text = (
+        "### Table 1\n"
+        "*Baseline characteristics of participants. Notes: All values are presented as proportion (%), or mean(standard error). PIR, ratio of family income to poverty; BMD, bone mineral density.*\n\n"
+        "<table>\n"
+        "  <thead><tr><th>Characteristics</th><th>Means (standard error) or percentage</th></tr></thead>\n"
+        "  <tbody>\n"
+        "    <tr><td>Age (year)</td><td>39.07 (0.28)</td></tr>\n"
+        "    <tr><td>Body mass index (kg/m2)</td><td>28.78 (0.16)</td></tr>\n"
+        "  </tbody>\n"
+        "</table>\n\n"
+        "Table 1.  Baseline characteristics of participants. Notes: All values are presented as proportion (%), or mean(standard error). PIR, ratio of family income to poverty; BMD, bone mineral density.\n\n"
+        "association between the DASH diet and various aspects of BMD.\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # Plain-text caption echo gone.
+    assert "Table 1.  Baseline characteristics" not in out
+    # Italic caption (inside the heading block) survives.
+    assert "*Baseline characteristics of participants" in out
+    # Body paragraph after the echo stays.
+    assert "association between the DASH diet" in out
+
+
+def test_strip_post_table_caption_echo_preserves_unique_payload():
+    """If the post-table caption echo contains a word NOT in the
+    rendered caption + cells (e.g. a footnote anchor), DO NOT strip
+    — the unique word might be real content."""
+    text = (
+        "### Table 1\n"
+        "*Baseline characteristics of participants. Notes: PIR, ratio of family income to poverty.*\n\n"
+        "<table>\n"
+        "  <thead><tr><th>Characteristics</th><th>Mean</th></tr></thead>\n"
+        "  <tbody><tr><td>Age</td><td>39</td></tr></tbody>\n"
+        "</table>\n\n"
+        "Table 1. Baseline characteristics with extra unique footnote text about whatever.\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # Has unique words ('extra', 'footnote', 'about', 'whatever') — preserve.
+    assert "Table 1. Baseline characteristics with extra" in out
+
+
+def test_strip_post_table_caption_echo_only_matching_table_number():
+    """A ``Table 2.`` line right after Table 1's </table> is NOT
+    stripped — different table number means the words aren't a caption
+    echo of THIS table even if they happen to be a subset."""
+    text = (
+        "### Table 1\n"
+        "*Baseline characteristics of participants.*\n\n"
+        "<table>\n"
+        "  <thead><tr><th>Characteristics</th></tr></thead>\n"
+        "  <tbody><tr><td>Age</td></tr></tbody>\n"
+        "</table>\n\n"
+        "Table 2. Baseline characteristics of participants.\n"
+    )
+    out = _strip_redundant_fragments_after_tables(text)
+    # Table 2 echo preserved despite subset (it's a different table).
+    assert "Table 2. Baseline characteristics" in out
+
+
 from splice_spike import _format_figure_md
 
 

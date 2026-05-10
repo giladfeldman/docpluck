@@ -265,8 +265,6 @@ This cross-sectional study encompassed a sample size of 8,486 individuals and ai
   </tbody>
 </table>
 
-Table 1.  Baseline characteristics of participants. Notes: All values are presented as proportion (%), or mean(standard error). PIR, ratio of family income to poverty; BMD, bone mineral density.
-
 association between the DASH diet and various aspects of BMD, including total BMD, thoracic BMD, and pelvic BMD. Sensitivity analyses were performed to confirm the findings’ robustness. Furthermore, subgroup analyses and interaction tests were conducted, demonstrating that the observed correlation remained unaffected. A previous study reported that changes of about 0.050 g/cm2 (equivalent to 4–7% change, depending on
 
 5 Vol.:(0123456789)
@@ -616,8 +614,6 @@ association between the DASH diet and various aspects of BMD, including total BM
     </tr>
   </tbody>
 </table>
-
-Table 2.  Baseline characteristics of participants based on DASH diet tertiles. Significant values are in [bold]. Notes: All values are presented as proportion (%), or mean(standard error). PIR, ratio of family income to poverty; BMD, bone mineral density.
 
 the baseline BMD value) are likely to be associated with clinically significant BMD ­changes37. In the context of our findings, the impact of the DASH diet may not be substantial for individuals with healthy BMD. However, for those with borderline BMD, a significant adherence to the DASH diet could potentially push them into the low BMD category.
 

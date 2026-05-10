@@ -236,8 +236,6 @@ Thanks to the efficient compression of input data through autoencoders, our mode
   </tbody>
 </table>
 
-Table 3. Results on CIFAR-10. (*) including reference time of the decoder. Among diffusion models, our method attains a state-ofthe-art speed while preserving comparable image fidelity.
-
 ### Table 4
 *Result on CELEBA-HQ. (*) including reference time of the decoder.*
 
