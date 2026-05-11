@@ -89,7 +89,9 @@ In the context of latent space representation learning, recent studies, particul
 tribution, proving effective when model assumptions rely heavily on Gaussian distributions. However, with models that allow for complex and multimodal distributions, as in this study, we do not use this KL-penalty. Instead, we allow our autoencoder to freely explore latent spaces and prioritize the ability to compress and recover images effectively.
 We construct our autoencoder architecture based on VQGAN [35], distinguished by the integration of a quantization layer within the decoder. To ensure adherence to the image manifold and promote local realism in reconstructions, we employ a training regimen that encompasses both perceptual loss [36] and a patch-based adversarial loss [37, 38], similar to VQGAN. This approach effectively circumvents the potential for blurriness that can arise when training relies exclusively on pixel-space losses such as L2 or L1 objectives. Furthermore, motivated by investigations in [30] that have demonstrated the superiority of two-dimensional latent variables over traditional one-dimensional counterparts in the domains of image compression and reconstruction, we elected to utilize a two-dimensional latent variable as both the output of our encoder and the input to the subsequent diffusion process.
 4.3. Loss Functions
-4.3.1 Adversarial loss
+
+### 4.3.1 Adversarial loss
+
 The adversarial loss for the discriminator and the generator are defined as follows.
 
 LDadv = − log(D(xt−1, xt, t)) + log(D(x′t−1, xt, t)) (5)
@@ -98,7 +100,8 @@ LGadv = − log(D(xt′−1, xt, t))
 
 (6)
 
-4.3.2 Reconstruction loss and Weighted Learning
+### 4.3.2 Reconstruction loss and Weighted Learning
+
 In WDDGAN [29], in addition to the adversarial loss, a reconstruction loss between the generated sample and its ground truth is also employed during the training of the generator. The generator’s overall objective function is mathematically formulated as a linear combination of adversarial loss and reconstruction loss, weighted by a fixed hyperparameter. It is expressed as follows:
 
 LrGec = ||x0 − x0′ ||
@@ -138,7 +141,9 @@ Figure 2. An example of Weighted Learning
 
 We first present a detailed description of the experimental settings, dataset, and evaluation metrics used in Section 5.1. Next, we present experimental results that verify the effectiveness of the proposed LDDGAN and compare these results with previous studies in Section 5.2. Finally, we evaluate the effectiveness of Weighted Learning and the impact of the learned latent space by the Autoencoder in Section 5.3.
 5.1. Experimental setup
-5.1.1 Datasets
+
+### 5.1.1 Datasets
+
 To save computational costs, we use CIFAR-10 32 × 32 as the main dataset for qualitative and quantitative comparisons with previous studies, as well as evaluating the effectiveness of each component added to LDDGAN. To further visualize the effectiveness of the model, we use LSUN Church 256 × 256 [40] and CELEBA-HQ 256 × 256 [39] datasets to assess performance through high-resolution image generation tasks.
 
 ## Evaluation
@@ -146,12 +151,14 @@ To save computational costs, we use CIFAR-10 32 × 32 as the main dataset for qu
 metrics
 When evaluating our model, we consider three key factors: inference time, sample fidelity, and sample diversity. To assess inference time, we measure the number of function evaluations (NFE) and the average time taken to generate a batch size of 100 across 300 trials. We use the widely recognized Fre´chet Inception Distance (FID, by Heusel et al. in [41]) metric for sample fidelity. To measure sample diversity, we rely on the improved recall score developed by Kynka¨a¨nniemi et al. in [42], which is an enhanced version of the original one proposed by Sajjadi et al. in [43].
 
-5.1.3 Autoencoder
+### 5.1.3 Autoencoder
+
 As described in Section 4.2, we build our autoencoder based on VQGAN [35], distinguished by the integration of a quantization layer within the decoder. The autoencoder is trained using perceptual loss [36] and patch-based adversarial loss [37, 38] to maintain adherence to the image manifold and promote local realism in the reconstructions. We aim to compress data as much as possible (using a larger scale factor f ), while still ensuring image quality upon decoding. Table 1 lists the autoencoders that were successfully trained for each dataset. All models were trained until convergence, defined as the point where there was no further substantial improvement in FID.
 
 Table 1. Successfully trained autoencoders are used for each dataset. The FID is calculated between the reconstructed images after compression and the original images from the validation set. The output size of these autoencoders will serve as the input size for both the discriminator and the generator.
 
-5.1.4 Implementation details
+### 5.1.4 Implementation details
+
 Our implementation is based on DDGAN [28], and we adhered to the same training configurations as those used in DDGAN for our experiments. In constructing our GAN generator, we align with DDGAN’s architectural choice by employing the U-Net-structured NCSN++ framework as presented in Song et al. [44]. To effectively model the denoising distribution within a complex and multimodal context, we leverage latent variable z to exert control over normalization layers. To achieve this, we strategically substitute all group normalization layers (Wu and He [46]) within the generator with adaptive group normalization layers. This technique involves utilizing a straightforward multi-layer fully-connected network to accurately predict the shift and scale parameters within group normalization directly from z. The network’s input consists of by the conditioning element xt, and time embedding is meticulously employed to ensure conditioning on t.
 Thanks to the efficient compression of input data through autoencoders, our models require fewer GPU resources
 
@@ -743,7 +750,9 @@ ously published papers. To ensure that the FID and Recall
 results remain consistent with those in the original papers,
 we adopt the code and experimental environment from the
 published code of the previous studies mentioned above.
-5.1.3 Autoencoder
+
+### 5.1.3 Autoencoder
+
 As described in Section 4.2, we build our autoencoder based
 on VQGAN [35], distinguished by the integration of a quan-
 tization layer within the decoder. The autoencoder is trained
@@ -772,9 +781,13 @@ impact of the learned latent space by the Autoencoder in dataset. The FID is cal
 Section 5.3. after compression and the original images from the validation set.
 The output size of these autoencoders will serve as the input size
 5.1. Experimental setup for both the discriminator and the generator.
-5.1.1 Datasets
+
+### 5.1.1 Datasets
+
 To save computational costs, we use CIFAR-10 32 × 32
-5.1.4 Implementation details
+
+### 5.1.4 Implementation details
+
 as the main dataset for qualitative and quantitative compar-
 isons with previous studies, as well as evaluating the ef- Our implementation is based on DDGAN [28], and we ad-
 fectiveness of each component added to LDDGAN. To fur- hered to the same training configurations as those used in
@@ -784,7 +797,9 @@ datasets to assess performance through high-resolution im- by employing the U-Ne
 age generation tasks. presented in Song et al. [44]. To effectively model the de-
 noising distribution within a complex and multimodal con-
 text, we leverage latent variable z to exert control over nor-
-5.1.2 Evaluation metrics
+
+### 5.1.2 Evaluation metrics
+
 malization layers. To achieve this, we strategically sub-
 When evaluating our model, we consider three key factors: stitute all group normalization layers (Wu and He [46])
 inference time, sample fidelity, and sample diversity. To within the generator with adaptive group normalization lay-

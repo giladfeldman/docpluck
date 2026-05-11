@@ -2995,6 +2995,12 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # the two halves of the CONCLUSIONS sentence — we extract the block,
     # stitch the split sentence if applicable, and emit a clean blockquote.
     out = _reformat_jama_key_points_box(out)
+    # Iteration 34 (F8): promote multi-level-numbered subsection lines like
+    # ``1.1 Background`` or ``1.2.1 Underlying mechanisms`` to ``### 1.1
+    # Background`` h3 headings. Conservative — only multi-level numbering
+    # (``\d+\.\d+`` minimum), since single-level ``1. X`` is too easily
+    # confused with list items in body prose.
+    out = _promote_numbered_subsection_headings(out)
     # Iteration 28 (F3): rescue the article title from inside ``## Abstract``
     # using layout-channel font-size analysis on page 1. Some publishers
     # (Nature scientific reports, Royal Society) place the abstract label
@@ -4072,6 +4078,91 @@ def _reformat_jama_key_points_box(text: str) -> str:
         # Non-stitched case: preserve the original spacing before the block
         # but ensure exactly one blank line between body and blockquote.
         return before.rstrip() + "\n\n" + kp_block + "\n" + after.lstrip("\n")
+
+
+# ---------------------------------------------------------------------------
+# Iteration 34 (F8): numbered subsection heading promotion
+# ---------------------------------------------------------------------------
+#
+# Many replication / methods papers use numbered subsection headings
+# (``1.1 Background``, ``1.2.1 Underlying mechanisms``) that pdftotext
+# linearizes as plain text lines wedged inside body paragraphs::
+#
+#     ratings of perceived domain difficulty more directly. We begin by ...
+#     1.2 Above-and-below-average effects
+#     In the 1980s, researchers began to assess subjects' self-evaluations ...
+#
+# In a markdown viewer those three lines render as a single run-on
+# paragraph. This pass promotes the middle line to ``### 1.2 Above-and-
+# below-average effects`` and inserts paragraph breaks around it.
+#
+# Conservative rules:
+#   - Only multi-level numbering (``\d+\.\d+(?:\.\d+)*``). Single-level
+#     ``1. X`` is too easily confused with list items / citations.
+#   - Heading title must start with a capital letter and be 2-80 chars of
+#     word/space/punctuation chars (no embedded line breaks).
+#   - Heading title must NOT end in a typical body-prose terminator
+#     (``.``, ``?``, ``!``) — those are sentences, not headings.
+
+_NUMBERED_SUBSECTION_HEADING_RE = re.compile(
+    r"^(?P<num>\d+(?:\.\d+){1,3})\s+"
+    r"(?P<title>[A-Z][A-Za-z0-9][\w\-\s,&\(\)/']{1,78})\s*$"
+)
+
+
+def _promote_numbered_subsection_headings(text: str) -> str:
+    if not text:
+        return text
+    lines = text.split("\n")
+    out: list[str] = []
+    for line in lines:
+        m = _NUMBERED_SUBSECTION_HEADING_RE.match(line)
+        if not m:
+            out.append(line)
+            continue
+        title = m.group("title").rstrip()
+        # Reject titles that look like sentence prose (terminal punctuation).
+        if title.endswith((".", "?", "!", ":", ",", ";")):
+            out.append(line)
+            continue
+        # Reject titles that contain typical body-prose markers like
+        # citation parentheses with year (``Smith et al. (2020)``) or
+        # multiple lowercase function words — heuristic: a TITLE should
+        # not contain more than 2 lowercase-only words in a row.
+        tokens = title.split()
+        lc_run = max_lc_run = 0
+        for tok in tokens:
+            if tok and tok[0].islower():
+                lc_run += 1
+                max_lc_run = max(max_lc_run, lc_run)
+            else:
+                lc_run = 0
+        if max_lc_run >= 5:
+            # Long run of lowercase words — almost certainly prose.
+            out.append(line)
+            continue
+        # Reject if the previous out-line is already a heading for this number
+        # (idempotency guard — running the pass twice should be safe).
+        if out and out[-1].startswith(f"### {m.group('num')} "):
+            out.append(line)
+            continue
+        num = m.group("num")
+        # Insert a blank line BEFORE the promoted heading if the previous
+        # output line is not already blank — this gives the heading its
+        # own paragraph block.
+        if out and out[-1].strip():
+            out.append("")
+        out.append(f"### {num} {title}")
+        # Insert a trailing blank line so the next body line starts a new
+        # paragraph. The next iteration of the loop will append the body
+        # line directly; if it's blank we'll get a double-blank that the
+        # paragraph-collapse pass would normally fix, but we are AFTER
+        # that pass — so we manually guard against the duplicate later.
+        out.append("")
+    cleaned = "\n".join(out)
+    # Collapse any 3+ consecutive newlines down to a single paragraph break.
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
 
 
 def _run_cli(pdf_path: str) -> str:

@@ -3957,3 +3957,96 @@ def test_footer_strip_does_not_drop_real_body_with_pipe():
     assert "We test the formula a | b | c" in out
     assert "Another line that mentions condition" in out
 
+
+# ---------------------------------------------------------------------------
+# Iter-34 / Tier F8: numbered subsection heading promotion
+# ---------------------------------------------------------------------------
+
+from splice_spike import _promote_numbered_subsection_headings
+
+
+def test_numbered_subsection_promotes_two_level_heading():
+    """`1.1 Background` becomes `### 1.1 Background` with surrounding blank
+    lines (korbmacher_2022_kruger pattern)."""
+    text = (
+        "## Introduction\n"
+        "\n"
+        "1.1 Background\n"
+        "The above-average effect refers to the tendency to perceive oneself as better than the average person.\n"
+    )
+    out = _promote_numbered_subsection_headings(text)
+    assert "### 1.1 Background" in out
+    assert "The above-average effect refers" in out
+
+
+def test_numbered_subsection_promotes_three_level_heading():
+    """`1.2.1 Underlying mechanisms` → `### 1.2.1 Underlying mechanisms`."""
+    text = (
+        "Body sentence A.\n"
+        "1.2.1 Underlying mechanisms\n"
+        "Throughout the last decades, a range of different underlying mechanisms was proposed.\n"
+    )
+    out = _promote_numbered_subsection_headings(text)
+    assert "### 1.2.1 Underlying mechanisms" in out
+
+
+def test_numbered_subsection_inserts_blank_before_when_glued_to_prose():
+    """When the numbered heading was glued onto the previous paragraph
+    (no blank line), the promoted version must insert a blank line above
+    so the heading renders as its own block (korbmacher pattern)."""
+    text = (
+        "ratings of perceived domain difficulty more directly. We begin by introducing the literature.\n"
+        "1.2 Above-and-below-average effects\n"
+        "In the 1980s, researchers began to assess subjects' self-evaluations.\n"
+    )
+    out = _promote_numbered_subsection_headings(text)
+    # The promoted heading is preceded by a blank line.
+    assert "directly. We begin by introducing the literature.\n\n### 1.2 Above-and-below-average effects" in out
+    # And followed by a blank line.
+    assert "### 1.2 Above-and-below-average effects\n\nIn the 1980s," in out
+
+
+def test_numbered_subsection_does_not_promote_single_level():
+    """`1. Hindsight bias` (single-level) is NOT promoted — too risky to
+    confuse with list items or citation list entries. Only multi-level
+    numbering (`\\d+\\.\\d+`) gets promoted."""
+    text = "Body sentence.\n1. Hindsight bias\nMore body.\n"
+    out = _promote_numbered_subsection_headings(text)
+    assert "### 1. Hindsight bias" not in out
+    # Original line is unchanged.
+    assert "1. Hindsight bias" in out
+
+
+def test_numbered_subsection_rejects_sentence_prose():
+    """`1.2 some lowercase prose here ends with period.` — title ends with
+    terminal punctuation, so it's prose, not a heading."""
+    text = "1.2 results were as follows in our analysis.\nMore body.\n"
+    out = _promote_numbered_subsection_headings(text)
+    assert "###" not in out
+
+
+def test_numbered_subsection_rejects_long_run_of_lowercase():
+    """A `1.2 X y z w u v t s ...` line with many lowercase words in a row
+    is almost certainly body prose — not promoted."""
+    text = "1.2 X is when alpha beta gamma delta epsilon zeta the cat sat on the mat.\nMore.\n"
+    out = _promote_numbered_subsection_headings(text)
+    assert "###" not in out
+
+
+def test_numbered_subsection_idempotent():
+    """Running the promotion twice produces no further change."""
+    text = (
+        "Body A.\n"
+        "\n"
+        "1.1 Background\n"
+        "Body B.\n"
+    )
+    once = _promote_numbered_subsection_headings(text)
+    twice = _promote_numbered_subsection_headings(once)
+    assert once == twice
+    assert "### 1.1 Background" in once
+
+
+def test_numbered_subsection_empty_input_safe():
+    assert _promote_numbered_subsection_headings("") == ""
+
