@@ -15,16 +15,15 @@ Seventy-five participants were enrolled with a mean (SD) age of 55 (12) years. T
 
 ## CONCLUSIONS AND RELEVANCE
 
-This randomized clinical trial found that a TRE diet strategy without calorie counting was effective for weight loss and lowering of HbA1c levels compared with
+This randomized clinical trial found that a TRE diet strategy without calorie counting was effective for weight loss and lowering of HbA1c levels compared with daily calorie counting in a sample of adults with T2D. These findings will need to be confirmed by larger RCTs with longer follow-up.
 
-Key Points Question Is time-restricted eating (TRE) without calorie counting more effective for weight loss and lowering of hemoglobin A1c (HbA1c) levels compared with daily calorie restriction (CR) in adults with type 2 diabetes (T2D)?
-
-## Findings
-
-In a 6-month randomized clinical trial involving 75 adults with T2D, TRE was more effective for weight loss (−3.6%) than CR (−1.8%) compared with controls. However, changes in HbA1c levels did not differ between the TRE (−0.91%) and CR (−0.94%) groups compared with controls.
-Meaning These findings suggest that time-restricted eating may be an effective alternative strategy to CR for lowering body weight and HbA1c levels in T2D.
-
-daily calorie counting in a sample of adults with T2D. These findings will need to be confirmed by larger RCTs with longer follow-up.
+> **Key Points**
+>
+> **Question:** Is time-restricted eating (TRE) without calorie counting more effective for weight loss and lowering of hemoglobin A1c (HbA1c) levels compared with daily calorie restriction (CR) in adults with type 2 diabetes (T2D)?
+>
+> **Findings:** In a 6-month randomized clinical trial involving 75 adults with T2D, TRE was more effective for weight loss (−3.6%) than CR (−1.8%) compared with controls. However, changes in HbA1c levels did not differ between the TRE (−0.91%) and CR (−0.94%) groups compared with controls.
+>
+> **Meaning:** These findings suggest that time-restricted eating may be an effective alternative strategy to CR for lowering body weight and HbA1c levels in T2D.
 
 TRIAL REGISTRATION ClinicalTrials.gov Identifier: NCT05225337
 

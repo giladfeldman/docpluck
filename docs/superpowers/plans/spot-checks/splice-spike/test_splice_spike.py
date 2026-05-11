@@ -3699,3 +3699,261 @@ def test_strip_document_header_banners_does_not_match_random_capitalized_phrase(
     )
     out = _strip_document_header_banners(text)
     assert "Some Real Title At The Top" in out
+
+
+# ---------------------------------------------------------------------------
+# Iter-32 / Tier F4: JAMA Key Points sidebar reformat
+# ---------------------------------------------------------------------------
+
+from splice_spike import _reformat_jama_key_points_box
+
+
+def test_key_points_jama_open_1_split_sentence_stitches_and_emits_blockquote():
+    """jama_open_1 pattern: the CONCLUSIONS sentence is split BY the Key
+    Points sidebar. Iter-32 must stitch the two halves and place the
+    blockquote AFTER the now-complete sentence."""
+    text = (
+        "## CONCLUSIONS AND RELEVANCE\n"
+        "\n"
+        "This randomized clinical trial found that a TRE diet strategy "
+        "was effective for weight loss compared with\n"
+        "\n"
+        "Key Points Question Is time-restricted eating more effective than CR?\n"
+        "\n"
+        "## Findings\n"
+        "\n"
+        "In a 6-month trial of 75 adults, TRE was more effective for weight loss than CR.\n"
+        "Meaning TRE may be an effective alternative strategy to CR.\n"
+        "\n"
+        "daily calorie counting in a sample of adults with T2D. These findings need confirmation.\n"
+    )
+    out = _reformat_jama_key_points_box(text)
+    # Stitched sentence is contiguous and grammatically continues.
+    assert "was effective for weight loss compared with daily calorie counting" in out
+    # The blockquote replaces the inlined sidebar.
+    assert "> **Key Points**" in out
+    assert "> **Question:** Is time-restricted eating more effective than CR?" in out
+    assert "> **Findings:** In a 6-month trial of 75 adults" in out
+    assert "> **Meaning:** TRE may be an effective alternative strategy to CR." in out
+    # The false ``## Findings`` heading is gone.
+    assert "## Findings" not in out
+    # The original block text is not duplicated.
+    assert out.count("Key Points Question") == 0  # only the inline form remains? no — gone entirely
+    assert out.count("Meaning TRE may be an effective") == 0
+    # CONCLUSIONS heading preserved.
+    assert "## CONCLUSIONS AND RELEVANCE" in out
+
+
+def test_key_points_jama_open_2_unsplit_no_stitch_needed():
+    """jama_open_2 pattern: the CONCLUSIONS sentence ends with a period
+    BEFORE the Key Points block; no stitching required, only reformat."""
+    text = (
+        "## CONCLUSIONS AND RELEVANCE\n"
+        "\n"
+        "The findings suggest that high UACR is associated with mortality risk.\n"
+        "\n"
+        "Key Points Question Does CVH modify the association of mortality with UACR?\n"
+        "\n"
+        "## Findings\n"
+        "\n"
+        "In this cohort study of 23 697 US adults, the risk gradually increased across CVH groups.\n"
+        "Meaning Maintaining ideal CVH may reduce mortality risk.\n"
+        "\n"
+        "## Introduction\n"
+        "\n"
+        "Chronic kidney disease is a major public health issue.\n"
+    )
+    out = _reformat_jama_key_points_box(text)
+    # No stitching attempted — period at end of CONCLUSIONS body.
+    assert "high UACR is associated with mortality risk." in out
+    # Blockquote present.
+    assert "> **Key Points**" in out
+    assert "> **Question:** Does CVH modify the association of mortality with UACR?" in out
+    # False heading gone.
+    assert "## Findings" not in out
+    # Subsequent ``## Introduction`` survives.
+    assert "## Introduction" in out
+    assert "Chronic kidney disease is a major public health issue." in out
+
+
+def test_key_points_idempotent():
+    """Running the pass twice produces the same result."""
+    text = (
+        "## CONCLUSIONS AND RELEVANCE\n"
+        "\n"
+        "Body sentence here.\n"
+        "\n"
+        "Key Points Question One question?\n"
+        "\n"
+        "## Findings\n"
+        "\n"
+        "Findings paragraph.\n"
+        "Meaning A meaning.\n"
+        "\n"
+        "## Introduction\n"
+    )
+    once = _reformat_jama_key_points_box(text)
+    twice = _reformat_jama_key_points_box(once)
+    assert once == twice
+
+
+def test_key_points_no_match_returns_unchanged():
+    """Text without the Key Points canonical structure is unchanged."""
+    text = (
+        "## CONCLUSIONS\n"
+        "\n"
+        "Some body.\n"
+        "\n"
+        "## Introduction\n"
+        "\n"
+        "Real intro body.\n"
+    )
+    out = _reformat_jama_key_points_box(text)
+    assert out == text
+
+
+def test_key_points_missing_meaning_returns_unchanged():
+    """If only Question + Findings are present (no Meaning label), the
+    canonical-structure regex doesn't match — leave the text alone."""
+    text = (
+        "Key Points Question One question?\n"
+        "\n"
+        "## Findings\n"
+        "\n"
+        "Findings paragraph without a Meaning line.\n"
+        "\n"
+        "## Introduction\n"
+    )
+    out = _reformat_jama_key_points_box(text)
+    assert out == text
+
+
+def test_key_points_empty_input_safe():
+    assert _reformat_jama_key_points_box("") == ""
+
+
+# ---------------------------------------------------------------------------
+# Iter-33 / Tier F1-extension: additional page-footer / running-header strips
+# ---------------------------------------------------------------------------
+
+
+def test_footer_strip_drops_plus_supplemental_content():
+    """jama_open_2 leaves a `+ Supplemental content` sidebar-leftover line."""
+    text = (
+        "Meaning Maintaining ideal CVH may reduce mortality risk.\n"
+        "+ Supplemental content\n"
+        "\n"
+        "## Introduction\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "+ Supplemental content" not in out
+    assert "## Introduction" in out
+
+
+def test_footer_strip_drops_pipe_page_running_header():
+    """`Maternal ACEs and mother-adult child relationships | 225` style
+    page-running-header is dropped (social_forces_1 pattern)."""
+    text = (
+        "Body sentence one.\n"
+        "Maternal ACEs and mother-adult child relationships | 225\n"
+        "Body sentence two.\n"
+        "Maternal ACEs and mother-adult child relationships | 230\n"
+        "Body sentence three.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Maternal ACEs and mother-adult child relationships | 225" not in out
+    assert "Maternal ACEs and mother-adult child relationships | 230" not in out
+    assert "Body sentence one." in out
+    assert "Body sentence two." in out
+    assert "Body sentence three." in out
+
+
+def test_footer_strip_drops_page_number_et_al_header():
+    """`894 Gábor Scheiring et al.` style running header is dropped
+    (bjps_1 pattern)."""
+    text = (
+        "Body sentence A.\n"
+        "894 Gábor Scheiring et al.\n"
+        "Body sentence B.\n"
+        "896 Gábor Scheiring et al\n"
+        "Body sentence C.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "894 Gábor Scheiring et al." not in out
+    assert "896 Gábor Scheiring et al" not in out
+    assert "Body sentence A." in out
+    assert "Body sentence B." in out
+    assert "Body sentence C." in out
+
+
+def test_footer_strip_drops_received_revised_accepted_copyright_compound():
+    """`Received: ... Revised: ... Accepted: ... © The Author(s) 2025 ...`
+    one-line compound copyright/footer is dropped (social_forces_1 pattern)."""
+    text = (
+        "Body sentence one.\n"
+        "Received: October 20, 2023. Revised: November 1, 2024. Accepted: January 29, 2025 © The Author(s) 2025. Published by Oxford University Press on behalf of the University of North Carolina at Chapel Hill.\n"
+        "Body sentence two.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Received: October 20" not in out
+    assert "Oxford University Press" not in out
+    assert "Body sentence one." in out
+    assert "Body sentence two." in out
+
+
+def test_footer_strip_drops_parenthesized_received_revised():
+    """`(Received DD Month YYYY; revised DD Month YYYY; accepted ...)`
+    parenthesized cite-line is dropped (bjps_1 pattern)."""
+    text = (
+        "Body sentence A.\n"
+        "(Received 21 February 2023; revised 24 October 2023; accepted 3 January 2024; first published online 22 February 2024)\n"
+        "Body sentence B.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "(Received 21 February 2023" not in out
+    assert "Body sentence A." in out
+    assert "Body sentence B." in out
+
+
+def test_footer_strip_drops_electronic_supplementary_material():
+    """`ELECTRONIC SUPPLEMENTARY MATERIAL The online version ...` line is
+    dropped (demography_1 pattern)."""
+    text = (
+        "Body sentence A.\n"
+        "ELECTRONIC SUPPLEMENTARY MATERIAL The online version of this article (https://doi.org/...) contains supplementary material.\n"
+        "Body sentence B.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "ELECTRONIC SUPPLEMENTARY MATERIAL" not in out
+    assert "Body sentence A." in out
+    assert "Body sentence B." in out
+
+
+def test_footer_strip_drops_this_is_open_access_article_line():
+    """`This is an open access article distributed under...` license text
+    on its own line is dropped (common across Oxford / Sage / Demography)."""
+    text = (
+        "Body sentence A.\n"
+        "This is an open access article distributed under the terms of a Creative Commons license.\n"
+        "Body sentence B.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    assert "This is an open access article" not in out
+    assert "Body sentence A." in out
+    assert "Body sentence B." in out
+
+
+def test_footer_strip_does_not_drop_real_body_with_pipe():
+    """A body sentence that legitimately contains a pipe character — e.g.
+    a markdown table separator or a code-block — must NOT be stripped by
+    the page-running-header pattern. The pattern requires the line to end
+    with `| <number>`, which a normal body sentence does not."""
+    text = (
+        "We test the formula a | b | c equal to 3 in the dataset.\n"
+        "Another line that mentions condition | flag pattern but ends here.\n"
+    )
+    out = _strip_page_footer_lines(text)
+    # First line ends with "in the dataset." (period), not a number — safe.
+    assert "We test the formula a | b | c" in out
+    assert "Another line that mentions condition" in out
+

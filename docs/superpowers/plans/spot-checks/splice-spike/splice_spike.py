@@ -2989,6 +2989,12 @@ def render_pdf_to_markdown(pdf_path: str) -> str:
     # by an orphaned body paragraph starting with ``AND RELEVANCE`` should
     # become ``## CONCLUSIONS AND RELEVANCE`` with the rest as body.
     out = _merge_compound_heading_tails(out)
+    # Iteration 32 (F4): reformat the JAMA Key Points sidebar box that
+    # pdftotext linearizes INTO the body. The box has a canonical structure
+    # (Question / Findings / Meaning) and on jama_open_1 it wedges between
+    # the two halves of the CONCLUSIONS sentence — we extract the block,
+    # stitch the split sentence if applicable, and emit a clean blockquote.
+    out = _reformat_jama_key_points_box(out)
     # Iteration 28 (F3): rescue the article title from inside ``## Abstract``
     # using layout-channel font-size analysis on page 1. Some publishers
     # (Nature scientific reports, Royal Society) place the abstract label
@@ -3345,6 +3351,47 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     ),
     # "+ Visual Abstract + Supplemental content" — JAMA sidebar.
     re.compile(r"^\+\s*Visual Abstract.*Supplemental content\s*$"),
+    # Iter-33: bare "+ Supplemental content" sidebar leftover (jama_open_2).
+    re.compile(r"^\+\s*Supplemental content\s*$"),
+    # Iter-33: "Received: DATE. Revised: DATE. Accepted: DATE © The Author(s) ..."
+    # compound copyright-footer line (social_forces_1 line 98).
+    re.compile(
+        r"^Received:\s+[\w ,]+\d{4}\.\s+(?:Revised:.*Accepted:.*"
+        r"|Accepted:.*)\s*©.*$"
+    ),
+    # Iter-33: bare "(Received DD Month YYYY; revised DD Month YYYY; accepted ...)"
+    # parenthesized cite-line (bjps_1 line 167).
+    re.compile(
+        r"^\(Received\s+\d{1,2}\s+\w+\s+\d{4};\s+(?:revised|accepted).*\)\s*$",
+        re.IGNORECASE,
+    ),
+    # Iter-33: "© The Author(s) YYYY. Published by ... (Creative Commons ...)"
+    # standalone open-access license line, often hundreds of chars long.
+    re.compile(
+        r"^©\s+The Author\(s\)[,\s]+\d{4}\..*Cambridge University Press.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^©\s+The Author\(s\)[,\s]+\d{4}\..*Published by .*$",
+        re.IGNORECASE,
+    ),
+    # Iter-33: "This is an open access article distributed under ..." continuation.
+    re.compile(r"^This is an open access article distributed under.*$", re.IGNORECASE),
+    # Iter-33: PMC "ELECTRONIC SUPPLEMENTARY MATERIAL The online version of
+    # this article (https://doi.org/...) contains supplementary material."
+    re.compile(
+        r"^ELECTRONIC SUPPLEMENTARY MATERIAL\b.*$",
+        re.IGNORECASE,
+    ),
+    # Iter-33: "<paper-title-fragment> | <page-number>" / "<page-number> <author> et al."
+    # PUBLISHER-PRINTED PAGE-RUNNING-HEADER lines. Conservative: matches
+    # "<word words> | <page-number>$" with limited word count to avoid
+    # snagging real body sentences. Note: requires a literal " | " separator
+    # which is rare in real prose.
+    re.compile(r"^\S(?:[^|\n]{2,80})\|\s*\d{1,4}\s*$"),
+    # Iter-33: "<page-number> <Capitalized words> et al\.?$" running header
+    # (e.g. "894 Gábor Scheiring et al.").
+    re.compile(r"^\d{1,4}\s+[A-ZÀ-ÿ][^\n]{1,60}\s+et al\.?\s*$"),
 ]
 
 
@@ -3919,6 +3966,112 @@ def _rescue_title_from_layout(out: str, pdf_path: str | None) -> str:
     if not title_text:
         return out
     return _apply_title_rescue(out, title_text)
+
+
+# ---------------------------------------------------------------------------
+# Iteration 32 (F4): JAMA Key Points sidebar reformat
+# ---------------------------------------------------------------------------
+#
+# JAMA papers print a sidebar box with three labeled fields — Question,
+# Findings, Meaning — in a separate x-column from the body text. pdftotext
+# linearizes the page so that the sidebar's lines wedge INTO the body,
+# splitting the abstract's CONCLUSIONS sentence and false-promoting the
+# sidebar's "Findings" label to a ``## Findings`` heading.
+#
+# Example (jama_open_1, BEFORE iter-32)::
+#
+#   ## CONCLUSIONS AND RELEVANCE
+#
+#   This randomized clinical trial found that a TRE diet strategy ... compared with
+#
+#   Key Points Question Is time-restricted eating (TRE) without calorie counting more effective for weight loss ... in adults with type 2 diabetes (T2D)?
+#
+#   ## Findings
+#
+#   In a 6-month randomized clinical trial involving 75 adults with T2D, TRE was more effective ...
+#   Meaning These findings suggest that time-restricted eating may be an effective ...
+#
+#   daily calorie counting in a sample of adults with T2D. These findings will need to be confirmed by larger RCTs ...
+#
+# The fix:
+#   1. Detect the block ``Key Points Question ...?\n\n## Findings\n\n<line>\nMeaning <line>\n\n``.
+#   2. If the text BEFORE the block ends mid-sentence (no terminal period)
+#      and the text AFTER starts with a lowercase letter (continuation),
+#      stitch them together with a single space.
+#   3. Emit the block content as a tidy markdown blockquote AFTER the
+#      stitched sentence.
+#
+# Conservative: only matches the EXACT canonical structure. If the input
+# doesn't include all three labels in order, the pass is a no-op.
+
+_KEY_POINTS_BLOCK_RE = re.compile(
+    r"^(?P<question>Key Points Question [^\n]+\?)\s*\n+"
+    r"## Findings\s*\n+"
+    r"(?P<findings>[^\n]+)\n"
+    r"(?P<meaning>Meaning [^\n]+)\s*\n+",
+    re.MULTILINE,
+)
+
+
+def _reformat_jama_key_points_box(text: str) -> str:
+    """Extract the JAMA Key Points sidebar and emit a clean blockquote.
+
+    See module-level comment block for the input/output examples. The
+    function is idempotent — once the block has been reformatted, the
+    regex no longer matches (no ``## Findings`` heading remains).
+    """
+    if not text:
+        return text
+    m = _KEY_POINTS_BLOCK_RE.search(text)
+    if not m:
+        return text
+
+    question_text = m.group("question")[len("Key Points Question "):].rstrip()
+    findings_text = m.group("findings").strip()
+    meaning_text = m.group("meaning")[len("Meaning "):].strip()
+
+    block_start, block_end = m.span()
+    before = text[:block_start]
+    after = text[block_end:]
+
+    # Stitch the split CONCLUSIONS sentence when applicable.
+    before_rstripped = before.rstrip()
+    after_lstripped = after.lstrip()
+    stitched = False
+    if (
+        before_rstripped
+        and not re.search(r"[.!?:]\s*$", before_rstripped)
+        and after_lstripped
+        and re.match(r"[a-z]", after_lstripped)
+    ):
+        # Grab the first line of `after` and append it to before.
+        first_line, sep, rest = after_lstripped.partition("\n")
+        first_line = first_line.strip()
+        if first_line:
+            before = before_rstripped + " " + first_line + "\n"
+            after = ("\n" + rest) if sep else "\n"
+            stitched = True
+
+    # Build the blockquote.
+    kp_block = (
+        "> **Key Points**\n"
+        ">\n"
+        f"> **Question:** {question_text}\n"
+        ">\n"
+        f"> **Findings:** {findings_text}\n"
+        ">\n"
+        f"> **Meaning:** {meaning_text}\n"
+    )
+
+    # Reassemble. Two blank lines between body and blockquote, two after.
+    if stitched:
+        # `before` already has a single trailing newline; we want a blank
+        # before the blockquote.
+        return before.rstrip("\n") + "\n\n" + kp_block + "\n" + after.lstrip("\n")
+    else:
+        # Non-stitched case: preserve the original spacing before the block
+        # but ensure exactly one blank line between body and blockquote.
+        return before.rstrip() + "\n\n" + kp_block + "\n" + after.lstrip("\n")
 
 
 def _run_cli(pdf_path: str) -> str:

@@ -12,7 +12,6 @@ Immigrant economic assimilation; New second generation; Intragenerational mobili
 ## Introduction
 
 Immigrant assimilation has long been recognized as a multigenerational process (Bean et al. 2015; Brubaker 2001; Gordon 1964; Warner and Srole 1945; White and Glick 2009). Despite the difficulties they encounter upon arrival, first-generation immigrants make considerable progress narrowing the socioeconomic gap with the native-born during the course of their working lives. Foreign-born men, for example, have been shown
-This is an open access article distributed under the terms of a Creative Commons license (CC BY-NC-ND 4.0). corresponding author Andrés Villarreal, avilla@soc.ucla.edu. ELECTRONIC SUPPLEMENTARY MATERIAL The online version of this article (https://doi.org/10.1215/00703370-10924116) contains supplementary material.
 
 to experience rapid earnings growth, often exceeding that of similarly qualified natives (Lubotsky 2007; Villarreal and Tamborini 2018). However, because immigrants who arrive as adults cannot easily make up for their lower levels of education or the disadvantage of a foreign degree, they often face a limit to their upward mobility. It is instead left to their children and later generations to reach socioeconomic parity.
 

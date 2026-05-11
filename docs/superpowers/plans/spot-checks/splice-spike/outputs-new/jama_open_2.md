@@ -17,13 +17,13 @@ The study included 23 697 participants (mean [SD] age, 45.58 [15.44] years; 11 8
 
 The findings suggest that high UACR within the normal range is associated with a significantly increased risk of all-cause mortality, with the association more pronounced in adults with poor CVH status. These findings highlight the importance of risk management for early kidney dysfunction, particularly among individuals with poor CVH.
 
-Key Points Question Does cardiovascular health (CVH) modify the association of all-cause mortality with elevated urinary albumin-to-creatinine ratio (UACR) within the normal range (<30 mg/g)?
-
-## Findings
-
-In this cohort study of 23 697 US adults with a UACR less than 30 mg/g, the risk of all-cause mortality associated with a high-normal UACR gradually increased across CVH groups as delineated by Life’s Essential 8 scores. Participants with poor CVH status and high-normal UACR had the highest risk of all-cause mortality.
-Meaning The findings suggest that maintaining ideal CVH may reduce the risk of all-cause mortality associated with high-normal UACR, highlighting the importance of risk management for early kidney dysfunction.
-+ Supplemental content
+> **Key Points**
+>
+> **Question:** Does cardiovascular health (CVH) modify the association of all-cause mortality with elevated urinary albumin-to-creatinine ratio (UACR) within the normal range (<30 mg/g)?
+>
+> **Findings:** In this cohort study of 23 697 US adults with a UACR less than 30 mg/g, the risk of all-cause mortality associated with a high-normal UACR gradually increased across CVH groups as delineated by Life’s Essential 8 scores. Participants with poor CVH status and high-normal UACR had the highest risk of all-cause mortality.
+>
+> **Meaning:** The findings suggest that maintaining ideal CVH may reduce the risk of all-cause mortality associated with high-normal UACR, highlighting the importance of risk management for early kidney dysfunction.
 
 ## Introduction
 
