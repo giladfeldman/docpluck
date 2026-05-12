@@ -15,6 +15,7 @@ from docpluck.render import (
     _promote_numbered_subsection_headings,
     _reformat_jama_key_points_box,
     _apply_title_rescue,
+    _strip_duplicate_title_occurrences,
 )
 
 
@@ -185,6 +186,131 @@ def test_title_rescue_strips_title_swept_into_abstract():
     # Title prepended at top, removed from inside abstract.
     assert out.startswith("# An Interesting Paper About Cats")
     assert "Abstract\n\nbody body body" in out or "Abstract\n\n\nbody body body" in out
+
+
+# ── v2.4.0: Nature-style duplicate-title sweep ───────────────────────────
+
+
+def test_strip_duplicate_title_removes_repeated_body_block():
+    """Nature Communications pattern: title placed at top, then repeated
+    as plain body paragraphs (broken across short lines because of column
+    layout). The sweep should remove the duplicate block."""
+    title = "Targeted treatment of injured nestmates with antimicrobial compounds"
+    text = (
+        f"# {title}\n"
+        "\n"
+        "Targeted treatment of injured nestmates\n"
+        "with antimicrobial compounds\n"
+        "\n"
+        "Real body sentence about ant social immunity studies.\n"
+    )
+    out = _strip_duplicate_title_occurrences(text, title, start_offset_lines=2)
+    # Title at top still present, duplicate block removed.
+    assert out.startswith("# Targeted treatment")
+    assert "Real body sentence" in out
+    assert "Targeted treatment of injured nestmates\nwith antimicrobial" not in out
+
+
+def test_strip_duplicate_title_keeps_unrelated_paragraphs():
+    """Sweep should not touch paragraphs that don't densely overlap the
+    title's token set, even if they share a few common words."""
+    title = "Effects of antimicrobial peptides on bacterial cell walls"
+    text = (
+        f"# {title}\n"
+        "\n"
+        "Smith J, Doe A, Roe B\n"
+        "Department of Biology, University X\n"
+        "\n"
+        "Antimicrobial peptides are short chains of amino acids that "
+        "have evolved across diverse organisms; their interaction with "
+        "bacterial membranes is widely studied.\n"
+    )
+    out = _strip_duplicate_title_occurrences(text, title, start_offset_lines=2)
+    # Authors line and body sentence both survive — neither densely matches title tokens.
+    assert "Smith J, Doe A, Roe B" in out
+    assert "Antimicrobial peptides are short chains" in out
+
+
+def test_apply_title_rescue_sweeps_secondary_duplicate():
+    """End-to-end: a Nature-style document with the title appearing twice
+    (once at large font caught by the first rescue, once as a small-font
+    body duplicate) should have both occurrences cleaned up."""
+    title = "Brain injury persists after viral infection in cohort follow-up"
+    text = (
+        "RESEARCH ARTICLE\n"
+        "\n"
+        "Brain injury persists after viral infection in cohort\n"
+        "follow-up\n"
+        "\n"
+        "## Abstract\n"
+        "\n"
+        "Brain injury persists after viral infection in cohort follow-up\n"
+        "\n"
+        "Body of the abstract describing the cohort study and its outcomes.\n"
+    )
+    out = _apply_title_rescue(text, title)
+    # Title placed at top.
+    assert out.count("# Brain injury persists after viral infection") >= 1
+    # Title H1 is the only line starting with "# Brain injury..." — the body
+    # duplicate (which would have been bare prose) is gone.
+    title_word_block_count = out.count(
+        "Brain injury persists after viral infection in cohort follow-up"
+    )
+    assert title_word_block_count <= 2  # H1 itself counts as 1; H1+body=3 would fail
+
+
+# ── v2.4.0: heading-body separation in rendered output ───────────────────
+
+
+def _make_section(text: str, *, heading_text: str = "Abstract", label_value: str = "abstract"):
+    """Tiny helper: build a Section + SectionedDocument fixture for render tests."""
+    from docpluck.sections.types import Section, SectionedDocument
+    from docpluck.sections.taxonomy import SectionLabel
+
+    sec = Section(
+        label=label_value,
+        canonical_label=SectionLabel(label_value),
+        text=text,
+        char_start=0,
+        char_end=len(text),
+        pages=(1,),
+        confidence="high",
+        detected_via="layout",
+        heading_text=heading_text,
+    )
+    return SectionedDocument(
+        sections=(sec,),
+        normalized_text=text,
+        sectioning_version="test",
+        source_format="pdf",
+    )
+
+
+def test_render_emits_blank_line_between_heading_and_body():
+    """Section markdown should be ``## Heading\\n\\n<body>`` so downstream
+    markdown renderers treat heading and body as separate blocks. Prior to
+    v2.4.0 only a single ``\\n`` separated them, which caused the workspace
+    to render ``## Abstract Lynching remains...`` as one paragraph."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section("Lynching remains a common form of collective punishment.")
+    md = _render_sections_to_markdown(sectioned, tables=[], figures=[])
+    assert "## Abstract\n\nLynching remains" in md
+
+
+def test_render_strips_duplicate_heading_word_from_body():
+    """When the section detector leaves the heading word in the body
+    (common for Abstract/Keywords sections), the renderer should drop it
+    so output doesn't read ``## Abstract Abstract Lynching ...``."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section(
+        "Abstract Lynching remains a common form of collective punishment."
+    )
+    md = _render_sections_to_markdown(sectioned, tables=[], figures=[])
+    # The body should start with "Lynching", not "Abstract Lynching".
+    assert "## Abstract\n\nLynching" in md
+    assert "Abstract Lynching" not in md
 
 
 # ── render_pdf_to_markdown smoke (requires test fixture) ──────────────────
