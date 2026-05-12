@@ -22,7 +22,7 @@ App pin `PDFextractor/service/requirements.txt`: `v2.4.1` → `v2.4.2` → `v2.4
 | v2.4.1 (baseline) | 98/101 | `bjps_4` [H], `ar_apa_j_jesp_2009_12_011` [H], `jdm_.2023.10` [S,X] |
 | **v2.4.2** | **101/101** | All three failures closed (H × 2 by render fix; S,X by verifier exemption) |
 | **v2.4.3** | **101/101** | No regressions from the normalize fix; caption trim was a no-op (bug) |
-| **v2.4.4** | **101/101 (in progress)** | Caption trim now real; expected pass — verifier currently running |
+| **v2.4.4** | **101/101 PASS** | Caption trim now actually fires on the render pipeline; verified end-to-end |
 
 26-paper baseline (`scripts/verify_corpus.py`) at v2.4.2: **26/26 PASS**. Full pytest suite at v2.4.4: **920 + 6 = 926 pass**, no regressions.
 
