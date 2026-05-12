@@ -137,14 +137,23 @@ def _metrics(md: str) -> dict:
     }
 
 
+_CORRECTION_TITLE_RE = re.compile(
+    r"\b(?:addendum|corrigendum|correction|erratum|retraction)\b",
+    re.IGNORECASE,
+)
+
+
 def _classify(name: str, md: str, spike_md: Optional[str]) -> tuple[str, dict, list[str]]:
     m = _metrics(md)
     tags: list[str] = []
+    title_text = m["title"] or ""
+    is_correction_paper = bool(_CORRECTION_TITLE_RE.search(title_text))
+
     if m["title"] is None:
         tags.append("M")  # missing title
     if m["title_truncated"]:
         tags.append("T")
-    if m["section_count"] < 4:
+    if m["section_count"] < 4 and not is_correction_paper:
         tags.append("S")
     if m["title_repeat_in_body"]:
         tags.append("R")  # title repeats in body (Nature-style dup)
@@ -155,7 +164,11 @@ def _classify(name: str, md: str, spike_md: Optional[str]) -> tuple[str, dict, l
         tags.append("H")
     if m["longest_fig_caption_chars"] > 800:
         tags.append("C")
-    if m["total_chars"] < 5000:
+    # X (short output) is suppressed when the title indicates an ADDENDUM /
+    # CORRIGENDUM / CORRECTION / ERRATUM — these are genuinely 1-page
+    # correction notices and a short render is correct (the
+    # jdm_.2023.10 paper is the canonical case in the 101-PDF corpus).
+    if m["total_chars"] < 5000 and not is_correction_paper:
         tags.append("X")  # extremely short — likely failure
 
     spike_title = None

@@ -1161,6 +1161,23 @@ def _render_sections_to_markdown(
         )
         if not skip_heading:
             heading = sec.heading_text or _pretty_label(sec.label)
+            # v2.4.2: when the heading_text the section detector captured is
+            # entirely lowercase (Elsevier "a b s t r a c t" letter-spaced
+            # typography → pdftotext flattens to "abstract") AND the section
+            # has a recognized canonical label, prefer the pretty Title-Case
+            # form. Without this fix the rendered output reads ``## abstract``
+            # alongside ``## Methods``/``## Results`` — a stylistic blemish
+            # that surfaces on every Elsevier (JESP, Cognition, JEP) paper.
+            if (
+                heading
+                and heading == heading.lower()
+                and heading.isascii()
+                and any(c.isalpha() for c in heading)
+                and canonical != "unknown"
+            ):
+                pretty = _pretty_label(sec.label)
+                if pretty and pretty != heading:
+                    heading = pretty
             # \n\n (not \n) separates heading from body so downstream
             # markdown renderers treat them as a heading block + paragraph,
             # not as one mashed paragraph starting with "## Abstract ...".
@@ -1191,11 +1208,19 @@ def _render_sections_to_markdown(
             if kind == "table":
                 cells = item.get("cells") or []
                 html = item.get("html") or (cells_to_html(cells) if cells else "")
-                body_chunks.append(f"\n### {label}\n")
-                if cap:
-                    body_chunks.append(f"*{cap}*\n")
                 if html:
+                    body_chunks.append(f"\n### {label}\n")
+                    if cap:
+                        body_chunks.append(f"*{cap}*\n")
                     body_chunks.append(html)
+                elif cap:
+                    # v2.4.2: Camelot returned no cells for this caption.
+                    # Skip the `### Table N` heading (which would falsely
+                    # promise structured content) and emit the caption as a
+                    # plain italicized paragraph so the table reference is
+                    # preserved in body flow. Affected papers in the
+                    # 101-PDF corpus: bjps_4, ar_apa_j_jesp_2009_12_011.
+                    body_chunks.append(f"\n*{cap}*\n")
             else:
                 body_chunks.append(f"\n### {label}\n")
                 if cap:
@@ -1213,18 +1238,28 @@ def _render_sections_to_markdown(
     leftover_figures.extend(unlocated_figures)
 
     if leftover_tables:
-        out_chunks.append("## Tables (unlocated in body)\n\n")
-        for t in leftover_tables:
-            label = t.get("label") or "Table"
-            cap = t.get("caption") or ""
-            cells = t.get("cells") or []
-            html = t.get("html") or (cells_to_html(cells) if cells else "")
-            out_chunks.append(f"### {label}\n")
-            if cap:
-                out_chunks.append(f"*{cap}*\n")
-            if html:
-                out_chunks.append(html + "\n")
-            out_chunks.append("\n")
+        # v2.4.2: drop tables that have neither a caption nor structured
+        # HTML — emitting a bare ``### Table N`` header in the appendix
+        # adds no information and clutters the output.
+        renderable_tables = [
+            t for t in leftover_tables
+            if (t.get("caption") or "").strip()
+            or t.get("html")
+            or t.get("cells")
+        ]
+        if renderable_tables:
+            out_chunks.append("## Tables (unlocated in body)\n\n")
+            for t in renderable_tables:
+                label = t.get("label") or "Table"
+                cap = t.get("caption") or ""
+                cells = t.get("cells") or []
+                html = t.get("html") or (cells_to_html(cells) if cells else "")
+                out_chunks.append(f"### {label}\n")
+                if cap:
+                    out_chunks.append(f"*{cap}*\n")
+                if html:
+                    out_chunks.append(html + "\n")
+                out_chunks.append("\n")
 
     if leftover_figures:
         out_chunks.append("## Figures\n\n")

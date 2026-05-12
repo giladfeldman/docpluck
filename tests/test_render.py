@@ -313,6 +313,158 @@ def test_render_strips_duplicate_heading_word_from_body():
     assert "Abstract Lynching" not in md
 
 
+# ── v2.4.2: H tag fix — no `### Table N` heading when html is empty ──────
+
+
+def _make_section_with_caption_text(caption_text: str, label_value: str = "results"):
+    """Build a Section + SectionedDocument where the body contains a table
+    caption that the renderer will splice on.
+    """
+    from docpluck.sections.types import Section, SectionedDocument
+    from docpluck.sections.taxonomy import SectionLabel
+
+    body = (
+        "Results showed strong evidence for the hypothesis.\n"
+        f"\n{caption_text}\n\n"
+        "The remainder of the body continues here.\n"
+    )
+    sec = Section(
+        label=label_value,
+        canonical_label=SectionLabel(label_value),
+        text=body,
+        char_start=0,
+        char_end=len(body),
+        pages=(1,),
+        confidence="high",
+        detected_via="layout",
+        heading_text="Results",
+    )
+    return SectionedDocument(
+        sections=(sec,),
+        normalized_text=body,
+        sectioning_version="test",
+        source_format="pdf",
+    )
+
+
+def test_render_skips_table_heading_when_html_empty():
+    """When Camelot returned no cells (no html), the renderer should NOT
+    emit a bare `### Table N` heading in the body — that promises
+    structured content that isn't there. Instead, the caption renders as
+    a plain italic paragraph so the table reference is still visible.
+    Regression target for v2.4.2 H-tag failures (bjps_4,
+    ar_apa_j_jesp_2009_12_011)."""
+    from docpluck.render import _render_sections_to_markdown
+
+    caption = "Table 1. Summary of predictions across conditions."
+    sectioned = _make_section_with_caption_text(caption)
+    tables = [{
+        "label": "Table 1",
+        "caption": caption,
+        "cells": [],     # Camelot found no structured cells.
+        "html": "",      # No HTML emitted.
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    # No bare `### Table 1` heading.
+    assert "### Table 1" not in md
+    # The caption is preserved as an italicized paragraph.
+    assert "*Table 1. Summary of predictions across conditions.*" in md
+
+
+def test_render_keeps_table_heading_when_html_present():
+    """When Camelot DID extract cells (html present), the renderer keeps
+    the `### Table N` heading + caption + html block intact. This is the
+    happy path and must not regress."""
+    from docpluck.render import _render_sections_to_markdown
+
+    caption = "Table 1. Summary of predictions across conditions."
+    sectioned = _make_section_with_caption_text(caption)
+    tables = [{
+        "label": "Table 1",
+        "caption": caption,
+        "cells": [],
+        "html": "<table><tr><td>cell</td></tr></table>",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "### Table 1" in md
+    assert "<table>" in md
+
+
+def test_render_unlocated_table_skipped_when_no_caption_no_html():
+    """An unlocated table with neither caption nor cells/html should not
+    produce a bare `### Table` stub in the appendix — it's an empty
+    placeholder that confuses readers."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section_with_caption_text("body sentence only.")
+    tables = [{
+        "label": "Table 1",
+        "caption": "",     # No caption.
+        "cells": [],
+        "html": "",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    # Should not produce a "Tables (unlocated in body)" appendix at all
+    # when the only candidate has nothing to show.
+    assert "## Tables (unlocated in body)" not in md
+    assert "### Table 1" not in md
+
+
+def test_render_uppercases_lowercase_canonical_heading():
+    """When the section detector emits a heading like ``abstract`` (lowercase,
+    from Elsevier letter-spaced ``a b s t r a c t`` typography that pdftotext
+    flattens), the renderer should use the canonical Title-Case form so
+    the rendered .md doesn't mix ``## abstract`` with ``## Methods``.
+    Regression target for v2.4.2 cosmetic fix on JESP/Cognition/JEP papers."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section(
+        "Self-control performance may be improved by regular practice.",
+        heading_text="abstract",
+        label_value="abstract",
+    )
+    md = _render_sections_to_markdown(sectioned, tables=[], figures=[])
+    assert "## Abstract" in md
+    assert "## abstract" not in md
+
+
+def test_render_keeps_custom_heading_text_when_titlecase():
+    """When the section detector emits a properly Title-Case canonical
+    heading like ``Methods``, do not touch it — the pretty-case fix
+    should be a no-op in the happy case."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section(
+        "Body of the methods section.",
+        heading_text="Materials and Methods",
+        label_value="methods",
+    )
+    md = _render_sections_to_markdown(sectioned, tables=[], figures=[])
+    # Should keep the publisher-specific heading verbatim.
+    assert "## Materials and Methods" in md
+
+
+def test_render_unlocated_table_kept_when_caption_present():
+    """An unlocated table with a caption but no cells still has useful
+    info — keep the appendix entry."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section_with_caption_text("body sentence only.")
+    tables = [{
+        "label": "Table 1",
+        "caption": "Table 1. A useful summary.",
+        "cells": [],
+        "html": "",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "## Tables (unlocated in body)" in md
+    assert "Table 1. A useful summary." in md
+
+
 # ── render_pdf_to_markdown smoke (requires test fixture) ──────────────────
 
 

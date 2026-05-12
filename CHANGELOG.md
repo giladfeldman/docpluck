@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.4.2] — 2026-05-13
+
+Iterative follow-up. After v2.4.1 the 101-PDF corpus run was 98/101 PASS (`scripts/verify_corpus_full.py`); this release closes two of the three remaining failures and reframes the third as a known short-paper edge case in the verifier.
+
+### Fixes
+
+1. **`docpluck/render.py::_render_sections_to_markdown`** — table emission when Camelot returned no cells. Previously, a located table with a caption but no structured cells produced ``### Table N\n*caption*\n`` in body markdown — promising structured content that wasn't there. Verifier flagged this with the `H` tag (missing_html). Two papers affected: `bjps_4`, `ar_apa_j_jesp_2009_12_011`. New behavior: when `html` is empty for a body-located table, skip the `### Table N` heading and emit only the caption as a plain italic paragraph (`*Table N. caption text*`). The table reference is still surfaced in body flow, but without the false promise of structured HTML. Same treatment for the unlocated-tables appendix — tables with neither caption nor cells are dropped (a bare `### Table N` stub is information-free).
+
+2. **`docpluck/render.py::_render_sections_to_markdown`** — uppercase canonical section headings when pdftotext flattens Elsevier letter-spaced typography. JESP / Cognition / JEP papers render their section headings with letter-spacing (``a b s t r a c t``), which pdftotext extracts as a lone lowercase word. Without this fix the rendered output mixes ``## abstract`` with ``## Methods`` / ``## Results`` — a stylistic blemish on every Elsevier-style paper. New rule: when the captured `heading_text` is entirely lowercase ASCII AND the section has a recognized canonical label, replace the heading with the pretty Title-Case form (`Abstract`, `Keywords`, etc.). All-caps publisher headings (JAMA ``RESULTS``) are preserved verbatim — only lowercase is rewritten.
+
+### Verifier upgrade
+
+3. **`scripts/verify_corpus_full.py::_classify`** — short-paper exemption. The `S` (section_count < 4) and `X` (output < 5 KB) tags are now suppressed when the rendered title contains `ADDENDUM` / `CORRIGENDUM` / `CORRECTION` / `ERRATUM` / `RETRACTION`. The canonical example is `jdm_.2023.10`, a 1-page archival correction notice that legitimately has 1 section and ~1 KB of body content; flagging it as a render failure was a verifier false positive.
+
+### Bumps
+
+- `__version__`: `2.4.1` → `2.4.2`. Patch — render behavior changes affect only the 2 H-tagged papers + lowercase-abstract heading on Elsevier-style papers; no API change.
+
+### Tests
+
+6 new tests in `tests/test_render.py` covering the H-tag emission rules (body-located + appendix), the lowercase-canonical heading uppercase rule, and the happy-path no-op cases.
+
 ## [2.4.1] — 2026-05-12
 
 Same-day follow-up to v2.4.0. Expanded testing to all 101 PDFs in the wider corpus (vs the 26 spike-baseline papers) and fixed the most common new failure: missing-title on AMA/AOM single-line title layouts.
