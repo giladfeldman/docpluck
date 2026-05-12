@@ -225,6 +225,31 @@ Walks the test-pdfs/ tree, runs extract_pdf on each, reports failures. Default c
 
 **Full procedure:** [references/check-7-batch-smoke.md](references/check-7-batch-smoke.md)
 
+### 7b. Corpus Render Verifier (v2.3.0+, CRITICAL)
+
+Runs `scripts/verify_corpus.py` against the 26-paper baseline corpus (the
+spike's `outputs/` + `outputs-new/` directories). For each paper, executes
+`render_pdf_to_markdown` and compares against the spike's known-good
+`.md` baseline. Reports per-paper PASS/WARN/FAIL with single-letter
+failure tags: T (title truncated), S (few sections), H (missing HTML on
+in-body table), C (caption too long), L (output too short), J (low Jaccard).
+
+```bash
+cd ~/Dropbox/Vibe/MetaScienceTools/docpluck
+python scripts/verify_corpus.py
+```
+
+**Expected:** `26 / 26 PASS` for v2.3.1+. Any FAIL is a render regression
+and blocks the QA pass. Run a single paper for fast triage:
+
+```bash
+python scripts/verify_corpus.py --paper efendic_2022_affect --diff
+# dumps tmp/efendic_2022_affect.rendered.md for inspection
+```
+
+Skips cleanly when the spike `outputs[-new]/` directories aren't on
+disk (fresh checkouts).
+
 ### 8. Service Health Endpoint
 ```bash
 curl -s http://localhost:6117/health
@@ -325,6 +350,7 @@ Opt-in cross-format benchmark suite --- DOCX corpus integrity, DOCX↔PDF parity
 | 5 | ESCIcheck 10-PDF (library) | PASS/FAIL | X/10 passed |
 | 6 | ESCIcheck 10-PDF (local webapp) | PASS/FAIL | X/10 passed |
 | 7 | Batch extraction (test-pdfs/) | PASS/FAIL | X/47 succeeded |
+| 7b | Corpus render verifier (26-paper) | PASS/FAIL | X/26 PASS, failure tags listed |
 | 8 | Service health | PASS/FAIL | pdftotext version |
 | 9 | Database connectivity | PASS/FAIL | 7/7 tables |
 | 10 | Admin API | PASS/FAIL | health + stats |
@@ -332,7 +358,7 @@ Opt-in cross-format benchmark suite --- DOCX corpus integrity, DOCX↔PDF parity
 | 12 | Production health | PASS/FAIL | HTTP codes |
 | 13 | ESCIcheck 10-PDF (production) | PASS/FAIL/SKIP | X/10 passed |
 
-**Overall: X/14 checks passed**
+**Overall: X/15 checks passed**
 
 ### Issues Found
 - [list any failures with exact error messages and file:line]

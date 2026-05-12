@@ -16,6 +16,7 @@ reading order. Verified on 50 PDFs across 8 citation styles — see BENCHMARKS.m
 """
 
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -106,6 +107,20 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
             ):
                 text = recovered
                 method = "pdftotext_default+pdfplumber_recovery"
+            elif recovered:
+                # v2.3.1: reading order disagreed (pdfplumber would
+                # column-interleave a 2-column paper), but we can still
+                # recover individual U+FFFD characters word-by-word
+                # without disturbing pdftotext's reading order. For each
+                # FFFD-containing word in pdftotext, find a same-shape
+                # candidate in pdfplumber's output and substitute. This
+                # is the 50-LOC fix from
+                # ``docs/HANDOFF_2026-05-11_visual_review_findings.md``
+                # \u2014 "18 residual FFFDs in Adelina body".
+                patched, n_patched = _patch_fffds_word_by_word(text, recovered)
+                if n_patched > 0:
+                    text = patched
+                    method = "pdftotext_default+pdfplumber_word_patch"
 
         if sections is not None:
             from .sections import extract_sections
@@ -151,8 +166,12 @@ def extract_pdf_file(path: Union[str, Path]) -> tuple[str, str]:
 def count_pages(pdf_bytes: bytes) -> int:
     """Count the number of pages in a PDF.
 
-    Uses byte pattern matching (no external binary required). Fast and
-    reliable for well-formed PDFs. Returns 1 as a minimum.
+    Uses byte pattern matching first (fast, no external binary). For
+    PDF 1.5+ documents that compress object streams (cross-reference
+    streams + ``/ObjStm``), the literal ``/Type /Page`` markers are
+    inside zlib-compressed blocks and the byte count returns 1 even
+    for multi-page documents. v2.3.1 fix: when the byte-pattern result
+    is 1, fall back to pdfplumber's accurate page count.
 
     Args:
         pdf_bytes: Raw PDF file content as bytes.
@@ -166,10 +185,91 @@ def count_pages(pdf_bytes: bytes) -> int:
         print(f"{n} pages")
     """
     try:
+        # Fast path: byte-pattern heuristic. Counts ``/Type /Page``
+        # occurrences while subtracting the parent ``/Type /Pages``
+        # entry. Works for uncompressed PDFs.
         count = pdf_bytes.count(b"/Type /Page") - pdf_bytes.count(b"/Type /Pages")
-        return max(count, 1)
+        if count >= 2:
+            return count
+        # The byte heuristic returned 0 or 1. For genuinely 1-page docs
+        # this is correct; for compressed-stream PDFs it's a false low.
+        # Use pdfplumber to disambiguate. pdfplumber is already a hard
+        # dependency, so this never fails on import.
+        try:
+            import io
+            import pdfplumber  # type: ignore[import-not-found]
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                return max(len(pdf.pages), 1)
+        except Exception:
+            # pdfplumber failed (corrupt PDF, password-protected, etc.) —
+            # fall back to the heuristic's value.
+            return max(count, 1)
     except Exception:
         return 0
+
+
+_FFFD_WORD_RE = re.compile(r"\S*�\S*")
+
+
+def _patch_fffds_word_by_word(
+    pdftotext_text: str, pdfplumber_text: str
+) -> tuple[str, int]:
+    """Per-word U+FFFD recovery using pdfplumber's text as the lookup source.
+
+    Strategy: scan ``pdftotext_text`` for tokens containing U+FFFD, build a
+    regex pattern with ``[A-Za-z]`` at each FFFD position (and the literal
+    char elsewhere), and look for a UNIQUE matching token in
+    ``pdfplumber_text``. When exactly one candidate matches, swap the
+    pdftotext token for the candidate (recovers the lost letter).
+
+    Conservative rules — only patch when:
+    - The FFFD position resolves to an ASCII letter (no digits / punct, so we
+      can't accidentally manufacture "1" into "I" or vice versa).
+    - The candidate is unique within pdfplumber's token set (no ambiguity).
+    - The non-FFFD characters in the pdftotext token match exactly.
+
+    Returns ``(patched_text, n_chars_recovered)``.
+
+    Caller invokes this when the full pdfplumber recovery was rejected
+    by ``_reading_order_agrees`` (e.g. two-column papers where pdfplumber
+    interleaves columns). Word-by-word patching doesn't move text around,
+    so reading order is preserved.
+    """
+    if "�" not in pdftotext_text or not pdfplumber_text:
+        return pdftotext_text, 0
+
+    # Build pdfplumber's token set once. Use the same \S+ tokenization so
+    # punctuation-attached words ("study)" / "(see") line up.
+    pp_tokens = set(re.findall(r"\S+", pdfplumber_text))
+    if not pp_tokens:
+        return pdftotext_text, 0
+
+    out_parts: list[str] = []
+    pos = 0
+    n_recovered = 0
+    for m in _FFFD_WORD_RE.finditer(pdftotext_text):
+        out_parts.append(pdftotext_text[pos:m.start()])
+        token = m.group(0)
+        # Build a per-char regex: literal escape except FFFD → [A-Za-z].
+        pattern = re.compile(
+            "^"
+            + "".join(
+                "[A-Za-z]" if ch == "�" else re.escape(ch)
+                for ch in token
+            )
+            + "$"
+        )
+        candidates = [t for t in pp_tokens if pattern.match(t)]
+        if len(candidates) == 1:
+            out_parts.append(candidates[0])
+            n_recovered += token.count("�")
+        else:
+            # Ambiguous (>1 candidate) or no match — keep the FFFD token
+            # so the caller's quality scoring still flags the document.
+            out_parts.append(token)
+        pos = m.end()
+    out_parts.append(pdftotext_text[pos:])
+    return "".join(out_parts), n_recovered
 
 
 def _reading_order_agrees(pdftotext_text: str, pdfplumber_text: str) -> bool:

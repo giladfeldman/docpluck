@@ -15,7 +15,12 @@ from docpluck.normalize import (
 
 
 def test_version_bumped():
-    assert NORMALIZATION_VERSION == "1.8.0"
+    # Locked to the v1.8.x family — patch-level bumps (e.g. 1.8.0 → 1.8.1
+    # for the extended W0 Downloaded-from watermark in v2.3.1) are
+    # accepted; a minor or major bump would mean a structural change in
+    # the strip pipeline and should require updating the H0/T0/P0 tests
+    # below.
+    assert NORMALIZATION_VERSION.startswith("1.8.")
 
 
 # ── H0: header banner strip ────────────────────────────────────────────────

@@ -33,15 +33,23 @@ def cells_to_html(cells: list[Cell]) -> str:
     """Render a list of Cell to a single <table>...</table> HTML string.
 
     Empty input → empty string (no table to render).
-    Otherwise: run the cleaning pipeline; fall back to a minimal raw
-    renderer when the pipeline produces no output (so structured tables
-    always have valid HTML).
+    Single-row input → empty string (degenerate; not a real table).
+    Multi-row input: run the cleaning pipeline; if it collapses the
+    table to <2 rows, fall back to a minimal raw renderer so structured
+    tables always have valid HTML.
     """
     if not cells:
         return ""
 
     n_rows = max(c["r"] for c in cells) + 1
     n_cols = max(c["c"] for c in cells) + 1
+
+    # Degenerate single-row input: nothing meaningful to render. Returning
+    # "" here keeps the contract that one-row "tables" produce no output
+    # (matches both the v2.3.0 cleaning pipeline behavior and the legacy
+    # ``test_single_cell_returns_empty_string`` invariant).
+    if n_rows < 2:
+        return ""
 
     grid: list[list[str]] = [[""] * n_cols for _ in range(n_rows)]
     for c in cells:
@@ -51,10 +59,10 @@ def cells_to_html(cells: list[Cell]) -> str:
     if cleaned:
         return cleaned
 
-    # Fallback: cleaning collapsed the table to <2 rows. Emit a raw
-    # renderer pass so callers receive valid HTML rather than ``""``.
-    # This preserves the contract that ``cells_to_html`` of a non-empty
-    # cell list always produces a ``<table>`` block. See
+    # Fallback: cleaning collapsed the table to <2 rows during processing
+    # (e.g. row 2 was a continuation that merged into row 1). The input
+    # had ≥2 rows so a structured-table caller still needs valid HTML;
+    # emit a raw renderer pass. See
     # ``tests/test_smoke_fixtures.py::test_table_html_renders_when_structured``.
     return _raw_cells_to_html(grid, cells)
 

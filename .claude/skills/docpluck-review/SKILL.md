@@ -85,6 +85,13 @@ The literal sentinel `"\n\f\f\n"` separates body from footnote appendix in `norm
 - **Check:** in `core.py`, the truncation loop uses `if i == 0: continue` (line-index guard) not `if line_start - s.char_start < N` (char-offset guard)
 - **Severity:** BLOCKER
 
+### 12. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
+The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/` is the regression line for `render_pdf_to_markdown`. Any change to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py` MUST be verified.
+- **Check:** When any of those files are modified, run `python scripts/verify_corpus.py` (~8-12 min) before approving.
+- **Expected:** `26 / 26 PASS`. Any FAIL is a regression and blocks the review.
+- **Fast path** (for single-file changes touching only one rendering aspect): run `pytest tests/test_corpus_smoke.py -v` (~45s) — 3 representative papers (APA, AMA, JESP) covering Bug 3 figure positioning, lattice artifact filter, and appendix fallback.
+- **Severity:** BLOCKER for `render.py` / `extract_structured.py` / `tables/`; WARN for other touches (where the smoke subset suffices).
+
 ## Review Checklist
 
 ### Python Service (`service/`)
