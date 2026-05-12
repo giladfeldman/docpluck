@@ -610,13 +610,34 @@ def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
         round(float(s.font_size) * 2) / 2 for s in upper_spans
     )
     title_size: Optional[float] = None
+    # Pass 1: largest font with count >= 2 (the title typically spans
+    # 2-3 lines).
     for sz, count in sorted(size_counts.items(), reverse=True):
         if sz >= 12.0 and count >= 2:
             title_size = sz
             break
-        if sz >= 14.0 and count >= 1:
-            title_size = sz
-            break
+    if title_size is None:
+        # Pass 2: fall back to the largest font in the TOP region with
+        # count >= 1 AND >= 10 chars of combined span text. The top-
+        # region filter (y0 >= 70% of page height) rejects mid-page
+        # decorations like a "+" badge or section-heading numerals.
+        # The text-length filter rejects short feature-labels (e.g. AOM
+        # papers' "GUIDEPOST" header at font 30) in favor of the longer
+        # title block immediately below.
+        top_region_threshold = height * 0.70
+        top_spans = [s for s in upper_spans if s.y0 >= top_region_threshold]
+        candidate_sizes = sorted(
+            {round(float(s.font_size) * 2) / 2 for s in top_spans},
+            reverse=True,
+        )
+        for sz in candidate_sizes:
+            if sz < 14.0:
+                break
+            matching = [s for s in top_spans if abs(float(s.font_size) - sz) < 0.3]
+            combined_text_len = sum(len((s.text or "").strip()) for s in matching)
+            if combined_text_len >= 10:
+                title_size = sz
+                break
     if title_size is None:
         return None
 
