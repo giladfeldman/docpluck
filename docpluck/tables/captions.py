@@ -16,13 +16,20 @@ from dataclasses import dataclass
 from typing import Literal
 
 
+# v2.3.0: explicit Title-case + ALL-CAPS variants for the caption label.
+# AOM-style and some IEEE PDFs print captions as "TABLE 13. ..." /
+# "FIGURE 4. ..."; we now match both Title-case ("Table") and ALL-CAPS
+# ("TABLE"). The trailing look-ahead ``(?:[.:]|\s+[A-Z])`` stays
+# case-sensitive — it must see a literal Capital after the number so
+# body references like "Table 13 below shows" don't false-match.
+# (A bare ``re.IGNORECASE`` flag would defeat the trailing guard.)
 TABLE_CAPTION_RE = re.compile(
-    r"^\s*Table\s+(?P<num>\d+)(?:[.:]|\s+[A-Z])",
+    r"^\s*(?:Table|TABLE)\s+(?P<num>\d+)(?:[.:]|\s+[A-Z])",
     re.MULTILINE,
 )
 
 FIGURE_CAPTION_RE = re.compile(
-    r"^\s*(?:Figure|Fig\.?)\s+(?P<num>\d+)(?:[.:]|\s+[A-Z])",
+    r"^\s*(?:Figure|Fig\.?|FIGURE|FIG\.?)\s+(?P<num>\d+)(?:[.:]|\s+[A-Z])",
     re.MULTILINE,
 )
 

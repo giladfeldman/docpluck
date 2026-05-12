@@ -32,3 +32,11 @@ REQUESTS_FROM_ESCIMATE.md
 # manifest-with-skip pattern via tests/conftest.py and tests/fixtures/structured/MANIFEST.json
 # referencing PDFs in the local ~/Dropbox/Vibe/ corpus.
 *.pdf
+
+# Verifier-output artifacts from scripts/verify_corpus.py + ad-hoc test
+# captures. Useful locally during iteration but not committed.
+verify_*.txt
+verify_*.err
+pytest_run.txt
+pytest_err.txt
+tmp/

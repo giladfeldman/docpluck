@@ -1,5 +1,162 @@
 # Changelog
 
+## [2.3.0] — 2026-05-11
+
+Ports the splice-spike's Section F (cell-cleaning) helpers into the library, per [`docs/HANDOFF_2026-05-11_visual_review_findings.md`](docs/HANDOFF_2026-05-11_visual_review_findings.md). v2.2.0 had explicitly deferred this; v2.3.0 lands it.
+
+### What's new
+
+1. **`docpluck/tables/cell_cleaning.py`** — new module containing the eight helpers ported verbatim from `splice_spike.py` (lines ~126–1013), plus the `cells_grid_to_html` orchestrator (was `pdfplumber_table_to_markdown` in the spike — renamed because it operates on a generic 2-D cell grid):
+   - `_merge_continuation_rows` — folds multi-line cell wraps (first-column-empty rows + label-modifier rows like `(Extension)` + wrap-punctuated col-0 continuations) into the parent row using a `<br>` placeholder that survives HTML escaping.
+   - `_strip_leader_dots` — strips `. . . . .` alignment fillers (4+ dot-space pairs), cleaning up doubled / leading / trailing `<br>` placeholders left behind.
+   - `_split_mashed_cell` — inserts `<br>` at column-undercount boundaries inside a cell (e.g. `Original domain groupEasy domain group` → `Original domain group<br>Easy domain group`). Strict camel-case rule (≥4 lowercase run) plus a relaxed 3-char whitespace-anchored rule that catches `lowPositive` / `lowNegative`. Letter→digit rule catches `Year2011` / `size80`. Preserves `macOS` / `iPhone` / `WiFi` / `JavaScript` / `WordPress` / `H1` / `2a` / `lowCI` (any of the boundary cases that would false-split).
+   - `_is_header_like_row` + `_drop_running_header_rows` + `_is_strong_running_header` / `_is_weak_running_header` / `_is_running_header_cell` — detects header-like rows (label-only, short, ≤30% numeric) and drops or in-place blanks leaked running-header rows (pure page numbers, `|232 Stacey et al.`, journal-CAPS lines, `Vol.`, DOI/URL). Iter-17 cell-level cleanup blanks strong-RH cells when they coexist with real header content (chan_feldman T5 pattern).
+   - `_is_group_separator` — detects rows where only column 0 has content in a ≥3-col table; renders as `<tr><td colspan="N"><strong>label</strong></td></tr>`.
+   - `_fold_super_header_rows` — folds 2-row super-header into one row column-wise when top row has empty cells AND every populated top cell has a populated cell directly below (korbmacher Table 7 pattern). Recurses for 3-row stacked super-supers.
+   - `_fold_suffix_continuation_columns` — per-column fold for 2-row headers where col-N row-0 ends in `- — – :` and col-N row-1 starts with a letter (ziano Table 2 `Win-` over `Uncertain` pattern). Conservative: only fires on exactly 2-row headers; drops row-1 if it becomes entirely empty.
+   - `_merge_significance_marker_rows` — attaches `*` / `∗∗∗` / `†` / `‡` rows as `<sup>...</sup>` on the nearest substantive estimate row. Walk-back skips std-err parenthetical rows; stops at text-anchor rows (`Ref.`, `Year FE`). Iter-24 (Tier A8) forward-attach narrowly attaches markers to the immediate-next numeric row when walk-back was blocked by a text-anchor block (social_forces_1 `0 ACEs Ref. / *** / 1 ACE 2.25` pattern). Per-column guard prevents `<sup>` orphans on empty target cells.
+
+2. **`docpluck/tables/render.py::cells_to_html`** — refactored to delegate to `cells_grid_to_html`. The behavioral change:
+   - Empty input `[]` now returns `""` (was `"<table></table>"`).
+   - Tables with fewer than 2 rows after cleaning return `""`.
+   - The `is_header` flag on each Cell is no longer consulted; heuristic header detection runs instead (more reliable across Camelot's per-cell flag quirks).
+   - Output is multi-line, indented HTML (`<table>\n  <thead>\n    <tr>\n      <th>...</th>`); existing consumers that splice the HTML into Markdown render identically.
+
+3. **`tests/test_tables_cell_cleaning.py`** — new file with ~60 pure-transform tests ported from `test_splice_spike.py` covering every helper above.
+
+### Bumps
+
+- `__version__`: `2.2.0` → `2.3.0`.
+- `TABLE_EXTRACTION_VERSION`: `2.0.0` → `2.1.0`.
+- `NORMALIZATION_VERSION`: `1.8.0` → `1.8.1` — additive: the W0 Downloaded-from watermark pattern now matches institutional download stamps (see item 11 below).
+- `SECTIONING_VERSION`: unchanged at `1.2.0`.
+
+### App-repo follow-up
+
+`PDFextractor/service/requirements.txt` needs its git pin bumped from `@v2.2.0` to `@v2.3.0`; `/docpluck-deploy`'s pre-flight check 4 enforces this.
+
+### Source
+
+Spike: [`docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py) — Section F (lines 126–1013). Spike tests: [`test_splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py).
+
+### Rendered-view bugs from `HANDOFF_2026-05-11_visual_review_findings.md` (status)
+
+- **Bug 1** (`<table>` not appearing in Rendered tab) — resolved by the v2.3.0 cleaning pipeline + the `_pick_best_per_page` lattice-artifact filter (item 6 below).
+- **Bug 2** (flattened table cells in body) — resolved as a consequence of Bug 1.
+- **Bug 3** (figures spliced before abstract) — **resolved** by `_locate_caption_anchor` + appendix-fallback (item 7 below).
+- **Bug 4** (caption concatenation across figures) — resolved by the `next_boundary` parameter on `_extract_caption_text`.
+- **Bug 5** (truncated title) — resolved by `_title_looks_truncated` connector-word guard.
+- **Bug 6** (subtitle styling) — still pending.
+
+### Post-initial-tag fixes (caught by `scripts/verify_corpus.py`)
+
+After the initial Section F port landed, a new corpus verifier (`scripts/verify_corpus.py`) ran `render_pdf_to_markdown` against the spike's 26-paper baseline corpus and found four high-value issues. All resolved before the final tag:
+
+6. **`docpluck/tables/camelot_extract.py::_pick_best_per_page`** — lattice tables of shape ≤1×N or N×1 no longer "win" their page over real stream tables. JAMA-style PDFs print signature blocks / running-header rules that lattice picks up as 1×1 100%-accuracy artifacts; without the size filter those artifacts were displacing the real 7×45 stream tables on pages 6/8/9 of `jama_open_1`. Fix: require ≥ 2 rows AND ≥ 2 cols before treating a page as "owned by lattice." Verified by 5 new tests in `tests/test_v23_post_corpus.py`.
+
+7. **`docpluck/render.py::_locate_caption_anchor` + appendix fallback** — Bug 3 root cause was `text.find(caption)` returning -1 (caption had spaces where the section-text had newlines) and the fallback `placements.append((0, …))` piling every figure at the top of the document, ahead of the abstract. New helper `_locate_caption_anchor` is whitespace-tolerant (regex with `\s+` between caption prefix tokens) and validates the match is at a caption-line start. Unanchored items flow to a `## Tables (unlocated in body)` / `## Figures` appendix at the bottom of the rendered output. Verified by 5 anchor-locator tests + the `tests/test_corpus_smoke.py` Bug 3 assertion on `efendic_2022_affect`.
+
+8. **`docpluck/extract_structured.py::_extract_caption_text`** — soft-hyphen rejoin. `chen_2021_jesp` captions showed `Sup­ plementary` / `esti­ mate` / `be­ tween` artifacts because pdftotext renders soft hyphens (U+00AD) at line-wraps and captions don't flow through `normalize_text` where the existing strip lives. Now `­\s+` → `''` and orphan `­` → `''` are applied during caption extraction. Verified by 3 tests.
+
+9. **`docpluck/tables/captions.py`** — `TABLE_CAPTION_RE` / `FIGURE_CAPTION_RE` are now case-insensitive. AOM and some IEEE PDFs print all-caps captions (`TABLE 13. ...`); previously these were silently missed. Recovered `TABLE 13` on `amle_1`, plus several captions across `ieee_access_*` and `amj_1`. Net effect: `amle_1` went from 0 to 13 HTML tables.
+
+10. **`docpluck/render.py::_pretty_label`** — section headings synthesized by Pattern E (where `heading_text` is empty) now render as `## Abstract` / `## Introduction` instead of `## abstract` / `## introduction`. Mapping covers the canonical labels plus a generic `Title Case + underscore→space` fallback.
+
+11. **`docpluck/normalize.py` Downloaded-from watermark extension** — the existing W0 pattern matched `Downloaded from <url> [by <single-word>] on <date>`. Royal Society Open Science PDFs print the institutional download stamp `Downloaded from <url> by University of Innsbruck (Universitat Innsbruck) user on 16 March 2026` — a multi-word "by phrase" tail. The `\w+` after `by` is now `[^\n]+?` (anchored by the trailing `on <day> <month> <year>`), capturing institutional stamps without runaway matches. Stripped every-page contamination from `ar_royal_society_rsos_140072` (4 occurrences). Verified by 3 tests in `tests/test_v23_post_corpus_v2.py`.
+
+12. **`docpluck/tables/render.py::cells_to_html` fallback** — preserve the contract that structured tables always produce non-empty HTML. Some 2-row Camelot tables fold to a single row through the v2.3.0 cleaning pipeline (legitimate behavior: the second row was a continuation of the first), and `cells_grid_to_html` returned `""` in that case. That broke the `tests/test_smoke_fixtures.py::test_table_html_renders_when_structured` invariant (`<table>` must be in `html` for kind=structured). New behavior: when cleaning returns "", fall back to a minimal raw renderer that emits the v2.2.0-style compact HTML for the original grid.
+
+13. **`docpluck/tables/camelot_extract.py` confidence clipping** — Camelot's reported `accuracy` field is occasionally floating-point-marginally above 100 (e.g., `100.0000000003`), producing `confidence` slightly > 1.0 in the Table dict. Now clipped to `[0.0, 1.0]`. Caught by `test_table_html_renders_when_structured` invariant.
+
+14. **`tests/fixtures/structured/MANIFEST.json` recalibration** — three fixtures (`ieee_lattice`, `amj_lattice`, `ieee_figure_heavy`) had stale 2026-05-07 `expected_tables`/`expected_figures` counts that pre-dated the case-insensitive caption fix and the lattice-artifact filter. Bumped to v2.3.0 baseline. The MANIFEST was already documenting that "per-fixture recalibration is a separate follow-up" — this is that follow-up.
+
+### Corpus verification harness
+
+- `scripts/verify_corpus.py` — runs `render_pdf_to_markdown` against the 26 papers in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/`, compares against the spike's known-good `.md` baselines, and reports per-paper PASS/WARN/FAIL with single-letter failure tags (T=title truncated, S=few sections, H=missing HTML, C=caption-too-long, L=much shorter, J=low Jaccard). Use after any change to `extract_structured.py`, `tables/`, or `render.py`.
+- `tests/test_corpus_smoke.py` — 3 representative papers (APA, AMA, JESP) running in ~45s as part of the standard pytest suite. Skips cleanly when test PDFs aren't on disk (CI / fresh-clone friendly).
+
+### Test counts
+
+- New unit tests: **30** total — 17 in `tests/test_v23_post_corpus.py` + 9 in `tests/test_v23_post_corpus_v2.py` + 4 in `tests/test_corpus_smoke.py`.
+- All existing tests still pass.
+
+### Verification result
+
+After all fixes: **26/26 papers PASS** under the corpus verifier across 9 journal styles (APA, AMA, IEEE, ASA, AOM, Nature, Royal Society, demographics, social_forces) — up from 21/26 after the initial Section F port. Notable gains:
+
+- `amle_1`: 0 → 13 HTML tables (case-insensitive TABLE/FIGURE detection)
+- `amj_1`: 0 → 5 HTML tables
+- `amc_1`: 0 → 2 HTML tables
+- `ieee_access_3`: 0 → 5 HTML tables
+- `jama_open_1` / `jama_open_2`: 0 → 3 HTML tables each (lattice 1×1 artifact filter)
+- `efendic_2022_affect`: 5 figures correctly placed inside Results/Discussion sections instead of stacked before the Abstract (Bug 3)
+- `chen_2021_jesp`: 4 soft-hyphen caption artifacts (`Sup­ plementary`, `esti­ mate`, etc.) eliminated
+- `ar_royal_society_rsos_140072`: every-page `Downloaded from … by University of Innsbruck …` watermark stripped (4 occurrences)
+- `demography_1` / `social_forces_1`: caption boundary capped at the next caption start (was bleeding into 1500-char runaway captions)
+
+---
+
+## [2.2.0] — 2026-05-11 (revised same-day)
+
+### Critical library fixes added during visual-review session (2026-05-11)
+
+These shipped under the same v2.2.0 version because no release was tagged yet between them and the original 2.2.0 work:
+
+1. **`extract.py::extract_pdf`** — `_recover_with_pdfplumber` is now gated by **two** checks instead of one:
+   - **Threshold raised from ≥1 to ≥3 FFFD chars** in the pdftotext output. Previously a single stray U+FFFD (typical when a paper contains 1-2 italic math letters in a stat expression) was enough to swap pdftotext's entire output for pdfplumber's, even though pdfplumber's `extract_text()` interleaves columns on multi-column papers.
+   - **New `_reading_order_agrees(pdftotext_text, pdfplumber_text)` helper** — extracts three 60-char snippets from non-FFFD body regions of pdftotext and requires that all three appear verbatim in pdfplumber's output. If even one is missing, pdfplumber reordered the columns and we keep pdftotext's text (FFFDs and all — much less harmful than word-by-word column interleave). Verified on the Adelina/Pronin replication PDF (IRSP, 2-column layout) which went from unreadable column-merged body text to clean reading order. Cascading benefits: Camelot's table-cell extraction now succeeds on the same paper (was returning 0 cells on the corrupted text).
+
+2. **`render.py::_apply_title_rescue`** — when the in-place title-upgrade path replaces matched lines with `# Title`, the heading is now padded with blank lines on both sides (`["", title, ""]`) so it renders as a standalone block. Previously the heading was glued to neighboring paragraphs, producing `RESEARCH ARTICLE # Title Nadia Adelina and Gilad Feldman...` all on one logical paragraph.
+
+3. **`render.py::render_pdf_to_markdown`** — new optional internal params `_structured`, `_sectioned`, `_layout_doc` let callers (e.g. an /analyze-style endpoint) reuse already-computed extraction results, skipping a duplicate Camelot pass and a duplicate `extract_sections` pass. On a typical APA paper this cuts the render step from ~15-30s to ~1-5s. The flag names are underscored to discourage casual library users from depending on a shape that may change; the default no-arg behavior is unchanged.
+
+4. **`render.py::_render_sections_to_markdown`** — sections with `canonical_label == "unknown"` and no `heading_text` no longer emit a `## unknown` heading. The body text flows as bare paragraphs instead.
+
+5. **Test count**: 189 tests pass (36 v1.8.0 strips + render tests; 153 D5/etc).
+
+---
+
+## [2.2.0] — 2026-05-11
+
+Promotes the iter-23 → iter-34 splice-spike fixes from `docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py` into the library. Two surfaces change:
+
+1. **`normalize_text`** gains three document-shape strip passes that run before the existing W0/S* unicode passes:
+   - **H0** (header banner strip): drops publisher / journal / repo banner lines in the first ~30 lines of the document. ~35 curated patterns cover HHS Public Access, Royal Society "Cite this article", Tandfonline ISSN, arXiv preprint banner, "Original Investigation" category labels, AOM / Sage / Cambridge / Oxford / Elsevier journal cite-lines, mangled DOI runs, etc. Line is dropped only on explicit pattern match — titles / authors / affiliations are never touched.
+   - **T0** (TOC dot-leader strip): drops paragraphs that contain `_{3,}` dot-leader runs (Nature Supplementary PDF style) or explicit "Table of Contents" / "List of Figures" labels, within the first ~100 lines.
+   - **P0** (page-footer / running-header strip): drops curated full-line patterns (Page N, copyright lines, JAMA running headers, "Corresponding Author:", bare emails, "(continued)", PMC supplementary-material footers, "<author> et al." running headers) anywhere in the document.
+
+2. **`docpluck.render`** is a new module exposing `render_pdf_to_markdown(pdf_bytes)` — the spike's end-to-end PDF-to-markdown renderer, brought into the library:
+   - Wraps `extract_pdf_structured` (Camelot tables + figures) + `extract_sections` (semantic structure).
+   - Splices tables and figures into their containing sections by caption position.
+   - Markdown-level post-processors (ported from spike iter-23 → iter-34):
+     - `_dedupe_h2_sections` (demote duplicate `##` headings to plain text)
+     - `_fix_hyphenated_line_breaks` (H1 — re-knit real compound words like `Meta-Processes` across line wraps)
+     - `_join_multiline_caption_paragraphs` (fold `FIGURE N` / `TABLE N` captions split by column wrap)
+     - `_merge_compound_heading_tails` (reattach `AND RELEVANCE` and 4 other JAMA structured-abstract heads to `## CONCLUSIONS`)
+     - `_reformat_jama_key_points_box` (extract the JAMA Key Points sidebar as a `> **Key Points**` blockquote, stitching split sentences)
+     - `_promote_numbered_subsection_headings` (turn `1.2 Foo` plain-text lines into `### 1.2 Foo`)
+     - `_rescue_title_from_layout` (read pdfplumber spans on page 1, identify the dominant title font, place `# Title` at the top of the document; uses char-level x-gap fallback for tight-kerned JAMA / AOM PDFs where `extract_words` collapses tokens)
+
+3. **CLI**: new `docpluck render <file> [--level none|standard|academic] > out.md` subcommand.
+
+### Deferred to v2.3.0
+
+The spike's pdfplumber-internal table-cleaning helpers (`pdfplumber_table_to_markdown`, `_merge_continuation_rows`, `_strip_leader_dots`, `_is_header_like_row`, `_drop_running_header_rows`, `_merge_significance_marker_rows`, `_fold_suffix_continuation_columns`, `_fold_super_header_rows`) are NOT in this release. v2.2.0's `render_pdf_to_markdown` uses Camelot for table cells via the existing library path. On a few JAMA / Sage papers table presentation may look weaker than the spike's bit-for-bit output; all other improvements (title rescue, banner / TOC / footer strip, Key Points sidebar, numbered subsection promotion, compound heading merge) land in full.
+
+### Compatibility
+
+- All existing public APIs unchanged. The new `render_pdf_to_markdown` and the H0/T0/P0 passes are additive.
+- `__version__`: `2.1.0` → `2.2.0`.
+- `NORMALIZATION_VERSION`: `1.7.0` → `1.8.0` — three new auto-applied passes at the `standard` level; cached normalized outputs need regeneration.
+- `SECTIONING_VERSION`: unchanged at `1.2.0` (Section B's heading restructuring lives in `render.py` as markdown-level post-processors; SectionedDocument shape is the same as v2.1.0).
+- `TABLE_EXTRACTION_VERSION`: unchanged at `2.0.0` (Section F deferred).
+
+### Source
+
+Spike: [`docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py) — iter-23 through iter-34 (lines 2148–4165). Handoff plan: [`docs/HANDOFF_2026-05-11_PROMOTE_SPIKE_TO_LIBRARY.md`](docs/HANDOFF_2026-05-11_PROMOTE_SPIKE_TO_LIBRARY.md).
+
+---
+
 ## [2.1.0] — 2026-05-09
 
 Strict-bar iteration on a 101-PDF corpus across 9 academic styles (apa, ieee, nature, vancouver, aom, ama, asa, harvard, chicago-ad). 96–98 of 101 papers PASS or PASS_W under the pragmatic grader; all 9 styles converge (≥3 consecutive first-try-clean papers). 14 targeted fixes across the section identification + normalization layers; no API surface changes. See [`docs/superpowers/plans/sections-issues-backlog.md`](docs/superpowers/plans/sections-issues-backlog.md) for the full per-issue ledger and [`LESSONS.md`](LESSONS.md) for the durable architectural rules this iteration codified.

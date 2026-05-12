@@ -81,9 +81,29 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
 
         # SMP recovery: Xpdf replaces U+FFFF+ characters with U+FFFD (replacement char).
         # pdfplumber handles these correctly and remaps them to ASCII equivalents.
-        if text.count("\ufffd") > 0:
+        #
+        # 2026-05-11: only trigger recovery when FFFDs are meaningfully
+        # present (\u2265 3) AND pdfplumber's reading order matches pdftotext's.
+        # Previously a single stray FFFD would swap the entire pdftotext text
+        # for pdfplumber's `extract_text()` \u2014 which on multi-column papers
+        # like the Adelina/Pronin replication (IRSP) interleaves the two
+        # columns word-by-word, producing unreadable body text with similar
+        # overall length. The length-similarity check is insufficient; we
+        # need a *reading-order* check.
+        #
+        # The check: take three 60-char snippets from non-FFFD-containing
+        # regions of pdftotext's body. If pdfplumber's output contains all
+        # three verbatim, both extractors agree on column ordering and the
+        # recovery is safe. If even one snippet is reordered out, pdfplumber
+        # collapsed the columns and we keep pdftotext's text (FFFDs and all).
+        fffd_count = text.count("\ufffd")
+        if fffd_count >= 3:
             recovered = _recover_with_pdfplumber(tmp_path)
-            if recovered:
+            if (
+                recovered
+                and recovered.count("\ufffd") < fffd_count
+                and _reading_order_agrees(text, recovered)
+            ):
                 text = recovered
                 method = "pdftotext_default+pdfplumber_recovery"
 
@@ -150,6 +170,48 @@ def count_pages(pdf_bytes: bytes) -> int:
         return max(count, 1)
     except Exception:
         return 0
+
+
+def _reading_order_agrees(pdftotext_text: str, pdfplumber_text: str) -> bool:
+    """Return True if pdfplumber's output preserves pdftotext's reading order.
+
+    pdftotext (xpdf, no -layout flag) produces correctly-ordered column text.
+    pdfplumber's ``page.extract_text()`` defaults sort characters by y-coord
+    first, which interleaves the two columns of a two-column academic paper.
+    On such papers the lengths come out very similar but the text is shuffled.
+
+    Heuristic: extract three 60-char snippets from non-FFFD body regions of
+    pdftotext (after the first 5%, at 30%, 50%, 70% of the document) and
+    require that ALL THREE appear verbatim in pdfplumber's output. If even
+    one is missing, columns were reordered.
+    """
+    n = len(pdftotext_text)
+    if n < 2000:
+        # Too short to safely sample; trust the length-similarity heuristic.
+        ratio = len(pdfplumber_text) / max(n, 1)
+        return 0.85 < ratio < 1.15
+
+    # Build candidate windows at 30%, 50%, 70% of the doc; slide forward up
+    # to 1000 chars looking for a 60-char run with no FFFDs / form feeds.
+    for frac in (0.30, 0.50, 0.70):
+        start = int(n * frac)
+        snippet = None
+        for offset in range(0, 1000, 30):
+            window = pdftotext_text[start + offset : start + offset + 60]
+            if (
+                len(window) == 60
+                and "�" not in window
+                and "\f" not in window
+                and not window.isspace()
+            ):
+                snippet = window
+                break
+        if snippet is None:
+            # Couldn't find a clean snippet at this fraction; skip it.
+            continue
+        if snippet not in pdfplumber_text:
+            return False
+    return True
 
 
 def _recover_with_pdfplumber(pdf_path: str) -> Optional[str]:

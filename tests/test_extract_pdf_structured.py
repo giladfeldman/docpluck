@@ -99,6 +99,12 @@ def test_table_kinds_are_valid():
 
 
 def test_table_ids_unique_and_sequential():
+    """v2.3.0: relaxed from a strict ``t{n}`` sequential check to
+    uniqueness + a recognized prefix. Camelot tables emit
+    ``camelot_t{idx}`` IDs while caption-only isolated tables emit
+    ``t{caption_number}`` — mixing them in a single document is normal
+    and the pure sequential invariant no longer holds (and never did
+    on PDFs where Camelot succeeds)."""
     from docpluck import extract_pdf_structured
     data = _read("apa_chan_feldman_lineless")
     result = extract_pdf_structured(data)
@@ -106,9 +112,9 @@ def test_table_ids_unique_and_sequential():
         pytest.skip("no tables detected")
     ids = [t["id"] for t in result["tables"]]
     assert len(set(ids)) == len(ids)
-    assert all(tid.startswith("t") for tid in ids)
-    expected = [f"t{i}" for i in range(1, len(result["tables"]) + 1)]
-    assert ids == expected
+    assert all(
+        tid.startswith("t") or tid.startswith("camelot_t") for tid in ids
+    )
 
 
 def test_table_required_fields_present():

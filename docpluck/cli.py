@@ -120,6 +120,15 @@ def _cmd_sections(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_render(args: argparse.Namespace) -> int:
+    from . import render_pdf_to_markdown, NormalizationLevel
+    blob = _read_bytes(args.file)
+    level = NormalizationLevel(args.level)
+    md = render_pdf_to_markdown(blob, normalization_level=level)
+    sys.stdout.write(md)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Ensure stdout is always UTF-8 (matters on Windows where the default is cp1252).
     if hasattr(sys.stdout, "reconfigure"):
@@ -132,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args_in[0] in ("-h", "--help", "help"):
-        print("usage: docpluck [--version | extract <file> [--sections L1,L2] [--structured [--thorough] [--text-mode raw|placeholder] [--tables-only|--figures-only] [--html-tables-to DIR]] | sections <file> [--format json|summary]]")
+        print("usage: docpluck [--version | extract <file> [--sections L1,L2] [--structured [--thorough] [--text-mode raw|placeholder] [--tables-only|--figures-only] [--html-tables-to DIR]] | sections <file> [--format json|summary] | render <file> [--level none|standard|academic]]")
         return 0
 
     parser = argparse.ArgumentParser(prog="docpluck", add_help=True)
@@ -164,6 +173,16 @@ def main(argv: list[str] | None = None) -> int:
     sections.add_argument("file")
     sections.add_argument("--format", default="json", choices=["json", "summary"])
     sections.set_defaults(func=_cmd_sections)
+
+    render = sub.add_parser("render")
+    render.add_argument("file")
+    render.add_argument(
+        "--level",
+        default="standard",
+        choices=["none", "standard", "academic"],
+        help="Normalization level applied during section detection. Default: standard.",
+    )
+    render.set_defaults(func=_cmd_render)
 
     try:
         parsed = parser.parse_args(args_in)
