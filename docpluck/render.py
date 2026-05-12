@@ -72,6 +72,76 @@ def _pretty_label(label: str) -> str:
     return s.replace("_", " ").title()
 
 
+# v2.3.1 Bug 6 fix (`docs/HANDOFF_2026-05-11_visual_review_findings.md`):
+# papers print short publication-format badge text immediately below the
+# title (e.g. "Registered Report", "Pre-Registered", "Stage 1 Registered
+# Report"). Without this pass they render as a stray plain-text line just
+# below the `# Title` block, with no visual cue that they're a subtitle.
+# We italicize them so the workspace UI styles them distinctly.
+_SUBTITLE_BADGE_PATTERNS = [
+    re.compile(r"^Registered\s+Report(?:\s+Stage\s+[12])?\b", re.IGNORECASE),
+    re.compile(r"^Stage\s+[12]\s+Registered\s+Report\b", re.IGNORECASE),
+    re.compile(r"^Pre-?Registered(?:\s+Replication)?\b", re.IGNORECASE),
+    re.compile(r"^Pre-?Registered\s+Report\b", re.IGNORECASE),
+    re.compile(r"^Replication\s+Report\b", re.IGNORECASE),
+    re.compile(r"^Original\s+Investigation\b", re.IGNORECASE),
+    re.compile(r"^Research\s+Article\b", re.IGNORECASE),
+    re.compile(r"^Brief\s+Report\b", re.IGNORECASE),
+    re.compile(r"^Short\s+Report\b", re.IGNORECASE),
+    re.compile(r"^Letter\s+to\s+the\s+Editor\b", re.IGNORECASE),
+]
+
+
+def _italicize_known_subtitle_badges(text: str) -> str:
+    """Italicize known publication-format badge lines immediately after
+    the ``# Title`` block.
+
+    Scope: only the first non-empty content line(s) within ~10 lines of
+    the ``# Title``, AND the line must be short (≤ 50 chars) AND match
+    a recognized badge pattern. This avoids touching body prose that
+    happens to contain the phrase.
+
+    Idempotent: already-italicized badges (``*Registered Report*``) are
+    left alone.
+    """
+    if "# " not in text:
+        return text
+    lines = text.split("\n")
+    # Find the # Title line.
+    title_idx = -1
+    for i, ln in enumerate(lines):
+        if re.match(r"^#\s+\S", ln):
+            title_idx = i
+            break
+    if title_idx < 0:
+        return text
+
+    # Look at the next ~10 lines for a badge candidate. Stop on the
+    # first ## heading (we've left the title block).
+    n_lines = len(lines)
+    changed = False
+    for j in range(title_idx + 1, min(title_idx + 11, n_lines)):
+        ln = lines[j].strip()
+        if not ln:
+            continue
+        if ln.startswith("##"):
+            break  # entered the next section
+        if len(ln) > 50:
+            continue  # likely body prose, not a badge
+        # Already italicized — leave alone.
+        if ln.startswith("*") and ln.endswith("*") and not ln.startswith("**"):
+            continue
+        # Check against badge patterns.
+        for pat in _SUBTITLE_BADGE_PATTERNS:
+            if pat.match(ln):
+                lines[j] = f"*{ln}*"
+                changed = True
+                break
+    if changed:
+        return "\n".join(lines)
+    return text
+
+
 # ── Section B markdown-level post-processors ───────────────────────────────
 
 
@@ -1080,5 +1150,6 @@ def render_pdf_to_markdown(
         except Exception:
             layout_doc = None
     md = _rescue_title_from_layout(md, layout_doc)
+    md = _italicize_known_subtitle_badges(md)
 
     return md.rstrip() + "\n"

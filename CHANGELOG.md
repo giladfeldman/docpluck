@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.3.1] — 2026-05-12
+
+Follow-up to v2.3.0. Closes the four remaining items from `docs/HANDOFF_2026-05-11_visual_review_findings.md` and wires the corpus verifier into the `/docpluck-qa` and `/docpluck-review` project skills so regressions get caught automatically.
+
+### Fixes
+
+1. **`docpluck/extract.py::count_pages`** — compressed-stream fallback. The byte-pattern heuristic returns 0/1 on PDF 1.5+ documents that compress object streams (`/ObjStm`), so multi-page papers that use cross-reference streams were reported as 1 page. New behavior: when the byte count is < 2, fall back to `pdfplumber.open(...).pages`. Verified by 4 new tests in `tests/test_v23_1_fixes.py`.
+
+2. **`docpluck/extract.py::_patch_fffds_word_by_word`** — per-word U+FFFD recovery. When the full pdfplumber-recovery path is rejected by the reading-order check (two-column papers that pdfplumber column-interleaves), individual FFFD-containing words can still be patched. For each FFFD-bearing token in pdftotext, build a regex with `[A-Za-z]` at each FFFD position and the literal char elsewhere, then look for a UNIQUE match in pdfplumber's token set. When exactly one candidate exists, swap. Conservative — only matches letters (no digits/punct), refuses ambiguous matches. Recovers the 18 residual FFFDs in the Adelina/Pronin paper that survived the full-document recovery rejection. 8 new tests.
+
+3. **`docpluck/render.py::_italicize_known_subtitle_badges`** — Bug 6 fix (subtitle styling). Recognized publication-format badge lines immediately after `# Title` (`Registered Report`, `Pre-Registered`, `Original Investigation`, `Brief Report`, etc., 10 patterns) are now wrapped in italic markdown so the workspace UI renders them as styled subtitles instead of plain body prose. Scope is narrow: only the first non-empty line(s) within ~10 lines of the title, ≤ 50 chars, must match a known badge pattern. Idempotent. 10 new tests.
+
+### Skill integration
+
+4. **`.claude/skills/docpluck-qa/SKILL.md`** — new Check 7b ("Corpus Render Verifier"). After Check 7 (batch extraction), `/docpluck-qa` now runs `python scripts/verify_corpus.py` against the 26-paper baseline corpus and reports per-paper PASS/FAIL with failure tags. Total check count: 14 → 15.
+
+5. **`.claude/skills/docpluck-review/SKILL.md`** — new Rule 12 ("Corpus render verifier must pass on changes to render / extract / tables"). When a `/docpluck-review` invocation detects changes to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py`, the reviewer must run `scripts/verify_corpus.py` (8–12 min) or `pytest tests/test_corpus_smoke.py` (~45s) before approving. Severity: BLOCKER for `render.py` / `extract_structured.py` / `tables/`; WARN for other touches.
+
+### Bumps
+
+- `__version__`: `2.3.0` → `2.3.1`.
+- `TABLE_EXTRACTION_VERSION`: unchanged at `2.1.0` (no table-pipeline behavior change).
+- `NORMALIZATION_VERSION`: unchanged at `1.8.1`.
+
+### Tests
+
+22 new tests in `tests/test_v23_1_fixes.py`. All existing tests still pass.
+
+### Follow-up
+
+`PDFextractor/service/requirements.txt` pin bumped from `@v2.3.0` to `@v2.3.1`.
+
+---
+
 ## [2.3.0] — 2026-05-11
 
 Ports the splice-spike's Section F (cell-cleaning) helpers into the library, per [`docs/HANDOFF_2026-05-11_visual_review_findings.md`](docs/HANDOFF_2026-05-11_visual_review_findings.md). v2.2.0 had explicitly deferred this; v2.3.0 lands it.
