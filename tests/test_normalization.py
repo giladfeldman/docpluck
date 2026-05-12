@@ -438,6 +438,45 @@ class TestS9_HeaderFooter:
         # so left alone (conservative).
         assert "1175" in result
 
+    def test_4digit_sequential_page_numbers_stripped(self):
+        """v2.4.5: Continuous-pagination journals like PSPB use sequential
+        page numbers per page (1174, 1175, 1177, 1179, ...). Each value is
+        DIFFERENT (not recurring) so the v2.4.3 ≥3-recurrence rule misses
+        them. v2.4.5 widens to also strip when ≥3 distinct 4-digit values
+        cluster within a 50-page range with mean diff ≤ 3."""
+        text = (
+            "Page 1 body.\n"
+            "1174\n"
+            "Page 2 body.\n"
+            "1175\n"
+            "Page 3 body.\n"
+            "1177\n"
+            "Page 4 body.\n"
+            "1179\n"
+            "Page 5 body.\n"
+        )
+        result = norm(text, "standard")
+        for n in ("1174", "1175", "1177", "1179"):
+            assert f"\n{n}\n" not in result, f"page number {n} not stripped"
+
+    def test_4digit_unrelated_values_preserved(self):
+        """4-digit values that don't cluster together (large spread, big
+        gaps) are NOT pagination — leave them alone (could be table cells
+        or unrelated data)."""
+        text = (
+            "abc\n"
+            "1000\n"
+            "def\n"
+            "5000\n"
+            "ghi\n"
+            "9999\n"
+        )
+        result = norm(text, "standard")
+        # Spread is 8999, way over 50 — preserved.
+        assert "1000" in result
+        assert "5000" in result
+        assert "9999" in result
+
     def test_4digit_year_on_own_line_preserved(self):
         """A 4-digit value that only appears ONCE on its own line is NOT
         a page number — could be a year reference or stray data. Leave it."""
