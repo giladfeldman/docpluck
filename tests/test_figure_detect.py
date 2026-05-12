@@ -159,3 +159,62 @@ def test_trim_caption_keeps_minimum_post_label_content():
     out = _trim_caption_at_chart_data(short_pre_label)
     # Sanity check fires; return original.
     assert out == short_pre_label
+
+
+# v2.4.4: caption truncation extended to short-token tick runs (5+ short
+# numeric tokens in a row — axis-tick label sequences from charts).
+
+
+def test_trim_caption_at_tick_run_truncates_axis_labels():
+    """v2.4.4: detect chart axis-tick sequences (5+ short numeric tokens
+    separated only by whitespace) — jama_open_3-style Kaplan-Meier
+    captions absorb gridline values like ``0 0 5 10 15`` that the 6-digit
+    rule didn't catch."""
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    cap = (
+        "Figure 1. Unadjusted Kaplan-Meier Curves Across Groups With "
+        "Different Objective Sleep Duration for All-Cause Mortality 100 "
+        "90 Survival probability, % 80 70 Sleep duration 60 seven hours "
+        "6 to 7 hours 50 5 to 6 hours less than 5 hours 0 0 5 10 15 "
+        "Follow-up time y No at risk Sleep duration seven hours 340 321 "
+        "280 5 Sleep duration"
+    )
+    out = _trim_caption_at_chart_data(cap)
+    assert "0 0 5 10 15" not in out
+    # Trim should preserve the prose lead-in.
+    assert out.startswith("Figure 1. Unadjusted Kaplan-Meier Curves")
+
+
+def test_trim_caption_preserves_legitimate_prose_with_inline_numbers():
+    """Real caption prose references numbers in stats ('n = 1234', 'p < .001'),
+    but each number is followed by a word — not 5+ stacked numerics in a row."""
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    cap = (
+        "Figure 2. Mean reaction times across the four experimental "
+        "conditions, with n = 1234 participants total (95% CI [120.5, "
+        "180.3] ms for condition A; 95% CI [110.2, 175.4] for condition "
+        "B). Significant differences observed at p < .001 between paired "
+        "conditions in all 4 contrasts of interest, as predicted."
+    )
+    out = _trim_caption_at_chart_data(cap)
+    assert out == cap
+
+
+def test_trim_caption_picks_earliest_match_across_both_rules():
+    """When both the 6-digit-run and the 5-token-tick rules match,
+    truncate at the earlier offset so we don't keep chart data past the
+    first signal."""
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    # Tick run appears first; 6-digit run appears later.
+    cap = (
+        "Figure 3. Bar plot of conditions A through F across the years "
+        "of interest 2020 2021 2022 2023 2024 2025 with later analytic "
+        "subsample participant total 4876956 in the secondary cohort "
+        "described in the methods section above and detailed in the "
+        "supplementary materials accompanying this paper."
+    )
+    out = _trim_caption_at_chart_data(cap)
+    # The tick run "2020 2021 2022 2023 2024 2025" appears earlier; trim
+    # there.
+    assert "2020 2021" not in out
+    assert "4876956" not in out

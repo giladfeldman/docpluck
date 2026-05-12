@@ -146,6 +146,14 @@ def _full_caption_text(raw_text: str, cap: CaptionMatch) -> str:
 # that pdftotext joined chart data (raw bar-chart values, participant counts,
 # row IDs) into the caption.
 _CHART_DATA_DIGIT_RUN_RE = re.compile(r"\b\d{6,}\b")
+# A run of 5+ short numeric tokens (1–4 digits each) separated only by
+# whitespace is a v2.4.4 signal — captures axis-tick label sequences
+# (``0 5 10 15 20``) and stacked column values (``340 321 280 5 270``)
+# that the 6-digit rule misses on charts with small-magnitude data.
+# Real captions reference numbers via prose ("with n = 1234 participants",
+# "p < .001"), so digit tokens are interleaved with words rather than
+# stacked five-in-a-row.
+_CHART_DATA_TICK_RUN_RE = re.compile(r"(?:\b\d{1,4}\b[ \t]+){5,}")
 
 
 def _trim_caption_at_chart_data(caption: str) -> str:
@@ -161,21 +169,27 @@ def _trim_caption_at_chart_data(caption: str) -> str:
     where the real caption is "Flowchart of Study Sample Selection" and the
     rest is chart data values.
 
-    Strategy: locate the first run of 6+ consecutive digits (the signature
-    of chart data — counts or row IDs that no real caption sentence would
-    contain). Truncate the caption just before that run, falling back to
-    the word boundary so we don't end mid-word.
+    v2.4.4: two complementary signatures are scanned (see module-level
+    constants); the *earlier* match in the caption wins so the caption is
+    trimmed at the start of the chart data, not partway through it.
 
     Conservative: only fires when the caption is ≥ 150 chars (real short
-    captions almost never have chart-data appendage), and only when the
-    surviving trimmed caption is ≥ 40 chars after the label.
+    captions almost never have a chart-data appendage), and only when the
+    surviving trimmed caption is ≥ 40 chars (sanity check protects against
+    edge cases where the digit run lands near the label).
     """
     if not caption or len(caption) < 150:
         return caption
-    m = _CHART_DATA_DIGIT_RUN_RE.search(caption)
-    if m is None:
+    candidates: list[int] = []
+    m1 = _CHART_DATA_DIGIT_RUN_RE.search(caption)
+    if m1 is not None:
+        candidates.append(m1.start())
+    m2 = _CHART_DATA_TICK_RUN_RE.search(caption)
+    if m2 is not None:
+        candidates.append(m2.start())
+    if not candidates:
         return caption
-    cut = m.start()
+    cut = min(candidates)
     # Walk back to the previous word boundary.
     while cut > 0 and not caption[cut - 1].isspace():
         cut -= 1
