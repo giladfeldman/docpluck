@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.1] — 2026-05-12
+
+Same-day follow-up to v2.4.0. Expanded testing to all 101 PDFs in the wider corpus (vs the 26 spike-baseline papers) and fixed the most common new failure: missing-title on AMA/AOM single-line title layouts.
+
+### Fixes
+
+1. **`docpluck/render.py::_compute_layout_title`** — title-size selection in two passes:
+   - Pass 1 (unchanged): largest font with count ≥ 2 (multi-line titles).
+   - Pass 2 (new): largest font in the TOP region (y0 ≥ 70% of page height) with count ≥ 1 and combined span text ≥ 10 chars.
+
+   Without the top-region restriction + text-length floor, a stray same-font glyph elsewhere on the page (a "+" decoration at font 16.0, an "GUIDEPOST" feature-label at font 30.0) would outrank a real single-line title at a smaller-but-still-large font. Affects: `jama_open_3`, `jama_open_4`, `jama_open_6`, `jama_open_10`, `annals_4`, `amd_1` and similar AMA/AOM-style papers.
+
+### Bumps
+
+- `__version__`: `2.4.0` → `2.4.1`. Patch-level — internal heuristic improvement, no API change.
+
 ## [2.4.0] — 2026-05-12
 
 Same-day follow-up. Closes the three real library bugs surfaced by the AI-Chrome visual verification pass on all 26 corpus papers documented in `docs/HANDOFF_2026-05-12_visual_verify_results.md`. The API-level `verify_corpus.py` was passing 26/26 throughout but couldn't see these — visual inspection in the workspace was needed.
