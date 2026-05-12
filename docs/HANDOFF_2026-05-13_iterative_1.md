@@ -1,6 +1,6 @@
 # Handoff — iterative library improvement (close-out, iter 1)
 
-**Session window:** 2026-05-12 22:00 → 2026-05-13 ~02:00 Vienna time (UTC+2).
+**Session window:** 2026-05-12 22:00 → 2026-05-13 ~02:30 Vienna time (UTC+2).
 **Driver:** autonomous iteration from `docs/HANDOFF_2026-05-13_iterative_library_improvement.md` workflow contract.
 
 ---
@@ -12,8 +12,9 @@
 | **v2.4.2** | `15a2715` | H-tag fix (caption-no-cells body skip), lowercase canonical heading uppercase, ADDENDUM verifier exemption |
 | **v2.4.3** | `9fa2e72` | 4-digit page-number strip (S9 widen), figure-caption chart-data 6-digit trim *(buggy — on wrong code path)* |
 | **v2.4.4** | `4861e35` | Caption-trim moved to real code path (`extract_structured._extract_caption_text`) + tick-run extension |
+| **v2.4.5** | `8f612d7` | Sequential 4-digit page-number strip (continuous-pagination journals) |
 
-App pin `PDFextractor/service/requirements.txt`: `v2.4.1` → `v2.4.2` → `v2.4.3` → `v2.4.4`, all pushed to `master`.
+App pin `PDFextractor/service/requirements.txt`: `v2.4.1` → `v2.4.2` → `v2.4.3` → `v2.4.4` → `v2.4.5`, all pushed to `master`.
 
 ## 101-PDF corpus results progression
 
@@ -23,6 +24,7 @@ App pin `PDFextractor/service/requirements.txt`: `v2.4.1` → `v2.4.2` → `v2.4
 | **v2.4.2** | **101/101** | All three failures closed (H × 2 by render fix; S,X by verifier exemption) |
 | **v2.4.3** | **101/101** | No regressions from the normalize fix; caption trim was a no-op (bug) |
 | **v2.4.4** | **101/101 PASS** | Caption trim now actually fires on the render pipeline; verified end-to-end |
+| **v2.4.5** | **26/26 PASS (101 in progress)** | Sequential page-num strip; 26-paper baseline confirmed clean |
 
 26-paper baseline (`scripts/verify_corpus.py`) at v2.4.2: **26/26 PASS**. Full pytest suite at v2.4.4: **920 + 6 = 926 pass**, no regressions.
 
@@ -47,6 +49,12 @@ App pin `PDFextractor/service/requirements.txt`: `v2.4.1` → `v2.4.2` → `v2.4
 2. **Extended chart-data signature** — added a second pattern: run of 5+ short (1-4 digit) numeric tokens separated only by whitespace. Catches axis-tick label sequences (``0 5 10 15 20``) and stacked column values that the 6-digit-run rule missed on charts with small-magnitude data. The two signatures evaluate jointly; earlier match in the caption wins.
 
 3 new tests in `tests/test_figure_detect.py`.
+
+## What v2.4.5 fixed
+
+1. **`docpluck/normalize.py::normalize_text` S9** — extended 4-digit page-number strip with a SEQUENTIAL pattern. v2.4.3 only stripped values that recurred 3+ times — but continuous-pagination journals (PSPB, Cognition and Emotion) use *sequential* page numbers per page (1174, 1175, 1177, 1179, ...) where each value is different, so v2.4.3 missed them. v2.4.5 widens with a second pattern: when ≥ 3 distinct standalone 4-digit values cluster within a 50-page spread AND mean inter-value gap ≤ 3, treat them as continuous-pagination page numbers and strip. Verified end-to-end on `efendic_2022_affect.md` (page numbers 1174-1184 stripped) and `chan_feldman_2025_cogemo.md` (page numbers 1229-1249 stripped). `NORMALIZATION_VERSION`: `1.8.2` → `1.8.3`.
+
+2 new tests in `tests/test_normalization.py`.
 
 ## Outstanding known issues (deferred)
 
@@ -94,10 +102,11 @@ PDFextractor/service/requirements.txt — pin bump v2.4.1 → v2.4.4
 
 ## Numbers
 
-- **3 library releases** (v2.4.2, v2.4.3, v2.4.4) with tag + commit + push.
-- **16 new tests** added across `test_render.py`, `test_normalization.py`, `test_figure_detect.py`.
-- **926 tests pass overall** (full suite at v2.4.4).
+- **4 library releases** (v2.4.2, v2.4.3, v2.4.4, v2.4.5) with tag + commit + push.
+- **18 new tests** added across `test_render.py`, `test_normalization.py`, `test_figure_detect.py`.
+- **926+ tests pass overall** (full suite at v2.4.4; 26-paper baseline + 156 normalize tests confirmed at v2.4.5).
 - **3 → 0 verifier failures** on the 101-PDF corpus.
-- **Average caption length reduction** on chart-heavy papers: ~250 chars dropped (estimate from v2.4.4 partial run).
+- **Average caption length reduction** on chart-heavy papers: ~250 chars dropped (v2.4.4 sample).
+- **Standalone page numbers stripped** on continuous-pagination journals (v2.4.5): efendic ~80 chars, chan_feldman ~140 chars per paper.
 
 Good luck.
