@@ -1,4 +1,9 @@
-"""HTML rendering of cells -> <table>."""
+"""HTML rendering of cells -> <table>.
+
+v2.3.0: cells_to_html now runs the full cell_cleaning pipeline. Heavy
+behavioral coverage lives in test_tables_cell_cleaning.py; this file
+just verifies the list[Cell] → grid → HTML adapter behaves correctly.
+"""
 
 from docpluck.tables import Cell
 from docpluck.tables.render import cells_to_html
@@ -12,27 +17,31 @@ def _cell(r, c, text, is_header=False) -> Cell:
     }
 
 
-def test_empty_cells_returns_empty_table():
-    assert cells_to_html([]) == "<table></table>"
+def test_empty_cells_returns_empty_string():
+    """v2.3.0: empty input returns empty string (was '<table></table>')."""
+    assert cells_to_html([]) == ""
 
 
-def test_simple_2x2_no_header():
+def test_simple_2x3_renders_thead_and_tbody():
+    """A 2x3 grid runs through the cleaning pipeline; the heuristic
+    promotes the first row to <thead>."""
     cells = [
-        _cell(0, 0, "a"), _cell(0, 1, "b"),
-        _cell(1, 0, "c"), _cell(1, 1, "d"),
+        _cell(0, 0, "Variable"), _cell(0, 1, "M"), _cell(0, 2, "SD"),
+        _cell(1, 0, "Age"), _cell(1, 1, "24.3"), _cell(1, 2, "3.1"),
+        _cell(2, 0, "IQ"), _cell(2, 1, "100.5"), _cell(2, 2, "15.2"),
     ]
     html = cells_to_html(cells)
-    assert html == (
-        "<table>"
-        "<tbody>"
-        "<tr><td>a</td><td>b</td></tr>"
-        "<tr><td>c</td><td>d</td></tr>"
-        "</tbody>"
-        "</table>"
-    )
+    assert "<thead>" in html
+    assert "<tbody>" in html
+    assert "<th>Variable</th>" in html
+    assert "<td>Age</td>" in html
+    assert "<td>24.3</td>" in html
 
 
-def test_with_header_row():
+def test_with_header_row_flag_does_not_matter():
+    """v2.3.0: the Cell is_header flag is ignored; heuristics drive
+    header detection. A short-label row above numeric data still goes
+    to <thead>."""
     cells = [
         _cell(0, 0, "Name", is_header=True),
         _cell(0, 1, "Score", is_header=True),
@@ -49,35 +58,29 @@ def test_with_header_row():
 
 
 def test_html_escapes_special_chars():
-    cells = [_cell(0, 0, "p < .05 & d > 0")]
+    cells = [
+        _cell(0, 0, "expression"),
+        _cell(1, 0, "p < .05 & d > 0"),
+    ]
     html = cells_to_html(cells)
     assert "&lt;" in html
     assert "&gt;" in html
     assert "&amp;" in html
-    assert "<" not in html.replace("<table>", "").replace("<tbody>", "").replace("<tr>", "").replace("<td>", "").replace("</td>", "").replace("</tr>", "").replace("</tbody>", "").replace("</table>", "")
-
-
-def test_empty_cells_render_as_empty_td():
-    cells = [
-        _cell(0, 0, "x"), _cell(0, 1, ""),
-        _cell(1, 0, ""), _cell(1, 1, "y"),
-    ]
-    html = cells_to_html(cells)
-    assert "<td></td>" in html
-    assert "<td>x</td>" in html
-    assert "<td>y</td>" in html
 
 
 def test_handles_missing_cells_in_grid():
-    # Row 1 has cell (1,0) but no (1,1) — render empty <td> in the gap.
+    """Cells missing from the grid render as empty <td>/<th>."""
     cells = [
-        _cell(0, 0, "a"), _cell(0, 1, "b"),
-        _cell(1, 0, "c"),
+        _cell(0, 0, "Variable"), _cell(0, 1, "Mean"),
+        _cell(1, 0, "Age"),
     ]
     html = cells_to_html(cells)
-    assert html.count("<tr>") == 2
-    # Second row should still have 2 td slots
-    tbody = html[html.find("<tbody>"):html.find("</tbody>")]
-    assert tbody.count("<td>") == 4  # 2 cells in first row + 2 cells in second row
-    # Verify second row has empty cell
-    assert "<td>c</td><td></td></tr>" in html
+    # Second row should still have 2 td slots — the missing (1,1) becomes "".
+    assert "<td>Age</td>" in html
+    assert "<td></td>" in html
+
+
+def test_single_cell_returns_empty_string():
+    """v2.3.0: single-row grid is too small to render meaningfully."""
+    cells = [_cell(0, 0, "hello")]
+    assert cells_to_html(cells) == ""

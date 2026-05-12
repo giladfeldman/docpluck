@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docpluck"
-version = "2.1.0"
+version = "2.3.0"
 description = "PDF, DOCX, and HTML text extraction and normalization for academic papers"
 readme = "docs/README.md"
 requires-python = ">=3.10"

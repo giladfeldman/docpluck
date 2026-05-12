@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.7.0"
+NORMALIZATION_VERSION = "1.8.1"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -44,7 +44,15 @@ _WATERMARK_PATTERNS = [
     # required `<url> on <date>` with nothing in between and missed it on
     # every Collabra paper.
     re.compile(
-        r"Downloaded\s+from\s+https?://[^\s]+(?:\s+by\s+\w+)?"
+        # v2.3.0: extended the "by <phrase>" tail from `\w+` (one word, fits
+        # "by guest") to any non-newline-bounded phrase, so it catches
+        # institutional download stamps like
+        #   "Downloaded from <url> by University of Innsbruck (Universitat
+        #    Innsbruck) user on 16 March 2026"
+        # found on every page of ar_royal_society_rsos_140072 (verified by
+        # ``scripts/verify_corpus.py``). The trailing "on <day> <month>
+        # <year>" anchor prevents runaway captures into body prose.
+        r"Downloaded\s+from\s+https?://[^\s]+(?:\s+by\s+[^\n]+?)?"
         r"\s+on\s+\d{1,2}\s+\w+\s+\d{4}",
         re.IGNORECASE,
     ),
@@ -334,6 +342,362 @@ def _looks_like_ref_start(line: str) -> bool:
     )
 
 
+# ── H0 / T0 / P0 / H1 : document-shape strips (NORMALIZATION_VERSION 1.8.0) ──
+# Ported from docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py
+# (iter-20, iter-25, iter-26, iter-27). These run BEFORE the unicode/whitespace
+# steps so the line-level regexes match raw pdftotext output.
+
+# H0: explicit publisher / journal / repository banner lines that appear in the
+# document header zone. A line is dropped ONLY if it matches an explicit
+# pattern — anything else (titles, authors, affiliations, unknown text) stays.
+_HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
+    # Bare URL line (publisher landing page).
+    re.compile(r"^(?:https?://)?(?:www\.)?\S+\.(?:com|org|edu|gov|net|fr|uk|jp|cn|de|ch|nl)(?:/\S*)?$"),
+    # NCBI / HHS / PMC manuscript banner (3-line block).
+    re.compile(r"^HHS Public Access$"),
+    re.compile(r"^Author manuscript$"),
+    re.compile(r"^Published in final edited form as:.*$"),
+    # Royal Society Open Science masthead.
+    re.compile(r"^Cite this article:.*$"),
+    re.compile(r"^Subject (?:Category|Areas):.*$"),
+    re.compile(r"^Author for correspondence:.*$"),
+    re.compile(r"^Received:\s+\d{1,2}\s+\w+\s+\d{4}.*$"),
+    re.compile(r"^Accepted:\s+\d{1,2}\s+\w+\s+\d{4}.*$"),
+    # Elsevier / ScienceDirect masthead.
+    re.compile(r"^Contents lists available at\s+\S+.*$"),
+    re.compile(r"^journal homepage:.*$", re.IGNORECASE),
+    # Tandfonline / Taylor & Francis masthead.
+    re.compile(r"^ISSN:\s*\S+.*$"),
+    re.compile(r"^To cite this article:.*$"),
+    re.compile(r"^To link to this article:.*$"),
+    re.compile(r"^View supplementary material.*$"),
+    re.compile(r"^Full Terms.*Conditions of access.*$"),
+    # arXiv preprint banner.
+    re.compile(r"^arXiv:\d+\.\d+(?:v\d+)?\s+\[[\w\.-]+\]\s+\d{1,2}\s+\w+\s+\d{4}\s*$"),
+    # Article-type / category single-word labels.
+    re.compile(r"^Article$"),
+    re.compile(r"^ARTICLE$"),
+    re.compile(r"^Research$"),
+    re.compile(r"^Empirical Research Paper$"),
+    re.compile(r"^Original (?:Investigation|Article|Research)(?:\s*\|\s*.+)?$"),
+    re.compile(r"^Article\s+type[:.]\s*.*$", re.IGNORECASE),
+    # AOM "r Academy of Management ..." masthead.
+    re.compile(r"^r\s+Academy of Management\s+\S.*\d{4},.*$"),
+    # SAGE / generic journal volume + page-range banner.
+    re.compile(
+        r"^[A-Z][A-Za-z &\-‐-―]{4,60}\s+\d{4},\s+Vol\.\s+\d+(?:\(\d+\))?[\s,].+$"
+    ),
+    # Chicago / Demography / similar: "Journal Name. YYYY Month DD; Vol(Iss): pages. doi:..."
+    re.compile(
+        r"^[A-Z][A-Za-z &]{3,40}\.\s+\d{4}.*\d+[:;].+doi:.*$"
+    ),
+    # SAGE / Cambridge / generic: "British Journal of Political Science (YYYY), Vol, pages doi:..."
+    re.compile(
+        r"^[A-Z][A-Za-z &]{4,60}\s+\(\d{4}\),\s+\d+,\s+\d+.{0,200}$"
+    ),
+    # Mangled DOI lines from publishers that overlay two PDF text runs.
+    re.compile(r"^Dhtt[Oo]ps[Ii]:.*$"),
+    # Manuscript-ID gibberish like "1253268 ASRXXX10.1177/00031224241253268..."
+    re.compile(r"^\d{6,}\s+[A-Z]{2,}[A-Z0-9]*\d+\.\d{4,}/.+$"),
+    # Generic journal-citation banner with DOI suffix.
+    re.compile(r"^[A-Z][A-Za-z\-]+,\s+\d{4},\s+vol(?:ume)?\s+\d+.*https?://doi\.org/.*$", re.IGNORECASE),
+    # ScienceDirect issue line: "Journal Name 96 (2021) 104154 Contents lists..."
+    re.compile(r"^[A-Z][A-Za-z &]+\s+\d+\s+\(\d{4}\)\s+\d+(?:\s+Contents.*)?$"),
+    # Standalone Digital Object Identifier line.
+    re.compile(r"^Digital Object Identifier\s+10\.\d+/.+$"),
+    # Curated bare journal-name lines (small-font running banner above title).
+    re.compile(r"^Journal of Economic Psychology$"),
+    re.compile(r"^Cognition and Emotion$"),
+    re.compile(
+        r"^Journal of Experimental Social Psychology"
+        r"(?:\s+\d+(?:\s*\(\d{4}\))?\s+\d+[‐-―\-]\d+)?$"
+    ),
+    # Judgment and Decision Making cite-line banner.
+    re.compile(
+        r"^[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){1,8},\s+"
+        r"Vol\.\s+\d+,\s+No\.\s+\d+,\s+\w+\s+\d{4},\s+pp\.\s+\d+[‐-―\-]\d+\s*$"
+    ),
+    # Oxford-journals: "Social Forces, 2025, 104, 224–249".
+    re.compile(
+        r"^[A-Z][A-Za-z]+(?:\s+[A-Za-z]+){0,3},\s+\d{4},\s+\d+,\s+\d+[‐-―\-]\d+\s*$"
+    ),
+    # Oxford-journals supplementary doi banner.
+    re.compile(r"^https?://doi\.org/\S+\s+Advance access.*$"),
+]
+
+
+def _strip_document_header_banners(text: str) -> str:
+    """H0: drop publisher/journal/repo banner lines in the document header zone.
+
+    Header zone = everything before the first ``##`` heading, capped at the
+    first 30 lines. (In the library pipeline ``##`` headings have not been
+    added yet, so the 30-line cap is what applies.) Lines are dropped only on
+    explicit pattern match; title / author / affiliation lines (which never
+    match any banner pattern) are preserved verbatim.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    header_end = len(lines)
+    cap = min(len(lines), 30)
+    for idx in range(cap):
+        if lines[idx].lstrip().startswith("##"):
+            header_end = idx
+            break
+    else:
+        header_end = cap
+
+    out_lines: list[str] = []
+    dropped_any = False
+    for idx, line in enumerate(lines):
+        if idx < header_end:
+            stripped = line.strip()
+            if stripped and any(
+                p.match(stripped) for p in _HEADER_BANNER_PATTERNS
+            ):
+                dropped_any = True
+                continue
+        out_lines.append(line)
+
+    if not dropped_any:
+        return text
+
+    cleaned = "\n".join(out_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    if cleaned.startswith("\n"):
+        cleaned = cleaned.lstrip("\n")
+    return cleaned
+
+
+# T0: TOC dot-leader strip — Nature Supplementary PDFs render their TOC with
+# runs of ``___`` (pdftotext's encoding of dot-leader filler characters).
+_TOC_DOT_LEADER_RE = re.compile(r"_{3,}")
+_PURE_TOC_LEADER_RE = re.compile(r"^\s*_{3,}\s*\d{0,4}\s*$")
+_TOC_HEADING_RE = re.compile(
+    r"^\s*(?:Table\s+of\s+Contents|List\s+of\s+(?:Supplementary\s+)?(?:Figures?|Tables?))\s*$",
+    re.IGNORECASE,
+)
+
+
+def _strip_toc_dot_leader_block(text: str) -> str:
+    """T0: drop TOC paragraphs with dot-leader page-number trails.
+
+    Scope is limited to the first ~100 lines of the document (TOCs live near
+    the top). Drops paragraphs that contain ``_{3,}`` runs or explicit TOC
+    label lines. Also drops a ``## Heading`` whose immediate next paragraph is
+    a TOC dot-leader paragraph (misparsed TOC entry promoted to a false
+    heading) — this second rule fires only when section-detection has already
+    introduced headings, which in the library pipeline happens later, so it
+    is effectively a no-op here. Kept for parity with the spike behavior in
+    case ``normalize_text`` is ever called on already-rendered markdown.
+    """
+    if not text:
+        return text
+    head_zone = text[:8000]
+    if "_" not in head_zone and not re.search(
+        r"\b(?:Table\s+of\s+Contents|List\s+of\s+(?:Supplementary\s+)?(?:Figures?|Tables?))\b",
+        head_zone,
+        re.IGNORECASE,
+    ):
+        return text
+    parts = re.split(r"(\n\n+)", text)
+    n = len(parts)
+
+    cum_lines = 0
+    last_para_idx_in_zone = -1
+    for i in range(0, n, 2):
+        if cum_lines >= 100:
+            break
+        last_para_idx_in_zone = i
+        cum_lines += parts[i].count("\n") + 1
+        if i + 1 < n:
+            cum_lines += parts[i + 1].count("\n")
+
+    drop_idx: set[int] = set()
+    for i in range(0, last_para_idx_in_zone + 1, 2):
+        para = parts[i]
+        para_s = para.strip()
+        if not para_s:
+            continue
+        is_toc = (
+            _TOC_DOT_LEADER_RE.search(para)
+            or _TOC_HEADING_RE.match(para_s)
+        )
+        if is_toc:
+            drop_idx.add(i)
+            if i >= 2 and parts[i - 2].strip().startswith("## "):
+                drop_idx.add(i - 2)
+
+    if not drop_idx:
+        return text
+
+    kept: list[str] = []
+    for i in range(0, n, 2):
+        if i in drop_idx:
+            continue
+        kept.append(parts[i])
+
+    while kept and not kept[0].strip():
+        kept.pop(0)
+    cleaned = "\n\n".join(kept)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+# P0: page-footer / running-header LINES anywhere in the document. Curated
+# patterns only — each must match a single COMPLETE line.
+_PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
+    # Bare page number: "Page 1", "Page 27".
+    re.compile(r"^Page\s+\d+\s*$"),
+    # Page-N-of-M with date prefix: "October 27, 2023 1/13".
+    re.compile(
+        r"^(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*20\d{2}\s+\d+/\d+\s*$"
+    ),
+    # Bare "(continued)" page-break marker.
+    re.compile(r"^\([Cc]ontinued\)\s*$"),
+    # Affiliation footnote markers like "aETH Zurich".
+    re.compile(r"^[a-z][A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*\s*$"),
+    # "Corresponding Author:" lines.
+    re.compile(r"^Corresponding\s+[Aa]uthor[s]?:.*$"),
+    # "Author for correspondence:" Royal Society style.
+    re.compile(r"^Author\s+for\s+correspondence:.*$", re.IGNORECASE),
+    # Email/phone metadata lines.
+    re.compile(r"^E-?mail(?:s)?:\s*\S+@.+$", re.IGNORECASE),
+    re.compile(r"^Tel(?:\.|ephone)?:\s*\S.*$", re.IGNORECASE),
+    re.compile(r"^Fax:\s*\S.*$", re.IGNORECASE),
+    # Bare email line (one or more emails separated by whitespace/punct).
+    re.compile(
+        r"^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,6}(?:[\s,;]+[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,6})*\s*$"
+    ),
+    # JAMA running header line.
+    re.compile(
+        r"^JAMA\s+Network\s+Open\.\s+20\d{2};\d+\(\d+\):e\d+\.\s*doi:10\.\d+/.+$"
+    ),
+    # JAMA category banner.
+    re.compile(r"^JAMA\s+Network\s+Open\s+\|\s+\S.*$"),
+    # Compound license + citation footer.
+    re.compile(
+        r"^Open\s+Access\.\s+This is an open access article.*doi:10\.\d+/.+$"
+    ),
+    # Standalone copyright line "© 20YY ...".
+    re.compile(r"^©\s*20\d{2}\b.*$"),
+    re.compile(r"^\(c\)\s*20\d{2}\b.*$", re.IGNORECASE),
+    # JAMA sidebar pointer.
+    re.compile(
+        r"^Author affiliations and article information are listed at the end of (?:this article|the article)\.?\s*$"
+    ),
+    # JAMA visual-abstract sidebar.
+    re.compile(r"^\+\s*Visual Abstract.*Supplemental content\s*$"),
+    re.compile(r"^\+\s*Supplemental content\s*$"),
+    # Compound copyright-footer.
+    re.compile(
+        r"^Received:\s+[\w ,]+\d{4}\.\s+(?:Revised:.*Accepted:.*"
+        r"|Accepted:.*)\s*©.*$"
+    ),
+    # Parenthesized cite-line: "(Received DD Month YYYY; revised...)".
+    re.compile(
+        r"^\(Received\s+\d{1,2}\s+\w+\s+\d{4};\s+(?:revised|accepted).*\)\s*$",
+        re.IGNORECASE,
+    ),
+    # Standalone open-access license footers.
+    re.compile(
+        r"^©\s+The Author\(s\)[,\s]+\d{4}\..*Cambridge University Press.*$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^©\s+The Author\(s\)[,\s]+\d{4}\..*Published by .*$",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^This is an open access article distributed under.*$", re.IGNORECASE),
+    # PMC supplementary-material footer.
+    re.compile(
+        r"^ELECTRONIC SUPPLEMENTARY MATERIAL\b.*$",
+        re.IGNORECASE,
+    ),
+    # Running-header lines with "| <page>" or "<page> Author et al.".
+    re.compile(r"^\S(?:[^|\n]{2,80})\|\s*\d{1,4}\s*$"),
+    re.compile(r"^\d{1,4}\s+[A-ZÀ-ÿ][^\n]{1,60}\s+et al\.?\s*$"),
+]
+
+
+def _strip_page_footer_lines(text: str) -> str:
+    """P0: drop page-footer / running-header lines anywhere in the document.
+
+    Curated patterns only. Line is dropped on explicit match; everything else
+    is preserved. CHEAP variant of F1 — does not stitch sentence halves that
+    spanned the page break, just removes the junk between them.
+    """
+    if not text:
+        return text
+    out_lines: list[str] = []
+    dropped_any = False
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped and any(
+            p.match(stripped) for p in _PAGE_FOOTER_LINE_PATTERNS
+        ):
+            dropped_any = True
+            continue
+        out_lines.append(line)
+    if not dropped_any:
+        return text
+    cleaned = "\n".join(out_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _fix_hyphenated_line_breaks(text: str) -> str:
+    """H1: join lines split mid-word at a hyphen by pdftotext column wrap.
+
+    Conservative: always keeps the hyphen, only removes the newline. Both
+    real compounds (``Meta-\\nProcesses`` → ``Meta-Processes``) and line-wrap
+    artifacts (``socio-\\neconomic`` → ``socio-economic``) end up as valid
+    hyphenated forms.
+
+    Skips ``<table>`` blocks, fenced code, markdown headings, hyphens after
+    non-alpha characters (date ranges), and continuation lines starting with
+    non-alpha (markers, brackets).
+    """
+    lines = text.split("\n")
+    in_table = False
+    in_fence = False
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        ls = line.strip()
+        if ls.startswith("```"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        if not in_fence:
+            if "<table" in ls:
+                in_table = True
+            if "</table>" in ls:
+                in_table = False
+                i += 1
+                continue
+        if in_fence or in_table:
+            i += 1
+            continue
+        if ls.startswith("#"):
+            i += 1
+            continue
+        if (
+            i + 1 < len(lines)
+            and len(line) >= 3
+            and line.endswith("-")
+            and line[-2].isalpha()
+        ):
+            next_line = lines[i + 1]
+            ns = next_line.strip()
+            if ns and ns[0].isalpha():
+                lines[i] = line + ns
+                del lines[i + 1]
+                continue
+        i += 1
+    return "\n".join(lines)
+
+
 @dataclass
 class NormalizationReport:
     level: str
@@ -413,6 +777,26 @@ def normalize_text(
         report.steps_applied.append("F0")
         if footnote_spans:
             report.steps_changed.append("F0")
+
+    # ── H0: document-header banner-line strip (NORMALIZATION_VERSION 1.8.0) ─
+    # Note: H1 (hyphen-broken-word rejoin) is NOT applied here — the library's
+    # S7 step below already removes column-wrap hyphens. H1 lives in
+    # docpluck/render.py, where it runs on already-rendered markdown to
+    # re-knit real compound words (e.g. Meta-Processes) split across caption
+    # line wraps after S7 has handled the common case.
+    before = t
+    t = _strip_document_header_banners(t)
+    report._track("H0_header_banner_strip", before, t, "header_banners_stripped")
+
+    # ── T0: TOC dot-leader paragraph strip (NORMALIZATION_VERSION 1.8.0) ────
+    before = t
+    t = _strip_toc_dot_leader_block(t)
+    report._track("T0_toc_dot_leader_strip", before, t, "toc_paragraphs_stripped")
+
+    # ── P0: page-footer / running-header line strip (NORMALIZATION_VERSION 1.8.0) ─
+    before = t
+    t = _strip_page_footer_lines(t)
+    report._track("P0_page_footer_strip", before, t, "page_footer_lines_stripped")
 
     # ── W0: Publisher-overlay watermark stripping (Request 9) ──────────
     # Runs BEFORE S0 so mid-line watermarks don't leak into body text via

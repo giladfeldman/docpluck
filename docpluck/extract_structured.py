@@ -32,7 +32,7 @@ from .tables.captions import CaptionMatch, find_caption_matches
 from .tables.render import cells_to_html
 
 
-TABLE_EXTRACTION_VERSION = "2.0.0"  # bumped: pdfplumber removed; Camelot is the table source
+TABLE_EXTRACTION_VERSION = "2.1.0"  # v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 
@@ -107,6 +107,17 @@ def extract_pdf_structured(
     tables: list[Table] = []
     figures: list[Figure] = []
 
+    # v2.3.0 Bug 4 fix: build a fast lookup from caption to the char_start
+    # of the next caption (any kind) so _extract_caption_text can bound
+    # the caption snippet at the next-caption boundary. Prevents the
+    # gratitude-paper Figure 1 caption from concatenating Figure 2's
+    # caption and the results-section F-stat prose.
+    sorted_caps = sorted(captions, key=lambda c: c.char_start)
+    next_boundary_by_id: dict[int, Optional[int]] = {}
+    for i, c in enumerate(sorted_caps):
+        nb = sorted_caps[i + 1].char_start if i + 1 < len(sorted_caps) else None
+        next_boundary_by_id[id(c)] = nb
+
     # ---- Tables (Camelot) ----
     camelot_disabled = os.environ.get("DOCPLUCK_DISABLE_CAMELOT", "0") == "1"
     camelot_tables: list[Table] = []
@@ -136,7 +147,9 @@ def extract_pdf_structured(
         if match is not None:
             used_caption_ids.add(id(match))
             ct["label"] = match.label
-            ct["caption"] = _extract_caption_text(rejoined, match)
+            ct["caption"] = _extract_caption_text(
+                rejoined, match, next_boundary_by_id.get(id(match))
+            )
             tables.append(ct)
 
     # If a table caption had no Camelot match, emit an "isolated" Table dict so
@@ -144,13 +157,19 @@ def extract_pdf_structured(
     for cap in table_captions:
         if id(cap) in used_caption_ids:
             continue
-        tables.append(_isolated_table_from_caption(cap, rejoined))
+        tables.append(
+            _isolated_table_from_caption(
+                cap, rejoined, next_boundary_by_id.get(id(cap))
+            )
+        )
 
     # ---- Figures ----
     for cap in captions:
         if cap.kind != "figure":
             continue
-        figures.append(_figure_from_caption(cap, rejoined))
+        figures.append(
+            _figure_from_caption(cap, rejoined, next_boundary_by_id.get(id(cap)))
+        )
 
     # ---- Placeholder mode ----
     text_out = (
@@ -249,17 +268,36 @@ def _find_caption_for_table(
     return best[2]
 
 
-def _extract_caption_text(raw_text: str, cap: CaptionMatch) -> str:
+def _extract_caption_text(
+    raw_text: str,
+    cap: CaptionMatch,
+    next_boundary: Optional[int] = None,
+) -> str:
     """Pull the full caption (label + description) starting at the caption line.
 
     Captions are often line-wrapped by pdftotext, so a single ``\\n\\n``
     boundary can sit MID-SENTENCE. Walk past such breaks until we find one
     where the preceding text ends with a real sentence terminator
-    (``.``/``!``/``?``) or we hit the 600-char hard cap.
+    (``.``/``!``/``?``) or we hit a hard cap.
+
+    v2.3.0 Bug 4 fix (handoff 2026-05-11): caller may pass
+    ``next_boundary`` — the char position of the next caption / next
+    section heading — to cap extraction. Without it, a caption that
+    didn't end in a sentence terminator would greedily extend into the
+    next figure's caption or unrelated body prose (the gratitude-paper
+    Figure 1 / Figure 2 / F-stat-prose concatenation bug). The
+    effective hard cap is ``min(cap.char_end + 800, next_boundary,
+    len(raw_text))``.
     """
     start = cap.char_start
-    # Hard cap — never read more than 600 chars from the caption start.
-    hard_end = min(cap.char_end + 600, len(raw_text))
+    # Hard cap — never read more than 800 chars from caption start. The
+    # 800 figure is the handoff's "guard against runaway captions" upper
+    # bound; before v2.3.0 this was 600, but raising it to 800 with the
+    # next_boundary cap is strictly safer since next_boundary now bounds
+    # the typical case.
+    hard_end = min(cap.char_end + 800, len(raw_text))
+    if next_boundary is not None and next_boundary > cap.char_end:
+        hard_end = min(hard_end, next_boundary)
     pos = cap.char_end
     while pos < hard_end:
         nxt = raw_text.find("\n\n", pos)
@@ -277,6 +315,14 @@ def _extract_caption_text(raw_text: str, cap: CaptionMatch) -> str:
         # Otherwise the caption continues — skip past this break and keep going.
         pos = nxt + 2
     snippet = raw_text[start:hard_end].replace("\n", " ").strip()
+    # v2.3.0 soft-hyphen rejoin (per `docs/HANDOFF_2026-05-11_visual_review_findings.md`
+    # "Soft-hyphen artifacts in captions" — chen.pdf showed `Sup­ plementary`).
+    # Captions don't flow through ``normalize_text``, so apply the same
+    # rejoin here. ``­`` followed by any whitespace = word-wrap artifact
+    # → drop both. Orphan ``­`` is also invisible by Unicode and gets
+    # dropped.
+    snippet = re.sub("­\\s+", "", snippet)
+    snippet = snippet.replace("­", "")
     # Collapse runs of any whitespace (including U+2002 EN SPACE, etc.) to a
     # single space; many APA PDFs use unusual spaces between label and caption.
     snippet = re.sub(r"\s+", " ", snippet)
@@ -291,14 +337,18 @@ def _extract_caption_text(raw_text: str, cap: CaptionMatch) -> str:
     return snippet
 
 
-def _isolated_table_from_caption(cap: CaptionMatch, raw_text: str) -> Table:
+def _isolated_table_from_caption(
+    cap: CaptionMatch,
+    raw_text: str,
+    next_boundary: Optional[int] = None,
+) -> Table:
     """Build an isolated (cellless) Table dict for a caption with no Camelot match."""
     return {
         "id": f"t{cap.number}",
         "label": cap.label,
         "page": cap.page,
         "bbox": (0.0, 0.0, 0.0, 0.0),
-        "caption": _extract_caption_text(raw_text, cap),
+        "caption": _extract_caption_text(raw_text, cap, next_boundary),
         "footnote": None,
         "kind": "isolated",
         "rendering": "isolated",
@@ -312,14 +362,18 @@ def _isolated_table_from_caption(cap: CaptionMatch, raw_text: str) -> Table:
     }
 
 
-def _figure_from_caption(cap: CaptionMatch, raw_text: str) -> Figure:
+def _figure_from_caption(
+    cap: CaptionMatch,
+    raw_text: str,
+    next_boundary: Optional[int] = None,
+) -> Figure:
     """Build a Figure dict from a caption match. bbox is unknown (zeros)."""
     return {
         "id": f"f{cap.number}",
         "label": cap.label,
         "page": cap.page,
         "bbox": (0.0, 0.0, 0.0, 0.0),
-        "caption": _extract_caption_text(raw_text, cap),
+        "caption": _extract_caption_text(raw_text, cap, next_boundary),
     }
 
 
@@ -337,9 +391,16 @@ def _apply_placeholder(raw_text: str, captions: list[CaptionMatch]) -> str:
         key=lambda item: item[0],
         reverse=True,
     )
+    # v2.3.0 Bug 4: bound each caption's snippet at the next caption's start.
+    by_start = sorted(captions, key=lambda c: c.char_start)
+    next_boundary_by_id: dict[int, Optional[int]] = {}
+    for i, c in enumerate(by_start):
+        next_boundary_by_id[id(c)] = (
+            by_start[i + 1].char_start if i + 1 < len(by_start) else None
+        )
     out = raw_text
     for start, end, cap in items:
-        snippet = _extract_caption_text(raw_text, cap)
+        snippet = _extract_caption_text(raw_text, cap, next_boundary_by_id.get(id(cap)))
         # Build "[Label: caption]" marker. Use the snippet (already cleaned).
         if cap.label and cap.label in snippet:
             desc = snippet[len(cap.label):].lstrip(" .:—–-,")

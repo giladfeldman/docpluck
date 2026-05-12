@@ -47,8 +47,8 @@
       "category": "lattice_table",
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_2.pdf",
       "expected_tables": 1,
-      "expected_figures": 0,
-      "notes": "IEEE Access — heavy-grid lattice tables."
+      "expected_figures": 37,
+      "notes": "IEEE Access — heavy-grid lattice tables. Recalibrated 2026-05-12 for v2.3.0: case-insensitive FIGURE caption regex now catches all 37 figures in the paper (previously missed the all-caps ones)."
     },
     {
       "id": "jama_lattice",
@@ -62,9 +62,9 @@
       "id": "amj_lattice",
       "category": "lattice_table",
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amj_1.pdf",
-      "expected_tables": 1,
-      "expected_figures": 0,
-      "notes": "Academy of Management Journal — lattice tables."
+      "expected_tables": 5,
+      "expected_figures": 7,
+      "notes": "Academy of Management Journal — lattice tables. Recalibrated 2026-05-12 for v2.3.0: case-insensitive TABLE/FIGURE caption regex now catches the all-caps captions used by AOM."
     },
     {
       "id": "nature_minimal_rule",
@@ -94,9 +94,9 @@
       "id": "ieee_figure_heavy",
       "category": "figure_only",
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_3.pdf",
-      "expected_tables": 0,
-      "expected_figures": 2,
-      "notes": "IEEE engineering paper, figure-heavy."
+      "expected_tables": 8,
+      "expected_figures": 1,
+      "notes": "IEEE engineering paper, figure-heavy. Recalibrated 2026-05-12 for v2.3.0: case-insensitive TABLE caption regex + improved Camelot lattice/stream picker now extract the 8 stat tables this paper actually has."
     }
   ],
   "known_gaps": [

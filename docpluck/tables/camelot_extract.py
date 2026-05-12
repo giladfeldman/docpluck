@@ -209,8 +209,17 @@ def _pick_best_per_page(stream_tables: list, lattice_tables: list) -> list:
     per (page, bbox-region).
 
     Heuristic: for each page, lattice usually wins when it returns ≥1 high-
-    accuracy table on that page (lattice means the PDF has visible ruled
-    lines, which is a strong tabularity signal). Otherwise stream wins.
+    accuracy SUBSTANTIVE table on that page (lattice means the PDF has visible
+    ruled lines, which is a strong tabularity signal). Otherwise stream wins.
+
+    v2.3.0 fix (per jama_open_1 regression caught by ``scripts/verify_corpus.py``):
+    a lattice table must have **≥ 2 rows AND ≥ 2 cols** to count as "the page
+    has lattice tables." Lattice often returns 1×1 / 1×2 / 2×1 artifacts on
+    pages with text boxes, signature blocks, or running-header rules (JAMA
+    PDFs are full of these). Those artifacts were causing the real 7×45
+    stream tables to be discarded on pages 6/8/9 of jama_open_1. Two of those
+    three tables produced clean HTML in the splice spike — the regression
+    re-surfaced when the size check was missing.
     """
     by_page: dict[int, list] = {}
     for ct in stream_tables:
@@ -223,8 +232,19 @@ def _pick_best_per_page(stream_tables: list, lattice_tables: list) -> list:
             acc = float(getattr(ct, "accuracy", 0))
         except (ValueError, TypeError):
             acc = 0.0
-        if acc >= 80.0:
-            pages_with_lattice.setdefault(page, []).append(("lattice", ct))
+        if acc < 80.0:
+            continue
+        # Require a SUBSTANTIVE lattice table (≥ 2 rows AND ≥ 2 cols) before
+        # treating the page as "owned by lattice." 1×N / N×1 results are
+        # almost always text-box / rule-line artifacts, not real tables.
+        try:
+            n_rows = len(ct.df)
+            n_cols = len(ct.df.columns)
+        except Exception:
+            continue
+        if n_rows < 2 or n_cols < 2:
+            continue
+        pages_with_lattice.setdefault(page, []).append(("lattice", ct))
 
     out: list = []
     for page in sorted(set(list(by_page.keys()) + list(pages_with_lattice.keys()))):
@@ -370,7 +390,11 @@ def extract_tables_camelot(
                     "footnote": None,
                     "kind": "structured",
                     "rendering": "whitespace",
-                    "confidence": accuracy / 100.0,
+                    # Clip to [0, 1] — Camelot's `accuracy` is occasionally
+                    # ≥ 100 due to floating-point arithmetic (e.g. 100.0000000003);
+                    # without this clip, ``confidence > 1.0`` fails the
+                    # ``test_table_html_renders_when_structured`` invariant.
+                    "confidence": max(0.0, min(1.0, accuracy / 100.0)),
                     "n_rows": n_rows,
                     "n_cols": n_cols,
                     "header_rows": 1,

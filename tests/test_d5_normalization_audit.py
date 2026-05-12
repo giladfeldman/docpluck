@@ -824,16 +824,17 @@ class TestLine238_Line260_ModerateRisk:
 class TestVersionBumps:
     """Verify version constants are correct after the D5 fix.
 
-    NORMALIZATION_VERSION was bumped 1.6.0 → 1.7.0 in v2.1.0 (2026-05-09)
-    when 5 additive W0 watermark patterns were added (Elsevier copyright,
-    two-column running header, Creative Commons license footer, Collabra
-    "Downloaded from … by guest" relaxation, and author-equal-contribution
-    footnote).  No D5 behavior changed.
+    NORMALIZATION_VERSION history:
+      1.6.0 → 1.7.0 (v2.1.0, 2026-05-09): 5 additive W0 watermark patterns.
+      1.7.0 → 1.8.0 (v2.2.0, 2026-05-11): three new document-shape strips
+        added — H0 header banner, T0 TOC dot-leader, P0 page footer line.
+        Ported from the splice-spike (iter-25/26/27/33). Auto-apply at the
+        standard level; results need cache regeneration.
     """
 
     def test_normalization_version(self):
-        assert NORMALIZATION_VERSION == "1.7.0"
+        assert NORMALIZATION_VERSION == "1.8.0"
 
     def test_report_version(self):
         _, report = norm_report("test text")
-        assert report.version == "1.7.0"
+        assert report.version == "1.8.0"

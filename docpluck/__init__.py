@@ -69,8 +69,9 @@ from .sections import (
 from .tables import Cell, Table
 from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
+from .render import render_pdf_to_markdown
 
-__version__ = "2.1.0"
+__version__ = "2.3.0"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
@@ -108,4 +109,6 @@ __all__ = [
     "TABLE_EXTRACTION_VERSION",
     "StructuredResult",
     "extract_pdf_structured",
+    # Markdown rendering (v2.2)
+    "render_pdf_to_markdown",
 ]

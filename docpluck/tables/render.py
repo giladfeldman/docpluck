@@ -1,12 +1,24 @@
-"""
-HTML rendering of structured table cells.
+"""HTML rendering of structured table cells.
 
-Deterministic transform: list[Cell] -> <table> HTML string. No styling, no
-class attributes, no inline style. Cell text is HTML-escaped. v2.0 always
-emits rowspan=1/colspan=1 (omitted because they're the default); level-C
-will populate higher rowspans/colspans.
+v2.3.0: ``cells_to_html`` now runs the full cell-cleaning pipeline from
+``docpluck.tables.cell_cleaning`` (ported from the 2026-05 splice spike).
+The pipeline merges multi-line cell continuations, strips leader dots,
+splits column-mashed cells, drops leaked running headers, detects
+multi-row headers (capped at 3), folds 2-row super-headers, attaches
+significance markers as ``<sup>``, and renders only-col-0 rows as
+``<tr><td colspan="N"><strong>...</strong></td></tr>`` group separators.
 
-See spec §5.5.
+The cleaning pipeline ignores the ``is_header`` flag on each Cell and
+uses heuristics (cell length, numeric ratio) to detect headers. This is
+intentional: Camelot's per-cell header flag is unreliable; the heuristics
+match a wider range of real-world academic tables.
+
+When the cleaning pipeline collapses a small table to fewer than 2 rows
+(e.g. a 2-row table where the second row is a continuation that folds
+into the first), we fall back to a minimal raw renderer rather than
+returning the empty string. This preserves the contract that structured
+tables (``kind == "structured"``) always have non-empty HTML containing
+``<table>``.
 """
 
 from __future__ import annotations
@@ -14,19 +26,48 @@ from __future__ import annotations
 import html as _html
 
 from . import Cell
+from .cell_cleaning import cells_grid_to_html
 
 
 def cells_to_html(cells: list[Cell]) -> str:
-    """Render a list of Cell to a single <table>...</table> HTML string."""
+    """Render a list of Cell to a single <table>...</table> HTML string.
+
+    Empty input → empty string (no table to render).
+    Otherwise: run the cleaning pipeline; fall back to a minimal raw
+    renderer when the pipeline produces no output (so structured tables
+    always have valid HTML).
+    """
     if not cells:
-        return "<table></table>"
+        return ""
 
     n_rows = max(c["r"] for c in cells) + 1
     n_cols = max(c["c"] for c in cells) + 1
 
-    grid: list[list[Cell | None]] = [[None] * n_cols for _ in range(n_rows)]
+    grid: list[list[str]] = [[""] * n_cols for _ in range(n_rows)]
     for c in cells:
-        grid[c["r"]][c["c"]] = c
+        grid[c["r"]][c["c"]] = c["text"] or ""
+
+    cleaned = cells_grid_to_html(grid)
+    if cleaned:
+        return cleaned
+
+    # Fallback: cleaning collapsed the table to <2 rows. Emit a raw
+    # renderer pass so callers receive valid HTML rather than ``""``.
+    # This preserves the contract that ``cells_to_html`` of a non-empty
+    # cell list always produces a ``<table>`` block. See
+    # ``tests/test_smoke_fixtures.py::test_table_html_renders_when_structured``.
+    return _raw_cells_to_html(grid, cells)
+
+
+def _raw_cells_to_html(grid: list[list[str]], cells: list[Cell]) -> str:
+    """Minimal HTML renderer used as a fallback when cleaning collapses.
+
+    Uses the same is_header signal as the pre-v2.3.0 renderer so the
+    output is recognizable. Pure formatting; no cleaning heuristics.
+    """
+    n_rows = len(grid)
+    if n_rows == 0:
+        return ""
 
     has_header = any(c["is_header"] for c in cells)
     header_row_index = (
@@ -34,8 +75,7 @@ def cells_to_html(cells: list[Cell]) -> str:
     )
 
     parts: list[str] = ["<table>"]
-
-    if has_header:
+    if has_header and 0 <= header_row_index < n_rows:
         parts.append("<thead>")
         parts.append(_render_row(grid[header_row_index], cell_tag="th"))
         parts.append("</thead>")
@@ -46,19 +86,15 @@ def cells_to_html(cells: list[Cell]) -> str:
             continue
         parts.append(_render_row(grid[r], cell_tag="td"))
     parts.append("</tbody>")
-
     parts.append("</table>")
     return "".join(parts)
 
 
-def _render_row(row: list[Cell | None], *, cell_tag: str) -> str:
+def _render_row(row: list[str], *, cell_tag: str) -> str:
     pieces: list[str] = ["<tr>"]
-    for cell in row:
-        if cell is None:
-            pieces.append(f"<{cell_tag}></{cell_tag}>")
-        else:
-            text = _html.escape(cell["text"], quote=False)
-            pieces.append(f"<{cell_tag}>{text}</{cell_tag}>")
+    for text in row:
+        escaped = _html.escape(text or "", quote=False)
+        pieces.append(f"<{cell_tag}>{escaped}</{cell_tag}>")
     pieces.append("</tr>")
     return "".join(pieces)
 
