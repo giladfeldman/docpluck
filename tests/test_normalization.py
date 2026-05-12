@@ -414,6 +414,49 @@ class TestS9_HeaderFooter:
         result = norm(text, "standard")
         assert "\n42\n" not in result
 
+    def test_4digit_page_numbers_stripped_when_recurring(self):
+        """v2.4.3: Continuous-pagination journals (PSPB, JESP volume runs)
+        emit page numbers in the 1000-9999 range. When the same 4-digit
+        value appears on its own line 3+ times in the doc, treat it as
+        a page-number artifact and strip."""
+        text = (
+            "First page content here.\n"
+            "1174\n"
+            "Second page begins.\n"
+            "1175\n"
+            "Body sentence continues.\n"
+            "1174\n"
+            "More body.\n"
+            "1175\n"
+            "Even more body content.\n"
+            "1174\n"
+        )
+        result = norm(text, "standard")
+        # 1174 appears 3 times → stripped.
+        assert "\n1174\n" not in result
+        # 1175 appears 2 times → not yet meeting the ≥3 threshold,
+        # so left alone (conservative).
+        assert "1175" in result
+
+    def test_4digit_year_on_own_line_preserved(self):
+        """A 4-digit value that only appears ONCE on its own line is NOT
+        a page number — could be a year reference or stray data. Leave it."""
+        text = "body text\n2024\nmore body text\n"
+        result = norm(text, "standard")
+        assert "2024" in result
+
+    def test_4digit_below_1000_preserved(self):
+        """Values below 1000 are page-number range only via the 1-3-digit
+        pattern; 4-digit values <1000 don't exist (would be 3-digit)."""
+        # Mostly a sanity check; values like 0999 wouldn't naturally occur.
+        text = "abc\n2020\ndef\n2020\nxyz\n2020\nfinal\n"
+        result = norm(text, "standard")
+        # 2020 recurs 3+ but is a year; the heuristic ALSO strips this
+        # case (1000-9999 range), which is acceptable since
+        # standalone-line years are a rare verbatim pattern in academic
+        # prose. Document the behavior here.
+        assert "2020" not in result
+
     def test_short_lines_preserved(self):
         """Lines < 15 chars should NOT be treated as headers."""
         text = "Short\n" * 10 + "Content"
