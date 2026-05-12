@@ -10,6 +10,7 @@ See spec §5.7.
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -135,7 +136,54 @@ def _full_caption_text(raw_text: str, cap: CaptionMatch) -> str:
     end = raw_text.find("\n\n", cap.char_end)
     if end == -1:
         end = min(cap.char_end + 500, len(raw_text))
-    return raw_text[cap.char_start:end].replace("\n", " ").strip()
+    full = raw_text[cap.char_start:end].replace("\n", " ").strip()
+    return _trim_caption_at_chart_data(full)
+
+
+# A run of 6+ consecutive digits in a figure caption is almost never
+# legitimate caption prose — page counts, statistical n-values, and years
+# all top out at 5 digits in academic captions. 6+ digits is a strong signal
+# that pdftotext joined chart data (raw bar-chart values, participant counts,
+# row IDs) into the caption.
+_CHART_DATA_DIGIT_RUN_RE = re.compile(r"\b\d{6,}\b")
+
+
+def _trim_caption_at_chart_data(caption: str) -> str:
+    """Truncate a caption when it transitions from prose to chart-data.
+
+    pdftotext extracts chart elements (axis labels, legend entries, gridline
+    values) inline with the figure caption when they share a paragraph in the
+    PDF reading order. The resulting caption text looks like::
+
+        Figure 1. Flowchart of Study Sample Selection 4876956 Pairs enrolled
+        before April 1, 2015 1117269 Pairs excluded 741469 Withdrawal …
+
+    where the real caption is "Flowchart of Study Sample Selection" and the
+    rest is chart data values.
+
+    Strategy: locate the first run of 6+ consecutive digits (the signature
+    of chart data — counts or row IDs that no real caption sentence would
+    contain). Truncate the caption just before that run, falling back to
+    the word boundary so we don't end mid-word.
+
+    Conservative: only fires when the caption is ≥ 150 chars (real short
+    captions almost never have chart-data appendage), and only when the
+    surviving trimmed caption is ≥ 40 chars after the label.
+    """
+    if not caption or len(caption) < 150:
+        return caption
+    m = _CHART_DATA_DIGIT_RUN_RE.search(caption)
+    if m is None:
+        return caption
+    cut = m.start()
+    # Walk back to the previous word boundary.
+    while cut > 0 and not caption[cut - 1].isspace():
+        cut -= 1
+    trimmed = caption[:cut].rstrip(" ,;:")
+    # Sanity check.
+    if len(trimmed) < 40:
+        return caption
+    return trimmed
 
 
 __all__ = ["find_figures"]

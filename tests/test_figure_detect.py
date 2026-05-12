@@ -94,3 +94,68 @@ def test_figure_typeddict_shape():
         "caption": "Mean reaction time across conditions.",
     }
     assert f["id"] == "f1"
+
+
+# v2.4.3: caption truncation at chart-data boundary
+# (digit runs ≥ 6 chars indicate pdftotext joined raw chart values into the
+# caption paragraph — common in clinical / biological flowcharts).
+
+
+def test_trim_caption_at_chart_data_truncates_long_digit_run():
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    cap = (
+        "Figure 1. Flowchart of Study Sample Selection 4876956 Pairs enrolled "
+        "before April 1, 2015 1117269 Pairs excluded 741469 Withdrawal 148414 "
+        "Withdrawal after baseline 137787 With spouses onset of CVD 84585 "
+        "With onset of depression 5014 Duplicated couples 3792142 Eligible "
+        "pairs Matched by age and income"
+    )
+    out = _trim_caption_at_chart_data(cap)
+    # 6-digit run "4876956" triggers truncation just before it.
+    assert out == "Figure 1. Flowchart of Study Sample Selection"
+    assert "4876956" not in out
+
+
+def test_trim_caption_preserves_short_caption():
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    cap = "Figure 2. A short caption with a year reference 2020 here."
+    out = _trim_caption_at_chart_data(cap)
+    # Under 150-char threshold AND no 6-digit run; no-op.
+    assert out == cap
+
+
+def test_trim_caption_preserves_legitimate_5digit_numbers():
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    cap = (
+        "Figure 3. Sample selection diagram including all participants from "
+        "the original cohort (N = 12345) and the analytic subsample of 9876 "
+        "individuals who completed both waves of the longitudinal survey "
+        "between 2018 and 2024 with no missing data on the focal outcomes."
+    )
+    out = _trim_caption_at_chart_data(cap)
+    # 5-digit "12345" does NOT trigger; whole caption preserved.
+    assert out == cap
+
+
+def test_trim_caption_preserves_prose_with_no_digits():
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    cap = (
+        "Figure 4. Cumulative incidence of depression by spouses cardiovascular "
+        "event among the entire study sample. The horizontal axis shows the "
+        "time in months and the vertical axis is cumulative incidence of "
+        "depression in percent. Lines represent the four sex-age subgroups."
+    )
+    out = _trim_caption_at_chart_data(cap)
+    # No 6-digit run; full caption preserved.
+    assert out == cap
+
+
+def test_trim_caption_keeps_minimum_post_label_content():
+    from docpluck.figures.detect import _trim_caption_at_chart_data
+    # 6-digit run lands right after the label — truncation would leave
+    # just "Figure 1." (under 40-char sanity check) — return original.
+    long_cap = "Figure 5. " + "x" * 200 + " 1234567 stuff"  # >150 chars
+    short_pre_label = "Figure 5. 1234567 chart data " + "y" * 200
+    out = _trim_caption_at_chart_data(short_pre_label)
+    # Sanity check fires; return original.
+    assert out == short_pre_label

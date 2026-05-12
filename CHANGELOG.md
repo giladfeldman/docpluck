@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.4.3] — 2026-05-13
+
+Same-day follow-up. Two preventative improvements aimed at quality issues that didn't trip the verifier tags but were visible in rendered output:
+
+### Fixes
+
+1. **`docpluck/normalize.py::normalize_text` S9 step** — strip 4-digit standalone page numbers from continuous-pagination journals (PSPB volume runs into the 1000s, Psychological Science, etc.). Previously S9 only handled 1–3 digit page numbers; a bare `1174` line leaked into rendered output (e.g. `efendic_2022_affect.md` line 24). New rule strips 4-digit standalone numbers when (a) value is in 1000–9999, (b) same value recurs ≥ 3 times in the document. The recurrence floor protects table-cell values that happen to land on their own line in single-value-per-line column layouts. `NORMALIZATION_VERSION`: `1.8.1` → `1.8.2`.
+
+2. **`docpluck/figures/detect.py::_full_caption_text`** — truncate figure captions at chart-data boundaries. pdftotext extracts chart elements (axis labels, gridline values, legend entries) inline with the figure caption when they share a PDF reading-order paragraph. The resulting caption text looks like `Figure 1. Flowchart of Study Sample Selection 4876956 Pairs enrolled before April 1, 2015 1117269 Pairs excluded ...` — useful prose followed by raw chart data. New heuristic: locate the first run of 6+ consecutive digits (signature of chart data — page counts, n-values, and years all top out at 5 digits in academic captions) and truncate just before it at the previous word boundary. Conservative: only fires when caption is ≥ 150 chars and surviving trimmed text is ≥ 40 chars (sanity check protects against edge cases). Affects clinical / biological flowcharts in JAMA, Sci Rep, BMC Medicine papers.
+
+### Bumps
+
+- `__version__`: `2.4.2` → `2.4.3`. Patch — both fixes are conservative pdftotext post-processing.
+- `NORMALIZATION_VERSION`: `1.8.1` → `1.8.2`.
+
+### Tests
+
+7 new tests across `tests/test_normalization.py` (4-digit page number stripping, recurrence floor, year edge case) and `tests/test_figure_detect.py` (caption truncation at digit-run boundary, short-caption no-op, legitimate 5-digit-number preservation, minimum-post-label sanity check).
+
 ## [2.4.2] — 2026-05-13
 
 Iterative follow-up. After v2.4.1 the 101-PDF corpus run was 98/101 PASS (`scripts/verify_corpus_full.py`); this release closes two of the three remaining failures and reframes the third as a known short-paper edge case in the verifier.

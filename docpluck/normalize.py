@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.1"
+NORMALIZATION_VERSION = "1.8.2"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -1004,8 +1004,31 @@ def normalize_text(
     if repeated:
         lines = [l for l in lines if l.strip() not in repeated]
         t = "\n".join(lines)
-    # Strip standalone page numbers
+    # Strip standalone page numbers — 1-3 digit unconditionally.
     t = re.sub(r"^\s*\d{1,3}\s*$", "", t, flags=re.MULTILINE)
+    # v2.4.3: 4-digit page numbers (continuous-pagination journals like PSPB
+    # where volume runs page numbers into the 1000s). Strip when ALL of:
+    #   1. The line is exactly 4 ASCII digits.
+    #   2. The value falls in the plausible page-number range 1000–9999
+    #      (avoids stripping a stray 4-digit year-on-its-own-line).
+    #   3. The SAME value recurs ≥3 times in the document (page numbers
+    #      repeat once per physical page, so this is conservative; a
+    #      duplicate-by-coincidence table-cell value would need to be the
+    #      same number 3 times, which is rare).
+    # The conservative threshold protects table data where a 4-digit value
+    # might legitimately appear on its own line (single-value-per-line
+    # column layouts).
+    four_digit_counts: dict[str, int] = {}
+    for ln in t.split("\n"):
+        s = ln.strip()
+        if len(s) == 4 and s.isascii() and s.isdigit() and 1000 <= int(s) <= 9999:
+            four_digit_counts[s] = four_digit_counts.get(s, 0) + 1
+    recurring_4d = {s for s, c in four_digit_counts.items() if c >= 3}
+    if recurring_4d:
+        t = "\n".join(
+            "" if ln.strip() in recurring_4d else ln
+            for ln in t.split("\n")
+        )
     report._track("S9_header_footer_removal", before, t, "headers_removed")
 
     # Limit consecutive newlines
