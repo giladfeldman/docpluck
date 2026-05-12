@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.4.0] — 2026-05-12
+
+Same-day follow-up. Closes the three real library bugs surfaced by the AI-Chrome visual verification pass on all 26 corpus papers documented in `docs/HANDOFF_2026-05-12_visual_verify_results.md`. The API-level `verify_corpus.py` was passing 26/26 throughout but couldn't see these — visual inspection in the workspace was needed.
+
+### Fixes
+
+1. **`docpluck/render.py::_render_sections_to_markdown`** — heading-body separation. Section headings were emitted with a single `\n` between `## Heading` and the body text, which downstream markdown renderers (incl. the workspace) treated as one paragraph starting `"## Abstract Lynching remains a common form..."`. Now emits `\n\n`. Additionally, when the section detector kept the heading word in `sec.text` (common for Abstract/Keywords sections), the renderer now strips the leading heading word from the body so output reads `## Abstract\n\nLynching ...` not `## Abstract\n\nAbstract Lynching ...`. Affects: `am_sociol_rev_3`, `amj_1`, `ar_royal_society_rsos_140072`, `ieee_access_4`, `jmf_1` (and likely more in larger corpora).
+
+2. **`docpluck/render.py::_strip_duplicate_title_occurrences`** (new) — Nature-style title duplication sweep. After `_apply_title_rescue` places `# Title` at the top, scan the first 80 lines for paragraph spans whose token content densely matches the title (recall ≥ 0.85, precision ≥ 0.75) and remove them. Catches Nature Communications-style papers where the title is repeated in a smaller font as body prose, often broken across 2-3 short lines due to column layout. Affects: `nat_comms_1`, `nat_comms_2`. 3 new tests.
+
+3. **`docpluck/render.py::_compute_layout_title` / `_title_text_from_chars`** — title-word selection made more inclusive while still rejecting non-title content on the same y-band:
+   - Word-height tolerance relaxed from 0.6 → 3.5 px (a U+FFFD glyph or italic emphasis can balloon a word's bbox by ~2.5 px without changing its actual font size).
+   - Word y-bbox tolerance relaxed from 1.5 → 3.0 px (same root cause).
+   - Char-level fallback height tolerance bumped 0.6 → 1.2 px to match.
+   - Line-grouping for word-to-line assembly: replaced `sort(key=(round(top), x0))` with sort-by-top-then-cluster-by-4px-then-sort-by-x0-within-line. Prior behavior mis-ordered tall-glyph words to the front of their line.
+   - **New: title_spans clustering** — restrict candidate spans to the contiguous top cluster (>100 px gap = different cluster). Without this, a stray same-font glyph elsewhere on the page (e.g. a "V." section heading at y0=450 while the title sits at y0=672) would stretch the y-band and swallow the byline + abstract into the title-word pool.
+
+   Effect on the corpus: `ziano_2021_joep` recovers "Shafir's" in `Tversky and Shafir's (1992) Disjunction Effect`, `ar_royal_society_rsos_140066` / `_140072` (Royal Society Open Science — long multi-line titles) keep their full title intact, `chen_2021_jesp` drops a stray ☆ recommendation-badge glyph that wasn't title content.
+
+### Verifier upgrade
+
+4. **`scripts/verify_corpus.py`** — new `D` tag (`title_words_dropped`). For each paper, distinct words ≥ 4 letters present in the spike-baseline title but missing from the rendered title are counted; any non-zero count flags the paper. Catches middle-of-title truncations (like `ziano_2021_joep`'s missing "Kahneman") that the `T` tag (trailing-connector check) doesn't see.
+
+### Bumps
+
+- `__version__`: `2.3.1` → `2.4.0`. Minor bump because rendered-output bytes change materially on the affected papers.
+- `TABLE_EXTRACTION_VERSION`: unchanged at `2.1.0`.
+- `NORMALIZATION_VERSION`: unchanged at `1.8.1`.
+
 ## [2.3.1] — 2026-05-12
 
 Follow-up to v2.3.0. Closes the four remaining items from `docs/HANDOFF_2026-05-11_visual_review_findings.md` and wires the corpus verifier into the `/docpluck-qa` and `/docpluck-review` project skills so regressions get caught automatically.

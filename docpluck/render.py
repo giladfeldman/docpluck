@@ -519,7 +519,7 @@ def _title_text_from_chars(page1, y_min: float, y_max: float, title_size: float)
             sz = float(c.get("size") or 0.0)
         except (TypeError, ValueError):
             continue
-        if abs(sz - title_size) > 0.6:
+        if abs(sz - title_size) > 1.2:
             continue
         ct = c.get("top")
         cb = c.get("bottom")
@@ -626,6 +626,24 @@ def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
     if not title_spans:
         return None
 
+    # Restrict title_spans to the contiguous top cluster. The title sits
+    # at the highest y0 (pdfplumber bottom-origin coords). A stray same-
+    # font glyph elsewhere on the page (e.g. a "V." section heading at
+    # y0=450 while the title sits at y0=672, with a >200-px gap between
+    # them) would otherwise stretch the y-band and swallow the byline +
+    # abstract. Cluster spans top-down, breaking on the first big gap.
+    title_spans_sorted = sorted(title_spans, key=lambda s: -s.y0)
+    cluster: list = [title_spans_sorted[0]]
+    for s in title_spans_sorted[1:]:
+        prev_y0 = min(c.y0 for c in cluster)
+        # Gap between this span's top edge (y1) and the cluster's bottom
+        # edge (prev_y0). A multi-line title has line-spacing ~30-40px;
+        # 100-px gap is comfortably larger than any real line break.
+        if prev_y0 - s.y1 > 100.0:
+            break
+        cluster.append(s)
+    title_spans = cluster
+
     y_min = min(s.y0 for s in title_spans)
     y_max = max(s.y1 for s in title_spans)
 
@@ -642,9 +660,19 @@ def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
             w_y1 = height - float(wt)
         except (TypeError, ValueError):
             continue
-        if w_height > 0 and abs(w_height - title_size) > 0.6:
+        # Height filter — relaxed from 0.6 to 3.5: a single tall glyph
+        # (U+FFFD replacement, an italic emphasis on a name, etc.) can
+        # balloon a title word's metric height by ~2.5 px (e.g. ziano's
+        # "Shafir�s" h=15.99 vs the title's 13.45). 3.5 px keeps that
+        # word while still rejecting a running-header URL in a smaller
+        # font that sits on the same y-band as a multi-line title
+        # (ar_royal_society_rsos: running header h=13.45 vs title 28.89).
+        if w_height > 0 and abs(w_height - title_size) > 3.5:
             continue
-        if w_y0 >= y_min - 1.5 and w_y1 <= y_max + 1.5:
+        # Y-bbox slop of 3.0 px (was 1.5) catches tall-glyph words like
+        # "Shafir�s" whose bbox extends 2.6 px above the line's normal
+        # top.
+        if w_y0 >= y_min - 3.0 and w_y1 <= y_max + 3.0:
             text = (w.get("text") or "").strip()
             if not text:
                 continue
@@ -655,20 +683,31 @@ def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
             title_word_recs.append((float(wt), x0, text))
 
     if title_word_recs:
-        title_word_recs.sort(key=lambda t: (round(t[0]), t[1]))
-        lines: list[list[str]] = []
-        current_line: list[str] = []
+        # Group into lines by ``top`` proximity (4-px tolerance, to
+        # match the y-bbox slop above), then x-sort within each line.
+        # Sorting by ``(round(top), x0)`` directly mis-orders tall-glyph
+        # words like ziano's "Shafir�s" (top=164.4) — they bin to a
+        # different "round(top)" than their neighbours (top=167.0) and
+        # sort to the front.
+        title_word_recs.sort(key=lambda t: t[0])
+        line_recs: list[list[tuple[float, float, str]]] = []
+        current_line_recs: list[tuple[float, float, str]] = []
         current_top: Optional[float] = None
-        for top, _x0, text in title_word_recs:
-            if current_top is None or abs(top - current_top) > 2.0:
-                if current_line:
-                    lines.append(current_line)
-                current_line = [text]
+        for top, x0, text in title_word_recs:
+            if current_top is None or abs(top - current_top) > 4.0:
+                if current_line_recs:
+                    line_recs.append(current_line_recs)
+                current_line_recs = [(top, x0, text)]
                 current_top = top
             else:
-                current_line.append(text)
-        if current_line:
-            lines.append(current_line)
+                current_line_recs.append((top, x0, text))
+                current_top = (current_top + top) / 2.0
+        if current_line_recs:
+            line_recs.append(current_line_recs)
+        lines: list[list[str]] = []
+        for line_rec in line_recs:
+            line_rec.sort(key=lambda r: r[1])
+            lines.append([text for _, _, text in line_rec])
         title_text = " ".join(" ".join(line) for line in lines).strip()
     else:
         title_text = ""
@@ -695,6 +734,106 @@ def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
     if len(re.findall(r"[A-Za-z]{2,}", title_text)) < 2:
         return None
     return title_text
+
+
+def _strip_duplicate_title_occurrences(
+    text: str,
+    title_text: str,
+    *,
+    start_offset_lines: int = 1,
+) -> str:
+    """Remove paragraph-spans in ``text`` whose token content matches
+    ``title_text``.
+
+    Some publishers (Nature Communications, Sci Reports) repeat the title
+    further down page 1 in a smaller font — once the layout-title rescue
+    has placed ``# Title`` at the top, these duplicate body blocks remain
+    and render as plain paragraphs like the title broken across 2-3 lines.
+    This sweeps them out.
+
+    ``start_offset_lines`` skips the first N lines (which contain the
+    placed title itself and immediately-following blank/byline lines). The
+    sweep is bounded to the first 80 lines of ``text`` to avoid touching
+    real body content that may legitimately reuse title words.
+    """
+    if not text or not title_text:
+        return text
+    title_tokens = re.findall(r"\w+", title_text.lower())
+    if len(title_tokens) < 4:
+        return text
+    title_token_set = set(title_tokens)
+    lines = text.split("\n")
+    horizon = min(80, len(lines))
+    i = max(0, start_offset_lines)
+    while i < horizon:
+        line = lines[i].strip()
+        if not line or line.startswith("#"):
+            i += 1
+            continue
+        # Greedy-extend up to 12 lines or until a heading. Blank lines DO
+        # NOT break the span — Nature-style titles split across columns
+        # come out as 2-3 short paragraphs separated by blank lines, and
+        # we need to span them to accumulate enough title tokens to match.
+        accumulated: list[str] = []
+        j = i
+        deleted = False
+        blank_run = 0
+        while j < min(i + 12, horizon):
+            line_j = lines[j].strip()
+            if line_j.startswith("#"):
+                break
+            if not line_j:
+                blank_run += 1
+                # Two consecutive blank lines = real section break; stop.
+                if blank_run >= 2:
+                    break
+                j += 1
+                continue
+            blank_run = 0
+            accumulated.extend(re.findall(r"\w+", lines[j].lower()))
+            if len(accumulated) > len(title_tokens) * 2.5:
+                break
+            covered = sum(1 for t in title_tokens if t in accumulated)
+            recall = covered / len(title_tokens)
+            in_title = sum(1 for t in accumulated if t in title_token_set)
+            precision = (in_title / len(accumulated)) if accumulated else 0.0
+            # High bar: dup blocks share ~all title words with little else.
+            if recall >= 0.85 and precision >= 0.75:
+                # Extend ``j`` forward to absorb short trailing-orphan
+                # fragments — Nature-style multi-column layouts leave a
+                # 1-2 word remainder ("society", "follow-up") after the
+                # main title span that on its own won't hit the recall
+                # threshold. Stop on the first line with any non-title
+                # token.
+                k = j + 1
+                while k < min(j + 6, horizon):
+                    nxt = lines[k].strip()
+                    if not nxt:
+                        k += 1
+                        continue
+                    if nxt.startswith("#"):
+                        break
+                    nxt_toks = re.findall(r"\w+", nxt.lower())
+                    if (
+                        nxt_toks
+                        and len(nxt_toks) <= 4
+                        and all(t in title_token_set for t in nxt_toks)
+                    ):
+                        j = k
+                        k += 1
+                    else:
+                        break
+                del lines[i:j + 1]
+                horizon = min(80, len(lines))
+                deleted = True
+                break
+            j += 1
+        if not deleted:
+            i += 1
+        # If deleted: don't advance i — re-check in case a second duplicate
+        # follows immediately.
+    out = "\n".join(lines)
+    return re.sub(r"\n{3,}", "\n\n", out)
 
 
 def _apply_title_rescue(out: str, title_text: str) -> str:
@@ -749,14 +888,16 @@ def _apply_title_rescue(out: str, title_text: str) -> str:
                         best = (i, j, score)
 
     if best is None:
-        return title_block + "\n" + out
+        prefixed = title_block + "\n" + out
+        return _strip_duplicate_title_occurrences(prefixed, title_text, start_offset_lines=2)
 
     s_idx, e_idx, _ = best
     if first_h2_idx is not None and s_idx > first_h2_idx:
         new_lines = out_lines[:s_idx] + out_lines[e_idx + 1:]
         new_text = "\n".join(new_lines)
         new_text = re.sub(r"\n{3,}", "\n\n", new_text)
-        return title_block + "\n" + new_text
+        prefixed = title_block + "\n" + new_text
+        return _strip_duplicate_title_occurrences(prefixed, title_text, start_offset_lines=2)
 
     # In-place upgrade: replace the matched title lines with `# Title`.
     # Pad the heading with blank lines on each side so downstream markdown
@@ -770,7 +911,12 @@ def _apply_title_rescue(out: str, title_text: str) -> str:
     )
     new_text = "\n".join(new_lines)
     new_text = re.sub(r"\n{3,}", "\n\n", new_text)
-    return new_text
+    # Sweep any *additional* title duplicates remaining in the body
+    # (Nature Communications-style repeat of the title in smaller font).
+    # The placed title sits at s_idx; start the sweep just after it.
+    return _strip_duplicate_title_occurrences(
+        new_text, title_text, start_offset_lines=s_idx + 3
+    )
 
 
 # v2.3.0 Bug 5 — connector-word guard. A rescued title that ends in a
@@ -994,10 +1140,24 @@ def _render_sections_to_markdown(
         )
         if not skip_heading:
             heading = sec.heading_text or _pretty_label(sec.label)
-            out_chunks.append(f"## {heading}\n")
+            # \n\n (not \n) separates heading from body so downstream
+            # markdown renderers treat them as a heading block + paragraph,
+            # not as one mashed paragraph starting with "## Abstract ...".
+            out_chunks.append(f"## {heading}\n\n")
         # Section body — splice in any tables/figures whose anchor falls
         # inside this section's char window.
-        body_chunks: list[str] = [sec.text.strip()]
+        body_text = sec.text.strip()
+        # Drop the leading heading word when the section detector kept it in
+        # the body (common for Abstract/Keywords where the PDF puts the
+        # heading and body on one line — without this we render
+        # "## Abstract\n\nAbstract Lynching ..." with the word duplicated).
+        if not skip_heading and sec.heading_text:
+            heading_clean = sec.heading_text.strip()
+            if heading_clean and body_text.lower().startswith(heading_clean.lower()):
+                rest = body_text[len(heading_clean):]
+                if not rest or rest[0] in " \t\n:.;,":
+                    body_text = rest.lstrip(" \t:.;,\n")
+        body_chunks: list[str] = [body_text]
         in_section = [
             (p_idx, kind, item)
             for p_idx, kind, item in placements

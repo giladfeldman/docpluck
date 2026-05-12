@@ -17,7 +17,8 @@ Metrics computed per paper:
   - Word-set Jaccard similarity to spike baseline (cheap content check)
 
 Failure tags emitted (single-letter, easy to grep):
-  T  = title truncated
+  T  = title truncated (ends in connector)
+  D  = title has dropped/missing word(s) vs spike baseline (middle-of-title loss)
   S  = section count < expected
   H  = table missing html
   C  = caption > 800 chars (boundary leak)
@@ -133,6 +134,21 @@ def _metrics(md: str) -> dict:
     }
 
 
+def _title_word_delta(rendered_title: Optional[str], spike_title: Optional[str]) -> int:
+    """Count distinctive title words present in the spike but missing from
+    the rendered title. Distinctive = 4+ letters (skips connectors/the/and).
+
+    Catches middle-of-title truncations like
+    ``Tversky and Kahneman (1992)`` → ``Tversky and (1992)`` (missing
+    "Kahneman"), which the trailing-connector check (T) doesn't see.
+    """
+    if not rendered_title or not spike_title:
+        return 0
+    rendered_words = set(re.findall(r"[A-Za-z]{4,}", rendered_title.lower()))
+    spike_words = set(re.findall(r"[A-Za-z]{4,}", spike_title.lower()))
+    return len(spike_words - rendered_words)
+
+
 def _classify(name: str, md: str, spike_md: Optional[str]) -> tuple[str, dict, list[str]]:
     """Return (status, metrics, tags). Status: PASS|WARN|FAIL."""
     m = _metrics(md)
@@ -142,6 +158,17 @@ def _classify(name: str, md: str, spike_md: Optional[str]) -> tuple[str, dict, l
         tags.append("T")
     if m["section_count"] < 4:
         tags.append("S")
+    # Title-word delta vs spike baseline catches middle-of-title drops
+    # that the T-tag (trailing-connector check) misses.
+    spike_title: Optional[str] = None
+    if spike_md:
+        spike_m = _TITLE_RE.search(spike_md)
+        spike_title = spike_m.group(1).strip() if spike_m else None
+    missing_title_words = _title_word_delta(m["title"], spike_title)
+    if missing_title_words > 0:
+        tags.append("D")
+    m["title_missing_words"] = missing_title_words
+    m["spike_title"] = spike_title
     # Tables: ``### Table N`` headings that appear BEFORE the "Tables
     # (unlocated in body)" appendix should have HTML. Headings inside the
     # appendix are explicitly known-isolated (Camelot couldn't extract
@@ -205,7 +232,7 @@ def main() -> int:
         return 1
 
     print(f"# Corpus verification — {len(papers)} papers")
-    print(f"# legend: T=title_truncated S=few_sections H=missing_html C=caption_too_long L=much_shorter J=low_jaccard")
+    print(f"# legend: T=title_truncated D=title_words_dropped S=few_sections H=missing_html C=caption_too_long L=much_shorter J=low_jaccard")
     print()
     print(f"{'STATUS':6} {'PAPER':40} {'TAGS':12} {'CHARS':>8} {'SECT':>5} {'TABS':>5} {'CAP':>6} {'RATIO':>6} {'JACC':>6}  TIME")
     print("-" * 110)
