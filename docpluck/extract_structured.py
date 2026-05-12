@@ -332,9 +332,55 @@ def _extract_caption_text(
     # Re-prefix the label if stripping ate it.
     if cap.label and not snippet.startswith(cap.label):
         snippet = f"{cap.label}. {snippet}".strip()
+    # v2.4.4: trim chart-data appendage from figure captions (axis-tick
+    # sequences, raw bar-chart values pdftotext joined inline into the
+    # caption paragraph). For tables the appendage is usually the next-
+    # row continuation so skip — the caption hard-cap at 400 below
+    # bounds it.
+    if cap.kind == "figure":
+        snippet = _trim_caption_at_chart_data(snippet)
     if len(snippet) > 400:
         snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
     return snippet
+
+
+# v2.4.4: shared chart-data trim, duplicated logic from
+# ``docpluck.figures.detect._trim_caption_at_chart_data`` so this module
+# doesn't import from ``figures.detect`` (which has its own layout-channel
+# dependencies). Two signatures of pdftotext-joined chart data:
+#   1. Run of 6+ consecutive digits — flowchart counts, row IDs.
+#   2. Run of 5+ short (1–4 digit) numeric tokens separated only by
+#      whitespace — axis-tick label sequences.
+_CHART_DATA_DIGIT_RUN_RE_STRUCT = re.compile(r"\b\d{6,}\b")
+_CHART_DATA_TICK_RUN_RE_STRUCT = re.compile(r"(?:\b\d{1,4}\b[ \t]+){5,}")
+
+
+def _trim_caption_at_chart_data(caption: str) -> str:
+    """Truncate a caption when it transitions from prose to chart-data.
+
+    Conservative: only fires when caption ≥ 150 chars AND the surviving
+    trimmed text is ≥ 40 chars. The two regex signatures catch
+    complementary chart-data patterns (large counts and small axis-tick
+    sequences); the earlier match wins.
+    """
+    if not caption or len(caption) < 150:
+        return caption
+    candidates: list[int] = []
+    m1 = _CHART_DATA_DIGIT_RUN_RE_STRUCT.search(caption)
+    if m1 is not None:
+        candidates.append(m1.start())
+    m2 = _CHART_DATA_TICK_RUN_RE_STRUCT.search(caption)
+    if m2 is not None:
+        candidates.append(m2.start())
+    if not candidates:
+        return caption
+    cut = min(candidates)
+    while cut > 0 and not caption[cut - 1].isspace():
+        cut -= 1
+    trimmed = caption[:cut].rstrip(" ,;:")
+    if len(trimmed) < 40:
+        return caption
+    return trimmed
 
 
 def _isolated_table_from_caption(

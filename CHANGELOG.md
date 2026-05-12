@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.4.4] — 2026-05-13
+
+Bug fix on v2.4.3's caption-trim feature + extension to a second chart-data signature.
+
+### Bug fix
+
+1. **`docpluck/extract_structured.py::_extract_caption_text`** — v2.4.3's `_trim_caption_at_chart_data` was added to `docpluck/figures/detect.py::_full_caption_text`, but the live render pipeline never calls that function — figure captions are built in `extract_structured.py::_extract_caption_text` (which `_figure_from_caption` calls). v2.4.3's caption-trim was therefore a no-op on real renders despite its tests passing in isolation. v2.4.4 applies the trim to `_extract_caption_text` for `kind == "figure"` captions, so the trim actually fires during `render_pdf_to_markdown(pdf_bytes)`. Verified by manual render of `jama_open_6` (caption 400 chars → 47 chars) and `jama_open_3` (405 → 208 chars).
+
+### Enhancement
+
+2. **`docpluck/extract_structured.py::_trim_caption_at_chart_data`** — extended with a second chart-data signature: a run of 5+ short (1–4 digit) numeric tokens separated only by whitespace. Catches axis-tick label sequences (``0 5 10 15 20``) and stacked column values (``340 321 280 5 270``) that the 6-digit-run rule didn't see on charts with small-magnitude data. The two signatures are evaluated jointly; the earlier match in the caption wins so the caption is trimmed at the start of the chart data, not partway through it. Same conservative gates as before (caption ≥ 150 chars, surviving text ≥ 40 chars). Affects most JAMA Network Open Kaplan-Meier and Sci Rep / BMC clinical-trial papers — caption length drops from 400-char hard cap to ~150 chars of real prose.
+
+### Bumps
+
+- `__version__`: `2.4.3` → `2.4.4`. Patch — figure-caption truncation is now real and broader.
+
+### Tests
+
+3 new tests in `tests/test_figure_detect.py` (tick-run truncation, prose-with-inline-numbers no-op, earlier-of-two-signatures priority).
+
 ## [2.4.3] — 2026-05-13
 
 Same-day follow-up. Two preventative improvements aimed at quality issues that didn't trip the verifier tags but were visible in rendered output:
