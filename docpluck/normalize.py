@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.2"
+NORMALIZATION_VERSION = "1.8.3"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -1006,27 +1006,45 @@ def normalize_text(
         t = "\n".join(lines)
     # Strip standalone page numbers — 1-3 digit unconditionally.
     t = re.sub(r"^\s*\d{1,3}\s*$", "", t, flags=re.MULTILINE)
-    # v2.4.3: 4-digit page numbers (continuous-pagination journals like PSPB
-    # where volume runs page numbers into the 1000s). Strip when ALL of:
-    #   1. The line is exactly 4 ASCII digits.
-    #   2. The value falls in the plausible page-number range 1000–9999
-    #      (avoids stripping a stray 4-digit year-on-its-own-line).
-    #   3. The SAME value recurs ≥3 times in the document (page numbers
-    #      repeat once per physical page, so this is conservative; a
-    #      duplicate-by-coincidence table-cell value would need to be the
-    #      same number 3 times, which is rare).
-    # The conservative threshold protects table data where a 4-digit value
-    # might legitimately appear on its own line (single-value-per-line
-    # column layouts).
+    # v2.4.3/v2.4.5: 4-digit page numbers (continuous-pagination journals like
+    # PSPB where volume runs page numbers into the 1000s, e.g.
+    # ``efendic_2022_affect`` with pages 1174-1185). Two patterns fire:
+    #
+    #   (A) RECURRING (v2.4.3) — same value appears ≥3 times. Catches PDFs
+    #       where every page repeats the same volume number on its own line
+    #       (rare for true page numbers, but happens for volume markers).
+    #
+    #   (B) SEQUENTIAL (v2.4.5) — ≥3 distinct standalone 4-digit values in
+    #       the doc AND they cluster within a 50-page range (max - min ≤ 50)
+    #       AND the average per-page gap is small (mean diff ≤ 3). This is
+    #       the canonical continuous-pagination signature: page numbers
+    #       monotonically increasing across the article. The conservative
+    #       gates protect table cells (where 4-digit values would have
+    #       larger spreads and irregular gaps).
     four_digit_counts: dict[str, int] = {}
     for ln in t.split("\n"):
         s = ln.strip()
         if len(s) == 4 and s.isascii() and s.isdigit() and 1000 <= int(s) <= 9999:
             four_digit_counts[s] = four_digit_counts.get(s, 0) + 1
-    recurring_4d = {s for s, c in four_digit_counts.items() if c >= 3}
-    if recurring_4d:
+
+    # Pattern A: same value recurs ≥3 times.
+    strip_set: set[str] = {s for s, c in four_digit_counts.items() if c >= 3}
+
+    # Pattern B: ≥3 distinct values clustered tightly together.
+    if len(four_digit_counts) >= 3:
+        values = sorted(int(s) for s in four_digit_counts.keys())
+        spread = values[-1] - values[0]
+        if spread <= 50:
+            # Compute mean of consecutive diffs.
+            diffs = [values[i + 1] - values[i] for i in range(len(values) - 1)]
+            mean_diff = sum(diffs) / len(diffs)
+            if mean_diff <= 3.0:
+                # All values in the cluster are page numbers.
+                strip_set.update(str(v) for v in values)
+
+    if strip_set:
         t = "\n".join(
-            "" if ln.strip() in recurring_4d else ln
+            "" if ln.strip() in strip_set else ln
             for ln in t.split("\n")
         )
     report._track("S9_header_footer_removal", before, t, "headers_removed")

@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.5] — 2026-05-13
+
+Continuation of v2.4.3's 4-digit page-number strip. v2.4.3 required the same 4-digit value to recur ≥ 3 times to strip — but continuous-pagination journals (PSPB, Psychological Science) use *sequential* page numbers per page (1174, 1175, 1177, 1179, ...) where each value is different. The v2.4.3 rule missed them entirely.
+
+### Fix
+
+1. **`docpluck/normalize.py::normalize_text` S9** — widened 4-digit page-number strip with a second pattern: when ≥ 3 distinct standalone 4-digit values cluster within a 50-page range AND have mean inter-value gap ≤ 3, treat them all as continuous-pagination page numbers and strip. The conservative gates (max-min spread, mean diff) protect against table-cell values which would have larger spreads and irregular gaps. Verified end-to-end on `efendic_2022_affect.md` — page numbers 1174, 1175, 1177, 1179, 1181, 1183, 1184 now all stripped. `NORMALIZATION_VERSION`: `1.8.2` → `1.8.3`.
+
+### Bumps
+
+- `__version__`: `2.4.4` → `2.4.5`. Patch.
+
+### Tests
+
+2 new tests in `tests/test_normalization.py` (sequential page-number stripping, unrelated 4-digit value preservation).
+
 ## [2.4.4] — 2026-05-13
 
 Bug fix on v2.4.3's caption-trim feature + extension to a second chart-data signature.
