@@ -1146,16 +1146,35 @@ def normalize_text(
     strip_set: set[str] = {s for s, c in four_digit_counts.items() if c >= 3}
 
     # Pattern B: ≥3 distinct values clustered tightly together.
+    #
+    # v2.4.11: scan for the densest sub-cluster instead of computing global
+    # spread. chan_feldman_2025_cogemo has page numbers 1228-1249 (21 values,
+    # tight) PLUS year mentions like 1997 and 2023 in inline citations. The
+    # old check `spread = max - min` saw the global span 1228-2023 (795
+    # chars) and rejected the cluster outright. Now we slide a 50-window
+    # across the sorted values, find the run with ≥3 values + mean diff ≤3,
+    # and strip those.
     if len(four_digit_counts) >= 3:
         values = sorted(int(s) for s in four_digit_counts.keys())
-        spread = values[-1] - values[0]
-        if spread <= 50:
-            # Compute mean of consecutive diffs.
-            diffs = [values[i + 1] - values[i] for i in range(len(values) - 1)]
+        # Greedy clustering: walk sorted values, extend a cluster while the
+        # next value is within 5 of the previous one. Pick the longest run
+        # with ≥3 values that spans ≤50 and mean-diff ≤3.
+        clusters: list[list[int]] = [[values[0]]]
+        for v in values[1:]:
+            if v - clusters[-1][-1] <= 5:
+                clusters[-1].append(v)
+            else:
+                clusters.append([v])
+        for cluster in clusters:
+            if len(cluster) < 3:
+                continue
+            spread = cluster[-1] - cluster[0]
+            if spread > 50:
+                continue
+            diffs = [cluster[i + 1] - cluster[i] for i in range(len(cluster) - 1)]
             mean_diff = sum(diffs) / len(diffs)
             if mean_diff <= 3.0:
-                # All values in the cluster are page numbers.
-                strip_set.update(str(v) for v in values)
+                strip_set.update(str(v) for v in cluster)
 
     if strip_set:
         t = "\n".join(

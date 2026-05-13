@@ -608,6 +608,42 @@ class TestS9_HeaderFooter:
         # so left alone (conservative).
         assert "1175" in result
 
+    def test_4digit_cluster_stripped_with_outliers_present(self):
+        """v2.4.11 fix for chan_feldman_2025_cogemo: the page-number
+        cluster 1228-1249 was being kept because the global value set
+        also contained year mentions (1997, 2023). Global spread became
+        795 (1228..2023) and the old Pattern B rejected it. The new
+        clustering finds the dense sub-cluster and strips it."""
+        # Simulate page numbers spanning 1228-1234 with two stray year
+        # mentions like 1997 and 2023 standing alone elsewhere in the text.
+        text = (
+            "Body content from page one.\n"
+            "1228\n"
+            "More body for the first page.\n"
+            "1229\n"
+            "Continued body content.\n"
+            "1230\n"
+            "Citation mentions McCullough et al.\n"
+            "1997\n"
+            "Another body paragraph here.\n"
+            "1231\n"
+            "More content for page four.\n"
+            "1232\n"
+            "Recent reference is.\n"
+            "2023\n"
+            "Yet more body content here.\n"
+            "1233\n"
+            "Final body paragraph.\n"
+            "1234\n"
+        )
+        result = norm(text, "standard")
+        # All seven page numbers in the dense cluster (1228-1234) stripped.
+        for pn in ("1228", "1229", "1230", "1231", "1232", "1233", "1234"):
+            assert f"\n{pn}\n" not in result, f"page number {pn} should be stripped"
+        # The standalone year outliers (1997, 2023) are NOT in the dense
+        # cluster and stay (conservative — could be legit content).
+        assert "1997" in result or "2023" in result
+
     def test_4digit_sequential_page_numbers_stripped(self):
         """v2.4.5: Continuous-pagination journals like PSPB use sequential
         page numbers per page (1174, 1175, 1177, 1179, ...). Each value is

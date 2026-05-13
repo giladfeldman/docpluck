@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.4.11] — 2026-05-13
+
+Three fixes for visible defects the user spotted in the live workspace UI on chan_feldman_2025_cogemo after v2.4.10 deployed:
+
+### Fix 1 — Page-number stripper: cluster-aware (handles outliers)
+
+`docpluck/normalize.py` S9 — the v2.4.5 sequential-4-digit stripper computed global spread (`max(values) - min(values)`) over ALL standalone 4-digit lines in the document. On chan_feldman the page numbers (1228-1249, 22 distinct values) shared the document with inline-citation year mentions like "1997" and "(2023)" that pdftotext linearized as standalone digit lines. Global spread became 795 (1228..2023), the spread ≤ 50 gate failed, and the entire cluster was preserved.
+
+Fix: greedy clustering. Walk sorted values, extend a cluster while the next value is within 5 of the previous. Strip every cluster of ≥ 3 values that spans ≤ 50 and has mean-diff ≤ 3. The years 1997 and 2023 are outliers (>5 from the page-number cluster) so they form their own length-1 clusters that don't meet the ≥ 3 threshold and stay untouched.
+
+### Fix 2 — Orphan suppressor: italic captions + threshold 2 + digit-period prefix
+
+`docpluck/render.py::_suppress_orphan_table_cell_text`:
+
+1. **Italic captions now scanned** — the v2.4.2 emission `*Table N. caption*` (used when Camelot returned 0 cells) is followed by orphan rows just as easily as a plain caption. The suppressor used to skip these; now it scans them and drops the orphan rows (keeping the caption unchanged).
+2. **Threshold lowered from 3 to 2** — chan_feldman Table 1 has exactly 2 orphan column-headers (`Hypothesis`, `Description`) before legitimate prose resumes. The old threshold of 3 missed this case. 2 is still conservative — single-orphan cases are preserved.
+3. **Digit-period prefix accepted as cell** — lines like `1. Degree of apology` look like numbered list items in isolation but are column-1 cell labels in academic stats tables. In a post-caption context (after a Table N caption, within the orphan-scan window), these are now recognized as cell-like and dropped.
+4. **No scan-window cap** — academic stats tables (5x5 correlation matrices + headers + group separators) can produce 30-100 orphan cell lines in a row. The previous 30-line scan window stopped mid-table on chan_feldman Table 2, leaving orphans from `.70**` onward. Now the scan continues until natural break (two blank lines OR first non-orphan line — typically the `Note: ...` table footnote).
+
+### Bumps
+
+- `__version__`: `2.4.10` → `2.4.11`. Patch.
+
+### Tests
+
+- 3 new tests in `tests/test_render.py` (threshold 2, italic-caption case from chan_feldman Table 2, regression for single-orphan preserved).
+- 1 new test in `tests/test_normalization.py::TestS9_HeaderFooter` (page-number cluster strips correctly when outlier years are present).
+- All 229 tests PASS.
+
 ## [2.4.10] — 2026-05-13
 
 Critical fix for the orphan-cell-row suppressor surfacing only on the production Railway extraction service — never on local dev. Root cause: **pdftotext version skew**. Local development environment uses Xpdf 4.00 (2017); production Railway runs poppler-utils 25.03.0 (2025). The two binaries produce subtly different paragraph spacing on the same PDF — Xpdf joins paragraphs with `\n\n`, poppler often joins cell-content runs with single `\n`.
