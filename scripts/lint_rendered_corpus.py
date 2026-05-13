@@ -56,9 +56,24 @@ _LINT_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "FN",
         re.compile(
-            r"^\d{1,2}\s+(?:Though|Note|See|We)\s+\w.{2,180}[\.\)]\s*$"
+            r"^\d{1,2}\s+(?:Though|Note|See|We|This|The|These|Although|However|"
+            r"It|For|In|Some|First|Further|Assuming|One|Given|Because)\s+"
+            r"\w+\s+\w.{2,180}[\.\)]\s*$"
         ),
         "Inline footnote leaked as standalone paragraph",
+    ),
+    (
+        "OR",
+        re.compile(r"^https?://orcid\.org/\d{4}-\d{4}-\d{4}-[0-9X]{4}\s*$"),
+        "Standalone ORCID URL",
+    ),
+    (
+        "JF",
+        re.compile(
+            r"^(?:Vol\.:\(\d+\)|rsos\.royalsocietypublishing\.org|"
+            r"www\.nature\.com/(?:naturecommunications|scientificreports))\s*$"
+        ),
+        "Journal-footer URL or vol marker leaked into body",
     ),
 ]
 

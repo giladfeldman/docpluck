@@ -15,6 +15,8 @@ from docpluck.render import (
     _promote_numbered_subsection_headings,
     _reformat_jama_key_points_box,
     _suppress_orphan_table_cell_text,
+    _demote_inline_footnotes_to_blockquote,
+    _promote_study_subsection_headings,
     _apply_title_rescue,
     _strip_duplicate_title_occurrences,
 )
@@ -247,6 +249,104 @@ def test_suppress_orphan_table_cell_text_idempotent():
 def test_suppress_orphan_table_cell_text_noop_when_no_table_caption():
     text = "## Methods\n\nWe ran the analysis.\n\nResults follow."
     assert _suppress_orphan_table_cell_text(text) == text
+
+
+# ── _demote_inline_footnotes_to_blockquote ──────────────────────────────────
+
+
+def test_footnote_demoted_to_blockquote():
+    text = (
+        "Body prose paragraph one.\n\n"
+        "1 Though we note a recent failed replication of the Kogut and "
+        "Ritov (2005) by Majumder et al. (2023).\n\n"
+        "Body prose paragraph two."
+    )
+    out = _demote_inline_footnotes_to_blockquote(text)
+    assert "> 1 Though we note a recent failed replication" in out
+    assert "Body prose paragraph one." in out
+    assert "Body prose paragraph two." in out
+
+
+def test_footnote_demoter_preserves_real_numbered_list_item():
+    text = (
+        "Some context.\n\n"
+        "1. First numbered point in a list.\n\n"
+        "More prose."
+    )
+    out = _demote_inline_footnotes_to_blockquote(text)
+    # Numbered list item has `1.` (with period), pattern expects `1 Word`.
+    assert "1. First numbered point" in out
+    assert "> 1. First numbered point" not in out
+
+
+def test_footnote_demoter_skips_short_paragraphs():
+    text = "Context.\n\n2 Note.\n\nMore."
+    out = _demote_inline_footnotes_to_blockquote(text)
+    # Under 30 chars — not enough to qualify as a footnote.
+    assert out == text
+
+
+def test_footnote_demoter_idempotent():
+    text = (
+        "Body.\n\n"
+        "1 Though we note this is a footnote that has been demoted already "
+        "by a previous pass through the pipeline.\n\n"
+        "More body."
+    )
+    once = _demote_inline_footnotes_to_blockquote(text)
+    twice = _demote_inline_footnotes_to_blockquote(once)
+    # After first pass, the line starts with "> ", so doesn't match `^\d`.
+    assert once == twice
+
+
+# ── _promote_study_subsection_headings ──────────────────────────────────────
+
+
+def test_study_subsection_heading_promoted():
+    text = (
+        "Some intro.\n\n"
+        "Study 1 Design and Findings\n\n"
+        "In Study 1 we examined..."
+    )
+    out = _promote_study_subsection_headings(text)
+    assert "### Study 1 Design and Findings" in out
+    assert "In Study 1 we examined" in out
+
+
+def test_study_subsection_multiple_variants_promoted():
+    text = (
+        "x\n\n"
+        "Study 3 Design and Findings\n\n"
+        "y\n\n"
+        "Study 2 Results\n\n"
+        "z\n\n"
+        "Overview of the Replication and Extension\n\n"
+        "w"
+    )
+    out = _promote_study_subsection_headings(text)
+    assert "### Study 3 Design and Findings" in out
+    assert "### Study 2 Results" in out
+    assert "### Overview of the Replication and Extension" in out
+
+
+def test_study_subsection_skip_existing_heading():
+    text = "### Study 1 Design and Findings\n\nbody"
+    out = _promote_study_subsection_headings(text)
+    # Already a heading; do not double-prefix.
+    assert "### ### Study 1" not in out
+    assert "### Study 1 Design and Findings" in out
+
+
+def test_study_subsection_skip_unrelated_prose():
+    text = (
+        "We summarize Study 1 design and the procedure used in our work.\n\n"
+        "More prose."
+    )
+    out = _promote_study_subsection_headings(text)
+    # Mid-prose mention is NOT a heading; pattern requires the line to be
+    # the entire paragraph and start with capital-S "Study N <token>".
+    assert "### We summarize" not in out
+    assert out == text
 
 
 # ── _reformat_jama_key_points_box ──────────────────────────────────────────

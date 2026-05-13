@@ -480,6 +480,42 @@ class TestP0_RunningHeaderFooterPatterns_v246:
         assert "Department of Psychology, University of Hong Kong" not in result
         assert "Body content here." in result
 
+    def test_rsos_footer_url_stripped(self):
+        text = (
+            "Body sentence one.\n"
+            "rsos.royalsocietypublishing.org\n"
+            "Body sentence two.\n"
+        )
+        result = norm(text, "standard")
+        assert "rsos.royalsocietypublishing.org" not in result
+        assert "Body sentence one." in result
+        assert "Body sentence two." in result
+
+    def test_nature_footer_url_stripped(self):
+        text = (
+            "Body.\n"
+            "www.nature.com/naturecommunications\n"
+            "More body.\n"
+            "www.nature.com/scientificreports\n"
+            "Yet more.\n"
+        )
+        result = norm(text, "standard")
+        assert "www.nature.com/naturecommunications" not in result
+        assert "www.nature.com/scientificreports" not in result
+        assert "Body." in result
+
+    def test_springer_vol_marker_stripped(self):
+        text = "Body.\nVol.:(0123456789)\nMore body.\n"
+        result = norm(text, "standard")
+        assert "Vol.:(0123456789)" not in result
+        assert "Body." in result
+
+    def test_orcid_url_stripped(self):
+        text = "Body.\nhttps://orcid.org/0000-0002-1234-5678\nMore body.\n"
+        result = norm(text, "standard")
+        assert "orcid.org/0000-0002-1234-5678" not in result
+        assert "Body." in result
+
     def test_affiliation_line_preserved_in_prose_context(self):
         """The Dept/University pattern must only match standalone lines, not
         prose mentioning the affiliation mid-sentence."""

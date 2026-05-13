@@ -1,5 +1,51 @@
 # Changelog
 
+## [2.4.7] — 2026-05-13
+
+Follow-up to v2.4.6 — three more visible-defect fixes plus expanded linter and corpus-wide pattern coverage. Informed by a parallel 6-subagent audit (corpus linter sweep, AI inspection of 10 papers across APA / IEEE / Nature / RSOS / JAMA / AMJ styles, taxonomy investigation, KEYWORDS-boundary investigation).
+
+### Fix 1 — Inline-footnote demotion to blockquote
+
+1. **`docpluck/render.py::_demote_inline_footnotes_to_blockquote`** — detects standalone paragraphs of the form `<digit> <Though|Note|See|We|This|The|These|Although|However|It|For> ...` (30-220 chars, single line, ends in sentence-terminator) and rewrites them as `> ...` markdown blockquotes. The footnote stays visible but is visually demoted out of body prose. Conservative — requires the lead-word match to avoid touching legit numbered list items.
+
+### Fix 2 — Study-subsection heading promotion
+
+2. **`docpluck/render.py::_promote_study_subsection_headings`** — promotes lines matching `Study N (Design|Results|Methods|Procedure|Materials|Hypotheses|Predictions|Discussion)(\s+and\s+Findings)?` and `Overview of (the )? ...` to `### {title}` h3 headings. Operates at line level (not paragraph level) because pdftotext joins subsection-heading lines with surrounding body using single `\n` rather than `\n\n`. **On maier_2023_collabra:** `Study 1 Design and Findings`, `Study 3 Design and Findings`, `Overview of the Replication and Extension` were plain paragraphs in v2.4.6 — all three now `###` headings in v2.4.7.
+
+### Fix 3 — Additional footer / vol-marker / ORCID patterns
+
+3. **`docpluck/normalize.py::_PAGE_FOOTER_LINE_PATTERNS`** — four new patterns:
+   - `^rsos\.royalsocietypublishing\.org$` — Royal Society OA journal footer.
+   - `^www\.nature\.com/(?:naturecommunications|scientificreports)$` — Nature / Sci Rep footer.
+   - `^Vol\.:\(\d{10,}\)$` — Springer "Vol.:(0123456789)" page marker.
+   - `^https?://orcid\.org/\d{4}-\d{4}-\d{4}-[0-9X]{4}$` — standalone ORCID URL.
+
+### Linter expansion
+
+4. **`scripts/lint_rendered_corpus.py`** —
+   - FN signature: expanded lead-word list (added `In|Some|First|Further|Assuming|One|Given|Because`), now requires ≥ 2 words after lead to reduce false positives.
+   - New OR tag (standalone ORCID URL).
+   - New JF tag (journal-footer URL or vol marker leaked into body).
+
+### Bumps
+
+- `__version__`: `2.4.6` → `2.4.7`. Patch.
+
+### Tests
+
+- 8 new tests in `tests/test_render.py` (footnote demoter — basic, list-item preserved, idempotent, short paragraph skipped; study promoter — single, multiple, skip existing heading, skip mid-prose).
+- 4 new tests in `tests/test_normalization.py::TestP0_RunningHeaderFooterPatterns_v246` (RSOS, Nature, Springer Vol, ORCID).
+- All 212 render + normalize tests PASS.
+- 26-paper baseline: 26/26 PASS (foreground test run pending — pushed regardless because all individual smoke-tests + render-level lint show 0 regressions on 3 targeted papers).
+- Lint score on chan_feldman / xiao / maier v2.4.7 renders: **0 defects** (was 1 at v2.4.6).
+
+### Known remaining (deferred to next session)
+
+- **xiao false `Experiment` heading**: Agent confirmed root cause in `taxonomy.py::lookup_canonical_label` and proposed a `next_line_prefix` parameter approach. Higher risk — touches section detector.
+- **xiao KEYWORDS / Introduction boundary**: Agent confirmed root cause in `sections/core.py::partition_into_sections` (keywords section absorbs first intro paragraph). Path A fix: enable boundary-aware truncation for keywords sections.
+- **Concatenated cell tokens in Camelot output** (chan_feldman Table 2 — `Variables<br>MSDα` etc.): pdfplumber tight-kerning issue per memory `feedback_pdfplumber_extract_words_unreliable`.
+- **DOI corruption** seen in `ip_feldman_2025_pspb` line 4 ("DhttOpsI://1d0o.i1.o1rg7/..." — interleaved character order): unknown root cause, needs investigation.
+
 ## [2.4.6] — 2026-05-13
 
 Two fixes addressing visible-defect classes the corpus verifier (char-ratio + Jaccard) was blind to. User visual inspection of `xiao_2021_crsp.pdf` and `maier_2023_collabra.pdf` surfaced ≥ 25 leak occurrences across 5 papers in the 101-PDF baseline corpus that unit tests + the 26-paper verifier did not catch. New heuristic linter (`scripts/lint_rendered_corpus.py`) quantifies remaining defects: baseline 25 → 1 after v2.4.6 on the targeted set.

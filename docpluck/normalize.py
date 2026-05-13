@@ -649,6 +649,14 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
         r"^Department\s+of\s+[A-Z][A-Za-z]+(?:\s+and\s+[A-Z][A-Za-z]+)?,\s+"
         r"University\s+of\s+[A-Z][A-Za-z]+(?:\s+Kong)?,\s+.{2,80}$"
     ),
+    # v2.4.7: journal-footer URLs and volume markers that recur on every
+    # page in Nature / Sci Rep / Royal Society OA journals — pdftotext
+    # extracts them as standalone lines that leak into body prose.
+    re.compile(r"^rsos\.royalsocietypublishing\.org\s*$"),
+    re.compile(r"^www\.nature\.com/(?:naturecommunications|scientificreports)\s*$"),
+    re.compile(r"^Vol\.:\(\d{10,}\)\s*$"),  # "Vol.:(0123456789)" Springer marker
+    # v2.4.7: standalone ORCID URL lines.
+    re.compile(r"^https?://orcid\.org/\d{4}-\d{4}-\d{4}-[0-9X]{4}\s*$"),
 ]
 
 
