@@ -617,6 +617,38 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     # Running-header lines with "| <page>" or "<page> Author et al.".
     re.compile(r"^\S(?:[^|\n]{2,80})\|\s*\d{1,4}\s*$"),
     re.compile(r"^\d{1,4}\s+[A-ZÀ-ÿ][^\n]{1,60}\s+et al\.?\s*$"),
+    # v2.4.6: "Q. XIAO ET AL." style running header — surname journal abbrev
+    # used by CRSP, JESP, and many other 2-column journals. Accepts:
+    #   "Q. XIAO ET AL."         single initial + surname
+    #   "Q.M. XIAO ET AL."       two initials with internal period
+    #   "Q. M. XIAO ET AL"       two initials with space (no trailing dot)
+    # All-caps surname required (lowercase letters appear in regular prose
+    # like "Most participants in the experimental condition were …").
+    re.compile(
+        r"^[A-Z]\.(?:\s*[A-Z]\.?)?\s+[A-Z]{2,}\s+ET\s+AL\.?\s*$"
+    ),
+    # v2.4.6: contact-line footer used by Taylor & Francis (CRSP, etc.):
+    #   "CONTACT Gilad Feldman gfeldman@hku.hk; giladfel@gmail.com …"
+    # The `CONTACT` keyword + name + email is distinctive enough to anchor
+    # safely. Optional trailing affiliation / region tokens.
+    re.compile(
+        r"^CONTACT\s+[A-Z][\w'’-]+(?:\s+[A-Z][\w'’-]+)+\s+\S+@\S+.*$"
+    ),
+    # v2.4.6: prefixed author-contribution / corresponding-author footnotes
+    # used by Collabra, eLife, PLOS, etc.:
+    #   "a Contributed equally, joint first author"
+    #   "b Contributed equally, joint first author"
+    #   "c Corresponding Author: <name>, <affiliation>"
+    re.compile(
+        r"^[a-z]\s+(?:Contributed\s+equally|Corresponding\s+Author)\b.*$"
+    ),
+    # v2.4.6: standalone affiliation lines that recur on bottom of every
+    # page in 2-column journals — "Department of <field>, University of
+    # <place>, <region>".
+    re.compile(
+        r"^Department\s+of\s+[A-Z][A-Za-z]+(?:\s+and\s+[A-Z][A-Za-z]+)?,\s+"
+        r"University\s+of\s+[A-Z][A-Za-z]+(?:\s+Kong)?,\s+.{2,80}$"
+    ),
 ]
 
 
