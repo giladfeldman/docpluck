@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docpluck"
-version = "2.4.12"
+version = "2.4.13"
 description = "PDF, DOCX, and HTML text extraction and normalization for academic papers"
 readme = "docs/README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,18 @@ classifiers = [
 ]
 dependencies = [
     "pdfplumber>=0.11.0",
+    # Camelot is the table-extraction engine (per memory
+    # `project_camelot_for_tables` — settled 2026-05-09 after a 5-library
+    # bake-off). [cv] extra pulls in opencv-python which Camelot's lattice
+    # flavor needs for line detection. Without this dep, the `import camelot`
+    # in tables/camelot_extract.py raises ImportError, the wrapper silently
+    # returns [], and every detected table caption becomes kind='isolated'
+    # with empty cells — exactly the v2.4.12 production regression.
+    "camelot-py[cv]>=0.11.0",
+    # Lattice flavor also needs Ghostscript at runtime — the system binary,
+    # installed via Dockerfile (apt-get install ghostscript). Without it,
+    # lattice silently fails and only the (often noisier) stream flavor
+    # contributes to detection.
 ]
 
 [project.optional-dependencies]
