@@ -379,6 +379,109 @@ def _join_multiline_caption_paragraphs(text: str) -> str:
     return "".join(paragraphs)
 
 
+# ── Section C3: inline-footnote demotion + study-subsection promotion ──────
+
+
+_INLINE_FOOTNOTE_RE = re.compile(
+    r"^(?P<num>\d{1,2})\s+"
+    r"(?P<lead>Though|Note|See|We|This|The|These|Although|However|It\s|Although|For)\b"
+    r".{2,210}[\.\)]\s*$"
+)
+
+
+def _demote_inline_footnotes_to_blockquote(text: str) -> str:
+    """Demote leaked inline footnote paragraphs to ``> ¹ ...`` blockquotes.
+
+    pdftotext renders footnotes at the bottom of each page in linear reading
+    order, producing a standalone single-line paragraph like:
+
+        1 Though we note a recent failed replication of the Kogut and Ritov
+          (2005) by Majumder et al. (2023).
+
+    These get spliced into body prose because they share a section's char
+    window with surrounding paragraphs. This pass detects such lines and
+    rewrites them as markdown blockquotes so the reader can still see the
+    footnote content but it's visually demoted out of the prose flow.
+
+    Conservative trigger requires ALL of:
+      - The paragraph is exactly one line (no embedded ``\\n``).
+      - Length 30-220 chars (real footnotes; longer is prose).
+      - Starts with a 1-2 digit number followed by whitespace.
+      - First word after the digit is from a small fixed set
+        (``Though|Note|See|We|This|The|These|Although|However|It|For``) —
+        these dominate academic footnote openings while rarely opening
+        non-footnote numbered paragraphs.
+      - Ends with a sentence-terminator (``.`` or ``)``).
+    """
+    if not text:
+        return text
+    paragraphs = re.split(r"(\n\n+)", text)
+    for idx in range(0, len(paragraphs), 2):
+        para = paragraphs[idx]
+        stripped = para.strip()
+        if not stripped or "\n" in stripped:
+            continue
+        if len(stripped) < 30 or len(stripped) > 220:
+            continue
+        if not _INLINE_FOOTNOTE_RE.match(stripped):
+            continue
+        paragraphs[idx] = f"> {stripped}"
+    return "".join(paragraphs)
+
+
+_STUDY_SUBSECTION_RE = re.compile(
+    r"^Study\s+\d+\s+"
+    r"(?:Design(?:\s+and\s+Findings)?|Results(?:\s+and\s+Findings)?|"
+    r"Methods?|Procedure|Materials|Hypotheses|Predictions|Discussion)$"
+)
+_OVERVIEW_HEADING_RE = re.compile(
+    r"^Overview\s+of\s+(?:the\s+)?[A-Z][A-Za-z\s]{2,60}$"
+)
+
+
+def _promote_study_subsection_headings(text: str) -> str:
+    """Promote ``Study N Design and Findings`` etc. to ``### {title}``.
+
+    Replication / multi-study papers (Collabra, Cogemo, JESP) use plain-text
+    "Study 1 Design and Findings" lines as subsection headings — same font
+    size as body in the PDF, so pdftotext linearizes them as bare lines and
+    the section detector doesn't pick them up. This pass promotes them to
+    `### Study N Foo` h3 headings.
+
+    Conservative: only matches a closed set of subsection patterns
+    (``Design (and Findings)``, ``Results (and Findings)``, ``Methods``,
+    ``Procedure``, ``Materials``, ``Hypotheses``, ``Predictions``,
+    ``Discussion``) and the related ``Overview of the …`` line.
+
+    Operates at the line level (not paragraph level) because pdftotext often
+    joins subsection-heading lines with surrounding body using single ``\\n``
+    rather than ``\\n\\n``. When a matching line is found inside a multi-line
+    paragraph, split the paragraph and promote the line to ``### {title}``
+    surrounded by blank lines.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    out: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            out.append(line)
+            continue
+        if _STUDY_SUBSECTION_RE.match(stripped) or _OVERVIEW_HEADING_RE.match(stripped):
+            # Promote with blank-line padding so downstream tools see it as
+            # a standalone heading paragraph. Avoid double blank lines.
+            if out and out[-1] != "":
+                out.append("")
+            out.append(f"### {stripped}")
+            out.append("")
+        else:
+            out.append(line)
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
 # ── Section C2: orphan table cell-text suppression ──────────────────────────
 
 
@@ -1477,6 +1580,8 @@ def render_pdf_to_markdown(
     md = _fix_hyphenated_line_breaks(md)
     md = _join_multiline_caption_paragraphs(md)
     md = _suppress_orphan_table_cell_text(md)
+    md = _demote_inline_footnotes_to_blockquote(md)
+    md = _promote_study_subsection_headings(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)
