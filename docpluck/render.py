@@ -677,53 +677,67 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
     """
     if not text or "Table" not in text:
         return text
-    # v2.4.10: operate at LINE level (not paragraph level). pdftotext
-    # version skew matters here — Xpdf 4.00 (used by local dev) joins
-    # paragraphs with `\n\n`, but poppler-utils 25.03+ (used on Railway
-    # production) often joins cell-content runs with single `\n`. The
-    # earlier paragraph-level split missed prod's structure entirely:
-    #   "Table 5. Caption.\nStudy design\nSample characteristics\n..."
-    # was one paragraph instead of N separate ones.
+    # Operate at LINE level. v2.4.10 rationale: pdftotext version skew
+    # between local dev (Xpdf 4.00 -> `\n\n` paragraph breaks) and Railway
+    # prod (poppler-utils 25.03 -> single `\n` between cell-content runs).
+    # v2.4.11 enhancements:
+    #   - Also fire after italic ``*Table N. ...*`` captions (v2.4.2
+    #     emits those when Camelot returned 0 cells; orphan rows can
+    #     follow the italic just as easily as a plain caption).
+    #   - Accept digit-period prefix lines (``1. Degree of apology``)
+    #     when seen inside a post-caption region. These look like
+    #     numbered list items in isolation but are column-1 cell labels
+    #     in academic stats tables.
+    #   - Lower threshold from 3 to 2 orphans (covers two-column tables
+    #     like chan_feldman Table 1 — Hypothesis + Description).
+    italic_re = re.compile(r"^\*Table\s+(\d+)[.:]\s+.{3,}\*\s*$")
     lines = text.split("\n")
     out: list[str] = []
     i = 0
     while i < len(lines):
         line = lines[i]
         stripped = line.strip()
-        if (
+        is_plain_caption = (
             stripped
             and not stripped.startswith("*")
             and not stripped.startswith("#")
             and _ORPHAN_TABLE_CAPTION_RE.match(stripped)
-        ):
-            # Scan ahead for orphan-cell lines (1 or 2 blank lines allowed
-            # between, single short paragraphs each — accommodates both
-            # pdftotext flavors).
+        )
+        is_italic_caption = stripped and italic_re.match(stripped)
+        if is_plain_caption or is_italic_caption:
+            # Scan ahead for orphan-cell lines. Allow 0-1 blank lines
+            # between orphans; stop on a second blank line or on the first
+            # non-orphan (e.g. "Note: ..." caption tail, or the next prose
+            # paragraph). No fixed line cap — academic stats tables can
+            # have 30-100 orphan cell lines in a row (5x5 correlation
+            # matrix + headers + group separators).
             j = i + 1
             blank_run = 0
             orphans: list[int] = []
-            saw_long_prose = False
-            while j < len(lines) and j < i + 25:
+            while j < len(lines):
                 p = lines[j].strip()
                 if not p:
                     blank_run += 1
                     j += 1
                     if blank_run > 1:
-                        # Two blank lines in a row → end of table region.
                         break
                     continue
                 blank_run = 0
-                if _is_orphan_cell_paragraph(p):
+                # In post-caption cell context, also accept the
+                # `^\d+\.\s+\w+` pattern (column-1 cell labels). Outside
+                # this context it's still rejected as a numbered list.
+                if _is_cell_like_in_post_caption_context(p):
                     orphans.append(j)
                     j += 1
                     continue
-                # Hit a non-orphan line. If it's substantial prose, stop;
-                # otherwise also stop (we only want runs of orphans).
-                saw_long_prose = True
                 break
-            if len(orphans) >= 3:
-                # Italicize the caption and drop the orphan lines.
-                out.append(f"*{stripped}*")
+            if len(orphans) >= 2:
+                # Italicize plain captions; leave italic ones unchanged.
+                # In both cases drop the orphan lines.
+                if is_plain_caption:
+                    out.append(f"*{stripped}*")
+                else:
+                    out.append(line)
                 i = orphans[-1] + 1
                 continue
         out.append(line)
@@ -731,6 +745,26 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
     cleaned = "\n".join(out)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
+
+
+def _is_cell_like_in_post_caption_context(p: str) -> bool:
+    """Like `_is_orphan_cell_paragraph` but accepts digit-period prefix
+    lines (``1. Degree of apology``) which look like list items in
+    isolation but are common column-1 cell labels in academic stats
+    tables. Called only inside the post-caption scan window."""
+    if _is_orphan_cell_paragraph(p):
+        return True
+    # Digit-period prefix: `^\d+\.\s+\w` — must be short (≤ 80 chars,
+    # cell label), no multi-sentence prose.
+    if re.match(r"^\d+\.\s+\w", p) and len(p) <= 80:
+        # Reject if it has many stopwords (real list item with prose).
+        lower = " " + p.lower() + " "
+        if sum(lower.count(sw) for sw in _ORPHAN_CELL_STOPWORDS) >= 3:
+            return False
+        if p.count(". ") >= 2:
+            return False
+        return True
+    return False
 
 
 # ── Section D: JAMA Key Points sidebar reformat ─────────────────────────────

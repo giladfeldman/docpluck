@@ -184,20 +184,57 @@ def test_suppress_orphan_table_cell_text_preserves_prose_following_caption():
     assert "The full breakdown of the comparison" in out
 
 
-def test_suppress_orphan_table_cell_text_requires_min_three_orphans():
-    """Only 2 orphan rows ⇒ no suppression (could be a legit short list)."""
+def test_suppress_orphan_table_cell_text_requires_min_two_orphans():
+    """v2.4.11 lowered the threshold from 3 to 2 (catches the
+    chan_feldman Table 1 case: Hypothesis + Description). 1 orphan
+    should still NOT trigger suppression (too aggressive)."""
     text = (
         "Table 5. Caption here.\n\n"
         "Short one\n\n"
-        "Short two\n\n"
         "Now a paragraph with several function words: the rest of the text "
         "continues here in flowing prose with normal markers and length."
     )
     out = _suppress_orphan_table_cell_text(text)
+    # Only 1 orphan → no suppression.
     assert "Table 5. Caption here." in out
     assert "*Table 5." not in out
     assert "Short one" in out
-    assert "Short two" in out
+
+
+def test_suppress_orphan_table_cell_text_fires_on_two_orphans():
+    """Two orphan rows (chan_feldman Table 1 case) IS suppressed."""
+    text = (
+        "Table 1. Summary of hypotheses of the target article.\n"
+        "Hypothesis\n\n"
+        "Description\n\n"
+        "Empathy mediates relationships between dispositional variables and "
+        "their causal effects on forgiving for the offender."
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "*Table 1. Summary of hypotheses of the target article.*" in out
+    assert "\nHypothesis\n" not in out
+    assert "\nDescription\n" not in out
+    assert "Empathy mediates relationships" in out
+
+
+def test_suppress_orphan_table_cell_text_fires_on_italic_caption():
+    """v2.4.11: italic ``*Table N. ...*`` captions emitted by the v2.4.2
+    Camelot-0-cells fix are followed by orphan rows just as easily.
+    The suppressor now strips those too."""
+    text = (
+        "*Table 2. Target article: Means, standard deviations, internal "
+        "consistency reliabilities and intercorrelations.*\n\n"
+        "1. Degree of apology\n2. Empathy\n3. Forgiving\n\n"
+        "5.63\n13.22\n16.82\n\n"
+        "Note: Apology scores ranged from 2 to 10."
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "*Table 2. Target article" in out
+    assert "1. Degree of apology" not in out
+    assert "13.22" not in out
+    # The Note line is short but starts with "Note" — would be excluded by
+    # _is_orphan_cell_paragraph's Note check, so it stays.
+    assert "Note: Apology scores" in out
 
 
 def test_suppress_orphan_table_cell_text_skips_already_italic_caption():

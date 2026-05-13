@@ -71,7 +71,7 @@ from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
 from .render import render_pdf_to_markdown
 
-__version__ = "2.4.10"
+__version__ = "2.4.11"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
