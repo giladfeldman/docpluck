@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.4.9] — 2026-05-13
+
+Regression hotfix for v2.4.8's `_demote_false_single_word_headings`. The 26-paper baseline gate caught it: ar_royal_society_rsos_140066 + ar_royal_society_rsos_140072 dropped from 4 → 2 sections because `## Discussion`/`## References` got demoted (next line started with lowercase `of this study...` or `1. Öhman A...`).
+
+### Fix
+
+1. **`docpluck/render.py::_demote_false_single_word_headings`** —
+   - Added `_STRONG_SECTION_NAMES` allowlist: abstract / introduction / background / methods / materials / results / discussion / conclusion / references / bibliography / acknowledgments / funding / limitations / appendix / keywords. Headings with these words are NEVER demoted — they are authoritative section markers.
+   - Added numbered-subsection guard: if next line matches `^\d+(?:\.\d+){1,3}\.?\s+\w` (e.g., `3.1. Subjects`, `3.1.2. Foo`), the heading stays — the numbered subsection is legitimate body content.
+
+### Tests
+
+- 4 new tests in `tests/test_render.py` (strong-section preservation for Results / Discussion / References, non-canonical word like ``Theory`` still demoted, numbered-subsection guard).
+- 55 render tests PASS.
+- **26-paper baseline: 26/26 PASS** (vs v2.4.8: 24/26).
+
+### Bumps
+
+- `__version__`: `2.4.8` → `2.4.9`. Patch.
+
 ## [2.4.8] — 2026-05-13
 
 Massive defect-class sweep informed by 8 parallel subagent audits. Highest-impact item: a render-level false-heading demoter that addresses 197 false `## Word` / `### Word` headings (24% of all single-word headings in the v2.4.0 101-paper corpus) where pdftotext split a single line ("Results of Study 1") across a column wrap.
