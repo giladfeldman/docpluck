@@ -507,17 +507,41 @@ def _synthesize_introduction_if_bloated_front_matter(
     total = sections[-1].char_end if sections else 0
     if total > 0 and cand_len / total < 0.05:
         return sections
-    # Find the first paragraph break ≥800 chars in.  The first line is the
-    # heading line and stays with the front-matter section.
+    # Find the cut position. Two regimes, by candidate label:
+    #
+    # * ABSTRACT: the abstract is typically a single 1500–3000-char prose
+    #   paragraph. Cut at the first paragraph break ≥800 chars in so the
+    #   abstract paragraph stays with the abstract span and only the
+    #   following body absorbs into the synthesized introduction.
+    # * KEYWORDS: the keyword line is short (one comma/semicolon-separated
+    #   line, ~50–200 chars). Cut at the FIRST paragraph break past the
+    #   keyword line so the synthesized introduction begins with the very
+    #   first intro paragraph rather than 800 chars deep inside it.
+    #   Without this branch (xiao_2021_crsp), the cut overshoots the short
+    #   keyword line and pulls 2 intro paragraphs INTO the keywords span,
+    #   leaving the synthesized Introduction starting on the next-column
+    #   metadata block (Supplemental data / Department / page number).
     body = cand.text
-    cut_local = body.find("\n\n", 800)
-    if cut_local < 0:
-        cut_local = body.find("\n", 1200)
+    if cand.canonical_label == SectionLabel.keywords:
+        # Cut at the FIRST paragraph break, no minimum-length gate. The
+        # keyword line itself is short (~50–200 chars on one or two
+        # newline-separated lines) and ends with a paragraph break before
+        # the body prose begins. The 800-char rule used for ABSTRACT
+        # would overshoot a short keyword line and pull intro paragraphs
+        # into the keywords span.
+        cut_local = body.find("\n\n")
         if cut_local < 0:
             return sections
-        cut_local += 1
-    else:
         cut_local += 2
+    else:
+        cut_local = body.find("\n\n", 800)
+        if cut_local < 0:
+            cut_local = body.find("\n", 1200)
+            if cut_local < 0:
+                return sections
+            cut_local += 1
+        else:
+            cut_local += 2
     cut_global = cand.char_start + cut_local
     new_cand = Section(
         label=cand.label,

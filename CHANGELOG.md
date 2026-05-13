@@ -1,5 +1,104 @@
 # Changelog
 
+## [2.4.15] — 2026-05-13
+
+Section-boundary fix from the post-v2.4.14 broad-read across 8 papers
+(xiao, jdm, jamison, amj_1, amle_1, nat_comms_1, ieee_access_2, chen).
+
+### Defect — KEYWORDS overshoot in `_synthesize_introduction_if_bloated_front_matter`
+
+When no `Introduction` heading is detected, the bloated front-matter
+synthesis splits the span at the first paragraph break ≥800 chars into
+its body. That rule was tuned for the ABSTRACT case (a single
+1500–3000-char prose paragraph). On the KEYWORDS case the keyword line
+is short (~50–200 chars; one or two newline-separated lines) — the
+800-char gate overshoots, pulling 2 intro paragraphs INTO the keywords
+span and starting the synthesized Introduction on next-column metadata
+fragments.
+
+On xiao_2021_crsp this rendered as:
+
+```
+## KEYWORDS
+
+Decoy effect; decision reversibility; regret; attraction effect; replication
+
+Human choice behaviors are susceptible …    ← intro para 1 (wrong section!)
+
+In its simplest form, the decoy effect …    ← intro para 2 (wrong section!)
+
+## Introduction
+
+Supplemental data for this article can be accessed here.        ← page-1 sidebar leak
+
+Department of Psychology, University of                          ← affiliation leak
+
+competitor form a core choice set …
+```
+
+After the fix:
+
+```
+## KEYWORDS
+
+Decoy effect; decision reversibility; regret; attraction effect; replication
+
+## Introduction
+
+Human choice behaviors are susceptible …
+```
+
+### Fix
+
+`docpluck/sections/core.py::_synthesize_introduction_if_bloated_front_matter`
+branches on the candidate's canonical label:
+
+- `keywords`: cut at the FIRST paragraph break (`body.find("\n\n")`,
+  no minimum-length gate). The keyword line is bounded by the first
+  `\n\n` and the synthesized Introduction begins with the very first
+  intro paragraph.
+- `abstract`: keep the existing 800-char rule.
+
+The KEYWORDS branch also preserves the prior fallback semantics for
+the no-paragraph-break edge case (return without splitting), since
+without a `\n\n` we have no reliable cut point — the section stays
+intact rather than guessing at a wrong split.
+
+### Verification
+
+- chandrashekar_2023_mp (also hit this path): KEYWORDS section now
+  contains only the keyword line; Introduction starts at the first
+  intro sentence.
+- xiao_2021_crsp: same fix applies; only the in-Introduction
+  page-1 right-column metadata leak (Supplemental data / Department of
+  Psychology, University of) remains — that is a separate F0
+  layout-strip target deferred to a later iteration.
+
+### Bumps
+
+- `__version__`: `2.4.14` → `2.4.15`. Patch (section-partition tightening;
+  no API or schema change).
+
+### Tests
+
+- New: `tests/test_sections_core_partition.py`:
+  * `test_synthesize_intro_keywords_cut_at_first_paragraph_break` —
+    asserts the KEYWORDS span stays short (< 300 chars) and the
+    Introduction begins at the first intro paragraph.
+  * `test_synthesize_intro_abstract_still_uses_800_char_minimum` —
+    asserts the ABSTRACT 800-char rule is unchanged so the abstract
+    paragraph is not split mid-sentence.
+- All section/partition unit tests PASS (11/11).
+- 26-paper baseline (`scripts/verify_corpus.py`) PASS 26/26.
+
+### Out of scope (next iteration)
+
+Front-matter footnote / acknowledgment / sidebar leaks landing
+mid-Introduction (xiao "Supplemental data" + "Department of
+Psychology", amj_1 "We wish to thank our editor", amle_1 "We thank
+Steven Charlier"). These need layout-aware F0 stripping or a
+heuristic text-channel filter; a broad pattern but a separate change.
+
 ## [2.4.14] — 2026-05-13
 
 Table-rendering quality iteration after v2.4.13 restored Camelot on prod. Two
