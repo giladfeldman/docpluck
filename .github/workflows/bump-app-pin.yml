@@ -1,0 +1,86 @@
+name: Bump docpluckapp library pin on new tag
+
+# Triggered when a vX.Y.Z tag is pushed to this (docpluck library) repo.
+# Opens a PR in the giladfeldman/docpluckapp repo bumping
+# `service/requirements.txt`'s docpluck git pin to the new tag. PR is
+# auto-merged once status checks pass (or admin can review first).
+#
+# Required secret:
+#   APP_REPO_TOKEN — GitHub Personal Access Token with `repo` scope on
+#                    giladfeldman/docpluckapp. Add via:
+#                      gh secret set APP_REPO_TOKEN
+#                        --repo giladfeldman/docpluck
+#                        --body "$YOUR_PAT"
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  open-bump-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Extract tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout docpluckapp
+        uses: actions/checkout@v4
+        with:
+          repository: giladfeldman/docpluckapp
+          token: ${{ secrets.APP_REPO_TOKEN }}
+          path: app
+
+      - name: Bump pin in service/requirements.txt
+        working-directory: app
+        run: |
+          set -e
+          REQ=service/requirements.txt
+          NEW_TAG="${{ steps.tag.outputs.tag }}"
+          PIN="docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git@${NEW_TAG}"
+          # Idempotent: only commit if the file actually changes.
+          python -c "
+          import re, sys
+          path = '$REQ'
+          s = open(path).read()
+          new = re.sub(r'docpluck\[all\] @ git\+https://github\.com/giladfeldman/docpluck\.git@v?[0-9]+\.[0-9]+\.[0-9]+', '$PIN', s)
+          if new == s:
+              print('no change'); sys.exit(0)
+          open(path, 'w').write(new)
+          print('bumped')
+          "
+
+      - name: Commit + open PR
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ secrets.APP_REPO_TOKEN }}
+          NEW_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -e
+          if git diff --quiet; then
+            echo "service/requirements.txt already pinned to ${NEW_TAG} — nothing to do."
+            exit 0
+          fi
+          BRANCH="auto-bump-docpluck-${NEW_TAG}"
+          git config user.name "docpluck-bot"
+          git config user.email "noreply@anthropic.com"
+          git checkout -b "$BRANCH"
+          git add service/requirements.txt
+          git commit -m "pin: auto-bump docpluck library to ${NEW_TAG}
+
+          Triggered by tag push on giladfeldman/docpluck.
+
+          Co-Authored-By: docpluck-bot <noreply@anthropic.com>"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --title "pin: auto-bump docpluck library to ${NEW_TAG}" \
+            --body "Automatic pin bump triggered by tag \`${NEW_TAG}\` on giladfeldman/docpluck. The post-deploy verifier (see .github/workflows/verify-railway-deploy.yml) will assert that the live Railway service reports the new library version after merge." \
+            --base master \
+            --head "$BRANCH"
+          # Auto-merge: enable squash-merge with the post-deploy verifier as the
+          # gate. If automerge isn't enabled for the repo, this will be a no-op
+          # and the PR sits for manual review.
+          gh pr merge --auto --squash || echo "auto-merge not enabled — PR left open for review"
