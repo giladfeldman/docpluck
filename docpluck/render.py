@@ -384,6 +384,20 @@ def _join_multiline_caption_paragraphs(text: str) -> str:
 
 _FALSE_HEADING_RE = re.compile(r"^(#{2,3})\s+(?P<word>[A-Z][A-Za-z]{2,12})\s*$")
 
+# Strong canonical section names — never demote even when followed by a
+# lowercase or digit continuation. These are unambiguous section markers
+# whose authoritative source is the document structure, not the surrounding
+# prose. The RSOS-family regression (v2.4.9) showed that ``## Discussion``
+# followed by body prose starting with ``of this study...`` got demoted —
+# losing the section. Same for ``## References\n\n1. Öhman A...``.
+_STRONG_SECTION_NAMES = frozenset({
+    "abstract", "introduction", "background", "methods", "method",
+    "materials", "results", "discussion", "discussions", "conclusion",
+    "conclusions", "references", "bibliography", "acknowledgments",
+    "acknowledgements", "funding", "limitations", "supplementary",
+    "appendix", "keywords",
+})
+
 
 def _demote_false_single_word_headings(text: str) -> str:
     """Demote ``## Word`` / ``### Word`` lines that are mid-prose continuations.
@@ -421,6 +435,14 @@ def _demote_false_single_word_headings(text: str) -> str:
             out.append(line)
             i += 1
             continue
+        # v2.4.9: never demote strong canonical section names. The body
+        # text following `## Discussion` or `## References` can start with
+        # lowercase prose / numbered list ("of this study...", "1. Öhman A..."),
+        # but the heading itself is authoritative.
+        if m.group("word").lower() in _STRONG_SECTION_NAMES:
+            out.append(line)
+            i += 1
+            continue
         # Find the next non-blank line.
         j = i + 1
         while j < len(lines) and not lines[j].strip():
@@ -435,6 +457,16 @@ def _demote_false_single_word_headings(text: str) -> str:
         # original heading line (``Results of Study 1`` → ``## Results`` +
         # ``of Study 1``). Skip the lookahead for proper-sentence starts.
         first_char = next_line[:1]
+        # v2.4.9: don't demote when the next line is a numbered subsection
+        # (``3.1. Subjects``, ``3.1 Subjects``, ``4.1. Do seasonal``).
+        # Royal Society RSOS papers use ``## Methods\n\n3.1. Subjects`` as
+        # a legitimate section + numbered-subsection structure. The
+        # `_promote_numbered_subsection_headings` post-processor will lift
+        # those into ``### 3.1 Subjects`` headings.
+        if re.match(r"^\d+(?:\.\d+){1,3}\.?\s+\w", next_line):
+            out.append(line)
+            i += 1
+            continue
         is_continuation = bool(
             first_char and (first_char.islower() or first_char.isdigit())
         )

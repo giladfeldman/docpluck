@@ -353,24 +353,35 @@ def test_study_subsection_skip_unrelated_prose():
 # ── _demote_false_single_word_headings ──────────────────────────────────────
 
 
-def test_false_heading_demoted_when_next_line_is_continuation_of():
+def test_strong_section_heading_results_preserved_with_continuation_text():
+    """v2.4.9 regression fix: ``## Results`` is a strong canonical section;
+    even if pdftotext rendered the body starting with lowercase ``of Study 1``,
+    the heading stays — the body keeps its (slightly weird) opening, but the
+    section structure survives."""
     text = "## Results\n\nof Study 1 showed significant effects."
     out = _demote_false_single_word_headings(text)
-    assert "## Results" not in out
-    assert "Results of Study 1 showed significant effects." in out
+    assert "## Results" in out
 
 
-def test_false_heading_demoted_when_next_line_starts_lowercase():
-    text = "## Discussion\n\nsection of the article was extensive."
+def test_strong_section_heading_discussion_preserved():
+    text = "## Discussion\n\nof this study apparently present evidence against."
     out = _demote_false_single_word_headings(text)
-    assert "## Discussion" not in out
-    assert "Discussion section of the article" in out
+    assert "## Discussion" in out
 
 
-def test_false_heading_demoted_when_next_line_starts_digit():
-    text = "## References\n\n1. Author, A. (2023). Title."
+def test_strong_section_heading_references_preserved_with_numbered_list():
+    text = "## References\n\n1. Öhman A, Lundqvist D, Esteves F. 2001 The face in the crowd."
     out = _demote_false_single_word_headings(text)
-    assert "## References\n\n1." not in out
+    assert "## References" in out
+
+
+def test_false_heading_demoted_for_non_canonical_word():
+    """A non-canonical single-word heading (``## Theory``) followed by
+    lowercase continuation IS demoted (v2.4.8 behavior preserved)."""
+    text = "### Theory\n\nof the firm: managerial implications follow."
+    out = _demote_false_single_word_headings(text)
+    assert "### Theory" not in out
+    assert "Theory of the firm" in out
 
 
 def test_legit_heading_preserved_when_next_line_capitalized_sentence():
@@ -398,6 +409,23 @@ def test_false_heading_demoter_idempotent():
     once = _demote_false_single_word_headings(text)
     twice = _demote_false_single_word_headings(once)
     assert once == twice
+
+
+def test_false_heading_preserved_when_next_line_is_numbered_subsection():
+    """v2.4.9 regression fix: RSOS-style ``## Methods\\n\\n3.1. Subjects``
+    must keep the heading + numbered subsection intact. Demoting here
+    would destroy the section structure."""
+    text = "## Methods\n\n3.1. Subjects and study site\n\nWe sampled..."
+    out = _demote_false_single_word_headings(text)
+    assert "## Methods" in out
+    assert "3.1. Subjects and study site" in out
+
+
+def test_false_heading_preserved_with_4digit_numbered_subsection():
+    text = "## Results\n\n4.1. Do seasonal challenges affect...\n\nResults follow."
+    out = _demote_false_single_word_headings(text)
+    assert "## Results" in out
+    assert "4.1. Do seasonal challenges affect..." in out
 
 
 # ── _reformat_jama_key_points_box ──────────────────────────────────────────
