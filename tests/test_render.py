@@ -14,6 +14,7 @@ from docpluck.render import (
     _merge_compound_heading_tails,
     _promote_numbered_subsection_headings,
     _reformat_jama_key_points_box,
+    _suppress_orphan_table_cell_text,
     _apply_title_rescue,
     _strip_duplicate_title_occurrences,
 )
@@ -133,6 +134,119 @@ def test_join_skips_short_first_line():
     out = _join_multiline_caption_paragraphs(text)
     # First line < 60 chars, no fold.
     assert "TABLE 1 Short\n(rest)" in out
+
+
+# ── _suppress_orphan_table_cell_text ───────────────────────────────────────
+
+
+def test_suppress_orphan_table_cell_text_drops_leaked_rows():
+    """The chan_feldman_2025_cogemo Table 5 leak: caption followed by short
+    orphan cell paragraphs gets italicized and the rows are dropped."""
+    text = (
+        "We made minor adjustments, summarised below.\n\n"
+        "Table 5. Comparison of target article versus replication.\n\n"
+        "Target article\n\n"
+        "Replication\n\n"
+        "Study design\n\n"
+        "Sample characteristics\n\n"
+        "Procedure\n\n"
+        "## Evaluation\n\n"
+        "criteria for replication findings"
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "*Table 5. Comparison of target article versus replication.*" in out
+    assert "\n\nTarget article\n\n" not in out
+    assert "\n\nReplication\n\n" not in out
+    assert "\n\nStudy design\n\n" not in out
+    assert "\n\nSample characteristics\n\n" not in out
+    assert "\n\nProcedure\n\n" not in out
+    assert "## Evaluation" in out
+    assert "criteria for replication findings" in out
+
+
+def test_suppress_orphan_table_cell_text_preserves_prose_following_caption():
+    """If a caption is followed by normal prose (not orphan cells), the
+    caption stays plain and the prose is kept untouched."""
+    text = (
+        "Table 5. See description below for full breakdown.\n\n"
+        "The full breakdown of the comparison between the target article and "
+        "our replication is provided in the supplementary materials, where we "
+        "describe each design facet in detail and explain the rationale for "
+        "the chosen criteria."
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    # No italicization (no 3+ orphan rows follow).
+    assert "Table 5. See description below for full breakdown." in out
+    assert "*Table 5." not in out
+    assert "The full breakdown of the comparison" in out
+
+
+def test_suppress_orphan_table_cell_text_requires_min_three_orphans():
+    """Only 2 orphan rows ⇒ no suppression (could be a legit short list)."""
+    text = (
+        "Table 5. Caption here.\n\n"
+        "Short one\n\n"
+        "Short two\n\n"
+        "Now a paragraph with several function words: the rest of the text "
+        "continues here in flowing prose with normal markers and length."
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "Table 5. Caption here." in out
+    assert "*Table 5." not in out
+    assert "Short one" in out
+    assert "Short two" in out
+
+
+def test_suppress_orphan_table_cell_text_skips_already_italic_caption():
+    """The v2.4.2 ``*Table N. ...*`` caption-only emission is never followed
+    by orphan rows; we must not touch it."""
+    text = (
+        "*Table 3. Difference and similarities between target article and replication.*\n\n"
+        "*Table 4. Replication and extension experimental design.*\n\n"
+        "## Evaluation"
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    # Unchanged.
+    assert out == text
+
+
+def test_suppress_orphan_table_cell_text_stops_at_next_caption():
+    """A run of orphan paragraphs ends when the next caption is reached;
+    the second caption is preserved as-is in its original form."""
+    text = (
+        "Table 5. First caption.\n\n"
+        "Cell a\n\n"
+        "Cell b\n\n"
+        "Cell c\n\n"
+        "Table 6. Second caption.\n\n"
+        "The discussion paragraph here is regular prose with the and of words."
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "*Table 5. First caption.*" in out
+    assert "Cell a" not in out
+    assert "Cell b" not in out
+    assert "Cell c" not in out
+    # Second caption preserved (no orphans after it).
+    assert "Table 6. Second caption." in out
+    assert "*Table 6." not in out
+
+
+def test_suppress_orphan_table_cell_text_idempotent():
+    text = (
+        "Table 5. Caption.\n\n"
+        "Cell a\n\n"
+        "Cell b\n\n"
+        "Cell c\n\n"
+        "## Next"
+    )
+    once = _suppress_orphan_table_cell_text(text)
+    twice = _suppress_orphan_table_cell_text(once)
+    assert once == twice
+
+
+def test_suppress_orphan_table_cell_text_noop_when_no_table_caption():
+    text = "## Methods\n\nWe ran the analysis.\n\nResults follow."
+    assert _suppress_orphan_table_cell_text(text) == text
 
 
 # ── _reformat_jama_key_points_box ──────────────────────────────────────────

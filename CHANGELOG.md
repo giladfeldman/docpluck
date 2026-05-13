@@ -1,5 +1,52 @@
 # Changelog
 
+## [2.4.6] — 2026-05-13
+
+Two fixes addressing visible-defect classes the corpus verifier (char-ratio + Jaccard) was blind to. User visual inspection of `xiao_2021_crsp.pdf` and `maier_2023_collabra.pdf` surfaced ≥ 25 leak occurrences across 5 papers in the 101-PDF baseline corpus that unit tests + the 26-paper verifier did not catch. New heuristic linter (`scripts/lint_rendered_corpus.py`) quantifies remaining defects: baseline 25 → 1 after v2.4.6 on the targeted set.
+
+### Fix 1 — Orphan table cell-text suppression
+
+1. **`docpluck/render.py::_suppress_orphan_table_cell_text`** — new post-processor inserted between `_join_multiline_caption_paragraphs` and `_merge_compound_heading_tails`. Detects single-line `Table N. <caption>` paragraphs (plain, not already italicized — the italic `*Table N. ...*` is the v2.4.2 caption-only emission and never has orphan rows) followed by ≥ 3 consecutive paragraphs matching `_is_orphan_cell_paragraph` (≤ 200 chars, no markdown/HTML/list markers, low stopword density, not multi-sentence prose). When detected: italicizes the caption and drops the orphan paragraphs. Conservative: stops at the first non-orphan paragraph.
+
+On `chan_feldman_2025_cogemo`: 5 of 9 captions (Tables 3, 4, 5, 6, 7) were plain `Table N.` lines followed by 3–50 lines of orphan cell rows; all now italicized with zero orphan rows.
+
+### Fix 2 — Running-header / contact-block / affiliation line patterns
+
+2. **`docpluck/normalize.py::_PAGE_FOOTER_LINE_PATTERNS`** — four new patterns:
+   - `^[A-Z]\.(?:\s*[A-Z]\.?)?\s+[A-Z]{2,}\s+ET\s+AL\.?$` — `Q. XIAO ET AL.` / `Q.M. SMITH ET AL` running headers (all-caps surname required to avoid stripping legit `Q. Xiao et al.` references in prose).
+   - `^CONTACT\s+[A-Z]\w+(?:\s+[A-Z]\w+)+\s+\S+@\S+.*$` — Taylor & Francis (CRSP, etc.) `CONTACT <Name> <email>` page-footer.
+   - `^[a-c]\s+(?:Contributed\s+equally|Corresponding\s+Author)\b.*$` — Collabra-style prefixed contribution / corresponding-author footnotes.
+   - `^Department\s+of\s+[A-Z]\w+(?:\s+and\s+\w+)?,\s+University\s+of\s+\w+(?:\s+Kong)?,\s+.{2,80}$` — standalone Dept/University affiliation lines (must be standalone — prose mentioning the affiliation mid-sentence stays).
+
+On `xiao_2021_crsp`: 18 `Q. XIAO ET AL.` standalone leaks → 0 (one residual is folded inside a figure caption, not at line start). On `maier_2023_collabra`: 3 contact/corresponding leaks → 0.
+
+### New: heuristic linter
+
+3. **`scripts/lint_rendered_corpus.py`** — greps rendered `.md` for 5 leak signatures (RH, CT, CB, AF, FN). Run `python scripts/lint_rendered_corpus.py tmp/renders_v2.4.0/` against the 101-PDF corpus to surface visible defects char-ratio/Jaccard miss. Wired into `docpluck-qa` skill as Check 7c.
+
+### New: QA skill spec updates
+
+4. **`.claude/skills/docpluck-qa/SKILL.md`** — three new checks documented:
+   - 7c: Visible-Defect Heuristic Linter (the `lint_rendered_corpus.py` script).
+   - 7d: AI Inspection of Rendered Output (Claude subagent compares `.md` paragraph-by-paragraph against source PDF).
+   - 7e: Text-Coverage Baseline (asserts `len(rendered.md) ≥ 0.85 × len(pdftotext_raw)` to catch silent text-loss).
+
+### Bumps
+
+- `__version__`: `2.4.5` → `2.4.6`. Patch (additive normalize patterns + new render post-processor; no API surface change).
+
+### Tests
+
+- 7 new tests in `tests/test_render.py` for `_suppress_orphan_table_cell_text` (drops leaked rows, preserves prose, requires ≥ 3 orphans, skips already-italic caption, stops at next caption, idempotent, no-op when no caption).
+- 7 new tests in `tests/test_normalization.py::TestP0_RunningHeaderFooterPatterns_v246` for the new footer patterns (Q. XIAO ET AL. stripping, two-initials variant, mixed-case preservation, CONTACT footer, prefixed Contributed equally, Dept/University standalone, Dept/University prose preserved).
+
+### Known remaining defects (deferred to next iteration)
+
+- `xiao_2021_crsp`: section detector treats mid-paragraph "Experiment" as a heading. Requires context-aware suppression in `sections/taxonomy.py`.
+- `xiao_2021_crsp`: KEYWORDS section boundary not visually separated from Introduction body in render output.
+- `maier_2023_collabra`: subsection headings like "Study 1 Design and Findings" / "Study 3 Design and Findings" remain plain paragraphs — need a subsection-pattern detector in `sections/`.
+- `maier_2023_collabra`: inline footnote leak (`1 Though we note ...`) — F1 footnote post-processing pass needed.
+
 ## [2.4.5] — 2026-05-13
 
 Continuation of v2.4.3's 4-digit page-number strip. v2.4.3 required the same 4-digit value to recur ≥ 3 times to strip — but continuous-pagination journals (PSPB, Psychological Science) use *sequential* page numbers per page (1174, 1175, 1177, 1179, ...) where each value is different. The v2.4.3 rule missed them entirely.

@@ -250,6 +250,81 @@ python scripts/verify_corpus.py --paper efendic_2022_affect --diff
 Skips cleanly when the spike `outputs[-new]/` directories aren't on
 disk (fresh checkouts).
 
+### 7c. Visible-Defect Heuristic Linter (v2.4.6+, CRITICAL)
+
+`verify_corpus.py` measures char-ratio + Jaccard against a baseline — it is
+**blind to visible defects** that the baseline itself contains. After the
+2026-05-13 audit (xiao_2021_crsp, maier_2023_collabra) the user identified
+five visible defect classes that the corpus verifier missed entirely:
+
+| Defect | Signature regex (on rendered .md, per-line) | Tag |
+|---|---|---|
+| Running header `Q. XIAO ET AL.` style | `^[A-Z]\.(?:\s*[A-Z]\.?)?\s+[A-Z]{2,}\s+ET\s+AL\.?$` | RH |
+| Contact / corresponding-author footer | `^CONTACT\s+[A-Z]\w+(?:\s+[A-Z]\w+)+\s+\S+@` | CT |
+| Prefixed contribution / corresponding footnote | `^[a-c]\s+(?:Contributed\s+equally\|Corresponding\s+Author)\b` | CB |
+| Standalone Dept/University affiliation | `^Department\s+of\s+[A-Z]\w+,\s+University\s+of\s+\w+` | AF |
+| Inline footnote leaked into prose | `^\d+\s+(?:Though\|Note\|See\|We)\s+\w` (per-line, ≤ 200 chars) | FN |
+
+Run:
+```bash
+python scripts/lint_rendered_corpus.py tmp/renders_*/*.md
+```
+
+Any match is a FAIL — the rendered .md contains a defect class that should
+have been stripped upstream. Cite the file + line + tag in the QA report.
+
+Note: these patterns target the **rendered output**, not pdftotext. They
+backstop normalize.py + render.py — if a pattern leaks past upstream
+filters and into the .md, the linter catches it.
+
+### 7d. AI Inspection of Rendered Output (v2.4.6+, RECOMMENDED)
+
+For 2-5 representative papers per render change, dispatch a Claude subagent
+(via Task or Agent tool) that:
+
+1. Reads `tmp/<paper>.md` (the rendered output).
+2. Reads the source PDF (via Read tool with `pages=1-5` for the first 5 pages).
+3. Scores each .md section for fidelity:
+   - **Text coverage**: any PDF paragraph missing from the .md?
+   - **Section boundaries**: does the heading match the content below it?
+   - **Mid-prose leaks**: any running-header / footer / footnote text infused?
+   - **False headings**: any `## ...` / `### ...` that isn't actually a section?
+
+Output a per-paper defect list. **Default papers:** `xiao_2021_crsp`,
+`maier_2023_collabra`, `chan_feldman_2025_cogemo`, `efendic_2022_affect`,
+`ip_feldman_2025_pspb` — these collectively exercise APA stats tables,
+Collabra footnotes, T&F contact-line footers, sequential page numbers,
+and replication-report subsections.
+
+This check exists because **char-ratio + Jaccard are blind to "right words
+in wrong order under wrong heading"** (see CLAUDE.md "Iteration discipline").
+Run it after every render change before declaring the iteration done.
+
+### 7e. Text-Coverage Baseline (v2.4.6+, CRITICAL)
+
+Catches the silent-text-loss defect class (rendered .md drops a body
+paragraph that was in the PDF):
+
+```bash
+python -c "
+from pathlib import Path
+from docpluck.extract import extract_pdf
+from docpluck.render import render_pdf_to_markdown
+for pdf_path in Path('../PDFextractor/test-pdfs').glob('**/*.pdf'):
+    pdf = pdf_path.read_bytes()
+    raw, _ = extract_pdf(pdf)
+    md = render_pdf_to_markdown(pdf)
+    ratio = len(md) / max(len(raw), 1)
+    if ratio < 0.85:
+        print(f'COVERAGE FAIL {pdf_path.name}: {ratio:.2f}')
+    elif ratio > 2.0:
+        print(f'COVERAGE WARN {pdf_path.name}: {ratio:.2f} (suspicious bloat)')
+"
+```
+
+**Threshold:** rendered .md length ≥ 0.85 × pdftotext raw length. Below
+that, body content has been dropped somewhere in the pipeline.
+
 ### 8. Service Health Endpoint
 ```bash
 curl -s http://localhost:6117/health

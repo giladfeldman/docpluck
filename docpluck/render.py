@@ -379,6 +379,130 @@ def _join_multiline_caption_paragraphs(text: str) -> str:
     return "".join(paragraphs)
 
 
+# ── Section C2: orphan table cell-text suppression ──────────────────────────
+
+
+_ORPHAN_TABLE_CAPTION_RE = re.compile(
+    r"^Table\s+(\d+)[.:]\s+(.{3,}?)$"
+)
+_ORPHAN_CELL_STOPWORDS = (
+    " the ", " of ", " and ", " in ", " to ", " for ", " with ", " that ",
+    " this ", " was ", " were ", " are ", " is ", " have ", " has ",
+    " from ", " on ", " by ", " an ", " a ",
+)
+
+
+def _is_orphan_cell_paragraph(p: str) -> bool:
+    """Return True iff ``p`` looks like a leaked table cell row, not prose.
+
+    Conservative heuristic, used only inside the table-cell-text suppressor:
+    - Total length ≤ 200 chars (cell content with quoted instruction text or
+      concatenated column headers can run 100-200 chars on a single pdftotext
+      line; longer than that is almost certainly prose).
+    - Not a heading, caption, HTML block, or list marker.
+    - Stopword-density and sentence-structure check rule out short prose.
+    """
+    if not p:
+        return False
+    if len(p) > 200:
+        return False
+    if p.startswith(("#", "*Table", "*Figure", "<table", "</table", "<thead", "<tbody", "<tr", "<td", "<th", ">")):
+        return False
+    if re.match(r"^(?:Table|Figure)\s+\d", p):
+        return False
+    if re.match(r"^[*+\-]\s", p) or re.match(r"^\d+\.\s+\w+", p):
+        # Markdown list / numbered list — not a cell row.
+        # (Numbered ranks like "1. Degree of apology" inside cells can match,
+        # but those are typically inside <td> tags, not standalone paragraphs.)
+        return False
+    if p.startswith("Note") and (":" in p[:8] or "." in p[:8]):
+        return False
+    lower = " " + p.lower() + " "
+    stopword_hits = sum(lower.count(sw) for sw in _ORPHAN_CELL_STOPWORDS)
+    # Above 90 chars, prose density must be very low (cells with quoted
+    # instruction text or column-header concatenations have ≤ 3 stopwords).
+    if len(p) > 90 and stopword_hits >= 4:
+        return False
+    if len(p) <= 90 and stopword_hits >= 3:
+        return False
+    # Multi-sentence content is prose, not a cell row.
+    if p.count(". ") >= 2:
+        return False
+    # Single long sentence ending in `.` (not `."` — cells often end in `"`)
+    # is prose.
+    if p.endswith(".") and not p.endswith(('."', '.")')) and len(p) > 70 and " " in p:
+        return False
+    return True
+
+
+def _suppress_orphan_table_cell_text(text: str) -> str:
+    """Suppress orphan cell-row text leaks after a plain-text Table caption.
+
+    When Camelot does not register a table on a page but pdftotext linearized
+    the cell content into the section body, the rendered markdown contains:
+
+        Table 5. Comparison of target article versus replication.
+
+        Target article
+
+        Replication
+
+        Study design
+
+        Sample characteristics
+
+    These short orphan paragraphs are leaked cell content with no structural
+    value in the rendered view (the user is told to consult the Raw view).
+    This pass:
+      1. Detects single-line ``Table N. <caption>`` paragraphs (plain, not
+         already italicized — the italic ``*Table N. ...*`` form is the
+         v2.4.2 caption-only emission and never has orphan rows).
+      2. Scans forward; if 3+ consecutive paragraphs match
+         :func:`_is_orphan_cell_paragraph`, italicizes the caption and drops
+         the orphan paragraphs.
+
+    Conservative: only fires after a ``Table N.`` caption and only when the
+    orphan run is at least 3 paragraphs long. Stops at the first non-orphan
+    paragraph (normal prose, another caption, or a heading).
+    """
+    if not text or "Table" not in text:
+        return text
+    paragraphs = re.split(r"\n\n+", text)
+    out: list[str] = []
+    i = 0
+    while i < len(paragraphs):
+        para = paragraphs[i]
+        para_stripped = para.strip()
+        # Caption must be a single line (no embedded newlines after strip).
+        if (
+            para_stripped
+            and "\n" not in para_stripped
+            and not para_stripped.startswith("*")
+            and _ORPHAN_TABLE_CAPTION_RE.match(para_stripped)
+        ):
+            j = i + 1
+            orphans: list[int] = []
+            while j < len(paragraphs):
+                p = paragraphs[j].strip()
+                if not p:
+                    j += 1
+                    continue
+                if _is_orphan_cell_paragraph(p):
+                    orphans.append(j)
+                    j += 1
+                    continue
+                break
+            if len(orphans) >= 3:
+                # Italicize the caption (matches v2.4.2 no-cells caption style)
+                # and drop the orphan paragraphs.
+                out.append(f"*{para_stripped}*")
+                i = j
+                continue
+        out.append(para)
+        i += 1
+    return "\n\n".join(out)
+
+
 # ── Section D: JAMA Key Points sidebar reformat ─────────────────────────────
 
 
@@ -1352,6 +1476,7 @@ def render_pdf_to_markdown(
     md = _dedupe_h2_sections(md)
     md = _fix_hyphenated_line_breaks(md)
     md = _join_multiline_caption_paragraphs(md)
+    md = _suppress_orphan_table_cell_text(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)

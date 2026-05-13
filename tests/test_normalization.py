@@ -401,6 +401,98 @@ class TestW0_PublisherCopyrightAndRunningHeader:
         assert "Smith, J. (2020). Another paper" in result
 
 
+class TestP0_RunningHeaderFooterPatterns_v246:
+    """v2.4.6: new line-level patterns in `_PAGE_FOOTER_LINE_PATTERNS` to
+    strip running headers and page-bottom contact / affiliation blocks that
+    were leaking into body text (xiao_2021_crsp + maier_2023_collabra)."""
+
+    def test_initial_surname_et_al_running_header_stripped(self):
+        text = (
+            "Body sentence one.\n"
+            "Q. XIAO ET AL.\n"
+            "Body sentence two continues here.\n"
+            "Q. XIAO ET AL.\n"
+            "Body sentence three.\n"
+            "Q. XIAO ET AL.\n"
+        )
+        result = norm(text, "standard")
+        assert "Q. XIAO ET AL." not in result
+        assert "Body sentence one." in result
+        assert "Body sentence three." in result
+
+    def test_two_initials_surname_et_al_running_header_stripped(self):
+        text = (
+            "Body line.\n"
+            "Q.M. SMITH ET AL.\n"
+            "More body.\n"
+            "Q.M. SMITH ET AL.\n"
+            "Yet more body.\n"
+            "Q.M. SMITH ET AL.\n"
+        )
+        result = norm(text, "standard")
+        assert "Q.M. SMITH ET AL" not in result
+        assert "More body." in result
+
+    def test_initial_surname_et_al_preserved_in_lowercase_prose(self):
+        """The pattern must require ALL-CAPS surname so it doesn't strip
+        legitimate references like ``Q. Xiao et al.`` in prose."""
+        text = (
+            "Body sentence.\n"
+            "We compared with Q. Xiao et al.\n"
+            "More body.\n"
+        )
+        result = norm(text, "standard")
+        # Should be preserved (mixed case).
+        assert "Q. Xiao et al" in result
+
+    def test_contact_email_footer_stripped(self):
+        text = (
+            "Body sentence one.\n"
+            "CONTACT Gilad Feldman gfeldman@hku.hk; giladfel@gmail.com Hong Kong\n"
+            "Body sentence two.\n"
+        )
+        result = norm(text, "standard")
+        assert "CONTACT Gilad Feldman" not in result
+        assert "Body sentence one." in result
+        assert "Body sentence two." in result
+
+    def test_prefixed_contributed_equally_footer_stripped(self):
+        text = (
+            "Introduction body sentence.\n"
+            "a Contributed equally, joint first author\n"
+            "b Contributed equally, joint first author\n"
+            "c Corresponding Author: Gilad Feldman, Department of Psychology\n"
+            "Body continues.\n"
+        )
+        result = norm(text, "standard")
+        assert "a Contributed equally" not in result
+        assert "b Contributed equally" not in result
+        assert "c Corresponding Author" not in result
+        assert "Introduction body sentence." in result
+
+    def test_department_university_affiliation_line_stripped(self):
+        text = (
+            "Body content here.\n"
+            "Department of Psychology, University of Hong Kong, Hong Kong SAR\n"
+            "More body content.\n"
+        )
+        result = norm(text, "standard")
+        assert "Department of Psychology, University of Hong Kong" not in result
+        assert "Body content here." in result
+
+    def test_affiliation_line_preserved_in_prose_context(self):
+        """The Dept/University pattern must only match standalone lines, not
+        prose mentioning the affiliation mid-sentence."""
+        text = (
+            "We collaborated with the Department of Psychology, University of Hong Kong, Hong Kong SAR, "
+            "during the 2022 academic year.\n"
+        )
+        result = norm(text, "standard")
+        # The whole sentence (one line) is preserved — only standalone matches strip.
+        assert "We collaborated" in result
+        assert "Department of Psychology" in result
+
+
 class TestS9_HeaderFooter:
     def test_repeated_line_stripped(self):
         header = "Journal of Example Studies Vol. 1"
