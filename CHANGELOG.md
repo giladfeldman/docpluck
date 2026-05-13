@@ -1,5 +1,107 @@
 # Changelog
 
+## [2.4.14] — 2026-05-13
+
+Table-rendering quality iteration after v2.4.13 restored Camelot on prod. Two
+defects from `docs/HANDOFF_2026-05-13_table_extraction_next_iteration.md` are
+addressed:
+
+### Defect A — Isolated tables now appear inline in the Rendered view
+
+Before this release the renderer dropped isolated tables (those Camelot could
+not extract cell-by-cell) from the rendered .md entirely — only the bare
+italicized caption survived from natural body flow, leaving the user unable to
+see the table's content under its caption. The Tables tab in the SaaS workspace
+already handled the `raw_text` fallback path (under an amber notice), but the
+Rendered view did not. On chan_feldman_2025_cogemo this meant 4 of 9 tables
+(Tables 1, 3, 4, 9) were invisible in the rendered output.
+
+**Fix.** `docpluck/render.py::_render_sections_to_markdown` and its unlocated-
+tables appendix now both emit:
+
+```
+### Table N
+*Table N. Caption ...*
+
+> Could not reconstruct a structured grid for this table. Showing the cell
+> text as a flat list.
+
+​```unstructured-table
+…raw_text content…
+​```
+```
+
+…when `html`/`cells` are absent but `raw_text` is populated. After the fix the
+chan_feldman rendered output goes from 5 → 9 inline `### Table N` blocks,
+efendic_2022_affect from 3 → 5, korbmacher_2022_kruger from 15 → 17.
+
+### Defect B — `raw_text` no longer bleeds into body prose past the table
+
+`_extract_table_body_text` (v2.4.12) bounded the body-text fallback by
+`min(next_boundary, body_start + 3000)`. When the next caption was far away or
+the table was last on the page, the 3000-char window routinely captured the
+next paragraph of body prose as if it were table cells. On chan_feldman
+Table 1, `raw_text` contained `"Note: Hypothesis 3 is not included… that one
+of the major limitations of their Study 1 was the correlational study design…"`
+— the second sentence is body prose the user saw as table content.
+
+**Fix.** `_extract_table_body_text` is rewritten to walk line-by-line from
+`body_start` and stop at the first of:
+
+1. **Form-feed** `\x0c` — page boundary. Previously the form-feed was just
+   stripped out of the snippet, letting the next page's content (running
+   header, next paragraph) ride along.
+2. **Body-prose-looking line** — new `_line_is_body_prose` discriminates:
+   * Long (≥80 chars) and sentence-shaped (≥12 words, ≥4 stopwords).
+   * NOT a table note (`Note:` / `Notes:` / `a Note`).
+   * NOT a measurement-scale row (parenthetical `(1 = …)` anchor,
+     `(Source: …)` attribution, OR double-quoted instrument prompts of
+     substantial length).
+3. **Hard cap of 1500 chars** (down from 3000) from `body_start`.
+4. `next_boundary` (next caption).
+
+After the body-prose stop, **trailing heading-like short lines** are trimmed —
+both Title-Case headings without terminating punctuation ("Experimental design",
+"Discussion") and numbered section headings like `3.2.3 H2: …` that ended up
+attached to the previous table.
+
+The line-by-line walk works on both Xpdf (`\n\n` paragraph breaks, local dev)
+and poppler (`\n` only, prod Railway) text channels — per the
+`feedback_pdftotext_version_skew` memory, the implementation does not depend on
+doubled newlines being preserved.
+
+### Verification (local, before deploy)
+
+| Paper | Isolated tables — raw_text chars (before → after) |
+|-------|---|
+| chan_feldman_2025_cogemo | Table 1: 2446 → 1035 (ends at Note); Table 3: 2952 → 620; Table 4: 2992 → 1495 (measurement-scale items preserved via quote-guard); Table 9: 2107 → 599 |
+| chen_2021_jesp | Table 3: 1662 → 1381; Table 10: 2927 → 1445; Table 13: 1077 → 1003 |
+| efendic_2022_affect | Table 2: 1719 → 678; Table 5: 2947 → 831 |
+| korbmacher_2022_kruger | Table 5: 1960 → 384; Table 9: 2978 → 402 |
+
+All four chan_feldman isolated tables now terminate cleanly at the table
+`Note:` line; trailing body prose ("that one of the major limitations…", "than
+empathy. We provided full analyses…") is excluded.
+
+### Bumps
+
+- `__version__`: `2.4.13` → `2.4.14`. Patch (render output schema unchanged;
+  raw_text content tightened; new fenced `unstructured-table` code-block tag
+  is additive markdown).
+
+### Tests
+
+- 192 normalize / caption / extract-filter tests PASS unchanged.
+- 26-paper baseline (`scripts/verify_corpus.py`) PASS 26/26.
+- Manual eyeball check across 4 papers confirms table positioning + raw_text
+  boundary fixes.
+
+### Out of scope (next iteration)
+
+- Defect D items: xiao_2021_crsp false `Experiment` heading, KEYWORDS /
+  Introduction boundary, page-number residue surviving S9 (15 instances),
+  50-PDF APA corpus expansion. See iter_1 handoff for ready-to-paste bash.
+
 ## [2.4.13] — 2026-05-13
 
 **Critical fix.** Camelot was never installed on the Railway production container, silently making every table on every PDF render as `kind='isolated'` with empty `cells`. User reported "tables do not show and are not detected at all" — and the diagnosis revealed the library declared Camelot as optional (with a silent `except ImportError: return []` fallback in `docpluck/tables/camelot_extract.py:276-278`), so prod had been running with NO table-cell extraction for the entire history of the deployment. Local development had Camelot pip-installed manually, masking the bug from every test pass.

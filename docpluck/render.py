@@ -1596,18 +1596,38 @@ def _render_sections_to_markdown(
             if kind == "table":
                 cells = item.get("cells") or []
                 html = item.get("html") or (cells_to_html(cells) if cells else "")
+                raw_t = (item.get("raw_text") or "").strip()
                 if html:
                     body_chunks.append(f"\n### {label}\n")
                     if cap:
                         body_chunks.append(f"*{cap}*\n")
                     body_chunks.append(html)
+                elif raw_t:
+                    # v2.4.14: Camelot returned no cells, but we extracted
+                    # the linearized cell text following the caption
+                    # (``raw_text``). Emit it as a fenced ``unstructured``
+                    # block so the user sees the table's content inline at
+                    # the caption position, with a clear note that the
+                    # grid couldn't be reconstructed. Matches the Tables
+                    # tab's behaviour in the SaaS UI (it shows raw_text
+                    # under an amber notice when no html is present).
+                    body_chunks.append(f"\n### {label}\n")
+                    if cap:
+                        body_chunks.append(f"*{cap}*\n")
+                    body_chunks.append(
+                        "\n> Could not reconstruct a structured grid for "
+                        "this table. Showing the cell text as a flat list.\n\n"
+                    )
+                    body_chunks.append("```unstructured-table\n")
+                    body_chunks.append(raw_t)
+                    body_chunks.append("\n```\n")
                 elif cap:
-                    # v2.4.2: Camelot returned no cells for this caption.
-                    # Skip the `### Table N` heading (which would falsely
-                    # promise structured content) and emit the caption as a
+                    # v2.4.2: Camelot returned no cells AND we have no
+                    # raw_text fallback for this caption. Skip the
+                    # `### Table N` heading (which would falsely promise
+                    # structured content) and emit the caption as a
                     # plain italicized paragraph so the table reference is
-                    # preserved in body flow. Affected papers in the
-                    # 101-PDF corpus: bjps_4, ar_apa_j_jesp_2009_12_011.
+                    # preserved in body flow.
                     body_chunks.append(f"\n*{cap}*\n")
             else:
                 body_chunks.append(f"\n### {label}\n")
@@ -1634,6 +1654,7 @@ def _render_sections_to_markdown(
             if (t.get("caption") or "").strip()
             or t.get("html")
             or t.get("cells")
+            or (t.get("raw_text") or "").strip()
         ]
         if renderable_tables:
             out_chunks.append("## Tables (unlocated in body)\n\n")
@@ -1642,11 +1663,22 @@ def _render_sections_to_markdown(
                 cap = t.get("caption") or ""
                 cells = t.get("cells") or []
                 html = t.get("html") or (cells_to_html(cells) if cells else "")
+                raw_t = (t.get("raw_text") or "").strip()
                 out_chunks.append(f"### {label}\n")
                 if cap:
                     out_chunks.append(f"*{cap}*\n")
                 if html:
                     out_chunks.append(html + "\n")
+                elif raw_t:
+                    # v2.4.14: surface raw_text fallback (same shape as
+                    # the inline emission above).
+                    out_chunks.append(
+                        "\n> Could not reconstruct a structured grid for "
+                        "this table. Showing the cell text as a flat list.\n\n"
+                    )
+                    out_chunks.append("```unstructured-table\n")
+                    out_chunks.append(raw_t)
+                    out_chunks.append("\n```\n")
                 out_chunks.append("\n")
 
     if leftover_figures:
