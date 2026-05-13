@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.4.13] — 2026-05-13
+
+**Critical fix.** Camelot was never installed on the Railway production container, silently making every table on every PDF render as `kind='isolated'` with empty `cells`. User reported "tables do not show and are not detected at all" — and the diagnosis revealed the library declared Camelot as optional (with a silent `except ImportError: return []` fallback in `docpluck/tables/camelot_extract.py:276-278`), so prod had been running with NO table-cell extraction for the entire history of the deployment. Local development had Camelot pip-installed manually, masking the bug from every test pass.
+
+### Root cause
+
+- `docpluck/pyproject.toml` declared only `pdfplumber>=0.11.0` as a runtime dep.
+- `docpluck/tables/camelot_extract.py:276-278` swallows `ImportError` and returns `[]` if camelot can't be imported.
+- `PDFextractor/service/requirements.txt` only pins `docpluck[all]` plus FastAPI/uvicorn/etc — no `camelot-py`.
+- The Railway Dockerfile installs only `poppler-utils` + `git`. No Ghostscript (needed by Camelot's lattice flavor for line detection), no libgl1/libglib2.0-0 (needed by opencv-python which Camelot[cv] depends on).
+- The Camelot decision was settled 2026-05-09 (memory `project_camelot_for_tables`: "Stream flavor, MIT, replaces pdfplumber after 5-option bake-off") but the dependency was never added.
+
+Diagnostic: local probe at v2.4.12 returns 5 structured + 4 isolated tables for chan_feldman_2025_cogemo. Prod probe at v2.4.12 returns 0 structured + 9 isolated — same library version, same PDF, different result because Camelot was absent.
+
+### Fix
+
+1. **`docpluck/pyproject.toml`** — added `camelot-py[cv]>=0.11.0` as a hard runtime dependency. The `[cv]` extra pulls in opencv-python for Camelot's lattice line detection.
+2. **`PDFextractor/service/Dockerfile`** — added `ghostscript libgl1 libglib2.0-0` to the apt-get install. Ghostscript is required by Camelot lattice at runtime; libgl1/libglib2.0-0 are OpenCV's system deps.
+3. **`PDFextractor/service/app/main.py::/_diag`** — expanded to report `camelot_version`, `opencv_version`, and `ghostscript_binary` path. After this fix lands and the next /_diag probe runs, regressions of this class will surface immediately (an "NOT INSTALLED" string in the diag response).
+
+### Verification
+
+After Railway redeploys with the new Dockerfile + library pin:
+- `curl /_diag` should report `camelot_version` = an actual version string (not "NOT INSTALLED").
+- `curl /tables` on chan_feldman_2025_cogemo should return 5+ tables with `kind='structured'` and non-empty `html` (matching local v2.4.12 behavior).
+
+### Bumps
+
+- `__version__`: `2.4.12` → `2.4.13`. Patch (dependency declaration; no API surface change).
+
+### Tests
+
+230 unit tests PASS unchanged. (The bug couldn't be caught by unit tests because the test environment had Camelot installed — same as local dev. Catching this class of bug requires the new /_diag endpoint to assert dep presence on the actual deployment.)
+
+### Lesson
+
+Optional dependencies with silent ImportError fallbacks are landmines. The `camelot_extract.py` docstring even called this out — "Camelot is an OPTIONAL dependency: if the library is not installed, this module's functions return [] and callers silently fall back" — but the decision to make Camelot mandatory (2026-05-09 bake-off) was never reflected in pyproject.toml. New rule: if a dep is "mandatory in spirit", declare it as `dependencies`, not as an `[optional-dependencies]` extra, and remove the `except ImportError` fallback so missing deps fail loudly.
+
 ## [2.4.12] — 2026-05-13
 
 Table-extraction quality fix: surface raw text under the caption when Camelot rejects all candidates. The user reported that the workspace's Tables tab on chan_feldman showed Tables 1 + 2 with the banner *"No cells or raw text extracted. The caption is above; the table's text content is available in the Raw tab."* — meaning docpluck had detected the table caption but couldn't extract structured cells. Camelot's stream flavor returned a 66×2 result for the page (the journal's 2-column layout), but the result was 95% body prose with only ~4% data-like cells, so `_is_table_like` correctly rejected it.
