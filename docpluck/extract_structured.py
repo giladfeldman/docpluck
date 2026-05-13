@@ -420,6 +420,67 @@ def _isolated_table_from_caption(
     }
 
 
+# Common English stopwords used by `_line_is_body_prose` to discriminate
+# table cells (mostly noun fragments / numbers / short labels) from running
+# body prose (rich in articles, prepositions, conjunctions). Kept small and
+# stable — the goal is signal, not coverage.
+_BODY_PROSE_STOPWORDS = frozenset({
+    "the", "of", "and", "in", "to", "that", "this", "with", "as", "for",
+    "we", "was", "were", "be", "is", "are", "an", "by", "on", "from",
+    "their", "have", "has", "had", "but", "not", "or", "which", "these",
+    "our", "its", "than", "at", "such", "between", "would", "could",
+    "however", "therefore", "thus", "while", "when",
+})
+
+
+def _line_is_body_prose(line: str) -> bool:
+    """True if ``line`` looks like body prose rather than table cell content.
+
+    Table cells from pdftotext linearization are typically short fragments
+    (column header, numeric value, "Mean (SD)"). Table notes start with
+    ``Note:`` or ``Notes:``. Body prose paragraphs that bleed past the
+    table boundary are long, sentence-shaped, and stopword-dense.
+
+    Guarded against measurement-scale items (e.g. ``"The offender has
+    apologised?" (1 = Strongly disagree to 5 = Strongly agree) (Source:
+    McCullough et al., 1997)``) which can be quite long but ARE table
+    cells in instrument-description tables.
+    """
+    s = line.strip()
+    if len(s) < 80:
+        return False
+    # Table notes / footnotes are legitimate trailing content.
+    if re.match(r"^(Note[s.:]?\s|a\s*Note\b)", s):
+        return False
+    # Strong "this is a table cell" signals — keep:
+    #   - measurement-scale anchor like "(1 = ... to 5 = ...)"
+    #   - parenthetical source attribution "(Source: ...)"
+    #   - quoted instrument items (curly or straight double quotes
+    #     enclosing 8+ chars — survey prompts, condition descriptions)
+    if re.search(r"\(\d+\s*=", s):
+        return False
+    if re.search(r"\(Source[:\s]", s, re.IGNORECASE):
+        return False
+    # Quoted instrument items: keep only when DOUBLE-quoted content is
+    # substantial (multiple runs OR ≥40 chars total). Use double-quote
+    # delimiters only — single curly quotes (‘ ’) double as apostrophes
+    # in academic text and a too-loose pattern would match across whole
+    # paragraphs (e.g. "Kruger‘s (1999) findings, ... section in the OSF"
+    # — 400 chars of body prose between an apostrophe and a quote-mark).
+    # Cap each run at 160 chars so a stray unmatched double-quote can't
+    # eat a runaway sentence either.
+    quoted_runs = re.findall(r"[“”\"](.{4,160}?)[“”\"]", s)
+    if quoted_runs and (
+        len(quoted_runs) >= 2 or sum(len(q) for q in quoted_runs) >= 40
+    ):
+        return False
+    words = re.findall(r"[A-Za-z']+", s.lower())
+    if len(words) < 12:
+        return False
+    stopwords_hit = sum(1 for w in words if w in _BODY_PROSE_STOPWORDS)
+    return stopwords_hit >= 4
+
+
 def _extract_table_body_text(
     raw_text: str,
     cap: CaptionMatch,
@@ -430,43 +491,99 @@ def _extract_table_body_text(
     string — column headers, values, group labels, etc., all linearized
     by pdftotext.
 
-    Bounds:
-      - Start at the end of the caption's snippet.
-      - End at the next caption (``next_boundary``) OR at the next clear
-        section break (heading marker, two consecutive prose-like
-        paragraphs of substantial length) OR after 3000 chars.
-      - Strip surrounding whitespace, collapse internal whitespace.
+    Bounds (v2.4.14 — tightened to stop body-prose bleed; handoff
+    2026-05-13 Defect B):
+      * Start at the end of the caption's snippet.
+      * Walk line-by-line and STOP at the first of:
+          - form-feed (``\\x0c`` page boundary),
+          - a body-prose-looking line (``_line_is_body_prose``),
+          - 1500 chars from body_start (hard cap, down from 3000),
+          - ``next_boundary`` (next caption).
+      * Trim trailing heading-like short lines (they're part of the next
+        section, not this table).
+
+    Both poppler (single ``\\n`` paragraph breaks) and Xpdf (``\\n\\n``)
+    text channels are supported: the line-by-line walk doesn't depend on
+    paragraph delimiters being doubled.
     """
-    # Find where the caption sentence actually ends within raw_text.
-    # `_extract_caption_text` uses the same logic to terminate; replicate
-    # it lazily by re-locating the first sentence-terminator paragraph
-    # break after cap.char_end.
+    # Walk past the caption's tail to find body_start. The caption sentence
+    # may continue across one or more wrapped lines; stop at the first
+    # paragraph-break following a sentence terminator.
     pos = cap.char_end
-    hard_end = min(cap.char_end + 800, len(raw_text))
+    cap_tail_end = min(cap.char_end + 800, len(raw_text))
     if next_boundary is not None and next_boundary > cap.char_end:
-        hard_end = min(hard_end, next_boundary)
-    while pos < hard_end:
-        nxt = raw_text.find("\n\n", pos)
-        if nxt == -1 or nxt >= hard_end:
-            pos = hard_end
+        cap_tail_end = min(cap_tail_end, next_boundary)
+    while pos < cap_tail_end:
+        # Prefer \n\n (Xpdf paragraph break) when present, otherwise treat
+        # a single \n as a candidate break (poppler).
+        nxt2 = raw_text.find("\n\n", pos)
+        nxt1 = raw_text.find("\n", pos)
+        if nxt2 != -1 and nxt2 < cap_tail_end:
+            nxt = nxt2
+            step = 2
+        elif nxt1 != -1 and nxt1 < cap_tail_end:
+            nxt = nxt1
+            step = 1
+        else:
+            pos = cap_tail_end
             break
         prev = raw_text[max(cap.char_start, nxt - 40):nxt].rstrip()
         if not prev or len(prev.split()) < 2 or re.search(
             r"[.!?][\"'\)\]]?$", prev
         ):
-            pos = nxt + 2  # skip past the paragraph break
+            pos = nxt + step
             break
-        pos = nxt + 2
+        pos = nxt + step
     body_start = pos
-    body_end = next_boundary if next_boundary is not None else len(raw_text)
-    body_end = min(body_end, body_start + 3000)
-    snippet = raw_text[body_start:body_end]
-    # Normalize whitespace; strip form-feed.
+    body_end_hard = min(body_start + 1500, len(raw_text))
+    if next_boundary is not None and next_boundary > body_start:
+        body_end_hard = min(body_end_hard, next_boundary)
+    region = raw_text[body_start:body_end_hard]
+
+    # Hard stop at page boundary — table cell flow doesn't survive a
+    # form-feed in pdftotext output; whatever's on the next page is
+    # the next page's running header / body, not this table's cells.
+    ff = region.find("\x0c")
+    if ff != -1:
+        region = region[:ff]
+
+    # Line-by-line walk; stop at first body-prose-looking line.
+    kept: list[str] = []
+    for ln in region.split("\n"):
+        if _line_is_body_prose(ln):
+            break
+        kept.append(ln)
+
+    # Trim trailing heading-like short lines that don't belong to this table
+    # (the start of the next section). Two patterns are trimmed:
+    #   * Title-Case headings without a sentence terminator
+    #     (e.g. "Experimental design", "Discussion")
+    #   * Numbered section headings like "3.2.3 H2: Relationship ..."
+    #     even when they end with a period (their structure betrays them).
+    while kept:
+        last = kept[-1].strip()
+        if not last:
+            kept.pop()
+            continue
+        is_numbered_heading = bool(
+            re.match(r"^\d+(?:\.\d+){1,3}\s+[A-Z]", last)
+        ) and len(last) < 200
+        is_titlecase_heading = (
+            10 < len(last) < 50
+            and not last.endswith((".", "!", "?", ":"))
+            and last[0].isupper()
+            and not last[0].isdigit()
+            and len(last.split()) <= 6
+        )
+        if is_numbered_heading or is_titlecase_heading:
+            kept.pop()
+            continue
+        break
+
+    snippet = "\n".join(kept)
     snippet = snippet.replace("\x0c", "")
     snippet = re.sub(r"­\s+", "", snippet)
     snippet = snippet.replace("­", "")
-    # Preserve line breaks but collapse runs of spaces/tabs within each
-    # line so the front-end can render the cells as a vertical list.
     cleaned_lines: list[str] = []
     for ln in snippet.split("\n"):
         s = re.sub(r"[ \t]+", " ", ln).strip()

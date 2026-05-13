@@ -709,12 +709,18 @@ def _make_section_with_caption_text(caption_text: str, label_value: str = "resul
 
 
 def test_render_skips_table_heading_when_html_empty():
-    """When Camelot returned no cells (no html), the renderer should NOT
-    emit a bare `### Table N` heading in the body — that promises
-    structured content that isn't there. Instead, the caption renders as
-    a plain italic paragraph so the table reference is still visible.
+    """When Camelot returned no cells (no html) AND there is no
+    ``raw_text`` fallback either, the renderer should NOT emit a bare
+    `### Table N` heading in the body — that promises structured content
+    that isn't there. Instead, the caption renders as a plain italic
+    paragraph so the table reference is still visible.
+
     Regression target for v2.4.2 H-tag failures (bjps_4,
-    ar_apa_j_jesp_2009_12_011)."""
+    ar_apa_j_jesp_2009_12_011). v2.4.14 keeps this behavior for the
+    truly-empty case; when raw_text IS populated the new fenced
+    ``unstructured-table`` path runs instead — see
+    ``test_render_emits_raw_text_block_when_html_empty_but_raw_text_present``.
+    """
     from docpluck.render import _render_sections_to_markdown
 
     caption = "Table 1. Summary of predictions across conditions."
@@ -751,6 +757,62 @@ def test_render_keeps_table_heading_when_html_present():
     md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
     assert "### Table 1" in md
     assert "<table>" in md
+
+
+def test_render_emits_raw_text_block_when_html_empty_but_raw_text_present():
+    """v2.4.14: when Camelot returns no cells (no html) but
+    ``_extract_table_body_text`` populated ``raw_text`` with the cells
+    linearized by pdftotext, the renderer emits a `### Table N` heading
+    + caption + a fenced ``unstructured-table`` block under a brief notice.
+
+    Without this fix, isolated tables disappeared entirely from the
+    rendered .md view — only the italicized caption from the body flow
+    survived. Tables tab in the SaaS UI already used raw_text; the
+    Rendered tab is now consistent with it.
+    """
+    from docpluck.render import _render_sections_to_markdown
+
+    caption = "Table 1. Hypotheses of the target article."
+    sectioned = _make_section_with_caption_text(caption)
+    tables = [{
+        "label": "Table 1",
+        "caption": caption,
+        "cells": [],
+        "html": "",
+        "raw_text": "Hypothesis\nDescription\n1\nEmpathy mediates ...",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "### Table 1" in md
+    assert "*Table 1. Hypotheses of the target article.*" in md
+    assert "```unstructured-table" in md
+    assert "Hypothesis" in md
+    assert "Could not reconstruct a structured grid" in md
+
+
+def test_render_unlocated_table_appendix_emits_raw_text_block():
+    """v2.4.14: the unlocated-tables appendix mirrors the inline path —
+    a table with raw_text but no html still surfaces its content under
+    a fenced ``unstructured-table`` block, not just a caption stub.
+    """
+    from docpluck.render import _render_sections_to_markdown
+
+    # Body that does NOT mention "Table 1" so the renderer can't anchor
+    # the table inline; it lands in the appendix.
+    sectioned = _make_section_with_caption_text("body sentence only.")
+    tables = [{
+        "label": "Table 1",
+        "caption": "Table 1. Demographics.",
+        "cells": [],
+        "html": "",
+        "raw_text": "Age\n42\nGender\nF",
+        "page": 99,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "## Tables (unlocated in body)" in md
+    assert "### Table 1" in md
+    assert "```unstructured-table" in md
+    assert "Age" in md
 
 
 def test_render_unlocated_table_skipped_when_no_caption_no_html():
