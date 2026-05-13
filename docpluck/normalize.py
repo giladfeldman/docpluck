@@ -396,7 +396,10 @@ _HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
         r"^[A-Z][A-Za-z &]{4,60}\s+\(\d{4}\),\s+\d+,\s+\d+.{0,200}$"
     ),
     # Mangled DOI lines from publishers that overlay two PDF text runs.
-    re.compile(r"^Dhtt[Oo]ps[Ii]:.*$"),
+    # v2.4.8: removed `^` anchor — PSPB / SAGE banners place the corrupted
+    # DOI mid-line after the journal name, so the whole line is publisher
+    # banner gibberish; "Dhtt" only appears in this specific corruption.
+    re.compile(r".*Dhtt[Oo]ps[Ii]://.*$"),
     # Manuscript-ID gibberish like "1253268 ASRXXX10.1177/00031224241253268..."
     re.compile(r"^\d{6,}\s+[A-Z]{2,}[A-Z0-9]*\d+\.\d{4,}/.+$"),
     # Generic journal-citation banner with DOI suffix.
@@ -657,7 +660,79 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^Vol\.:\(\d{10,}\)\s*$"),  # "Vol.:(0123456789)" Springer marker
     # v2.4.7: standalone ORCID URL lines.
     re.compile(r"^https?://orcid\.org/\d{4}-\d{4}-\d{4}-[0-9X]{4}\s*$"),
+    # v2.4.8: Academy of Management copyright footer (recurs on every AOM
+    # journal — AMC, AMD, AMJ, AMLE, AMP, Annals; 9 papers in corpus).
+    re.compile(
+        r"^Copyright\s+of\s+the\s+Academy\s+of\s+Management,.*rights\s+reserved\.?.*$",
+        re.IGNORECASE,
+    ),
+    # v2.4.8: ARTICLE HISTORY title + date block (chan_feldman + xiao).
+    # The block leaks as a single pdftotext line in T&F two-column layouts.
+    re.compile(
+        r"^ARTICLE\s+HISTORY\s+Received\s+\d{1,2}\s+\w+\s+\d{4}"
+        r"(?:\s+Revised\s+\d{1,2}\s+\w+\s+\d{4})?"
+        r"\s+Accepted\s+\d{1,2}\s+\w+\s+\d{4}\s*$"
+    ),
+    # v2.4.8: Standalone "Open Access" line that BMC / PMC journals stamp
+    # at the top of each page. Bare two-word marker — anchored to top of
+    # line, requires nothing else.
+    re.compile(r"^Open\s+Access\s*$"),
+    # v2.4.8: Elsevier (JESP, JEP) compound footer with DOI + dates +
+    # copyright + "All rights reserved." on a single line. Distinctive
+    # enough to anchor on `Received\s+\d{1,2}\s+\w+\s+\d{4};` near the
+    # start.
+    re.compile(
+        r"^(?:https?://doi\.org/\S+\s+)?Received\s+\d{1,2}\s+\w+\s+\d{4};"
+        r".*(?:©|All\s+rights\s+reserved\.?).*$"
+    ),
 ]
+
+
+# v2.4.8: garbled OCR headers — "ACK NOW L EDGEM EN TS", "DATA AVA IL A
+# BILIT Y STATEM ENT" etc. (brjpsych_1 + similar). The pdftotext extraction
+# collapses letter-spaced display text by inserting spaces between groups
+# of letters; the resulting line is unintelligible but has a distinctive
+# signature: ≥4 capital-letter clusters separated by single spaces, total
+# alpha characters ≥ 12.
+_GARBLED_OCR_HEADER_RE = re.compile(
+    r"^(?:[A-Z]{1,4}\s+){3,}[A-Z]{1,4}(?:\s+[A-Z]{1,4}){0,8}\s*$"
+)
+
+
+def _rejoin_garbled_ocr_headers(text: str) -> str:
+    """Re-knit letter-spaced display-typography headers.
+
+    pdftotext renders display-typography acknowledgments / data-availability
+    headers (where the PDF uses letter-spacing for emphasis) as:
+
+        ACK NOW L EDGEM EN TS
+
+    which is unparseable as either prose or a heading. This pass detects
+    such lines (≥ 4 capital-letter clusters separated by single spaces) and
+    collapses them by removing the spaces, recovering ``ACKNOWLEDGMENTS``.
+
+    Conservative trigger: the entire line must consist of all-caps token
+    groups separated by single spaces, with each token ≤ 4 chars and ≥ 4
+    tokens. Real all-caps headings like ``CONCLUSIONS AND RELEVANCE`` have
+    longer tokens (≥ 5 chars) and pass through unchanged.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or len(stripped) < 12:
+            continue
+        if not _GARBLED_OCR_HEADER_RE.match(stripped):
+            continue
+        # Compact: remove all whitespace between caps.
+        compact = re.sub(r"\s+", "", stripped)
+        if len(compact) < 8:
+            continue
+        # Preserve leading whitespace; replace rest.
+        lead = line[: len(line) - len(line.lstrip())]
+        lines[i] = lead + compact
+    return "\n".join(lines)
 
 
 def _strip_page_footer_lines(text: str) -> str:

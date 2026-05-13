@@ -510,6 +510,48 @@ class TestP0_RunningHeaderFooterPatterns_v246:
         assert "Vol.:(0123456789)" not in result
         assert "Body." in result
 
+    def test_aom_copyright_footer_stripped(self):
+        text = (
+            "Body.\n"
+            "Copyright of the Academy of Management, all rights reserved. "
+            "Contents may not be copied or shared.\n"
+            "More body.\n"
+        )
+        result = norm(text, "standard")
+        assert "Copyright of the Academy of Management" not in result
+        assert "Body." in result
+
+    def test_article_history_block_stripped(self):
+        text = (
+            "Body.\n"
+            "ARTICLE HISTORY Received 2 February 2020 Accepted 7 January 2021\n"
+            "More body.\n"
+        )
+        result = norm(text, "standard")
+        assert "ARTICLE HISTORY Received" not in result
+        assert "Body." in result
+
+    def test_open_access_standalone_stripped(self):
+        text = "Body.\nOpen Access\nMore body.\n"
+        result = norm(text, "standard")
+        # The line "Open Access" alone should be stripped.
+        assert "\nOpen Access\n" not in result
+        assert "Body." in result
+
+    def test_corrupted_doi_banner_stripped(self):
+        # PSPB-style: full banner line containing the interleaved DOI corruption.
+        text = (
+            "Body sentence.\n"
+            "Personality and Social Psychology Bulletin 1– 19 © 2025 "
+            "DhttOpsI://1d0o.i1.o1rg7/71/00.11147671/06174262165712322571132679169 "
+            "journals.sagepub.com/home/pspb\n"
+            "More body.\n"
+        )
+        result = norm(text, "standard")
+        assert "DhttOpsI" not in result
+        assert "Body sentence." in result
+        assert "More body." in result
+
     def test_orcid_url_stripped(self):
         text = "Body.\nhttps://orcid.org/0000-0002-1234-5678\nMore body.\n"
         result = norm(text, "standard")

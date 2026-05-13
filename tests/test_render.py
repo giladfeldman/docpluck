@@ -17,6 +17,7 @@ from docpluck.render import (
     _suppress_orphan_table_cell_text,
     _demote_inline_footnotes_to_blockquote,
     _promote_study_subsection_headings,
+    _demote_false_single_word_headings,
     _apply_title_rescue,
     _strip_duplicate_title_occurrences,
 )
@@ -347,6 +348,56 @@ def test_study_subsection_skip_unrelated_prose():
     # the entire paragraph and start with capital-S "Study N <token>".
     assert "### We summarize" not in out
     assert out == text
+
+
+# ── _demote_false_single_word_headings ──────────────────────────────────────
+
+
+def test_false_heading_demoted_when_next_line_is_continuation_of():
+    text = "## Results\n\nof Study 1 showed significant effects."
+    out = _demote_false_single_word_headings(text)
+    assert "## Results" not in out
+    assert "Results of Study 1 showed significant effects." in out
+
+
+def test_false_heading_demoted_when_next_line_starts_lowercase():
+    text = "## Discussion\n\nsection of the article was extensive."
+    out = _demote_false_single_word_headings(text)
+    assert "## Discussion" not in out
+    assert "Discussion section of the article" in out
+
+
+def test_false_heading_demoted_when_next_line_starts_digit():
+    text = "## References\n\n1. Author, A. (2023). Title."
+    out = _demote_false_single_word_headings(text)
+    assert "## References\n\n1." not in out
+
+
+def test_legit_heading_preserved_when_next_line_capitalized_sentence():
+    text = "## Results\n\nWe found a significant effect of condition."
+    out = _demote_false_single_word_headings(text)
+    # "We" is capitalized AND not a continuation particle — heading stays.
+    assert "## Results" in out
+
+
+def test_legit_heading_preserved_with_following_sentence():
+    text = "## Methods\n\nParticipants were 100 undergraduates."
+    out = _demote_false_single_word_headings(text)
+    assert "## Methods" in out
+
+
+def test_false_heading_h3_also_demoted():
+    text = "### Theory\n\nof the firm: managerial implications follow."
+    out = _demote_false_single_word_headings(text)
+    assert "### Theory" not in out
+    assert "Theory of the firm" in out
+
+
+def test_false_heading_demoter_idempotent():
+    text = "## Results\n\nof Study 1."
+    once = _demote_false_single_word_headings(text)
+    twice = _demote_false_single_word_headings(once)
+    assert once == twice
 
 
 # ── _reformat_jama_key_points_box ──────────────────────────────────────────

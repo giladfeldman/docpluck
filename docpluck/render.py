@@ -31,7 +31,7 @@ from typing import Optional
 
 from .extract_layout import LayoutDoc
 from .extract_structured import extract_pdf_structured
-from .normalize import NormalizationLevel
+from .normalize import NormalizationLevel, _rejoin_garbled_ocr_headers
 from .sections import extract_sections
 from .tables.render import cells_to_html
 
@@ -377,6 +377,81 @@ def _join_multiline_caption_paragraphs(text: str) -> str:
         paragraphs[idx] = lead + "\n".join(lines) + trail
 
     return "".join(paragraphs)
+
+
+# ── Section C4: false single-word heading demotion ──────────────────────────
+
+
+_FALSE_HEADING_RE = re.compile(r"^(#{2,3})\s+(?P<word>[A-Z][A-Za-z]{2,12})\s*$")
+
+
+def _demote_false_single_word_headings(text: str) -> str:
+    """Demote ``## Word`` / ``### Word`` lines that are mid-prose continuations.
+
+    Audit of the v2.4.0 101-paper corpus found 197 false single-word section
+    headings (24% of all such headings). Pattern: ``## Results`` (line N)
+    followed by ``of Study 1`` (line N+1) — the heading text was originally
+    one paragraph ("Results of Study 1") that pdftotext split across a column
+    wrap; the section detector then promoted the first line to a heading and
+    left the continuation behind.
+
+    Rules to demote:
+      1. Heading matches ``^(##|###)\\s+[A-Z][a-z]{2,12}\\s*$`` (single short
+         capitalized word).
+      2. Next non-blank, non-heading line starts with a lowercase letter, a
+         digit, OR a continuation particle (``of``, ``from``, ``and``,
+         ``for``, ``in``, ``shows``, etc.).
+      3. The heading word itself is NOT a strong, unambiguous section
+         marker (we keep ``## Abstract``, ``## Introduction``, ``## Methods``,
+         ``## Discussion``, ``## References`` when they ARE followed by a
+         capitalized sentence — those are not demoted).
+
+    Demote = replace the heading line with the plain word (no leading
+    ``##``), then re-join with the next paragraph if appropriate.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = _FALSE_HEADING_RE.match(line)
+        if not m:
+            out.append(line)
+            i += 1
+            continue
+        # Find the next non-blank line.
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if j >= len(lines):
+            out.append(line)
+            i += 1
+            continue
+        next_line = lines[j].lstrip()
+        # Heuristic: a single-word heading followed by a lowercase or digit
+        # first-char paragraph is almost always a column-wrap split of one
+        # original heading line (``Results of Study 1`` → ``## Results`` +
+        # ``of Study 1``). Skip the lookahead for proper-sentence starts.
+        first_char = next_line[:1]
+        is_continuation = bool(
+            first_char and (first_char.islower() or first_char.isdigit())
+        )
+        if not is_continuation:
+            out.append(line)
+            i += 1
+            continue
+        # Demote: emit the bare word (no ##) and let it flow into the next
+        # paragraph naturally. Preserve the same blank-line structure as a
+        # normal paragraph would have.
+        word = m.group("word")
+        out.append(word + " " + next_line.rstrip())
+        # Consume the next line we just merged.
+        i = j + 1
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
 
 
 # ── Section C3: inline-footnote demotion + study-subsection promotion ──────
@@ -1582,6 +1657,8 @@ def render_pdf_to_markdown(
     md = _suppress_orphan_table_cell_text(md)
     md = _demote_inline_footnotes_to_blockquote(md)
     md = _promote_study_subsection_headings(md)
+    md = _demote_false_single_word_headings(md)
+    md = _rejoin_garbled_ocr_headers(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)
