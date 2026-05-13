@@ -252,6 +252,37 @@ def test_suppress_orphan_table_cell_text_noop_when_no_table_caption():
     assert _suppress_orphan_table_cell_text(text) == text
 
 
+def test_suppress_orphan_table_cell_text_poppler_single_newline_format():
+    """v2.4.10 regression-fix test: poppler-utils 25.03+ (Railway prod
+    pdftotext) joins cell-content runs with single ``\\n`` rather than
+    ``\\n\\n``. Earlier paragraph-level split missed prod's structure.
+
+    Real example from chan_feldman_2025_cogemo on the Railway service:
+        "Table 5. Comparison of target article versus replication.\\n"
+        "Study design\\nSample characteristics\\nProcedure\\n\\n"
+        "Statistical analysis\\n\\nConditions\\n\\n..."
+    All on consecutive single-newline-separated lines; the caption and
+    the first 3 orphan rows are a single paragraph in `\\n\\n+`-split.
+    """
+    text = (
+        "Some intro about table 5.\n\n"
+        "Table 5. Comparison of target article versus replication.\n"
+        "Study design\n"
+        "Sample characteristics\n"
+        "Procedure\n\n"
+        "Statistical analysis\n\n"
+        "Conditions\n\n"
+        "After this paragraph the prose continues and is long enough to be"
+        " recognized as normal body content, not an orphan cell row.\n"
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "*Table 5. Comparison of target article versus replication.*" in out
+    assert "\nStudy design\n" not in out
+    assert "\nSample characteristics\n" not in out
+    assert "\nProcedure\n" not in out
+    assert "After this paragraph the prose continues" in out
+
+
 # ── _demote_inline_footnotes_to_blockquote ──────────────────────────────────
 
 

@@ -677,40 +677,60 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
     """
     if not text or "Table" not in text:
         return text
-    paragraphs = re.split(r"\n\n+", text)
+    # v2.4.10: operate at LINE level (not paragraph level). pdftotext
+    # version skew matters here — Xpdf 4.00 (used by local dev) joins
+    # paragraphs with `\n\n`, but poppler-utils 25.03+ (used on Railway
+    # production) often joins cell-content runs with single `\n`. The
+    # earlier paragraph-level split missed prod's structure entirely:
+    #   "Table 5. Caption.\nStudy design\nSample characteristics\n..."
+    # was one paragraph instead of N separate ones.
+    lines = text.split("\n")
     out: list[str] = []
     i = 0
-    while i < len(paragraphs):
-        para = paragraphs[i]
-        para_stripped = para.strip()
-        # Caption must be a single line (no embedded newlines after strip).
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
         if (
-            para_stripped
-            and "\n" not in para_stripped
-            and not para_stripped.startswith("*")
-            and _ORPHAN_TABLE_CAPTION_RE.match(para_stripped)
+            stripped
+            and not stripped.startswith("*")
+            and not stripped.startswith("#")
+            and _ORPHAN_TABLE_CAPTION_RE.match(stripped)
         ):
+            # Scan ahead for orphan-cell lines (1 or 2 blank lines allowed
+            # between, single short paragraphs each — accommodates both
+            # pdftotext flavors).
             j = i + 1
+            blank_run = 0
             orphans: list[int] = []
-            while j < len(paragraphs):
-                p = paragraphs[j].strip()
+            saw_long_prose = False
+            while j < len(lines) and j < i + 25:
+                p = lines[j].strip()
                 if not p:
+                    blank_run += 1
                     j += 1
+                    if blank_run > 1:
+                        # Two blank lines in a row → end of table region.
+                        break
                     continue
+                blank_run = 0
                 if _is_orphan_cell_paragraph(p):
                     orphans.append(j)
                     j += 1
                     continue
+                # Hit a non-orphan line. If it's substantial prose, stop;
+                # otherwise also stop (we only want runs of orphans).
+                saw_long_prose = True
                 break
             if len(orphans) >= 3:
-                # Italicize the caption (matches v2.4.2 no-cells caption style)
-                # and drop the orphan paragraphs.
-                out.append(f"*{para_stripped}*")
-                i = j
+                # Italicize the caption and drop the orphan lines.
+                out.append(f"*{stripped}*")
+                i = orphans[-1] + 1
                 continue
-        out.append(para)
+        out.append(line)
         i += 1
-    return "\n\n".join(out)
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
 
 
 # ── Section D: JAMA Key Points sidebar reformat ─────────────────────────────

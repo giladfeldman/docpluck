@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.4.10] — 2026-05-13
+
+Critical fix for the orphan-cell-row suppressor surfacing only on the production Railway extraction service — never on local dev. Root cause: **pdftotext version skew**. Local development environment uses Xpdf 4.00 (2017); production Railway runs poppler-utils 25.03.0 (2025). The two binaries produce subtly different paragraph spacing on the same PDF — Xpdf joins paragraphs with `\n\n`, poppler often joins cell-content runs with single `\n`.
+
+The v2.4.6 `_suppress_orphan_table_cell_text` split input on `\n\n+` to identify the caption-only paragraph and the following orphan cell rows. This worked locally (Xpdf format) but missed every prod case (poppler format), because on prod the caption + first 3 orphan rows were already a single multi-line paragraph after `\n\n+` split.
+
+### Fix
+
+1. **`docpluck/render.py::_suppress_orphan_table_cell_text`** — rewritten to operate at LINE level. Iterates each line; when a line matches the caption regex, scans ahead up to 25 lines for orphan cell rows (allowing 0-1 blank lines between). If 3+ orphan lines follow the caption, italicizes the caption and drops the orphan lines. Works against both Xpdf-style and poppler-style line spacing.
+
+### Diagnostic added
+
+2. **`PDFextractor/service/app/main.py::/_diag`** — new endpoint that reports `docpluck.__version__`, the loaded `render.py` file path, and a presence-check for each v2.4.6+ post-processor. Used during diagnosis to confirm the library was correctly installed on prod (it was) — narrowing the bug to a behavioral mismatch rather than a stale-install issue.
+
+### Bumps
+
+- `__version__`: `2.4.9` → `2.4.10`. Patch (single render-pipeline function rewrite).
+
+### Tests
+
+- 1 new regression test in `tests/test_render.py::test_suppress_orphan_table_cell_text_poppler_single_newline_format` that simulates poppler-style single-newline cell row joining. All 55 render tests + 227 render+normalize tests PASS.
+
+### Operational note
+
+This bug surfaced because local dev uses an older pdftotext than prod. Every render-pipeline regex/heuristic in this codebase should be tested against BOTH paragraph styles — see `tests/test_render.py::test_suppress_orphan_table_cell_text_poppler_single_newline_format` as the template. Consider adding a fixture that synthesizes both styles for every post-processor.
+
 ## [2.4.9] — 2026-05-13
 
 Regression hotfix for v2.4.8's `_demote_false_single_word_headings`. The 26-paper baseline gate caught it: ar_royal_society_rsos_140066 + ar_royal_society_rsos_140072 dropped from 4 → 2 sections because `## Discussion`/`## References` got demoted (next line started with lowercase `of this study...` or `1. Öhman A...`).
