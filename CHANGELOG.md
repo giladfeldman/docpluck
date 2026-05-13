@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.4.12] — 2026-05-13
+
+Table-extraction quality fix: surface raw text under the caption when Camelot rejects all candidates. The user reported that the workspace's Tables tab on chan_feldman showed Tables 1 + 2 with the banner *"No cells or raw text extracted. The caption is above; the table's text content is available in the Raw tab."* — meaning docpluck had detected the table caption but couldn't extract structured cells. Camelot's stream flavor returned a 66×2 result for the page (the journal's 2-column layout), but the result was 95% body prose with only ~4% data-like cells, so `_is_table_like` correctly rejected it.
+
+This release doesn't change the rejection logic (preserves precision against false-positive table detections in body prose). Instead it improves the *fallback*: when an isolated table (caption + no cells) is emitted, populate `raw_text` with the text from the caption's body region. The Next.js Tables tab already had a code path to render `raw_text` in a `<pre>` block under an amber notice ("Camelot couldn't structure this table into cells — showing raw extracted text below"); it just never had non-empty `raw_text` to render.
+
+### Fix
+
+1. **`docpluck/extract_structured.py::_extract_table_body_text`** — new helper that pulls the body text following a Table caption. Bounded by the next caption (`next_boundary`), the next clear paragraph break with sentence-terminator, or 3000 chars. Preserves line breaks (so cells stack vertically in the front-end `<pre>` block) but collapses internal whitespace.
+2. **`docpluck/extract_structured.py::_isolated_table_from_caption`** — now calls `_extract_table_body_text` to populate `raw_text` instead of leaving it as `""`.
+
+On chan_feldman Table 1 (the hypothesis table): `raw_text` now contains 2446 chars of cell content (`Hypothesis\nDescription\n1\nEmpathy mediates relationships...`). The Tables tab will show this stacked content instead of the empty-state banner.
+
+### Bumps
+
+- `__version__`: `2.4.11` → `2.4.12`. Patch (additive — `raw_text` was already a typed field, populating it doesn't change schema).
+
+### Tests
+
+- 310 unit tests PASS (full render + normalize + table subset).
+
+### Out of scope (next iteration)
+
+A proper structured extraction for prose-heavy tables (hypothesis tables, narrative replication-table summaries) requires bbox-anchored Camelot retry: locate the caption's pdfplumber bbox, then re-run Camelot with `table_areas=[bbox below caption]`. That isolates the table from the surrounding 2-column body prose. Deferred to a dedicated iteration with the pdfplumber layout-channel already used by `extract_pdf_layout` — this v2.4.12 fix is the "surface what we have right now" floor.
+
 ## [2.4.11] — 2026-05-13
 
 Three fixes for visible defects the user spotted in the live workspace UI on chan_feldman_2025_cogemo after v2.4.10 deployed:

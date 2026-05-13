@@ -388,13 +388,25 @@ def _isolated_table_from_caption(
     raw_text: str,
     next_boundary: Optional[int] = None,
 ) -> Table:
-    """Build an isolated (cellless) Table dict for a caption with no Camelot match."""
+    """Build an isolated (cellless) Table dict for a caption with no Camelot match.
+
+    v2.4.12: populate ``raw_text`` with the body text following the caption.
+    pdftotext linearizes table cells into the body as a vertical run of
+    short lines (column headers, then values, then more rows). Even
+    though we can't reconstruct the grid (Camelot failed and we run in
+    pdfplumber-free mode here), surfacing the raw cell content under the
+    caption is much better than the previous "no cells or raw text
+    extracted" banner — the user sees the table's information, just as
+    a flat list rather than a structured grid.
+    """
+    cap_text = _extract_caption_text(raw_text, cap, next_boundary)
+    body_text = _extract_table_body_text(raw_text, cap, next_boundary)
     return {
         "id": f"t{cap.number}",
         "label": cap.label,
         "page": cap.page,
         "bbox": (0.0, 0.0, 0.0, 0.0),
-        "caption": _extract_caption_text(raw_text, cap, next_boundary),
+        "caption": cap_text,
         "footnote": None,
         "kind": "isolated",
         "rendering": "isolated",
@@ -404,8 +416,63 @@ def _isolated_table_from_caption(
         "header_rows": None,
         "cells": [],
         "html": None,
-        "raw_text": "",
+        "raw_text": body_text,
     }
+
+
+def _extract_table_body_text(
+    raw_text: str,
+    cap: CaptionMatch,
+    next_boundary: Optional[int] = None,
+) -> str:
+    """Pull the text following a Table caption (intended for use when
+    Camelot failed to extract cells). Returns the cell content as a flat
+    string — column headers, values, group labels, etc., all linearized
+    by pdftotext.
+
+    Bounds:
+      - Start at the end of the caption's snippet.
+      - End at the next caption (``next_boundary``) OR at the next clear
+        section break (heading marker, two consecutive prose-like
+        paragraphs of substantial length) OR after 3000 chars.
+      - Strip surrounding whitespace, collapse internal whitespace.
+    """
+    # Find where the caption sentence actually ends within raw_text.
+    # `_extract_caption_text` uses the same logic to terminate; replicate
+    # it lazily by re-locating the first sentence-terminator paragraph
+    # break after cap.char_end.
+    pos = cap.char_end
+    hard_end = min(cap.char_end + 800, len(raw_text))
+    if next_boundary is not None and next_boundary > cap.char_end:
+        hard_end = min(hard_end, next_boundary)
+    while pos < hard_end:
+        nxt = raw_text.find("\n\n", pos)
+        if nxt == -1 or nxt >= hard_end:
+            pos = hard_end
+            break
+        prev = raw_text[max(cap.char_start, nxt - 40):nxt].rstrip()
+        if not prev or len(prev.split()) < 2 or re.search(
+            r"[.!?][\"'\)\]]?$", prev
+        ):
+            pos = nxt + 2  # skip past the paragraph break
+            break
+        pos = nxt + 2
+    body_start = pos
+    body_end = next_boundary if next_boundary is not None else len(raw_text)
+    body_end = min(body_end, body_start + 3000)
+    snippet = raw_text[body_start:body_end]
+    # Normalize whitespace; strip form-feed.
+    snippet = snippet.replace("\x0c", "")
+    snippet = re.sub(r"­\s+", "", snippet)
+    snippet = snippet.replace("­", "")
+    # Preserve line breaks but collapse runs of spaces/tabs within each
+    # line so the front-end can render the cells as a vertical list.
+    cleaned_lines: list[str] = []
+    for ln in snippet.split("\n"):
+        s = re.sub(r"[ \t]+", " ", ln).strip()
+        if s:
+            cleaned_lines.append(s)
+    return "\n".join(cleaned_lines).strip()
 
 
 def _figure_from_caption(
