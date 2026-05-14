@@ -1,5 +1,40 @@
 # Changelog
 
+## [2.4.29] — 2026-05-14
+
+**Source-glyph preservation in the render path** (Cycles 15a + 15b + 15c, bundled — all share root cause "rendered .md must preserve source PDF glyphs"). Established by the Phase-5d AI-gold audit (docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md): the v2.4.28 render systematically transliterated Greek letters, math operators, superscripts/subscripts, comma-thousands separators, and decomposed combining-character names — silently corrupting meta-science content. The fix preserves all source glyphs in the rendered .md while keeping backward-compatible behavior for stat-extraction callers (D5 audit suite + downstream regex matching).
+
+### Cycle 15a — Greek letters + math operators + super/sub digits (G2/G7/G12/G21)
+
+New `preserve_math_glyphs` flag in `normalize_text(...)` (default `False` for back-compat); when `True`, skips the A5 transliteration step (β→"beta", δ→"delta", χ²→"chi2", η²→"eta2", ²→"2", ₀→"0", ×→"x", ≥→">=", ≤→"<=", ≠→"!=", etc.). `extract_sections(..., preserve_math_glyphs=False)` forwards the flag. `render_pdf_to_markdown(...)` internally passes `True`. Verified: ieee_access_2 now has 61 β + 43 δ + 106 ≤ in the rendered .md (was 0/0/0), and zero "betaSI"/"deltaR" transliterations.
+
+### Cycle 15b — Comma-thousands separators (G17)
+
+A3a (which intentionally stripped commas from `7,445`-style integers to protect against A3 corrupting them into European decimals) is gated on `preserve_math_glyphs=False`. A3 (European decimal-comma → ASCII dot) and A3c (leading-zero decimal recovery) are also gated. In preserve mode, body-text retains `7,445 sources`, `33,719 articles`, `32,981 authors`, `49,742 rows`, `89,044 times` etc. as printed. Verified on amle_1: all 10 sample thousands separators preserved; zero comma-stripped 4-digit forms remain in body.
+
+### Cycle 15c — NFC composition for decomposed combining characters (G15)
+
+Added Unicode NFC normalization at the top of `normalize_text` plus a regex that squashes a stray space between a base letter and an immediately-following combining diacritic (the `Fö rster` → `Förster` corruption pattern observed in amj_1 v2.4.28). Recomposes `Potočnik` (NFD: c + U+030C combining caron) to `Potočnik` (NFC: U+010D). Applied to ALL normalize callers (no flag gate) because NFC is the universal correct form — there is no use case for keeping decomposed-with-stray-spaces author names.
+
+### Library API
+
+- `normalize_text(text, level, *, layout=None, table_regions=None, preserve_math_glyphs=False)` — new keyword param.
+- `extract_sections(..., preserve_math_glyphs=False)` — new keyword param forwarded to `normalize_text`.
+- `render_pdf_to_markdown(...)` — unchanged signature, internally sets `preserve_math_glyphs=True`.
+- D5 stat-extraction tests (153 tests) still pass unchanged — back-compat preserved.
+- `NORMALIZATION_VERSION` bumped 1.8.9 → 1.9.0 (minor: behavioral change behind a flag, but A5 + A3 gating is a meaningful semantic shift).
+
+### Known remaining (TRIAGE cycles 15d-15g, scheduled for follow-up)
+
+- G6 orphan Roman-numeral consumption (ieee_access_2: `I.` alone above `## INTRODUCTION`)
+- G16 page-header leak into equations (ieee_access_2: `Page 4 (2)`)
+- G4 body-stream cells duplicating structured tables (amj_1 Tables 2/3/4/5, amle_1 13 tables)
+- G1 pdftotext glyph collapse (`=`→`5`, `<`→`,`, `−`→`2` — amj_1/amle_1 stat-poisoning)
+- G3 multi-paper table-cell defects (phantom columns, cell fusion, caption-thead bleed)
+- G5 section-detection under-firing
+- G7 equation destruction in math contexts
+- G8 body-prose splay around inline math glyphs
+
 ## [2.4.28] — 2026-05-14
 
 Cycles 13 + 14 of the /docpluck-iterate resume run, bundled as one

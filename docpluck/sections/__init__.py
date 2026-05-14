@@ -31,6 +31,7 @@ def extract_sections(
     *,
     text: str | None = None,
     source_format: Literal["pdf", "docx", "html"] | None = None,
+    preserve_math_glyphs: bool = False,
 ) -> SectionedDocument:
     """Public entry point. Either pass `file_bytes` (with optional
     source_format hint) or pre-extracted `text` + required `source_format`.
@@ -71,7 +72,11 @@ def extract_sections(
         from .core import partition_into_sections
 
         raw_text, _method = extract_pdf(file_bytes)
-        normalized, report = normalize_text(raw_text, NormalizationLevel.academic)
+        normalized, report = normalize_text(
+            raw_text,
+            NormalizationLevel.academic,
+            preserve_math_glyphs=preserve_math_glyphs,
+        )
         hints = annotate_text(normalized)
         sections = partition_into_sections(
             normalized, hints, source_format="pdf",
