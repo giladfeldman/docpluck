@@ -12,7 +12,7 @@ from typing import Literal
 from .taxonomy import SectionLabel, Confidence, DetectedVia
 from .types import Section, SectionedDocument
 
-SECTIONING_VERSION = "1.2.0"
+SECTIONING_VERSION = "1.2.1"
 
 
 def _detect_format(file_bytes: bytes) -> str:

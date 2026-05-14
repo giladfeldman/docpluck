@@ -1,5 +1,59 @@
 # Changelog
 
+## [2.4.18] — 2026-05-14
+
+Sectioning fix — false `## Results` body-prose promotion suppressed
+(cycle 3 of the /docpluck-iterate run, partial scope; table-cell-heading
+mis-promotion and ~24 missing-section-promotion items queued as a
+follow-up cycle).
+
+### Defect — body-prose paragraph openers falsely promoted to `## Heading`
+
+Pass 1a / Pass 1b of the canonical-heading annotator used a disambiguator
+`(a OR b OR c)` where:
+- (a) heading preceded by a blank line
+- (b) followed by Capital body word on same line
+- (c) at end-of-line
+
+Body paragraphs starting with a canonical heading word ("Results from our
+study have implications…", "Results based on the top-50 sources…",
+"Methods of analysis…", "Discussion of these findings…") satisfy (a)
+trivially and got promoted to `## Heading`. Surfaced by v2.4.16 Phase 5d
+AI verify on amle_1.
+
+### Fix — `docpluck/sections/annotators/text.py` (SECTIONING_VERSION 1.2.0 → 1.2.1)
+
+1. **Tighten Pass 1a:** require `preceded_by_blank AND (followed_by_capital
+   OR at_end_of_line)`. The blank-line-predecessor alone is no longer
+   sufficient — the heading must ALSO have an explicit structural marker
+   (Capital body word or end-of-line termination). Body-prose openers
+   fail both (b) and (c) and get correctly rejected.
+
+2. **Function-word reject in Pass 1b** (`_FUNCTION_WORD_AFTER`): Pass 1b
+   was designed to catch legitimate lowercase-body cases like "Keywords
+   emotional pluralistic ignorance…". Body-prose openers like "Results
+   based on the top-50…" share that surface shape (lowercase second
+   word). Reject when the second word is a function word, preposition,
+   article, auxiliary verb, or one of ~30 common descriptive verb forms
+   used after a canonical-heading word in body prose (based/derived/
+   showed/observed/etc.). The function-word list reliably distinguishes
+   keyword-list lowercase-body from sentence lowercase-body.
+
+### Scope NOT in this cycle (queued for cycle 9)
+
+- Table-cell heading mis-promotion (e.g. `## Findings` in amj_1, where
+  "Findings" is a table column header). Different root cause —
+  `_looks_like_table_cell` filter not catching the case.
+- ~24 missing `##` section promotions (STUDY 1, STUDY 2, Participants,
+  Design and procedure, Implications, etc.) — different root cause:
+  heading patterns too restrictive for ALL-CAPS-with-digits ("STUDY 1:
+  QUASI-FIELD EXPERIMENT") and Title-Case multi-word subsection labels.
+
+### Regression coverage
+
+- Existing sections test suite 35/35 PASS
+- 26-paper baseline (awaiting result; if it regresses, cycle 3 reverts)
+
 ## [2.4.17] — 2026-05-14
 
 Body-integer corruption fixes — second cycle of `/docpluck-iterate` run.
