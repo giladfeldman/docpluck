@@ -76,6 +76,16 @@ Before any iteration, establish:
 
    The matrix replaces the 4-paper "canonical" tunnel-vision that let 14 cycles miss broad-corpus defects. The user's directive (2026-05-14, session-end): "docpluck as an academic scientific product has to be near perfect. document all lessons learned and improve the skill as you go. self-learning and improvement have to baked into the skill."
 
+   **Coverage state queries the SHARED REPOSITORY, not just tmp/.** Per the 2026-05-14 user directive on long-term gold storage:
+   ```bash
+   # The "gold-generated" cell-state is queried from the article-finder skill's
+   # ai-gold cache, not from this project's tmp/ directory. Local tmp/ files are
+   # working copies; the shared repository at ~/ArticleRepository/ai_gold/ is the
+   # durable truth — any project can read/write it.
+   python ~/.claude/skills/article-finder/ai-gold.py stats
+   ```
+   When advancing a paper's cell from `pending` → `gold-generated`, you MUST store the gold to the shared repository via `ai-gold.py store` (Phase 5d Step 1c). When checking a paper's status, you MUST consult `ai-gold.py check` first — don't re-generate a gold that already exists in another project's prior session.
+
 ---
 
 ## Subagent parallelization (cross-cutting principle, applies to every phase below)
@@ -272,7 +282,15 @@ Per memory `feedback_ai_verification_mandatory`: AI-verification + visual inspec
 | 5f | **Cross-output consistency check** (mandatory cycle-15+ requirement) | ~1 min/paper | Verifies that the same fact appears identically across views (section labels in sections JSON match the `##` headings in rendered .md; table cells in structured JSON match the `<table>` HTML in rendered .md; etc.). Cross-view drift is its own defect class. |
 | 5g | **Methodology meta-audit** (every 3rd cycle, or after any user correction) | ~3 min | Dispatches a subagent that audits the LAST 3 cycles' verification approach against the Phase 0.8 smell-test. If methodology has drifted, the audit reports it and the loop fixes the methodology before the next code change. |
 
-**Phase 5d is the keystone.** Ground truth is an **AI multimodal read of the source PDF** (`tmp/<paper>_gold.md`, generated once per paper via `Read` with `pages=N-M`, cached forever) — NOT pdftotext, NOT Camelot, NOT any deterministic extractor. Pdftotext / Camelot are *diagnostics only*: useful AFTER a finding to pinpoint the responsible library layer ("rendered says 'beta', gold says 'β', pdftotext also says 'beta' → bug is upstream in pdftotext, not in normalize.py"). A verifier subagent reads the FULL rendered .md AND the FULL gold extraction and produces a structured verdict on six checks: TEXT-LOSS, HALLUCINATION, SECTION-BOUNDARY, TABLE, FIGURE, METADATA-LEAK. TEXT-LOSS and HALLUCINATION findings are uncategorical-blockers — revert the cycle's edit, do not negotiate. See [references/ai-full-doc-verify.md](references/ai-full-doc-verify.md) for the full protocol (gold-extraction prompt template, verifier prompt template, gold caching, single-paper vs every-3rd-cycle corpus sweep). Memory `feedback_ground_truth_is_ai_not_pdftotext` and CLAUDE.md's ground-truth hard rule are the durable backstops against silently sliding back to pdftotext-as-truth.
+**Phase 5d is the keystone.** Ground truth is an **AI multimodal read of the source PDF** (`tmp/<paper>_gold.md`, generated once per paper via `Read` with `pages=N-M`, cached forever in the SHARED article repository at `~/ArticleRepository/ai_gold/<key>.md`) — NOT pdftotext, NOT Camelot, NOT any deterministic extractor. Pdftotext / Camelot are *diagnostics only*: useful AFTER a finding to pinpoint the responsible library layer ("rendered says 'beta', gold says 'β', pdftotext also says 'beta' → bug is upstream in pdftotext, not in normalize.py").
+
+**Long-term gold caching (mandatory, added 2026-05-14):** the gold is stored in the article-finder skill's shared repository so future cycles and OTHER PROJECTS (CitationGuard, ESCIcheck, MetaESCI) reuse the same extraction. Workflow:
+
+1. **CHECK first:** `python ~/.claude/skills/article-finder/ai-gold.py check <key>` where `<key>` is the DOI (preferred) or the local fixture stem. Exit 0 means cached — copy to `tmp/<paper>_gold.md` and skip Step 2.
+2. **Generate on miss:** dispatch the gold-extraction subagent. Output to `tmp/<paper>_gold.md`.
+3. **STORE after generate:** `python ~/.claude/skills/article-finder/ai-gold.py store <key> tmp/<paper>_gold.md --source-pdf <pdf-path> --version v1 --by docpluck-iterate@<date>`. Persists to the shared repository so the next cycle (or another project) doesn't re-pay the 3-15min subagent cost.
+
+A verifier subagent then reads the FULL rendered .md AND the FULL gold extraction and produces a structured verdict on six checks: TEXT-LOSS, HALLUCINATION, SECTION-BOUNDARY, TABLE, FIGURE, METADATA-LEAK. TEXT-LOSS and HALLUCINATION findings are uncategorical-blockers — revert the cycle's edit, do not negotiate. See [references/ai-full-doc-verify.md](references/ai-full-doc-verify.md) for the full protocol (gold-extraction prompt template, verifier prompt template, gold caching, single-paper vs every-3rd-cycle corpus sweep). Memory `feedback_ground_truth_is_ai_not_pdftotext` and CLAUDE.md's ground-truth hard rule are the durable backstops against silently sliding back to pdftotext-as-truth.
 
 **Heavy detail (commands, monitor patterns, common-failure table):** see [references/local-verification.md](references/local-verification.md). Load on demand when entering Phase 5.
 
