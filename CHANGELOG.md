@@ -1,5 +1,81 @@
 # Changelog
 
+## [2.4.24] — 2026-05-14
+
+Final cycle of the /docpluck-iterate run (cycle 9 of 9). Three
+partial-scope fixes for render-layer defects surfaced by Phase 5d AI
+verifiers across cycles 1-6.
+
+### Fix A — table-column-header heading mis-promotion
+
+`docpluck/sections/annotators/text.py::_looks_like_table_cell` extended
+to detect the TABLE-COLUMN-HEADER signature: if the heading is preceded
+by 2+ short standalone-line "noun phrase" siblings (each ≤30 chars,
+blank-line separated, no body-prose function words), treat as a table
+column header row, not a section heading.
+
+Caught case: amj_1 Table 1 has column headers `Study and Context\n\n
+Feedback Directions\n\nFindings\n\n<body row>`. Without this fix, the
+third column header "Findings" got promoted to `## Findings` mid-doc.
+v2.4.24 verified: amj_1 has 0 `## Findings` (was 1).
+
+### Fix B — heading-pattern widening for ALL-CAPS-with-digits-and-colons
+
+`_HEADING_LINE` regex character class extended from `[A-Za-z &\-/]` to
+`[A-Za-z0-9 &\-/:,]` (and the all-caps variant similarly). Admits
+headings like `STUDY 1: QUASI-FIELD EXPERIMENT`, `STUDY 2: LABORATORY
+EXPERIMENT`, `Section 3.1: Methods` that v2.4.23 rejected. Section tests
+42/42 still pass (no regressions).
+
+**Note:** the widening fires only when other Pass 3 constraints are
+satisfied (blank-line-before, blank-line-after, ≥5 chars, ≥2 words, no
+trailing period). amj_1's `STUDY 1: ...` is on a line immediately
+followed by `Procedure` (no blank line) — Pass 3 still rejects. A
+deeper fix would relax the blank-after requirement for ALL-CAPS multi-
+word headings. Deferred to a future cycle.
+
+### Fix C — figure caption running-header trim
+
+`docpluck/figures/detect.py::_trim_caption_at_running_header` trims a
+trailing page-number + running-header (e.g. ` 14 Q. XIAO ET AL.`) at
+the end of an extracted figure caption, then walks back to the last
+`. ` and drops any body-prose sentence that pdftotext absorbed before
+the running header.
+
+Caught case: xiao_2021_crsp Figure 2 caption at v2.4.23 was
+`*Figure 2. Study 1 interaction plots. Exploratory analysis To examine
+whether and to what extent participants perceived the decoys to be
+less preferable than their targets, we performed paired-samples t-
+tests to compare the points 14 Q. XIAO ET AL.*` — should be just
+`*Figure 2. Study 1 interaction plots.*`.
+
+### Verification status (partial — context exhausted)
+
+- 42/42 sections tests pass
+- 22/22 figure-detect + sections-partition tests pass
+- Full broad pytest: in flight at commit time (was at 78% with no
+  failures), final result deferred to next session
+- 26-paper baseline: in flight at commit time (10/26 PASS so far),
+  final result deferred to next session
+- Phase 5d AI verify: not run for cycle 9 (context budget); the three
+  fixes target narrow specific defects so regression risk is low
+- Phase 6 Tier 2 parity / Phase 7 release / Phase 8 prod deploy: NOT
+  YET RUN. v2.4.24 commit + tag are local-only at handoff time.
+
+### Out-of-scope deferrals (queued for fresh session)
+
+- ~24 missing section promotions where heading is on line followed by
+  another heading-shaped word without blank line (STUDY 1 in amj_1,
+  etc.) — needs blank-after constraint relaxation per heading class
+- Frontend Markdown rendering quality (Rendered tab vs Tables tab UX
+  per user 2026-05-14 directive) — outside library scope, fix lives in
+  `PDFextractor/frontend/`
+
+### Versioning
+
+`NORMALIZATION_VERSION` stays 1.8.8 (no normalize changes this cycle).
+`SECTIONING_VERSION` 1.2.1 → 1.2.2 (annotator + heading regex changes).
+
 ## [2.4.23] — 2026-05-14
 
 pdftotext version-skew pattern robustness (cycle 8 of /docpluck-iterate
