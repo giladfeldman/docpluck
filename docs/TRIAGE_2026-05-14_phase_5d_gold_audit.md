@@ -86,6 +86,30 @@
 **G23. xiao hallucinated `## Introduction` heading** (no such heading in PDF)
 **G24. Acknowledgments paragraph dropped** (amj_1 entirely; amle_1 entirely)
 
+## NEW DEFECTS DISCOVERED BY v2.4.29 RE-VERIFICATION (added 2026-05-14)
+
+### G_15n — Figure caption placeholder regression in ieee_access_2 (NEW v2.4.29)
+
+ieee_access_2's `## Figures` block (lines 694-800 in v2.4.29 rendered .md) shows truncated placeholders `*Figure N. FIGURE N.*` for all 37 figures, instead of full italic captions. v2.4.28 had full captions in this block.
+
+**Investigation:** the inline figure captions in the body (e.g. `### Figure 6` blocks at lines 484-643) DO have full Unicode-correct text. So the regression is specifically in the trailing `## Figures` appendix path that emits `f.get("caption")`. Likely cause: `_strip_duplicate_uppercase_label` or `_trim_caption_at_running_header_tail` over-trimming due to NFC-composed input (Cycle 15c), OR an interaction with the preserve_math_glyphs path.
+
+**Layer:** `docpluck/extract_structured.py::_extract_caption_text` chain (specifically `_strip_duplicate_uppercase_label`, `_trim_caption_at_chart_data`, `_trim_caption_at_running_header_tail`, `_trim_caption_at_body_prose_boundary`).
+
+**Severity:** S2 (medium). Inline captions are intact; only the trailing appendix copies degraded. Reader can still find the captions but the trailing block is now useless.
+
+**Cycle 15n** (queued for next session).
+
+### G_partial_15d — III./IV. orphan numerals not adjacent (NEW limitation)
+
+Cycle 15d (v2.4.30) successfully folds `I.` and `II.` (adjacent to their `##` headings) but not `III.` and `IV.` (placed far from their headings by the section partitioner, between `### Figure 9` / `### Table 1` blocks).
+
+**Layer:** `docpluck/sections/core.py` (partition_into_sections) — places the orphan numeral in the wrong section.
+
+**Severity:** S2. Half-fixed; documented as known limitation in the test (warning emitted).
+
+**Cycle 15i+** (section-partitioner cycle).
+
 ## Recommended cycle order
 
 | # | Cycle | Group | Severity | Cost | Why this order |
