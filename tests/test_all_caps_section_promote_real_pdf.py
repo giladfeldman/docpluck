@@ -158,12 +158,26 @@ def test_amle_1_promotes_all_caps_headings():
 )
 def test_ieee_access_2_promotes_all_caps_headings():
     """ieee_access_2.pdf has INTRODUCTION, METHODOLOGY, RESULTS,
-    DISCUSSION AND CONCLUSION, etc. that v2.4.25 left as inline bold."""
+    DISCUSSION AND CONCLUSION, etc. that v2.4.25 left as inline bold.
+
+    Cycle 15d (v2.4.30) ALSO folds orphan Roman-numeral lines (I., II., V.:)
+    into adjacent headings, so the promoted forms now appear as
+    `## I. INTRODUCTION` / `## II. METHODOLOGY` when the numeral is adjacent.
+    Headings whose numeral isn't adjacent (e.g. III. before `## RESULTS` when
+    the section partitioner placed III. far away) still appear as bare
+    `## RESULTS`. Accept both forms."""
     pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
     md = render_pdf_to_markdown(pdf.read_bytes())
     headings = _headings(md)
-    for h in ("## INTRODUCTION", "## METHODOLOGY", "## RESULTS"):
-        assert h in headings, f"missing {h!r} in {headings!r}"
+    # Accept either bare or Roman-prefixed form per cycle 15d
+    accepted_forms = {
+        "INTRODUCTION": ("## INTRODUCTION", "## I. INTRODUCTION"),
+        "METHODOLOGY": ("## METHODOLOGY", "## II. METHODOLOGY"),
+        "RESULTS": ("## RESULTS", "## III. RESULTS"),
+    }
+    for name, options in accepted_forms.items():
+        found = any(o in headings for o in options)
+        assert found, f"missing any of {options!r} in {headings!r}"
 
 
 @pytest.mark.skipif(

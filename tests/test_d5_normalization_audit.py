@@ -840,8 +840,11 @@ class TestVersionBumps:
     """
 
     def test_normalization_version(self):
-        assert NORMALIZATION_VERSION.startswith("1.8.")
+        # v2.4.29 (Cycle 15a/b/c, NORMALIZATION_VERSION 1.9.0) introduced the
+        # preserve_math_glyphs flag — behavioral change behind an opt-in flag.
+        # Test bumped to 1.9+ to track the new contract surface.
+        assert NORMALIZATION_VERSION.startswith("1.9.") or NORMALIZATION_VERSION.startswith("2.")
 
     def test_report_version(self):
         _, report = norm_report("test text")
-        assert report.version.startswith("1.8.")
+        assert report.version.startswith("1.9.") or report.version.startswith("2.")
