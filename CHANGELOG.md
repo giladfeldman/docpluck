@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.4.31] — 2026-05-14
+
+**Cycle 15n — figure caption placeholder repair (G_15n).** Phase-5d AI-gold audit of `ieee_access_2.pdf` at v2.4.30 surfaced that 36 of 37 figure captions in the trailing `## Figures` appendix rendered as `*Figure N. FIGURE N.*` placeholders with no description content. Affected the `f["caption"]` field of `extract_pdf_structured`, which `render_pdf_to_markdown` emits verbatim in the trailing Figures block.
+
+Root cause (long-standing, not a v2.4.29 regression — same defect reproduces at v2.4.28 against the current pdftotext output): the paragraph-walk in `_extract_caption_text` bails on the first `\n\n` whose preceding text ends with `.!?` — but for PMC-style IEEE captions, pdftotext lays out the ALL-CAPS label `FIGURE N.` on its own line, then a blank, then the description. The walk consumed `FIGURE N.` (ends with `.`) and stopped, never reaching the description. After re-prefix the snippet became `Figure N. FIGURE N.`. The `_strip_duplicate_uppercase_label` regex requires trailing whitespace after the duplicate, so it couldn't trim either.
+
+- New helper `_accumulated_is_label_only(text)` recognises text that is just a Table/Figure label (with optional duplicate ALL-CAPS form). The paragraph-walk now keeps going past a sentence-terminator break when the accumulated text is label-only, so the description in the next paragraph is consumed.
+- New helper `_strip_leading_pmc_running_header(snippet)` strips one or more `Author Manuscript ` PMC reprint running headers that pdftotext interleaves between the label and the description (sibling defect surfaced by the walk fix — 27/37 captions had this leakage after the walk fix alone, per rule 0e bundled in the same cycle).
+
+Result on ieee_access_2 (verified against AI-gold): 0/37 placeholders, 0/37 PMC header leaks, every caption is the full title-case sentence with Unicode (β/γ/δ/τ/≤/²) preserved.
+
+10 new regression tests added in `tests/test_figure_caption_trim_real_pdf.py` (8 unit + 2 real-PDF). Total: 34 tests for the caption-trim chain.
+
 ## [2.4.30] — 2026-05-14
 
 **Cycle 15d — orphan Roman-numeral consumption (G6).** IEEE-style papers use `I. INTRODUCTION` / `II. METHODOLOGY` / ... / `V.: SUPPLEMENTARY INDEX` section headings. pdftotext often emits these with the numeral on a separate line above the ALL-CAPS heading (orphan form), or as an inline form with `.` / `:` after the numeral that the standard ALL-CAPS heading regex doesn't match.
