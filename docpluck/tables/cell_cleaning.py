@@ -133,10 +133,37 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
     def _row_cells_are_short(row: list[str], threshold: int = 60) -> bool:
         return all(len((c or "").strip()) <= threshold for c in row)
 
+    # v2.4.27 (cycle 12): detect "section-row label" pattern — a row
+    # with only ONE non-empty cell containing a noun-phrase + a
+    # parenthesized descriptor (often n / M / SD breakdown). These are
+    # spanning section labels within the table body (e.g. xiao Table 6's
+    # ``Regret-Salient (n = 331, 5 selected the decoy, 1.5%)``) and
+    # must NOT be merged into the prior data row. See HANDOFF
+    # 2026-05-14 item C.
+    _SECTION_ROW_LABEL_RE = re.compile(
+        r"^[A-Z][\w\-]*(?:\s+[\w\-]+)*\s*\([^)]*\b(?:n|N|M|SD|p)\s*[=<>]"
+    )
+
+    def _is_section_row_label(row: list[str]) -> bool:
+        non_empty = [(i, (c or "").strip()) for i, c in enumerate(row)]
+        non_empty = [(i, s) for i, s in non_empty if s]
+        if len(non_empty) != 1:
+            return False
+        _, content = non_empty[0]
+        if len(content) > 200:
+            return False
+        return bool(_SECTION_ROW_LABEL_RE.match(content))
+
     out: list[list[str]] = []
     for row in rows:
         first = row[0].strip() if row else ""
         rest_has_content = any((c or "").strip() for c in row[1:])
+
+        if _is_section_row_label(row):
+            # Don't merge — emit as a separate row so the renderer can
+            # surface the spanning section label as its own table row.
+            out.append([(c or "").strip() for c in row])
+            continue
 
         if out and not first and rest_has_content and _looks_prose_like(row[1:]):
             parent = out[-1]

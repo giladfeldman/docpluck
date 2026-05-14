@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.4.27] — 2026-05-14
+
+Cycle 12 of the /docpluck-iterate run (HANDOFF_2026-05-14 deferred
+item C). Table 6 of `xiao_2021_crsp.pdf` had spanning section-row
+labels (`Control (n = 339, 2 selected the decoy, 0.6%)`,
+`Regret-Salient (n = 331, ...)`) collapsed into the data cell above:
+
+    <td>112/172<br>Regret-Salient (n = 331, ...)</td>
+
+Camelot emits these as single-non-empty-cell rows. The
+`_merge_continuation_rows` pre-v2.4.27 logic interpreted any row with
+an empty first cell and prose content elsewhere as a continuation —
+and merged it into the prior data row.
+
+Fix: new `_is_section_row_label` guard in
+`docpluck/tables/cell_cleaning.py::_merge_continuation_rows`. A row
+is treated as a spanning section-row label (and NOT merged) when:
+
+- Exactly ONE cell is non-empty (rest are empty).
+- That cell is ≤ 200 chars.
+- The cell content matches `_SECTION_ROW_LABEL_RE`: starts with a
+  Title-Case noun phrase followed by `(... n|N|M|SD|p [=<>] ...)`
+  parenthetical — the canonical statistical-condition descriptor.
+
+### Caught case
+
+- xiao Table 6: `Control` and `Regret-Salient` section rows now
+  surface as separate `<tr>` rows, no longer merged into the
+  `Choice set N | 112/172 | ...` data rows.
+
+### Tests
+
+- `tests/test_section_row_label_no_merge_real_pdf.py` — 5 contract
+  + 1 real-PDF regression test. 6/6 PASS.
+- Targeted table suite (`tests/test_tables_cell_cleaning.py`,
+  `tests/test_table_detect.py`, `tests/test_f0_table_region_aware.py`):
+  78/78 PASS.
+
 ## [2.4.26] — 2026-05-14
 
 Cycle 11 of the /docpluck-iterate run (HANDOFF_2026-05-14 deferred
