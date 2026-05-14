@@ -58,6 +58,24 @@ Before any iteration, establish:
 
 7. **Print the cycle plan.** One paragraph stating the stop condition, expected cycle count, and which TRIAGE items you're targeting first. The user should be able to interrupt before any code changes.
 
+8. **Methodology smell-test** (MANDATORY, added 2026-05-14 cycle-15 postmortem). Before any code change, the orchestrator answers ALL six checks in writing. If any answer is "no" or "unclear," the cycle STOPS and the methodology is repaired first.
+
+   a. **Ground-truth source check.** What is THIS cycle's ground truth for verification? It MUST be an AI multimodal read of the source PDF (`tmp/<paper>_gold.md`, generated via `Read` with `pages=N-M` or pypdfium2 fallback). pdftotext / Camelot / pdfplumber output is NEVER the truth — only diagnostic. If the cycle plans to use anything other than AI-gold as truth, STOP — methodology is broken.
+
+   b. **Cross-output coverage check.** Which outputs of the library will be affected by this cycle's fix? The output set includes: raw text, normalized text, sections, structured tables JSON, structured figures JSON, rendered .md, frontend Rendered tab, frontend Tables tab, frontend Sections tab, frontend Raw/Normalized tabs. The cycle's verification MUST cover every affected output, not only the rendered .md.
+
+   c. **Recurrence check.** Has the user given the same correction (about ground truth, methodology, or process) before, in this session or a prior one? Search LEARNINGS.md + memory for the topic. If yes, the methodology has a regression hole and must be re-grounded before continuing. Don't add the user's correction "again" — figure out why it slipped back, and fix the slip.
+
+   d. **Coverage matrix check.** Read `tmp/corpus-coverage.md` (or initialize it — see Phase 0.9 below). Which (paper × output-view) cells are still unverified? The cycle should advance the matrix, not just touch the same 4 canonical papers each time.
+
+   e. **Defect-density check.** If 3+ cycles in a row found NEW critical defects in the same output, the prior verification didn't see those defects. Why? The skill needs a methodology amendment, not just another code fix.
+
+   f. **Postmortem-pending check.** Are there defect classes in the active TRIAGE that haven't had their methodology-gap postmortem written? If yes, write the postmortem (template in LEARNINGS.md "Catastrophic-bug postmortem template") BEFORE starting the code fix. A postmortem-free fix is a fix that won't generalize.
+
+9. **Corpus coverage matrix init.** If `tmp/corpus-coverage.md` doesn't exist, initialize it from the full test-PDF set (`PDFextractor/test-pdfs/**/*.pdf`). The matrix is `papers × outputs`, with cells in `{pending, gold-generated, gold-verified, fixed-and-reverified}`. Every cycle must advance at least one cell from one state to the next. Papers progress: pending → gold-generated → gold-verified → (defects queued) → fix shipped → fixed-and-reverified.
+
+   The matrix replaces the 4-paper "canonical" tunnel-vision that let 14 cycles miss broad-corpus defects. The user's directive (2026-05-14, session-end): "docpluck as an academic scientific product has to be near perfect. document all lessons learned and improve the skill as you go. self-learning and improvement have to baked into the skill."
+
 ---
 
 ## Subagent parallelization (cross-cutting principle, applies to every phase below)
@@ -249,8 +267,10 @@ Per memory `feedback_ai_verification_mandatory`: AI-verification + visual inspec
 | 5a | Targeted unit tests (real-PDF fixtures + contract tests both) | ≤30s | Must pass; 3-retry max before revert |
 | 5b | Broad pytest (no camelot fixtures) | ~5 min | Must pass; run in background + Monitor |
 | 5c | `scripts/verify_corpus.py` 26-paper baseline | ~10 min | **Hard gate: 26/26 PASS, single WARN blocks** |
-| 5d | **Full-document AI verify** (every affected paper, every cycle) | ~2 min/paper | MANDATORY — no text loss, no hallucinations, structural correctness |
+| 5d | **Full-document AI verify against AI gold** (every affected paper, every cycle, every affected output view) | ~2-4 min/paper × N-views | MANDATORY — no text loss, no hallucinations, structural correctness across ALL output views (raw / normalized / sections / tables JSON / figures JSON / rendered .md / frontend tabs) |
 | 5e | Camelot-bearing tests (only if touched table extraction) | ~10 min | Required only when relevant |
+| 5f | **Cross-output consistency check** (mandatory cycle-15+ requirement) | ~1 min/paper | Verifies that the same fact appears identically across views (section labels in sections JSON match the `##` headings in rendered .md; table cells in structured JSON match the `<table>` HTML in rendered .md; etc.). Cross-view drift is its own defect class. |
+| 5g | **Methodology meta-audit** (every 3rd cycle, or after any user correction) | ~3 min | Dispatches a subagent that audits the LAST 3 cycles' verification approach against the Phase 0.8 smell-test. If methodology has drifted, the audit reports it and the loop fixes the methodology before the next code change. |
 
 **Phase 5d is the keystone.** Ground truth is an **AI multimodal read of the source PDF** (`tmp/<paper>_gold.md`, generated once per paper via `Read` with `pages=N-M`, cached forever) — NOT pdftotext, NOT Camelot, NOT any deterministic extractor. Pdftotext / Camelot are *diagnostics only*: useful AFTER a finding to pinpoint the responsible library layer ("rendered says 'beta', gold says 'β', pdftotext also says 'beta' → bug is upstream in pdftotext, not in normalize.py"). A verifier subagent reads the FULL rendered .md AND the FULL gold extraction and produces a structured verdict on six checks: TEXT-LOSS, HALLUCINATION, SECTION-BOUNDARY, TABLE, FIGURE, METADATA-LEAK. TEXT-LOSS and HALLUCINATION findings are uncategorical-blockers — revert the cycle's edit, do not negotiate. See [references/ai-full-doc-verify.md](references/ai-full-doc-verify.md) for the full protocol (gold-extraction prompt template, verifier prompt template, gold caching, single-paper vs every-3rd-cycle corpus sweep). Memory `feedback_ground_truth_is_ai_not_pdftotext` and CLAUDE.md's ground-truth hard rule are the durable backstops against silently sliding back to pdftotext-as-truth.
 
@@ -307,7 +327,7 @@ For app-code-touching cycles (Defect classes touch FastAPI / Next.js), invoke `/
 
 ## Phase 9 · Self-improvement & TODO update (mandatory every cycle)
 
-This is what makes the loop self-improving. Skip this and you've lost the cycle's signal. Five short steps, all mandatory:
+This is what makes the loop self-improving. Skip this and you've lost the cycle's signal. Now NINE short steps, all mandatory (expanded 2026-05-14 from 5 → 9 to close the methodology hole that let 14 cycles ship under broken verification):
 
 | Step | What | Where |
 |------|------|-------|
@@ -315,7 +335,11 @@ This is what makes the loop self-improving. Skip this and you've lost the cycle'
 | 8b | Append project lesson (if bug fixed or user correction) | `<project>/.claude/skills/_project/lessons.md` (R1 spine) |
 | 8c | Self-report cycle outcome to run-meta | `~/.claude/skills/_shared/run-meta/docpluck-iterate.json` |
 | 8d | Refresh always-visible TODO and print at cycle end | `tmp/iterate-todo.md` |
-| 8e | Propose SKILL.md amendment if same theme hit 2+ LEARNINGS | `PROPOSED AMENDMENT` block; await user approval |
+| 8e | **Refresh corpus-coverage matrix.** Update `tmp/corpus-coverage.md` for every (paper × output) cell touched this cycle. Advance the cell from one state to the next. If no cell advanced, the cycle didn't expand coverage — flag and ask why. | `tmp/corpus-coverage.md` |
+| 8f | **Write methodology postmortem if applicable.** If this cycle's AI-gold verifier surfaced a defect that survived N prior cycles, write the structured postmortem (template at the top of LEARNINGS.md) BEFORE moving on. Don't leave methodology gaps undocumented — they recur. | `LEARNINGS.md` |
+| 8g | **User-correction ratchet.** If the user corrected anything about methodology or process in this cycle (not just code), log it as `### USER CORRECTION (yyyy-mm-dd):` in LEARNINGS, AND add a project lesson, AND save a feedback memory, AND amend the relevant SKILL.md. Don't merely apply the correction — encode it durably. | LEARNINGS + project-lessons + memory + SKILL.md |
+| 8h | **Skill-amendment proposal** if same theme hit 2+ LEARNINGS | `PROPOSED AMENDMENT` block; await user approval |
+| 8i | **Verify Phase 0.8 smell-test invariants** hold at cycle-end. If any check (ground-truth source, cross-output coverage, recurrence, coverage-matrix advance, defect-density, postmortem-pending) failed, the loop is structurally broken and the next cycle starts with methodology repair, not code work. | inline self-check |
 
 **Heavy detail (LEARNINGS template, run-meta field-by-field, TODO format, amendment proposal format, wiring diagram):** see [references/self-improvement.md](references/self-improvement.md). Load on demand at end-of-cycle.
 

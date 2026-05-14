@@ -144,3 +144,90 @@ The bug was in `document-workspace.tsx::renderMarkdownToHtml`, a custom markdown
 - **The handoff's "Item F (carried over) — Frontend Rendered tab UX (out of /docpluck-iterate scope)" was wrong.** The frontend bug was a 4-line fix with library-level diagnostic effort. Future handoffs should not preemptively label single-component bugs as "needs a separate session focused on the frontend repo."
 
 **Not a cycle in the loop accounting** — this was an interrupt-driven app-repo fix. No library version bump, no /docpluck-cleanup, no /docpluck-review. Resuming Cycle 15 (the original handoff target — Phase 5d AI verify on xiao + amj_1 + amle_1 + ieee_access_2) next.
+
+---
+
+## SESSION POSTMORTEM (2026-05-14 — tier-S methodology failure)
+
+This entry is fundamentally different from all entries above. It's not a per-cycle learning — it's a postmortem of **why 14 cycles of iteration shipped under a fundamentally broken verification methodology**, and what process changes are now mandatory so this can't happen again.
+
+### The failure pattern
+
+Across 14 cycles (v2.4.15 → v2.4.28, two sessions), the iterate skill ran Phase 5d "AI verify" using **pdftotext output as the source of truth**. Each cycle the verifier read `rendered.md` + `pdftotext.txt` and produced a verdict. Each cycle the loop concluded the rendered .md was "faithful to its input."
+
+This was structurally insufficient. Pdftotext itself has flaws — the very class of flaws the library exists to fix:
+
+- Greek-letter glyph corruption (β → wrong ASCII byte on tight-kerned PDFs)
+- Math operator collapse (`−` U+2212 → digit `2`, `=` → `5`, `<` → `,`)
+- Combining-character decomposition without recomposition
+- Subscript/superscript flattening at the font-encoding layer
+- Whitespace shred around math glyphs (paragraph splay)
+
+When pdftotext drops or corrupts a glyph, AND the library passes through whatever pdftotext gave it, AND the verification compares rendered.md against pdftotext output — **all three artifacts agree, so the verifier reports PASS**. The actual PDF has β. Pdftotext has "beta". Rendered.md has "beta". Verifier compares "beta" to "beta" → PASS. The library is silently corrupting meta-science.
+
+The same logic explains how the catastrophic `=` → `5` and `−` → `2` collapse passed 14 cycles undetected: pdftotext.txt has "p 5 .001", rendered.md has "p 5 .001", verifier compares → PASS. A reader checking the rendered .md against the PDF sees "p 5 .001" and asks "did you sign-flip my data?" — and the answer is yes, silently, for every statistical paper extracted in the last 14 versions.
+
+The user pointed this out **for the Nth time** during the 2026-05-14 cycle-15 audit run. The Nth-time framing matters: the same correction had been given in prior sessions but kept slipping back into the skill files. The recurrence is the deepest signal — the skill's self-improvement loop had a hole.
+
+### Root cause of the methodology failure (in the skill itself)
+
+The iterate SKILL.md and `ai-full-doc-verify.md` reference doc explicitly said pdftotext was the truth source. Each cycle's verification was internally consistent with the skill. There was no smell test that asked "is the truth source the actual PDF, or just the library's input?" There was no audit ratchet that asked "are we finding the same class of bug in cycle N+3 that we 'fixed' in cycle N?" There was no user-pushback ratchet that asked "if the user has corrected this exact methodology before, why is it back?"
+
+### What CHANGED in v2.4.29 (durable countermeasures)
+
+The following are now MANDATORY in the iterate skill. If any future cycle violates them, the skill itself is broken and must be repaired before continuing.
+
+**1. Ground truth = AI multimodal read of the source PDF — NEVER any deterministic extractor.**
+Encoded in: CLAUDE.md hard rule, `.claude/skills/docpluck-iterate/SKILL.md` Phase 5d, `references/ai-full-doc-verify.md` (full protocol rewrite), `docpluck-qa/SKILL.md` check 7g, memory `feedback_ground_truth_is_ai_not_pdftotext.md`.
+
+**2. Cross-output coverage** (added 2026-05-14 cycle-15 postmortem).
+Verification must cover ALL outputs the library produces, not just the rendered .md. The output set is:
+- Raw text (`extract_pdf` output — pdftotext stream)
+- Normalized text (`normalize_text(level=academic)` — post-pipeline)
+- Sections (canonical labels + char offsets, `extract_sections`)
+- Structured tables JSON (`extract_pdf_structured`)
+- Structured figures JSON
+- Rendered .md (`render_pdf_to_markdown`)
+- Frontend Rendered tab (HTML pass-through)
+- Frontend Tables tab (structured cells)
+- Frontend Sections tab (canonical labels)
+- Frontend Raw / Normalized tabs
+
+For each cycle's affected papers, every output in the list above must be checked (at minimum: spot-checked for the bug class being fixed; for milestone releases, every output fully AI-gold-verified).
+
+**3. Periodic methodology smell-test** (added 2026-05-14).
+Every 3 cycles, OR before any release, OR after any user correction, the orchestrator MUST run a meta-audit subagent that asks:
+- "What is the current ground-truth source? Is it the actual source PDF, or a derived artifact?"
+- "Are the recent verifier outputs internally consistent in a way that could mask a class of bug?"
+- "Has the user given the same correction more than once across sessions? If yes, why is it back?"
+- "What classes of defect have NOT been verified for this paper / corpus?"
+
+If the smell-test surfaces a methodology hole, fix the methodology BEFORE shipping the next cycle. Code fixes wait until the methodology is correct.
+
+**4. User-correction ratchet** (added 2026-05-14).
+When the user corrects the methodology (not just a code defect — the *process* itself), that correction is logged immediately:
+- A new entry in this LEARNINGS.md prefixed `### USER CORRECTION (yyyy-mm-dd):`
+- A new project lesson in `.claude/skills/_project/lessons.md` (R1 spine)
+- A new feedback memory at `~/.claude/projects/.../memory/`
+- An immediate skill amendment with the user's correction encoded as a hard rule
+- A check in subsequent cycles: "Does my approach still align with the correction the user just gave?"
+
+**5. Multi-cycle ratchet** (added 2026-05-14).
+If the same class of bug surfaces across 2+ AI-gold cycles (e.g., glyph hallucination appears in cycle 15a/b/c), it's not 3 cycles — it's one root-cause group that the prior verification methodology missed in bulk. Document the methodology gap, not just the code fix.
+
+**6. Catastrophic-bug postmortem template** (this section).
+When AI-gold surfaces a defect that survived N prior cycles, write a structured postmortem in LEARNINGS.md that answers:
+- How did N prior verifications miss it?
+- What invariant of the prior verification was violated?
+- What process change would have caught it at cycle 1?
+- Which file in the skill needs amending so a future cycle can't miss it the same way?
+
+Apply this template to every defect class in `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` (24 groups identified by the cycle-15 audit — most of which had been silently present for many cycles).
+
+### What this postmortem doesn't (yet) close
+
+- Cycles 15d-15g remain queued. They were identified by AI-gold; the *new* methodology is the gain. The actual fixes still need to ship.
+- The full test corpus (~100 papers across 9 publishers) has only had 4 papers AI-gold-verified. Coverage expansion is mandatory; queued in `tmp/corpus-coverage.md` (built next).
+- A handful of methodology checks (smell-test cadence, user-correction ratchet activation) are encoded in this LEARNINGS but not yet codified as runnable scripts. Cycle-by-cycle they're checklist items; eventually they should be enforced by `_shared/quality-loop/` hooks similar to spine-gate.sh.
+
+**The session-overall lesson:** an iteration loop that doesn't have a feedback mechanism back to its OWN verification methodology will accumulate methodology debt indefinitely. The user pays for it in shipped corruption that nobody flags because the verification keeps reporting green.
