@@ -123,7 +123,10 @@ _FUNCTION_WORD_AFTER = re.compile(
     # 'as' / 'when' / 'where' starters
     r"as|when|where|whereas|whether|if|unless"
     r")\b",
-    re.IGNORECASE,
+    # Case-SENSITIVE: only reject when the function word is lowercase
+    # ("from", "the", "based"). Capital-letter "The"/"From" starts a body
+    # SENTENCE after a heading (e.g. "Funding The author(s) disclosed…")
+    # — those are real heading + body pairs, not body-prose openers.
 )
 
 
@@ -315,28 +318,26 @@ def annotate_text(text: str) -> list[BlockHint]:
         # (c) At end-of-line (with optional trailing colon/period/space).
         at_end_of_line = bool(_END_OF_LINE.match(after_heading))
 
-        # v2.4.18 (SECTIONING fix): tighten Pass 1a disambiguators.
+        # v2.4.18 (SECTIONING fix): hard-reject the body-prose case.
         #
-        # Previously the rule was `(a) OR (b) OR (c)` — ANY of the three
-        # signals admitted the heading. But (a) `preceded_by_blank` is
-        # weak: every body paragraph that starts with a canonical-heading-
-        # shaped word (e.g. "Results from our study have implications…",
-        # "Results based on the top-50 sources…", "Methods of analysis…",
-        # "Discussion of these findings…") satisfies (a) trivially and
-        # got falsely promoted to `## Heading`.
+        # The previous rule `(a) OR (b) OR (c)` admitted canonical heading
+        # words at paragraph starts even when the next same-line word
+        # revealed body prose ("Results from our study…", "Results based
+        # on the top-50…", "Methods of analysis…"). A function-word check
+        # is the right discriminator: keyword-list / subsection-label
+        # lowercase-body NEVER starts with a function/preposition/
+        # auxiliary/common-body-verb word. Body sentences DO.
         #
-        # New rule: require (a) AND ((b) OR (c)). The heading must be
-        # preceded by a paragraph break AND have an explicit structural
-        # heading marker (Capital body word starting a new sentence, OR
-        # end-of-line / colon termination). Body-prose openers fail both
-        # (b) and (c) so they correctly get rejected.
-        #
-        # Pass 1b (`_CANONICAL_AFTER_BLANK`) still handles legitimate
-        # lowercase-body cases like "Keywords emotional pluralistic
-        # ignorance…" — that path has its own function-word reject (added
-        # in v2.4.18) to distinguish keyword-list lowercase-body from
-        # sentence lowercase-body.
-        if not (preceded_by_blank and (followed_by_capital or at_end_of_line)):
+        # Approach: keep the original a/b/c disambiguator (it correctly
+        # admits "Funding The author(s) disclosed…", "Keywords: …",
+        # "Method body."), then add a HARD REJECT for the function-word
+        # pattern. See ``_FUNCTION_WORD_AFTER`` for the curated list of
+        # ~50 body-opener words.
+        followed_by_function_word = bool(_FUNCTION_WORD_AFTER.match(after_heading))
+        if followed_by_function_word:
+            continue
+
+        if not (preceded_by_blank or followed_by_capital or at_end_of_line):
             continue
 
         # Table-cell filter: if the heading was line-isolated (not followed by a
