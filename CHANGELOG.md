@@ -1,5 +1,70 @@
 # Changelog
 
+## [2.4.28] — 2026-05-14
+
+Cycles 13 + 14 of the /docpluck-iterate resume run, bundled as one
+release (independent fixes, narrow blast radius). Closes
+HANDOFF_2026-05-14 deferred items D + G.
+
+### Cycle 13 — amj_1 chart-data leak (item G, HIGH)
+
+The v2.4.25 caption-trim chain landed but amj_1 figure captions
+still contained flow-chart node text and axis-tick labels. The
+existing chart-data trim's two signatures (6+ digit run, 5+ short
+numeric tokens) don't match amj_1's pattern: axis ticks interleaved
+with Title-Case axis labels (`7 6 Employee Creativity 5 4 Bottom-up
+Flow`) and numbered flow-chart nodes (`1. Bottom-up Feedback Flow 2.
+Top-down Feedback Flow 3. Lateral Feedback Flow`).
+
+Two new chart-data signatures added in
+`docpluck/extract_structured.py`:
+
+- `_AXIS_TICK_PAIR_RE` — `\b\d\s+(?:[A-Z][\w\-]+(?:\s+[A-Z][\w\-]+)
+  {0,3}\s+)?\d\b` — single-digit token + (optional 1-4 Title-Case
+  words) + single-digit token. Catches both bare adjacent digits and
+  digits separated by axis labels.
+- `_NUMBERED_CHART_NODE_RE` — `\b\d+\.\s+[A-Z][a-z]+(?:-[a-z]+)?
+  (?:\s+[A-Z][a-z]+(?:-[a-z]+)?){1,4}` — numbered prefix + Title-Case
+  noun phrase (2-5 words, hyphens allowed).
+
+Both wired into `_trim_caption_at_chart_data` via new helper
+`_find_chart_data_cluster` (2+ / 3+ matches in close proximity,
+`max_gap=100`; matches at position < 20 excluded so `Figure N.`
+can't be the cluster anchor).
+
+**Caught cases (all 7 amj_1 figures):**
+
+- Figure 1: `Theoretical Framework Direction of Feedback Flow ...
+  flow-chart nodes ... body prose ... 587 ... section heading` →
+  trims to `Theoretical Framework Direction of Feedback Flow`.
+- Figures 2-7: chart-data tail (`7 6 Employee Creativity 5 4 ...`)
+  stripped cleanly; captions end at `(Study N)`.
+
+### Cycle 14 — A3 leading-zero decimal recovery (item D, LOW)
+
+A3's lookbehind `(?<![a-zA-Z,0-9\[\(])` blocks European-decimal
+p-values inside parens or brackets — `(0,003)` stays as `(0,003)`
+instead of converting to `(0.003)`. The exclusion is necessary to
+protect statistical df-bracket forms like `F(2,42)`.
+
+New A3c step in `docpluck/normalize.py`: convert `0,(\d{2,4})` to
+`0.\1` regardless of lookbehind, since leading-zero is unambiguous
+(df values never start with 0, citation superscripts never start
+with 0). Single-digit-after-comma cases like `[0,5]` are
+skipped — those are typically range expressions, not decimals.
+
+NORMALIZATION_VERSION bumped 1.8.8 → 1.8.9.
+
+### Tests
+
+- `tests/test_chart_data_trim_real_pdf.py` (NEW — 14 contract +
+  3 real-PDF) — 22/22 PASS.
+- `tests/test_a3c_leading_zero_decimal_real_pdf.py` (NEW — 7
+  positive + 4 negative contract tests) — 11/11 PASS.
+- Combined cycle 13 + 14 suite: 34/34 PASS.
+- Normalize / D5 / A3-existing suite: 66/66 PASS.
+- 26-paper baseline (pre-cycle-14): 26/26 PASS.
+
 ## [2.4.27] — 2026-05-14
 
 Cycle 12 of the /docpluck-iterate run (HANDOFF_2026-05-14 deferred
