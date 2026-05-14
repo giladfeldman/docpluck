@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.5"
+NORMALIZATION_VERSION = "1.8.6"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -678,6 +678,21 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     # like "Most participants in the experimental condition were …").
     re.compile(
         r"^[A-Z]\.(?:\s*[A-Z]\.?)?\s+[A-Z]{2,}\s+ET\s+AL\.?\s*$"
+    ),
+    # v2.4.19: same-surname two-author running header:
+    #   "Kim and Kim" (Yeun Joon Kim & Junha Kim — amj_1, 14 occurrences)
+    #   "Smith and Smith" / "Lee and Lee" (any X-and-X co-author pattern)
+    # Anchored on `(\w+) and (?:that same word)` — distinct from prose
+    # "John and Mary" (different names). Conservative: same surname only.
+    re.compile(r"^(?P<surname>[A-Z][a-z]+) and (?P=surname)\s*$"),
+    # v2.4.19: bare month-name page marker (AOM, ASA, T&F volume headers):
+    #   "April" (amj_1: AOM April 2020 issue, 14 occurrences)
+    #   "March" / "October" / etc.
+    # Page-marker month names appear ALONE on a line as the issue indicator.
+    # Body prose never uses a month name alone on a line.
+    re.compile(
+        r"^(?:January|February|March|April|May|June|July|August|"
+        r"September|October|November|December)\s*$"
     ),
     # v2.4.16: bare uppercase running header with lowercase "et al." tail:
     #   "RECKELL et al."

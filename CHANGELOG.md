@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.4.19] — 2026-05-14
+
+P0 residual-running-header patterns (cycle 4 of /docpluck-iterate run).
+Surfaced by v2.4.16 Phase 5d AI verify on amj_1 as pre-existing defects;
+fixed in same run per rule 0e.
+
+### Defect — residual standalone running-header / page-marker lines
+
+P0 (`_PAGE_FOOTER_LINE_PATTERNS`) had many patterns but missed two common
+ones that survived as 14 standalone occurrences each in amj_1:
+
+| Pattern | Source | Count in amj_1 v2.4.18 |
+|---------|--------|-------------------------|
+| Same-surname co-author running header: `Kim and Kim` | AOM author byline running header | 14 |
+| Bare month-name page marker: `April` | AOM April 2020 volume indicator | 14 |
+
+### Fix — two new P0 patterns in `docpluck/normalize.py` (NORMALIZATION_VERSION 1.8.5 → 1.8.6)
+
+1. `^(?P<surname>[A-Z][a-z]+) and (?P=surname)\s*$` — matches "Kim and
+   Kim" / "Smith and Smith" / "Lee and Lee" (X-and-X same-surname co-
+   author pattern). Restrictive: rejects "John and Mary" (different
+   names) so body prose isn't touched.
+
+2. `^(?:January|February|...|December)\s*$` — bare month-name as
+   page-issue marker. Body prose never uses a month name alone on its
+   own line.
+
+### Verified
+
+- 986/986 broad pytest pass (no regressions in section / normalize / D5
+  audit / A3b tests)
+- 26-paper baseline 26/26 PASS
+- amj_1 Phase 5d AI verify: 0 standalone `Kim and Kim` lines (was 14);
+  0 standalone `April` lines (was 14). Two residual non-body
+  occurrences remain inside a `<th>` cell and a figure-caption blob —
+  acceptable per skill protocol (not on body channel).
+- Tier 2 byte-match Tier 1 confirmed on amj_1
+
+### Out of scope (queued cycle 9)
+
+- `## Findings` heading at amj_1 line 58 is a Table 1 column-header
+  mis-promotion (pre-existing pre-v2.4.19; flagged by AI verifier as
+  cycle-3 follow-up). Different root cause (table-cell heading
+  mis-promotion). NOT a v2.4.19 regression.
+
 ## [2.4.18] — 2026-05-14
 
 Sectioning fix — false `## Results` body-prose promotion suppressed
