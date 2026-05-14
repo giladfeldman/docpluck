@@ -1,5 +1,87 @@
 # Changelog
 
+## [2.4.25] — 2026-05-14
+
+Cycle 10 of the /docpluck-iterate run (resumed from HANDOFF_2026-05-14
+deferred item A). The handoff flagged "figure caption running-header
+trim incomplete" as the only ship-blocker — investigation revealed the
+v2.4.24 trim was added to `figures/detect.py::_full_caption_text`,
+which is NOT the function `render_pdf_to_markdown` calls. The actual
+render path goes through `extract_structured.py::_extract_caption_text`,
+which had no running-header or body-prose trim at all. Combined with a
+broad-read of amj_1 / ieee_access_2 / xiao figure captions, this cycle
+moves the entire trim chain to the correct module and widens it to
+cover three additional patterns surfaced by the broad-read.
+
+### Caption-trim chain in `_extract_caption_text` (figures only)
+
+1. **Form-feed hard boundary.** Page break (`\f`) is now a hard cap on
+   the paragraph-walk's hard_end. Figure/table captions never span
+   page breaks; anything past the next `\f` is guaranteed to be a
+   running header, next-page body prose, or a different figure.
+2. **Duplicate ALL-CAPS label strip.** Strips a redundant `FIGURE N` /
+   `TABLE N` that pdftotext extracts alongside the title-case label
+   (amj_1 figures, ieee_access_2 figures). Pattern:
+   `^Figure 1\. FIGURE 1[ .]<text>` → `Figure 1. <text>`.
+3. **Running-header tail trim** — three signatures:
+   - **Author-running-header**: `\d+\s+[A-Z]\.\s+[A-Z]+\s+ET\s+AL\.?$`
+     (T&F / APA journals: "14 Q. XIAO ET AL.")
+   - **Same-surname dyad page**: `\d{4}\s+Surname\s+and\s+Surname\s+\d+$`
+     (AOM journals: "2020 Kim and Kim 599")
+   - **PMC reprint footer**: `Journal\. Author manuscript; available
+     in PMC <date>\.$` (ieee_access_2 every figure)
+   When a tail matches, the trim also walks back to the last `. `
+   boundary if the prefix lacks a sentence terminator — kills any
+   body-prose run that preceded the running header within the same
+   absorbed-caption string.
+4. **Body-prose boundary detection.** Walks every `. ` sentence
+   boundary after position 20 in the caption. Trims at the first one
+   whose tail matches `[A-Z][a-z]+(?:\s+[a-z]+){0,3}\s+[A-Z][a-z]+` (a
+   Title Case noun phrase followed by a Capital-starting word without
+   intervening period — the inline-section-heading-then-body-prose
+   pattern). Requires a body-prose corroboration signal (year citation,
+   first-person verb, "participants", subordinator, infinitive of
+   intent) to reduce false positives on legit two-sentence captions.
+   Skips boundaries whose tail starts with caption-continuation
+   openers (Note, Source, Bars, Error, Asterisks, Numbers, Panel, n=,
+   p<, *p, **p, ***p).
+
+### Caught cases
+
+Before → after (working tree v2.4.25, regression tests
+`tests/test_figure_caption_trim_real_pdf.py`):
+
+- `xiao_2021_crsp` Figure 2:
+  `Figure 2. Study 1 interaction plots. Exploratory analysis To
+  examine whether and to what extent participants perceived the decoys
+  to be less preferable than their targets, we performed
+  paired-samples t-tests to compare the points 14 Q. XIAO ET AL.`
+  → `Figure 2. Study 1 interaction plots.`
+- `xiao_2021_crsp` Figure 3: same root cause, now clean.
+- `ieee_access_2` every figure: `IEEE Access. Author manuscript;
+  available in PMC 2026 February 25.` footer stripped.
+- `amj_1` every figure: duplicate `FIGURE N` label stripped.
+- `ieee_access_2` every figure: duplicate `FIGURE N.` label stripped.
+
+### Known remaining defect (not addressed this cycle)
+
+`amj_1` Figure 1–7 captions still contain flow-chart node text and
+axis-tick labels (e.g. `Direction of Feedback Flow 1. Bottom-up
+Feedback Flow 2. Top-down Feedback Flow 3. Lateral Feedback Flow`).
+These are not digit-runs and not body-prose-shape, so the existing
+chart-data trim and the new body-prose-boundary trim both pass them
+through. Would require a flow-chart-node-name detector (Title Case
+phrases interleaved with single-digit ordinals). Queued for a future
+cycle.
+
+### Tests
+
+- `tests/test_figure_caption_trim_real_pdf.py` — 14 contract tests
+  + 5 real-PDF regression tests on the 4 cycle-9 papers. 19/19 PASS.
+- Broad pytest: 1035 PASS, 19 SKIP, 0 FAIL (3 pre-existing failures
+  re-verified as Camelot-disabled-only; pass with Camelot enabled).
+- 26-paper baseline: 26/26 PASS.
+
 ## [2.4.24] — 2026-05-14
 
 Final cycle of the /docpluck-iterate run (cycle 9 of 9). Three

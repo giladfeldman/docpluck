@@ -298,6 +298,14 @@ def _extract_caption_text(
     hard_end = min(cap.char_end + 800, len(raw_text))
     if next_boundary is not None and next_boundary > cap.char_end:
         hard_end = min(hard_end, next_boundary)
+    # v2.4.25: page-break (form feed) is a hard caption boundary — academic
+    # figure/table captions never span pages, so anything past the next \f
+    # is guaranteed to be either a running header, next-page body prose, or
+    # a different figure. Cap hard_end at the next \f to prevent the
+    # paragraph-walk below from absorbing post-pagebreak content.
+    pagebreak = raw_text.find("\f", cap.char_end, hard_end)
+    if pagebreak != -1:
+        hard_end = pagebreak
     pos = cap.char_end
     while pos < hard_end:
         nxt = raw_text.find("\n\n", pos)
@@ -332,6 +340,12 @@ def _extract_caption_text(
     # Re-prefix the label if stripping ate it.
     if cap.label and not snippet.startswith(cap.label):
         snippet = f"{cap.label}. {snippet}".strip()
+    # v2.4.25: strip a duplicate ALL-CAPS label that pdftotext often
+    # captures alongside the title-case caption label (AOM / IEEE PMC
+    # patterns: "Figure 1. FIGURE 1 Theoretical Framework …", "Figure 2.
+    # FIGURE 2. Continuous-time …"). Keep title-case label, drop the
+    # ALL-CAPS one.
+    snippet = _strip_duplicate_uppercase_label(snippet, cap.label)
     # v2.4.4: trim chart-data appendage from figure captions (axis-tick
     # sequences, raw bar-chart values pdftotext joined inline into the
     # caption paragraph). For tables the appendage is usually the next-
@@ -339,6 +353,12 @@ def _extract_caption_text(
     # bounds it.
     if cap.kind == "figure":
         snippet = _trim_caption_at_chart_data(snippet)
+        # v2.4.25: trim journal/running-header tails and inline section-
+        # heading body-prose absorption. Only applied to figures —
+        # tables hit different post-cell patterns and are already bounded
+        # by the next caption / Camelot cell merge.
+        snippet = _trim_caption_at_running_header_tail(snippet)
+        snippet = _trim_caption_at_body_prose_boundary(snippet)
     if len(snippet) > 400:
         snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
     return snippet
@@ -381,6 +401,170 @@ def _trim_caption_at_chart_data(caption: str) -> str:
     if len(trimmed) < 40:
         return caption
     return trimmed
+
+
+# v2.4.25 (cycle 10): three new figure-caption trim functions for
+# defects surfaced by the cycle-9 handoff (item A) + broad-read of
+# amj_1 / ieee_access_2 figure captions. All three target
+# ``_extract_caption_text``'s output AFTER the paragraph-walk has
+# settled — they fix things the walk can't (it operates on \n\n
+# boundaries; these patterns sit inside a single rejoined paragraph).
+
+
+_DUPLICATE_UPPER_LABEL_RE = re.compile(
+    r"^(?P<label>Figure|Table)\s+(?P<num>\d+(?:\.\d+)?)\.\s+"
+    r"(?:FIGURE|TABLE)\s+(?P=num)\.?\s+",
+    re.IGNORECASE,
+)
+
+
+def _strip_duplicate_uppercase_label(snippet: str, label: str) -> str:
+    """Strip a redundant ALL-CAPS "FIGURE N" / "TABLE N" that follows the
+    title-case label.
+
+    Example:
+        "Figure 1. FIGURE 1 Theoretical Framework …" → "Figure 1. Theoretical Framework …"
+        "Figure 2. FIGURE 2. Continuous-time …"      → "Figure 2. Continuous-time …"
+
+    The duplicate occurs in many AOM and IEEE / PMC reprints where the
+    PDF embeds the ALL-CAPS label as a graphics overlay alongside the
+    title-case caption text. pdftotext returns both.
+    """
+    if not snippet or not label:
+        return snippet
+    return _DUPLICATE_UPPER_LABEL_RE.sub(
+        lambda m: f"{m.group('label')} {m.group('num')}. ", snippet, count=1
+    )
+
+
+# Running-header tail signatures. Each is anchored at end-of-snippet
+# (`\s*$`) so they can't accidentally chop the middle of a legit caption.
+# Three families covered:
+#   A. Author-running-header — e.g. "14 Q. XIAO ET AL."  (T&F / APA journals)
+#   B. Same-surname dyad     — e.g. "2020 Kim and Kim 599" (AOM / Wiley)
+#   C. PMC reprint footer    — e.g. "IEEE Access. Author manuscript;
+#                                    available in PMC 2026 February 25."
+_TAIL_AUTHOR_ETAL_RE = re.compile(
+    r"\s+\d+\s+[A-Z]\.\s+(?:[A-Z]\.?\s+)?[A-Z]{2,}"
+    r"(?:\s+(?:AND|&)\s+[A-Z][A-Z'\-]+)?"
+    r"\s+ET\s+AL\.?\s*$"
+)
+_TAIL_DYAD_PAGE_RE = re.compile(
+    r"\s+\d{4}\s+(?P<a>[A-Z][a-z]+)\s+and\s+(?P=a)\s+\d{1,4}\s*$"
+)
+_TAIL_PMC_REPRINT_RE = re.compile(
+    r"\s+[A-Z][\w\s]+?\.\s+Author manuscript;\s+available in PMC[^.]*?\.?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _trim_caption_at_running_header_tail(snippet: str) -> str:
+    """Strip a trailing running-header / journal-reprint footer that
+    pdftotext absorbed at the end of a figure caption.
+
+    Walks the three known tail signatures and removes the matched span.
+    Then back-tracks to the last sentence-ending period so a body-prose
+    run that preceded the running header (between the legit caption and
+    the page-break) is also dropped.
+    """
+    if not snippet:
+        return snippet
+    for pat in (_TAIL_PMC_REPRINT_RE, _TAIL_AUTHOR_ETAL_RE, _TAIL_DYAD_PAGE_RE):
+        m = pat.search(snippet)
+        if m is None:
+            continue
+        trimmed = snippet[: m.start()].rstrip()
+        # If the trimmed prefix still has body-prose tail (no sentence
+        # terminator at end), walk back to the last ". " boundary.
+        if trimmed and not re.search(r"[.!?][\"'\)\]]?$", trimmed):
+            last_period = trimmed.rfind(". ")
+            if last_period > 0:
+                trimmed = trimmed[: last_period + 1]
+        snippet = trimmed
+        break
+    return snippet
+
+
+# Body-prose absorption: a caption sentence terminated by a period,
+# followed by a Title-Case noun phrase (1-3 lowercase words after the
+# capital lead) and then a Capital-starting clause with no intervening
+# period. This is the inline-section-heading-then-body-prose pattern
+# (e.g. "Study 1 interaction plots. Exploratory analysis To examine
+# whether …"). The 2nd Capital word distinguishes body prose from a
+# legit caption continuation like "Note. Bars represent SE." (which has
+# no further Capital-starting word in the tail).
+_BODY_PROSE_BOUNDARY_RE = re.compile(
+    r"\s+([A-Z][a-z]+(?:\s+[a-z]+){0,3})\s+([A-Z][a-z]+)\b"
+)
+
+# Lowercase opener keywords that legitimately introduce a caption's 2nd
+# / 3rd sentence; if the tail starts with one of these we treat it as
+# caption-continuation and skip the trim at this boundary.
+_CAPTION_CONTINUATION_OPENERS = (
+    "note", "notes", "source", "sources", "bars", "error",
+    "asterisks", "numbers", "values", "data", "see",
+    "n =", "n=", "p <", "p<", "*p", "**p", "***p",
+    "panel", "panels",
+)
+
+
+def _trim_caption_at_body_prose_boundary(snippet: str) -> str:
+    """Trim a figure caption at the first sentence boundary where the
+    tail looks like inline-section-heading-then-body-prose rather than
+    a caption continuation.
+
+    Triggered by the cycle-9 handoff item A: pdftotext occasionally
+    flattens "Figure N. <short caption>.\\n<inline section heading>
+    <body sentence>" into a single rejoined paragraph, so the
+    paragraph-walk in :func:`_extract_caption_text` can't separate
+    them. This function walks every ``. `` boundary after position 20
+    (so "Figure N." isn't trimmed) and stops at the first one whose
+    tail matches :data:`_BODY_PROSE_BOUNDARY_RE` AND doesn't start with
+    a caption-continuation opener.
+
+    Also requires a body-prose corroboration signal in the tail
+    (parenthesized year, first-person pronoun, subordinating
+    conjunction, or "participants") to reduce false positives on legit
+    multi-sentence captions.
+    """
+    if not snippet or len(snippet) < 60:
+        return snippet
+    pos = snippet.find(". ", 20)
+    while pos != -1:
+        tail = snippet[pos + 2:]
+        if not tail:
+            break
+        tail_lower = tail.lower()
+        if any(tail_lower.startswith(k) for k in _CAPTION_CONTINUATION_OPENERS):
+            pos = snippet.find(". ", pos + 2)
+            continue
+        m = _BODY_PROSE_BOUNDARY_RE.match(" " + tail)
+        if m is not None and _looks_like_body_prose(tail):
+            return snippet[: pos + 1]
+        pos = snippet.find(". ", pos + 2)
+    return snippet
+
+
+_BODY_PROSE_SIGNAL_RE = re.compile(
+    r"\(\d{4}\)"                       # year citation
+    r"|\b(?:we|our|us)\s+(?:examined|tested|observed|investigated|analyzed|compared|explored|performed|found|present|aimed|sought|conducted)\b"
+    r"|\bparticipants?\b"
+    r"|\bwhether\b"
+    r"|\bbecause\b"
+    r"|\bin\s+order\s+to\b"
+    r"|\bto\s+(?:examine|test|observe|investigate|analyze|compare|explore|describe|determine|assess|evaluate)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_body_prose(tail: str) -> bool:
+    """Corroborate the body-prose boundary signature with a content signal.
+
+    Requires one of: parenthesized year citation, first-person verb
+    phrase, "participants", subordinating conjunction, or an infinitive
+    of intent. Caption continuations rarely contain any of these.
+    """
+    return _BODY_PROSE_SIGNAL_RE.search(tail) is not None
 
 
 def _isolated_table_from_caption(
