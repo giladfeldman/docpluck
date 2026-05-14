@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.6"
+NORMALIZATION_VERSION = "1.8.7"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -1017,6 +1017,82 @@ def _strip_frontmatter_metadata_leaks(text: str) -> str:
     return cleaned
 
 
+# v2.4.20 (NORMALIZATION_VERSION 1.8.7): rejoin pdftotext-space-broken
+# compound words.
+#
+# Soft-hyphenation artifact: PDFs use Unicode soft-hyphen (U+00AD) or
+# letter-spacing for line-break-aware hyphenation. pdftotext removes the
+# soft-hyphen but leaves a single SPACE between the two halves. Example:
+# the word "experiments" in xiao_2021_crsp's abstract renders as
+# "experi ments" — visible as a typo to a human reader and breaks every
+# downstream NLP / search / citation-extraction tool that relies on word
+# tokens.
+#
+# Note: S7 (hyphenation repair) handles `\\nword-\\nword2` → `\\nwordword2`
+# but ONLY when the hyphen is still present (the line-break-then-hyphen
+# pattern). pdftotext's space-broken form has no hyphen — different bug,
+# different fix.
+#
+# Strategy: curated list of (prefix, suffix-set) pairs where the joined
+# form is unambiguously a single English word. The pairs were sourced
+# from xiao_2021_crsp Phase 5d AI verify (2026-05-14): experi/ments,
+# addi/tion, discre/pancies, con/ducted, con/cerning, con/fined,
+# presenta/tion, ques/tionnaires, experi/ences. Expanded with sibling
+# pairs in the same morphological family.
+#
+# Conservative: every (prefix, suffix) listed produces a single valid
+# English word when joined. Rejecting body context: the patterns require
+# both halves to be lowercase and at word boundaries. Phrases like
+# "they were experi ments" → "they were experiments" — the surrounding
+# context is fine.
+_DEHYPHEN_REJOIN_PAIRS: list[tuple[str, str]] = [
+    (r"experi",  r"(?:ments?|mental|mentally|ences?|enced|mentation)"),
+    (r"addi",    r"(?:tions?|tionally|tive|tives)"),
+    (r"discre",  r"(?:pancy|pancies|tion|tionary)"),
+    (r"con",     r"(?:cerning|ducted|ducting|fined|firmed|sequently|"
+                 r"sistent|sistently|cluded|sists|sisted|siderable|"
+                 r"siderably|trolled|trolling|fronted|fronting|firmation)"),
+    (r"ques",    r"(?:tion|tions|tionnaire|tionnaires|tioned|tioning)"),
+    (r"presenta", r"(?:tion|tions|tional)"),
+    (r"discus",  r"(?:sion|sions|sed)"),
+    (r"informa", r"(?:tion|tions|tive|tional)"),
+    (r"differ",  r"(?:ence|ences|ent|ently|ential|entiate|entiated)"),
+    (r"repli",   r"(?:cation|cations|cate|cates|cated|cating)"),
+    (r"refer",   r"(?:ence|ences|ential|enced|encing)"),
+    (r"identi",  r"(?:fied|fies|fy|fication)"),
+    (r"specifi", r"(?:cation|cations|cally|ed)"),
+    (r"reliabi", r"(?:lity|lities)"),
+    (r"genera",  r"(?:tion|tions|lly|lize|lized|lization)"),
+    (r"explana", r"(?:tion|tions|tory)"),
+    (r"transla", r"(?:tion|tions|ted|ting)"),
+    (r"observa", r"(?:tion|tions|tional)"),
+    (r"opera",   r"(?:tion|tions|tional|tionalize|tionalized)"),
+    (r"varia",   r"(?:tion|tions|ble|bles|bility)"),
+    (r"correla", r"(?:tion|tions|ted|ting|tional)"),
+    (r"applica", r"(?:tion|tions|ble|bility)"),
+    (r"interpre", r"(?:tation|tations|t|ted|ting|tive)"),
+]
+
+_DEHYPHEN_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(rf"\b{p}\s+{s}\b")
+    for p, s in _DEHYPHEN_REJOIN_PAIRS
+]
+
+
+def _rejoin_space_broken_compounds(text: str) -> str:
+    """H1b: rejoin pdftotext-space-broken compound words.
+
+    Applies the curated (prefix, suffix) regex list. Each match's
+    interior space is removed; the rest of the text is preserved
+    verbatim. Idempotent.
+    """
+    if not text:
+        return text
+    for pat in _DEHYPHEN_PATTERNS:
+        text = pat.sub(lambda m: m.group(0).replace(" ", ""), text)
+    return text
+
+
 def _fix_hyphenated_line_breaks(text: str) -> str:
     """H1: join lines split mid-word at a hyphen by pdftotext column wrap.
 
@@ -1323,6 +1399,15 @@ def normalize_text(
     before = t
     t = re.sub(r"([a-z])-\n([a-z])", r"\1\2", t)
     report._track("S7_hyphenation_repair", before, t, "hyphenations_repaired")
+
+    # S7a (v2.4.20, NORMALIZATION_VERSION 1.8.7): space-broken-compound
+    # rejoin. See _rejoin_space_broken_compounds docstring + the pair
+    # list defined above for the curated cases (experi/ments,
+    # con/ducted, presenta/tion, ques/tionnaires, etc.).
+    before = t
+    t = _rejoin_space_broken_compounds(t)
+    report._track("S7a_space_broken_compound_rejoin", before, t,
+                  "space_broken_compounds_rejoined")
 
     # S8: Mid-sentence line break joining
     before = t
