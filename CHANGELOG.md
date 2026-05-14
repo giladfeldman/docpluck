@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.4.26] — 2026-05-14
+
+Cycle 11 of the /docpluck-iterate run (HANDOFF_2026-05-14 deferred
+item B). The section detector in
+`docpluck/sections/annotators/text.py` Pass 3 rejects ALL-CAPS
+multi-word headings when pdftotext flattens paragraph breaks around
+them (no blank line before AND no blank line after). This breaks
+AOM-style structure where a major section heading sits directly
+between the prior paragraph's last sentence and a sub-section label.
+
+Initial attempt (Pass 3 relaxation) was reverted because subheading
+hints stored on `Section.subheadings` aren't consumed by the render
+pipeline — only canonical-labeled hints become `## Heading` lines.
+
+Final fix: render-layer post-processor. Extended
+`_promote_study_subsection_headings` with a new
+`_ALL_CAPS_SECTION_HEADING_RE` pattern guarded by
+`_is_safe_all_caps_promote`. Promotes a standalone ALL-CAPS line to
+`## {heading}` when:
+
+- Line is ALL-CAPS, ≥ 10 chars, ≥ 2 words.
+- Doesn't end with sentence terminator.
+- Previous non-blank line ends with a terminator (`. ! ? : " ' ) ]`).
+- Next non-blank line starts uppercase.
+- Next non-blank line is NOT itself ALL-CAPS (avoids multi-line title
+  continuations).
+
+### Caught cases
+
+- `amj_1` now promotes `## THEORETICAL DEVELOPMENT`,
+  `## OVERVIEW OF THE STUDIES`, `## STUDY 1: QUASI-FIELD EXPERIMENT`,
+  `## STUDY 2: LABORATORY EXPERIMENT`.
+- `amle_1` now promotes `## SCHOLARLY IMPACT AND KNOWLEDGE TRANSFER`,
+  `## PRESENT STUDY AND RESEARCH QUESTIONS`, `## METHOD`,
+  `## RESULTS`, `## DISCUSSION`, `## LIMITATIONS AND FUTURE RESEARCH
+  DIRECTIONS`, `## CONCLUDING REMARKS`, `## REFERENCES`.
+- `ieee_access_2` now promotes `## INTRODUCTION`, `## METHODOLOGY`,
+  `## RESULTS`, `## DISCUSSION AND CONCLUSION`, `## LIMITATIONS AND
+  FUTURE WORK`, `## REFERENCES`.
+- `xiao_2021_crsp` — no change (uses Title Case headings; existing
+  detection works).
+
+### Tests
+
+- `tests/test_all_caps_section_promote_real_pdf.py` — 18 contract
+  + 4 real-PDF regression tests. 22/22 PASS.
+- Targeted suite (`tests/test_render.py`, `tests/test_sections_*`,
+  `tests/test_corpus_smoke.py`): 66/66 PASS (the 2 failures are the
+  same pre-existing Camelot-disabled-only ones from v2.4.25).
+
 ## [2.4.25] — 2026-05-14
 
 Cycle 10 of the /docpluck-iterate run (resumed from HANDOFF_2026-05-14
