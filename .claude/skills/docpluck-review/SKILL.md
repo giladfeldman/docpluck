@@ -1,7 +1,7 @@
 ---
 name: docpluck-review
-description: Code review specialist for Docpluck PDF extraction library + app. Reviews changes against CLAUDE.md hard rules (never use -layout flag, never use AGPL deps like pymupdf4llm, always normalize U+2212, no broad regex catch-alls in normalize.py per D5 lesson) plus section-identification rules (universal-coverage invariant in partition_into_sections, F0 footnote sentinel preservation, HTML CONTAINER_TAGS skip, PDF boundary-truncation skips heading line not flat char count). Checks normalization pipeline completeness, validates FastAPI endpoint security, reviews Auth.js middleware, checks for hardcoded secrets/URLs, verifies Dockerfile best practices. Use /docpluck-review after making code changes (especially in docpluck/sections/, docpluck/extract_layout.py, docpluck/normalize.py) or before merging.
-tags: [python, fastapi, nextjs, pdf, authjs, drizzle, docpluck, review]
+description: Code review specialist for Docpluck PDF extraction library + app. Reviews changes against CLAUDE.md hard rules (never use -layout flag, never use AGPL deps like pymupdf4llm, always normalize U+2212, no broad regex catch-alls in normalize.py per D5 lesson) plus section-identification rules (universal-coverage invariant in partition_into_sections, F0 footnote sentinel preservation, HTML CONTAINER_TAGS skip, PDF boundary-truncation skips heading line not flat char count). Checks normalization pipeline completeness, validates FastAPI endpoint security, reviews Auth.js middleware, checks for hardcoded secrets/URLs, verifies Dockerfile best practices. ALSO reviews frontend mobile/desktop UI parity (any nav/menu/CTA hidden behind `hidden sm:` / `hidden md:` etc. MUST have a mobile equivalent — hamburger, drawer, sheet) and marketing-page capability accuracy (homepage feature list, normalization step counts, supported formats must match current library reality). Use /docpluck-review after making code changes (especially in docpluck/sections/, docpluck/extract_layout.py, docpluck/normalize.py, frontend/src/app/page.tsx, frontend/src/components/app-header.tsx) or before merging.
+tags: [python, fastapi, nextjs, pdf, authjs, drizzle, docpluck, review, mobile-parity, marketing-accuracy]
 ---
 
 ## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
@@ -85,7 +85,26 @@ The literal sentinel `"\n\f\f\n"` separates body from footnote appendix in `norm
 - **Check:** in `core.py`, the truncation loop uses `if i == 0: continue` (line-index guard) not `if line_start - s.char_start < N` (char-offset guard)
 - **Severity:** BLOCKER
 
-### 12. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
+### 12. Mobile / desktop nav parity (frontend, v2.4.18+)
+Every navigation link, primary CTA, account control, and admin entry-point that is rendered on desktop MUST also be reachable on mobile. The most common failure: wrapping `<nav>` (or a menu container) in `className="hidden sm:flex"` / `hidden md:flex` / `hidden lg:flex` without a mobile counterpart (hamburger button + drawer / Sheet / collapsible menu). When this happens, mobile users land on the homepage with **no way to reach** `/extract`, `/api-docs`, `/benchmarks`, `/admin`, etc.
+- **Check:** grep `frontend/src/components/` and `frontend/src/app/**/layout.tsx` for `hidden sm:`, `hidden md:`, `hidden lg:` on any element containing `<Link>` or `<a>` or `<button>`. For each match, verify there is a sibling block (typically gated by `sm:hidden` / `md:hidden`) that renders the same items as a hamburger / drawer / Sheet / Disclosure menu.
+- **Check:** specifically inspect `frontend/src/components/app-header.tsx` — the primary `<nav>` MUST have a mobile-visible counterpart. Account email / Sign In / Sign Out controls also need mobile reachability (an avatar menu is fine; complete invisibility is not).
+- **Check:** any item that appears conditionally on desktop (e.g., `{isAdmin && <Link href="/admin">…)`) MUST appear in the mobile menu under the same condition.
+- **Check:** primary call-to-action buttons in hero / CTA sections must not rely on horizontal layout that overflows on 360px-wide viewports — verify with the responsive emulator OR by reading the CSS (no fixed widths > 320px on the CTA itself).
+- **Severity:** BLOCKER for full nav being mobile-invisible (regression in feature reachability for ~50% of traffic). WARN for individual secondary links missing from a present mobile menu.
+
+### 13. Marketing / landing-page accuracy must reflect current library capabilities (frontend, v2.4.18+)
+The homepage (`frontend/src/app/page.tsx`) and any "About" / "Features" / "How it works" page is the public face of Docpluck. It MUST stay in lock-step with the library's actual public surface, not freeze at v1.x assumptions.
+- **Check:** when this PR touches `docpluck/__init__.py:__all__`, `docpluck/normalize.py:NORMALIZATION_VERSION`, `pyproject.toml [project.optional-dependencies]`, or any new top-level module (`docpluck.sections`, `docpluck.tables`, `docpluck.figures`, `docpluck.extract_layout`, `docpluck.extract_docx`, `docpluck.extract_html`, `docpluck.render`), verify `frontend/src/app/page.tsx` still tells the truth. Specifically:
+  - Hero copy / `<title>` / meta description: do they still describe the product as "PDF only" when DOCX + HTML are now supported? (Should mention all three.)
+  - Hard-coded counts ("14 normalization steps", "16 normalization steps", "29/29 verified passages"): do they still match `NORMALIZATION_VERSION` and the current corpus size? Either update the number or replace with a code-derived count.
+  - "Choose your level" / pipeline-step cards: list of steps must include everything currently in `normalize.py` (W0, R2, R3, A7, F0 in addition to S0–S9, A1–A6, A3a, A3b).
+  - Major-feature absence: if a public capability shipped (section identification, table extraction via Camelot, figure extraction, layout-aware footnote stripping, render-to-markdown), the homepage Features grid should mention it OR a deliberate "marketing decision to hold back" note should exist in the PR description.
+  - Hard-coded URLs in code samples (`https://docpluck.vercel.app/api/extract`, etc.) must match the actual production URL — prefer `process.env.NEXT_PUBLIC_API_BASE` or a constant in `frontend/src/lib/`.
+- **Check:** the same audit applies to `frontend/src/app/about-normalization/page.tsx`, `frontend/src/app/api-docs/page.tsx`, `frontend/src/app/sections/page.tsx`, and `frontend/src/app/benchmarks/page.tsx` whenever the underlying library surface they describe changed.
+- **Severity:** WARN (non-blocker) on isolated stale numbers; BLOCKER if the homepage actively contradicts shipped functionality (e.g., claims "PDF-only" while DOCX/HTML endpoints are live, or omits a feature gated behind a deploy that already happened).
+
+### 14. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
 The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/` is the regression line for `render_pdf_to_markdown`. Any change to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py` MUST be verified.
 - **Check:** When any of those files are modified, run `python scripts/verify_corpus.py` (~8-12 min) before approving.
 - **Expected:** `26 / 26 PASS`. Any FAIL is a regression and blocks the review.
@@ -116,6 +135,25 @@ The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/output
 - [ ] No secrets in client-side code
 - [ ] Environment variables used for all external URLs
 - [ ] Drizzle schema matches ARCHITECTURE.md
+
+### Frontend UI parity — mobile vs desktop (hard rule 12)
+
+- [ ] `frontend/src/components/app-header.tsx` exposes the full nav on mobile (no `hidden sm:flex` / `hidden md:flex` on the only `<nav>`). If desktop has a horizontal bar, mobile MUST have a hamburger / Sheet / drawer rendering the SAME items in the SAME order.
+- [ ] Every `<Link>` / `<a>` / `<button>` rendered conditionally on desktop (e.g., admin-only) is rendered under the same condition in the mobile menu.
+- [ ] Account controls (email display, Sign In, Sign Out) are reachable on mobile — either inline in the header at xs viewports or inside the mobile menu / avatar dropdown.
+- [ ] Footer links are not stranded inside `hidden sm:*` either.
+- [ ] No element with a click handler / link is hidden on mobile without a documented replacement path. Document the replacement path in the PR description if non-obvious.
+- [ ] Run a viewport-emulator pass at 360x800 (Pixel-class) and 390x844 (iPhone-class) AND read the JSX — both, because Tailwind classes can hide things the emulator misses if the emulator was opened before a code change.
+
+### Marketing / landing-page accuracy (hard rule 13)
+
+- [ ] If this PR touches `docpluck/__init__.py`, `docpluck/normalize.py`, `pyproject.toml`, OR any new `docpluck/*` module, the homepage (`frontend/src/app/page.tsx`) was re-read and still tells the truth.
+- [ ] Homepage hero / meta description mentions every input format the library supports today (PDF + DOCX + HTML, not just PDF).
+- [ ] Homepage Features grid mentions section identification, table extraction (Camelot), figure extraction, layout-aware footnote stripping, and render-to-markdown — OR the PR description explains why each absence is intentional.
+- [ ] Hard-coded numbers ("14 normalization steps", verified-passage counts, average extraction time) match current reality. Either updated or derived from a constant (e.g., `NORMALIZATION_VERSION`).
+- [ ] "Choose your level" / "Normalization" card list contains all currently-applied steps (S0–S9, A1–A6, A3a, A3b, W0, R2, R3, A7, F0 — confirm against `docpluck/normalize.py`).
+- [ ] Code samples on the homepage and in `frontend/src/app/api-docs/` show URLs and parameter names that match what `service/app/main.py` actually accepts today.
+- [ ] `frontend/src/app/about-normalization/`, `frontend/src/app/sections/`, `frontend/src/app/benchmarks/` re-checked if their underlying library surface shifted.
 
 ### Documentation
 

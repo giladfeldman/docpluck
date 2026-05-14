@@ -1,7 +1,7 @@
 ---
 name: docpluck-cleanup
-description: Comprehensive doc-sync + dead-code cleanup across BOTH the docpluck library repo and the PDFextractor app repo. Reads actual code, then verifies CLAUDE.md / README.md / DESIGN.md / NORMALIZATION.md / BENCHMARKS.md / API.md / ARCHITECTURE.md / SETUP_GUIDE.md / TODO.md / CHANGELOG.md / LESSONS.md reflect it. Removes dead benchmark scripts, cleans temp/, audits .gitignore + env vars, verifies cross-repo version pin consistency. Use /docpluck-cleanup periodically and after every release or major feature.
-tags: [python, pdf, docx, html, fastapi, nextjs, docs, cleanup]
+description: Comprehensive doc-sync + dead-code cleanup across BOTH the docpluck library repo and the PDFextractor app repo. Reads actual code, then verifies CLAUDE.md / README.md / DESIGN.md / NORMALIZATION.md / BENCHMARKS.md / API.md / ARCHITECTURE.md / SETUP_GUIDE.md / TODO.md / CHANGELOG.md / LESSONS.md reflect it. ALSO syncs USER-FACING frontend pages (homepage, about-normalization, sections, api-docs, benchmarks) with current library capabilities — supported formats (PDF/DOCX/HTML), feature list, normalization step count, hard-coded URLs — and audits mobile/desktop content parity (no nav links, CTAs, or footer items hidden on mobile without a hamburger / Sheet equivalent). Removes dead benchmark scripts, cleans temp/, audits .gitignore + env vars, verifies cross-repo version pin consistency. Use /docpluck-cleanup periodically and after every release or major feature.
+tags: [python, pdf, docx, html, fastapi, nextjs, docs, cleanup, marketing-sync, mobile-parity]
 ---
 
 ## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
@@ -186,6 +186,65 @@ Before deleting any script, grep the codebase to confirm nothing imports or invo
 - [ ] `service/requirements.txt` — only fastapi, uvicorn, pdfplumber, python-multipart, docpluck (+ optional extras)
 - [ ] No `pymupdf`, `pymupdf4llm`, `column_boxes` anywhere in either repo (AGPL guard — BLOCKER if found)
 
+### 2.4b — Frontend USER-FACING pages must reflect current library capabilities
+
+The marketing surface (homepage, feature pages, docs pages) is the public face of Docpluck and goes stale faster than any other doc — every shipped library feature can silently un-document itself here. Audit on every cleanup run, not just on releases.
+
+**Step 1 — capture ground truth from the LIBRARY repo:**
+
+```bash
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck
+python -c "import docpluck; print(sorted(docpluck.__all__))"
+python -c "from docpluck.normalize import NORMALIZATION_VERSION; print(NORMALIZATION_VERSION)"
+python -c "
+import re
+src = open('docpluck/normalize.py').read()
+steps = sorted(set(re.findall(r'^\s*#\s*(S\d|A\d[a-z]?|W\d|R\d|F\d)\b', src, re.M)))
+print('Active normalization step labels:', steps, '→ count =', len(steps))
+"
+```
+
+Note the supported formats (any `extract_pdf*`, `extract_docx*`, `extract_html*`, `extract_layout*`, `extract_structured*`, `render*`, `partition_into_sections`, `extract_tables*`, `extract_figures*` in `__all__`).
+
+**Step 2 — audit each user-facing page against ground truth:**
+
+#### `frontend/src/app/page.tsx` (homepage)
+- [ ] Hero / `<h1>` / hero paragraph mentions every supported INPUT format (PDF + DOCX + HTML if all are exposed). NOT just "PDF" if the service accepts more.
+- [ ] Stats row (e.g., `"14 normalization steps"`, `"100% ground truth"`, `"~400ms"`) matches current reality. If a hard-coded number drifted, either update it or replace with a constant import.
+- [ ] Features grid mentions each MAJOR capability the library exposes today: column-aware reading order, ligature expansion, Unicode recovery, statistical line-break repair, minus-sign normalization, quality scoring, **section identification**, **table extraction**, **figure extraction**, **layout-aware footnote stripping**, **render-to-markdown**. Missing capability = stale homepage.
+- [ ] "How it works" step list reflects the actual pipeline (e.g., "Extract → Normalize → Sections → Tables → Render", not just "Extract → Normalize → Score" if more is happening).
+- [ ] "Choose your level" / normalization-tier cards list every step active in `normalize.py` for that tier.
+- [ ] Code-sample URL (e.g., `https://docpluck.vercel.app/api/extract`) matches the actual production URL — flag if the frontend hard-codes an outdated host.
+- [ ] CTA copy ("5 PDFs/day", "Free for researchers") matches the active rate-limit constants in `frontend/src/lib/`.
+
+#### `frontend/src/app/about-normalization/page.tsx`
+- [ ] Step list and per-step explanations match `docs/NORMALIZATION.md` AND `docpluck/normalize.py` (read all three; trust the code).
+- [ ] `NORMALIZATION_VERSION` shown on the page matches the constant.
+
+#### `frontend/src/app/api-docs/page.tsx`
+- [ ] Endpoint list matches `service/app/main.py` routes — no missing endpoints, no removed-endpoint references.
+- [ ] Request/response examples match the latest pydantic models / FastAPI signatures.
+- [ ] Auth header / API-key format documented current.
+
+#### `frontend/src/app/sections/page.tsx`
+- [ ] If the page describes section-identification capability, it lists every `SectionLabel` member from `docpluck.sections.SectionLabel` (or a curated subset, with the curation criterion documented).
+- [ ] Mentions current `SECTIONING_VERSION`.
+
+#### `frontend/src/app/benchmarks/page.tsx`
+- [ ] Numbers match `docs/BENCHMARKS.md` (which itself was synced in Section 1.1). If they drifted apart, fix benchmarks page to match the docs.
+
+### 2.4c — Mobile vs desktop content parity (frontend)
+
+A frequent regression: a `<nav>` or CTA gets `className="hidden sm:flex"` for desktop styling, but no mobile counterpart is added → mobile users land on a page with NO way to reach core features. The cleanup pass catches these because they accumulate silently across PRs that each "looked fine on the dev laptop."
+
+- [ ] Grep `frontend/src/components/` and `frontend/src/app/**/*.tsx` for `hidden sm:`, `hidden md:`, `hidden lg:` and `sm:hidden`, `md:hidden`, `lg:hidden`. For every match on a container that holds `<Link>`, `<a>`, `<button>`, or `onClick` handlers, verify a sibling block renders the same items at the opposite breakpoint.
+- [ ] `frontend/src/components/app-header.tsx` specifically: the primary `<nav>` MUST be reachable on mobile. If the nav is `hidden sm:flex`, there must be a mobile menu (hamburger button + Sheet/Drawer/Disclosure) in the same component rendering the SAME items, and conditional items (like admin) must appear under the same condition.
+- [ ] Footer links not stranded inside `hidden sm:flex` either (mobile users still need to reach API docs, GitHub).
+- [ ] `<table>` / wide layouts inside marketing pages: either responsive (`overflow-x-auto`) or restructured for mobile.
+- [ ] No primary CTA button width is fixed > 320px on mobile.
+
+If parity gaps are found, REPORT them in the cleanup output (do NOT silently rewrite the mobile UX — that's a design decision the user owns; flag it and let `/docpluck-review` enforce on the next PR).
+
 ### 2.4 — App memory
 
 - [ ] `C:\Users\filin\.claude\projects\c--Users-filin-Dropbox-Vibe-MetaScienceTools-PDFextractor\memory\` — check for stale memories
@@ -198,6 +257,8 @@ Before deleting any script, grep the codebase to confirm nothing imports or invo
 - [ ] Both `CLAUDE.md` files describe the same two-repo architecture (no contradictions on paths, repo names, visibility, or release flow)
 - [ ] If a public library API changed, the app must use the new signature OR pin an older library version (don't silently break)
 - [ ] If `SECTIONING_VERSION` bumped, `tests/golden/sections/*.json` files in the library were regenerated (verify with the test: `python -m pytest tests/test_sections_golden.py -q`)
+- [ ] Library's current public surface (formats, modules, normalization step count) is REFLECTED on the homepage. Library says PDF + DOCX + HTML? Homepage must too. Library exposes `extract_tables`, `partition_into_sections`, `render_pdf_to_markdown`? Homepage Features grid mentions them, OR PR notes say marketing was deliberately deferred. (Audited in §2.4b above — surface drift here.)
+- [ ] Mobile users can reach every desktop-only nav link / CTA. (Audited in §2.4c above — surface drift here.)
 
 ---
 
