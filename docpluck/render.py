@@ -1851,7 +1851,15 @@ def render_pdf_to_markdown(
     if _sectioned is not None:
         sectioned = _sectioned
     else:
-        sectioned = extract_sections(pdf_bytes, source_format="pdf")
+        # preserve_math_glyphs=True so the rendered .md keeps β/δ/χ²/η²/²/₀
+        # as the source PDF prints them. See CLAUDE.md ground-truth rule + memory
+        # feedback_ground_truth_is_ai_not_pdftotext. The flag is plumbed through
+        # extract_sections → normalize_text → A5 step.
+        sectioned = extract_sections(
+            pdf_bytes,
+            source_format="pdf",
+            preserve_math_glyphs=True,
+        )
 
     # 3. Render sections + splice tables/figures.
     md = _render_sections_to_markdown(

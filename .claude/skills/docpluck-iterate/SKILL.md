@@ -60,6 +60,100 @@ Before any iteration, establish:
 
 ---
 
+## Subagent parallelization (cross-cutting principle, applies to every phase below)
+
+> Added 2026-05-14 by user directive: "use subagents whenever possible to speed up the process. do this carefully and safely but use subagents when this can be done without any fear of issues."
+
+Iteration is dominated by I/O + AI work that is naturally parallel across papers. The orchestrator (this skill) should aggressively fan out to `Agent` subagents whenever there are 2+ independent units of work, BUT only when the work passes the safety checklist below.
+
+### Safety checklist — must pass ALL 4 before parallelizing
+
+1. **No shared file state.** Each parallel unit must write to a distinct output path (e.g., `tmp/<paper>_gold.md` for paper A vs `tmp/<paper>_gold.md` for paper B — different paths). Never have two agents writing the same file.
+2. **No shared git state.** Never run two parallel agents that modify git (commits, tags, branches, pushes). Git operations are sequential.
+3. **No sequential dependency.** Agent B does not consume an artifact agent A produces in the same fan-out batch. If A→B, run sequentially.
+4. **Self-contained briefs.** Each subagent prompt is a complete, standalone instruction set — absolute paths, no references to "the prior conversation", no implicit context.
+
+If ANY checklist item fails, run sequentially.
+
+### Where to parallelize (and where to use `run_in_background: true`)
+
+| Phase / step | Parallel? | How | Background? |
+|---|---|---|---|
+| **Phase 2 broad-read** — render 8-10 sample papers from publishers | YES | One `Bash` subprocess per paper OR one `Agent` per paper-cluster | Foreground for ≤4; background for more |
+| **Phase 5d gold-extraction** — generate `tmp/<paper>_gold.md` for each canonical / affected paper | YES | One `Agent` per paper (each reads its own PDF via `Read` with `pages=`) | **Background** (3-5 min each; orchestrator does other work while waiting) |
+| **Phase 5d verification** — compare rendered.md ↔ gold for each affected paper | YES | One `Agent` per paper (independent inputs) | **Background** (1-2 min each) |
+| **Phase 5d cross-paper sweep** — corpus-level pattern detection on 5 papers | YES, but only ONE agent for the whole sweep | Single agent reading 5 paper pairs and emitting a corpus-level findings list | Foreground (one call, ~3-4 min) |
+| **Diagnostic artifact capture** — `pdftotext` + `extract_pdf_structured` per paper | YES | One `Bash` per paper | Foreground (each <5s) |
+| **Phase 5b broad pytest** — independent of Phase 5d verification | YES | `Bash` with `run_in_background: true` | Background; check via `Monitor` |
+| **Phase 5c 26-paper baseline** — independent of Phase 5d | YES | `Bash` with `run_in_background: true` | Background; ~10 min |
+| **Phase 6c rendered ↔ tables-tab parity** — across affected papers | YES | One `Bash` per paper | Foreground; each <5s |
+| **Phase 8 Tier-3 prod parity** — across affected papers (POST-deploy) | YES | One `Bash` curl per paper | Foreground; each <10s |
+| **Phase 7 release** — version bump + commit + tag + push + auto-bump merge | **NO** | Sequential git operations | N/A |
+| **Phase 4 library fix** — code edits | **NO** | Orchestrator holds architectural context | N/A |
+| **/docpluck-cleanup, /docpluck-review, /docpluck-deploy** — meta-skill chain | **NO** to running 2 at once | Each is sequential per its own internal logic | Foreground; chain them |
+
+### Concrete fan-out patterns to use
+
+**Pattern A — fan-out gold extraction + verification for affected papers (typical Phase 5d):**
+
+```
+1. Identify N affected papers for this cycle.
+2. For each paper without `tmp/<paper>_gold.md`: dispatch one Agent (run_in_background=true)
+   to read the PDF and write the gold. Do this for ALL papers in a single message
+   with multiple Agent tool calls (true parallel dispatch).
+3. While golds are generating, render the affected papers at the working-tree version
+   via a single `Bash` script that renders them in sequence (Camelot is not thread-safe;
+   keep render serial).
+4. As each gold completes, optionally dispatch its verifier Agent immediately (background).
+   Or wait for all golds, then dispatch all verifiers in a single multi-tool-call message.
+5. Aggregate verdicts as they return; queue defects per rule 0e.
+```
+
+**Pattern B — background long-running tasks during planning:**
+
+```
+1. Kick off the 26-paper baseline (`Bash` with run_in_background=true).
+2. Kick off the broad pytest (`Bash` with run_in_background=true).
+3. While both run, do Phase 3 TRIAGE re-read + Phase 4 code edit planning.
+4. By the time you need 5b/5c results, they're already done.
+```
+
+**Pattern C — corpus sweep with a single agent:**
+
+```
+For the every-3rd-cycle corpus sweep, do NOT fan out 5 separate agents.
+Use ONE agent given paths to 5 paper pairs and ask for a corpus-level
+findings list. This produces a coherent ranking; 5 independent agents
+would each produce a local list and the orchestrator would have to
+merge them by hand.
+```
+
+### Anti-patterns to avoid
+
+| Anti-pattern | Why it's wrong |
+|---|---|
+| "Dispatch 10 agents to each fix a different defect" | Multiple agents editing the same library code → merge conflicts, lost work. Orchestrator does fixes. |
+| "Dispatch parallel agents to bump version" | Two agents racing on `pyproject.toml` / `__init__.py` / git → broken commits. |
+| "Dispatch parallel agents to render the same paper" | Same `tmp/<paper>_v<version>.md` written twice → race condition. |
+| "Skip the Pattern-A wait and do verify before gold exists" | Verifier needs gold as input; sequential dependency. |
+| "Fan out gold extraction in foreground (no background)" | 4 papers × 3 min each = 12 min blocked. Background dispatch lets the orchestrator do other work and reduces wall-clock to ~3 min. |
+| "Use multiple agents for a single small task" | Subagent dispatch has fixed overhead (~30s). For tasks <60s, do it inline. |
+| "Subagents share my conversation context" | They DON'T. Each subagent prompt must be self-contained — give absolute paths, restate the goal, restate the discipline. |
+
+### When in doubt
+
+Default to **sequential** when:
+- You're not sure if outputs collide.
+- The task takes <1 minute (overhead > benefit).
+- The task modifies global state (git, env, settings).
+
+Default to **parallel** when:
+- 3+ independent items with the same pattern (papers, sections, checks).
+- Each item takes ≥2 minutes.
+- Each item has a distinct output path.
+
+---
+
 ## Phase 1 · Cycle bootstrap (every cycle)
 
 At the start of each cycle, print one heartbeat line:
@@ -112,6 +206,8 @@ For each rendered .md, **read the first 30 lines as a USER would** — title, ab
 
 **Skip rule:** if a previous cycle in this same run did a broad-read AND no library-level change has happened since, you may skip this cycle's broad-read with `--no-broad-read`. Otherwise do not skip.
 
+**Parallelize the rendering:** if sampling 8+ papers, render them in a single Python script that loops sequentially (Camelot is NOT thread-safe — keep renders serial within a process), but you can launch the script in `Bash` with `run_in_background=true` and do other planning while it runs. See "Subagent parallelization" Pattern B.
+
 ---
 
 ## Phase 3 · Triage & pick
@@ -156,7 +252,7 @@ Per memory `feedback_ai_verification_mandatory`: AI-verification + visual inspec
 | 5d | **Full-document AI verify** (every affected paper, every cycle) | ~2 min/paper | MANDATORY — no text loss, no hallucinations, structural correctness |
 | 5e | Camelot-bearing tests (only if touched table extraction) | ~10 min | Required only when relevant |
 
-**Phase 5d is the keystone.** It dispatches a subagent that reads the FULL rendered .md AND the FULL pdftotext source-of-truth, and produces a structured verdict on six checks: TEXT-LOSS, HALLUCINATION, SECTION-BOUNDARY, TABLE, FIGURE, METADATA-LEAK. TEXT-LOSS and HALLUCINATION findings are uncategorical-blockers — revert the cycle's edit, do not negotiate. See [references/ai-full-doc-verify.md](references/ai-full-doc-verify.md) for the protocol (subagent prompt template, severity ladder, single-paper vs every-3rd-cycle corpus sweep).
+**Phase 5d is the keystone.** Ground truth is an **AI multimodal read of the source PDF** (`tmp/<paper>_gold.md`, generated once per paper via `Read` with `pages=N-M`, cached forever) — NOT pdftotext, NOT Camelot, NOT any deterministic extractor. Pdftotext / Camelot are *diagnostics only*: useful AFTER a finding to pinpoint the responsible library layer ("rendered says 'beta', gold says 'β', pdftotext also says 'beta' → bug is upstream in pdftotext, not in normalize.py"). A verifier subagent reads the FULL rendered .md AND the FULL gold extraction and produces a structured verdict on six checks: TEXT-LOSS, HALLUCINATION, SECTION-BOUNDARY, TABLE, FIGURE, METADATA-LEAK. TEXT-LOSS and HALLUCINATION findings are uncategorical-blockers — revert the cycle's edit, do not negotiate. See [references/ai-full-doc-verify.md](references/ai-full-doc-verify.md) for the full protocol (gold-extraction prompt template, verifier prompt template, gold caching, single-paper vs every-3rd-cycle corpus sweep). Memory `feedback_ground_truth_is_ai_not_pdftotext` and CLAUDE.md's ground-truth hard rule are the durable backstops against silently sliding back to pdftotext-as-truth.
 
 **Heavy detail (commands, monitor patterns, common-failure table):** see [references/local-verification.md](references/local-verification.md). Load on demand when entering Phase 5.
 

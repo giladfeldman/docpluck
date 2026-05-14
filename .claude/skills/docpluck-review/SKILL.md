@@ -123,6 +123,50 @@ Base UI (`@base-ui-components/react`, used through `frontend/src/components/ui/*
 **14c — Prefer vanilla disclosure for trivial mobile menus.** `MobileNav` and similar 3-to-6-item disclosures don't need base-ui's Portal / Positioner / Popup / Group machinery. A plain `useState` + outside-click + Escape pattern has zero hierarchy constraints, zero SSR Portal quirks, and zero base-ui dependency. Reach for base-ui only when the surface needs nested submenus, type-ahead selection, virtualization, or accessibility primitives that would be expensive to reproduce.
 - **Check:** if a base-ui primitive is being used for a 3-to-6-item flat menu, ask the author why. WARN, not BLOCKER.
 
+### 15a. Content-fidelity rules surfaced by Phase-5d AI verify (v2.4.29+, multi-paper)
+
+The 2026-05-14 4-paper AI-verify run (xiao, amj_1, amle_1, ieee_access_2 against AI gold extractions of the source PDFs) surfaced content-fidelity defect classes the prior verifier suite is blind to. Each class maps to a specific code-review check. **Ground truth for any verification cited in this section is the AI multimodal read of the source PDF, NOT pdftotext / NOT Camelot** (per CLAUDE.md's ground-truth hard rule and memory `feedback_ground_truth_is_ai_not_pdftotext`).
+
+**15a.1 — Unicode→ASCII normalization may touch ONLY U+2212.** Per CLAUDE.md L004, the only documented Unicode-to-ASCII conversion in `docpluck/normalize.py` is `U+2212 (MINUS) → "-"`. Any new substitution that touches Greek letters (β, δ, γ, σ, μ, τ, ε, ω, π and their uppercase forms), comparison operators (≥, ≤, ×, ÷, ±, ·), or thousands-separator commas in integers (`1,675 → 1675`) is content corruption. Real-world Phase-5d finding (ieee_access_2 v2.4.28): `β → "beta"`, `δ → "delta"`, `γ KEPT` (inconsistent), `× → "x"`, `≥/≤ → ">="/"<="`. Real-world Phase-5d finding (amle_1 v2.4.28): all comma-thousands stripped throughout body.
+- **Check:** grep `docpluck/normalize.py` and `docpluck/render.py` for `.replace(` calls. Each replacement that takes a non-ASCII character on the left MUST be either:
+  (a) The documented U+2212 → `-` (S5).
+  (b) A soft-hyphen / line-wrap rejoin (S3, S4).
+  (c) A smart-quote / fancy-quote / ligature normalization that preserves semantic content.
+  (d) Explicitly documented and added to CLAUDE.md as a new normalization step.
+- **Check:** grep `docpluck/normalize.py` for any regex of the form `r"(\d+),(\d{3})"` or `re.sub(r"(\d),(\d{3})", ...)`. Comma-thousands stripping is a content corruption (1,675 reads as 1675 = different number); BLOCKER.
+- **Check:** grep `docpluck/` for `.replace("β"`, `.replace("δ"`, `.replace("γ"`, `.replace("σ"`, `.replace("μ"`, `.replace("≥"`, `.replace("≤"`, `.replace("×"`, `re.sub.*[α-ωΑ-Ω]`. Each is BLOCKER unless documented as a deliberate normalization with a published rationale.
+- **Severity:** BLOCKER.
+
+**15a.2 — Table cell emission must preserve cell boundaries (no concatenation, no phantom columns).** Real-world Phase-5d findings: ieee_access_2 Table 1 emits `<td>ParameterDescriptionReference Range/Value</td>` (three logical columns concatenated); amle_1 Table 13 emits `<td>Michigan State6Harvard University</td>` (3 logical cells fused); xiao Tables 1/2/6 emit phantom `<th></th>` empty cells between non-empty headers (Camelot stream-flavor whitespace-gap mis-segmentation); amj_1 Table 4 emits an essentially empty `<table>` while the actual matrix data is dumped to body stream.
+- **Check:** when reviewing changes in `docpluck/tables/cell_cleaning.py`, `docpluck/tables/render_html.py`, `docpluck/tables/*.py`, or `docpluck/extract_structured.py`, run a real-PDF regression on the 4 canonical papers (xiao, amj_1, amle_1, ieee_access_2) and `grep -nE '<td>[A-Za-z]{6,}[A-Z][a-z]+' tmp/*_v<version>.md` to detect concatenation; `grep -cE '<th>[^<]+</th>\s*<th></th>\s*<th>[^<]+</th>' tmp/*_v<version>.md` to detect phantom columns.
+- **Check:** if `docpluck/tables/extract.py` (Camelot wrapper) is touched, verify Camelot's `lattice` flavor is still preferred over `stream` for ruled tables (stream over-segments whitespace gaps) — and that the fallback chain doesn't silently drop to a flavor that produces phantom columns.
+- **Check:** any new code that emits a `<table>` element MUST guarantee `<td>` boundaries between every pair of source cells; concatenation as a "cleanup" of empty cells is a BLOCKER.
+- **Severity:** BLOCKER.
+
+**15a.3 — Caption text must not be welded into thead.** Real-world Phase-5d finding (amle_1 Tables 3/4/5/7/8): `<th>TABLE 4<br>Most Cited Sources in General Management Textbooks<br>Source</th>` — the table caption + table number are jammed into the first thead cell instead of a separate `<caption>` element.
+- **Check:** grep `docpluck/tables/render_html.py` and `docpluck/extract_structured.py` for the logic that places `### Table N` headings AND emits the `<table>`. The caption should be either above the `<table>` (as `*Table N. Caption*` italic line) OR inside `<caption>...</caption>` — never inside `<th>`.
+- **Check:** `grep -nE '<th>(TABLE|Table)\s+\d+' tmp/*_v<version>.md` against the canonical-4 rendered output; any match is a BLOCKER.
+- **Severity:** BLOCKER.
+
+**15a.4 — Never fabricate a `## Introduction` heading if the source has none.** Real-world Phase-5d finding (xiao v2.4.28): `## Introduction` injected at .md line 19 even though the source PDF has no such heading (it goes directly from Keywords to body prose).
+- **Check:** when reviewing changes in `docpluck/sections/annotators/text.py`, `docpluck/sections/taxonomy.py`, `docpluck/sections/core.py`, or `docpluck/render.py`, search for any unconditional `## Introduction` insertion. Heading must be detected from the source, not inserted as a fallback.
+- **Check:** grep `docpluck/` for hard-coded strings like `"## Introduction"`, `"Introduction\n"`, `f"## {default_intro}"`. Each occurrence must be in a conditional path that detected the heading in the source.
+- **Severity:** BLOCKER.
+
+**15a.5 — ALL-CAPS section promotion must consume preceding Roman-numeral marker.** Real-world Phase-5d finding (ieee_access_2 v2.4.28): the cycle-11 ALL-CAPS promoter promoted `INTRODUCTION` → `## INTRODUCTION` but left orphan `I.` on the prior line. Same for `II.` / `III.` / `IV.`. The promoter must also handle the `V.: SUPPLEMENTARY INDEX` (colon-after-numeral) variant.
+- **Check:** when reviewing changes in `docpluck/render.py::_promote_all_caps_section` (or equivalent), verify the regex consumes BOTH `^[IVX]{1,4}\.\s*\n` immediately above the promoted heading AND `^[IVX]{1,4}\.:?\s+[A-Z]` inline-prefix form.
+- **Check:** run on the canonical-4 corpus, then `grep -nE '^[IVX]{1,4}\.\s*$' tmp/*_v<version>.md` — any match in the line immediately above a `## ` heading is a BLOCKER.
+- **Severity:** BLOCKER.
+
+**15a.6 — Endmatter (Appendix / Bios / Notes / ORCID) must not leak into References.** Real-world Phase-5d finding (amj_1 v2.4.28): Appendix A is fractured. Task Processes items 3-4 + Meta-Processes block + author bios all appear INSIDE `## REFERENCES` before the `## APPENDIX A` heading is emitted. Real-world Phase-5d finding (xiao v2.4.28): `Notes`, `ORCID`, `Authorship declaration`, `Disclosure statement`, `Additional information` appear as flat body text instead of `##` headings.
+- **Check:** when reviewing changes in `docpluck/sections/`, verify the endmatter taxonomy detects `APPENDIX [A-Z]`, `Appendix [A-Z]`, `Author biographies`, `Notes`, `ORCID`, `Funding`, `Disclosure statement`, `Authorship declaration`, `Additional information`, and routes each to its own top-level section.
+- **Check:** verify biographical-prose heuristic exists — patterns like `<Name> (<email>) is (assistant|associate|emeritus|full) (professor|student) of` should NOT appear inside a `## REFERENCES` block.
+- **Severity:** BLOCKER for cross-section leak (content under wrong heading); WARN for flat-body when a `## ` heading was expected.
+
+**15a.7 — Figure captions must not double-emit with mismatched normalization.** Real-world Phase-5d finding (ieee_access_2 v2.4.28): 37 figure captions emitted twice — once interleaved in body using ASCII normalization (`beta`, `>=`), once in dedicated `## Figures` section using Unicode (`β`, `≥`).
+- **Check:** when reviewing changes in `docpluck/render.py` figure emission, verify each figure caption is emitted exactly once. If both inline + trailing-section are intentional, both must use the same normalization (and a comment in the source must justify the duplication).
+- **Severity:** WARN if duplication is intentional and consistent; BLOCKER if normalization differs between the two emissions.
+
 ### 15. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
 The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/` is the regression line for `render_pdf_to_markdown`. Any change to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py` MUST be verified.
 - **Check:** When any of those files are modified, run `python scripts/verify_corpus.py` (~8-12 min) before approving.

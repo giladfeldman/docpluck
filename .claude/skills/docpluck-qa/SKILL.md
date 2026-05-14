@@ -361,6 +361,73 @@ This check exists because **char-ratio + Jaccard are blind to "right words
 in wrong order under wrong heading"** (see CLAUDE.md "Iteration discipline").
 Run it after every render change before declaring the iteration done.
 
+### 7f. Content-Fidelity Linter (v2.4.29+, CRITICAL — surfaced 2026-05-14 by Phase-5d AI verify on 4-paper canonical corpus)
+
+`verify_corpus.py` + `lint_rendered_corpus.py` + the 7d AI-inspection pass are still blind to a class of *content-fidelity* defects that the 4-paper AI-verify run surfaced across xiao / amj_1 / amle_1 / ieee_access_2 in v2.4.28. These are silent corruptions that pass char-ratio + Jaccard + structural checks but are meta-science-fatal. Run this linter on the rendered corpus after every release and on the cycle-1 canonical papers at every verification:
+
+| Defect class | Signature (regex on rendered .md) | Tag | Origin |
+|---|---|---|---|
+| Greek transliteration (β/δ → "beta"/"delta", inconsistent vs γ) | `\b(beta\d?|delta\d?|alpha\d?|sigma\d?|mu\d?|tau\d?|epsilon\d?|gamma\d?)\b` co-occurring with `[α-ωΑ-Ω]` elsewhere in same .md | GT | `normalize.py` |
+| Comma-thousands strip in integers (`7,445 → 7445`) | source pdftotext has `\b\d{1,3},\d{3}\b` count tokens NOT present in rendered .md | TS | `normalize.py` |
+| Unicode comparison-operator substitution (`≥ → >=`, `≤ → <=`, `× → x`) | `>=` or `<=` or `\bx\b` in math contexts when source pdftotext has `≥`/`≤`/`×` | CMP | `normalize.py` |
+| Phantom empty `<th>` between non-empty headers | `<th>[^<]+</th>\s*<th></th>\s*<th>[^<]+</th>` | PEC | `tables/` (Camelot stream-flavor) |
+| Concatenated cells (no `<td>` boundary) | `<td>[A-Z][a-z]+\s+[A-Z][a-z]+\d+[A-Z][a-z]+` or `<td>[A-Za-z]{8,}[A-Z][a-z]+\s+[A-Z][a-z]+</td>` (e.g. `Michigan State6Harvard University`, `ParameterDescriptionReference Range/Value`) | CC | `tables/` cell-emission |
+| Caption text welded into thead (`TABLE N<br>` in thead) | `<th>(?:TABLE\|Table)\s+\d+<br>` or `<th>(?:TABLE\|Table)\s+\d+\s*</th>\s*<th>` | CBT | `tables/` or `extract_structured.py::_extract_caption_text` |
+| Hallucinated `## Introduction` heading (source has no such heading) | `^## Introduction\s*$` in .md AND no `^\s*Introduction\s*$` in pdftotext output (case-sensitive) | HIH | `sections/` or `render.py` |
+| Orphan Roman-numeral line above promoted ALL-CAPS heading | `^[IVX]{1,4}\.\s*$\n\n^## [A-Z]` (multi-line) | ORN | `render.py::_promote_all_caps_section` |
+| Author-bio prose inside REFERENCES section | `## REFERENCES[\s\S]*?\b\w+\s+\w+\s+\(\w+@\w+\.\w+\)\s+is\s+(assistant|associate|full|emeritus|tenure|doctoral)\s+(professor\|student)\b[\s\S]*?(?=##\|$)` | ABL | `sections/` endmatter routing |
+| Empty `<table>` with non-empty same-numbered raw text in body | `<table>\s*<thead>[\s\S]*?</thead>\s*<tbody>\s*(?:<tr>\s*<td>[^<]*</td>\s*</tr>\s*){0,1}</tbody>\s*</table>` AND `### Table N\b` (correlation/means table) | ET | `extract_structured.py` table-merge |
+| Page-header leak into equation/math context | `Page\s+\d+\s+\(\d+\)` (e.g. `Page 4 (2)`) | PHE | `normalize.py` page-footer strip |
+| Figure-caption double-emission with mismatched normalization | same `Figure N.` caption appearing in body inline AND in trailing `## Figures` section with different glyph encodings | FCD | `render.py` |
+
+`scripts/lint_rendered_corpus.py` should be extended with each tag above. Provisional one-liner during the v2.4.29 cycle (before the script is updated):
+
+```bash
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck && python -u -c "
+import re, sys
+from pathlib import Path
+TAGS = [
+    ('GT', r'\b(beta\d?|delta\d?|sigma\d?|mu\d?|tau\d?|epsilon\d?)\b'),
+    ('CBT', r'<th>(?:TABLE|Table)\s+\d+<br>'),
+    ('PEC', r'<th>[^<]+</th>\s*<th></th>\s*<th>[^<]+</th>'),
+    ('HIH', r'^## Introduction\s*$'),
+    ('ORN', r'^[IVX]{1,4}\.\s*$\n\n^## [A-Z]'),
+    ('PHE', r'Page\s+\d+\s+\(\d+\)'),
+]
+fails = 0
+for md in sorted(Path('tmp').glob('*_v*.md')):
+    text = md.read_text(encoding='utf-8', errors='replace')
+    hits = []
+    for tag, pat in TAGS:
+        m = list(re.finditer(pat, text, re.M))
+        if m:
+            hits.append(f'{tag}:{len(m)}')
+    if hits:
+        print(f'{md.name}: {\"  \".join(hits)}')
+        fails += 1
+sys.exit(0 if fails == 0 else 1)
+"
+```
+
+**Severity:** any tag above is a FAIL — content corruption that meta-science consumers downstream cannot recover from. See `docs/HANDOFF_2026-05-14_iterate_phase_5d_audit.md` (forthcoming) for full per-paper trace.
+
+### 7g. Phase-5d Full-Doc AI Verify on Canonical 4 (v2.4.29+, CRITICAL)
+
+Mandatory before EVERY release. Renders + AI-verifies the 4-paper canonical corpus (xiao_2021_crsp, amj_1, amle_1, ieee_access_2) at the current working-tree version against an **AI multimodal read of the source PDF**.
+
+**Ground truth = AI multimodal read of the PDF, NOT pdftotext / NOT Camelot / NOT any deterministic extractor.** Per CLAUDE.md's ground-truth hard rule and memory `feedback_ground_truth_is_ai_not_pdftotext`: comparing the library's rendered .md against pdftotext output masks any bug that pdftotext itself produces (Greek glyphs dropped on tight-kerned PDFs, columns interleaved, tables/images invisible) — exactly the bug class this library exists to fix. The truth comes from a subagent reading the PDF directly via `Read` with `pages=N-M`, producing `tmp/<paper>_gold.md`.
+
+**Procedure** (full detail: `.claude/skills/docpluck-iterate/references/ai-full-doc-verify.md`):
+
+1. For each of the 4 canonical papers, ensure `tmp/<paper>_gold.md` exists. If absent, dispatch a gold-extraction subagent (`Agent` tool, `general-purpose`) that reads the PDF directly via `Read` with `pages=...` and writes the structured gold. Gold is **generated once and reused forever** — PDFs are immutable.
+2. Render the paper at the current working-tree version → `tmp/<paper>_v<version>.md`.
+3. (Optional, diagnostic) Capture `tmp/<paper>_pdftotext.txt` and `tmp/<paper>_structured.json`. These are **NOT ground truth** — they are diagnostics used AFTER a finding to pinpoint which library layer is responsible.
+4. Dispatch a verifier subagent for each paper. The subagent reads `tmp/<paper>_gold.md` (truth) and `tmp/<paper>_v<version>.md` (rendered) IN FULL and produces a structured 6-check verdict (TEXT-LOSS / HALLUCINATION / SECTION-BOUNDARY / TABLE / FIGURE / METADATA-LEAK).
+
+**Gate:** all 4 papers must return `Verdict: PASS`. Any TEXT-LOSS or HALLUCINATION finding is a critical blocker (revert + queue cycle). SECTION-BOUNDARY / TABLE / FIGURE / METADATA-LEAK findings are queue-for-fix (rule 0e in `docpluck/CLAUDE.md`).
+
+**Diagnostic use of pdftotext / Camelot:** when the gold says "β present" and the rendered .md says "beta", check the pdftotext output. If it says "beta" too, the bug is in pdftotext upstream — the library can fix by adding a layout-channel Greek-letter rescue, not by changing normalize.py. If the pdftotext says "β" and the rendered .md says "beta", the bug is in `docpluck/normalize.py`. Same logic for tables vs Camelot structured output.
+
 ### 7e. Text-Coverage Baseline (v2.4.6+, CRITICAL)
 
 Catches the silent-text-loss defect class (rendered .md drops a body
@@ -487,6 +554,8 @@ Opt-in cross-format benchmark suite --- DOCX corpus integrity, DOCX↔PDF parity
 | 6 | ESCIcheck 10-PDF (local webapp) | PASS/FAIL | X/10 passed |
 | 7 | Batch extraction (test-pdfs/) | PASS/FAIL | X/47 succeeded |
 | 7b | Corpus render verifier (26-paper) | PASS/FAIL | X/26 PASS, failure tags listed |
+| 7f | Content-fidelity linter (GT/TS/CMP/PEC/CC/CBT/HIH/ORN/ABL/ET/PHE/FCD) | PASS/FAIL | tag counts per paper |
+| 7g | Phase-5d AI verify on 4 canonical papers | PASS/FAIL | 4/4 PASS or list TEXT-LOSS / HALLUCINATION findings |
 | 8 | Service health | PASS/FAIL | pdftotext version |
 | 9 | Database connectivity | PASS/FAIL | 7/7 tables |
 | 10 | Admin API | PASS/FAIL | health + stats |

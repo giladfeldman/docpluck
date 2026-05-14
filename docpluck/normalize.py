@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.9"
+NORMALIZATION_VERSION = "1.9.0"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -1212,6 +1212,7 @@ def normalize_text(
     *,
     layout=None,
     table_regions: list[dict] | None = None,
+    preserve_math_glyphs: bool = False,
 ) -> tuple[str, NormalizationReport]:
     """Apply normalization pipeline at the specified level.
 
@@ -1223,6 +1224,17 @@ def normalize_text(
     is provided alongside `layout`, F0 will not strip lines whose y-range falls
     inside any table region — preserving table footnotes (e.g. ``Note. *p < .05.``)
     that would otherwise be misclassified as page footnotes.
+
+    When `preserve_math_glyphs=True` (default False), the A5 step that
+    transliterates Greek letters (β→"beta", δ→"delta", η²→"eta2", etc.) and
+    math operators (×→"x", ≥→">=", ²→"2", ₀→"0", etc.) is SKIPPED. This is
+    the correct setting for the rendered-markdown user output: every glyph
+    that appears in the source PDF is preserved verbatim in the .md (subject
+    only to U+2212→hyphen per CLAUDE.md L004 — the single documented
+    Unicode→ASCII conversion). Default False preserves backward-compatible
+    behavior for callers that depend on ASCII-form stat tokens (D5 audit
+    suite, statistical pattern matching). Established 2026-05-14 from the
+    Phase-5d AI-gold audit (TRIAGE_2026-05-14_phase_5d_gold_audit.md G2/G7/G12/G21).
     """
     if level == NormalizationLevel.none:
         report = NormalizationReport(level="none")
@@ -1234,6 +1246,22 @@ def normalize_text(
     if layout is not None:
         report.page_offsets = layout.page_offsets
     t = text
+
+    # ── NFC composition (Cycle 15c, G15 — combining-char split fix) ───
+    # pdftotext sometimes emits author names with combining accents in NFD
+    # decomposed form ("Förster", "Potočnik") or with a stray space
+    # between base and combining mark ("Fö rster" → "Fö rster").
+    # NFC composition recombines them into precomposed code points (Förster,
+    # Potočnik). Safe to run at the top of the pipeline because all downstream
+    # regex patterns operate on precomposed glyphs.
+    import unicodedata
+    # First squash any space between a base letter and an immediately-following
+    # combining diacritic (the "Fö rster" → "Förster" case observed in amj_1
+    # v2.4.28 audit). This relies on pdftotext's specific corruption pattern.
+    t = re.sub(r"([A-Za-z])\s+([̀-ͯ])", r"\1\2", t)
+    # Then NFC-compose to merge base+combining into precomposed (Fö → Förster
+    # only works if Fö is precomposed; NFC handles the Potočnik case).
+    t = unicodedata.normalize("NFC", t)
 
     # Snapshot raw page-number set before any mutation — R2 needs lines that
     # match `^\s*\d+\s*$` in the original extraction.
@@ -1665,8 +1693,16 @@ def normalize_text(
                 r"(?<![A-Z][\(\[])(\b)([1-9]\d{0,2}(?:,\d{3})+)(?=[\s,;.)\]:]|$)"
             ),
         ]
-        for pattern in _N_PROTECT_PATTERNS:
-            t = pattern.sub(_strip_commas_integer, t)
+        if preserve_math_glyphs:
+            # Render path: count matches for telemetry but DO NOT strip commas.
+            # Thousands separators (`7,445`, `33,719`, etc.) are source glyphs
+            # the rendered .md must preserve. A3 below is also gated to skip
+            # in preserve mode so it doesn't corrupt these into decimals.
+            for pattern in _N_PROTECT_PATTERNS:
+                _thousands_count[0] += len(pattern.findall(t))
+        else:
+            for pattern in _N_PROTECT_PATTERNS:
+                t = pattern.sub(_strip_commas_integer, t)
         report.steps_applied.append("A3a_thousands_separator_protect")
         if _thousands_count[0] > 0:
             report.changes_made["thousands_separators_preserved"] = _thousands_count[0]
@@ -1713,11 +1749,16 @@ def normalize_text(
         # is `.` followed by a digit. Validated against the existing A3 +
         # A4 regression suite.
         before = t
-        t = re.sub(
-            r"(?<![a-zA-Z,0-9\[\(])(\d),(\d{1,3})(?=\s|[;)\]]|\.(?!\d)|$)",
-            r"\1.\2",
-            t,
-        )
+        if not preserve_math_glyphs:
+            t = re.sub(
+                r"(?<![a-zA-Z,0-9\[\(])(\d),(\d{1,3})(?=\s|[;)\]]|\.(?!\d)|$)",
+                r"\1.\2",
+                t,
+            )
+        # In preserve mode, A3 is SKIPPED so the rendered .md keeps European-
+        # decimal comma form ("d = 0,87") AND thousands-separator form
+        # ("7,445 sources") exactly as printed. Downstream stat extraction
+        # that wants ENG decimal can normalize on its own.
         report._track("A3_decimal_comma_normalization", before, t, "decimal_commas_fixed")
 
         # A3c: Leading-zero decimal recovery (cycle 14, HANDOFF_2026-05-14
@@ -1739,11 +1780,14 @@ def normalize_text(
         # range expressions like ``[0,5]`` meaning ``[0, 5]``, not a
         # decimal.
         before = t
-        t = re.sub(
-            r"\b0,(\d{2,4})(?=[\s)\];,.:]|$)",
-            r"0.\1",
-            t,
-        )
+        if not preserve_math_glyphs:
+            t = re.sub(
+                r"\b0,(\d{2,4})(?=[\s)\];,.:]|$)",
+                r"0.\1",
+                t,
+            )
+        # In preserve mode, A3c is SKIPPED so the rendered .md keeps the
+        # European-decimal form ("0,003") exactly as printed.
         report._track("A3c_leading_zero_decimal_recovery", before, t, "leading_zero_decimals_fixed")
 
         # A3b: Statistical df-bracket harmonization (MetaESCI D2, 2026-04-11)
@@ -1779,56 +1823,65 @@ def normalize_text(
         report._track("A4_ci_delimiter_harmonization", before, t, "ci_delimiters_fixed")
 
         # A5: Math symbol and Greek letter normalization
+        # When preserve_math_glyphs=True (render path), this block is SKIPPED
+        # so the rendered .md preserves source glyphs (\u03B2, \u03B4, \u03C7\u00B2, \u03B7\u00B2, \u00B2, \u2080, etc.)
+        # exactly as printed. Default False preserves backward-compatible
+        # behavior for stat-extraction callers (D5 audit, regex matching).
+        # See CLAUDE.md ground-truth rule + memory feedback_ground_truth_is_ai_not_pdftotext.
         before = t
-        t = t.replace("\u00D7", "x")     # multiplication sign
-        t = t.replace("\u2264", "<=")     # less-than-or-equal
-        t = t.replace("\u2265", ">=")     # greater-than-or-equal
-        t = t.replace("\u2260", "!=")     # not-equal
+        if preserve_math_glyphs:
+            # Skip A5 entirely \u2014 preserve source glyphs.
+            report._track("A5_skipped_preserve_math_glyphs", before, t, "preserved")
+        else:
+            t = t.replace("\u00D7", "x")     # multiplication sign
+            t = t.replace("\u2264", "<=")     # less-than-or-equal
+            t = t.replace("\u2265", ">=")     # greater-than-or-equal
+            t = t.replace("\u2260", "!=")     # not-equal
 
-        # Greek statistical letters → ASCII (for downstream regex matching)
-        # Order matters: multi-char sequences before single chars
-        t = t.replace("\u03B7\u00B2", "eta2")    # η² → eta2
-        t = t.replace("\u03B7\u00B2", "eta2")    # η² variant
-        t = t.replace("\u03C7\u00B2", "chi2")    # χ² → chi2
-        t = t.replace("\u03C9\u00B2", "omega2")  # ω² → omega2
-        t = re.sub(r"\u03B7\s*2", "eta2", t)     # η 2 → eta2 (space variant)
-        t = re.sub(r"\u03C7\s*2", "chi2", t)     # χ 2 → chi2
-        t = re.sub(r"\u03C9\s*2", "omega2", t)   # ω 2 → omega2
-        t = t.replace("\u03B7", "eta")            # η → eta
-        t = t.replace("\u03C7", "chi")            # χ → chi
-        t = t.replace("\u03C9", "omega")          # ω → omega
-        t = t.replace("\u03B1", "alpha")          # α → alpha
-        t = t.replace("\u03B2", "beta")           # β → beta
-        t = t.replace("\u03B4", "delta")          # δ → delta
-        t = t.replace("\u03C3", "sigma")          # σ → sigma
-        t = t.replace("\u03C6", "phi")            # φ → phi
-        t = t.replace("\u03BC", "mu")             # μ → mu
+            # Greek statistical letters → ASCII (for downstream regex matching)
+            # Order matters: multi-char sequences before single chars
+            t = t.replace("\u03B7\u00B2", "eta2")    # η² → eta2
+            t = t.replace("\u03B7\u00B2", "eta2")    # η² variant
+            t = t.replace("\u03C7\u00B2", "chi2")    # χ² → chi2
+            t = t.replace("\u03C9\u00B2", "omega2")  # ω² → omega2
+            t = re.sub(r"\u03B7\s*2", "eta2", t)     # η 2 → eta2 (space variant)
+            t = re.sub(r"\u03C7\s*2", "chi2", t)     # χ 2 → chi2
+            t = re.sub(r"\u03C9\s*2", "omega2", t)   # ω 2 → omega2
+            t = t.replace("\u03B7", "eta")            # η → eta
+            t = t.replace("\u03C7", "chi")            # χ → chi
+            t = t.replace("\u03C9", "omega")          # ω → omega
+            t = t.replace("\u03B1", "alpha")          # α → alpha
+            t = t.replace("\u03B2", "beta")           # β → beta
+            t = t.replace("\u03B4", "delta")          # δ → delta
+            t = t.replace("\u03C3", "sigma")          # σ → sigma
+            t = t.replace("\u03C6", "phi")            # φ → phi
+            t = t.replace("\u03BC", "mu")             # μ → mu
 
-        # Superscript digits → regular digits (² → 2, ³ → 3, etc.)
-        t = t.replace("\u00B2", "2")   # ²
-        t = t.replace("\u00B3", "3")   # ³
-        t = t.replace("\u00B9", "1")   # ¹
-        t = t.replace("\u2070", "0")   # ⁰
-        t = t.replace("\u2074", "4")   # ⁴
-        t = t.replace("\u2075", "5")   # ⁵
-        t = t.replace("\u2076", "6")   # ⁶
-        t = t.replace("\u2077", "7")   # ⁷
-        t = t.replace("\u2078", "8")   # ⁸
-        t = t.replace("\u2079", "9")   # ⁹
+            # Superscript digits → regular digits (² → 2, ³ → 3, etc.)
+            t = t.replace("\u00B2", "2")   # ²
+            t = t.replace("\u00B3", "3")   # ³
+            t = t.replace("\u00B9", "1")   # ¹
+            t = t.replace("\u2070", "0")   # ⁰
+            t = t.replace("\u2074", "4")   # ⁴
+            t = t.replace("\u2075", "5")   # ⁵
+            t = t.replace("\u2076", "6")   # ⁶
+            t = t.replace("\u2077", "7")   # ⁷
+            t = t.replace("\u2078", "8")   # ⁸
+            t = t.replace("\u2079", "9")   # ⁹
 
-        # Subscript digits → regular digits
-        t = t.replace("\u2080", "0")   # ₀
-        t = t.replace("\u2081", "1")   # ₁
-        t = t.replace("\u2082", "2")   # ₂
-        t = t.replace("\u2083", "3")   # ₃
-        t = t.replace("\u2084", "4")   # ₄
-        t = t.replace("\u2085", "5")   # ₅
-        t = t.replace("\u2086", "6")   # ₆
-        t = t.replace("\u2087", "7")   # ₇
-        t = t.replace("\u2088", "8")   # ₈
-        t = t.replace("\u2089", "9")   # ₉
+            # Subscript digits → regular digits
+            t = t.replace("\u2080", "0")   # ₀
+            t = t.replace("\u2081", "1")   # ₁
+            t = t.replace("\u2082", "2")   # ₂
+            t = t.replace("\u2083", "3")   # ₃
+            t = t.replace("\u2084", "4")   # ₄
+            t = t.replace("\u2085", "5")   # ₅
+            t = t.replace("\u2086", "6")   # ₆
+            t = t.replace("\u2087", "7")   # ₇
+            t = t.replace("\u2088", "8")   # ₈
+            t = t.replace("\u2089", "9")   # ₉
 
-        report._track("A5_math_symbol_normalization", before, t, "math_symbols_normalized")
+            report._track("A5_math_symbol_normalization", before, t, "math_symbols_normalized")
 
         # A6: Footnote marker removal after statistical values
         # "p < .001¹" → "p < .001", "95% CI [0.1, 0.5]²" → "95% CI [0.1, 0.5]"
