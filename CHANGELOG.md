@@ -1,5 +1,87 @@
 # Changelog
 
+## [2.4.17] — 2026-05-14
+
+Body-integer corruption fixes — second cycle of `/docpluck-iterate` run.
+Surfaced by v2.4.16 Phase 5d AI verify (xiao_2021_crsp, amj_1, amle_1)
+as pre-existing defects. Fixed in same run per new hard rule 0e (no bug
+left behind).
+
+### Defect 1 — A3 thousands-separator false-positive corrupts sample sizes
+
+`A3` (decimal-comma normalization, European locale) converted body
+integers with thousands-separators to decimal-looking values:
+
+| Source | v2.4.16 (broken) | v2.4.17 (fixed) |
+|--------|------------------|-----------------|
+| `1,001 participants` | `1.001 participants` (sample size becomes 1.001) | `1001 participants` |
+| `4,200 followers` | `4.200 followers` | `4200 followers` |
+| `7,445 sources, 33,719 articles, 32,981 authors` | `7.445 / 33.719 / 32.981` | `7445 / 33719 / 32981` |
+| `3,000 hours` | `3.000 hours` | `3000 hours` |
+
+Sample sizes corrupted from N=1,001 to "1.001 participants" is a
+catastrophic meta-science failure — a downstream researcher would read it
+as N=1 (1.001 rounded). This defect was present in v2.4.15 and earlier
+but invisible to char-ratio + Jaccard verifiers (the digits are present,
+just relocated by the decimal point).
+
+### Defect 2 — R2 page-number scrub strips legitimate body integers in references
+
+`R2` (page-number scrub in references span) uses `_raw_page_numbers`
+(integer values appearing as standalone lines ≥ 2 times in the doc). On
+PDFs with table-cell standalone digits (e.g. `amle_1` has "20" and "40"
+as Yes/No cell values appearing 4+ times each), R2 mistakes those for
+page numbers and strips the digit from any reference whose title
+contains the value between lowercase words:
+
+| Source | v2.4.16 (broken) | v2.4.17 (fixed) |
+|--------|------------------|-----------------|
+| `The first 20 years of Organizational Research Methods` | `The first years of Organizational Research Methods` | `The first 20 years…` |
+| `Journal of Management's first 40 years` | `Journal of Management's first years` | `Journal of Management's first 40 years` |
+
+### Fix — three changes in `docpluck/normalize.py` (NORMALIZATION_VERSION 1.8.4 → 1.8.5)
+
+1. **A3a `_N_PROTECT_PATTERNS` widening (5th pattern):** generic body-integer
+   protection. Strips comma-thousands-separators from any
+   `[1-9]\d{0,2}(?:,\d{3})+` followed by a boundary (`\s|,|;|.|)|]|:|$`)
+   BEFORE A3 runs. Three independent guards (leading `[1-9]` blocks
+   European-decimal `0,001`; exact `\d{1,3}(?:,\d{3})+` shape blocks
+   `1,5` single-digit decimal; trailing-boundary lookahead blocks
+   citation context).
+
+2. **R2 noun-exception list (`_R2_BODY_NOUN_PATTERN` + `_r2_is_body_phrase`):**
+   when R2's pattern matches, peek the 60-char window after the digit
+   for a body-noun keyword (years/days/hours/participants/sources/
+   authors/articles/etc.). If found, the digit is part of a body phrase
+   — preserve. The enumerated noun list covers ~60 common academic-prose
+   units and entity types.
+
+3. **A3 lookahead minor extension:** added `\.(?!\d)` to the trailing
+   lookahead so sentence-ending decimals like `d = 0,87.` get normalized
+   to `d = 0.87.`. Mirrors A2's `_A2_LOOKAHEAD` pattern (already safe).
+   The `(?!\d)` guard blocks the thousands-separated-decimal case
+   `1,234.567` (still doesn't match).
+
+### Regression coverage
+
+`tests/test_normalize_a3_r2_body_integer_real_pdf.py` — 11 contract tests
++ 3 real-PDF integration tests:
+- A3a widening: `1,001`, `4,200`, `7,445/33,719/32,981`, `3,000` all preserved
+- R2 helper: matches `years`/`participants`/`followers`/etc. as body phrases;
+  rejects `science`-like non-body-noun lookups
+- A3 still normalizes European decimals: `0,05 → 0.05`, `1,5 → 1.5`
+- xiao_2021_crsp real-PDF: `1.001 participants` NEVER appears in render
+- amle_1 real-PDF: `first 20 years` AND `first 40 years` preserved;
+  `7.445`, `33.719`, `32.981` (corrupted forms) absent
+
+### Process note
+
+This cycle confirmed hard rule 0e (fix every bug found in same run).
+v2.4.16's Phase 5d AI verify surfaced these as "pre-existing, not
+introduced" — under the OLD rule those would have been deferred. Under
+0e they were immediately addressed. 184/184 unit + 153 D5 audit + 17
+v1.8.x strip tests PASS at v2.4.17.
+
 ## [2.4.16] — 2026-05-14
 
 Cross-publisher front-matter metadata-leak strip — first cycle of the new
