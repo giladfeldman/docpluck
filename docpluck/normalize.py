@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.3"
+NORMALIZATION_VERSION = "1.8.4"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -630,6 +630,35 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"^[A-Z]\.(?:\s*[A-Z]\.?)?\s+[A-Z]{2,}\s+ET\s+AL\.?\s*$"
     ),
+    # v2.4.16: bare uppercase running header with lowercase "et al." tail:
+    #   "RECKELL et al."
+    #   "SMITH et al"
+    #   "VAN DER WAL et al."   (preceded by space-separated prefix tokens)
+    # Distinct from the variants above (which require initials prefix or
+    # all-caps ET AL). Appears as its own paragraph in IEEE / 2-column
+    # journals between Abstract and Introduction and at every page break.
+    # Globally safe: an all-caps surname + lowercase et al. on a line by
+    # itself is unambiguously a running header — in-paragraph citations
+    # never appear without parens / year.
+    re.compile(
+        r"^[A-Z]{2,}(?:\s+[A-Z]{2,}){0,3}\s+et\s+al\.?\s*$"
+    ),
+    # v2.4.16: Taylor & Francis "Supplemental data for this article …"
+    # sidebar boilerplate. Exact-phrase pattern — safe globally.
+    re.compile(
+        r"^Supplemental\s+data\s+for\s+this\s+article\s+can\s+be\s+"
+        r"accessed\s+(?:here|online|via)\.?\s*$",
+        re.IGNORECASE,
+    ),
+    # v2.4.16: truncated affiliation that ends at "University of" with no
+    # place name on the same line. Distinct from the full form
+    # "Department of X, University of Y" (P0 already strips that via the
+    # earlier pattern on line ~651) because of the trailing ``$`` after
+    # "University of" — nothing follows on the line.
+    re.compile(
+        r"^Department\s+of\s+[A-Z][A-Za-z]+"
+        r"(?:\s+and\s+[A-Z][A-Za-z\s]+?)?,\s*University\s+of\s*$"
+    ),
     # v2.4.6: contact-line footer used by Taylor & Francis (CRSP, etc.):
     #   "CONTACT Gilad Feldman gfeldman@hku.hk; giladfel@gmail.com …"
     # The `CONTACT` keyword + name + email is distinctive enough to anchor
@@ -757,6 +786,169 @@ def _strip_page_footer_lines(text: str) -> str:
     if not dropped_any:
         return text
     cleaned = "\n".join(out_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+# ── P1 (v2.4.16 / NORMALIZATION_VERSION 1.8.4) ──────────────────────────
+# Front-matter metadata-leak paragraph strip.
+#
+# pdftotext's reading-order serialization linearizes a two-column article by
+# emitting the article's left-column (Abstract → Introduction body) and then
+# the right-column / inter-column metadata (corresponding-author block,
+# acknowledgments footnote, supplemental-data sidebar, "A previous version
+# of this article was presented…" note, IEEE/CC license blob, running
+# headers like "RECKELL et al."). Those metadata fragments end up as
+# standalone single-line paragraphs INLINED between body paragraphs of the
+# Introduction — visible to a human reader but invisible to char-ratio /
+# Jaccard verifiers (the tokens are present, just in the wrong section).
+#
+# Confirmed leak instances at v2.4.15 (broad-read 2026-05-13):
+#   xiao_2021_crsp (APA / T&F): "Supplemental data for this article…",
+#       "Department of Psychology, University of" (truncated affiliation).
+#   amj_1 (AOM):                "We wish to thank our editor Jill Perry-Smith
+#       and three anonymous reviewers… Correspondence concerning this article
+#       should be addressed to…" (one long pdftotext-serialized line).
+#   amle_1 (AOM):               "We thank Steven Charlier… reviewers for
+#       offering highly constructive feedback…", "A previous version of this
+#       article was presented at the Management Education and Development…".
+#   ieee_access_2 (IEEE):       "This work is licensed under a Creative
+#       Commons Attribution 4.0 License… CONFLICT OF INTEREST…",
+#       "RECKELL et al." (bare running header).
+#
+# Strategy: paragraph-level strip (\n\n-bounded) with two safety gates:
+#   1. Pattern must match the START of the paragraph — anchored, not
+#      free-floating.
+#   2. Position gate: paragraph must begin in the first ``max(8000,
+#      len(text) // 6)`` characters of the document. This protects the
+#      legitimate Acknowledgments / Funding / Affiliations sections that
+#      live at the end (e.g. xiao's `## Acknowledgments / We thank Siu Kit
+#      Yeung…` at ~25% of doc, amle_1's affiliations block at ~90%).
+#
+# Two pattern groups:
+#   - ``_FRONTMATTER_LEAK_PARA_PATTERNS`` — multi-sentence acknowledgments
+#     / previous-version / license blocks. Anchored on a distinctive
+#     opening phrase. The pattern allows the paragraph to be of any length
+#     up to ``_FRONTMATTER_LEAK_MAX_PARA_CHARS``.
+#   - ``_FRONTMATTER_LEAK_LINE_PATTERNS`` — short single-line orphan
+#     fragments (running headers, truncated affiliations, supplemental-
+#     data sidebars). These are ultra-specific patterns that match a full
+#     bounded line.
+_FRONTMATTER_LEAK_MAX_PARA_CHARS = 1500
+
+_FRONTMATTER_LEAK_PARA_PATTERNS: list[re.Pattern[str]] = [
+    # Acknowledgments footnote serialized as a paragraph:
+    #   "We wish to thank our editor Jill Perry-Smith and three anonymous
+    #    reviewers for their insightful and constructive feedback. We also
+    #    thank Angelo DeNisi, Matthew Feinberg…"
+    # Anchor: starts with "We thank" or "We wish to thank" AND the
+    # paragraph contains at least one of (reviewers|editor|feedback|
+    # comments|suggestions|insights|helpful) within the first 300 chars.
+    # The keyword guard rejects body prose that legitimately starts with
+    # "We thank participants for…".
+    re.compile(
+        r"^We\s+(?:wish\s+to\s+)?thank\s+[A-Z].{0,300}?\b"
+        r"(?:reviewers?|editor|feedback|comments?|suggestions?|insights?|helpful)\b",
+        re.IGNORECASE | re.DOTALL,
+    ),
+    # "A previous version of this article was presented/published at…"
+    # (AOM, T&F, Sage — anywhere a conference / proceedings note leaks).
+    re.compile(
+        r"^A\s+previous\s+version\s+of\s+this\s+article\s+was\s+"
+        r"(?:presented|published)\b",
+        re.IGNORECASE,
+    ),
+    # IEEE / Creative Commons license block. The full block typically chains
+    # "This work is licensed under… Corresponding author: <name>… CONFLICT
+    # OF INTEREST…". Anchoring on the opening is enough.
+    re.compile(
+        r"^This\s+work\s+is\s+licensed\s+under\s+(?:a\s+|the\s+)?"
+        r"Creative\s+Commons\b",
+        re.IGNORECASE,
+    ),
+    # APA-style standalone corresponding-author paragraph (when not already
+    # caught by P0's "CONTACT <name>" single-line rule because the
+    # serialization put it on its own bounded paragraph rather than a one-
+    # line "Corresponding Author:" header).
+    re.compile(
+        r"^Correspondence\s+concerning\s+this\s+article\s+should\s+be\s+"
+        r"addressed\s+to\b",
+        re.IGNORECASE,
+    ),
+]
+
+# Note: the three "globally safe" LINE patterns originally drafted here
+# (Supplemental-data sidebar, truncated affiliation, bare uppercase running
+# header) were promoted into P0's ``_PAGE_FOOTER_LINE_PATTERNS`` in
+# v2.4.16 once it became clear that the running-header variant recurs at
+# every page break (e.g. ieee_access_2 emits ``RECKELL et al.`` between
+# Abstract / Introduction AND again at ~18% of the doc, past P1's position
+# gate). P0 is the correct home for those patterns — they have zero
+# false-positive risk in the body. P1 keeps only the multi-sentence
+# paragraph-level patterns that DO carry false-positive risk in the late
+# Acknowledgments section and need the position gate.
+_FRONTMATTER_LEAK_LINE_PATTERNS: list[re.Pattern[str]] = []
+
+
+def _strip_frontmatter_metadata_leaks(text: str) -> str:
+    """P1: strip orphan front-matter metadata lines.
+
+    Targets standalone single-line paragraphs that pdftotext serializes
+    mid-Introduction via right-column reading order:
+      - acknowledgments footnote on one long line ("We wish to thank …
+        reviewers …")
+      - "A previous version of this article was presented at …" note
+      - IEEE / Creative Commons license blob
+      - "Correspondence concerning this article should be addressed to …"
+      - "Supplemental data for this article can be accessed here."
+      - Truncated affiliation ending at "University of" (no place name)
+      - Bare "RECKELL et al." style running header
+
+    Operates at the LINE level (not paragraph level) because pdftotext often
+    emits the leak with only a single ``\\n`` separator from the body
+    paragraph above it — the paragraph-level (``\\n\\n``-bounded) view
+    would absorb the leak into the body paragraph and miss it.
+
+    Position-gated to the first ``max(8000, len(text) // 6)`` characters of
+    the document so the legitimate Acknowledgments / Funding /
+    Affiliations sections at the END are preserved unchanged.
+
+    Cross-paper coverage (confirmed at v2.4.15): xiao_2021_crsp, amj_1,
+    amle_1, ieee_access_2. See LESSONS / NORMALIZATION_VERSION 1.8.4
+    history for the discovery context.
+    """
+    if not text or len(text) < 200:
+        return text
+
+    cutoff = max(8000, len(text) // 6)
+    # Snap the cutoff to a line boundary so we don't bisect a line.
+    nl = text.rfind("\n", 0, cutoff)
+    split = (nl + 1) if nl != -1 else cutoff
+    front, back = text[:split], text[split:]
+
+    out_lines: list[str] = []
+    dropped = False
+    for line in front.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            out_lines.append(line)
+            continue
+        if len(stripped) > _FRONTMATTER_LEAK_MAX_PARA_CHARS:
+            out_lines.append(line)
+            continue
+        matched = (
+            any(p.match(stripped) for p in _FRONTMATTER_LEAK_LINE_PATTERNS)
+            or any(p.match(stripped) for p in _FRONTMATTER_LEAK_PARA_PATTERNS)
+        )
+        if matched:
+            dropped = True
+            continue
+        out_lines.append(line)
+
+    if not dropped:
+        return text
+
+    cleaned = "\n".join(out_lines) + back
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
 
@@ -912,6 +1104,18 @@ def normalize_text(
     before = t
     t = _strip_page_footer_lines(t)
     report._track("P0_page_footer_strip", before, t, "page_footer_lines_stripped")
+
+    # ── P1: front-matter metadata-leak paragraph strip (NORMALIZATION_VERSION 1.8.4) ─
+    # Drops orphan acknowledgments / license / "previous version" / supplemental
+    # -data / truncated-affiliation / bare-running-header paragraphs that
+    # pdftotext serializes mid-Introduction via right-column reading order.
+    # Position-gated to the first ~16% of the document so the legitimate
+    # Acknowledgments / Funding / Affiliations sections at the END are
+    # preserved. See _strip_frontmatter_metadata_leaks docstring for the
+    # cross-publisher pattern coverage.
+    before = t
+    t = _strip_frontmatter_metadata_leaks(t)
+    report._track("P1_frontmatter_metadata_leak_strip", before, t, "frontmatter_leaks_stripped")
 
     # ── W0: Publisher-overlay watermark stripping (Request 9) ──────────
     # Runs BEFORE S0 so mid-line watermarks don't leak into body text via

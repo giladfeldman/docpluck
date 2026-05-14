@@ -1,5 +1,84 @@
 # Changelog
 
+## [2.4.16] — 2026-05-14
+
+Cross-publisher front-matter metadata-leak strip — first cycle of the new
+`/docpluck-iterate` skill.
+
+### Defect — front-matter metadata bleeding mid-Introduction
+
+pdftotext's reading-order serialization linearizes a two-column article by
+emitting the left column (Abstract → Introduction body) and then the
+right-column / inter-column metadata (corresponding-author block,
+acknowledgments footnote, supplemental-data sidebar, "A previous version
+of this article was presented…" note, IEEE / Creative Commons license
+blob, running headers like "RECKELL et al."). Those fragments end up
+inlined as standalone single-line paragraphs between body paragraphs of
+the Introduction. The leak is invisible to char-ratio + Jaccard verifiers
+(tokens present, wrong section), to a 30-line eyeball read (mid-document),
+and to the 26-paper baseline regression gate.
+
+Confirmed instances at v2.4.15:
+
+| Paper | Style | Leak observed |
+|-------|-------|---------------|
+| `xiao_2021_crsp` | APA / T&F | `Supplemental data for this article can be accessed here.` + truncated `Department of Psychology, University of` |
+| `amj_1` | AOM | `We wish to thank our editor Jill Perry-Smith and three anonymous reviewers… Correspondence concerning this article…` |
+| `amle_1` | AOM | `We thank Steven Charlier…` + `A previous version of this article was presented…` |
+| `ieee_access_2` | IEEE | `This work is licensed under a Creative Commons…` + bare `RECKELL et al.` running header |
+
+### Fix — new `P1_frontmatter_metadata_leak_strip` step (NORMALIZATION_VERSION 1.8.3 → 1.8.4)
+
+`docpluck/normalize.py` gains a new normalization step, **P1**, immediately
+after P0 (page-footer / running-header line strip). P1 operates at the
+LINE level (not paragraph level — pdftotext typically separates the leak
+from the body paragraph above it with only a single `\n`, so a
+`\n\n`-bounded paragraph view would absorb the leak into the body) and is
+position-gated to the first `max(8000, len(text) // 6)` characters of the
+document. The position gate protects the legitimate Acknowledgments /
+Funding / Affiliations sections at the document's end.
+
+Two pattern groups inside P1:
+
+- **`_FRONTMATTER_LEAK_LINE_PATTERNS`** — short, highly specific orphan
+  fragments:
+  - `Supplemental data for this article can be accessed here.`
+  - Truncated `Department of <Field>, University of` (line ends right
+    after "University of"; full `, University of Minnesota` form
+    preserved unchanged)
+  - Bare `[A-Z]{3,} et al.` running header (the `Q. XIAO ET AL.` variant
+    is already handled by P0)
+- **`_FRONTMATTER_LEAK_PARA_PATTERNS`** — multi-sentence footnotes that
+  pdftotext emits on a single long line:
+  - `We (wish to )?thank …<keyword>` where `<keyword>` is one of
+    `reviewers|editor|feedback|comments|suggestions|insights|helpful`
+    within the first 300 chars (the keyword guard rejects body prose
+    like "We thank participants for completing the survey.")
+  - `A previous version of this article was (presented|published) …`
+  - `This work is licensed under a Creative Commons …`
+  - `Correspondence concerning this article should be addressed to …`
+
+### Regression coverage
+
+- `tests/test_normalize_metadata_leak_real_pdf.py` — 13 contract tests on
+  synthetic strings + 4 real-PDF integration tests (one per affected
+  paper) exercising the public `render_pdf_to_markdown` entry point
+  against the actual fixtures in `../PDFextractor/test-pdfs/`.
+- The truncated-affiliation test asserts the *full* `Department of
+  Psychology, University of Minnesota` form is preserved unchanged
+  (regression guard for the late-affiliations appendix).
+- The position-gate test asserts a `We wish to thank …` paragraph past
+  the front-matter cutoff (i.e. in the late `## Acknowledgments`
+  section) is preserved.
+
+### Process — first run of `/docpluck-iterate`
+
+This release is also the first end-to-end use of the new
+`/docpluck-iterate` skill (Phase 0 → 12: preflight, broad-read, triage
+pick, library fix, Tier 1 verify, Tier 2 parity, release, Tier 3 verify,
+LEARNINGS append, handoff). See `.claude/skills/docpluck-iterate/` and
+the run-meta JSON for the audit trail.
+
 ## [2.4.15] — 2026-05-13
 
 Section-boundary fix from the post-v2.4.14 broad-read across 8 papers
