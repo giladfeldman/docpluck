@@ -231,3 +231,32 @@ Apply this template to every defect class in `docs/TRIAGE_2026-05-14_phase_5d_go
 - A handful of methodology checks (smell-test cadence, user-correction ratchet activation) are encoded in this LEARNINGS but not yet codified as runnable scripts. Cycle-by-cycle they're checklist items; eventually they should be enforced by `_shared/quality-loop/` hooks similar to spine-gate.sh.
 
 **The session-overall lesson:** an iteration loop that doesn't have a feedback mechanism back to its OWN verification methodology will accumulate methodology debt indefinitely. The user pays for it in shipped corruption that nobody flags because the verification keeps reporting green.
+
+---
+
+## Run: 2026-05-14 (continuation) · Cycle 15n · v2.4.31
+
+### Outcome
+- **Cycle 15n shipped** — figure caption placeholder repair (G_15n). Two helpers added to `docpluck/extract_structured.py`:
+  - `_accumulated_is_label_only(text)` lets `_extract_caption_text`'s paragraph-walk push past a sentence-terminator break when nothing of substance has been consumed yet.
+  - `_strip_leading_pmc_running_header(snippet)` removes `Author Manuscript` PMC running-header runs that pdftotext interleaves between the ALL-CAPS label line and the description across the page-spanning blank.
+- ieee_access_2: 36 of 37 placeholders gone (was `*Figure N. FIGURE N.*`), 27/27 inline `Author Manuscript` leaks gone (sibling defect surfaced AFTER applying the walk fix — fixed in the same cycle per rule 0e).
+- 10 new tests in `tests/test_figure_caption_trim_real_pdf.py` (8 unit + 2 real-PDF). 26-paper baseline still 26/26 PASS, 0 WARN.
+
+### Blind Spots
+- **The handoff misclassified this as a v2.4.29 regression.** It wasn't. The same placeholder behavior reproduces at v2.4.28 against the current pdftotext output. The "v2.4.28 had full captions" claim was based on `tmp/ieee_access_2_v2.4.28.md` which was generated before pdftotext version skew on the local machine changed the layout (the PDF is immutable; the extracted text isn't). Lesson: when the handoff says "regression introduced by vX.Y.Z", verify by re-rendering at vX.Y.(Z-1) BEFORE writing code — git-stash + checkout takes 30s and prevents an entire cycle worth of hypothesis chasing.
+- **Pre-existing test failures `test_chart_data_trim_real_pdf::test_amj_1_figure_captions_no_chart_data_leak` (expects `Meta- Processes`, gets `MetaProcesses`)** — this is a soft-hyphen-rejoin regression, separate from cycle 15n. Confirmed pre-existing via stash test. The library's `re.sub("­\s+", "", snippet)` drops the hyphen-space; pdftotext output now joins `Meta-\nProcesses` as `Meta­Processes` (with soft-hyphen) which the rejoin collapses to `MetaProcesses`. Future cycle target.
+- **`test_extract_pdf_structured::test_method_string_indicates_structured_extraction` fails under `DOCPLUCK_DISABLE_CAMELOT=1`.** Test wasn't designed for the disabled-flag environment. Environmental, not a real defect.
+
+### Edge Cases
+- **MULTILINE `^` + `\s*` in caption regex can land `m.start()` on a `\n`.** `find_caption_matches` uses `FIGURE_CAPTION_RE = re.compile(r"^\s*(?:Figure|Fig\.?|FIGURE|FIG\.?)\s+...", re.MULTILINE)`. When pdftotext lays the caption on its own line with a leading blank-line gap, `^` matches AT the blank-line position (offset of the second `\n` in `\n\n`), and `\s*` consumes the newline. The result: `m.start()` is at a `\n`, `_line_at(text, m.start())` returns `""`, and `char_end == char_start`. Downstream `_extract_caption_text` then starts its walk at a blank line and bails on the next break that ends with `.`. Future fix candidate: `_line_at` should skip leading `\n` at `offset`.
+- **Bundling per rule 0e.** The PMC-leak defect was uncovered by my OWN walk-fix verification — applying the walk-fix alone caused 27/37 captions to expose the previously-hidden running-header leak. Per rule 0e this was bundled into the same cycle (both share `_extract_caption_text` paragraph-walk root cause). Good signal that rule 0e prevented a half-fix from shipping.
+
+### Improvements
+- **Re-render at the prior version to confirm a "regression" before fixing it.** A 30s `git stash && git checkout vX.Y.(Z-1) -- docpluck/ && python -c "from docpluck.render import ..." && git restore docpluck/ && git stash pop` round-trip beats hours of speculative root-cause hunting.
+- **Pre-existing pytest failures are a forensic signal.** When `pytest -q` reports 22 failures and the handoff said "366 pass / 1 skip", the gap = real or environmental regressions accumulated since the last full run. Don't dismiss as "carry forward"; spot-check at least the ones in the same module you're touching.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` before deploy) — SKIPPED because no doc changes besides CHANGELOG.md (cycle-scoped); reason recorded in spine_skips.
+- R3 (`/docpluck-review` before deploy) — SKIPPED because change surface is one `extract_structured.py` patch + tests + version bumps; no AGPL/-layout/normalize/regex-catch-all risk surface.
+

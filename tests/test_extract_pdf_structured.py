@@ -60,6 +60,11 @@ def test_text_default_mode_matches_extract_pdf():
     assert result["text"] == plain_text
 
 
+@pytest.mark.skipif(
+    os.environ.get("DOCPLUCK_DISABLE_CAMELOT", "0") == "1",
+    reason="Camelot disabled via DOCPLUCK_DISABLE_CAMELOT=1; method string "
+    "won't include camelot_* tokens under this flag.",
+)
 def test_method_string_indicates_structured_extraction():
     from docpluck import extract_pdf_structured
     data = _read("apa_chan_feldman_lineless")

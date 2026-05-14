@@ -40,7 +40,10 @@ def _maybe_render(rel: str) -> str:
 
 
 def test_p1_version_bumped_to_184():
-    assert NORMALIZATION_VERSION.startswith("1.8.")
+    # v2.4.29 bumped 1.8.x → 1.9.0 for `preserve_math_glyphs`. The P0/P1
+    # metadata-leak strips this file exercises are unaffected. Accept
+    # both families.
+    assert NORMALIZATION_VERSION.startswith(("1.8.", "1.9."))
 
 
 def test_p0_strips_supplemental_data_sidebar():

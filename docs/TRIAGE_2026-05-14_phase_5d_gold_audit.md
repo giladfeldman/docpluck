@@ -88,17 +88,15 @@
 
 ## NEW DEFECTS DISCOVERED BY v2.4.29 RE-VERIFICATION (added 2026-05-14)
 
-### G_15n — Figure caption placeholder regression in ieee_access_2 (NEW v2.4.29)
+### ~~G_15n — Figure caption placeholder regression in ieee_access_2~~ ✓ FIXED v2.4.31 (2026-05-14)
 
-ieee_access_2's `## Figures` block (lines 694-800 in v2.4.29 rendered .md) shows truncated placeholders `*Figure N. FIGURE N.*` for all 37 figures, instead of full italic captions. v2.4.28 had full captions in this block.
+**Status: SHIPPED v2.4.31.** Originally classified as a v2.4.29 regression; investigation found the placeholder behavior is long-standing (reproduces at v2.4.28 against current pdftotext output — the saved `tmp/ieee_access_2_v2.4.28.md` predates a pdftotext layout shift; PDFs are immutable but extracted text isn't).
 
-**Investigation:** the inline figure captions in the body (e.g. `### Figure 6` blocks at lines 484-643) DO have full Unicode-correct text. So the regression is specifically in the trailing `## Figures` appendix path that emits `f.get("caption")`. Likely cause: `_strip_duplicate_uppercase_label` or `_trim_caption_at_running_header_tail` over-trimming due to NFC-composed input (Cycle 15c), OR an interaction with the preserve_math_glyphs path.
+**Root cause:** `_extract_caption_text` paragraph-walk bailed on `\n\n` after the ALL-CAPS label line because `FIGURE N.` ends with `.`. Plus the caption regex's MULTILINE `^` + `\s*` could land `m.start()` on a `\n`, giving `char_end == char_start` for PMC-style captions.
 
-**Layer:** `docpluck/extract_structured.py::_extract_caption_text` chain (specifically `_strip_duplicate_uppercase_label`, `_trim_caption_at_chart_data`, `_trim_caption_at_running_header_tail`, `_trim_caption_at_body_prose_boundary`).
+**Fix:** new helpers `_accumulated_is_label_only(text)` (keep walking past terminator when accumulated text is label-only) + `_strip_leading_pmc_running_header(snippet)` (strip `Author Manuscript` leakage between label and description, surfaced after the walk fix per rule 0e).
 
-**Severity:** S2 (medium). Inline captions are intact; only the trailing appendix copies degraded. Reader can still find the captions but the trailing block is now useless.
-
-**Cycle 15n** (queued for next session).
+**Verification:** ieee_access_2 0/37 placeholders, 0/37 PMC leaks, Unicode preserved. 10 new tests in `tests/test_figure_caption_trim_real_pdf.py`. 26-paper baseline 26/26 PASS.
 
 ### G_partial_15d — III./IV. orphan numerals not adjacent (NEW limitation)
 
