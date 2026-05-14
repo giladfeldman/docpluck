@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.4"
+NORMALIZATION_VERSION = "1.8.5"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -332,6 +332,55 @@ def _detect_recurring_page_numbers(raw_text: str) -> set[int]:
             if 1 <= n <= 999:
                 counts[n] = counts.get(n, 0) + 1
     return {n for n, c in counts.items() if c >= 2}
+
+
+# v2.4.17 (NORMALIZATION_VERSION 1.8.5): R2 noun-exception list.
+#
+# R2 strips inline digits in references span when the digit value also appears
+# as a standalone line elsewhere in the doc (treated as a page-number leak).
+# BUT some PDFs have many standalone-digit lines that aren't page numbers
+# (table cell values, footnote markers, etc.) — those falsely contaminate
+# the candidate set.
+#
+# Confirmed at v2.4.16: amle_1 has "20" as a standalone line 4+ times (Yes/No
+# table cell values), causing R2 to strip "20" from the legitimate reference
+# title "The first 20 years of Organizational Research Methods" → "The first
+# years of …". Same for "40" in "The Journal of Management's first 40 years"
+# → "first years".
+#
+# Fix: a negative-lookahead exception list. If the digit is followed by a
+# whitespace-then-noun-class word (years, days, hours, percent, participants,
+# people, etc.), the digit is part of a body phrase, NOT a page-number leak —
+# do not strip.
+_R2_BODY_NOUN_PATTERN = re.compile(
+    r"(?:years?|days?|months?|weeks?|hours?|minutes?|seconds?|"
+    r"percent|cents?|dollars?|pounds?|kilograms?|kg|grams?|cm|mm|m|km|"
+    r"miles?|inches?|feet|points?|times?|samples?|individuals?|"
+    r"participants?|subjects?|respondents?|cases?|trials?|studies?|"
+    r"articles?|papers?|books?|chapters?|sources?|authors?|"
+    r"countries?|nations?|institutions?|universities?|firms?|"
+    r"companies?|organizations?|teams?|groups?|hospitals?|schools?|"
+    r"records?|entries?|observations?|measurements?|events?|incidents?|"
+    r"people|persons?|adults?|children|students?|patients?|workers?|"
+    r"employees?|managers?|leaders?|followers?|users?|members?|"
+    r"votes?|comments?|ratings?|reviews?|posts?|tweets?|messages?|"
+    r"items?|conditions?|variables?|categories?|topics?|themes?)\b",
+    re.IGNORECASE,
+)
+
+
+def _r2_is_body_phrase(digit_str: str, refs_text: str, match_pos: int) -> bool:
+    """Return True if the digit at ``match_pos`` is part of a body phrase
+    (e.g. "20 years", "1,675 participants") and should NOT be stripped by R2.
+
+    Heuristic: check the 30-char window AFTER the matched digit for a
+    body-noun keyword (years, participants, etc.). If found, the digit is
+    almost certainly part of legitimate body prose, not a page-number leak.
+    """
+    # Window starts after the digit + at least one space.
+    window_start = match_pos + len(digit_str)
+    window = refs_text[window_start:window_start + 60]
+    return bool(_R2_BODY_NOUN_PATTERN.search(window))
 
 
 def _looks_like_ref_start(line: str) -> bool:
@@ -1447,6 +1496,49 @@ def normalize_text(
             re.compile(r"(\bsample\s+size\s+of\s+)(\d{1,3}(?:,\d{3})+)(\b)", re.IGNORECASE),
             # "total of 2,443 participants"
             re.compile(r"(\btotal\s+of\s+)(\d{1,3}(?:,\d{3})+)(\s+participants)", re.IGNORECASE),
+            # v2.4.17 widening (NORMALIZATION_VERSION 1.8.5): generic body-integer
+            # with thousands-separator. The original 4 patterns above only protect
+            # narrow syntactic contexts (`N =`, `df =`, "sample size of", "total
+            # of … participants"). Real academic prose uses thousands-separated
+            # integers in many more constructions:
+            #     "1,001 participants"           (xiao_2021_crsp)
+            #     "4,200 followers"              (amj_1)
+            #     "3,000 hours"                  (amle_1)
+            #     "7,445 sources, 33,719 articles, 32,981 authors"   (amle_1)
+            #     "5,792 people"
+            #     "1,675 entries"
+            #     "1,842 records"
+            # Without this widening, A3 (decimal-comma normalization) corrupts
+            # these to "1.001 participants", "4.200 followers", etc., destroying
+            # the meaning of sample sizes and count statistics. Confirmed via
+            # v2.4.16 Phase 5d AI verify across xiao + amj_1 + amle_1.
+            #
+            # Guards (four independent):
+            #   1. Integer must start with [1-9] (rejects `0,001` decimal form
+            #      — a European-decimal pattern A3 is supposed to fix).
+            #   2. Integer must have exactly `\d{1,3}(?:,\d{3})+` structure
+            #      (requires comma-thousands-separator; "0,05" → 1 digit after
+            #      comma, won't match; "1,5" → 1 digit, won't match; "1,500" →
+            #      3 digits, matches).
+            #   3. Followed by a lookahead boundary `\s|[,;.)\]:]|$` (must not
+            #      be in mid-citation context like "Smith, 1992" — that has
+            #      no comma between digits).
+            #   4. NEGATIVE LOOKBEHIND `(?<![A-Z][\(\[])` blocks the
+            #      degrees-of-freedom stat-bracket context "F[7,140]",
+            #      "F(7,140)", "t(1,197)", "chi2(2,42)" — those are stat
+            #      df brackets, not thousands-separators. A3b handles them
+            #      separately (bracket-to-paren harmonization). Without this
+            #      guard, stripping the comma from "7,140" inside "F[7,140]"
+            #      destroys the df pair and A3b can no longer harmonize.
+            #
+            # Effect: strips the comma from "1,001" → "1001" BEFORE A3 runs,
+            # so A3 sees the plain integer and leaves it alone. Reader sees
+            # "1001 participants" instead of "1.001 participants" — same
+            # meaning, no thousands-separator (acceptable; consistent with
+            # Methods sections that often use comma-free format).
+            re.compile(
+                r"(?<![A-Z][\(\[])(\b)([1-9]\d{0,2}(?:,\d{3})+)(?=[\s,;.)\]:]|$)"
+            ),
         ]
         for pattern in _N_PROTECT_PATTERNS:
             t = pattern.sub(_strip_commas_integer, t)
@@ -1484,11 +1576,20 @@ def normalize_text(
         #    does not affect that path.
         #
         # The trailing lookahead keeps the original restrictive character set
-        # (\s | ; ) ] | $) — broadening it to [^0-9a-zA-Z] caused A4 ordering
-        # regressions, so we rely on A4 to handle bracket-internal commas.
+        # (\s | ; ) ] | $). Broadening it to [^0-9a-zA-Z] caused A4 ordering
+        # regressions historically.
+        #
+        # v2.4.17 (NORMALIZATION_VERSION 1.8.5): minor extension — add
+        # `\.(?!\d)` to the lookahead so sentence-ending decimals like
+        # "d = 0,87." get normalized to "d = 0.87." Same pattern A2 already
+        # uses safely (line 1466 ``_A2_LOOKAHEAD``). The `(?!\d)` guard
+        # blocks the thousands-separated-decimal case "1,234.567" — that
+        # still doesn't match because the next char after the comma group
+        # is `.` followed by a digit. Validated against the existing A3 +
+        # A4 regression suite.
         before = t
         t = re.sub(
-            r"(?<![a-zA-Z,0-9\[\(])(\d),(\d{1,3})(?=\s|[;)\]]|$)",
+            r"(?<![a-zA-Z,0-9\[\(])(\d),(\d{1,3})(?=\s|[;)\]]|\.(?!\d)|$)",
             r"\1.\2",
             t,
         )
@@ -1631,10 +1732,35 @@ def normalize_text(
             # R2: scrub orphan page-number digits that appear surrounded by
             # lowercase letters (so we don't touch volume numbers, page
             # ranges with hyphens, or year boundaries).
+            #
+            # v2.4.17 (NORMALIZATION_VERSION 1.8.5): body-noun exception
+            # list. Some PDFs (e.g. amle_1) have many standalone-digit lines
+            # that are table cell values, NOT page numbers — those falsely
+            # contaminate ``_raw_page_numbers``. Guard against false-positive
+            # strips on legitimate body phrases like "first 20 years",
+            # "1,675 participants", "3,000 hours" by checking the 30-char
+            # window after the matched digit for a body-noun keyword
+            # (years/days/participants/etc.). If a body noun follows, the
+            # digit is part of prose — leave it alone. See
+            # ``_R2_BODY_NOUN_PATTERN`` and ``_r2_is_body_phrase``.
             for pg in _raw_page_numbers:
-                pat = re.compile(r"(?<=[a-z])\s+" + re.escape(str(pg)) + r"\s+(?=[a-z])")
-                refs_text, c = pat.subn(" ", refs_text)
-                r2_count_total += c
+                pat = re.compile(r"(?<=[a-z])(\s+)" + re.escape(str(pg)) + r"(\s+)(?=[a-z])")
+                # Use a sub-callable so we can inspect each match individually
+                # and skip body-phrase contexts (see ``_r2_is_body_phrase`` —
+                # v2.4.17 guard against false-positive strips on legitimate
+                # body phrases like "first 20 years"). Track strip count
+                # explicitly because ``subn`` counts both preserved and
+                # stripped matches.
+                pg_str = str(pg)
+                _r2_strip_count = [0]
+                _captured_refs = refs_text  # closure: read original text
+                def _r2_repl(m, _pg=pg_str, _refs=_captured_refs, _c=_r2_strip_count):
+                    if _r2_is_body_phrase(_pg, _refs, m.start() + len(m.group(1))):
+                        return m.group(0)  # preserve — body phrase
+                    _c[0] += 1
+                    return " "
+                refs_text = pat.sub(_r2_repl, refs_text)
+                r2_count_total += _r2_strip_count[0]
 
             t = t[:r_start] + refs_text + t[r_end:]
 
