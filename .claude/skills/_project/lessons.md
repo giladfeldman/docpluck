@@ -92,3 +92,23 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Fix:** v2.4.27 added `_is_section_row_label` guard early in the merge loop. A row is treated as a spanning section-row label (not merged) when exactly ONE cell is non-empty AND that cell is ≤ 200 chars AND matches `[A-Z][\w\-]*(?:\s+[\w\-]+)*\s*\([^)]*\b(?:n|N|M|SD|p)\s*[=<>]`.
 
 **How to detect (next time):** When `_merge_continuation_rows` misfires, look for rows with EXACTLY one non-empty cell and a parenthetical statistical descriptor. The "exactly one cell" is the discriminator from a true continuation row (which has content in multiple cells matching the parent row's column structure).
+
+## Cluster-detection prevents false-positives in chart-data trim (caught 2026-05-14, v2.4.28 release)
+
+**What:** amj_1 figure captions contained flow-chart node text (`1. Bottom-up Feedback Flow 2. Top-down Feedback Flow 3. Lateral Feedback Flow`) and axis-tick labels (`7 6 Employee Creativity 5 4 Bottom-up Flow`) interleaved with the legit caption. A single occurrence of either pattern could be legitimate (`Study 1 in Figure 2`), so single-match regexes either over-trim legit captions or miss the real chart-data leak.
+
+**Why:** The discriminator between "legit number in caption" and "chart-data leak" is *repetition*. Real captions reference one or two numbers in prose; chart-data appendages have 2+ axis-tick pairs or 3+ numbered-list items in close succession (typically within 100 chars of each other).
+
+**Fix:** New `_find_chart_data_cluster(caption, pattern, min_matches, max_gap)` helper in `docpluck/extract_structured.py`. Slides a window through `pattern.finditer(caption)` results and returns the start of the FIRST cluster of `min_matches` consecutive matches where each adjacent pair is within `max_gap` chars. Matches at position < 20 are filtered to prevent `Figure N.` from self-anchoring.
+
+**How to detect (next time):** When designing a chart-data / metadata trim, ask: "what's the false-positive case where one match is legit?" If you can construct one, switch to cluster detection. A single match should NEVER trigger a destructive trim.
+
+## A3 lookbehind override: narrower follow-up rule, not relaxed original (caught 2026-05-14, v2.4.28 release)
+
+**What:** A3's lookbehind `(?<![a-zA-Z,0-9\[\(])` blocks European-decimal conversion of `(0,003)` and `[0,05]` inside parens/brackets. This exclusion is necessary to protect statistical df forms like `F(2,42)` (must NOT convert to `F(2.42)`) and citation superscripts like `Smith1,3`. But it leaves legitimate parenthetical p-values uncorrected.
+
+**Why:** Relaxing A3's lookbehind would break df-form protection. The right structure is a narrower follow-up rule with stronger guards.
+
+**Fix:** New A3c step in `docpluck/normalize.py` runs AFTER A3. Pattern `0,(\d{2,4})` regardless of lookbehind. Leading-zero constraint makes the match unambiguous: df values never start with 0, citation superscripts never start with 0. `0,5` (single-digit after comma) is intentionally skipped — it's ambiguous between European decimal and range syntax.
+
+**How to detect (next time):** When a normalization rule's exclusion is overly conservative, don't relax the original rule's lookbehind/lookahead — add a narrower follow-up step with stronger guards. Sequence matters: original first (protects the dangerous case), narrower follow-up second (recovers the false-negative).

@@ -1,24 +1,27 @@
-# Handoff — `/docpluck-iterate` resume run, 4 cycles (cycle 9 finish + cycles 10–12)
+# Handoff — `/docpluck-iterate` resume run, 6 cycles (cycle 9 finish + cycles 10–14)
 
-**Authored:** 2026-05-14 evening (second session).
+**Authored:** 2026-05-14 evening (second session). Updated after user resume → 2 additional cycles (13, 14).
 **Run started from:** `docs/HANDOFF_2026-05-14_iterate_9_cycle_run.md` (cycle 9 finish + deferred items A, B, C, D).
 **Run scope:** `--goal until:"Cycle 9 finished + items A, B, C, D from HANDOFF_2026-05-14 deferred list addressed" --max-cycles 5`.
-**Stopped because:** items A, B, C done. Item D (LOW priority) deferred. Context budget conservation per the 5-cycle/session hard cap noted in the prior handoff's "what didn't work" section.
+**Stopped because:** **all 4 deferred items closed** (A, B, C, D) + bonus item G (amj_1 chart-data leak surfaced by cycle-10 broad-read). 5 releases shipped (v2.4.25-2.4.28; cycle 13+14 bundled into v2.4.28).
 
 ---
 
 ## TL;DR for the next session
 
-**Three releases shipped to prod this session (v2.4.25, v2.4.26, v2.4.27).** All three verified live on Railway. Auto-bump PRs all merged.
+**Four releases shipped to prod this session (v2.4.25, v2.4.26, v2.4.27, v2.4.28).** v2.4.25-27 verified live on Railway; v2.4.28 deploy in flight at handoff. Auto-bump PRs all merged (or auto-merge-on-prod-confirmation pending for v2.4.28).
+
+**All 4 deferred items from HANDOFF_2026-05-14_iterate_9_cycle_run.md are closed (A, B, C, D)** + the bonus discovered defect (item G — amj_1 chart-data leak) is also closed.
 
 **Start by:**
 
-1. Verify v2.4.27 prod deploy: `curl -s https://extraction-service-production-d0e5.up.railway.app/_diag | python -m json.tool | grep docpluck_version` — must show `2.4.27`.
-2. Address the one remaining HIGH/MEDIUM defect in the deferred list (**item D** + the new **amj_1 chart-data leak**) plus run Phase 5d AI verify on the 4 cycle-1 papers to catch any cycle-10–12 regression that the char-ratio verifier missed.
+1. Verify v2.4.28 prod deploy: `curl -s https://extraction-service-production-d0e5.up.railway.app/_diag | python -m json.tool | grep docpluck_version` — must show `2.4.28`.
+2. Run **Phase 5d AI verify** on the 4 cycle-1 papers (`xiao_2021_crsp`, `amj_1`, `amle_1`, `ieee_access_2`) at v2.4.28 — this is the only verification gate that was skipped for all 5 of this session's cycles (and the prior 9-cycle session). Char-ratio/Jaccard verifiers can't catch right-words-wrong-order-under-wrong-heading defects. **This is now the highest priority work** since the run-meta has shipped 14 cycles total across 2 sessions without an AI verify pass.
+3. After AI verify, the loop should switch focus: the prior handoff's items A-G are all closed. New defects discovered by AI verify will form the next TRIAGE list.
 
 ---
 
-## 4 cycles shipped this session
+## 6 cycles shipped this session
 
 | # | Version | Defect class | What changed |
 |---|---------|--------------|--------------|
@@ -26,6 +29,7 @@
 | 10 | v2.4.25 | **Item A (figure caption trim) + 3 universal patterns** | The v2.4.24 caption trim landed in `figures/detect.py::_full_caption_text`, which `render_pdf_to_markdown` doesn't call. The real render path goes through `extract_structured.py::_extract_caption_text`. v2.4.25 migrates the trim chain there and widens to 4 patterns: (a) form-feed page-break boundary, (b) duplicate ALL-CAPS label strip (`Figure N. FIGURE N. …` → `Figure N. …`), (c) running-header tails (author-ET-AL, dyad surname, PMC reprint footer), (d) body-prose boundary (Title-Case + Capital-word + corroborating signal). Caught xiao Figure 2/3 (ship-blocker), ieee_access_2 every figure PMC footer, amj_1 + ieee_access_2 duplicate FIGURE N. |
 | 11 | v2.4.26 | **Item B (ALL-CAPS heading promotion)** | New render-layer post-processor: `_ALL_CAPS_SECTION_HEADING_RE` guarded by `_is_safe_all_caps_promote` extends `_promote_study_subsection_headings`. Initial Pass 3 relaxation attempt was reverted because subheading hints in `Section.subheadings` are never consumed by the render pipeline. Caught: amj_1 `THEORETICAL DEVELOPMENT` / `OVERVIEW OF THE STUDIES` / `STUDY 1` / `STUDY 2`; amle_1 `METHOD` / `RESULTS` / `DISCUSSION` / `SCHOLARLY IMPACT…` / `PRESENT STUDY…` / `LIMITATIONS…` / `CONCLUDING REMARKS` / `REFERENCES`; ieee_access_2 `INTRODUCTION` / `METHODOLOGY` / `RESULTS` / `DISCUSSION AND CONCLUSION` / `LIMITATIONS AND FUTURE WORK` / `REFERENCES`. |
 | 12 | v2.4.27 | **Item C (table section-row cell-merge)** | `_is_section_row_label` guard in `cell_cleaning.py::_merge_continuation_rows`. A row is treated as a spanning section-row label (not merged) when exactly one cell is non-empty, ≤ 200 chars, and matches `[A-Z][\w\-]*(?:\s+[\w\-]+)*\s*\([^)]*\b(?:n\|N\|M\|SD\|p)\s*[=<>]`. Fixes xiao Table 6 `<td>112/172<br>Regret-Salient (n = 331, …)</td>` defect. |
+| 13 + 14 | v2.4.28 | **Item G (amj_1 chart-data leak) + Item D (A3 leading-zero decimal)** | Bundled into one release. **Cycle 13:** two new chart-data trim signatures in `extract_structured.py` — `_AXIS_TICK_PAIR_RE` (`\d (Title-Case-words?) \d` cluster) and `_NUMBERED_CHART_NODE_RE` (`\d+. <Title-Case noun phrase>` cluster). Both via new `_find_chart_data_cluster` helper (2+/3+ matches, max_gap=100, pos≥20 to exclude `Figure N.` prefix). All 7 amj_1 figures now trim cleanly to legit caption text. **Cycle 14:** new A3c step in `normalize.py` — converts `0,(\d{2,4})` → `0.\1` regardless of A3's lookbehind blocks, fixing parenthetical p-values like `(0,003)` that were A3-blind because of the `\(` exclusion. Leading-zero constraint keeps `F(2,42)` etc. safe. NORMALIZATION_VERSION 1.8.8 → 1.8.9. |
 
 ---
 
@@ -65,29 +69,22 @@ b04f51a skills(docpluck-review,cleanup): add mobile-parity + marketing-accuracy 
 
 ## DEFERRED BACKLOG (must address next run)
 
-### D. Pre-existing A3 thousands-separator edge case (LOW)
+### All cycle-9-handoff items closed ✓
 
-**What:** Edge case from cycle-9 handoff item D — `0,003` (legit European-decimal p-value) doesn't get converted to `0.003` because A3 lookahead doesn't catch the leading-zero context. v2.4.17 widened A3 for `1,001 thousands` but `0,XYZ` p-values are still A3-blind.
+Items A, B, C, D from `HANDOFF_2026-05-14_iterate_9_cycle_run.md` are all shipped and prod-verified (A, B, C confirmed; D in flight at handoff). Item G (discovered during cycle-10 broad-read) is also shipped.
 
-**Where:** `docpluck/normalize.py::A3` step.
+### Phase 5d AI verify NEVER RAN this session (HIGH — keystone gate)
 
-**Fix sketch:** add a leading-zero-comma-followed-by-three-digits pattern to the A3 conversion. Caveat: any rule must guard against false-positive conversion of legit comma-thousands like `0,003 of the population` (rare but possible).
+This is the most important next-session action. Five cycles shipped without a full-document AI verify pass on any of the four cycle-1 papers. The cycle-9 handoff also had this gap. **14 cycles total shipped across 2 sessions without an AI verify pass** — this is exactly what rule 0e and `references/ai-full-doc-verify.md` say to prevent.
 
-### G (carried over). amj_1 chart-data leak in figure captions (HIGH — surfaced in cycle 10 broad-read)
+Required next session:
 
-**What:** amj_1 figures 1–7 still contain flow-chart node text and axis-tick labels even after v2.4.25's trim chain — e.g.
+- `xiao_2021_crsp` v2.4.28 full-doc AI verify (TEXT-LOSS / HALLUCINATION / SECTION-BOUNDARY / TABLE / FIGURE / METADATA-LEAK)
+- `amj_1` v2.4.28 full-doc AI verify
+- `amle_1` v2.4.28 full-doc AI verify
+- `ieee_access_2` v2.4.28 full-doc AI verify
 
-```
-*Figure 1. Theoretical Framework Direction of Feedback Flow 1. Bottom-up Feedback Flow 2. Top-down Feedback Flow 3. Lateral Feedback Flow Recipient Reactions Toward Negative Feedback Negative Feedback Targeted at Creativity Task Processes Meta-Processes 587 Recipient Creativity Reconciling the Inconsistent Negative Feedback–Creativity Relationship The primary theoretical innovation of…*
-```
-
-The legit caption is just `Theoretical Framework`. Everything after is figure-internal text (flow-chart node names, body running header, next-section heading + body-prose).
-
-**Where:** `docpluck/extract_structured.py::_extract_caption_text` (and possibly `figures/detect.py::_full_caption_text` for symmetry).
-
-**Fix sketch:** new chart-data signature — Title-Case noun phrases interleaved with single-digit ordinals (`Direction of Feedback Flow 1. Bottom-up Feedback Flow 2. Top-down Feedback Flow`). Regex something like `(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+\d+\.\s+){2,}`. Apply only when caption is already ≥ 100 chars and the surviving trimmed portion is ≥ 20 chars.
-
-This is the most user-visible remaining caption defect and ships every amj_1 figure with body prose absorbed into the caption.
+Any defect surfaced gets queued per rule 0e. The expectation is that several of the 14 cycles produced regressions that char-ratio/Jaccard verifiers and the 26-paper baseline can't see.
 
 ### E (carried over). Architectural — pdftotext version skew (DEFERRED ARCHITECTURAL)
 
@@ -97,12 +94,12 @@ Token-based instead of line-based P0/P1/H0/W0 — still unaddressed. See prior h
 
 Library-side parity is 100%. The remaining issues are in `PDFextractor/frontend/`. Same as prior handoff.
 
-### Verification gates not completed for v2.4.27
+### Verification gates not completed for cycles 10-14
 
-- [ ] **Phase 5d full-doc AI verify** on `xiao_2021_crsp` + `amj_1` + `amle_1` + `ieee_access_2` at v2.4.27. (No AI verify was run for any of cycles 10–12; this is the keystone gate per `references/ai-full-doc-verify.md`.)
-- [ ] **Phase 7 cleanup + review** — `/docpluck-cleanup` last ran for v2.4.16; doc-sync drift across v2.4.17–27. `/docpluck-review` not run for any of cycles 10–12.
-- [ ] **Phase 8 Tier 3 prod byte-diff** — for each of the 4 cycle-1 papers at v2.4.27.
-- [ ] **Phase 9 LEARNINGS append** — done for this session (see below); cycle-by-cycle journal entries to be written when items D + G ship.
+- [ ] **Phase 5d full-doc AI verify** on all 4 cycle-1 papers at v2.4.28 — keystone gate (see above).
+- [ ] **Phase 7 cleanup + review** — `/docpluck-cleanup` last ran for v2.4.16; doc-sync drift across v2.4.17–28. `/docpluck-review` not run for any of cycles 10–14.
+- [ ] **Phase 8 Tier 3 prod byte-diff** — for each of the 4 cycle-1 papers at v2.4.28.
+- [ ] **Phase 9 LEARNINGS append** — done for cycles 10-12; cycle 13+14 entry to be appended.
 
 ---
 
@@ -111,11 +108,11 @@ Library-side parity is 100%. The remaining issues are in `PDFextractor/frontend/
 ```bash
 cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck
 
-# 1. Confirm v2.4.27 prod deploy
+# 1. Confirm v2.4.28 prod deploy
 curl -s https://extraction-service-production-d0e5.up.railway.app/_diag | python -m json.tool | head -8
 
-# 2. Pick up items D + G + Phase 5d AI verify
-/docpluck-iterate --goal until:"Item D + Item G (amj_1 chart-data) addressed + Phase 5d AI verify ran for 4 cycle-1 papers at v2.4.27" --max-cycles 5
+# 2. Phase 5d AI verify on all 4 cycle-1 papers at v2.4.28 (keystone gate)
+/docpluck-iterate --goal until:"Phase 5d AI verify completed for xiao + amj_1 + amle_1 + ieee_access_2 at v2.4.28, all surfaced defects shipped per rule 0e" --max-cycles 5
 ```
 
 The next session should re-load:
@@ -156,21 +153,24 @@ The next session should re-load:
 
 **docpluck (library) repo:**
 
-- `docpluck/extract_structured.py` — v2.4.25 caption-trim chain
+- `docpluck/extract_structured.py` — v2.4.25 caption-trim chain + v2.4.28 chart-data cluster signatures
 - `docpluck/render.py` — v2.4.26 ALL-CAPS heading post-processor
 - `docpluck/tables/cell_cleaning.py` — v2.4.27 section-row label guard
-- `docpluck/__init__.py` — version 2.4.24 → 2.4.25 → 2.4.26 → 2.4.27
+- `docpluck/normalize.py` — v2.4.28 A3c leading-zero decimal recovery (NORMALIZATION_VERSION 1.8.8 → 1.8.9)
+- `docpluck/__init__.py` — version 2.4.24 → 2.4.25 → 2.4.26 → 2.4.27 → 2.4.28
 - `pyproject.toml` — same
-- `CHANGELOG.md` — 3 new release blocks
+- `CHANGELOG.md` — 4 new release blocks
 - `tests/test_figure_caption_trim_real_pdf.py` (NEW — 14 contract + 5 real-PDF)
 - `tests/test_all_caps_section_promote_real_pdf.py` (NEW — 18 contract + 4 real-PDF)
 - `tests/test_section_row_label_no_merge_real_pdf.py` (NEW — 5 contract + 1 real-PDF)
-- `docs/HANDOFF_2026-05-14_iterate_resume_4_cycles.md` (THIS DOC)
+- `tests/test_chart_data_trim_real_pdf.py` (NEW — 14 contract + 3 real-PDF)
+- `tests/test_a3c_leading_zero_decimal_real_pdf.py` (NEW — 7 + 4 contract)
+- `docs/HANDOFF_2026-05-14_iterate_resume_4_cycles.md` (THIS DOC, updated for cycles 13+14)
 
 **docpluckapp (app) repo:**
 
-- `service/requirements.txt` (auto-bumped 2.4.24 → 2.4.27 via PR #15 → #16 → #17 → all merged)
+- `service/requirements.txt` (auto-bumped 2.4.24 → 2.4.28 via PR #15 → #16 → #17 → #18 → #19 → all merged)
 
 ---
 
-Good luck. The biggest single next item is **item G (amj_1 chart-data leak)** — it's the most user-visible remaining defect (every amj_1 figure caption is corrupted). After that, item D + Phase 5d AI verify.
+Good luck. The single biggest next item is **Phase 5d AI verify** on all 4 cycle-1 papers at v2.4.28. 14 cycles shipped over 2 sessions without an AI verify pass is the highest-priority gap; everything else (item E architectural, item F frontend) is incremental.
