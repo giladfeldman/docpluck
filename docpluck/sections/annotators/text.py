@@ -87,6 +87,44 @@ _UNDERLINED_HEADING = re.compile(
 _CAPITAL_WORD_AFTER = re.compile(r"[ \t]+[A-Z]")
 # Matches end-of-line after the heading (optional trailing colon/period/space).
 _END_OF_LINE = re.compile(r"[ \t]*[:.]?[ \t]*(?:\n|$)")
+# v2.4.18 (SECTIONING fix): a heading followed by a lowercase word on the
+# same line is body prose, not a heading. Canonical example: "Results from
+# our study have implications…" — the word "Results" matches the canonical
+# heading list but the following lowercase "from" reveals it's the first
+# word of a body sentence.
+_LOWERCASE_WORD_AFTER = re.compile(r"[ \t]+[a-z]")
+
+# v2.4.18: function-word check distinguishes body prose ("Results from our
+# study…") from keyword-list headings ("Keywords emotional pluralistic
+# ignorance…"). Body sentences use English function words (from/of/the/
+# in/with/to/by/for/on/at/and/are/is/was/were/has/had/have/that/this/which).
+# Keyword lists don't. A heading whose trailing content starts with a
+# function word is body prose — even if the canonical heading word matches.
+_FUNCTION_WORD_AFTER = re.compile(
+    r"[ \t]+(?:"
+    # Prepositions / articles / conjunctions
+    r"from|of|the|in|with|to|by|for|on|at|and|or|but|nor|so|yet|"
+    r"a|an|into|onto|about|after|before|between|during|though|although|"
+    r"because|while|since|under|over|across|through|via|per|than|then|"
+    # Pronouns / determiners
+    r"our|their|its|his|her|my|your|these|those|this|that|which|whom|whose|"
+    # Auxiliary / linking verbs
+    r"are|is|was|were|has|had|have|being|been|be|am|do|does|did|"
+    r"will|would|can|could|may|might|shall|should|must|"
+    # Common post-"Results"/"Methods" body openers (descriptive verbs)
+    r"based|derived|obtained|observed|showed|shown|indicated|suggested|"
+    r"demonstrated|found|revealed|reveal|presented|present|presents|"
+    r"reported|report|reports|support|supports|supported|"
+    r"show|shows|indicate|indicates|suggest|suggests|demonstrate|demonstrates|"
+    r"regarding|including|excluding|using|comparing|examining|"
+    # Common adverbs at sentence start
+    r"however|moreover|furthermore|thus|hence|therefore|consequently|"
+    r"additionally|finally|first|second|third|next|"
+    # 'as' / 'when' / 'where' starters
+    r"as|when|where|whereas|whether|if|unless"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def _next_nonblank_line(text: str, after_pos: int) -> str | None:
@@ -277,7 +315,28 @@ def annotate_text(text: str) -> list[BlockHint]:
         # (c) At end-of-line (with optional trailing colon/period/space).
         at_end_of_line = bool(_END_OF_LINE.match(after_heading))
 
-        if not (preceded_by_blank or followed_by_capital or at_end_of_line):
+        # v2.4.18 (SECTIONING fix): tighten Pass 1a disambiguators.
+        #
+        # Previously the rule was `(a) OR (b) OR (c)` — ANY of the three
+        # signals admitted the heading. But (a) `preceded_by_blank` is
+        # weak: every body paragraph that starts with a canonical-heading-
+        # shaped word (e.g. "Results from our study have implications…",
+        # "Results based on the top-50 sources…", "Methods of analysis…",
+        # "Discussion of these findings…") satisfies (a) trivially and
+        # got falsely promoted to `## Heading`.
+        #
+        # New rule: require (a) AND ((b) OR (c)). The heading must be
+        # preceded by a paragraph break AND have an explicit structural
+        # heading marker (Capital body word starting a new sentence, OR
+        # end-of-line / colon termination). Body-prose openers fail both
+        # (b) and (c) so they correctly get rejected.
+        #
+        # Pass 1b (`_CANONICAL_AFTER_BLANK`) still handles legitimate
+        # lowercase-body cases like "Keywords emotional pluralistic
+        # ignorance…" — that path has its own function-word reject (added
+        # in v2.4.18) to distinguish keyword-list lowercase-body from
+        # sentence lowercase-body.
+        if not (preceded_by_blank and (followed_by_capital or at_end_of_line)):
             continue
 
         # Table-cell filter: if the heading was line-isolated (not followed by a
@@ -324,6 +383,16 @@ def annotate_text(text: str) -> list[BlockHint]:
         # didn't constrain what follows.
         # Add to seen_offsets even on rejection so Pass 3 doesn't re-emit it.
         if _looks_like_table_cell(text, m.end(), True):
+            seen_offsets.add(start)
+            continue
+        # v2.4.18 (SECTIONING fix): same function-word reject as Pass 1a.
+        # "Results from our study…" matches Pass 1b too — block it here.
+        # Pass 1b's intent is to catch "Keywords emotional pluralistic…"
+        # cases where the trailing words are a list, not a sentence —
+        # function-word presence reliably distinguishes the two.
+        heading_end_1b = m.end("heading")
+        after_heading_1b = text[heading_end_1b:]
+        if _FUNCTION_WORD_AFTER.match(after_heading_1b):
             seen_offsets.add(start)
             continue
         seen_offsets.add(start)
