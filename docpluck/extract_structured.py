@@ -318,6 +318,22 @@ def _extract_caption_text(
             hard_end = nxt
             break
         if re.search(r"[.!?][\"'\)\]]?$", prev):
+            # Cycle 15n (v2.4.31): the paragraph-walk's sentence-terminator
+            # bail is too aggressive when the *only* thing consumed so far
+            # is the caption's own label (e.g. just "FIGURE 1." on its own
+            # line, followed by "\n\n" and then the real description). The
+            # caption regex anchors at MULTILINE ``^`` and `\s*` can absorb
+            # the leading newline, so for IEEE/PMC-style captions where
+            # the ALL-CAPS label sits alone on a line before a blank break
+            # before the title-case description, char_start lands at the
+            # blank line and char_end == char_start. The walk then bails
+            # on prev="FIGURE 1." (a terminator), truncating the caption
+            # to the duplicate-label placeholder ``Figure 1. FIGURE 1.``.
+            # Fix: if the accumulated text from start..nxt is just a
+            # label-only stretch (no real description), keep walking.
+            if _accumulated_is_label_only(raw_text[start:nxt]):
+                pos = nxt + 2
+                continue
             hard_end = nxt
             break
         # Otherwise the caption continues — skip past this break and keep going.
@@ -346,6 +362,15 @@ def _extract_caption_text(
     # FIGURE 2. Continuous-time …"). Keep title-case label, drop the
     # ALL-CAPS one.
     snippet = _strip_duplicate_uppercase_label(snippet, cap.label)
+    # Cycle 15n (v2.4.31): when the paragraph-walk above absorbs a
+    # cross-page running header that pdftotext placed BETWEEN the
+    # caption's label line and the description (PMC reprint pattern:
+    # ``FIGURE 4.\n\nAuthor Manuscript\n\nTwo options …``), the
+    # running header survives into the snippet as a leading prefix
+    # after the label. Strip a sequence of "Author Manuscript " (one
+    # or more occurrences) that sits between the label and the
+    # description.
+    snippet = _strip_leading_pmc_running_header(snippet)
     # v2.4.4: trim chart-data appendage from figure captions (axis-tick
     # sequences, raw bar-chart values pdftotext joined inline into the
     # caption paragraph). For tables the appendage is usually the next-
@@ -497,6 +522,69 @@ _DUPLICATE_UPPER_LABEL_RE = re.compile(
     r"(?:FIGURE|TABLE)\s+(?P=num)\.?\s+",
     re.IGNORECASE,
 )
+
+
+# Cycle 15n (v2.4.31): label-only fullmatch — accumulated caption text that
+# contains nothing more than the caption's own label (and possibly a
+# duplicate ALL-CAPS form). When the paragraph-walk in
+# ``_extract_caption_text`` is about to bail at a sentence-terminator but
+# the accumulated snippet is just label-only, the walk should keep going
+# so it can reach the actual description in the next paragraph.
+_LABEL_ONLY_FULLMATCH_RE = re.compile(
+    r"\s*(?:figure|fig\.?|table)\s+\d+(?:\.\d+)?\.?"
+    r"(?:\s+(?:figure|fig\.?|table)\s+\d+(?:\.\d+)?\.?)?\s*",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _accumulated_is_label_only(text: str) -> bool:
+    """True when ``text`` is just a Table/Figure label (optionally followed
+    by a duplicate ALL-CAPS or title-case form of the same label) with no
+    description content. Used by ``_extract_caption_text``'s paragraph-walk
+    to decide whether a `.`-terminated short fragment is a real caption or
+    just the label sitting on its own line.
+
+    Examples that return True:
+        "FIGURE 1."
+        "Figure 1.\\n\\nFIGURE 1."
+        "Figure 1. FIGURE 1."
+
+    Examples that return False:
+        "Figure 1. Petri nets model formalism elements."
+        "Author Manuscript"  (would also be rejected by the prev-words check)
+    """
+    if not text:
+        return False
+    return bool(_LABEL_ONLY_FULLMATCH_RE.fullmatch(text))
+
+
+# Cycle 15n (v2.4.31): PMC running header that pdftotext interleaves
+# between a figure caption's label line and its description. Pattern
+# observed in ieee_access_2 (37 figures): after the title-case label
+# ``Figure N.`` the snippet has ``Author Manuscript`` (one or more
+# repeats) before the description. Anchored to require the label as
+# a prefix so it can't false-fire on body prose that happens to start
+# with the phrase.
+_PMC_LEADING_HEADER_RE = re.compile(
+    r"^(?P<label>(?:Figure|Fig\.?|Table)\s+\d+(?:\.\d+)?\.)\s+"
+    r"(?:Author\s+Manuscript\s+)+",
+    re.IGNORECASE,
+)
+
+
+def _strip_leading_pmc_running_header(snippet: str) -> str:
+    """Strip a PMC ``Author Manuscript`` running header that sits
+    between the caption label and the description, after duplicate-
+    label collapse has run.
+
+    Examples:
+        ``Figure 4. Author Manuscript Two options …`` → ``Figure 4. Two options …``
+        ``Figure 5. Author Manuscript Author Manuscript Comparison …``
+            → ``Figure 5. Comparison …``
+    """
+    if not snippet:
+        return snippet
+    return _PMC_LEADING_HEADER_RE.sub(lambda m: f"{m.group('label')} ", snippet, count=1)
 
 
 def _strip_duplicate_uppercase_label(snippet: str, label: str) -> str:

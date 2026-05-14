@@ -28,7 +28,9 @@ from pathlib import Path
 import pytest
 
 from docpluck.extract_structured import (
+    _accumulated_is_label_only,
     _strip_duplicate_uppercase_label,
+    _strip_leading_pmc_running_header,
     _trim_caption_at_body_prose_boundary,
     _trim_caption_at_running_header_tail,
     extract_pdf_structured,
@@ -236,3 +238,117 @@ def test_amj_1_no_duplicate_uppercase_label():
         if f["caption"].startswith(f"{f['label']}. FIGURE")
     ]
     assert offenders == [], f"Duplicate uppercase label in: {offenders}"
+
+
+# ---- Cycle 15n (v2.4.31) ---------------------------------------------------
+
+
+class TestAccumulatedIsLabelOnly:
+    """Pure-helper coverage for the label-only fullmatch predicate the
+    paragraph-walk uses to decide whether to keep going past a
+    sentence-terminator break.
+    """
+
+    def test_uppercase_label_only(self):
+        assert _accumulated_is_label_only("FIGURE 1.")
+
+    def test_titlecase_label_only(self):
+        assert _accumulated_is_label_only("Figure 12.")
+
+    def test_label_no_period(self):
+        assert _accumulated_is_label_only("FIGURE 1")
+
+    def test_duplicate_label_in_two_paragraphs(self):
+        assert _accumulated_is_label_only("Figure 1.\n\nFIGURE 1.")
+
+    def test_table_label_only(self):
+        assert _accumulated_is_label_only("Table 3.")
+
+    def test_real_caption_rejected(self):
+        assert not _accumulated_is_label_only(
+            "Figure 1. Petri nets model formalism elements."
+        )
+
+    def test_running_header_rejected(self):
+        assert not _accumulated_is_label_only("Author Manuscript")
+
+    def test_empty_rejected(self):
+        assert not _accumulated_is_label_only("")
+
+
+class TestStripLeadingPmcRunningHeader:
+    def test_single_author_manuscript(self):
+        snippet = "Figure 4. Author Manuscript Two options for addressing arcs."
+        assert _strip_leading_pmc_running_header(snippet) == (
+            "Figure 4. Two options for addressing arcs."
+        )
+
+    def test_multiple_author_manuscript(self):
+        snippet = (
+            "Figure 5. Author Manuscript Author Manuscript Comparison of rounding "
+            "method performance."
+        )
+        assert _strip_leading_pmc_running_header(snippet) == (
+            "Figure 5. Comparison of rounding method performance."
+        )
+
+    def test_table_label_form(self):
+        snippet = "Table 2. Author Manuscript Means by condition."
+        assert _strip_leading_pmc_running_header(snippet) == (
+            "Table 2. Means by condition."
+        )
+
+    def test_no_header_unchanged(self):
+        snippet = "Figure 3. Discrete-time, deterministic SIRS model."
+        assert _strip_leading_pmc_running_header(snippet) == snippet
+
+    def test_author_manuscript_mid_sentence_not_stripped(self):
+        # Don't strip occurrences that are not immediately after the label.
+        snippet = "Figure 6. The authors edit the Author Manuscript before submission."
+        assert _strip_leading_pmc_running_header(snippet) == snippet
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
+    reason="ieee_access_2.pdf fixture not present",
+)
+def test_ieee_access_no_label_only_placeholder_captions():
+    """Cycle 15n regression: at v2.4.30 every ieee_access_2 figure
+    caption other than Figure 9 rendered as ``Figure N. FIGURE N.`` —
+    a label-only placeholder with no description content. The paragraph-
+    walk was bailing at the first ``\\n\\n`` after the ALL-CAPS label
+    line because the label ends in ``.``. Fix: keep walking past that
+    break when the accumulated text is label-only.
+    """
+    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    result = extract_pdf_structured(pdf.read_bytes())
+    placeholders = [
+        f["label"]
+        for f in result["figures"]
+        if "FIGURE" in (f["caption"] or "") and len(f["caption"]) < 30
+    ]
+    assert placeholders == [], f"label-only placeholder captions: {placeholders}"
+
+    # Spot-check Figure 1 — the canonical case from the handoff.
+    figs = {f["label"]: f["caption"] for f in result["figures"]}
+    assert figs.get("Figure 1") == "Figure 1. Petri nets model formalism elements."
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
+    reason="ieee_access_2.pdf fixture not present",
+)
+def test_ieee_access_no_inline_pmc_running_header():
+    """Cycle 15n sibling defect: 27/37 ieee_access_2 figure captions had
+    a leading ``Author Manuscript`` PMC running header between the
+    label and the description (pdftotext interleaved it across the
+    blank line that separates the ALL-CAPS label from the description).
+    """
+    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    result = extract_pdf_structured(pdf.read_bytes())
+    offenders = [
+        f["label"]
+        for f in result["figures"]
+        if "Author Manuscript" in (f["caption"] or "")
+    ]
+    assert offenders == [], f"Author Manuscript leak in: {offenders}"
