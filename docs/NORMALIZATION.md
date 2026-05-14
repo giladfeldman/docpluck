@@ -3,7 +3,7 @@
 The normalization pipeline transforms raw PDF-extracted text into clean text suitable for academic statistical pattern matching. It is applied after extraction via `normalize_text(text, level)`.
 
 **Version:** 1.1.0  
-**Three levels:** `none` | `standard` (S0-S9) | `academic` (S0-S9 + A1-A6)
+**Three levels:** `none` | `standard` (F0 + H0 + T0 + P0 + P1 + W0 + S0-S9) | `academic` (everything in `standard` + A1-A6)
 
 ---
 
@@ -222,6 +222,36 @@ Before (page 4 of journal article):
   "..."
 After:  (headers and page numbers removed)
 ```
+
+---
+
+## Pre-S0 Document-shape Strips (v1.8.x)
+
+Document-shape passes that run **before** the unicode/whitespace S0–S9
+steps. They strip page-level junk that pdftotext serializes into the body
+text stream (banners, dot-leader TOCs, page-footer lines, watermarks,
+front-matter metadata leaks).
+
+Implemented in `docpluck/normalize.py` (see code for full pattern lists);
+documented here at summary level only.
+
+| Step | Purpose | Notes |
+|------|---------|-------|
+| F0 | Layout-aware running-header / footer / footnote strip | Requires `LayoutDoc` from `extract_pdf_layout`; populates `report.footnote_spans`. Optional. |
+| H0 | Document-header banner-line strip | Runs only in the first 30 lines; curated `_HEADER_BANNER_PATTERNS`. v1.8.0. |
+| T0 | TOC dot-leader paragraph strip | Drops paragraphs containing `_{3,}` runs in the head zone (first ~100 lines). v1.8.0. |
+| P0 | Page-footer / running-header LINE strip | Curated `_PAGE_FOOTER_LINE_PATTERNS` matching single complete lines. Includes `^Q. XIAO ET AL.$`, `^RECKELL et al.$`, `^CONTACT …$`, `^Department of …, University of <Place>, <Region>$`, `^Supplemental data for this article …$`, truncated `^Department of …, University of$`, JAMA/AOM/PMC footers, etc. v1.8.0 + v2.4.6 + v2.4.8 + v2.4.16. |
+| P1 | Front-matter metadata-leak PARAGRAPH strip | **v2.4.16.** Drops orphan acknowledgments / license blocks / "previous version" notes / correspondence blocks that pdftotext inlines as standalone single-line paragraphs mid-Introduction. Position-gated to the first `max(8000, len(text)//6)` chars so the legitimate `## Acknowledgments` section at the end is preserved. |
+| W0 | Publisher-overlay watermark strip | "Downloaded from …", "Provided by …", "This article is protected by copyright", Royal Society OA footer, Elsevier copyright stamp, two-column running-header, equal-contribution footnote. v1.7.0–v2.3.1. |
+
+**Ordering:** F0 → H0 → T0 → P0 → P1 → W0 → S0 (unicode) → S1 …
+
+P1 runs AFTER P0 because P0 already handles single-line variants of the
+patterns P1 catches at paragraph level. The two are complementary:
+P0 is globally safe (no position gate, matches full lines); P1 is
+position-gated and matches paragraph openings to catch multi-sentence
+acknowledgments / license blobs that pdftotext serialized on a single
+long physical line.
 
 ---
 
