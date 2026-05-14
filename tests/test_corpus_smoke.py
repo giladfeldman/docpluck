@@ -22,6 +22,7 @@ Representative picks:
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -75,14 +76,18 @@ def test_corpus_paper_renders(name, min_sections, min_table_html, max_figs_above
     )
 
     # 3. Table HTML count (body-spliced only — appendix tables are
-    #    inherently isolated and not a render-bug signal).
-    appendix_idx = md.find("## Tables (unlocated in body)")
-    body_section = md if appendix_idx < 0 else md[:appendix_idx]
-    html_count = body_section.count("<table>")
-    assert html_count >= min_table_html, (
-        f"{name}: only {html_count} body-spliced HTML tables "
-        f"(expected ≥ {min_table_html})"
-    )
+    #    inherently isolated and not a render-bug signal). Skipped
+    #    under DOCPLUCK_DISABLE_CAMELOT=1: without Camelot, structured
+    #    tables aren't extracted so there is no body-spliced HTML to
+    #    count; the metric is only meaningful with Camelot enabled.
+    if os.environ.get("DOCPLUCK_DISABLE_CAMELOT", "0") != "1":
+        appendix_idx = md.find("## Tables (unlocated in body)")
+        body_section = md if appendix_idx < 0 else md[:appendix_idx]
+        html_count = body_section.count("<table>")
+        assert html_count >= min_table_html, (
+            f"{name}: only {html_count} body-spliced HTML tables "
+            f"(expected ≥ {min_table_html})"
+        )
 
     # 4. Bug 3 check — figures must NOT appear before the first ## heading.
     first_h2 = _H2_RE.search(md)
