@@ -399,6 +399,27 @@ def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
         return header_rows
     sup = list(header_rows[0])
     sub = list(header_rows[1])
+    # v2.4.21 (cycle 6): body-prose leak rejection. Real super-headers
+    # are typically short single-word or two-word labels. Body prose
+    # that pdftotext-extracted-table-region-detection incorrectly
+    # absorbed appears as a 60+-char run with sentence-y commas /
+    # unmatched parens. Example caught in xiao_2021_crsp Table 5:
+    #   sup row[0] = "the regret salience manipulation check item
+    #     revealed a main effect of condition, FWelch(2,"
+    # which got folded into the real Options header, producing
+    # ``<th>the regret salience…, FWelch(2,<br>Options</th>``.
+    # If ANY super-row cell exceeds 80 chars AND contains a comma-
+    # then-lowercase or an unmatched open paren, DROP the super-row
+    # rather than fold it. Real super-headers never look this way.
+    if any(
+        len((cell or "").strip()) > 80
+        and (
+            re.search(r",\s*[a-z]", cell or "")
+            or ("(" in (cell or "") and (cell or "").count("(") > (cell or "").count(")"))
+        )
+        for cell in sup
+    ):
+        return [sub] + header_rows[2:]
     n = max(len(sup), len(sub))
     sup += [""] * (n - len(sup))
     sub += [""] * (n - len(sub))
