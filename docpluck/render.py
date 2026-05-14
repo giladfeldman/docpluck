@@ -570,6 +570,53 @@ _ALL_CAPS_SECTION_HEADING_RE = re.compile(
     r"^[A-Z][A-Z0-9:\-,/ ]{9,}[A-Z0-9]$"
 )
 
+# Cycle 15d (G6): Roman-numeral section markers in IEEE / engineering papers.
+# IEEE style is `I. INTRODUCTION` / `II. METHODOLOGY` / ... / `V.: SUPPLEMENTARY INDEX`.
+# Two layout variants observed in pdftotext output:
+#   (A) Orphan numeral on its own line, blank, then ALL-CAPS heading on next line.
+#       Detected via _ROMAN_NUMERAL_ORPHAN_RE; consumed by the post-processor
+#       and folded into the following promoted heading: `## I. INTRODUCTION`.
+#   (B) Roman numeral + (optional colon) + ALL-CAPS title on a single line.
+#       The `.` and `:` after the numeral block the standard heading regex
+#       above, so we add a dedicated _ROMAN_PREFIX_HEADING_RE for this form.
+_ROMAN_NUMERAL_ORPHAN_RE = re.compile(r"^[IVX]{1,4}\.\s*$")
+_ROMAN_PREFIX_HEADING_RE = re.compile(
+    r"^([IVX]{1,4})\.:?\s+([A-Z][A-Z0-9:\-,/ ]{3,}[A-Z0-9])$"
+)
+
+
+def _fold_orphan_roman_numerals_into_headings(text: str) -> str:
+    """Cycle 15d (G6): fold an orphan Roman-numeral line into the following
+    `## ` heading.
+
+    By the time `_promote_study_subsection_headings` runs, the section
+    partitioner has often already promoted the ALL-CAPS heading to `## `
+    on its own — but the preceding `I.` / `II.` / etc. numeral line is
+    left as orphan body prose. This post-processor scans for the pattern
+    and folds the numeral into the heading:
+
+        I.\\n\\n## INTRODUCTION  →  ## I. INTRODUCTION
+
+    Operates on text-level regex (multi-line) so it catches any blank-line
+    separation between the numeral and the heading.
+    """
+    if not text:
+        return text
+    # Match: orphan Roman-numeral on its own line, any number of blank lines,
+    # then a `## ` heading. Capture the numeral and the heading text.
+    pattern = re.compile(
+        r"(?m)^([IVX]{1,4}\.)\s*\n(?:\s*\n)+(?P<head>## (?!\s*[IVX]{1,4}\.\s)[^\n]+)"
+    )
+
+    def repl(m: re.Match) -> str:
+        numeral = m.group(1)
+        head_line = m.group("head")
+        # head_line is "## SOMETHING" — splice the numeral after the `## `
+        head_text = head_line[3:]
+        return f"## {numeral} {head_text}"
+
+    return pattern.sub(repl, text)
+
 
 def _promote_study_subsection_headings(text: str) -> str:
     """Promote ``Study N Design and Findings`` etc. to ``### {title}``.
@@ -601,7 +648,18 @@ def _promote_study_subsection_headings(text: str) -> str:
             out.append(line)
             continue
         promoted_h2 = False
-        if _ALL_CAPS_SECTION_HEADING_RE.match(stripped) and _is_safe_all_caps_promote(
+        # Cycle 15d: inline Roman-numeral-prefixed ALL-CAPS heading
+        # ("I. INTRODUCTION", "V.: SUPPLEMENTARY INDEX"). The `.`/`:` after
+        # the numeral blocks the bare ALL-CAPS regex, so handle this form
+        # explicitly before falling through to the bare ALL-CAPS branch.
+        roman_inline = _ROMAN_PREFIX_HEADING_RE.match(stripped)
+        if roman_inline and _is_safe_all_caps_promote(lines, i, stripped):
+            if out and out[-1] != "":
+                out.append("")
+            out.append(f"## {stripped}")
+            out.append("")
+            promoted_h2 = True
+        elif _ALL_CAPS_SECTION_HEADING_RE.match(stripped) and _is_safe_all_caps_promote(
             lines, i, stripped
         ):
             # v2.4.26 (cycle 11): an ALL-CAPS line sandwiched between a
@@ -609,9 +667,40 @@ def _promote_study_subsection_headings(text: str) -> str:
             # is almost certainly a major section heading that the
             # section detector missed because pdftotext flattened
             # paragraph breaks around it. Promote to ``## {heading}``.
+            #
+            # Cycle 15d (G6): when the heading is preceded by an orphan
+            # Roman-numeral line ("I." on its own line above
+            # "INTRODUCTION"), fold the numeral into the promoted heading
+            # so the output reads "## I. INTRODUCTION" (matching the
+            # source PDF) instead of leaving an orphan numeral above the
+            # `##` line. Search the last ≤3 entries of out[] for the
+            # orphan; remove it if found and prepend its content to the
+            # heading text.
+            roman_consumed = ""
+            for back in range(1, min(4, len(out)) + 1):
+                idx = len(out) - back
+                if idx < 0:
+                    break
+                candidate = out[idx].strip()
+                if candidate == "":
+                    continue
+                m = _ROMAN_NUMERAL_ORPHAN_RE.match(candidate)
+                if m:
+                    roman_consumed = candidate  # e.g. "I."
+                    # Pop the orphan AND any subsequent blank lines so we
+                    # don't end up with double blanks in front of `##`.
+                    out = out[:idx]
+                    # Trim any trailing blanks in out so the `##` lands
+                    # cleanly after one blank line.
+                    while out and out[-1] == "":
+                        out.pop()
+                break
             if out and out[-1] != "":
                 out.append("")
-            out.append(f"## {stripped}")
+            if roman_consumed:
+                out.append(f"## {roman_consumed} {stripped}")
+            else:
+                out.append(f"## {stripped}")
             out.append("")
             promoted_h2 = True
         elif _STUDY_SUBSECTION_RE.match(stripped) or _OVERVIEW_HEADING_RE.match(stripped):
@@ -1878,6 +1967,10 @@ def render_pdf_to_markdown(
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)
+    # Cycle 15d (G6): fold orphan Roman-numeral lines into the following
+    # `## ` heading produced by the section partitioner. Runs LAST among
+    # heading post-processors so it operates on the final heading shapes.
+    md = _fold_orphan_roman_numerals_into_headings(md)
 
     # 5. Title rescue — only available when pdfplumber layout extracts cleanly.
     if _layout_doc is not None:

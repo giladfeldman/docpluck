@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.30] — 2026-05-14
+
+**Cycle 15d — orphan Roman-numeral consumption (G6).** IEEE-style papers use `I. INTRODUCTION` / `II. METHODOLOGY` / ... / `V.: SUPPLEMENTARY INDEX` section headings. pdftotext often emits these with the numeral on a separate line above the ALL-CAPS heading (orphan form), or as an inline form with `.` / `:` after the numeral that the standard ALL-CAPS heading regex doesn't match.
+
+- New `_ROMAN_NUMERAL_ORPHAN_RE` (`^[IVX]{1,4}\.\s*$`) + `_ROMAN_PREFIX_HEADING_RE` (`^[IVX]{1,4}\.:?\s+[A-Z][A-Z0-9:\-,/ ]{3,}[A-Z0-9]$`) in `docpluck/render.py`.
+- New post-processor `_fold_orphan_roman_numerals_into_headings` wired into the render chain after section partitioning — scans the rendered .md for an orphan numeral line followed by a `## ` heading and folds the numeral into the heading: `I.` + `## INTRODUCTION` → `## I. INTRODUCTION`.
+- Inline form (`V.: SUPPLEMENTARY INDEX`) handled at promote-time before falling through to the bare ALL-CAPS regex.
+
+Verified on ieee_access_2: `## I. INTRODUCTION`, `## II. METHODOLOGY`, `## V.: SUPPLEMENTARY INDEX` all now appear correctly. (`## III. RESULTS`, `## IV. DISCUSSION AND CONCLUSION` partial — those numerals aren't adjacent to their headings in the section-partitioner output, so they remain bare. Documented as known limitation queued for the section-partitioner cycle 15i+.)
+
+5 new regression tests added in `tests/test_roman_numeral_section_promote_real_pdf.py` (3 real-PDF + 2 synthetic-text contract tests).
+
+Side-fix: `tests/test_d5_normalization_audit.py::TestVersionBumps` updated to accept `NORMALIZATION_VERSION` 1.9.x (was hard-coded to 1.8.x).
+
 ## [2.4.29] — 2026-05-14
 
 **Source-glyph preservation in the render path** (Cycles 15a + 15b + 15c, bundled — all share root cause "rendered .md must preserve source PDF glyphs"). Established by the Phase-5d AI-gold audit (docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md): the v2.4.28 render systematically transliterated Greek letters, math operators, superscripts/subscripts, comma-thousands separators, and decomposed combining-character names — silently corrupting meta-science content. The fix preserves all source glyphs in the rendered .md while keeping backward-compatible behavior for stat-extraction callers (D5 audit suite + downstream regex matching).
