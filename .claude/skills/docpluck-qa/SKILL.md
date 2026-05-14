@@ -1,7 +1,7 @@
 ---
 name: docpluck-qa
-description: Comprehensive QA engineer for Docpluck App (PDF + DOCX + HTML extraction SaaS). Runs 500+ Python tests (library + service), ESCIcheck 10-PDF AI verification (library + local webapp + production), normalization spot-check, section-identification smoke, batch extraction, service health, DB, admin API, and deployment checks. When asked for a "DOCX benchmark" or "format parity benchmark" or "--benchmark-docx" or similar, runs the special cross-format benchmark suite (CitationGuard DOCX corpus + DOCX→PDF + PDF→DOCX). Use /docpluck-qa whenever testing, after changes, or before deployment.
-tags: [python, nextjs, pdf, docx, fastapi, drizzle, neon, qa]
+description: Comprehensive QA engineer for Docpluck App (PDF + DOCX + HTML extraction SaaS). Runs 500+ Python tests (library + service), ESCIcheck 10-PDF AI verification (library + local webapp + production), normalization spot-check, section-identification smoke, batch extraction, service health, DB, admin API, and deployment checks. ALSO runs frontend mobile-viewport interactive smoke (Playwright at 360x800 — opens hamburger, walks menu, captures console errors) for any PR touching frontend components — `next build` cannot catch base-ui hierarchy violations or polymorphic-render footguns that only surface at component-mount runtime. When asked for a "DOCX benchmark" or "format parity benchmark" or "--benchmark-docx" or similar, runs the special cross-format benchmark suite (CitationGuard DOCX corpus + DOCX→PDF + PDF→DOCX). Use /docpluck-qa whenever testing, after changes, or before deployment.
+tags: [python, nextjs, pdf, docx, fastapi, drizzle, neon, qa, mobile-smoke, base-ui]
 ---
 
 # Docpluck QA
@@ -40,6 +40,67 @@ Run ALL checks sequentially. Report results in a structured table at the end.
 cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor\frontend && npm run build 2>&1 | tail -20
 ```
 Must compile with **0 errors**. Warnings about middleware/turbopack are expected (Next.js 16).
+
+> **A clean build is NOT sufficient.** Base-UI primitives (used in `frontend/src/components/ui/dropdown-menu.tsx`, etc.) assert component-hierarchy invariants at component-MOUNT runtime. A misuse like `<DropdownMenuLabel>` outside `<DropdownMenuGroup>` produces a numeric production error (e.g. `Base UI error #31`) that crashes every page rendering the offending tree, even before the user opens the menu — and `next build` does NOT catch it. Section 1b below is required for any PR touching `app-header.tsx`, `mobile-nav.tsx`, or any new component using base-ui primitives.
+
+---
+
+### 1b. Frontend Mobile-Viewport Interactive Smoke (CRITICAL when frontend touched)
+
+**Trigger:** any PR touching `frontend/src/components/` (especially `app-header.tsx`, `mobile-nav.tsx`, anything new using base-ui primitives), `frontend/src/app/page.tsx`, or other marketing pages.
+
+**Why this exists:** the v2.4.24 mobile-nav incident shipped twice with `tsc + eslint + next build` all green. First ship: `render={<Link>}` polymorphic prop crashed on click. Second ship: `<DropdownMenuLabel>` outside `<DropdownMenuGroup>` triggered Base UI error #31 on mount, crashing every page rendering `<AppHeader />`. The class of bug — base-ui hierarchy violations and polymorphic-render footguns — only surfaces at runtime in a real browser. SSR markup looks fine.
+
+**Procedure (preferred — Playwright):**
+```bash
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor\frontend
+# Install if missing — this becomes a permanent dev-dep:
+npm i -D @playwright/test && npx playwright install chromium
+# Boot prod build on a free port (do NOT use dev server — base-ui prod assertions only fire in NODE_ENV=production):
+PORT=3099 npx next start -p 3099 &
+SERVER_PID=$!
+sleep 4
+# Run the smoke: 360x800 viewport, capture console errors, click hamburger, click each menu item.
+node scripts/qa_mobile_smoke.mjs http://localhost:3099 2>&1 | tail -20
+kill $SERVER_PID
+```
+
+`scripts/qa_mobile_smoke.mjs` (create on first run; commit to repo):
+```js
+import { chromium } from "@playwright/test";
+const url = process.argv[2] || "http://localhost:3099";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 360, height: 800 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+page.on("console", (m) => { if (m.type() === "error") errors.push(`console: ${m.text()}`); });
+await page.goto(url, { waitUntil: "networkidle" });
+const hamburger = await page.$('[aria-label="Open navigation menu"]');
+if (!hamburger) { console.error("FAIL: no hamburger button"); process.exit(1); }
+await hamburger.click();
+await page.waitForTimeout(300);
+const menu = await page.$('[role="menu"]');
+if (!menu) { console.error("FAIL: menu did not open after hamburger click"); process.exit(1); }
+const items = await page.$$('[role="menuitem"]');
+console.log(`menu opened with ${items.length} items`);
+if (items.length < 3) { console.error("FAIL: expected ≥3 menu items"); process.exit(1); }
+if (errors.length) {
+  console.error("FAIL: runtime errors detected:");
+  errors.forEach((e) => console.error("  " + e));
+  process.exit(1);
+}
+console.log("PASS: mobile nav renders, opens, and has no runtime errors");
+await browser.close();
+```
+
+**Procedure (fallback — manual when Playwright unavailable):**
+1. `PORT=3099 npx next start -p 3099` and open `http://localhost:3099/` in a real browser at a 360px-wide viewport (DevTools device emulation).
+2. Open the browser DevTools console BEFORE interacting.
+3. Click the hamburger button (top-right).
+4. PASS if: menu opens, items match desktop nav, no console errors. FAIL if: any "Base UI error #N", any unhandled exception, or the menu fails to open.
+5. Click at least one menu item — verify navigation works.
+
+**Production preview check (every deploy):** after Vercel finishes the preview deploy, repeat steps 2–5 against the preview URL in a real browser at 360px viewport. PASS = no console errors + menu interactive. FAIL = revert or hot-fix immediately; broken mobile nav blocks ~50% of traffic.
 
 ---
 

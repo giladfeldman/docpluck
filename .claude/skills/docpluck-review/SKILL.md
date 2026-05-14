@@ -104,7 +104,26 @@ The homepage (`frontend/src/app/page.tsx`) and any "About" / "Features" / "How i
 - **Check:** the same audit applies to `frontend/src/app/about-normalization/page.tsx`, `frontend/src/app/api-docs/page.tsx`, `frontend/src/app/sections/page.tsx`, and `frontend/src/app/benchmarks/page.tsx` whenever the underlying library surface they describe changed.
 - **Severity:** WARN (non-blocker) on isolated stale numbers; BLOCKER if the homepage actively contradicts shipped functionality (e.g., claims "PDF-only" while DOCX/HTML endpoints are live, or omits a feature gated behind a deploy that already happened).
 
-### 14. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
+### 14. Base-UI primitive component-hierarchy + polymorphism rules (frontend, v2.4.24+)
+Base UI (`@base-ui-components/react`, used through `frontend/src/components/ui/*.tsx`) eager-renders portal children and asserts component-hierarchy invariants on mount. A violation produces a cryptic numeric production error (e.g. `Base UI error #31`) that crashes EVERY page rendering the offending tree, even before the user opens the menu. The dev build often masks this; only `next build` + a real browser hit surfaces it. Two recurring footguns from v2.4.24 incident:
+
+**14a — Hierarchy violation (Base UI error #31).** A primitive whose name implies it labels / belongs to a parent group MUST be wrapped in that parent. Specifically for the `DropdownMenu` family in `frontend/src/components/ui/dropdown-menu.tsx`:
+- `<DropdownMenuLabel>` (= `MenuPrimitive.GroupLabel`) MUST be inside `<DropdownMenuGroup>` (= `MenuPrimitive.Group`).
+- `<DropdownMenuRadioItem>` MUST be inside `<DropdownMenuRadioGroup>`.
+- `<DropdownMenuSubTrigger>` and `<DropdownMenuSubContent>` MUST be inside `<DropdownMenuSub>`.
+- The same rule applies to `Combobox`, `Select`, `Tabs`, `Accordion`, and any other base-ui primitive with a `Group` / `Root` parent.
+- **Check:** grep `frontend/src/` for `<DropdownMenuLabel`, `<DropdownMenuRadioItem`, `<DropdownMenuSubTrigger`, `<DropdownMenuSubContent`. For each match, walk OUT (not in) until you find a wrapping `<DropdownMenuGroup` / `<DropdownMenuRadioGroup` / `<DropdownMenuSub`. If absent within the same component, BLOCKER.
+- **Severity:** BLOCKER (production-crashing).
+
+**14b — Polymorphic `render={<Link>}` patterns on base-ui items.** Passing a Next.js `<Link>` (or any element form) to base-ui's `render` prop on `Menu.Item` / similar primitives crashed the page on click in production (the element-form clone path interacts badly with Next.js Link's ref forwarding). For navigation inside a base-ui menu / popover, use `onClick={() => router.push(href)}` with a `useRouter()` hook instead.
+- **Check:** grep `frontend/src/` for `render={<Link` and `render={<a `. Each match is at minimum a WARN; on `MenuPrimitive.Item` / `DropdownMenuItem` / similar interactive primitives, BLOCKER.
+- **Check:** when reviewing a new menu/dropdown component, prefer `onClick` + `router.push` over polymorphic `render` for navigation.
+- **Severity:** BLOCKER on interactive menu items; WARN elsewhere.
+
+**14c — Prefer vanilla disclosure for trivial mobile menus.** `MobileNav` and similar 3-to-6-item disclosures don't need base-ui's Portal / Positioner / Popup / Group machinery. A plain `useState` + outside-click + Escape pattern has zero hierarchy constraints, zero SSR Portal quirks, and zero base-ui dependency. Reach for base-ui only when the surface needs nested submenus, type-ahead selection, virtualization, or accessibility primitives that would be expensive to reproduce.
+- **Check:** if a base-ui primitive is being used for a 3-to-6-item flat menu, ask the author why. WARN, not BLOCKER.
+
+### 15. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
 The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/` is the regression line for `render_pdf_to_markdown`. Any change to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py` MUST be verified.
 - **Check:** When any of those files are modified, run `python scripts/verify_corpus.py` (~8-12 min) before approving.
 - **Expected:** `26 / 26 PASS`. Any FAIL is a regression and blocks the review.
@@ -144,6 +163,10 @@ The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/output
 - [ ] Footer links are not stranded inside `hidden sm:*` either.
 - [ ] No element with a click handler / link is hidden on mobile without a documented replacement path. Document the replacement path in the PR description if non-obvious.
 - [ ] Run a viewport-emulator pass at 360x800 (Pixel-class) and 390x844 (iPhone-class) AND read the JSX — both, because Tailwind classes can hide things the emulator misses if the emulator was opened before a code change.
+- [ ] **Base-UI primitive hierarchy audit (rule 14a):** grep `frontend/src/` for `<DropdownMenuLabel`, `<DropdownMenuRadioItem`, `<DropdownMenuSubTrigger`, `<DropdownMenuSubContent`. Each match must have an enclosing `<DropdownMenuGroup` / `<DropdownMenuRadioGroup` / `<DropdownMenuSub` in the same JSX subtree. Missing wrapper = BLOCKER (production Base UI error #N crashes every page rendering this component).
+- [ ] **Polymorphic-render audit (rule 14b):** grep `frontend/src/` for `render={<Link` and `render={<a `. Inside any base-ui interactive primitive (MenuPrimitive.Item / DropdownMenuItem / similar) = BLOCKER. Outside = WARN. Replace with `onClick={() => router.push(href)}`.
+- [ ] **Trivial-menu vanilla-disclosure check (rule 14c):** if a new base-ui DropdownMenu / Popover is being added for a 3-to-6-item flat menu, surface as WARN — vanilla `useState` + outside-click is simpler and has zero base-ui hierarchy/Portal/SSR risk.
+- [ ] **Production smoke required:** for any change touching `app-header.tsx`, `mobile-nav.tsx`, or any other component using base-ui primitives, the PR description MUST confirm a `next build` ran AND a real browser hit at mobile viewport (or the deployed preview URL) opened the menu without console errors. `next build` succeeding alone is NOT sufficient — base-ui hierarchy errors only fire at component-mount runtime.
 
 ### Marketing / landing-page accuracy (hard rule 13)
 
