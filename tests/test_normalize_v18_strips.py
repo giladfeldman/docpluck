@@ -15,12 +15,12 @@ from docpluck.normalize import (
 
 
 def test_version_bumped():
-    # Locked to the v1.8.x family — patch-level bumps (e.g. 1.8.0 → 1.8.1
-    # for the extended W0 Downloaded-from watermark in v2.3.1) are
-    # accepted; a minor or major bump would mean a structural change in
-    # the strip pipeline and should require updating the H0/T0/P0 tests
-    # below.
-    assert NORMALIZATION_VERSION.startswith("1.8.")
+    # v2.4.29 bumped 1.8.x → 1.9.0 for the source-glyph-preservation
+    # `preserve_math_glyphs` gating in A5 / A3a / A3 / A3c. The H0/T0/P0
+    # strip pipeline is unaffected by that bump, so this test accepts
+    # the 1.9.x family in addition to 1.8.x. A 2.x bump would still be
+    # a structural change that needs explicit re-evaluation.
+    assert NORMALIZATION_VERSION.startswith(("1.8.", "1.9."))
 
 
 # ── H0: header banner strip ────────────────────────────────────────────────

@@ -52,7 +52,11 @@ def _maybe_render(rel: str) -> str:
 
 
 def test_v185_version_bump():
-    assert NORMALIZATION_VERSION.startswith("1.8.")
+    # v2.4.29 bumped 1.8.x → 1.9.0 for `preserve_math_glyphs`. The A3
+    # widening this test exercises remains in place; the bump only
+    # gates the A3 step on the new flag, which defaults to False
+    # (back-compat). Accept both families.
+    assert NORMALIZATION_VERSION.startswith(("1.8.", "1.9."))
 
 
 def test_a3_widening_preserves_sample_size_1001():
