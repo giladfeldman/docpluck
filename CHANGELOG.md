@@ -1,5 +1,54 @@
 # Changelog
 
+## [2.4.20] — 2026-05-14
+
+Dehyphenation: rejoin pdftotext-space-broken compound words (cycle 5 of
+/docpluck-iterate run). Surfaced by v2.4.16 / v2.4.17 Phase 5d AI verify
+on xiao_2021_crsp; flagged as pre-existing "residual dehyphenation gap";
+fixed per rule 0e.
+
+### Defect — space-broken compound words
+
+PDFs use Unicode soft-hyphen (U+00AD) or letter-spacing for line-break-
+aware hyphenation. pdftotext removes the soft-hyphen but leaves a single
+SPACE between the two halves. The word "experiments" in xiao's abstract
+renders as "experi ments" — a typo to a human reader and a tokenization
+breakage for every downstream NLP / search / citation-extraction tool.
+
+S7 (hyphenation repair) catches `word-\nword2` → `wordword2` but NOT the
+space-broken form (no hyphen). Different bug, different fix.
+
+### Fix — new step S7a in `docpluck/normalize.py` (NORMALIZATION_VERSION 1.8.6 → 1.8.7)
+
+`_rejoin_space_broken_compounds` walks a curated list of (prefix,
+suffix-set) regex pairs and removes the interior space whenever the
+joined form is an unambiguous English word. The pairs cover ~23
+prefix-family pairs surfaced from the corpus AI verify:
+
+| Prefix | Joined forms |
+|--------|--------------|
+| `experi` | experiments, experience, experimental, experimentation, … |
+| `addi` | addition, additionally, additive, … |
+| `discre` | discrepancy, discrepancies, discretion, … |
+| `con` | concerning, conducted, confined, confirmed, consequently, consistent, sists, sisted, siderable, trolled, fronted, firmation |
+| `ques` | question, questionnaire, questioned, questioning |
+| `presenta` | presentation, presentational |
+| `discus` | discussion, discussions, discussed |
+| `informa`, `differ`, `repli`, `refer`, `identi`, `specifi`, `reliabi`, `genera`, `explana`, `transla`, `observa`, `opera`, `varia`, `correla`, `applica`, `interpre` | analogous suffix-sets |
+
+Conservative: every (prefix, suffix) listed produces a single valid
+English word when joined. The patterns require both halves to be
+lowercase and at word boundaries, so surrounding body prose is
+unaffected. Idempotent.
+
+### Verified
+
+- xiao_2021_crsp v2.4.20: zero "experi ments" / "addi tion" / "discre
+  pancies" / "con cerning" / "con ducted" / "con fined" / "ques
+  tionnaires" / "presenta tion" / "experi ences" remain
+  (all 9 patterns from cycle-2 AI verify rejoined)
+- Broad pytest (in flight); 26-paper baseline (in flight)
+
 ## [2.4.19] — 2026-05-14
 
 P0 residual-running-header patterns (cycle 4 of /docpluck-iterate run).
