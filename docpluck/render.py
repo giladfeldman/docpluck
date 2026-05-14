@@ -545,6 +545,31 @@ _OVERVIEW_HEADING_RE = re.compile(
     r"^Overview\s+of\s+(?:the\s+)?[A-Z][A-Za-z\s]{2,60}$"
 )
 
+# v2.4.26 (cycle 11): post-processor regex for ALL-CAPS major section
+# headings that pdftotext kept on their own line but the section
+# detector rejected (blank_before / blank_after constraints failed
+# because pdftotext flattened paragraph breaks around the heading).
+#
+# Captures AOM-style structure (amj_1):
+#   * THEORETICAL DEVELOPMENT
+#   * OVERVIEW OF THE STUDIES
+#   * STUDY 1: QUASI-FIELD EXPERIMENT
+#   * STUDY 2: LABORATORY EXPERIMENT
+#   * MANIPULATION AND MEASURES
+#   * GENERAL DISCUSSION  (also covered by the section detector — but
+#     idempotent since this post-processor skips lines that already
+#     have ``#`` prefix)
+#
+# Strict criteria to avoid false positives:
+#   - Whole line is ALL-CAPS (letters + digits + ``:``/``-``/space/comma).
+#   - ≥ 10 chars (excludes "USA", "EU").
+#   - ≥ 2 whitespace-separated tokens.
+#   - Doesn't end with a sentence terminator.
+#   - At least one alphabetic character (excludes pure-digit lines).
+_ALL_CAPS_SECTION_HEADING_RE = re.compile(
+    r"^[A-Z][A-Z0-9:\-,/ ]{9,}[A-Z0-9]$"
+)
+
 
 def _promote_study_subsection_headings(text: str) -> str:
     """Promote ``Study N Design and Findings`` etc. to ``### {title}``.
@@ -570,12 +595,26 @@ def _promote_study_subsection_headings(text: str) -> str:
         return text
     lines = text.split("\n")
     out: list[str] = []
-    for line in lines:
+    for i, line in enumerate(lines):
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             out.append(line)
             continue
-        if _STUDY_SUBSECTION_RE.match(stripped) or _OVERVIEW_HEADING_RE.match(stripped):
+        promoted_h2 = False
+        if _ALL_CAPS_SECTION_HEADING_RE.match(stripped) and _is_safe_all_caps_promote(
+            lines, i, stripped
+        ):
+            # v2.4.26 (cycle 11): an ALL-CAPS line sandwiched between a
+            # sentence-terminator and a heading-like sub-section line
+            # is almost certainly a major section heading that the
+            # section detector missed because pdftotext flattened
+            # paragraph breaks around it. Promote to ``## {heading}``.
+            if out and out[-1] != "":
+                out.append("")
+            out.append(f"## {stripped}")
+            out.append("")
+            promoted_h2 = True
+        elif _STUDY_SUBSECTION_RE.match(stripped) or _OVERVIEW_HEADING_RE.match(stripped):
             # Promote with blank-line padding so downstream tools see it as
             # a standalone heading paragraph. Avoid double blank lines.
             if out and out[-1] != "":
@@ -587,6 +626,57 @@ def _promote_study_subsection_headings(text: str) -> str:
     cleaned = "\n".join(out)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
+
+
+def _is_safe_all_caps_promote(lines: list[str], i: int, stripped: str) -> bool:
+    """Guard for :func:`_promote_study_subsection_headings`'s ALL-CAPS
+    branch to prevent false-positive promotion of body fragments.
+
+    Requires both:
+      * The previous non-blank line ends with a sentence-terminator
+        (``.``, ``!``, ``?``) or is itself an empty/whitespace-only line
+        from a paragraph break — i.e. the prior paragraph ended cleanly.
+      * The next non-blank line starts with an uppercase letter (a real
+        paragraph or sub-heading) AND doesn't itself look like part of
+        the heading line's continuation (e.g. column-header siblings).
+
+    Also requires the line to contain at least one alphabetic char so
+    pure-digit lines (table-row leakage) don't fire.
+    """
+    if not any(c.isalpha() for c in stripped):
+        return False
+    # Previous non-blank line check.
+    prev = None
+    j = i - 1
+    while j >= 0:
+        ps = lines[j].strip()
+        if ps:
+            prev = ps
+            break
+        j -= 1
+    if prev is None:
+        return False
+    if prev[-1:] not in {".", "!", "?", ":", '"', "'", ")", "]"}:
+        return False
+    # Next non-blank line check.
+    nxt = None
+    j = i + 1
+    while j < len(lines):
+        ns = lines[j].strip()
+        if ns:
+            nxt = ns
+            break
+        j += 1
+    if nxt is None:
+        return False
+    if not nxt[:1].isupper():
+        return False
+    # Reject if the next line is itself ALL-CAPS — that would be a
+    # continuation of a multi-line ALL-CAPS title (only the title
+    # case at top-of-doc has this) rather than a sub-heading.
+    if _ALL_CAPS_SECTION_HEADING_RE.match(nxt):
+        return False
+    return True
 
 
 # ── Section C2: orphan table cell-text suppression ──────────────────────────
