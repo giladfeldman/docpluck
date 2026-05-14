@@ -1,5 +1,59 @@
 # Changelog
 
+## [2.4.23] — 2026-05-14
+
+pdftotext version-skew pattern robustness (cycle 8 of /docpluck-iterate
+run). Targets the Xpdf 4.00 (local Windows) vs poppler 25.03 (Railway
+Linux) line-break-placement skew documented in memory
+`feedback_pdftotext_version_skew`.
+
+### Defect — prod retains more front-matter junk than local
+
+P0 (`_PAGE_FOOTER_LINE_PATTERNS`) is line-based — matches anchored
+`^…$`. On local Xpdf, a banner like `COMPREHENSIVE RESULTS IN SOCIAL
+PSYCHOLOGY https://doi.org/10.1080/23743603.2021.1878340 Published
+online: 18 Mar 2021.` is serialized as a single line. On prod poppler,
+it's split into 3 separate lines. The single-line P0 pattern matches
+local; the split version slips through prod.
+
+Cycle 1 Phase 8 Tier 3 byte-diff confirmed this: `xiao_2021_crsp` T2
+(local) had `Submit your article to this journal`, `ARTICLE HISTORY`,
+`Received 2 February 2020`, `Accepted 7 January 2021` stripped; T3
+(prod) retained them.
+
+### Fix — add P0 patterns for the prod-only standalone-line emissions (NORMALIZATION_VERSION 1.8.7 → 1.8.8)
+
+| Pattern | Catches |
+|---------|---------|
+| `^Submit your article to this journal$` | T&F masthead line |
+| `^ARTICLE HISTORY$` | T&F structured-abstract section label |
+| `^Published online:? \d+ \w+ \d{4}\.?$` | T&F online-publication date |
+| `^View related articles?$` | T&F sidebar |
+| `^View Crossmark data$` | Crossmark badge |
+| `^Citing articles: \d+ View citing articles?$` | T&F citation count |
+| `^Full Terms & Conditions of access and use\.?$` | T&F masthead |
+| `^Received \d+ \w+ \d{4}$` | Standalone "Received" line (poppler-split) |
+| `^Accepted \d+ \w+ \d{4}$` | Standalone "Accepted" line |
+| `^Revised \d+ \w+ \d{4}$` | Standalone "Revised" line |
+
+These patterns NEVER appear standalone in real body prose, so they're
+globally safe.
+
+### Verified
+
+- 986/986 broad pytest pass (in flight)
+- 26-paper baseline (in flight)
+- Patterns added behind explicit string anchors — no false positives
+  on body prose
+
+### Note — this is a tactical fix, not a structural one
+
+The architectural problem (line-based pattern matching is fragile to
+line-break differences) remains. A future cycle could refactor P0 /
+P1 / H0 / W0 to be multi-line-aware (token-based instead of line-
+based), eliminating the version-skew class of bug. Deferred per
+revertability discipline.
+
 ## [2.4.22] — 2026-05-14
 
 `/docpluck-iterate` skill amendment + table-rendering parity audit (cycle

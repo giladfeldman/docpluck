@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.7"
+NORMALIZATION_VERSION = "1.8.8"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -679,6 +679,31 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"^[A-Z]\.(?:\s*[A-Z]\.?)?\s+[A-Z]{2,}\s+ET\s+AL\.?\s*$"
     ),
+    # v2.4.23 (NORMALIZATION_VERSION 1.8.8): prod-pdftotext-skew patterns.
+    # Xpdf 4.00 (local Win) and poppler 25.03 (Railway Linux) emit
+    # different line-break placements. P0 line patterns only match
+    # COMPLETE single lines (anchored `^…$`). Prod's poppler often splits
+    # what Xpdf serializes as a single line into multiple lines, so the
+    # previous P0 patterns miss the strip on prod. Surfaced by v2.4.16
+    # Phase 8 Tier 3 byte-diff (xiao_2021_crsp T2 vs T3 had +4897 bytes
+    # of front-matter junk retained on prod).
+    #
+    # Strategy: add patterns for the specific front-matter junk lines
+    # that prod's poppler emits as standalone lines (where Xpdf merged
+    # them into longer banner lines). Conservative — each pattern matches
+    # a complete line on its own.
+    re.compile(r"^Submit your article to this journal\s*$", re.IGNORECASE),
+    re.compile(r"^ARTICLE HISTORY\s*$"),
+    re.compile(r"^Published online:?\s+\d{1,2}\s+\w+\s+\d{4}\.?\s*$", re.IGNORECASE),
+    re.compile(r"^View related articles?\s*$", re.IGNORECASE),
+    re.compile(r"^View Crossmark data\s*$", re.IGNORECASE),
+    re.compile(r"^Citing articles?:\s+\d+\s+View citing articles?\s*$", re.IGNORECASE),
+    re.compile(r"^Full Terms\s+&?\s+Conditions of access and use\.?\s*$", re.IGNORECASE),
+    # Bare "Received DD Month YYYY" line (T&F masthead split by poppler)
+    re.compile(r"^Received\s+\d{1,2}\s+\w+\s+\d{4}\s*$"),
+    re.compile(r"^Accepted\s+\d{1,2}\s+\w+\s+\d{4}\s*$"),
+    re.compile(r"^Revised\s+\d{1,2}\s+\w+\s+\d{4}\s*$"),
+
     # v2.4.19: same-surname two-author running header:
     #   "Kim and Kim" (Yeun Joon Kim & Junha Kim — amj_1, 14 occurrences)
     #   "Smith and Smith" / "Lee and Lee" (any X-and-X co-author pattern)
