@@ -64,9 +64,15 @@ _HEADING_LINE = re.compile(
     (?:\#{1,6}[ \t]+)?
     (?:\d+(?:\.\d+)*\.?[ \t]+)?
     (?P<heading>
-        [A-Z][A-Za-z &\-/]{0,80}
+        # v2.4.24 (cycle 9): extended character classes to admit digits
+        # and colons. Catches AOM-style subsection labels like
+        # "STUDY 1: QUASI-FIELD EXPERIMENT" / "STUDY 2: LABORATORY
+        # EXPERIMENT" / "OVERVIEW OF THE STUDIES" that v2.4.23 left as
+        # inline bold lines. Real headings can contain digits (study
+        # numbers, table numbers) and colons (label:descriptor).
+        [A-Z][A-Za-z0-9 &\-/:,]{0,80}
         |
-        [A-Z][A-Z &\-/]{0,80}
+        [A-Z][A-Z0-9 &\-/:,]{0,80}
         |
         (?:[A-Z][ \t]){2,30}[A-Z]
     )
@@ -255,7 +261,73 @@ def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolate
     next_line = _next_nonblank_line(text, i)
     if next_line is None:
         return False
-    return len(next_line) <= 5
+    if len(next_line) <= 5:
+        return True
+
+    # v2.4.24 (cycle 9): table-COLUMN-header detection. If the heading is
+    # PRECEDED by 2+ short standalone-line "noun phrase" siblings (each
+    # ≤30 chars, blank-line separated), it's a table column header row,
+    # not a section heading. Canonical example caught by this check:
+    # amj_1 Table 1 has column headers `Study and Context\n\nFeedback
+    # Directions\n\nFindings\n\n<body row>` — without this check, the
+    # third column header "Findings" gets promoted to `## Findings`.
+    line_actual_start = text.rfind("\n", 0, heading_end - 1) + 1
+    if line_actual_start > 0:
+        # Walk back: collect the previous up to 3 non-blank paragraphs.
+        siblings: list[str] = []
+        k = line_actual_start - 1
+        while k > 0 and len(siblings) < 3:
+            # Skip blank lines
+            while k > 0 and text[k] in (" ", "\t", "\n"):
+                if text[k] == "\n":
+                    k -= 1
+                    break
+                k -= 1
+            if k <= 0:
+                break
+            # k is at the last non-whitespace char of a line. Walk to start.
+            line_end_local = k + 1
+            while k > 0 and text[k] not in ("\n",):
+                k -= 1
+            line_start_local = k if text[k] == "\n" else 0
+            if text[line_start_local] == "\n":
+                line_start_local += 1
+            prev_line = text[line_start_local:line_end_local].strip()
+            if not prev_line:
+                k -= 1
+                continue
+            siblings.append(prev_line)
+            # Check that line_start_local was preceded by blank (sibling
+            # was standalone, not part of a longer paragraph).
+            if line_start_local < 2:
+                pass
+            else:
+                # The char before line_start_local should be `\n` (then
+                # before that another `\n` for blank-line separation).
+                prev_char = text[line_start_local - 1] if line_start_local >= 1 else "\n"
+                prev_prev_char = text[line_start_local - 2] if line_start_local >= 2 else "\n"
+                if not (prev_char == "\n" and prev_prev_char == "\n"):
+                    # Not blank-line-separated — sibling is part of a
+                    # longer paragraph, not a table cell. Stop collecting.
+                    break
+            k -= 1
+        # Require ALL collected siblings (need ≥ 2) to be short
+        # noun-phrase-like (≤ 30 chars, no terminal punctuation, no
+        # function words that suggest body prose).
+        if len(siblings) >= 2:
+            def _looks_like_table_header_cell(s: str) -> bool:
+                if len(s) > 30:
+                    return False
+                if s.endswith((".", "!", "?")):
+                    return False
+                # No common body-prose function words.
+                if re.search(r"\b(?:the|is|was|are|were|that|which|with|of|in|to|by|for|on|at|from)\b", s, re.IGNORECASE):
+                    return False
+                return True
+            if all(_looks_like_table_header_cell(s) for s in siblings[:2]):
+                return True
+
+    return False
 
 
 def annotate_text(text: str) -> list[BlockHint]:

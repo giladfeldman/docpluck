@@ -137,7 +137,53 @@ def _full_caption_text(raw_text: str, cap: CaptionMatch) -> str:
     if end == -1:
         end = min(cap.char_end + 500, len(raw_text))
     full = raw_text[cap.char_start:end].replace("\n", " ").strip()
-    return _trim_caption_at_chart_data(full)
+    full = _trim_caption_at_chart_data(full)
+    return _trim_caption_at_running_header(full)
+
+
+# v2.4.24 (cycle 9): caption boundary running-header trim.
+# pdftotext occasionally absorbs body prose + the page running header
+# into the caption span when there's no `\n\n` separator before the
+# next-paragraph body. Example caught in xiao_2021_crsp Figure 2:
+#
+#   *Figure 2. Study 1 interaction plots. Exploratory analysis To
+#   examine whether and to what extent participants perceived… 14
+#   Q. XIAO ET AL.*
+#
+# The actual caption ends at "Study 1 interaction plots." Everything
+# after is body + running header. Detect the running-header signature
+# at the END of the caption and trim it (along with the body prose run
+# that precedes it within the same caption string).
+_CAPTION_RUNNING_HEADER_TAIL_RE = re.compile(
+    r"\s+\d+\s+[A-Z]\.\s*(?:[A-Z]\.?)?\s+[A-Z]{2,}"
+    r"(?:\s+(?:AND|&)\s+[A-Z][A-Z'\-]+)?"
+    r"\s+ET\s+AL\.?\s*$"
+)
+
+
+def _trim_caption_at_running_header(caption: str) -> str:
+    """If a figure caption was extracted with a trailing page-number +
+    running-header (e.g. ``… 14 Q. XIAO ET AL.``), trim it. Also trim
+    the body-prose sentence run that immediately precedes the running
+    header within the same extracted caption string.
+    """
+    if not caption:
+        return caption
+    m = _CAPTION_RUNNING_HEADER_TAIL_RE.search(caption)
+    if not m:
+        return caption
+    trimmed = caption[: m.start()].rstrip()
+    last_period = trimmed.rfind(". ")
+    if last_period > 0:
+        tail = trimmed[last_period + 2:]
+        if (
+            tail
+            and tail[0].isupper()
+            and len(tail.split()) >= 5
+            and not tail.lower().startswith(("note", "source", "data", "see"))
+        ):
+            trimmed = trimmed[: last_period + 1]
+    return trimmed
 
 
 # A run of 6+ consecutive digits in a figure caption is almost never
