@@ -56,3 +56,39 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Fix:** Per skill rule 0d, the regression test file is named `test_*_real_pdf.py` and uses `render_pdf_to_markdown(Path('../PDFextractor/test-pdfs/<style>/<paper>.pdf').read_bytes())` to drive the full pipeline. Contract tests with synthetic strings are useful as helpers but never substitute for a real-PDF regression test. Use `pytest.skip` when the fixture is unavailable locally (PDFs are gitignored per memory `feedback_no_pdfs_in_repo`).
 
 **How to detect (next time):** If `bugs_fixed` in run-meta references a normalization-pipeline defect, grep the new tests for `render_pdf_to_markdown\|extract_pdf\b` AND `test-pdfs/` — a fix without that combination is a synthetic-only test and won't catch real pdftotext output quirks.
+
+## Caption trim chain belongs in extract_structured, not figures/detect (caught 2026-05-14, v2.4.25 release)
+
+**What:** v2.4.24 added a figure-caption running-header trim to `docpluck/figures/detect.py::_full_caption_text`. The trim was correctly implemented and passed unit tests calling `find_figures()` directly. But `render_pdf_to_markdown()` doesn't call `find_figures()` — its render path goes through `docpluck/extract_structured.py::_extract_caption_text`. Result: the v2.4.24 fix was completely invisible in rendered output. The cycle-9 ship-blocker (xiao Figure 2 caption with body prose absorbed) was still present in production for 24 hours after v2.4.24 was tagged.
+
+**Why:** Two `_full_caption_text` / `_extract_caption_text` functions exist for similar purposes but feed different consumers. The naming similarity (`_full_caption_text` vs `_extract_caption_text`) hides the divergence.
+
+**Fix:** v2.4.25 migrated the running-header trim plus three new trim functions (duplicate-label strip, body-prose boundary, PMC reprint footer) to `extract_structured.py::_extract_caption_text`. Now both render paths consume the trim chain.
+
+**How to detect (next time):**
+1. When adding a fix to any `docpluck/<module>/detect.py` or any helper named `_*caption*` / `_*table*` / `_*figure*`, grep for callers: `grep -rn "function_name" docpluck/ tests/`.
+2. If `render_pdf_to_markdown` isn't in the call chain (transitively), the fix won't surface in rendered output. Add the fix to the consumer that IS in the chain (`extract_structured.py::_extract_caption_text` for caption text, `tables/cell_cleaning.py` for table rows, `render.py::_promote_*` post-processors for heading promotion).
+3. **The regression test must drive `render_pdf_to_markdown(pdf_bytes)`** and assert on the rendered `.md` output, not on the helper's return value. Rule 0d strengthened: real-PDF tests go through the render entry point.
+
+## Section.subheadings tuple is stored but not rendered (caught 2026-05-14, v2.4.26 release)
+
+**What:** Initial Pass 3 relaxation for cycle 11 (admitting ALL-CAPS multi-word headings with no blank-before/after) correctly emitted heading hints from `annotate_text`. The hints reached `Section.subheadings` via `core.py:281`. But the rendered .md output had no `## METHOD` / `## RESULTS` lines — the `subheadings` tuple is **stored but never consumed** by `render.py`. Only canonical-labeled hints (resolving to `SectionLabel.methods` etc.) become `## ` rendered lines.
+
+**Why:** Section.subheadings was added in v1.6.1 as a "in-section unrecognized headings" field for downstream consumers, but `render.py` was not updated to surface them. Smart list-vs-heading discrimination for weak text_pattern hints is deferred to v1.6.2+ per a comment in `core.py:99-103`.
+
+**Fix:** v2.4.26 reverted the Pass 3 relaxation and added a render-layer post-processor (`_promote_study_subsection_headings` extended with `_ALL_CAPS_SECTION_HEADING_RE`). The post-processor operates on the FINAL rendered text, scanning every line and promoting matching ones to `## ` — no involvement of the section detector at all.
+
+**How to detect (next time):**
+1. When adding heading detection: write the regression test FIRST against `render_pdf_to_markdown(pdf_bytes)` and assert on rendered `## ` / `### ` lines. If the assertion fails after a fix that touched only the section detector, the fix is in the wrong layer.
+2. Render-layer post-processors (`_promote_*` functions in `render.py`) are the right tool when the section detector's strict isolation constraints reject real headings that pdftotext flattened. They have access to the final rendered text and can be more permissive about context.
+3. **Never modify `Section.subheadings` and expect it to render.** That tuple is metadata only. To surface a heading in rendered output, either (a) add a canonical label so it becomes a `Section`, or (b) add a render-layer post-processor.
+
+## Camelot section-row labels (single-cell with parenthetical) are NOT continuation rows (caught 2026-05-14, v2.4.27 release)
+
+**What:** Table 6 in `xiao_2021_crsp.pdf` has condition-group section-row labels like `Control (n = 339, 2 selected the decoy, 0.6%)` and `Regret-Salient (n = 331, ...)`. Camelot emits these as rows with one non-empty cell (the label) and all other columns empty. `_merge_continuation_rows`'s first-cell-empty + rest-has-prose path then merged them into the data row above, producing `<td>112/172<br>Regret-Salient (n = 331, ...)</td>`.
+
+**Why:** The continuation-row signature (empty first cell + prose elsewhere) overlaps with the section-row signature (empty first cell + one prose cell elsewhere). The merge rule treated them identically.
+
+**Fix:** v2.4.27 added `_is_section_row_label` guard early in the merge loop. A row is treated as a spanning section-row label (not merged) when exactly ONE cell is non-empty AND that cell is ≤ 200 chars AND matches `[A-Z][\w\-]*(?:\s+[\w\-]+)*\s*\([^)]*\b(?:n|N|M|SD|p)\s*[=<>]`.
+
+**How to detect (next time):** When `_merge_continuation_rows` misfires, look for rows with EXACTLY one non-empty cell and a parenthetical statistical descriptor. The "exactly one cell" is the discriminator from a true continuation row (which has content in multiple cells matching the parent row's column structure).

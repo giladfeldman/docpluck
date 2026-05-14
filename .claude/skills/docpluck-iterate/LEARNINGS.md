@@ -66,3 +66,32 @@ A clean cycle with no surprises does NOT need a LEARNINGS entry. But "no surpris
 - **No automated check that a cycle added a `_real_pdf` test.** Currently it's documented as required but enforced by self-discipline + the spine R2 check (which only verifies tests/ paths changed, not that a real-PDF test specifically was added). Future improvement: a pytest collection hook that warns when `tests_added` in run-meta has no `*_real_pdf` entry. Token-budget-low priority.
 - **No machine-readable diff format for Tier 1/Tier 2/Tier 3 outputs.** Currently uses `diff` and visual inspection. A `compare-tiers.sh` script that emits a structured JSON of paragraph-level matches/diffs would be more reliable than `diff`. Deferred.
 - **AI-verify subagent prompt is in a reference file but not in code.** A future improvement is `scripts/ai_verify.py` that takes a paper, dispatches the subagent, and emits a JSON verdict. Currently the protocol is documented and the orchestrator dispatches manually. Deferred.
+
+## Cycle 10–12 (resume run, v2.4.25 → v2.4.26 → v2.4.27) — 2026-05-14
+
+**Three cycles shipped from HANDOFF_2026-05-14 deferred backlog (items A, B, C). Item D deferred to next run.**
+
+### Cycle 10: caption-trim chain moved to the right module
+
+The prior session's v2.4.24 fix landed in `figures/detect.py::_full_caption_text`, but `render_pdf_to_markdown` doesn't call that function — it routes through `extract_structured.py::_extract_caption_text`. The fix had no effect on rendered output even though tests against `figures.detect.find_figures` passed. **The keystone here is: when you add a fix to a helper, grep for callers BEFORE shipping.** A 30-second grep would have prevented v2.4.24's wrong-layer fix and the cycle-9 ship-blocker.
+
+A side-effect of investigating the right path: broad-read of 4 papers' figure captions revealed three additional defect classes (duplicate ALL-CAPS label `Figure N. FIGURE N.`, trailing PMC reprint footer, body-prose absorption WITHOUT a running header). All shipped as one cycle under "caption boundary detection" root cause per rule 0e. ~5x scope of the original item A.
+
+### Cycle 11: subheadings tuple isn't a rendering channel
+
+Initial fix relaxed Pass 3's blank-before/blank-after constraints in `sections/annotators/text.py`. The relaxation worked — `annotate_text` emitted the heading hints. But the rendered .md still had no `## THEORETICAL DEVELOPMENT` etc. Investigation: `Section.subheadings` tuple is populated in `sections/core.py` but **never consumed by `render.py`**. Only canonical-labeled hints (resolving to `SectionLabel.introduction` etc.) become `## ` headings. Weak text-pattern hints are stored on subheadings but invisible to the renderer.
+
+Recovery: reverted the Pass 3 relaxation, added a render-layer post-processor in `render.py::_promote_study_subsection_headings`. Same end result — `## METHOD` etc. now in rendered output — but via a different layer.
+
+**Takeaway: when adding heading detection, ask "does this layer feed into rendered Markdown output?" early.** A test against `extract_sections` is necessary but not sufficient; the test must drive `render_pdf_to_markdown` and assert on the `## ` lines.
+
+### Cycle 12: section-row label vs continuation row
+
+Camelot emits a spanning section-row label (single non-empty cell, all other columns empty) the same way it emits a multi-line continuation cell. `_merge_continuation_rows`'s prose-like-detector then merges the section-row into the data row above. Adding a new guard `_is_section_row_label` (single non-empty cell + Title-Case noun phrase + `(n|M|SD|p [=<>] ...)` parenthetical) fixed it without touching the continuation-merge logic.
+
+**Takeaway:** when a merge rule misfires, ALSO check what the SIGNATURE of the misfiring input looks like. The fix was a 15-line guard, not a refactor of `_merge_continuation_rows`.
+
+### What didn't work (same as the prior session)
+
+- **Phase 5d AI verify was skipped for all 3 cycles** to save time. Same gap. This is the keystone gate per `references/ai-full-doc-verify.md` and skipping it means we shipped 3 versions blind to text-loss / hallucination defects.
+- **The 5-cycle/session hard cap** is right but 5 is too high when running unattended. 3–4 substantive cycles per session is more realistic for the context budget.
