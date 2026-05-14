@@ -1,5 +1,47 @@
 # Changelog
 
+## [2.4.21] — 2026-05-14
+
+Table cell-header prose-leak rejection (cycle 6 of /docpluck-iterate
+run). Surfaced by v2.4.16 Phase 5d AI verify on xiao_2021_crsp Table 5.
+
+### Defect — body prose leaked into a table's super-header row
+
+Camelot occasionally widens the table-region detection to include body
+prose above the actual table. The body prose lands as a "super-header"
+row in the extracted cells. `_fold_super_header_rows` then merges the
+super-row with the real header using `_MERGE_SEPARATOR` (= `<br>`),
+producing a `<th>` cell like:
+
+    <th>the regret salience manipulation check item revealed a main
+    effect of condition, FWelch(2,<br>Options</th>
+
+instead of the expected `<th>Options</th>`. The leak survived to the
+rendered .md and was visible in xiao_2021_crsp Table 5 at v2.4.20.
+
+### Fix — body-prose super-row drop in `docpluck/tables/cell_cleaning.py::_fold_super_header_rows`
+
+Before folding, scan the super-row for any cell that:
+- exceeds 80 chars in length, AND
+- contains a `, [a-z]` sequence (sentence-style comma) OR an unmatched
+  open-paren `(`.
+
+If any super-row cell meets both criteria, the row is body prose, not a
+real super-header — drop it from `header_rows` (return only the sub-row
++ rest) instead of folding into the sub-row.
+
+Conservative: real super-headers are typically short single-word or
+two-word labels (e.g. `Win-` over `Uncertain` → `Win-Uncertain` in
+two-row stat tables). The 80-char + comma/paren heuristic only triggers
+on sentence-shaped body prose.
+
+### Verified
+
+- xiao_2021_crsp v2.4.21: Table 5 first `<th>` now `'Options'` (was
+  `'the regret salience manipulation check item revealed a main effect
+  of condition, FWelch(2,<br>Options'`)
+- Broad pytest + 26-paper baseline (in flight)
+
 ## [2.4.20] — 2026-05-14
 
 Dehyphenation: rejoin pdftotext-space-broken compound words (cycle 5 of
