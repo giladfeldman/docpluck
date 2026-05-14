@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.8.8"
+NORMALIZATION_VERSION = "1.8.9"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -1719,6 +1719,32 @@ def normalize_text(
             t,
         )
         report._track("A3_decimal_comma_normalization", before, t, "decimal_commas_fixed")
+
+        # A3c: Leading-zero decimal recovery (cycle 14, HANDOFF_2026-05-14
+        # deferred item D, NORMALIZATION_VERSION 1.8.9).
+        #
+        # A3's lookbehind ``(?<![a-zA-Z,0-9\[\(])`` blocks legitimate
+        # European-decimal p-values inside parens or brackets, e.g.
+        # ``(0,003)``, ``[0,05]``, ``(p < 0,001)`` with the parenthesis
+        # directly preceding the integer. This exclusion exists to
+        # protect statistical-df forms like ``F(2,42)`` and citation
+        # superscripts. But the leading-zero form ``0,XX[X[X]]`` is
+        # unambiguous: degrees-of-freedom never use 0 as the first df
+        # value, and citation superscripts never start with 0.
+        #
+        # Rule: convert ``0,(\d{2,4})`` (zero + comma + 2-4 digits)
+        # regardless of lookbehind, as long as it's at a word boundary
+        # and followed by a non-digit terminator. Single-digit-after-
+        # comma cases like ``[0,5]`` are skipped — they're typically
+        # range expressions like ``[0,5]`` meaning ``[0, 5]``, not a
+        # decimal.
+        before = t
+        t = re.sub(
+            r"\b0,(\d{2,4})(?=[\s)\];,.:]|$)",
+            r"0.\1",
+            t,
+        )
+        report._track("A3c_leading_zero_decimal_recovery", before, t, "leading_zero_decimals_fixed")
 
         # A3b: Statistical df-bracket harmonization (MetaESCI D2, 2026-04-11)
         #

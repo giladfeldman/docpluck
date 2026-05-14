@@ -374,14 +374,89 @@ def _extract_caption_text(
 _CHART_DATA_DIGIT_RUN_RE_STRUCT = re.compile(r"\b\d{6,}\b")
 _CHART_DATA_TICK_RUN_RE_STRUCT = re.compile(r"(?:\b\d{1,4}\b[ \t]+){5,}")
 
+# v2.4.28 (cycle 13): two new signatures added for amj_1 flow-chart and
+# axis-tick patterns the original two regexes don't catch:
+#
+#   3. **Axis-tick pair**: 2+ occurrences of `\d\s+\d` (a single-digit
+#      token followed by another single-digit token, separated only by
+#      whitespace). amj_1 Figures 2-7 emit chart axis ticks as
+#      `7 6 Employee Creativity 5 4 Bottom-up Flow 3 Lateral Flow 2 1`
+#      after pdftotext flattens them inline with the caption. The
+#      existing 5+ numeric-token signature doesn't fire because the
+#      digits are interrupted by Title-Case words.
+#
+#   4. **Numbered flow-chart nodes**: 3+ occurrences of
+#      `\d+\.\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,4}` (a numbered prefix
+#      followed by a Title-Case noun phrase, 2-5 words). amj_1 Figure 1
+#      embeds flow-chart node labels as `1. Bottom-up Feedback Flow 2.
+#      Top-down Feedback Flow 3. Lateral Feedback Flow`.
+#
+# Both require 2+ matches (axis-tick) / 3+ matches (numbered list) in
+# close proximity (< 80 chars between matches) so a single legit "in
+# Study 1" or numbered list item in a real caption doesn't false-fire.
+# Match either two adjacent single-digit tokens (``7 6``) or two
+# single-digit tokens separated by 1-4 Title-Case words
+# (``7 Meta-Processes 6``, ``5 Bottom-up Flow 4``). The Title-Case
+# variant catches axis ticks that pdftotext interleaved with their
+# axis labels, common in amj_1 Figure 5-7.
+_AXIS_TICK_PAIR_RE = re.compile(
+    r"\b\d\s+(?:[A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){0,3}\s+)?\d\b"
+)
+# Allow hyphenated Title-Case words ("Bottom-up", "Top-down") in the
+# numbered-node pattern by treating ``[A-Z][\w\-]*`` as the "word"
+# unit. Both anchor word AND continuation words must be Title-Case.
+_NUMBERED_CHART_NODE_RE = re.compile(
+    r"\b\d+\.\s+[A-Z][a-z]+(?:-[a-z]+)?(?:\s+[A-Z][a-z]+(?:-[a-z]+)?){1,4}"
+)
+
+
+def _find_chart_data_cluster(
+    caption: str, pattern: re.Pattern, min_matches: int, max_gap: int = 80
+) -> int | None:
+    """Find the start position of the first chart-data cluster.
+
+    A cluster is ``min_matches`` consecutive matches of ``pattern``
+    where each pair of adjacent matches is within ``max_gap`` chars of
+    each other. Returns the start position of the FIRST match in the
+    cluster, or None if no cluster meets the threshold.
+
+    Matches at position < 20 are excluded so the ``Figure N.`` /
+    ``Table N.`` label prefix can't itself become the first match
+    of a numbered-list cluster.
+
+    This is the discriminator that prevents false-positives on legit
+    captions that happen to contain ONE numbered list item or ONE
+    "Study 1" — only clusters of repeated patterns trigger the trim.
+    """
+    matches = [m for m in pattern.finditer(caption) if m.start() >= 20]
+    if len(matches) < min_matches:
+        return None
+    # Sliding window: find any min_matches consecutive matches within
+    # max_gap chars of each other.
+    for i in range(len(matches) - min_matches + 1):
+        window = matches[i:i + min_matches]
+        gaps = [
+            window[j + 1].start() - window[j].end()
+            for j in range(len(window) - 1)
+        ]
+        if all(g <= max_gap for g in gaps):
+            return window[0].start()
+    return None
+
 
 def _trim_caption_at_chart_data(caption: str) -> str:
     """Truncate a caption when it transitions from prose to chart-data.
 
     Conservative: only fires when caption ≥ 150 chars AND the surviving
-    trimmed text is ≥ 40 chars. The two regex signatures catch
-    complementary chart-data patterns (large counts and small axis-tick
-    sequences); the earlier match wins.
+    trimmed text is ≥ 40 chars. Four regex signatures catch
+    complementary chart-data patterns; the earliest match wins.
+
+    v2.4.28 (cycle 13): added axis-tick-pair clusters
+    (``\\d \\d ... \\d \\d`` interleaved with Title Case words, common
+    in amj_1 Figures 2-7) and numbered flow-chart node clusters
+    (``1. Bottom-up Foo 2. Top-down Foo``, common in amj_1 Figure 1).
+    Both require 2+ / 3+ matches in close proximity so a single legit
+    "in Study 1" or numbered list item doesn't false-fire.
     """
     if not caption or len(caption) < 150:
         return caption
@@ -392,6 +467,12 @@ def _trim_caption_at_chart_data(caption: str) -> str:
     m2 = _CHART_DATA_TICK_RUN_RE_STRUCT.search(caption)
     if m2 is not None:
         candidates.append(m2.start())
+    c3 = _find_chart_data_cluster(caption, _AXIS_TICK_PAIR_RE, min_matches=2, max_gap=100)
+    if c3 is not None:
+        candidates.append(c3)
+    c4 = _find_chart_data_cluster(caption, _NUMBERED_CHART_NODE_RE, min_matches=3, max_gap=100)
+    if c4 is not None:
+        candidates.append(c4)
     if not candidates:
         return caption
     cut = min(candidates)
