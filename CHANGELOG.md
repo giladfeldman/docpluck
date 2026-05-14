@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.4.22] — 2026-05-14
+
+`/docpluck-iterate` skill amendment + table-rendering parity audit (cycle
+7 of run). User directive from 2026-05-14: "encode a recurring check for
+table-rendering parity (Rendered tab == Tables tab) in the iteration
+skill."
+
+### Phase 6c — Rendered ↔ structured-tables parity check (new MUST-RUN gate)
+
+Added to `.claude/skills/docpluck-iterate/SKILL.md` Phase 6 table:
+
+> For each affected paper: (a) count `### Table N` blocks in the
+> rendered .md, (b) call `/extract-structured` and count tables in the
+> JSON response. (c) Both counts must match. Any `### Table N` in the
+> .md must correspond to a structured table with the same label. Any
+> structured table with `kind=structured` should emit as `<table>` HTML
+> in the .md (not fenced ```unstructured-table). (d) Mismatches indicate
+> either: table extracted-but-not-emitted in .md, table emitted as
+> raw_text fallback when cells were available, or table-label
+> inconsistency.
+
+### Audit run on 2026-05-14 — library-side parity 100%
+
+| Paper | Tables (extract_structured) | `### Table` in .md | `<table>` HTML | Fallback |
+|-------|-----------------------------|--------------------|--------------|----------|
+| xiao_2021_crsp | 8 (7 structured + 1 isolated) | 8 | 7 | 1 unstructured-table |
+| amj_1 | 5 | 5 | 5 | 0 |
+| amle_1 | 13 | 13 | 13 | 0 |
+| ieee_access_2 | 1 | 1 | 1 | 0 |
+
+The 1 unstructured-table block in xiao (Camelot couldn't parse cells →
+raw_text fallback) is by design — see v2.4.12 raw_text fallback for
+isolated tables.
+
+### Frontend Markdown rendering (out of library scope)
+
+The user's original "Rendered tab doesn't show tables as nicely as
+Tables tab" concern is a frontend rendering issue: how
+`PDFextractor/frontend/` renders the library's `<table>` HTML inside
+markdown (escaping, code-block fallback for `unstructured-table`,
+mobile UI parity, etc.). The library output itself is correct and
+matches the Tables tab's structured data 1:1.
+
+Recommended follow-up (outside `/docpluck-iterate` scope):
+- Verify `react-markdown` / `rehype-raw` config passes through `<table>`
+  HTML rather than escaping it
+- Style `unstructured-table` fenced blocks as a styled box (not
+  monospace) in the Rendered tab
+- File as a `/docpluck-review` frontend-UI issue
+
 ## [2.4.21] — 2026-05-14
 
 Table cell-header prose-leak rejection (cycle 6 of /docpluck-iterate
