@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.3"
+NORMALIZATION_VERSION = "1.9.4"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1315,6 +1315,55 @@ class NormalizationReport:
         }
 
 
+# v2.4.38 (NORMALIZATION_VERSION 1.9.4): recover U+2212 minus signs that
+# pdftotext maps to the digit '2' on certain fonts (e.g. efendic_2022 — every
+# confidence interval reads "[20.92, 20.30]" for "[−0.92, −0.30]", every
+# "r = 2.74" for "r = −.74"). Two self-gating, context-safe signatures:
+#   Rule 1 — a bracketed numeric pair "[A, B]" DESCENDING as written (A > B,
+#   impossible for a CI / range) that becomes a valid ASCENDING interval once
+#   the leading '2' of a decimal-bearing bound is read as '−'. Integer-only
+#   brackets (citation lists like "[25, 3]") never convert.
+#   Rule 2 — "r = 2.<digits>": a Pearson r cannot exceed 1, so any
+#   "r = 2.something" is a corrupted "r = −.something".
+# An ascending CI or a plausible correlation is never touched.
+_BRACKET_PAIR_RE = re.compile(r"\[\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*\]")
+_CORRUPT_R_RE = re.compile(r"(\br\s*(?:\(\s*\d+\s*\)\s*)?=\s*)2(\.\d+)")
+
+
+def recover_corrupted_minus_signs(text: str) -> str:
+    """W0b: recover pdftotext '2'-for-U+2212 minus-sign corruption."""
+    if not text:
+        return text
+
+    def _conv(tok: str) -> str:
+        # A '2'-prefixed decimal token reads as a negative: 20.92 -> -0.92.
+        if tok.startswith("2") and "." in tok:
+            return "-" + tok[1:]
+        return tok
+
+    def _fix_bracket(m: "re.Match[str]") -> str:
+        a_str, b_str = m.group(1), m.group(2)
+        try:
+            a, b = float(a_str), float(b_str)
+        except ValueError:
+            return m.group(0)
+        if a <= b:
+            return m.group(0)  # ascending — genuine interval, leave it
+        a2_str, b2_str = _conv(a_str), _conv(b_str)
+        if a2_str == a_str and b2_str == b_str:
+            return m.group(0)  # nothing convertible (e.g. integer bracket)
+        try:
+            if float(a2_str) <= float(b2_str):
+                return f"[{a2_str}, {b2_str}]"
+        except ValueError:
+            pass
+        return m.group(0)
+
+    t = _BRACKET_PAIR_RE.sub(_fix_bracket, text)
+    t = _CORRUPT_R_RE.sub(r"\1-\2", t)
+    return t
+
+
 def normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -1434,6 +1483,11 @@ def normalize_text(
     for _wp in _WATERMARK_PATTERNS:
         t = _wp.sub("", t)
     report._track("W0_watermark_strip", before, t, "watermarks_stripped")
+
+    # ── W0b: recover '2'-for-U+2212 minus-sign corruption ──────────────
+    before = t
+    t = recover_corrupted_minus_signs(t)
+    report._track("W0b_minus_sign_recovery", before, t, "minus_signs_recovered")
 
     # ── Standard steps (S1-S9) ──────────────────────────────────────────
 

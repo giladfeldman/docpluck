@@ -35,6 +35,7 @@ from .normalize import (
     NormalizationLevel,
     _rejoin_garbled_ocr_headers,
     destyle_math_alphanumeric,
+    recover_corrupted_minus_signs,
 )
 from .sections import extract_sections
 from .tables.render import cells_to_html
@@ -2007,6 +2008,12 @@ def render_pdf_to_markdown(
     # raw_text fallbacks — so no math-italic glyph (𝜂, 𝛽, …) reaches the
     # rendered .md from ANY channel.
     md = destyle_math_alphanumeric(md)
+    # v2.4.38: final guarantee — recover '2'-for-U+2212 minus corruption from
+    # the assembled markdown. W0b (body channel) and cell_cleaning (Camelot
+    # table cells) already cover their channels; this catches the remaining
+    # surfaces — unstructured-table fenced blocks, raw_text table fallbacks
+    # when Camelot is unavailable — so no sign-flipped CI reaches the .md.
+    md = recover_corrupted_minus_signs(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)

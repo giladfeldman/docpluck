@@ -36,7 +36,7 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
-from docpluck.normalize import destyle_math_alphanumeric
+from docpluck.normalize import destyle_math_alphanumeric, recover_corrupted_minus_signs
 
 
 _MERGE_SEPARATOR = "\x00BR\x00"  # placeholder swapped to <br> after escaping
@@ -61,6 +61,11 @@ def _html_escape(s: str | None) -> str:
     # -31. "(cid:0)" is never legitimate text, so recovering it before a digit
     # is unambiguous. Normalised to ASCII hyphen (CLAUDE.md hard rule 4).
     s = re.sub(r"\(cid:0\)\s*(?=\d)", "-", s)
+    # Recover '2'-for-U+2212 minus corruption in a CI cell — "[20.45, 20.06]"
+    # is the descending (impossible) bracket for "[-0.45, -0.06]". Same
+    # self-gating descending-bracket rule as normalize.py's W0b step; table
+    # cells bypass W0b (Camelot layout channel).
+    s = recover_corrupted_minus_signs(s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")
