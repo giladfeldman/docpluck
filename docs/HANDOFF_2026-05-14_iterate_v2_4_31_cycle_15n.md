@@ -9,28 +9,26 @@ The session shipped **v2.4.31** (figure caption placeholder repair, cycle 15n) a
 - **Cycle 15e (G16):** investigated — the page-header-leak-in-equations defect is already fixed at v2.4.31 (incidentally closed between v2.4.27–v2.4.31). Added `tests/test_equation_page_header_strip_real_pdf.py` (6 tests) to lock the closure. No library change.
 - **Cycle 15f (G4):** investigated — found the body-stream-table-dupe defect is a **deeper multi-defect cluster** than the TRIAGE estimated. Re-scoped C2 → C3 and split into 15f-1 (G4b, table-caption walk) + 15f-2 (G4a, body-stream strip). See TRIAGE G4 block for the full analysis. **Not yet fixed** — needs a dedicated session per the recommendation below.
 
+**Cycle 15f-1 (G4b) SHIPPED v2.4.32 (2026-05-15)** — table caption cell-absorption fix. `_trim_table_caption_at_cell_region` in `extract_structured.py`. 26 tables across amle_1/amj_1/xiao verified clean against the AI-gold `reading` view. 17 new tests.
+
+**CI change (2026-05-15):** the auto-bump workflow (`bump-app-pin.yml`) now commits the docpluckapp library pin **directly to master** — no PR. The PR's only check (Vercel frontend build) never gated a Python `requirements.txt` change; `verify-railway-deploy.yml` is the real gate and runs on push regardless.
+
 15 broad-pytest failures remain (all pre-existing — 12 byte-identical snapshot drift, 2 sections golden regen, 1 request_09 bibliography regex).
 
-User directive: *"fix all known issues, and wait before next iteration."* Known-issues bucket from this run is closed. Cycle 15f-1 is the recommended next pickup.
+## Cycle 15f — the re-scoped G4 cluster
 
-## Cycle 15f — the re-scoped G4 cluster (READ BEFORE picking this up)
-
-The TRIAGE G4 block now has the full investigation. Summary:
-
-- **G4b (do this first — C1/C2, isolated):** `extract_pdf_structured` table `caption` fields absorb the entire linearized cell content. `amle_1` Table 1's caption is `"Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 ..."` (400-char cap of cell garbage). Cause: `_extract_caption_text` paragraph-walk has no sentence terminator to stop at when the table title lacks a trailing period, so it walks through the cells. Fix in `extract_structured.py::_extract_caption_text` — for `cap.kind == "table"`, stop the walk at the title line when the following paragraph is predominantly cell-like. Risk: a legitimate multi-sentence table caption (`Table 1. Means and SDs. Values in parens are SEs.`) must NOT be truncated — test both.
-- **G4a (do this second — C3, dedicated session):** the section body text from `extract_sections` contains the raw linearized table-cell dump (caption → ~140 cell lines → `Note:` → body prose). render emits it verbatim alongside the structured `<table>`. Fix needs render/section coordination: compute table regions and strip them from `sec.text`. Broad-corpus false-positive testing required (don't strip legit short-line-dense prose).
-
-Recommended: ship 15f-1 as v2.4.32 (clean win), then schedule 15f-2 as its own session.
+- **~~G4b — SHIPPED v2.4.32~~.** `extract_pdf_structured` table `caption` fields no longer absorb linearized cell content. New `_trim_table_caption_at_cell_region`: period-terminated first line → cut after it; bare-label/unterminated first line → cut at first run of ≥3 header-like short lines.
+- **G4a (do this next — C3, dedicated session):** the section body text from `extract_sections` contains the raw linearized table-cell dump (caption → ~140 cell lines → `Note:` → body prose). render emits it verbatim alongside the structured `<table>`. Fix needs render/section coordination: compute table regions and strip them from `sec.text`. Broad-corpus false-positive testing required (don't strip legit short-line-dense prose).
 
 ## State at handoff
 
 | Tier | Version | Status |
 |---|---|---|
-| Library | **v2.4.31** | tagged + pushed; `docpluck/__init__.py` + `pyproject.toml` synced |
-| App pin | **v2.4.31** | auto-bump PR #22 merged |
-| Prod `/_diag` | **v2.4.31** | confirmed at `https://extraction-service-production-d0e5.up.railway.app/_diag` |
+| Library | **v2.4.32** | tagged + pushed; `docpluck/__init__.py` + `pyproject.toml` synced |
+| App pin | **v2.4.32** | committed directly to docpluckapp master (no PR — new workflow) |
+| Prod `/_diag` | **v2.4.32** | confirmed at `https://extraction-service-production-d0e5.up.railway.app/_diag` |
 
-26-paper baseline: **26/26 PASS, 0 WARN**. Broad pytest: **1369 passed, 15 failed (all pre-existing), 21 skipped, 1 xfailed**.
+26-paper baseline: **26/26 PASS, 0 WARN**. Broad pytest: **1393 passed, 15 failed (all pre-existing), 21 skipped, 1 xfailed**.
 
 ## What shipped this session
 
