@@ -260,3 +260,27 @@ Apply this template to every defect class in `docs/TRIAGE_2026-05-14_phase_5d_go
 - R3 (`/docpluck-cleanup` before deploy) — SKIPPED because no doc changes besides CHANGELOG.md (cycle-scoped); reason recorded in spine_skips.
 - R3 (`/docpluck-review` before deploy) — SKIPPED because change surface is one `extract_structured.py` patch + tests + version bumps; no AGPL/-layout/normalize/regex-catch-all risk surface.
 
+
+---
+
+## Run: 2026-05-15 (continuation) · Cycle 15e + 15f-investigation · v2.4.31 (no new release)
+
+### Outcome
+- **Cycle 15e (G16 — page-header leak in equations):** investigated, found ALREADY FIXED at v2.4.31. The TRIAGE defect (`ieee_access_2` eq `(2)` → `Page 4 (2)`) no longer reproduces — pdftotext output still has `Page N` running headers but the render pipeline strips them. Incidentally closed between v2.4.27–v2.4.31. Verified across 6 IEEE papers (0 hits). Locked with `tests/test_equation_page_header_strip_real_pdf.py` (6 tests). No library change, no release.
+- **Cycle 15f (G4 — body-stream table dupes):** investigated, found it's a **2-defect cluster**, re-scoped C2 → C3, NOT fixed this session. Documented in TRIAGE G4 block + handoff.
+
+### Blind Spots
+- **TRIAGE severity/cost estimates can be wrong by a whole tier.** G16 was listed S2×C1 — turned out to be C0 (already fixed). G4 was listed S1×C2 — turned out to be a C3 cluster (G4a body-strip needs render/section coordination + G4b caption-absorbs-cells). Lesson: the FIRST step of any cycle is to *reproduce the defect at current HEAD* before trusting the TRIAGE's cost estimate. A 5-minute render + grep saved an entire mis-scoped cycle on G16.
+- **A "fixed" defect with no regression test is a latent regression.** G16 was fixed incidentally by unrelated cycles (v2.4.29 preserve_math_glyphs / NFC / section-partitioning). Without `test_equation_page_header_strip_real_pdf.py` it could silently come back. Every time a cycle finds a TRIAGE item already-fixed, the right move is NOT "strike it and move on" — it's "strike it AND add a regression test", because the fix was unintentional and unprotected.
+
+### Edge Cases
+- **The `_extract_caption_text` paragraph-walk has no terminator for table captions whose title lacks a period.** `amle_1` Table 1 caption = `"Table 1. Most Cited Sources in Organizational Behavior Textbooks"` (no trailing `.`). The walk continues through the linearized column headers + cell values until the 400-char hard cap, so the `caption` field is 400 chars of cell garbage. Figures get post-walk trims (`_trim_caption_at_chart_data` etc.) but TABLES get none. This is G4b — queued as cycle 15f-1.
+- **`extract_sections` and `extract_pdf_structured` are uncoordinated pipelines.** The section body text (`sec.text`) contains the raw pdftotext-linearized table region; the structured `<table>` is extracted separately. Neither knows the other's regions. `normalize_text` has a `table_regions` param but `render.py` never populates it. Fixing G4a (body-stream dup strip) requires bridging these two pipelines — that's why it's C3.
+
+### Improvements
+- **Reproduce-at-HEAD before trusting TRIAGE cost.** Added to the cycle-start ritual: render the affected paper at current HEAD and grep for the defect signature FIRST. If absent → the item is already fixed (add a regression test, strike, move on). If present but different from the TRIAGE description → re-scope before coding.
+- **When a cycle's investigation re-scopes a TRIAGE item, write the re-scoped analysis INTO the TRIAGE block** (not just the handoff). The TRIAGE is the durable work queue; a handoff goes stale. The G4 block now carries the full G4a/G4b split so the next session picks up the refined scope directly.
+
+### Session shape note
+- This continuation did 1 verified-closure (15e) + 1 deep investigation (15f) with no new release. That's a legitimate cycle outcome — "investigate and re-scope" is real progress when it converts a vague TRIAGE item into two precisely-scoped, independently-shippable cycles. Don't force a release when the honest finding is "this needs a dedicated session."
+
