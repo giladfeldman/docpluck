@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.2"
+NORMALIZATION_VERSION = "1.9.3"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -150,6 +150,41 @@ _WATERMARK_PATTERNS = [
         r"(?:Copyright[: ]\s*[©Ó]?\s*\d{4}\.?\s+)?"
         r"The authors? licen[cs]e this article under the terms of the\s+"
         r"Creative\s+Commons[^\n]*?License\.?",
+    ),
+    # v2.4.37 (D4): Cambridge University Press per-page running footer.
+    # pdftotext emits "https://doi.org/10.1017/<id> Published online by
+    # Cambridge University Press" once per page; downstream paragraph-rejoin
+    # then splices it MID-SENTENCE into body prose ("...individuals usually
+    # fail to <footer> notice the absence..."). Not line-anchored — matches
+    # whether the footer stands alone or is glued inline (pdftotext version
+    # skew, memory feedback_pdftotext_version_skew). "Published online by
+    # Cambridge University Press" is unambiguous platform boilerplate (book
+    # citations read "Cambridge: Cambridge University Press"). Generic across
+    # every Cambridge UP journal.
+    re.compile(
+        r"(?:https?://doi\.org/\S+\s+)?"
+        r"Published\s+online\s+by\s+Cambridge\s+University\s+Press",
+        re.IGNORECASE,
+    ),
+    # v2.4.37 (D4): Cambridge / JDM open-access licence boilerplate sentence.
+    # The copyright block "© The Author(s), <year>. Published by Cambridge
+    # University Press on behalf of ... European Association for Decision
+    # Making. This is an Open Access article, distributed under the terms of
+    # the Creative Commons Attribution licence (...), which permits ...
+    # properly cited." gets serialized into the Introduction body. The "© ..."
+    # head is caught by the page-footer strip; this removes the trailing
+    # open-access sentence (with any dangling "...Association for Decision
+    # Making." lead-in). [\s\S] spans the pdftotext line wrap inside it.
+    re.compile(
+        # Optional bare "Association for Decision Making." lead-in (the tail
+        # of the publisher name, left behind when the "© ... European" head
+        # is stripped by the page-footer pass). Literal only — must NOT reach
+        # backward across legitimate body prose.
+        r"(?:Association for Decision Making\.\s*)?"
+        r"This is an Open Access article,[\s\S]{0,60}?"
+        r"distributed under the terms of the\s+Creative\s+Commons"
+        r"[\s\S]{0,240}?properly cited\.",
+        re.IGNORECASE,
     ),
 ]
 
