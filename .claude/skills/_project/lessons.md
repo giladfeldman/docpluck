@@ -112,3 +112,15 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Fix:** New A3c step in `docpluck/normalize.py` runs AFTER A3. Pattern `0,(\d{2,4})` regardless of lookbehind. Leading-zero constraint makes the match unambiguous: df values never start with 0, citation superscripts never start with 0. `0,5` (single-digit after comma) is intentionally skipped — it's ambiguous between European decimal and range syntax.
 
 **How to detect (next time):** When a normalization rule's exclusion is overly conservative, don't relax the original rule's lookbehind/lookahead — add a narrower follow-up step with stronger guards. Sequence matters: original first (protects the dangerous case), narrower follow-up second (recovers the false-negative).
+
+## 2026-05-15 · USER DIRECTIVE — subagent parallelization + general-not-PDF-specific fixes
+
+**What:** During the autonomous APA-first docpluck-iterate run the user gave two standing directives:
+1. **Use subagents to optimize the whole process whenever possible** — re-statement of the 2026-05-14 directive (it had slipped: the orchestrator parallelized gold extraction but did broad-read reading, diagnostics, and per-paper verification serially inline).
+2. **Every fix must be general** — serve all future PDFs, never a local quick-fix tuned to one PDF that could create issues for others. Any change must benefit the tool overall.
+
+**Why:** docpluck is a meta-science tool over arbitrary academic PDFs across 9 publishers. (1) Iteration work is naturally parallel per-paper; serial inline work is slow and burns orchestrator context. (2) A fix keyed to one paper's quirk is brittle, doesn't generalize, and risks silent regressions elsewhere.
+
+**Fix (encoded durably):** CLAUDE.md "Critical hard rules" gains the general-fix bullet. docpluck-iterate SKILL.md: Subagent-parallelization section upgraded to a MANDATE with a per-cycle self-check; Phase 4 discipline #2 = general-fix rule; hard rules 16 (general fix) + 17 (subagents); Verification Checklist gains both checks. Memories `feedback_use_subagents_aggressively` + `feedback_general_fixes_not_pdf_specific`.
+
+**How to detect (next time):** Before any batch of 2+ independent units (renders, golds, verifications, broad-reads, diagnostics) — fan out to parallel subagents. Before shipping any fix — confirm it is keyed on a structural signature, not paper identity, and the 26-paper baseline confirms no regression.

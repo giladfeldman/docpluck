@@ -161,3 +161,33 @@ tmp/ieee_access_2_gold.md           ( 75 KB)
 tmp/ieee_access_2_v2.4.28.md        ( 75 KB)
 tmp/ieee_access_2_pdftotext.txt     ( 74 KB)
 ```
+
+---
+
+## APA BROAD-READ — autonomous run, 2026-05-15 (rendered v2.4.32, 18-paper APA corpus)
+
+Reader-pass of the first ~32 lines of all 18 APA `.pdf` renders. 15/18 papers now have AI-gold `reading` views (010, 012, jamison content-filter-blocked at the subagent layer — render-verified only). Defect classes ranked by APA papers-affected:
+
+| ID | Defect | APA papers affected | Sev | Cost | Status |
+|---|---|---|---|---|---|
+| **D1** | Letter-spaced lowercase Elsevier labels `a r t i c l e` / `i n f o` / `a b s t r a c t` leaked as body text; suppresses `## Abstract` | 010, 011, 012 (3) | S1 | C1 | **✓ SHIPPED v2.4.33 (cycle 1)** |
+| **D4** | Journal/typesetting metadata leaked into front matter (volume/DOI banners, `Article views:`, `research-article2025`, `PSPXXX…`, open-science badge block, `Edited by:` lines, leading citation lines, copyright) | chan_feldman, chandrashekar, efendic, ip_feldman, maier, xiao, korbmacher, all jdm `Vol. 18:eN` headers (~12) | S2 | C2-C3 | OPEN — grab-bag; needs per-pattern triage, not one cycle |
+| **D5** | Author/affiliation block fragmented; affiliation superscript markers (`a` `b` `c` `∗` `†` `‡` `⁎`) stranded on their own lines | 010, chen, jamison, ip_feldman, maier, korbmacher, jdm16, jdm_m2, jdm_m3 (~9) | S2 | C2 | OPEN |
+| **D6** | Orphan section-number line (`1.` / `1`) stranded immediately before `## Introduction` (the `1.` of "1. Introduction" separated from its heading text) | jdm15, jdm16, jdm_m2, korbmacher, ziano, jamison (6) | S2 | C1 | OPEN — clean single root cause, cheap |
+| **D2** | All-caps / concatenated front-matter labels leaked (`ABSTRACT`, `ARTICLE INFO`, `ARTICLEINFO`) — newer Elsevier + T&F layouts; abstract not promoted to a heading | chan_feldman, chen, jamison, ziano (4) | S1 | C2 | OPEN |
+| **D3** | Abstract content mis-sectioned: chen places the abstract body under `## Introduction`; jamison/ziano/maier emit abstract prose with no heading | chen, jamison, ziano, maier (4) | S1 | C2 | OPEN — overlaps D2; abstract-detection on label-present layouts |
+| **D7** | **G1 glyph collapse** — pdftotext maps efendic's U+2212 minus to digit `2`: `r = −.74 [−.92,−.30]` renders as `r = 2.74 [20.92, 20.30]`. 29 corrupted CIs. Confirmed in pdftotext raw output (upstream). | efendic (1, catastrophic) | **S0** | C2 | OPEN — **cycle 2 target** (published-stat corruption) |
+| **D8** | Metadata mid-body: korbmacher acknowledgment + copyright block leaked into the Keywords section; xiao `CONTACT` line mid-Introduction | korbmacher, xiao (2) | S2 | C2 | OPEN |
+
+**Cycle order for the APA fix loop (revised by this broad-read):** D1 ✓ → **D7/G1** (S0, efendic) → D6 (widest clean C1) → D2+D3 (abstract detection) → D5 (author block) → D4 (metadata grab-bag, split per pattern) → D8.
+
+### Cycle-1 Phase-5d AI-gold verify — 011 findings (pre-existing, queued per rule 0e)
+
+The 011 verifier (gold ↔ v2.4.33 render) returned FAIL — **all findings pre-existing** (the v2.4.32→v2.4.33 render diff is exactly the 3 collapsed D1 labels; cycle 1 introduced nothing). `## Abstract` recovery confirmed correct. Pre-existing defects queued:
+
+- **D7b — minus-sign DROP (distinct from G1's `−`→`2`).** pdftotext raw output for 011 prints `b = .022`, `b = .245`, `b = .428` — the U+2212 minus is **deleted entirely** (gold: `−.022`, `−.245`, `−.428`). Confirmed upstream in `tmp/011_pdftotext.txt`. **Sign-inverts regression coefficients — S0.** Unlike G1 (`−`→`2`, a recoverable signal), a *deleted* minus leaves no text-channel signal — recovery needs the layout channel (pdfplumber per-char glyph). **C3-C4; likely escalate / layout-channel work.**
+- **G2 reframed — `β`→`b` is pdftotext-upstream, not a docpluck transliteration rule.** pdftotext outputs `b` for efendic-family β glyphs; confirmed in `tmp/011_pdftotext.txt` line 333. The TRIAGE's original G2 hypothesis ("delete normalize.py Greek `.replace` rules") is wrong for 011 — there is no docpluck rule to delete; the corruption is in pdftotext's font handling. Layer = upstream; recovery needs layout-channel glyph identity.
+- **G5 confirmed in APA — 7 subsection headings demoted to inline body text** in 011 (`Participants`, `Overview`, `Practice instructions`, `Self-control assessment`, `Perception of practice tasks`, `Stop signal`, `Supplemental analyses`). Also the "Supplemental analyses" section is shredded across the Table 1 region.
+- **G3/G4 confirmed in APA — 011 Table 1 not reconstructed** ("Could not reconstruct a structured grid"); cell dump as orphan lines above the `### Table 1` marker; body-prose bleed into the `unstructured-table` fenced block.
+- **G10/G11 in APA — 011 Figure 1** caption double-emitted (inline + `## Figures`); axis tick labels (`-10`, `-20`, `2.0 2.5 3.0…`, `Effort`) injected as orphan body lines.
+- **D4 in APA — 011** Introduction contains leaked `E-mail address:`, `0022-1031/$ … Ó 2009 Elsevier` (note `Ó` = mangled `©`), `doi:10.1016/…` banner.

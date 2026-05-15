@@ -22,7 +22,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.0"
+NORMALIZATION_VERSION = "1.9.1"
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -853,6 +853,52 @@ def _rejoin_garbled_ocr_headers(text: str) -> str:
     return "\n".join(lines)
 
 
+# v2.4.33 (NORMALIZATION_VERSION 1.9.1): lowercase letter-spaced display
+# labels. Elsevier-family journals (e.g. JESP 2009-era FlashReports) letter-
+# space the front-matter box labels "article info" and "abstract" for
+# typographic emphasis. pdftotext serializes each as a run of single
+# lowercase characters separated by single spaces, one label per line:
+#       a r t i c l e
+#       i n f o
+#       a b s t r a c t
+# The all-caps sibling _rejoin_garbled_ocr_headers does not fire (its regex
+# requires capital-letter clusters). Left uncollapsed, "a b s t r a c t" is
+# never recognised by the section taxonomy, so the Abstract section heading
+# is lost on every paper with this typography. This pass collapses such
+# lines; the recovered "abstract" then resolves through the normal section
+# taxonomy ({"abstract"} -> SectionLabel.abstract) exactly like a paper that
+# printed the label without letter-spacing.
+_LETTERSPACED_LABEL_RE = re.compile(r"^(?:[a-z] ){3,}[a-z]$")
+
+
+def _rejoin_letterspaced_lowercase_labels(text: str) -> str:
+    """H0b: collapse lowercase letter-spaced display labels (Elsevier).
+
+    Sibling of _rejoin_garbled_ocr_headers (which handles the all-caps
+    variant at render time); this lowercase variant must run pre-sectioning
+    so a recovered "abstract" label can be promoted to the Abstract heading.
+
+    Conservative trigger: the ENTIRE line must be >=4 single lowercase
+    letters separated by single spaces, and the collapsed form must contain
+    a vowel (rejects spaced-out consonant runs / variable lists).
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    changed = False
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or not _LETTERSPACED_LABEL_RE.match(stripped):
+            continue
+        compact = stripped.replace(" ", "")
+        if not any(v in compact for v in "aeiou"):
+            continue
+        lead = line[: len(line) - len(line.lstrip())]
+        lines[i] = lead + compact
+        changed = True
+    return "\n".join(lines) if changed else text
+
+
 def _strip_page_footer_lines(text: str) -> str:
     """P0: drop page-footer / running-header lines anywhere in the document.
 
@@ -1309,6 +1355,13 @@ def normalize_text(
     before = t
     t = _strip_frontmatter_metadata_leaks(t)
     report._track("P1_frontmatter_metadata_leak_strip", before, t, "frontmatter_leaks_stripped")
+
+    # ── H0b: lowercase letter-spaced display-label collapse (NORMALIZATION_VERSION 1.9.1) ─
+    # Elsevier letter-spaced "a r t i c l e / i n f o / a b s t r a c t" box
+    # labels. Runs pre-sectioning so the recovered "abstract" heads its section.
+    before = t
+    t = _rejoin_letterspaced_lowercase_labels(t)
+    report._track("H0b_letterspaced_label_collapse", before, t, "letterspaced_labels_collapsed")
 
     # ── W0: Publisher-overlay watermark stripping (Request 9) ──────────
     # Runs BEFORE S0 so mid-line watermarks don't leak into body text via

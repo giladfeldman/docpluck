@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.33] — 2026-05-15
+
+**Cycle 1 (autonomous APA-first run) — lowercase letter-spaced Elsevier front-matter labels (D1).** The broad-read of the 18-paper APA corpus at v2.4.32 found that the three Elsevier JESP-2009 papers (`ar_apa_j_jesp_2009_12_010/011/012`) rendered their front-matter box labels as unintelligible letter-spaced runs — `a r t i c l e` / `i n f o` / `a b s t r a c t` — one single-spaced character run per line. pdftotext serializes letter-spaced display typography this way; the all-caps sibling `_rejoin_garbled_ocr_headers` does not fire on lowercase input. Beyond the cosmetic leak, the section taxonomy never recognised `a b s t r a c t`, so the **Abstract section heading was lost** on every paper with this typography.
+
+Fix in `docpluck/normalize.py` — new `_rejoin_letterspaced_lowercase_labels` (step **H0b**, runs in the document-shape-strip zone after P1, pre-sectioning). Collapses any line that is entirely ≥4 single lowercase letters separated by single spaces, gated by a vowel check (rejects spaced-out consonant runs / variable lists). The recovered `abstract` then resolves through the normal taxonomy (`{"abstract"}` → `SectionLabel.abstract`) exactly like a paper that printed the label without letter-spacing.
+
+Result on all 3 papers (verified by v2.4.32→v2.4.33 render diff — the *only* change is the 3 collapsed labels): `a r t i c l e`→`article`, `i n f o`→`info`, `a b s t r a c t`→`## Abstract` (heading recovered). Zero text loss, zero hallucination.
+
+`NORMALIZATION_VERSION` 1.9.0 → 1.9.1. 12 new tests in `tests/test_letterspaced_label_real_pdf.py` (6 unit + 6 real-PDF).
+
 ## [2.4.32] — 2026-05-15
 
 **Cycle 15f-1 — table caption no longer absorbs linearized cell content (G4b).** The cycle-15f investigation of `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` G4 found that `extract_pdf_structured` table `caption` fields were 400 chars of linearized cell garbage (e.g. `amle_1` Table 1: `"Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 5 7 8 Yes Yes Yes ..."`). Root cause: `_extract_caption_text`'s paragraph-walk has no sentence terminator to stop at when a table title lacks a trailing period (common in AOM / management journals), so it walks straight through the pdftotext-linearized cell content until the 400-char hard cap.

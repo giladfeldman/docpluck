@@ -88,11 +88,15 @@ Before any iteration, establish:
 
 ---
 
-## Subagent parallelization (cross-cutting principle, applies to every phase below)
+## Subagent parallelization (cross-cutting MANDATE, applies to every phase below)
 
-> Added 2026-05-14 by user directive: "use subagents whenever possible to speed up the process. do this carefully and safely but use subagents when this can be done without any fear of issues."
+> **Added 2026-05-14 by user directive, RE-STATED 2026-05-15** ("use subagents to optimize the whole process whenever possible"). The re-statement means the directive slipped — treat this section as a HARD MANDATE, not advice.
 
-Iteration is dominated by I/O + AI work that is naturally parallel across papers. The orchestrator (this skill) should aggressively fan out to `Agent` subagents whenever there are 2+ independent units of work, BUT only when the work passes the safety checklist below.
+**MANDATE:** Before doing ANY batch of 2+ independent units of work inline, STOP and ask: *"could N parallel background subagents do this instead?"* If yes and the safety checklist passes, you MUST fan out. Doing serially in the orchestrator's own context what subagents could do in parallel is a process defect — it is slow and burns the orchestrator's context window. This applies to: per-paper renders, gold extractions, AI-gold verifications, broad-read reader-passes, diagnostic captures, cross-paper sweeps. The orchestrator keeps ONLY: code edits, git/release operations, version bumps, and <60s one-offs.
+
+**Per-cycle self-check (Phase 9 / Verification Checklist):** every cycle must be able to answer "what did I parallelize via subagents this cycle, and what did I do inline that could have been parallel?" If the honest answer is "I did N independent things serially," that is a logged process miss — fix it next cycle.
+
+Iteration is dominated by I/O + AI work that is naturally parallel across papers. The orchestrator (this skill) MUST aggressively fan out to `Agent` subagents whenever there are 2+ independent units of work, when the work passes the safety checklist below.
 
 ### Safety checklist — must pass ALL 4 before parallelizing
 
@@ -256,9 +260,10 @@ Mark the picked item `IN PROGRESS` in TRIAGE and in `tmp/iterate-todo.md`.
 **The discipline (from CLAUDE.md):**
 
 1. **One class of defect per cycle.** Don't fix three things in one commit — they can't be reverted independently if a regression appears.
-2. **Layer-of-origin rule (LESSONS L-001):** fix in the layer that owns the artifact. Body-text issues → `normalize.py` / `sections/`. Title/table/figure issues → layout-channel consumers. **Never swap text-extraction tool as a fix for downstream problems.**
-3. **Add a regression test in the same edit** in the matching `tests/test_*.py` file. The test must fail at HEAD before your fix and pass after.
-4. **No silent ImportError fallbacks** for settled-on deps — see memory `feedback_no_silent_optional_deps`. Declare loudly in `pyproject.toml` and let missing deps fail at import.
+2. **EVERY FIX MUST BE GENERAL — never a one-PDF quick-hack** (CLAUDE.md hard rule, user directive 2026-05-15; memory `feedback_general_fixes_not_pdf_specific`). Key the fix on a STRUCTURAL SIGNATURE (a typographic pattern, layout invariant, glyph-corruption shape, section-structure rule) — never on paper identity, filename, or a string hard-coded from one PDF. A fix that resolves the target paper but risks regressions on others is the WRONG fix; find the general root cause. The regression test uses specific PDF fixtures, but the fix *logic* must generalize to any PDF with the same signature. The 26-paper baseline (Phase 5c) is the no-regression gate; widen verification when a fix touches a shared code path. If the only way you can express the fix is "special-case this paper," STOP and re-scope.
+3. **Layer-of-origin rule (LESSONS L-001):** fix in the layer that owns the artifact. Body-text issues → `normalize.py` / `sections/`. Title/table/figure issues → layout-channel consumers. **Never swap text-extraction tool as a fix for downstream problems.**
+4. **Add a regression test in the same edit** in the matching `tests/test_*.py` file. The test must fail at HEAD before your fix and pass after.
+5. **No silent ImportError fallbacks** for settled-on deps — see memory `feedback_no_silent_optional_deps`. Declare loudly in `pyproject.toml` and let missing deps fail at import.
 
 Code with the Edit / Write tools. Do not delegate the actual code change to a subagent — you need to hold the architectural context.
 
@@ -414,6 +419,7 @@ Before declaring a cycle PASS / PARTIAL, confirm each item below. If you can't t
   - [ ] 26-paper baseline PASS 26/26 (5c) — single WARN counts as fail
   - [ ] Full-doc AI verify per affected paper: **TEXT-LOSS = 0**, **HALLUCINATION = 0** (5d)
   - [ ] At least one `*_real_pdf` test added or modified this cycle (rule 0d) — verify by git diff of `tests/`
+  - [ ] **Fix is GENERAL, not a one-PDF hack** — keyed on a structural signature, not paper identity; 26-paper baseline confirms no regression (Phase 4 discipline #2)
 - [ ] **Tier 2 — local-app parity**
   - [ ] uvicorn restarted post version-bump; `/_diag::docpluck_version` matches working-tree
   - [ ] `diff Tier1 Tier2` = empty for every affected paper (6c)
@@ -428,6 +434,7 @@ Before declaring a cycle PASS / PARTIAL, confirm each item below. If you can't t
   - [ ] `tmp/iterate-todo.md` updated
   - [ ] run-meta `bugs_fixed` / `tests_added` / `verdict` set
   - [ ] Postflight heartbeat printed (R4 spine)
+  - [ ] **Subagent parallelization used** — any batch of 2+ independent units (renders, golds, verifications, broad-reads, diagnostics) was fanned out to parallel subagents, not done serially inline (Subagent-parallelization MANDATE)
 - [ ] **Hard rules** — none of 0a–0d, 1–15 violated this cycle
 
 If any unchecked item is "skipped intentionally" rather than "fails": record a `SPINE-SKIP: <rule-id> — reason: <why>` line so the next run can audit the decision.
@@ -499,6 +506,8 @@ If you skip these, future runs of `docpluck-iterate` (and other docpluck skills 
 13. **Bump library version every release.** Patch for fixes; minor for behavior changes that alter rendered byte content.
 14. **Use `awk '{print; fflush()}'` after `python -u`** for any subprocess on Windows (memory `feedback_pdftotext_version_skew` extends to all subprocess output buffering).
 15. **Three-tier parity is sequential, not parallel.** Tier 1 passes → run Tier 2. Tier 2 passes → run Tier 3. Do not start a tier before the previous one passes.
+16. **Every fix must be GENERAL — never a one-PDF quick-hack** (CLAUDE.md hard rule, user directive 2026-05-15; memory `feedback_general_fixes_not_pdf_specific`). Key fixes on a structural signature, never paper identity. A fix that helps one paper but risks others is the wrong fix. The 26-paper baseline is the no-regression gate.
+17. **Use subagents to parallelize whenever possible** (user directive 2026-05-14, re-stated 2026-05-15; memory `feedback_use_subagents_aggressively`). Any batch of 2+ independent units is fanned out to parallel subagents — see the Subagent-parallelization MANDATE. Doing independent work serially inline is a process defect.
 
 ---
 
