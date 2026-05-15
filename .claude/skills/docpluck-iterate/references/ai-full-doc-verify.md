@@ -30,22 +30,34 @@ For each paper the cycle's fix targets (typically 3–8 papers):
 
 ### Step 1 — Produce / refresh the AI gold extraction
 
-The gold extraction is the source of truth for ALL future verification of this paper. It is generated once by an AI subagent reading the PDF and is reused across cycles (PDFs are immutable). **The gold is stored long-term in the shared article repository** (`~/ArticleRepository/ai_gold/<key>.md`) via the `article-finder` skill's `ai-gold.py` utility — every project that needs the gold for this paper can read it without re-running the AI extraction.
+The gold extraction is the source of truth for ALL future verification of this paper. It is generated once by an AI subagent reading the PDF and is reused across cycles (PDFs are immutable). **The gold is stored long-term in the shared article repository** via the `article-finder` skill's `ai-gold.py` utility — every project that needs the gold for this paper can read it without re-running the AI extraction.
 
-**Long-term gold caching (MANDATORY, added 2026-05-14):**
+**Multi-view model (revised 2026-05-15).** The `ai_gold/` cache moved from a flat `<key>.md` layout to a per-key directory with named **views**:
+
+```
+ai_gold/<canonical_key>/
+  ├── reading.md          ← docpluck-iterate's full-document gold (THIS skill's view)
+  ├── reading.meta.json
+  ├── citations.json      ← CitationGuard's view (different producer)
+  └── stats_lite.json     ← CitationGuard's view
+```
+
+docpluck-iterate produces and consumes the **`reading`** view exclusively — the full-document AI multimodal read. `check` / `get` default to `--view reading`, so for this skill the view flag is normally implicit. As of 2026-05-15 the cache holds **90 papers / 173 views**.
+
+**Long-term gold caching (MANDATORY, added 2026-05-14; updated for views 2026-05-15):**
 
 ```bash
 # 1. Check the shared repository FIRST. ~/.claude/skills/article-finder/ai-gold.py
-#    handles DOI / .pdf-path / stem keys uniformly.
+#    handles DOI / .pdf-path / stem keys uniformly. Default view = "reading".
 AI_GOLD_SCRIPT="~/.claude/skills/article-finder/ai-gold.py"
 
 if cached=$(python "$AI_GOLD_SCRIPT" check "$KEY"); then
-    # Cache HIT — copy to tmp/<paper>_gold.md and skip subagent dispatch.
-    cp "$cached" "tmp/<paper>_gold.md"
-    # (Or symlink, on platforms that support it.)
+    # Cache HIT — `check` printed the path to <key>/reading.md.
+    # `get` returns the same path. Copy to tmp/<paper>_gold.md.
+    cp "$(python "$AI_GOLD_SCRIPT" get "$KEY")" "tmp/<paper>_gold.md"
 else
     # Cache MISS — dispatch the gold-extraction subagent (Step 1b below).
-    # After the subagent writes tmp/<paper>_gold.md, STORE it back to the
+    # After the subagent writes tmp/<paper>_gold.md, REGISTER it back to the
     # shared repository so the next consumer (this or another project) reuses it.
     # See Step 1c below.
     :
@@ -57,7 +69,7 @@ Where `$KEY` is one of:
 - Filename stem (e.g. `xiao_2021_crsp`) — for local fixture PDFs that don't have a DOI in the repo (the typical case for `PDFextractor/test-pdfs/<publisher>/<stem>.pdf`).
 - Absolute path to the PDF (the script derives the stem from the filename).
 
-The repository layout is described in `~/.claude/skills/article-finder/SKILL.md`. The new directory `ArticleRepository/ai_gold/` is dedicated to AI-multimodal ground truths (distinct from `ground_truth/` which holds deterministic-text ground truths from publisher HTML / PMC XML / OCR consensus).
+The repository layout is described in `~/.claude/skills/article-finder/SKILL.md` (§ `ai-gold.py`). `ai_gold/` is AI-multimodal ground truth (distinct from `ground_truth/`, which holds deterministic-text ground truths from publisher HTML / PMC XML / OCR consensus). A held-out `ai_gold_eval_only/` corpus also exists — it is gated and NEVER consulted by default `check`/`get`; docpluck-iterate must not pass `--include-eval-only`.
 
 ### Step 1b — Dispatch gold-extraction subagent (only on cache miss)
 
@@ -177,23 +189,33 @@ be parseable as Markdown and faithful to the PDF.
 
 Save the resulting gold as `tmp/<paper>_gold.md`.
 
-### Step 1c — Store the new gold back to the shared repository (MANDATORY after a cache miss)
+### Step 1c — Register the new gold back to the shared repository (MANDATORY after a cache miss)
 
 ```bash
 # Persist the freshly-generated gold to long-term storage so future
 # consumers (this project's next cycle, OR ANY OTHER PROJECT) reuse it
 # without re-running the AI extraction. PDFs are immutable; golds are
 # durable artifacts that can be cached forever.
-python ~/.claude/skills/article-finder/ai-gold.py store \
-    "<KEY>" \
-    "tmp/<paper>_gold.md" \
+#
+# Use `register-view` (views-aware, 2026-05-15) with view="reading" —
+# this is the full-document gold view docpluck-iterate owns. `register-view`
+# is idempotent and records producer + schema + source-PDF SHA256.
+python ~/.claude/skills/article-finder/ai-gold.py register-view \
+    "<KEY>" reading "tmp/<paper>_gold.md" \
+    --producer docpluck-iterate \
+    --format md \
+    --schema reading.v1 \
     --source-pdf "<absolute path to source PDF>" \
-    --version v1 \
     --by "docpluck-iterate@<session-id-or-date>" \
-    --note "Phase 5d gold extraction for cycle <N>"
+    --note "Phase 5d gold extraction for cycle <N>" \
+    --corpus production
+
+# (The legacy `store <KEY> <path>` command still works and writes the
+#  reading view, but `register-view` is preferred — it carries the
+#  producer/schema/corpus metadata the cache's audit + gaps tooling needs.)
 ```
 
-This step is MANDATORY whenever Step 1b ran (i.e., whenever the cache missed and a new gold was generated). Skipping it means the next cycle re-pays the ~3-15min subagent cost for the same paper. The repository is the durable artifact; `tmp/<paper>_gold.md` is the working copy.
+This step is MANDATORY whenever Step 1b ran (i.e., whenever the cache missed and a new gold was generated). Skipping it means the next cycle re-pays the ~3-15min subagent cost for the same paper. The repository is the durable artifact; `tmp/<paper>_gold.md` is the working copy. NEVER register to the `eval-only` corpus from docpluck-iterate — that corpus is held-out arena answer keys.
 
 **Invalidation:** the meta JSON records the source PDF SHA256. If a future consumer detects the PDF on disk has a different hash than what's recorded, they can either accept the cache (if they trust the paper hasn't fundamentally changed) or re-extract. PDFs in our test corpus are immutable, so this is rare.
 
