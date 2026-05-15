@@ -1,9 +1,15 @@
 name: Bump docpluckapp library pin on new tag
 
 # Triggered when a vX.Y.Z tag is pushed to this (docpluck library) repo.
-# Opens a PR in the giladfeldman/docpluckapp repo bumping
-# `service/requirements.txt`'s docpluck git pin to the new tag. PR is
-# auto-merged once status checks pass (or admin can review first).
+# Commits the bumped `service/requirements.txt` docpluck git pin DIRECTLY
+# to the giladfeldman/docpluckapp `master` branch — no PR.
+#
+# Why no PR (decided 2026-05-15): the only pre-merge check a PR ran was
+# Vercel, which builds the Next.js frontend and is orthogonal to a
+# Python-service `requirements.txt` change — it never gated the pin.
+# The real gate, `verify-railway-deploy.yml`, triggers on push to master
+# and runs identically whether the bump lands via PR or direct commit.
+# `master` has no branch protection, so a direct push is permitted.
 #
 # Required secret:
 #   APP_REPO_TOKEN — GitHub Personal Access Token with `repo` scope on
@@ -18,7 +24,7 @@ on:
       - "v*.*.*"
 
 jobs:
-  open-bump-pr:
+  bump-pin:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -53,10 +59,9 @@ jobs:
           print('bumped')
           "
 
-      - name: Commit + open PR
+      - name: Commit pin bump directly to master
         working-directory: app
         env:
-          GH_TOKEN: ${{ secrets.APP_REPO_TOKEN }}
           NEW_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -e
@@ -64,23 +69,14 @@ jobs:
             echo "service/requirements.txt already pinned to ${NEW_TAG} — nothing to do."
             exit 0
           fi
-          BRANCH="auto-bump-docpluck-${NEW_TAG}"
           git config user.name "docpluck-bot"
           git config user.email "noreply@anthropic.com"
-          git checkout -b "$BRANCH"
           git add service/requirements.txt
           git commit -m "pin: auto-bump docpluck library to ${NEW_TAG}
 
-          Triggered by tag push on giladfeldman/docpluck.
+          Triggered by tag push on giladfeldman/docpluck. Committed directly
+          to master — verify-railway-deploy.yml (triggers on push to master)
+          asserts the live Railway service reports ${NEW_TAG} after redeploy.
 
           Co-Authored-By: docpluck-bot <noreply@anthropic.com>"
-          git push -u origin "$BRANCH"
-          gh pr create \
-            --title "pin: auto-bump docpluck library to ${NEW_TAG}" \
-            --body "Automatic pin bump triggered by tag \`${NEW_TAG}\` on giladfeldman/docpluck. The post-deploy verifier (see .github/workflows/verify-railway-deploy.yml) will assert that the live Railway service reports the new library version after merge." \
-            --base master \
-            --head "$BRANCH"
-          # Auto-merge: enable squash-merge with the post-deploy verifier as the
-          # gate. If automerge isn't enabled for the repo, this will be a no-op
-          # and the PR sits for manual review.
-          gh pr merge --auto --squash || echo "auto-merge not enabled — PR left open for review"
+          git push origin HEAD:master
