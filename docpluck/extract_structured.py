@@ -32,7 +32,7 @@ from .tables.captions import CaptionMatch, find_caption_matches
 from .tables.render import cells_to_html
 
 
-TABLE_EXTRACTION_VERSION = "2.1.0"  # v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
+TABLE_EXTRACTION_VERSION = "2.1.1"  # v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 

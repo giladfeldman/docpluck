@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.36] — 2026-05-15
+
+**Cycle 4 (autonomous APA-first run) — `(cid:0)` corrupted minus signs in table cells (GLYPH, S0).** The APA Phase-5d sweep found `ziano_2021_joep` and `chen_2021_jesp` rendered negative numbers in their statistical tables as `(cid:0) 0.23` instead of `-0.23` — a sign-corrupted (hallucinated) value in published statistics. Diagnosis: the cells come from the Camelot layout channel, whose text layer is pdfminer; pdfminer emits `(cid:N)` for a font glyph with no Unicode mapping. In these PDFs the unmapped glyph is the U+2212 minus, always printed directly before a number (confirmed: 100% of `(cid:0)` occurrences — 22 in ziano, 68 in chen — are immediately followed by a digit). `(cid:0)` is never legitimate text.
+
+Fix in `docpluck/tables/cell_cleaning.py::_html_escape` — recover `(cid:0)` (with optional trailing space) immediately before a digit to an ASCII hyphen (`(cid:0) 0.23` → `-0.23`, `[(cid:0) 0.108,` → `[-0.108,`). Digit-anchored so a `(cid:0)` not before a number is left untouched. Verified: ziano 16 + chen 85 negative table cells recovered, 0 `(cid:N)` markers remain in the rendered output.
+
+`TABLE_EXTRACTION_VERSION` 2.1.0 → 2.1.1. 8 new tests in `tests/test_cid_minus_recovery_real_pdf.py`.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.35] — 2026-05-15
 
 **Cycle 3 (autonomous APA-first run) — orphan arabic section numbers (D6).** JDM / Cambridge-style papers number their sections `1. Introduction`, `2. Method`, etc. pdftotext emits the section number on its own line, separated from the heading text the section partitioner promoted to `## ` — so the rendered output had a stray `1.` floating above `## Introduction` (found across ~8 APA papers: jdm_.2023.15/16, jdm_m.2022.2/3, korbmacher, ziano, jamison).

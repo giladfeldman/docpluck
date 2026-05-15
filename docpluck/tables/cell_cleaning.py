@@ -54,6 +54,13 @@ def _html_escape(s: str | None) -> str:
     # from the Camelot layout channel and bypass normalize_text's S0 step, so
     # math-italic Greek would otherwise leak raw into rendered table HTML.
     s = destyle_math_alphanumeric(s)
+    # Recover corrupted minus signs. pdfminer (Camelot's text layer) emits
+    # "(cid:0)" for a font glyph it cannot map to Unicode; in academic stat
+    # tables that unmapped glyph is the U+2212 minus, always printed directly
+    # before a number — "(cid:0) 0.23" is the CI bound -0.23, "(cid:0) 31" is
+    # -31. "(cid:0)" is never legitimate text, so recovering it before a digit
+    # is unambiguous. Normalised to ASCII hyphen (CLAUDE.md hard rule 4).
+    s = re.sub(r"\(cid:0\)\s*(?=\d)", "-", s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")
