@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.37] — 2026-05-15
+
+**Cycle 5 (autonomous APA-first run) — Cambridge / JDM publisher boilerplate spliced into body prose (D4).** The APA Phase-5d sweep found that every Cambridge JDM paper (jdm_.2023.15/16, jdm_m.2022.2/3, jdm_.2023.10) had two pieces of publisher boilerplate welded mid-sentence into the body: the per-page running footer `https://doi.org/10.1017/jdm.<id> Published online by Cambridge University Press` (~9× per paper — pdftotext emits it once per page and downstream paragraph-rejoin splices it inline, e.g. "...individuals usually fail to `<footer>` notice the absence..."), and the open-access licence sentence `This is an Open Access article, distributed under the terms of the Creative Commons Attribution licence (...), ... provided the original article is properly cited.`
+
+Fix — two patterns added to `normalize.py` W0 watermark-strip: a non-anchored Cambridge-footer pattern (robust whether the footer stands alone or is glued inline — pdftotext version skew) and the open-access licence-sentence pattern (`[\s\S]`-spanning to cross the pdftotext line wrap; optional bare `Association for Decision Making.` lead-in). Removing the boilerplate rejoins the split body sentence. Verified jdm_m.2022.2 v2.4.36→v2.4.37 diff: 21 lines, all boilerplate removals, no body prose lost; a regression test caught and fixed an over-strip where the lead-in pattern reached backward across legitimate prose.
+
+`NORMALIZATION_VERSION` 1.9.2 → 1.9.3. 5 new tests in `tests/test_cambridge_footer_strip_real_pdf.py`.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.36] — 2026-05-15
 
 **Cycle 4 (autonomous APA-first run) — `(cid:0)` corrupted minus signs in table cells (GLYPH, S0).** The APA Phase-5d sweep found `ziano_2021_joep` and `chen_2021_jesp` rendered negative numbers in their statistical tables as `(cid:0) 0.23` instead of `-0.23` — a sign-corrupted (hallucinated) value in published statistics. Diagnosis: the cells come from the Camelot layout channel, whose text layer is pdfminer; pdfminer emits `(cid:N)` for a font glyph with no Unicode mapping. In these PDFs the unmapped glyph is the U+2212 minus, always printed directly before a number (confirmed: 100% of `(cid:0)` occurrences — 22 in ziano, 68 in chen — are immediately followed by a digit). `(cid:0)` is never legitimate text.
