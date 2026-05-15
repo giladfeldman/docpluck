@@ -36,6 +36,8 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
+from docpluck.normalize import destyle_math_alphanumeric
+
 
 _MERGE_SEPARATOR = "\x00BR\x00"  # placeholder swapped to <br> after escaping
 _SUP_OPEN = "\x00SUP\x00"  # placeholder swapped to <sup> after escaping
@@ -48,6 +50,10 @@ def _html_escape(s: str | None) -> str:
     placeholders to ``<sup>``/``</sup>``."""
     if s is None:
         return ""
+    # Strip math-alphanumeric styling (𝜂->η, 𝛽->β, 𝐴->A) — table cells come
+    # from the Camelot layout channel and bypass normalize_text's S0 step, so
+    # math-italic Greek would otherwise leak raw into rendered table HTML.
+    s = destyle_math_alphanumeric(s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")

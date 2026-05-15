@@ -11,6 +11,7 @@ Levels:
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -22,7 +23,34 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.1"
+NORMALIZATION_VERSION = "1.9.2"
+
+
+# ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
+# The SMP block U+1D400-U+1D7FF holds styled (italic / bold / bold-italic /
+# script / fraktur / double-struck / sans-serif / sans-bold / monospace)
+# Latin letters, Greek letters and digits. Every codepoint in it is a
+# compatibility character whose NFKC decomposition is its plain base form:
+# 𝐴->A, 𝜂->η, 𝛽->β, 𝟎->0. Greek MUST stay Greek — mapping it to ASCII Latin
+# (the pre-v2.4.34 bug: 𝜂->"n", 𝛽->"b") silently corrupts statistical
+# symbols (η² rendered as "n2"). CLAUDE.md hard rule 4: only U+2212->hyphen
+# is a sanctioned Unicode->ASCII conversion. Shared by normalize_text's S0
+# step (text/body channel) and tables/cell_cleaning (layout channel) so math
+# styling is stripped consistently across every output view.
+_MATH_ALNUM_RE = re.compile(r"[\U0001D400-\U0001D7FF]")
+
+
+def destyle_math_alphanumeric(text: str) -> str:
+    """Strip Mathematical-Alphanumeric styling to the plain base letter/digit.
+
+    NFKC-normalises each U+1D400-U+1D7FF codepoint (Greek stays Greek, Latin
+    stays Latin, digits stay digits). No-op when the text holds no such char.
+    """
+    if not text or not _MATH_ALNUM_RE.search(text):
+        return text
+    return _MATH_ALNUM_RE.sub(
+        lambda m: unicodedata.normalize("NFKC", m.group()), text
+    )
 
 
 # ── Request 9 (Scimeto, 2026-04-27): Reference-list normalization ──────────
@@ -1374,25 +1402,15 @@ def normalize_text(
 
     # ── Standard steps (S1-S9) ──────────────────────────────────────────
 
-    # S0: SMP Mathematical Italic -> ASCII
+    # S0: Mathematical Alphanumeric Symbols (U+1D400-U+1D7FF) de-styling.
+    # NFKC strips the math styling to the plain base letter/digit; Greek
+    # stays Greek (see destyle_math_alphanumeric). Replaces pre-v2.4.34
+    # hand-rolled loops that were (a) incomplete — only italic Latin + a
+    # partial italic-Greek dict, so bold / sans / script variants and
+    # ι/κ/λ/ν/ξ/τ/υ/ω leaked through — and (b) mapped math-italic Greek to
+    # ASCII Latin (𝜂->"n", 𝛽->"b"), corrupting statistical symbols.
     before = t
-    # Math italic capitals A-Z: U+1D434 - U+1D44D
-    for i, letter in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
-        t = t.replace(chr(0x1D434 + i), letter)
-    # Math italic small a-z: U+1D44E - U+1D467
-    for i, letter in enumerate("abcdefghijklmnopqrstuvwxyz"):
-        t = t.replace(chr(0x1D44E + i), letter)
-    # Math italic Greek
-    _greek = {
-        0x1D6E2: "A", 0x1D6E4: "G", 0x1D6E5: "D", 0x1D6F4: "S",
-        0x1D6F7: "Ph", 0x1D6F8: "Ch", 0x1D6F9: "Ps", 0x1D6FA: "O",
-        0x1D6FC: "a", 0x1D6FD: "b", 0x1D6FE: "g", 0x1D6FF: "d",
-        0x1D700: "e", 0x1D701: "z", 0x1D702: "n", 0x1D703: "th",
-        0x1D707: "m", 0x1D70B: "pi", 0x1D70C: "r", 0x1D70E: "s",
-        0x1D711: "ph", 0x1D712: "ch", 0x1D713: "ps",
-    }
-    for cp, repl in _greek.items():
-        t = t.replace(chr(cp), repl)
+    t = destyle_math_alphanumeric(t)
     if t != before:
         report._track("S0_smp_to_ascii", before, t, "smp_chars_converted")
 
