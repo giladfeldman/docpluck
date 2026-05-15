@@ -76,7 +76,7 @@
 **G13. References concatenated to mega-lines** (xiao, amj_1); references fused with author bios (amle_1)
 **G14. URL soft-wrap space insertion** (ieee_access_2 refs [4]/[6]/[21])
 **G15. Combining-character split / no NFKC** (amj_1: Förster→"Fö rster"; Potočnik→"Potocˇnik")
-**G16. Page-header leak inside equations** (ieee_access_2: `Page 4 (2)`)
+~~**G16. Page-header leak inside equations** (ieee_access_2: `Page 4 (2)`)~~ ✓ FIXED — verified at v2.4.31 (cycle 15e investigation, 2026-05-14): incidentally closed between v2.4.27 and v2.4.31 by some combination of preserve_math_glyphs / NFC / section-partitioning shifts. Confirmed across 6 IEEE papers (0 hits). Locked in by `tests/test_equation_page_header_strip_real_pdf.py` (6 tests).
 **G17. Comma-thousands stripping** (amle_1 ~130 instances in body; structured tables PRESERVE commas — bug is body-text path only)
 **G18. Digit drift / OCR misread** (amle_1: 14992 vs 14,002; 9913 vs 9,953; 48390 vs 48,396)
 **G19. Citation count drift in body table dumps** (amle_1: 3986 vs 1,808; 1810 vs 1,318)
