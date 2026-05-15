@@ -374,3 +374,18 @@ The user (via article-finder) flagged that docpluck-iterate golds were being "th
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 2 is one normalize helper + 2 one-line call-site additions; NFKC over a fixed Unicode block, no regex catch-all. 26/26 baseline confirms generality.
+
+---
+
+## Run: 2026-05-15 (autonomous APA-first run) · Cycles 3 + 4 · v2.4.35, v2.4.36
+
+### Cycle 3 (v2.4.35) — D6 orphan arabic section numbers
+- `_fold_orphan_arabic_numerals_into_headings` (render.py), arabic analogue of the Roman-numeral folder. Folds `1.`\n\n`## Introduction` → `## 1. Introduction`. 8 papers. Clean — diff = only orphan numbers folded.
+- **Learning:** the post-fix render still showed bare-number lines in some papers — but those are NOT D6 failures. The fix correctly folds only numbers *blank-line-adjacent* to a heading; the residual bare numbers are page-number residue (a normalize-S9 concern) or section numbers separated from their heading by wedged table content (a heading-displacement concern). Distinguishing "the defect I'm fixing" from "a different defect with a similar surface signature" prevented over-broadening the regex.
+
+### Cycle 4 (v2.4.36) — (cid:0) corrupted minus in table cells
+- `tables/cell_cleaning._html_escape` recovers `(cid:0)` + optional space before a digit → `-`. ziano 16 + chen 85 negative cells recovered.
+- **Diagnostic learning:** the `(cid:0)` marker is NOT in pdftotext output (`grep -c "(cid:"` on the raw text = 0) — it comes from the **Camelot/pdfminer layout channel**. The same logical defect (corrupted U+2212 minus) has channel-specific manifestations: pdftotext maps it to `2` or drops it; pdfminer emits `(cid:0)`. Always grep the raw output of *each* channel to attribute a glyph defect to the right layer before fixing.
+
+### Session shape
+4 cycles shipped (v2.4.33–36), all clean (26/26 baseline every cycle, 0 new pytest failures). APA corpus 2/18 confirmed PASS, 13 still FAIL — session closed PARTIAL with a full punch-list handoff (`docs/HANDOFF_2026-05-15_iterate_apa_run_1.md`) per rule 0e-bis. The biggest remaining defects (TABLE cluster, G5 section detection, COL column-interleave) are C3 — a dedicated session.
