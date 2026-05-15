@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.35] — 2026-05-15
+
+**Cycle 3 (autonomous APA-first run) — orphan arabic section numbers (D6).** JDM / Cambridge-style papers number their sections `1. Introduction`, `2. Method`, etc. pdftotext emits the section number on its own line, separated from the heading text the section partitioner promoted to `## ` — so the rendered output had a stray `1.` floating above `## Introduction` (found across ~8 APA papers: jdm_.2023.15/16, jdm_m.2022.2/3, korbmacher, ziano, jamison).
+
+Fix — new `_fold_orphan_arabic_numerals_into_headings` in `docpluck/render.py` (post-process), the arabic analogue of the existing `_fold_orphan_roman_numerals_into_headings`. Folds an orphan 1-2 digit number (dot optional) into the `## ` heading immediately below it (blank lines only between): `## Introduction` → `## 1. Introduction`. Conservative — only fires when the number is immediately adjacent to a heading that does not already begin with a number; page-number residue, list items, and stat fragments that merely precede body prose are left untouched (verified: korbmacher v2.4.34→v2.4.35 diff is exactly 3 headings folded, nothing else).
+
+8 new tests in `tests/test_orphan_section_number_real_pdf.py`. No `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change (render-only).
+
+12 APA papers still FAIL Phase-5d verification; the autonomous run continues fixing them.
+
 ## [2.4.34] — 2026-05-15
 
 **Cycle 2 (autonomous APA-first run) — math-italic Greek corruption (GLYPH, S0).** The APA Phase-5d verifier sweep found effect-size symbols corrupted across the corpus: `η² = 0.34` rendered as `n2 = 0.34`, the coefficient `β` as `b`, `χ²` as `ch2`, `α` as `a`. Diagnosis (`korbmacher_2022_kruger` raw pdftotext): the source PDFs encode Greek as **Mathematical-Italic codepoints** (U+1D6FD `𝛽`, U+1D702 `𝜂`, …); pdftotext extracts them faithfully, then `normalize.py`'s S0 step **transliterated math-italic Greek to ASCII Latin** (`𝜂`→`"n"`, `𝛽`→`"b"`, `𝛼`→`"a"`) — a docpluck-introduced corruption that violates the hard rule "only U+2212→ASCII is a sanctioned Unicode→ASCII conversion."

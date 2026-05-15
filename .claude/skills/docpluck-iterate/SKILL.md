@@ -435,6 +435,7 @@ Before declaring a cycle PASS / PARTIAL, confirm each item below. If you can't t
   - [ ] run-meta `bugs_fixed` / `tests_added` / `verdict` set
   - [ ] Postflight heartbeat printed (R4 spine)
   - [ ] **Subagent parallelization used** — any batch of 2+ independent units (renders, golds, verifications, broad-reads, diagnostics) was fanned out to parallel subagents, not done serially inline (Subagent-parallelization MANDATE)
+  - [ ] **Every gold generated is persisted** — each `tmp/*_gold.md` from this cycle is `register-view`'d to the article-finder `ai_gold/` cache under its canonical key (`ai-gold.py check` exits 0); no gold left only in tmp/ (rule 18)
 - [ ] **Hard rules** — none of 0a–0d, 1–15 violated this cycle
 
 If any unchecked item is "skipped intentionally" rather than "fails": record a `SPINE-SKIP: <rule-id> — reason: <why>` line so the next run can audit the decision.
@@ -510,6 +511,7 @@ If you skip these, future runs of `docpluck-iterate` (and other docpluck skills 
 15. **Three-tier parity is sequential, not parallel.** Tier 1 passes → run Tier 2. Tier 2 passes → run Tier 3. Do not start a tier before the previous one passes.
 16. **Every fix must be GENERAL — never a one-PDF quick-hack** (CLAUDE.md hard rule, user directive 2026-05-15; memory `feedback_general_fixes_not_pdf_specific`). Key fixes on a structural signature, never paper identity. A fix that helps one paper but risks others is the wrong fix. The 26-paper baseline is the no-regression gate.
 17. **Use subagents to parallelize whenever possible** (user directive 2026-05-14, re-stated 2026-05-15; memory `feedback_use_subagents_aggressively`). Any batch of 2+ independent units is fanned out to parallel subagents — see the Subagent-parallelization MANDATE. Doing independent work serially inline is a process defect.
+18. **Every AI gold MUST be persisted to the article-finder repository — NEVER thrown away** (user directive 2026-05-15; memory `feedback_gold_canonical_key`). An AI-multimodal gold extraction costs minutes of subagent time and is the irreplaceable verification ground truth — and AI-verified ground truths are not regenerable on demand (some papers are content-filter-blocked). The moment a gold is generated it MUST be `register-view`'d into the shared `ai_gold/` cache under the paper's CANONICAL key (resolve to DOI; filename stem only as a genuine last resort — see `references/ai-full-doc-verify.md` "Choosing $KEY"). A gold left only in `tmp/` is a thrown-away artifact — `tmp/` is ephemeral. **End-of-run audit (Phase 12, MANDATORY):** every `tmp/*_gold.md` produced in the run resolves to a registered cache view (`ai-gold.py check <canonical-key>` exits 0) and `reading` co-locates with the paper's other views; register any that do not before the run ends. Per-cycle AI-verifier verdicts are likewise persisted — recorded into the active `TRIAGE_*.md` (committed), never left only in conversation.
 
 ---
 
