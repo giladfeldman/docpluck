@@ -389,3 +389,21 @@ The user (via article-finder) flagged that docpluck-iterate golds were being "th
 
 ### Session shape
 4 cycles shipped (v2.4.33–36), all clean (26/26 baseline every cycle, 0 new pytest failures). APA corpus 2/18 confirmed PASS, 13 still FAIL — session closed PARTIAL with a full punch-list handoff (`docs/HANDOFF_2026-05-15_iterate_apa_run_1.md`) per rule 0e-bis. The biggest remaining defects (TABLE cluster, G5 section detection, COL column-interleave) are C3 — a dedicated session.
+
+---
+
+## Run: 2026-05-15/16 (autonomous APA-first run) · Cycles 5 + 6 · v2.4.37, v2.4.38
+
+### Cycle 5 (v2.4.37) — D4 Cambridge/JDM publisher boilerplate splice
+- Two patterns added to normalize.py W0 watermark-strip: the Cambridge UP per-page footer and the open-access licence sentence. Non-anchored so they catch the boilerplate whether standalone or glued inline (pdftotext version skew).
+- **Learning:** the regression test caught a real over-strip — the optional `Association for Decision Making.` lead-in was written as `[\w ]{0,40}?Association...` which reached BACKWARD across legitimate body prose ("consumers commonly find themselves" got eaten). Fixed to a bare literal. An optional prefix in a strip pattern must be a literal anchor, never a greedy/lazy span that can bridge real content. The test (synthetic input simulating the mid-sentence splice) is what caught it — rule 0d earning its keep.
+
+### Cycle 6 (v2.4.38) — '2'-for-U+2212 minus-sign recovery
+- `recover_corrupted_minus_signs`: descending-CI-bracket rule + implausible-`r=2.X` rule. The descending-bracket signature (lower>upper is impossible for a CI) is the safe discriminator — an ascending pair is never touched.
+- **Cross-channel learning (3rd time this run — cycles 2, 4, 6):** a glyph defect surfaces in EVERY text channel. W0b (body) alone left 25 corrupt CIs in tables; adding `_html_escape` (Camelot cells) still left 2 in the no-Camelot `unstructured-table` fallback. The complete fix needed the SAME helper at all three chokepoints: normalize step + cell_cleaning + a render.py final post-process pass. **This is now a known pattern — any glyph/encoding fix must be applied at all three (body / table-cell / render-final), via a shared helper, from the start.** Proposed amendment below.
+
+### PROPOSED SKILL AMENDMENT (3 cycles, same theme — awaiting user review)
+Cycles 2, 4, 6 each independently rediscovered that a glyph/encoding corruption reaches the rendered .md through three channels (normalize body, Camelot table cells, no-Camelot table fallback / captions) and a fix to one channel is incomplete. SKILL.md Phase 4 should state: "A glyph/encoding/character-level fix MUST be a shared helper applied at all three text chokepoints — `normalize_text` (body), `tables/cell_cleaning` (Camelot cells), and `render_pdf_to_markdown` post-process (final guarantee). Fixing only the body channel is a known incomplete-fix trap."
+
+### Session close
+6 cycles shipped (v2.4.33-38), all clean. APA corpus 3/18 confirmed PASS (jdm10, korbmacher, ziano — up from 1/18). Closed PARTIAL with full punch-list handoff (`docs/HANDOFF_2026-05-15_iterate_apa_run_1.md`). Dominant remaining blocker: section-heading misplacement / out-of-order body assembly (C2-C3) + table-structure flattening (C3).
