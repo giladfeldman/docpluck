@@ -33,10 +33,15 @@ class TestS0_SMP:
         assert norm(text, "standard").startswith("A")
 
     def test_math_italic_greek_eta(self):
-        # U+1D702 = math italic eta
+        # U+1D702 = MATHEMATICAL ITALIC SMALL ETA. v2.4.34: S0 must de-style
+        # it to the GREEK letter η — NOT to ASCII Latin 'n'. The pre-2.4.34
+        # bug mapped math-italic Greek to ASCII Latin, corrupting the effect
+        # size "η² = .054" into "n2 = .054".
         text = f"{chr(0x1D702)}² = .054"
         result = norm(text, "standard")
-        assert "n" in result  # eta maps to 'n'
+        assert chr(0x1D702) not in result            # math-italic styling stripped
+        assert "n2" not in result                    # NOT corrupted to ASCII 'n'
+        assert ("η" in result) or ("eta" in result)  # de-styled to Greek eta
 
     def test_mixed_smp_and_normal(self):
         text = f"The {chr(0x1D44F)}eta was {chr(0x1D44E)} = 0.5"

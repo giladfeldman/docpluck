@@ -64,10 +64,17 @@ else
 fi
 ```
 
-Where `$KEY` is one of:
-- DOI in normalized form (e.g. `10.1080/23743603.2021.1878340`) — preferred when the paper has a DOI indexed in the article repository.
-- Filename stem (e.g. `xiao_2021_crsp`) — for local fixture PDFs that don't have a DOI in the repo (the typical case for `PDFextractor/test-pdfs/<publisher>/<stem>.pdf`).
-- Absolute path to the PDF (the script derives the stem from the filename).
+### Choosing `$KEY` — ALWAYS resolve to the CANONICAL key first (MANDATORY)
+
+**A paper has exactly ONE canonical record in the shared cache. Every view (`reading`, `textstaging`, `citations`, `stats_lite`, …, from every project) must land on the SAME key, or the paper fragments into two half-populated records and `ai-gold.py gaps` reports the canonical record as missing the view you just generated.** This is a real defect that happened on 2026-05-15: docpluck-iterate registered `reading` golds for the JDM papers under filename-stem keys (`jdm_.2023.10`) while another project had already created the canonical DOI-keyed record (`10.1017__jdm.2023.10`) — the `reading` golds were orphaned, invisible to coverage tracking.
+
+**Key-selection algorithm (do this for every gold, before `check` and before `register-view`):**
+
+1. **Derive the DOI.** Most test PDFs carry a DOI — on the first page, in `pdftotext` output, and often encoded in the filename (`jdm_.2023.10` → `10.1017/jdm.2023.10`; `xiao_2021_crsp` → the T&F DOI on page 1). Extract it.
+2. **Resolve.** `python ai-gold.py resolve "<doi-or-stem>"`. If it returns a canonical key, USE THAT KEY for both `check` and `register-view`.
+3. **If `resolve` HALTs** (paper not in the article-finder index): the DOI itself, normalized to the cache form (`10.1017/jdm.2023.10` → `10.1017__jdm.2023.10`), is the canonical key — register there so the `reading` view co-locates with any `textstaging`/`citations` views other projects registered under the DOI.
+4. **Filename stem is the LAST resort** — only when the paper genuinely has no DOI anywhere. It is NOT "the typical case." A stem key for a paper that has a DOI silently fragments the record.
+5. **After `register-view`, verify co-location:** `python ai-gold.py views "<canonical-key>"` must list `reading` alongside whatever else is there. If `reading` is on a different key than the paper's other views, you mis-keyed — fix it.
 
 The repository layout is described in `~/.claude/skills/article-finder/SKILL.md` (§ `ai-gold.py`). `ai_gold/` is AI-multimodal ground truth (distinct from `ground_truth/`, which holds deterministic-text ground truths from publisher HTML / PMC XML / OCR consensus). A held-out `ai_gold_eval_only/` corpus also exists — it is gated and NEVER consulted by default `check`/`get`; docpluck-iterate must not pass `--include-eval-only`.
 

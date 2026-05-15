@@ -124,3 +124,11 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Fix (encoded durably):** CLAUDE.md "Critical hard rules" gains the general-fix bullet. docpluck-iterate SKILL.md: Subagent-parallelization section upgraded to a MANDATE with a per-cycle self-check; Phase 4 discipline #2 = general-fix rule; hard rules 16 (general fix) + 17 (subagents); Verification Checklist gains both checks. Memories `feedback_use_subagents_aggressively` + `feedback_general_fixes_not_pdf_specific`.
 
 **How to detect (next time):** Before any batch of 2+ independent units (renders, golds, verifications, broad-reads, diagnostics) — fan out to parallel subagents. Before shipping any fix — confirm it is keyed on a structural signature, not paper identity, and the 26-paper baseline confirms no regression.
+
+## 2026-05-15 · Cycle 2 — a test can encode the bug; cross-channel glyph coverage
+
+**What:** Fixing normalize.py's S0 step (math-italic Greek was transliterated to ASCII Latin — `𝜂`→`n`) surfaced two process lessons. (1) `test_normalization.py::TestS0_SMP::test_math_italic_greek_eta` literally asserted `"n" in result  # eta maps to 'n'` — the test encoded the corruption as expected behavior, so the correct fix turned it red. (2) The same corruption appeared in three channels — body text (normalize S0), table cells (Camelot, bypasses S0), and figure/table captions (bypass both) — so an S0-only fix was incomplete.
+
+**Why:** A test written against buggy output silently protects the bug. And a normalization defect rooted in glyph handling surfaces in every channel that carries text, not just the body.
+
+**How to detect (next time):** When a fix targets a normalize/extract step, grep that step's existing tests FIRST — a test may be asserting the very behavior you're correcting; update it in the same cycle. And when a glyph/encoding defect is found, enumerate every channel that emits text (body, table cells, captions, raw_text, structured JSON) and confirm the fix — ideally a shared helper — covers all of them (Phase 0.8 cross-output check).

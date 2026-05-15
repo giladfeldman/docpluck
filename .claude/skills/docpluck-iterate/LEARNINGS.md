@@ -349,3 +349,28 @@ During the autonomous APA-first run (cycle 1), the user issued two standing dire
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review` before deploy) — SKIPPED. Cycle 1 is a single-helper normalize.py addition (one anchored, vowel-gated, whole-line regex — the opposite of a broad catch-all). Generality self-verified; 26/26 baseline confirms no regression. Matches cycle-15n precedent.
+
+### USER CORRECTION (2026-05-15) — never frame a run as "clean" while FAILs remain
+
+The cycle-1 report described the 14-paper Phase-5d sweep (13 FAIL / 1 PASS) as "Cycle 1 is clean and shippable" — reasoning that cycle 1's own diff introduced no regression so the *cycle* was clean. The user rejected this hard: "I don't care if something is pre-existing or not — we had a directive, if there are issues you fix them. Always."
+
+The substance was already correct (rule 0e: the 13 FAILs were queued in the TRIAGE and the plan was to fix them in cycles 2+). The failure was **framing and mindset**: "clean and shippable" reads as closure/victory when 13 papers are broken. "Pre-existing" was used as a reassurance — exactly what rule 0e's spirit forbids.
+
+Encoded: CLAUDE.md rule 0e-bis + SKILL.md rule 0e-bis + memory `feedback_fix_every_bug_found` point 6. The standing run verdict is FAIL until the APA corpus is clean; cycle reports must plainly state "N papers still FAIL; run continues"; budget-stop reports an honest PARTIAL with the punch-list, never "clean".
+
+---
+
+## Run: 2026-05-15 (autonomous APA-first run) · Cycle 2 · v2.4.34
+
+### Outcome
+- **Cycle 2 shipped v2.4.34** — math-italic Greek corruption (GLYPH, S0). New shared `destyle_math_alphanumeric()` NFKC-normalises the whole Mathematical Alphanumeric block (U+1D400-U+1D7FF); applied at 3 channels (normalize S0 / tables `_html_escape` / render final pass). The pre-2.4.34 S0 hand-rolled loops mapped math-italic Greek → ASCII Latin (`𝜂`→"n", `𝛽`→"b"), corrupting effect-size symbols — a docpluck-introduced bug. Diagnosed via korbmacher raw pdftotext (`𝜂2 = 0.34` present → docpluck mangled it). v2.4.32→v2.4.34 diff = 18 lines, all pure glyph corrections. 26/26 baseline; korbmacher re-verified FAIL→PASS; jdm_m2 Greek-fix confirmed.
+
+### Blind spots
+- **A test asserted the bug.** `test_normalization.py::TestS0_SMP::test_math_italic_greek_eta` literally asserted `"n" in result  # eta maps to 'n'` — it encoded the corruption as expected behavior. The cycle-2 fix flipped it to a failure. Fixed the test to assert correct behavior (de-styles to η, never ASCII `n`) in the same cycle. Lesson: when a fix targets a normalize step, grep the step's existing tests FIRST — a test may be enforcing the very bug you're fixing.
+- **Cross-channel coverage.** The corruption surfaced in 3 channels: body text (S0), table cells (Camelot bypasses S0), figure/table captions (bypass both). A fix to S0 alone left table + caption leaks. Phase 0.8 check (b) cross-output coverage caught this — the complete fix needed a shared helper at all 3 chokepoints.
+
+### USER CORRECTION (2026-05-15) — register golds under the canonical DOI key
+The user (via article-finder) flagged that docpluck-iterate golds were being "thrown away." Investigation: gold files were NOT deleted — all 28 registered, `audit` clean — but registered under filename-STEM keys (`jdm_.2023.10`) while the canonical record is the DOI key (`10.1017__jdm.2023.10`, holding another project's `textstaging` view). The `reading` golds were orphaned onto a separate key; `ai-gold.py gaps` showed the canonical record still "missing reading." Fix: re-registered the 5 JDM `reading` golds onto their DOI keys; rewrote `references/ai-full-doc-verify.md` "Choosing $KEY" to mandate resolve-to-canonical-DOI before register-view. Memory `feedback_gold_canonical_key`.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 2 is one normalize helper + 2 one-line call-site additions; NFKC over a fixed Unicode block, no regex catch-all. 26/26 baseline confirms generality.

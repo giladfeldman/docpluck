@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.4.34] — 2026-05-15
+
+**Cycle 2 (autonomous APA-first run) — math-italic Greek corruption (GLYPH, S0).** The APA Phase-5d verifier sweep found effect-size symbols corrupted across the corpus: `η² = 0.34` rendered as `n2 = 0.34`, the coefficient `β` as `b`, `χ²` as `ch2`, `α` as `a`. Diagnosis (`korbmacher_2022_kruger` raw pdftotext): the source PDFs encode Greek as **Mathematical-Italic codepoints** (U+1D6FD `𝛽`, U+1D702 `𝜂`, …); pdftotext extracts them faithfully, then `normalize.py`'s S0 step **transliterated math-italic Greek to ASCII Latin** (`𝜂`→`"n"`, `𝛽`→`"b"`, `𝛼`→`"a"`) — a docpluck-introduced corruption that violates the hard rule "only U+2212→ASCII is a sanctioned Unicode→ASCII conversion."
+
+Fix — new shared `destyle_math_alphanumeric()` in `docpluck/normalize.py`: NFKC-normalises the whole Mathematical Alphanumeric Symbols block (U+1D400–U+1D7FF) to the plain base letter/digit — **Greek stays Greek**, Latin stays Latin, digits stay digits. Replaces the pre-2.4.34 hand-rolled S0 loops, which were both incomplete (only italic Latin + a partial italic-Greek dict — bold/sans/script variants and ι/κ/λ/ν/ξ/τ/υ/ω leaked) and wrong (Greek→ASCII). Applied at three channels so no math-styled glyph reaches any output view:
+- **S0** (`normalize_text`) — body/text channel → sections + normalized-text views.
+- **`_html_escape`** (`tables/cell_cleaning.py`) — Camelot layout channel (table cells bypass S0).
+- **`render_pdf_to_markdown` post-process** — final guarantee over the assembled markdown (catches figure/table captions, unstructured-table fences, raw_text).
+
+Verified on korbmacher / jdm_m.2022.2 / jdm_m.2022.3 / jdm_.2023.15: 0 math-alphanumeric leaks, Greek recovered (`η²`, `β`, `α`, `χ`); korbmacher re-verified against AI-gold FAIL → PASS. `NORMALIZATION_VERSION` 1.9.1 → 1.9.2. 6 new tests in `tests/test_mathitalic_greek_real_pdf.py`; `test_normalization.py::TestS0_SMP::test_math_italic_greek_eta` corrected — it had asserted the bug (`"n" in result  # eta maps to 'n'`).
+
+13 APA papers still FAIL Phase-5d verification; the autonomous run continues fixing them.
+
 ## [2.4.33] — 2026-05-15
 
 **Cycle 1 (autonomous APA-first run) — lowercase letter-spaced Elsevier front-matter labels (D1).** The broad-read of the 18-paper APA corpus at v2.4.32 found that the three Elsevier JESP-2009 papers (`ar_apa_j_jesp_2009_12_010/011/012`) rendered their front-matter box labels as unintelligible letter-spaced runs — `a r t i c l e` / `i n f o` / `a b s t r a c t` — one single-spaced character run per line. pdftotext serializes letter-spaced display typography this way; the all-caps sibling `_rejoin_garbled_ocr_headers` does not fire on lowercase input. Beyond the cosmetic leak, the section taxonomy never recognised `a b s t r a c t`, so the **Abstract section heading was lost** on every paper with this typography.

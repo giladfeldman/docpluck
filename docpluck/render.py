@@ -31,7 +31,11 @@ from typing import Optional
 
 from .extract_layout import LayoutDoc
 from .extract_structured import extract_pdf_structured
-from .normalize import NormalizationLevel, _rejoin_garbled_ocr_headers
+from .normalize import (
+    NormalizationLevel,
+    _rejoin_garbled_ocr_headers,
+    destyle_math_alphanumeric,
+)
 from .sections import extract_sections
 from .tables.render import cells_to_html
 
@@ -1964,6 +1968,13 @@ def render_pdf_to_markdown(
     md = _promote_study_subsection_headings(md)
     md = _demote_false_single_word_headings(md)
     md = _rejoin_garbled_ocr_headers(md)
+    # v2.4.34: final guarantee — strip Mathematical-Alphanumeric styling from
+    # the assembled markdown. S0 (body channel) and tables/cell_cleaning
+    # (table HTML) already de-style their channels; this catches the
+    # remaining surfaces — figure/table captions, unstructured-table fences,
+    # raw_text fallbacks — so no math-italic glyph (𝜂, 𝛽, …) reaches the
+    # rendered .md from ANY channel.
+    md = destyle_math_alphanumeric(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)
