@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.38] — 2026-05-16
+
+**Cycle 6 (autonomous APA-first run) — `2`-for-U+2212 minus-sign corruption (GLYPH, S0).** `efendic_2022_affect` rendered every negative statistic with the U+2212 minus turned into the digit `2`: the abstract read `r = 2.74 [20.92, 20.30]` for `r = −.74 [−0.92, −0.30]`, and all 29 confidence intervals in the body and tables were sign-corrupted — a sign-FLIP of published statistics. Diagnosis: a font quirk makes pdftotext map U+2212 to `2`.
+
+Fix — new `normalize.py::recover_corrupted_minus_signs`, two self-gating context-safe rules: **(1)** a bracketed numeric pair `[A, B]` that is *descending* as written (A > B — impossible for a CI/range) and becomes a valid *ascending* interval when the leading `2` of a decimal-bearing bound is read as `−`; **(2)** `r = 2.<digits>` — a Pearson r cannot exceed 1. An ascending CI, a plausible correlation, and integer-only brackets (citation lists `[25, 3]`) are never touched. Applied at three channels (same pattern as the v2.4.34 Greek fix): normalize W0b step (body), `cell_cleaning._html_escape` (Camelot table cells), and the `render_pdf_to_markdown` post-process (final guarantee — unstructured-table fenced blocks / raw_text fallbacks).
+
+Verified on efendic (v2.4.36→v2.4.38 diff: 60 lines, all minus-sign recoveries, no body prose touched): abstract `r = -.74 [-0.92, -0.30]`, 0 corrupt CI brackets, 0 `r = 2.X`. **Residual:** 6 standalone `2X.XX` coefficient/mean cells (`Mposterior = 20.54`, table estimate cells) have no per-cell discriminator — they need column-aware logic; queued. The `<`→`\` operator corruption (`p < .05` → `p \ .05`) is a separate glyph defect, also queued.
+
+`NORMALIZATION_VERSION` 1.9.3 → 1.9.4 · `TABLE_EXTRACTION_VERSION` 2.1.1 → 2.1.2. 9 new tests in `tests/test_minus_sign_recovery_real_pdf.py`.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.37] — 2026-05-15
 
 **Cycle 5 (autonomous APA-first run) — Cambridge / JDM publisher boilerplate spliced into body prose (D4).** The APA Phase-5d sweep found that every Cambridge JDM paper (jdm_.2023.15/16, jdm_m.2022.2/3, jdm_.2023.10) had two pieces of publisher boilerplate welded mid-sentence into the body: the per-page running footer `https://doi.org/10.1017/jdm.<id> Published online by Cambridge University Press` (~9× per paper — pdftotext emits it once per page and downstream paragraph-rejoin splices it inline, e.g. "...individuals usually fail to `<footer>` notice the absence..."), and the open-access licence sentence `This is an Open Access article, distributed under the terms of the Creative Commons Attribution licence (...), ... provided the original article is properly cited.`
