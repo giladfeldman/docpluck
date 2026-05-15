@@ -338,6 +338,19 @@ def _extract_caption_text(
             break
         # Otherwise the caption continues — skip past this break and keep going.
         pos = nxt + 2
+    # Cycle 15f-1 (v2.4.32, G4b): for TABLE captions, the paragraph-walk
+    # above has no sentence terminator to stop at when the table title
+    # lacks a trailing period (common in AOM / management journals:
+    # "Table 1. Most Cited Sources in Organizational Behavior Textbooks").
+    # It walks straight through the linearized cell content until the
+    # 400-char hard cap, so the caption field becomes 400 chars of cell
+    # garbage. Trim the raw caption region at the start of the cell run
+    # (>=3 consecutive header-like short lines) before flattening.
+    if cap.kind == "table":
+        region = raw_text[start:hard_end]
+        trimmed = _trim_table_caption_at_cell_region(region)
+        if len(trimmed) < len(region):
+            hard_end = start + len(trimmed)
     snippet = raw_text[start:hard_end].replace("\n", " ").strip()
     # v2.3.0 soft-hyphen rejoin (per `docs/HANDOFF_2026-05-11_visual_review_findings.md`
     # "Soft-hyphen artifacts in captions" — chen.pdf showed `Sup­ plementary`).
@@ -535,6 +548,94 @@ _LABEL_ONLY_FULLMATCH_RE = re.compile(
     r"(?:\s+(?:figure|fig\.?|table)\s+\d+(?:\.\d+)?\.?)?\s*",
     re.IGNORECASE | re.DOTALL,
 )
+
+
+# Cycle 15f-1 (v2.4.32, G4b): conjunction / article words that, when a
+# short line ends with one, signal the line is a wrapped title
+# continuation rather than a table column header.
+_TITLE_WRAP_TAIL_WORDS = frozenset({
+    "and", "or", "of", "the", "for", "in", "on", "to", "a", "an",
+    "with", "by", "from", "&",
+})
+
+
+def _is_table_header_like_short_line(line: str) -> bool:
+    """True if ``line`` looks like a table column header or linearized
+    cell token rather than a caption title (or a wrapped title line).
+
+    Header / cell tokens from pdftotext linearization are short, start
+    with an uppercase letter or a digit, and are not grammatical
+    continuations of a title. Lowercase-leading short lines
+    (``by condition``) and lines ending in a conjunction/article
+    (``Means and SDs for the``) are title wraps, not headers.
+    """
+    s = line.strip()
+    if not s:
+        return False
+    words = s.split()
+    # Column headers / linearized cell tokens are short — almost always
+    # <=3 words ("Academic Rank", "Number of Citations", "Impact Factor").
+    # A 4+-word capitalised line is far more likely a wrapped title line
+    # ("General Management (GM) Textbooks") — keep it out so the cell-run
+    # detector can't cut a real title.
+    if len(words) > 3 or len(s) > 35:
+        return False
+    # Lowercase-leading short line → grammatical title continuation.
+    if s[0].islower():
+        return False
+    # Ends with a conjunction/article → title wrap, not a standalone header.
+    if words[-1].lower() in _TITLE_WRAP_TAIL_WORDS:
+        return False
+    return True
+
+
+def _trim_table_caption_at_cell_region(region: str) -> str:
+    """Trim a raw TABLE caption region at the start of linearized cell content.
+
+    pdftotext linearizes a table's cells as a run of short one-per-line
+    tokens. When the caption title has no sentence terminator, the
+    paragraph-walk in :func:`_extract_caption_text` absorbs all of them.
+
+    Detect the cell region as the first run of >=3 consecutive
+    ``_is_table_header_like_short_line`` non-blank lines, and cut there.
+    The label line plus at least one title line are always preserved
+    (the run can only start at the 3rd non-blank line or later), so a
+    short single-word title (``Correlations``) is never truncated.
+
+    ``region`` is the raw caption text with newlines intact. Returns the
+    region truncated to label + title line(s) — or unchanged if no cell
+    run is found (the existing 400-char hard cap still applies).
+    """
+    lines = region.split("\n")
+    nonblank = [(i, ln) for i, ln in enumerate(lines) if ln.strip()]
+    if len(nonblank) < 5:
+        # Too few lines to confidently locate a cell run — leave as-is.
+        return region
+    first = nonblank[0][1].strip()
+    label_only = bool(re.fullmatch(r"(?:TABLE|Table)\s+\d+\.?", first))
+    first_terminated = bool(re.search(r"[.!?][\"'\)\]]?$", first))
+    # Primary rule: when the FIRST line already carries title text AND
+    # ends with a sentence terminator ("Table 6. Study 2 descriptive
+    # statistics."), the title sentence is complete on line 0. Everything
+    # after is either a table note (belongs in the `footnote` field, not
+    # `caption`) or linearized cell content — cut it all. This reliably
+    # handles captions whose column headers are multi-word phrases that
+    # the cell-run heuristic below would miss.
+    if not label_only and first_terminated:
+        return lines[nonblank[0][0]] if nonblank[0][0] == 0 else "\n".join(
+            lines[: nonblank[0][0] + 1]
+        )
+    # Fallback rule: nonblank[0] is just a bare label ("TABLE 13") or an
+    # unterminated title that may wrap. Locate the linearized cell region
+    # as the first run of >=3 consecutive header-like short lines, and cut
+    # there. nonblank[1] (the title or its first wrapped line) is always
+    # protected — the run can only start at the 3rd non-blank line.
+    for j in range(2, len(nonblank) - 2):
+        window = nonblank[j:j + 3]
+        if all(_is_table_header_like_short_line(ln) for _, ln in window):
+            cut_line_idx = window[0][0]
+            return "\n".join(lines[:cut_line_idx])
+    return region
 
 
 def _accumulated_is_label_only(text: str) -> bool:

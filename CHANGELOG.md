@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.32] — 2026-05-15
+
+**Cycle 15f-1 — table caption no longer absorbs linearized cell content (G4b).** The cycle-15f investigation of `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` G4 found that `extract_pdf_structured` table `caption` fields were 400 chars of linearized cell garbage (e.g. `amle_1` Table 1: `"Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 5 7 8 Yes Yes Yes ..."`). Root cause: `_extract_caption_text`'s paragraph-walk has no sentence terminator to stop at when a table title lacks a trailing period (common in AOM / management journals), so it walks straight through the pdftotext-linearized cell content until the 400-char hard cap.
+
+Fix in `docpluck/extract_structured.py` — new `_trim_table_caption_at_cell_region(region)`, applied for `cap.kind == "table"` before the snippet is flattened:
+- **Primary rule:** when the caption's first line already carries title text AND ends with a sentence terminator (`Table 6. Study 2 descriptive statistics.`), the title is complete — cut everything after it (trailing table notes belong in the `footnote` field, linearized cells are not caption text).
+- **Fallback rule:** when the first line is a bare label (`TABLE 13`) or an unterminated title that may wrap, locate the linearized cell region as the first run of ≥3 consecutive header-like short lines (`_is_table_header_like_short_line`: ≤3 words, ≤35 chars, uppercase/digit-leading, no conjunction tail) and cut there. The label + first title line are always protected.
+
+Verified against the AI-gold `reading` view for amle_1 / amj_1 / xiao_2021_crsp (26 tables total): every caption is now a clean title. amle_1 Table 1 → `Table 1. Most Cited Sources in Organizational Behavior Textbooks`; xiao Table 6 → `Table 6. Study 2 descriptive statistics.`; amle_1 Table 13's 236-char caption is the genuine 2-line title (verified, not cell leak).
+
+17 new tests in `tests/test_table_caption_cell_region_real_pdf.py` (13 unit + 4 real-PDF).
+
+Does NOT address G4a (the body-stream table-cell *dump* duplicating the structured `<table>`) — that needs render/section pipeline coordination and is queued as cycle 15f-2 (C3). See TRIAGE G4 block.
+
 ## [2.4.31] — 2026-05-14
 
 **Cycle 15n — figure caption placeholder repair (G_15n).** Phase-5d AI-gold audit of `ieee_access_2.pdf` at v2.4.30 surfaced that 36 of 37 figure captions in the trailing `## Figures` appendix rendered as `*Figure N. FIGURE N.*` placeholders with no description content. Affected the `f["caption"]` field of `extract_pdf_structured`, which `render_pdf_to_markdown` emits verbatim in the trailing Figures block.
