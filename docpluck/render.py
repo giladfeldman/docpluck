@@ -622,6 +622,38 @@ def _fold_orphan_roman_numerals_into_headings(text: str) -> str:
     return pattern.sub(repl, text)
 
 
+def _fold_orphan_arabic_numerals_into_headings(text: str) -> str:
+    """Cycle 3 (D6): fold an orphan arabic section-number line into the
+    following `## ` heading.
+
+    JDM / Cambridge-style papers number their sections ``1. Introduction``,
+    ``2. Method``, etc. pdftotext frequently emits the bare number on its
+    own line, separated from the heading text the section partitioner
+    promoted to `## `:
+
+        1.\\n\\n## Introduction  →  ## 1. Introduction
+
+    Arabic analogue of ``_fold_orphan_roman_numerals_into_headings``.
+    Conservative: the number (1-2 digits, dot optional) must be IMMEDIATELY
+    followed — blank lines only — by a `## ` heading that does not already
+    begin with a number. A bare ``1.`` line that precedes ordinary body
+    prose (page number, list item) is left untouched.
+    """
+    if not text:
+        return text
+    pattern = re.compile(
+        r"(?m)^(\d{1,2})\.?[ \t]*\n(?:[ \t]*\n)+"
+        r"(?P<head>## (?!\s*\d{1,2}[.\s])[^\n]+)"
+    )
+
+    def repl(m: re.Match) -> str:
+        num = m.group(1)
+        head_text = m.group("head")[3:]
+        return f"## {num}. {head_text}"
+
+    return pattern.sub(repl, text)
+
+
 def _promote_study_subsection_headings(text: str) -> str:
     """Promote ``Study N Design and Findings`` etc. to ``### {title}``.
 
@@ -1982,6 +2014,7 @@ def render_pdf_to_markdown(
     # `## ` heading produced by the section partitioner. Runs LAST among
     # heading post-processors so it operates on the final heading shapes.
     md = _fold_orphan_roman_numerals_into_headings(md)
+    md = _fold_orphan_arabic_numerals_into_headings(md)
 
     # 5. Title rescue — only available when pdfplumber layout extracts cleanly.
     if _layout_doc is not None:
