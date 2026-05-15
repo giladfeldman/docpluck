@@ -53,6 +53,8 @@
 >   - Fix layer: `extract_structured.py::_extract_caption_text` — for `cap.kind == "table"`, when the walk is about to consume a paragraph whose lines are predominantly cell-like (short, numeric, single-word), STOP at the title line. Lower-risk than G4a; could ship independently as its own cycle.
 >
 > **Recommendation:** split into two cycles. **15f-1 (G4b, C1-C2):** tighten the table-caption walk — isolated, testable, ships independently. **15f-2 (G4a, C3):** body-stream table-region strip — needs a render/section coordination design and broad-corpus false-positive testing; warrants a dedicated session. Do 15f-1 first; it's a clean win and de-risks 15f-2.
+>
+> **Update 2026-05-15 — ~~G4b SHIPPED v2.4.32~~ (cycle 15f-1).** New `_trim_table_caption_at_cell_region` in `extract_structured.py`: primary rule cuts after a sentence-terminated first caption line; fallback rule cuts at the first run of ≥3 header-like short lines. Verified against AI-gold `reading` view for amle_1/amj_1/xiao (26 tables) — all captions clean. 17 new tests. **G4a (body-stream dump) remains OPEN — queued as cycle 15f-2, C3.**
 
 **G5. Section-boundary detection under-firing** (all 4 papers)
 - xiao: ~25 of ~35 gold headings demoted to body prose

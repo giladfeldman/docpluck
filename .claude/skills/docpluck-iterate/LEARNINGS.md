@@ -284,3 +284,24 @@ Apply this template to every defect class in `docs/TRIAGE_2026-05-14_phase_5d_go
 ### Session shape note
 - This continuation did 1 verified-closure (15e) + 1 deep investigation (15f) with no new release. That's a legitimate cycle outcome — "investigate and re-scope" is real progress when it converts a vague TRIAGE item into two precisely-scoped, independently-shippable cycles. Don't force a release when the honest finding is "this needs a dedicated session."
 
+
+---
+
+## Run: 2026-05-15 (continuation) · Cycle 15f-1 · v2.4.32
+
+### Outcome
+- **Cycle 15f-1 shipped v2.4.32** — G4b table-caption cell-absorption fix. New `_trim_table_caption_at_cell_region` + `_is_table_header_like_short_line` in `extract_structured.py`. Verified against AI-gold `reading` view for amle_1/amj_1/xiao (26 tables) — every caption now a clean title (was 400-char cell garbage on every amle_1 table). 17 new tests. 26/26 baseline, broad pytest 1393 pass / 15 pre-existing.
+- Verified the article-finder ai-gold infrastructure: migrated to a multi-view model (`<key>/reading.md` + `citations.json` + `stats_lite.json`), grew 16 → 90 papers / 173 views. Updated `references/ai-full-doc-verify.md` to use `register-view` + the `reading` view.
+
+### Blind Spots
+- **Two helper iterations were needed before the trim was correct.** First version protected `nonblank[1]` unconditionally (j≥2 floor) — correct for amle_1 (`TABLE 1` label-only first line) but leaked one column header for xiao (whose title is fully on a period-terminated first line). The fix: branch on whether the first caption line is label-only vs already-carries-a-terminated-title. Lesson: table captions come in (at least) two layout shapes — `LABEL\nTitle\ncells` and `LABEL. Title.\ncells` — and a single rule can't serve both. Reproduce across ≥3 papers from different publishers BEFORE settling the heuristic.
+- **A "too-long" caption is not necessarily a defect.** amle_1 Table 13's 236-char caption first looked like residual cell leak; checking the AI gold showed it's a genuine 2-line title (`Affiliations and Number of Most Cited Authors in ... (GM) Textbooks`). Always diff a suspicious output against the gold before assuming it's broken — an arbitrary length threshold in a debug print is not a defect signal.
+
+### Edge Cases
+- **Multi-word column headers defeat a short-line cell-run detector.** xiao Table 6 has headers like `Choice of the target option` (5 words) and `N/Total No. of choices (%)` (5 words) — too long to register as "header-like short lines", so a pure 3-run detector never fires. The robust signal there is the *period on the title line*: when a non-label-only caption line ends with `.!?`, the title sentence is complete and everything after is cells/notes. The period-cut rule is primary; the 3-run detector is the fallback for label-only / unterminated first lines.
+- **Header word-count threshold tuning.** Started at ≤4 words; a wrapped title's last line `General Management (GM) Textbooks` (4 words) was being mis-flagged as a header and risked cutting a real title. Dropped to ≤3 words — real column headers are almost always ≤3 words (`Academic Rank`, `Number of Citations`, `Impact Factor`); 4+-word capitalised lines are far more likely wrapped title text. Under-trimming (leaving a header in the caption) is a cosmetic miss; over-trimming (cutting a real title) is data loss — when in doubt, bias the threshold toward under-trimming.
+
+### Improvements
+- **The cycle-15f investigation that re-scoped G4 into G4a/G4b paid off immediately.** Last session's "investigate and re-scope, don't force a release" produced a precise G4b spec that this session shipped in one clean cycle. Re-scoping is not a stalling tactic — it converts a vague C2 line into a shippable C1-C2 sub-cycle.
+- **article-finder is now a 90-paper multi-view cache.** docpluck-iterate consumes the `reading` view; `check`/`get` default to it. Future cycles should `register-view <key> reading <path> --producer docpluck-iterate --schema reading.v1` (not the legacy `store`).
+
