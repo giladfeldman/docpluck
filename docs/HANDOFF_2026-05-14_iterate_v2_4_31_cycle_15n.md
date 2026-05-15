@@ -1,13 +1,26 @@
 # Handoff — Continue docpluck-iterate cycles after v2.4.31 ship
 
-**Authored:** 2026-05-14 (end of cycle-15n session).
+**Authored:** 2026-05-14, extended 2026-05-15 (cycle 15n + 15e + 15f-investigation session).
 **Audience:** New Claude session, fresh context, resuming docpluck-iterate.
 
 ## TL;DR
 
-The session shipped **v2.4.31** (figure caption placeholder repair, cycle 15n) and cleaned up **7 pre-existing pytest failures** (5 test-fixture fixes + 2 corpus_smoke env-flag fixes). 15 broad-pytest failures remain (all pre-existing, documented below) — they need snapshot/golden regeneration cycles or deeper investigation, not surface-level fixes.
+The session shipped **v2.4.31** (figure caption placeholder repair, cycle 15n) and cleaned up **7 pre-existing pytest failures** (5 test-fixture fixes + 2 corpus_smoke env-flag fixes). Then:
+- **Cycle 15e (G16):** investigated — the page-header-leak-in-equations defect is already fixed at v2.4.31 (incidentally closed between v2.4.27–v2.4.31). Added `tests/test_equation_page_header_strip_real_pdf.py` (6 tests) to lock the closure. No library change.
+- **Cycle 15f (G4):** investigated — found the body-stream-table-dupe defect is a **deeper multi-defect cluster** than the TRIAGE estimated. Re-scoped C2 → C3 and split into 15f-1 (G4b, table-caption walk) + 15f-2 (G4a, body-stream strip). See TRIAGE G4 block for the full analysis. **Not yet fixed** — needs a dedicated session per the recommendation below.
 
-User directive at end of run: *"fix all known issues, and wait before next iteration."* The known-issues bucket from THIS run is closed. Cycles 15e / 15f / 15g / 15h+ from TRIAGE remain queued for future sessions.
+15 broad-pytest failures remain (all pre-existing — 12 byte-identical snapshot drift, 2 sections golden regen, 1 request_09 bibliography regex).
+
+User directive: *"fix all known issues, and wait before next iteration."* Known-issues bucket from this run is closed. Cycle 15f-1 is the recommended next pickup.
+
+## Cycle 15f — the re-scoped G4 cluster (READ BEFORE picking this up)
+
+The TRIAGE G4 block now has the full investigation. Summary:
+
+- **G4b (do this first — C1/C2, isolated):** `extract_pdf_structured` table `caption` fields absorb the entire linearized cell content. `amle_1` Table 1's caption is `"Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 ..."` (400-char cap of cell garbage). Cause: `_extract_caption_text` paragraph-walk has no sentence terminator to stop at when the table title lacks a trailing period, so it walks through the cells. Fix in `extract_structured.py::_extract_caption_text` — for `cap.kind == "table"`, stop the walk at the title line when the following paragraph is predominantly cell-like. Risk: a legitimate multi-sentence table caption (`Table 1. Means and SDs. Values in parens are SEs.`) must NOT be truncated — test both.
+- **G4a (do this second — C3, dedicated session):** the section body text from `extract_sections` contains the raw linearized table-cell dump (caption → ~140 cell lines → `Note:` → body prose). render emits it verbatim alongside the structured `<table>`. Fix needs render/section coordination: compute table regions and strip them from `sec.text`. Broad-corpus false-positive testing required (don't strip legit short-line-dense prose).
+
+Recommended: ship 15f-1 as v2.4.32 (clean win), then schedule 15f-2 as its own session.
 
 ## State at handoff
 

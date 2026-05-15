@@ -42,6 +42,18 @@
 - **Layer:** `docpluck/render.py` or `extract_structured.py` — body-stream cells should be SUPPRESSED after structured emission
 - **Fix:** when a table is structured-extracted, suppress its cell content from body stream
 
+> **Cycle 15f investigation (2026-05-15) — G4 is a multi-defect cluster, NOT a single body-strip fix. Re-scoped C2 → C3.**
+>
+> Investigated amle_1 at v2.4.31. Found TWO compounding defects, each substantial:
+>
+> **G4a — body-stream table-cell dump.** The RESULTS section's `sec.text` (from `extract_sections`) contains the raw pdftotext-linearized table region: caption line `TABLE 1`, the title, then ~140 lines of column-by-column linearized cells (`Rank / Academic / Source / Yes / Yes / No / 1,675 / 9.35% / 7.12 / ...`), then the `Note:` footnote, then body prose resumes. `render.py::_render_sections_to_markdown` emits `body_text = sec.text.strip()` verbatim, so this dump appears in the body. Separately the structured `<table>` HTML is emitted (correctly, 189 cells) in the `## Tables (unlocated in body)` appendix. Net: every table's data appears twice.
+>   - Fix requires: detect the table-dump region inside each section's `sec.text` and strip it. The region runs caption-line → linearized-cells → `Note:` block → first body-prose line. `extract_structured._line_is_body_prose` + `_extract_table_body_text` already have the cell-vs-prose walk logic but produce cleaned text, not char offsets into the section. The two pipelines (`extract_sections` for body, `extract_pdf_structured` for tables) are **uncoordinated** — neither knows the other's regions. `normalize_text` has a `table_regions` param but render doesn't populate it. A correct fix needs the render layer to compute/pass table regions OR a section-text post-strip keyed on the structured tables' captions. **Risk:** false positives stripping legitimate short-line-dense body prose.
+>
+> **G4b — table caption field absorbs the entire linearized cell content.** `extract_pdf_structured` returns `Table 1` with `caption = "Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 5 7 8 Yes Yes Yes Yes No Yes ..."` — the `_extract_caption_text` paragraph-walk, when the caption title has no sentence terminator (`Most Cited Sources in Organizational Behavior Textbooks` ends with no `.`), keeps walking through the linearized cells until the 400-char hard cap. Render emits this as `*Table 1. <400 chars of cell garbage>*` directly above the (correct) `<table>` HTML. Affects every table whose title lacks a trailing period — common in AOM/management journals.
+>   - Fix layer: `extract_structured.py::_extract_caption_text` — for `cap.kind == "table"`, when the walk is about to consume a paragraph whose lines are predominantly cell-like (short, numeric, single-word), STOP at the title line. Lower-risk than G4a; could ship independently as its own cycle.
+>
+> **Recommendation:** split into two cycles. **15f-1 (G4b, C1-C2):** tighten the table-caption walk — isolated, testable, ships independently. **15f-2 (G4a, C3):** body-stream table-region strip — needs a render/section coordination design and broad-corpus false-positive testing; warrants a dedicated session. Do 15f-1 first; it's a clean win and de-risks 15f-2.
+
 **G5. Section-boundary detection under-firing** (all 4 papers)
 - xiao: ~25 of ~35 gold headings demoted to body prose
 - amj_1: missing INDEX TERMS, Biographies, V.: SUPPLEMENTARY INDEX
