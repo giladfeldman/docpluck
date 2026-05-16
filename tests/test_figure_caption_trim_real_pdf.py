@@ -151,6 +151,66 @@ class TestTrimCaptionAtBodyProseBoundary:
         snippet = "Figure 1. Means."
         assert _trim_caption_at_body_prose_boundary(snippet) == snippet
 
+    # ---- FIG-3a (v2.4.49): lowercase-initial body-prose boundary ----------
+
+    def test_lowercase_citation_fragment_trimmed(self):
+        # chandrashekar Figure 4 shape: a wrapped citation fragment
+        # ("and Linos, 2022).") welded onto the caption — the tail
+        # starts lowercase, so it is absorbed body prose.
+        snippet = (
+            "Figure 4. Extension 2: participation rates by frame. "
+            "(A) rates by frame. (B) rates by default conditions. "
+            "(C) rates by frame and conditions. and Linos, 2022)."
+        )
+        result = _trim_caption_at_body_prose_boundary(snippet)
+        assert result.endswith("(C) rates by frame and conditions."), result
+        assert "Linos" not in result
+
+    def test_lowercase_body_sentence_trimmed(self):
+        # chandrashekar Figure 5 shape: a body sentence starting
+        # lowercase ("peoples' preferences. Given …") welded on.
+        snippet = (
+            "Figure 5. Effect sizes in the current replication. Estimates "
+            "are plotted on a natural logarithmic scale. peoples' "
+            "preferences. Given the other successful replication."
+        )
+        result = _trim_caption_at_body_prose_boundary(snippet)
+        assert result.endswith("on a natural logarithmic scale."), result
+        assert "peoples" not in result
+        assert "Given the other" not in result
+
+    def test_note_label_lowercase_continuation_kept(self):
+        # efendic Figure 1 shape: "Note. t-values …" — the period after
+        # "Note" is a label separator, not a sentence terminator; the
+        # lowercase note content must be kept.
+        snippet = (
+            "Figure 1. Mean ratings by condition across studies. Note. "
+            "t-values for four-direction information manipulations are partial."
+        )
+        result = _trim_caption_at_body_prose_boundary(snippet)
+        assert result == snippet, result
+
+    def test_significance_legend_lowercase_tail_kept(self):
+        # korbmacher Figure 1 shape: "… conditions. ns p>.05, * p<.05 …"
+        # — a significance legend legitimately continues the caption.
+        snippet = (
+            "Figure 1. Mean recall accuracy across the four study "
+            "conditions. ns p>.05, ∗ p<.05, ∗∗ p<.01, "
+            "∗∗∗ p<.001."
+        )
+        result = _trim_caption_at_body_prose_boundary(snippet)
+        assert result == snippet, result
+
+    def test_abbreviation_before_lowercase_tail_kept(self):
+        # "permanent vs. temporary …" — the period belongs to the
+        # abbreviation "vs.", not a sentence end.
+        snippet = (
+            "Figure 1. Comparison of permanent vs. temporary choice "
+            "scenarios for the organ-donation conditions."
+        )
+        result = _trim_caption_at_body_prose_boundary(snippet)
+        assert result == snippet, result
+
 
 # ---- Real-PDF regression tests (rule 0d) ----------------------------------
 
@@ -538,3 +598,111 @@ def test_chandrashekar_figure_captions_stop_at_significance_legend():
     f3 = figs.get("Figure 3", "")
     assert f3.rstrip().endswith("p < .001"), f3
     assert "We conducted" not in f3, f"body prose absorbed: {f3!r}"
+
+
+# ---- FIG-3a (v2.4.49): lowercase-initial body-prose boundary --------------
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").exists(),
+    reason="chandrashekar_2023_mp.pdf fixture not present",
+)
+def test_chandrashekar_figure_4_5_no_lowercase_body_prose():
+    """FIG-3a: chandrashekar Figure 4 absorbed a wrapped citation
+    fragment (``and Linos, 2022).``) and Figure 5 absorbed a body
+    sentence (``peoples' preferences. Given …``). Both attach at a
+    ``. `` boundary whose tail starts lowercase — a figure caption's
+    own sentences always start capitalized."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").read_bytes()
+        )["figures"]
+    }
+    f4 = figs.get("Figure 4", "")
+    assert "Linos" not in f4, f"citation fragment absorbed: {f4!r}"
+    assert f4.rstrip().endswith("conditions."), f4
+
+    f5 = figs.get("Figure 5", "")
+    assert "peoples" not in f5, f"body prose absorbed: {f5!r}"
+    assert "Given the other" not in f5, f"body prose absorbed: {f5!r}"
+    assert f5.rstrip().endswith("logarithmic scale."), f5
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "jdm_.2023.16.pdf").exists(),
+    reason="jdm_.2023.16.pdf fixture not present",
+)
+def test_jdm16_figure_1_no_lowercase_body_prose():
+    """FIG-3a (also-affected): jdm_.2023.16 Figure 1 absorbed the
+    Participants body sentence ``included in the analysis ranged from
+    18 to 78 years …`` after the legitimate caption end."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "jdm_.2023.16.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert "ranged from 18 to 78" not in f1, f"body prose absorbed: {f1!r}"
+    assert "target nodes." in f1, f1
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "jdm_m.2022.3.pdf").exists(),
+    reason="jdm_m.2022.3.pdf fixture not present",
+)
+def test_jdm_m_2022_3_figures_no_lowercase_body_prose():
+    """FIG-3a (also-affected): jdm_m.2022.3 Figures 1/2 absorbed the
+    Results body prose (``interaction between scenario and PES scores
+    (F(1, 96) …``) after the legitimate caption end."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "jdm_m.2022.3.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert "F(1, 96)" not in f1, f"body prose absorbed: {f1!r}"
+    assert f1.rstrip().endswith("task."), f1
+
+    f2 = figs.get("Figure 2", "")
+    assert "exhibiting larger causal illusion" not in f2, f"absorbed: {f2!r}"
+    assert f2.rstrip().endswith("task."), f2
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").exists(),
+    reason="efendic_2022_affect.pdf fixture not present",
+)
+def test_efendic_figure_1_note_label_kept():
+    """FIG-3a false-positive guard: efendic Figure 1's caption note
+    ``Note. t-values …`` starts lowercase after ``Note.`` — the note
+    content must be KEPT, not trimmed as body prose."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert "Note." in f1, f1
+    assert "t-values" in f1, f"note content trimmed away: {f1!r}"
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf").exists(),
+    reason="korbmacher_2022_kruger.pdf fixture not present",
+)
+def test_korbmacher_figure_1_significance_legend_kept():
+    """FIG-3a false-positive guard: korbmacher Figure 1's caption ends
+    with a significance legend (``ns p>.05, ∗ p<.05 …``) that starts
+    lowercase — it must be KEPT, not trimmed as body prose."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert "p>.05" in f1 or "p > .05" in f1, f"significance legend trimmed: {f1!r}"
