@@ -336,6 +336,32 @@ prose and as a `### Figure N` block). FIG-2 needs the body-prose-boundary
 detector strengthened (`_trim_caption_at_body_prose_boundary`'s opener regex
 misses `H1 :` / `(N = 61)` shapes) — a higher-false-positive-surface change.
 
+### Cycle FIG-2 (run 6, 2026-05-16) — figure-caption walk stops at period-less complete caption — SHIPPED v2.4.48
+
+New `extract_structured.py::_caption_is_complete_without_terminator`. The
+`_extract_caption_text` paragraph-walk only stopped at a `\n\n` when the
+preceding text ended with a `.!?` terminator — so it sailed past the `\n\n`
+that legitimately ends a caption ending WITHOUT a period: an APA Title-Case
+figure title (efendic Figs 4/5) or a trailing significance legend
+(`*** p < .001`, chandrashekar Figs 1/3). The helper recognizes both
+period-less complete-caption shapes (Title-Case title ≥4 words / sig-legend
+tail) and stops the walk. Label stripped case-insensitively; leading PMC
+`Author Manuscript` running header stripped (else it reads as a 4-word title).
+
+**Result:** efendic Figs 4/5 + chandrashekar Figs 1/3 recovered to AI gold.
+**Phase-5d AI-gold verify** (10 figures, efendic + chandrashekar): 8 PASS, 2
+RESIDUAL-ABSORB (untargeted), **0 text-loss, 0 regressions**. 26/26 baseline;
+Tier1==Tier2==Tier3 byte-identical; 7 new tests.
+
+**FIG-3 RESIDUAL (queued):** (a) chandrashekar Fig 4 (`and Linos, 2022).`
+citation fragment) + Fig 5 (`peoples' preferences. Given …` body prose) — both
+absorbed via a `. `-boundary the walk-stop fixes do not reach (no `\n\n`, or a
+`. ` followed by a lowercase-initial fragment); (b) chan_feldman Fig 10 — the
+caption *anchor* latched onto a `Figure 10` reference in body prose, so the
+whole "caption" is body prose (a caption-DETECTION defect, distinct root cause);
+(c) figure-caption **double-emission** (caption in body prose AND as a
+`### Figure N` block, ~8 papers).
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -348,17 +374,20 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | **G5d named (unnumbered) heading demotion** | S1 | ar_apa_011 (`Participants`, `Overview`), efendic, chandrashekar, ip_feldman (~7) | section-partitioner work; largest false-positive surface. |
 | ~~**G5b long-descriptive-title prose guard**~~ ✓ FIXED v2.4.45 (cycle 13) | S1 | jdm16, jdm_m2, chen | ~~`≥5-lowercase-word` guard over-rejects legit long numbered headings.~~ Subsection promoter's lc-run guard removed; single-level raised 5→8. |
 | ~~**FIG caption ellipsis-truncation**~~ ✓ SHIPPED v2.4.47 (cycle FIG-1) | S2 | jdm_m2, efendic, chandrashekar, chan_feldman, jdm15, maier | ~~truncated mid-word with `…`~~ — `_trim_overflowing_figure_caption` walks overflow back to last sentence terminator; 12 → 0 corpus-wide. |
-| **FIG-2 caption residual-absorb + double-emission** | S2 | efendic, chandrashekar, chan_feldman (6 captions) + double-emission ~8 | 6 captions still carry partial trailing body prose (sentence-terminated residual); figure caption also emitted both inline in body prose AND as `### Figure N`. Needs `_trim_caption_at_body_prose_boundary` opener-regex widening + render-layer body/caption de-dup. |
+| ~~**FIG-2 caption residual (\n\n-after-period-less-caption)**~~ ✓ SHIPPED v2.4.48 (cycle FIG-2) | S2 | efendic Fig 4/5, chandrashekar Fig 1/3 | ~~walk sailed past the `\n\n` ending a period-less caption~~ — `_caption_is_complete_without_terminator` stops it. |
+| **FIG-3 caption residual (no-\n\n) + double-emission** | S2 | chandrashekar Fig 4/5, chan_feldman Fig 10 + double-emission ~8 | chandrashekar Fig 4/5 absorb prose via a `. `-boundary with no `\n\n` (needs `_trim_caption_at_body_prose_boundary` opener widening for lowercase-fragment / `and`-citation tails); chan_feldman Fig 10 is a caption-ANCHOR defect (latched on a body `Figure 10` reference); figure caption also double-emitted (body + `### Figure N`). |
 | **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
 | **D4 metadata residuals** | S2 | ar_apa_011 (`doi:` line), chen, efendic masthead | see D4 RESIDUALS above. |
 | **COL column-interleave** | S0 | chan_feldman, chandrashekar | text-channel reading order. C3. |
 | **GLYPH 011 `−`→deleted / efendic `Mchange` no-CI** | S0 | 011, efendic | unrecoverable from text channel — needs layout-channel glyph identity. Escalate. |
 
 **Next session resumes here.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
-G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47).
-Recommended order: **FIG-2 caption residual-absorb + double-emission** (S2×C2-C3 —
-6 residual captions + ~8 double-emissions) → **G5c-2 partitioner split-heading
-rejoin** (S1×C3, 5 jdm_m2 cases) → **G5d named/unnumbered heading demotion**
+G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47),
+FIG-2 period-less-caption walk-stop ✓ (v2.4.48).
+Recommended order: **FIG-3 caption residual (no-`\n\n`) + double-emission**
+(S2×C2-C3 — chandrashekar Fig 4/5, chan_feldman Fig 10 anchor, ~8 double-emissions)
+→ **G5c-2 partitioner split-heading rejoin** (S1×C3, 5 jdm_m2 cases) → **G5d
+named/unnumbered heading demotion**
 (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##` promotion
 (`## Supplementary Material`/`## Appendix` — S1×C2) → **TABLE cluster** (S0/S1×C3,
 dedicated session, the single largest blocker) → **COL** + 011 deleted-minus

@@ -589,3 +589,24 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, following the run-5 precedent the handoff documents for an identically-shaped low-risk change). Inline hard-rule checks all pass: extraction-layer regex-only change in `extract_structured.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table surface touched; general fix keyed on a structural signature (overflow + sentence boundary, not paper identity); real-PDF test added; no `.pdf` staged; version bump consistent (`__init__.py` + `pyproject.toml`; NORMALIZATION_VERSION/SECTIONING_VERSION correctly unchanged — `normalize.py`/`sections/` untouched). 26/26 baseline + Tier1==Tier2 byte-identical + figure-caption-text-only diff confirm no regression.
+
+---
+
+## Run: 2026-05-16 (run 6) · Cycle FIG-2 · v2.4.48
+
+### Outcome
+- SHIPPED v2.4.48. New helper `_caption_is_complete_without_terminator` in `extract_structured.py`, called from the figure-caption paragraph-walk. The walk previously stopped at a `\n\n` only when the preceding text ended with `.!?`; it now also stops when the accumulated caption is a COMPLETE period-less caption — an APA Title-Case figure title, or a trailing significance legend (`*** p < .001`). efendic Figs 4/5 + chandrashekar Figs 1/3 recovered to AI gold. Phase-5d (10 figures, 2 papers): 8 PASS, 2 untargeted RESIDUAL-ABSORB, 0 text-loss, 0 regressions. 26/26 baseline; Tier1==Tier2==Tier3 byte-identical; 7 new tests.
+
+### Blind Spots
+- **The root cause was in the WALK, not in a post-hoc trimmer.** FIG-1 added a post-400-overflow walk-back; the FIG-2 residuals looked like "the walk-back over-keeps." Reading the RAW pdftotext text showed the truth: there IS a `\n\n` that legitimately ends each caption — the walk's terminator check (`prev ends with .!?`) just doesn't recognize a period-less caption end, so it sails past the `\n\n`. Fixing the walk's stop condition is far cleaner than any downstream trimmer. Lesson: when a caption is over-absorbed, read the raw text and find where pdftotext actually put the `\n\n` — the boundary usually exists; the walk just didn't honor it.
+- **APA 7 figure titles are period-less Title-Case phrases.** `The Interaction Between Change in Manipulated Attribute and Pleasure on Change in Non-Manipulated Attribute` — a complete caption with NO terminal period. Any caption-end heuristic keyed only on `.!?` misses every APA-styled figure. The two period-less complete-caption shapes in the corpus: Title-Case title, and significance-legend tail (`*** p < .001`).
+
+### Edge Cases
+- **The repeated PMC running header `Author Manuscript Author Manuscript` reads as a 4-word Title-Case title.** First implementation false-matched it → ieee_access_2 captions truncated to `Figure 15. Author Manuscript` (regression caught by `test_ieee_access_no_inline_pmc_running_header` + `test_ieee_no_chart_data_false_positive_trim` in the targeted run — BEFORE the broad pytest). Fix: strip a leading `(Author Manuscript)+` run before the title check.
+- **`cap.label` is title-case but pdftotext may emit the label ALL-CAPS** (`FIGURE 15.`). The first label-strip used `flat.startswith(cap.label)` — case-sensitive — so `FIGURE 15.` was NOT stripped and `FIGURE 15. Author Manuscript` read as a 4-word title. Fix: strip the label with the case-insensitive `_CAPTION_LABEL_PREFIX_RE` (reused from FIG-1). Lesson: never assume the label form in the raw text matches the normalized `cap.label`.
+
+### Verification Gaps
+- **The targeted-test run caught the PMC regression before the 12-minute broad pytest.** Running `test_figure_caption_trim_real_pdf.py` + `test_chart_data_trim_real_pdf.py` (the IEEE-bearing files) as the FIRST verification step surfaced the regression in ~30s. Always run the test files that exercise the SAME code path as the fix first, before the broad suite — a fast fail saves a 12-minute round-trip.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 4th consecutive cycle; run-6 handoff carries a PROPOSED AMENDMENT to codify this branch). Inline hard-rule checks all pass: extraction-layer change in `extract_structured.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table surface; general fix keyed on structural signatures (period-less complete-caption shapes); real-PDF test added; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 byte-identical confirm no regression.
