@@ -87,6 +87,61 @@ def find_caption_matches(
     return matches
 
 
+def caption_anchor_is_in_text_reference(raw_text: str, cap: CaptionMatch) -> bool:
+    """True if a caption-regex match is actually a body-text *reference*
+    to a figure/table (``… as summarised in Figure 10.``) rather than a
+    real caption line.
+
+    pdftotext line-wraps body prose, so a sentence like ``We summarised
+    the effects in Figure 10.`` can place ``Figure 10.`` at the start of
+    a line — where :data:`FIGURE_CAPTION_RE`'s ``^`` anchor matches it. A
+    real caption is set off by a paragraph break (blank line) or starts a
+    fresh sentence; an in-text reference *continues* the previous line's
+    sentence, so that line ends mid-clause (a lowercase word, a comma).
+
+    Used only as a dedup TIE-BREAKER (FIG-3b): when two anchors share a
+    ``(kind, number)``, the non-reference one is the real caption.
+    Deliberately conservative — returns ``False`` (treat as a real
+    caption) whenever the preceding context is not unambiguously
+    mid-sentence, so a figure/table is never dropped when its only
+    anchor is uncertain.
+    """
+    # FIGURE_CAPTION_RE / TABLE_CAPTION_RE begin ``^\s*`` and the ``\s*``
+    # can absorb blank lines, so ``cap.char_start`` may sit one or more
+    # lines ABOVE the real "Figure N" / "Table N" token. Advance to the
+    # token before inspecting the surrounding line structure.
+    n = len(raw_text)
+    tok = cap.char_start
+    while tok < n and raw_text[tok] in " \t\r\n":
+        tok += 1
+    if tok >= n:
+        return False
+    line_start = raw_text.rfind("\n", 0, tok) + 1
+    if line_start == 0:
+        return False  # caption token on the first line — a real caption
+    prev_nl = line_start - 1  # the '\n' ending the previous line
+    if prev_nl == 0 or raw_text[prev_nl - 1] == "\n":
+        return False  # blank line precedes the caption — paragraph break
+    prev_line_start = raw_text.rfind("\n", 0, prev_nl) + 1
+    prev_line = raw_text[prev_line_start:prev_nl].rstrip()
+    if not prev_line:
+        return False
+    last = prev_line[-1]
+    # Previous line ends a sentence → the caption starts a new one.
+    if last in ".!?":
+        return False
+    if (
+        last in "\"')]’”"
+        and len(prev_line) >= 2
+        and prev_line[-2] in ".!?"
+    ):
+        return False
+    # Previous line ends mid-clause (a lowercase word, or a comma /
+    # semicolon) → the sentence continues into the "Figure N" token,
+    # so this anchor is an in-text reference, not a caption.
+    return last.islower() or last in ",;"
+
+
 def _line_at(text: str, offset: int) -> str:
     """Return the full line in text containing offset (without trailing newline)."""
     line_start = text.rfind("\n", 0, offset) + 1
@@ -110,4 +165,5 @@ __all__ = [
     "CaptionMatch",
     "CaptionKind",
     "find_caption_matches",
+    "caption_anchor_is_in_text_reference",
 ]

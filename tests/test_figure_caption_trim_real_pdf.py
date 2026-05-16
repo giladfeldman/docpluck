@@ -706,3 +706,49 @@ def test_korbmacher_figure_1_significance_legend_kept():
     }
     f1 = figs.get("Figure 1", "")
     assert "p>.05" in f1 or "p > .05" in f1, f"significance legend trimmed: {f1!r}"
+
+
+# ---- FIG-3b (v2.4.50): caption-anchor in-text-reference dedup -------------
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").exists(),
+    reason="chan_feldman_2025_cogemo.pdf fixture not present",
+)
+def test_chan_feldman_figure_10_uses_real_caption_not_body_reference():
+    """FIG-3b: chan_feldman has two "Figure 10." anchors — a body-text
+    reference (`… we summarised the effects in Figure 10.`) that
+    line-wraps to a line start and false-matches the caption regex
+    EARLIER in the document, and the real caption (`Figure 10.
+    Exploratory mediation analyses …`). The dedup must keep the real
+    caption, not render the following body prose as the caption."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").read_bytes()
+        )["figures"]
+    }
+    f10 = figs.get("Figure 10", "")
+    assert "Exploratory mediation analyses" in f10, f10
+    assert "We found support for the effect" not in f10, (
+        f"body prose rendered as caption: {f10!r}"
+    )
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "maier_2023_collabra.pdf").exists(),
+    reason="maier_2023_collabra.pdf fixture not present",
+)
+def test_maier_figure_1_uses_real_caption_not_body_reference():
+    """FIG-3b (also-affected): maier Figure 1's real caption is
+    `Footprint of Publication Bias in Lee and Freely (2016)`; a body
+    sentence `… the pattern of bias … in Figure 1. The left panel
+    shows …` line-wrapped and false-matched earlier."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "maier_2023_collabra.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert "Footprint of Publication Bias" in f1, f1

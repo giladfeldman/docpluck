@@ -28,7 +28,11 @@ from .extract import extract_pdf, count_pages
 from .figures import Figure
 from .tables import Cell, Table
 from .tables.camelot_extract import extract_tables_camelot
-from .tables.captions import CaptionMatch, find_caption_matches
+from .tables.captions import (
+    CaptionMatch,
+    caption_anchor_is_in_text_reference,
+    find_caption_matches,
+)
 from .tables.render import cells_to_html
 
 
@@ -88,16 +92,30 @@ def extract_pdf_structured(
     rejoined = _join_split_captions(raw_text)
     page_offsets = _page_offsets(rejoined)
     captions_all = find_caption_matches(rejoined, page_offsets)
-    # Dedupe by (kind, number): keep only the first occurrence — body-text
-    # references like "see Table 1" can otherwise duplicate captions.
-    seen_keys: set[tuple[str, int]] = set()
-    captions: list[CaptionMatch] = []
+    # Dedupe by (kind, number). A body-text reference like
+    # "… we summarised the effects in Figure 10." can line-wrap so the
+    # "Figure 10." token lands at a line start and false-matches the
+    # caption regex — and it often sits EARLIER in the document than the
+    # real caption. Keeping the first occurrence then renders body prose
+    # as the caption (FIG-3b: chan_feldman Figure 10). So when a
+    # (kind, number) has multiple anchors, prefer one that is NOT an
+    # in-text reference. Falls back to first-in-document-order when every
+    # anchor looks like a reference (no real caption captured) — i.e. no
+    # regression vs. the old "keep first" behavior in that case.
+    by_key: dict[tuple[str, int], list[CaptionMatch]] = {}
     for c in captions_all:
-        key = (c.kind, c.number)
-        if key in seen_keys:
+        by_key.setdefault((c.kind, c.number), []).append(c)
+    captions: list[CaptionMatch] = []
+    for group in by_key.values():
+        if len(group) == 1:
+            captions.append(group[0])
             continue
-        seen_keys.add(key)
-        captions.append(c)
+        real = [
+            c for c in group
+            if not caption_anchor_is_in_text_reference(rejoined, c)
+        ]
+        captions.append(real[0] if real else group[0])
+    captions.sort(key=lambda c: c.char_start)
     # The captions' char_start/char_end refer to `rejoined`, not raw_text. For
     # placeholder mode we need positions in raw_text — build a translation map.
     # Since the rejoin only deletes whitespace runs, char positions in rejoined

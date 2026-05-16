@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.50] — 2026-05-16
+
+**Cycle FIG-3b (APA-first run, run 7) — figure/table caption anchored to a body-text reference instead of the real caption (FIG, S2).** When a paper both *references* a figure/table in body prose ("…we summarised the effects in Figure 10.") and has the figure/table's real caption, pdftotext line-wraps the body sentence so the "Figure 10." token lands at a line start and false-matches the caption regex. That in-text reference often sits *earlier* in the document than the real caption, and `extract_pdf_structured`'s dedup kept the first occurrence per `(kind, number)` — so the renderer showed body prose as the caption (chan_feldman Figure 10 rendered the sentence `We found support for the effect of perceived apology…` as its caption).
+
+Fix (v2.4.50) — new `caption_anchor_is_in_text_reference` in `tables/captions.py`: a real caption is set off by a paragraph break (blank line) or starts a fresh sentence, whereas an in-text reference *continues* the previous line's sentence (that line ends mid-clause — a lowercase word or comma). The helper advances past the `^\s*` the caption regex absorbs to inspect the line structure around the *actual* token. `extract_pdf_structured`'s dedup now prefers a non-reference anchor when a `(kind, number)` has multiple matches, falling back to first-in-document-order when every anchor looks like a reference (no regression vs. the old behavior in that case).
+
+A corpus scan of all 52 test PDFs found 14 caption groups with a mixed reference/real-caption anchor set — across APA (chan_feldman, chen, jamison, maier), AOM (amd_2, annals_3), IEEE (ieee_access_2/9/10) and Vancouver (plos_med_1) — every one now resolves to the real caption. Phase-5d AI-gold verify across 51 figure/table captions in 3 papers: 51 PASS, 0 wrong-anchor, 0 text-loss, 0 hallucination. 26/26 baseline PASS. Tier1==Tier2==Tier3. 10 new tests (`tests/test_caption_regex.py`, `tests/test_figure_caption_trim_real_pdf.py`).
+
+~9 APA papers still FAIL Phase-5d verification (FIG-3c figure-caption double-emission, FIG-4 Note trailing-sentence loss, TBL-CAP table-caption over-extension into column headers, G5c-2, G5d, HALLUC-HEAD, TABLE cluster, COL); the run continues.
+
 ## [2.4.49] — 2026-05-16
 
 **Cycle FIG-3a (APA-first run, run 7) — figure caption absorbs body prose at a lowercase-initial `. ` boundary (FIG, S2).** After the FIG-1/FIG-2 walk-stop fixes, some figure captions still absorbed trailing body prose that pdftotext welded on at a real `. ` sentence boundary with no `\n\n` paragraph break — so the paragraph-walk could not separate it. Two shapes: a wrapped citation fragment (`...by frame and conditions. and Linos, 2022).` — chandrashekar Figure 4) and a body sentence (`...natural logarithmic scale. peoples' preferences. Given the other successful replication...` — chandrashekar Figure 5). The common structural signature: a figure caption's own sentences always start *capitalized*, so a `. ` terminator followed by a *lowercase-initial* word is absorbed body prose.
