@@ -13,8 +13,15 @@ bias`.
 
 Fix (v2.4.41): the number group tolerates an optional trailing dot and
 the title may carry an internal colon. A title that ENDS in a colon is
-still rejected downstream; titles with terminal sentence punctuation and
-prose-like lowercase runs are still rejected.
+still rejected downstream; titles with terminal sentence punctuation are
+still rejected.
+
+Cycle 13 (v2.4.45, G5b): the lowercase-run prose guard was removed from
+the subsection promoter. Multi-level dotted numbering at line-start is
+itself a strong heading signal, and descriptive subsection titles
+legitimately run to many lowercase words ("3.3.2.1 The quality of
+planning on the previous trial moderates the effect of reflection") — the
+guard mis-rejected real headings. Long descriptive headings now promote.
 """
 
 from __future__ import annotations
@@ -66,6 +73,14 @@ def test_title_ending_in_colon_not_promoted():
     assert _promote_numbered_subsection_headings(line) == line
 
 
+def test_long_descriptive_title_promoted():
+    # G5b (cycle 13): a descriptive subsection title with a long run of
+    # lowercase words is still a heading — the prose guard was removed.
+    line = "3.3.2.1. The quality of planning on the previous trial moderates the effect"
+    out = _promote_numbered_subsection_headings(line)
+    assert out.startswith("### 3.3.2.1. The quality of planning")
+
+
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_jdm_m_2022_2_numbered_subsections_promoted():
@@ -92,3 +107,21 @@ def test_chen_2021_colon_subsections_promoted():
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "### 6.1.1. Replication: Retrospective hindsight bias" in md
     assert "### 6.2.4. Replication evaluation: Very close replication" in md
+
+
+def test_jdm_2023_16_long_descriptive_subsections_promoted():
+    """G5b (cycle 13): long descriptive multi-level numbered subsection
+    headings — previously demoted to body text by the lowercase-run guard —
+    now render as `###` headings."""
+    pdf = TEST_PDFS / "apa" / "jdm_.2023.16.pdf"
+    if not pdf.exists():
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(pdf.read_bytes())
+    for heading in (
+        "### 2.4.2.2. Inference of planning strategies and strategy types",
+        "### 3.2. H2: Systematic metacognitive reflection improves how and how much people plan",
+        "### 3.3.2.1. The quality of planning on the previous trial moderates the effect of reflection",
+    ):
+        assert heading in md, f"missing promoted heading: {heading}"
+    # And not still sitting as bare body text.
+    assert "\n2.4.2.2. Inference of planning strategies and strategy types\n" not in md

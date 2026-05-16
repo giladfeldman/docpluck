@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.45] — 2026-05-16
+
+**Cycle 13 (autonomous APA-first run) — long descriptive numbered headings demoted to body text (G5b, S1).** `render.py`'s numbered-heading promoters carried a "long lowercase-word run" prose guard (`max_lc_run >= 5`) that rejected legitimate descriptive headings — e.g. `2.4.2.2. Inference of planning strategies and strategy types`, `3.3.2.1. The quality of planning on the previous trial moderates the effect of reflection`. jdm_.2023.16 alone had 19 multi-level numbered subsection headings demoted to body text.
+
+Fix (v2.4.45) — the lowercase-run guard is **removed from `_promote_numbered_subsection_headings`**: multi-level dotted numbering at line-start is itself a strong section-heading signal (combined with capital-started title + no terminal sentence punctuation + single ≤80-char line), and descriptive subsection titles legitimately run to many lowercase words, so the guard could not distinguish a real heading from prose and only mis-rejected headings. For `_promote_numbered_section_headings` (single-level `N.`, which genuinely collides with enumerated lists) the guard is **kept but raised `5 → 8`** — single-level promotion still has its document-numbering-range / uniqueness / list-adjacency gates as defense in depth.
+
+jdm_.2023.16: 19 previously-demoted multi-level headings now render as `###`; the v2.4.44→v2.4.45 diff is heading-promotion only (0 text loss, 0 hallucination). 26/26 baseline PASS. New real-PDF + contract tests in `tests/test_numbered_heading_promotion_real_pdf.py` and `tests/test_render.py`.
+
+~11 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.44] — 2026-05-16
 
 **Cycle 12 (autonomous APA-first run) — Latin typographic ligatures not decomposed in the table/caption channels (GLYPH, S2).** pdftotext preserves presentation-form ligature glyphs (`ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ`, U+FB00-FB06) verbatim, so words rendered as `conﬁdent` / `inﬂuence` / `eﬃcient` — broken for search, word matching, and any downstream NLP. A corpus scan found the glyphs in 35 rendered papers (korbmacher 82×, jdm_.2023.16 34×, jdm_m.2022.2 8×). The body channel's `normalize.py` S3 step already expanded ligatures correctly; the leak was confined to **table cells, figure/table captions, and `unstructured-table` fenced blocks**, which bypass `normalize_text` entirely.

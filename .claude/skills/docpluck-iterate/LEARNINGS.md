@@ -521,3 +521,29 @@ Mid-run, ArticleFinder flagged (and the user confirmed as a directive) that docp
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 12 is one normalize helper (explicit table over a 7-codepoint block) + S3 unified to call it + 2 bypass-channel call sites; 26/26 baseline + AI verifier confirm no regression. Same shape as cycles 2/4/6/7.
+
+---
+
+## Run: 2026-05-16 (run 4, fix-and-continue) · Cycles: cycle-12 rework, tests-regen, cycle 13
+
+This run executed `docs/HANDOFF_2026-05-16_iterate_run_4_fix_and_continue.md`'s three jobs. Cycle-12 rework + tests-regen + cycle 13 below; the article-finder AI-gold integration (JOB 2) is tracked in the run-meta.
+
+### tests-regen (commit `c831e28`, no version bump)
+- 15 pre-existing pytest failures triaged. 12 `test_extract_pdf_byte_identical` snapshots + 2 `test_sections_golden` goldens = environmental drift (local pdftotext re-wraps lines differently than the build that captured the snapshots; `extract_pdf` is a pure pdftotext passthrough). Regenerated; the 26-paper baseline is the real extraction-quality gate and stays green.
+- **The 15th, `test_request_09`, is NOT snapshot drift** — it is a real COL-class column-interleave defect: the numbered RSOS bibliography renders as `References\n1. 2. 3. ... 16.\n\nThaler RH...` (the number column split from the entry text). Left red and documented as the escalated COL defect class. Lesson: when a handoff lumps failures as "all snapshot drift," still inspect each — a real-defect-detecting test must never be "regenerated" away.
+
+### Cycle 13 (v2.4.45) — G5b long-descriptive numbered headings demoted
+
+### Outcome
+- **Cycle 13 shipped v2.4.45** — `render.py`'s numbered-heading promoters carried a `max_lc_run >= 5` prose guard that demoted legitimate long descriptive headings. Removed the guard entirely from `_promote_numbered_subsection_headings`; raised it `5→8` in `_promote_numbered_section_headings`. jdm_.2023.16: 19 multi-level subsection headings recovered.
+
+### Blind spots / process notes
+- **The TRIAGE estimate ("raise 5→8") was a partial fix.** Reproducing at HEAD showed jdm16 headings with `max_lc` up to 12 — a `5→8` raise would have left 7 of 19 still demoted. The lesson card `reproduce-triage-defect-at-head-before-trusting-cost-estimate` paid off again: always reproduce and measure before trusting a queue item's prescribed fix. The lc-run count genuinely cannot distinguish a 12-lowercase-word descriptive heading from prose — for multi-level dotted numbering the *number shape* is the discriminator, so the guard had to go, not just move.
+- **A guard worth keeping for one promoter, not the other.** Single-level `N.` numbers collide with enumerated lists (real false-positive risk) → keep a prose guard (raised to 8) as defense-in-depth. Multi-level `N.N[.N…]` numbers do not → the guard was pure harm. Same-named guard, opposite verdicts, because the false-positive surface differs.
+- **A contract test encoded the removed guard.** `test_render.py::test_promote_rejects_prose_with_long_lowercase_run` asserted the old behavior; updated it to assert the new contract (long descriptive titles ARE promoted) in the same cycle — per the cycle-2 `a test can encode the bug` lesson.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 13 is a guard removal + one threshold bump in two render post-processors; 26/26 baseline + heading-promotion-only diff confirm no regression. Same shape as cycles 9/11.
+
+### Process note — Codex cross-model verification has a Windows UTF-8 bug
+The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibake on this Windows machine (`Västfjäll`→`VA<SI>stfjA<SI>ll`, `–`→`ƒ?"`), producing ~10-24 false "discrepancies" per paper. The gold files are confirmed clean UTF-8. Worked around by re-running Codex with an explicit "files are UTF-8; mojibake is your decode error, not a discrepancy" preamble. **This is article-finder's protocol to fix** — `gold-generation.md` Step 4 needs a UTF-8 read instruction for Windows. Flagged for coordination with the article-finder owner.

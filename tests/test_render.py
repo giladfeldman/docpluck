@@ -71,10 +71,14 @@ def test_promote_numbered_subsection():
     assert "### 1.2 Above-and-below-average effects" in out
 
 
-def test_promote_rejects_prose_with_long_lowercase_run():
-    text = "1.2 The quick brown fox jumps over the lazy dog"
+def test_promote_long_descriptive_subsection_title():
+    # G5b (cycle 13): multi-level dotted numbering at line-start is itself a
+    # strong section-heading signal. Descriptive subsection titles legitimately
+    # run to many lowercase words, so a lowercase-run prose guard mis-rejects
+    # real headings and was removed. A long descriptive title IS promoted.
+    text = "1.2 Inference of planning strategies and strategy types"
     out = _promote_numbered_subsection_headings(text)
-    assert "### 1.2" not in out
+    assert "### 1.2 Inference of planning strategies and strategy types" in out
 
 
 def test_promote_rejects_sentence_terminator():

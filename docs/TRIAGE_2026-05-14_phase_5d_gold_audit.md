@@ -271,6 +271,10 @@ New `render.py::_promote_numbered_section_headings` promotes `N. Title` → `## 
 
 > **Cycle-12 rework note (run 4, 2026-05-16):** the first cycle-12 attempt added a SECOND, parallel `decompose_ligatures` call *before* the pre-existing S3 step inside `normalize_text` — it consumed every ligature before S3 ran, so S3 tracked `ligatures_expanded = 0` and broke `test_normalization.py::test_report_tracks_changes`. The rework removed the duplicate call and unified S3 to use the shared helper. Lesson: before adding a glyph-normalization helper, grep the existing `normalize_text` S-steps for one already handling that glyph class — extend/unify it, do not add a parallel path.
 
+### Cycle 13 (v2.4.45) — G5b long-descriptive-title prose guard — SHIPPED
+
+`render.py`'s numbered-heading promoters carried a `max_lc_run >= 5` "long lowercase-word run" prose guard that mis-rejected legitimate descriptive headings. Reproduced at HEAD: jdm_.2023.16 alone had **19** multi-level numbered subsection headings demoted to body text, with `max_lc` up to **12** (`3.3.2.1. The quality of planning on the previous trial moderates the effect of reflection`) — far deeper than the TRIAGE's "raise 5→8" estimate. Re-scoped: the lc-run guard is **removed entirely from `_promote_numbered_subsection_headings`** (multi-level dotted numbering + capital-start + no-terminal-punctuation + single ≤80-char line is itself a sufficient heading signature; the lc-run guard cannot distinguish a descriptive heading from prose). For `_promote_numbered_section_headings` (single-level `N.`, real list-collision risk) the guard is kept but raised `5→8`, alongside its existing numbering-range/uniqueness/list-adjacency gates. jdm16: 19 headings recovered; v2.4.44→v2.4.45 diff is heading-promotion only (0 text loss/hallucination); 26/26 baseline.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -280,7 +284,7 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | **TABLE structure destruction** | S0/S1 | efendic, ar_apa_011, xiao, jdm15/16, chen, maier, ip_feldman (~11) | grid lost → caption-bleed; flat number-dump; empty `<table>` shells; two tables merged; rows dropped. C3 — needs a render/structured coordination design. The single largest blocker. |
 | **G5c split-line numbered headings** | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`7.3.` etc.) | number alone on a line, title on the next; renders as orphan bare-number + a MISLABELED generic `## Results`. cycle-3 orphan-folder multi-level analogue. |
 | **G5d named (unnumbered) heading demotion** | S1 | ar_apa_011 (`Participants`, `Overview`), efendic, chandrashekar, ip_feldman (~7) | section-partitioner work; largest false-positive surface. |
-| **G5b long-descriptive-title prose guard** | S1 | jdm16, jdm_m2, chen | `≥5-lowercase-word` guard over-rejects legit long numbered headings. |
+| ~~**G5b long-descriptive-title prose guard**~~ ✓ FIXED v2.4.45 (cycle 13) | S1 | jdm16, jdm_m2, chen | ~~`≥5-lowercase-word` guard over-rejects legit long numbered headings.~~ Subsection promoter's lc-run guard removed; single-level raised 5→8. |
 | **FIG caption double-emission + truncation** | S2 | jdm_m2, efendic, chan_feldman, ziano, jdm15/16 (~8) | caption inline + in `## Figures` block; truncated mid-word; figure data-labels as orphan body lines. |
 | **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
 | **D4 metadata residuals** | S2 | ar_apa_011 (`doi:` line), chen, efendic masthead | see D4 RESIDUALS above. |
