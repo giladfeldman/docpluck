@@ -650,3 +650,24 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 6th consecutive identically-shaped low-risk cycle). Inline hard-rule checks all pass: extraction-layer change in `extract_structured.py` + `tables/captions.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (in-text-reference line structure), not paper identity; real-PDF + contract tests added; version bump consistent (NORMALIZATION_VERSION/SECTIONING_VERSION correctly unchanged). 26/26 baseline + Tier1==Tier2==Tier3 byte-identical confirm no regression.
+
+---
+
+## Run: 2026-05-16 (run 7) · Cycle FIG-3c · v2.4.51
+
+### Outcome
+- SHIPPED v2.4.51. pdftotext linearizes a figure caption into the running text column, so the caption renders TWICE — inline as a standalone body paragraph AND as the spliced `### Figure N` block. New render post-processor `_suppress_inline_duplicate_figure_captions` drops the inline body copy. SAFE-SUBSET scope: removes the inline run ONLY when the `### Figure N` block caption fully covers it (equal / prefix-superset); a run that EXCEEDS the block caption is kept (text-loss guard). ~21 captions de-duplicated across 5 APA papers; ~7 body-exceeds-block cases skipped + queued (FIG-3c-2). Phase-5d 3/3 papers PASS, 0 text-loss. 26/26 baseline; Tier1==Tier2==Tier3; 6 new tests.
+
+### Blind Spots
+- **A post-processor that compares two text spans for EQUALITY must run AFTER every glyph-normalization pass.** First placement put `_suppress_inline_duplicate_figure_captions` early in the chain (right after `_suppress_orphan_table_cell_text`). It found the figure blocks and the body lines but removed 0 lines. Standalone on the FINAL render it worked. The cause: at the early position the figure-BLOCK caption still carried a `ﬂ` ligature (`reﬂection`) while the BODY line was already ligature-decomposed (`reflection`) — `decompose_ligatures` runs late in the chain. The two spans were byte-unequal until that pass ran. Fix: moved the de-dup pass to AFTER `decompose_ligatures` / `destyle_math_alphanumeric` / `recover_*` so both spans are in the same final glyph form. **Detection rule:** when a render pass does cross-span string equality/prefix matching, audit where every glyph/normalization pass that touches either span sits — the comparison pass must be downstream of all of them.
+- **The diagnostic that localized it: "works standalone on the output, no-op in-chain" ⟹ a later pass mutates the matched text.** When a post-processor is a no-op in the chain but works when applied to the final output, the text it needs differs between its chain position and the end — bisect the passes between to find which one mutates the relevant span. A traced wrapper (`removed N lines`, dump the block + body line) pinpointed it in one render.
+
+### Edge Cases
+- **Removing body text is a text-loss risk — scope to the provably-safe subset.** A figure caption double-emission has two shapes: the inline body copy EQUALS the block caption (safe to drop), or the inline copy EXCEEDS the block caption — because the block caption was trimmed shorter (FIG-3a/earlier trims) OR the inline run accumulated trailing body prose. Dropping a body-exceeds run loses the excess text. The fix removes ONLY when `block_caption.startswith(normalized_inline_run)` — block ⊇ run — guaranteeing zero text loss. The body-exceeds cases need the block caption COMPLETED first (entangled with caption-trimming) → queued as FIG-3c-2, not forced into this cycle.
+- **30-char minimum match.** The inline run must match ≥30 chars of the block caption before removal, so a coincidental short `Figure N.` prefix can never trigger a drop.
+
+### New defect found (queued per rule 0e)
+- **FIG-3c-2 — body-exceeds-block double-emission.** ~7 figures (chandrashekar Figs 2/4/5, jdm_m.2022.3 Figs 1/2, efendic Fig 1, jdm_.2023.16 Fig 1) have an inline caption copy that exceeds the block caption. De-duping them safely needs the block caption completed first (entangled with the caption-trim cycles). Queued.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 7th consecutive). Inline hard-rule checks all pass: render-layer post-processor in `render.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (a `Figure N`-led body run reproducing a known block caption), not paper identity; the change only REMOVES exact-duplicate lines (0 text loss by construction, Phase-5d-confirmed); real-PDF + contract tests added; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 confirm no regression.

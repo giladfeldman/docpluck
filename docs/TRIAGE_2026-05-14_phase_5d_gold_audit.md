@@ -437,6 +437,38 @@ from the grid (maier Tbl 5/9/10/11, chen Tbl 3/5/6/7/9/13/15) and chen
 Fig 1 picks up a stray page-number `8`. Pre-existing caption-walk
 over-extension. Queued as **TBL-CAP** below.
 
+### Cycle FIG-3c (run 7) — figure-caption double-emission de-dup — SHIPPED v2.4.51
+
+pdftotext linearizes a figure caption into the running text column, so
+the caption renders TWICE — once inline as a standalone body paragraph,
+once as the spliced `### Figure N` block (chan_feldman emitted all 10
+figure captions twice). New render post-processor
+`_suppress_inline_duplicate_figure_captions` (`render.py`) drops the
+inline body copy.
+
+**Safe-subset scope:** the inline run is removed ONLY when the block
+caption *fully covers* it (equals / is a prefix-superset of the
+normalized inline run). A run that EXCEEDS the block caption — block
+caption trimmed shorter, or the run accumulated trailing body prose — is
+left untouched so no caption text is lost. The pass runs AFTER every
+glyph-normalization pass (a `ﬂ` ligature in the block caption vs a
+decomposed `fl` in the body line would otherwise defeat the equality
+check — the root cause of a first-placement no-op).
+
+~21 double-emitted captions de-duplicated across 5 APA papers
+(chan_feldman Figs 1-10, chandrashekar Figs 1/3, efendic Figs 2-5, maier
+Figs 1/2, jdm_.2023.16 Figs 2-4). **Phase-5d AI-gold verify** (3 papers
+chan_feldman/jdm_.2023.16/efendic): **3 PASS, 0 text-loss, 0
+hallucination** — every removed line was an exact duplicate of a
+surviving `### Figure N` block. 26/26 baseline; Tier1==Tier2==Tier3; 6
+new tests.
+
+**FIG-3c NEW DEFECT (queued):** ~7 figures (chandrashekar Figs 2/4/5,
+jdm_m.2022.3 Figs 1/2, efendic Fig 1, jdm_.2023.16 Fig 1) have an inline
+caption copy that EXCEEDS the block caption — de-duping them needs the
+block caption completed first (entangled with the caption-trim cycles).
+Queued as **FIG-3c-2** below.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -452,7 +484,8 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | ~~**FIG-2 caption residual (\n\n-after-period-less-caption)**~~ ✓ SHIPPED v2.4.48 (cycle FIG-2) | S2 | efendic Fig 4/5, chandrashekar Fig 1/3 | ~~walk sailed past the `\n\n` ending a period-less caption~~ — `_caption_is_complete_without_terminator` stops it. |
 | ~~**FIG-3a caption residual lowercase `. `-boundary**~~ ✓ SHIPPED v2.4.49 (run 7) | S2 | chandrashekar Fig 4/5, jdm_.2023.16 Fig 1, jdm_m.2022.3 Fig 1/2 | ~~absorb prose via a `. `-boundary with no `\n\n`~~ — `_trim_caption_at_body_prose_boundary` lowercase-initial-tail rule; 5 trimmed, 2 legit continuations guarded. |
 | ~~**FIG-3b caption anchored to body-text reference**~~ ✓ SHIPPED v2.4.50 (run 7) | S2 | chan_feldman, chen, jamison, maier, amd_2, annals_3, ieee_access_2/9/10, plos_med_1 (14 caption groups) | ~~caption ANCHOR latched onto an in-text `Figure N` reference~~ — `caption_anchor_is_in_text_reference` dedup tie-break; 14 groups corrected. |
-| **FIG-3c figure-caption double-emission** | S2 | ~8 papers | caption present both in body prose AND as a `### Figure N` block — render-layer body/caption de-dup. C2-C3. |
+| ~~**FIG-3c figure-caption double-emission**~~ ✓ SHIPPED v2.4.51 (run 7) | S2 | chan_feldman, chandrashekar, efendic, maier, jdm_.2023.16 (~21 captions) | ~~caption in body prose AND as a `### Figure N` block~~ — `_suppress_inline_duplicate_figure_captions` render pass; safe-subset (block caption ⊇ inline run). |
+| **FIG-3c-2 body-exceeds-block double-emission** | S2 | chandrashekar Fig 2/4/5, jdm_m.2022.3 Fig 1/2, efendic Fig 1, jdm_.2023.16 Fig 1 (~7) | the inline caption copy EXCEEDS the `### Figure N` block caption — de-dup needs the block caption completed first (entangled with caption-trim). C2-C3. |
 | **FIG-4 efendic Fig 1 Note trailing-sentence loss** | S2 | efendic Fig 1 (and likely other multi-sentence figure Notes) | the caption paragraph-walk's `\n\n`-stop fires inside a multi-sentence figure Note, dropping the Note's final sentence. C2. |
 | **TBL-CAP table-caption over-extension into column headers** | S2 | maier Tbl 5/9/10/11, chen Tbl 3/5/6/7/9/13/15, chen Fig 1 (stray page-no) | the caption walk / `_trim_table_caption_at_cell_region` does not always stop at the grid boundary — trailing column-header words splice into the caption. C2. |
 | **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
@@ -463,11 +496,11 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 **Run 7 progress.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
 G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47),
 FIG-2 period-less-caption walk-stop ✓ (v2.4.48), FIG-3a lowercase-boundary trim ✓ (v2.4.49),
-FIG-3b caption-anchor dedup ✓ (v2.4.50).
-Recommended order: **FIG-3c figure-caption double-emission** (S2×C2-C3, ~8 papers)
-→ **FIG-4 efendic Fig 1 Note trailing-sentence loss** (S2×C2) → **TBL-CAP
-table-caption over-extension** (S2×C2) → **G5d named/unnumbered heading
-demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##`
+FIG-3b caption-anchor dedup ✓ (v2.4.50), FIG-3c double-emission de-dup ✓ (v2.4.51).
+Recommended order: **FIG-4 efendic Fig 1 Note trailing-sentence loss** (S2×C2)
+→ **TBL-CAP table-caption over-extension** (S2×C2) → **FIG-3c-2
+body-exceeds-block double-emission** (S2×C2-C3) → **G5d named/unnumbered
+heading demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##`
 promotion (`## Supplementary Material`/`## Appendix` — S1×C2) → **G5c-2
 partitioner split-heading rejoin** (S1×C3, 5 jdm_m2 cases) → **TABLE cluster**
 (S0/S1×C3, dedicated session, the single largest blocker) → **COL** + 011

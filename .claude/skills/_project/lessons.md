@@ -238,3 +238,11 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Why:** `FIGURE_CAPTION_RE`/`TABLE_CAPTION_RE` start with `^\s*`; the `\s*` absorbs blank lines, so `CaptionMatch.char_start` (= `m.start()`) sits ABOVE the real `Figure N` token. A first cut of the discriminator read the line at `char_start` and mis-classified a real caption (its "previous line" was actually the end of the paragraph two lines up).
 
 **How to detect next time:** Any logic that inspects the line/paragraph context of a `CaptionMatch` must first advance past the regex-absorbed whitespace to the real token (`while raw[i] in " \t\r\n": i += 1`). Make caption-anchor heuristics a dedup TIE-BREAK (consulted only on 2+ anchors, fall back to old behavior) so a mis-classification is a no-op, never a dropped figure. Corpus-scan every changed case before shipping — the scan caught this bug pre-release.
+
+## 2026-05-16 · Cycle FIG-3c — an equality-matching render pass must run after all glyph-normalization passes (v2.4.51)
+
+**What:** A figure caption renders twice — inline in body prose + as the `### Figure N` block. New render post-processor `_suppress_inline_duplicate_figure_captions` drops the inline copy, but ONLY when the block caption fully covers it (no text-loss).
+
+**Why:** First placement (early in the post-processor chain) was a silent no-op: the block caption still had a `ﬂ` ligature (`reﬂection`) while the body line was already decomposed (`reflection`) — `decompose_ligatures` runs late. The two spans were byte-unequal, so the equality check never fired.
+
+**How to detect next time:** A render post-processor that compares two text spans for equality/prefix must run DOWNSTREAM of every pass that normalizes glyphs in either span (`decompose_ligatures`, `destyle_math_alphanumeric`, `recover_corrupted_minus_signs`, …). Diagnostic: if a pass is a no-op in the chain but works when applied standalone to the final output, a later pass is mutating the text it matches on — bisect the passes between. When the fix removes body text, scope it to the provably-safe subset (here: block caption ⊇ inline run) and queue the rest.
