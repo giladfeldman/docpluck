@@ -16,7 +16,7 @@ COMMON_WORDS = {
     "each", "after", "both", "most", "only", "over", "may", "into",
 }
 
-LIGATURE_CHARS = set("\ufb00\ufb01\ufb02\ufb03\ufb04")
+LIGATURE_CHARS = set("\ufb00\ufb01\ufb02\ufb03\ufb04\ufb05\ufb06")
 
 
 def compute_quality_score(text: str) -> dict:

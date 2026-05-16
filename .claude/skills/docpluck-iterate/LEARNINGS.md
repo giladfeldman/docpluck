@@ -503,3 +503,21 @@ Mid-run, ArticleFinder flagged (and the user confirmed as a directive) that docp
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 11 is one new render post-processor, gated by 5 conjunctive safety checks; 26/26 baseline + AI-gold verifier confirm 0 false positives. Same shape as cycles 1-10.
+
+---
+
+## Run: 2026-05-16 (autonomous APA-first run, session 3) · Cycle 12 · v2.4.44
+
+> **Reworked in run 4 (2026-05-16).** The session-3 cycle-12 attempt was broken — it duplicated the pre-existing S3 step and was never committed. The entry below describes the *reworked, shipped* cycle 12.
+
+### Outcome
+- **Cycle 12 shipped v2.4.44** — Latin typographic ligatures (U+FB00-FB06: ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ) leaked verbatim in the **table-cell, figure/table-caption, and `unstructured-table`-fence channels**. The body channel's `normalize.py` S3 step already expanded ligatures correctly; those three channels bypass `normalize_text`. `normalize.py::decompose_ligatures` is now the single shared helper for the full U+FB00-FB06 block (explicit ASCII table), called from all three channels (S3 body / `cell_cleaning._html_escape` / `render_pdf_to_markdown` post-process). jdm_m2/korbmacher/jdm16 → 0 residual ligatures. 11 tests.
+
+### Blind spots / process notes
+- **The session-3 cycle-12 attempt duplicated an existing step.** It added a NEW `decompose_ligatures` call EARLY in `normalize_text` — before the pre-existing `S3_ligature_expansion` step (FB00-FB04). The early call consumed every ligature, so S3 tracked `ligatures_expanded = 0` and `test_report_tracks_changes` broke. **Lesson: before adding a glyph-normalization helper, grep the existing `normalize_text` S-steps for one already handling that glyph class — extend/unify it, never add a parallel path. The rework removed the duplicate call and unified S3 to call the shared helper.**
+- **Verify the body channel is actually broken before "fixing" it.** The cycle was triggered by 35 rendered papers showing raw ligatures — but the body channel was fine; the 35 papers' ligatures were in table cells / captions / fences. A 2-minute check (grep the ligature lines in a recent render, look at whether they sit in `<td>`/`<th>`/`*Table N*`/```unstructured-table``` vs body prose) localizes the defect to the right channel before any code is written.
+- **Explicit ASCII table, not scoped NFKC.** NFKC of `ﬅ` (U+FB05) yields `ſt` with a non-ASCII LONG S — so a per-char NFKC pass does not actually guarantee the ASCII output the docstring promises. An explicit 7-entry table (`ﬅ/ﬆ→st`) does, and matches the existing S3 code style.
+- **The 3-channel glyph pattern, 5th application.** Cycles 2/4/6/7/12 all needed the shared-helper-at-3-chokepoints treatment. The cycle-6 PROPOSED AMENDMENT (still pending user review) is now backed by 5 cycles of evidence — it should be promoted into SKILL.md Phase 4.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 12 is one normalize helper (explicit table over a 7-codepoint block) + S3 unified to call it + 2 bypass-channel call sites; 26/26 baseline + AI verifier confirm no regression. Same shape as cycles 2/4/6/7.

@@ -265,6 +265,12 @@ New `render.py::_promote_numbered_section_headings` promotes `N. Title` → `## 
 
 **G5a RESIDUALS (queued):** the ≥5-lowercase-word prose guard rejects long descriptive headings (`4. Knowledge acquisition, decision delay, and choice outcomes`) — same G5b guard issue; list-number collision under-promotes a section heading whose number a body list reuses (chen 1/2/3/5 — conservative, not a false positive).
 
+### Cycle 12 (v2.4.44) — GLYPH ligature decomposition — SHIPPED
+
+`normalize.py::decompose_ligatures` is the single shared helper for the U+FB00-FB06 ligature block — an explicit ASCII table (`ﬁ→fi`, `ﬂ→fl`, …, `ﬅ/ﬆ→st`; NFKC is avoided because `ﬅ`→`ſt` carries a non-ASCII long s). **The body channel's S3 step already expanded ligatures** — the real gap was the table-cell, figure/table-caption, and `unstructured-table`-fence channels that bypass `normalize_text`. The helper is now called from all three channels (S3 body / `cell_cleaning._html_escape` / `render_pdf_to_markdown` post-process); the S3 step also gains `ﬅ/ﬆ` reach. Corpus scan found ligatures in 35 rendered papers (korbmacher 82×, jdm16 34×); jdm_m2/korbmacher/jdm16 verified → 0 residual. The `GLYPH ligature` row below is now RESOLVED.
+
+> **Cycle-12 rework note (run 4, 2026-05-16):** the first cycle-12 attempt added a SECOND, parallel `decompose_ligatures` call *before* the pre-existing S3 step inside `normalize_text` — it consumed every ligature before S3 ran, so S3 tracked `ligatures_expanded = 0` and broke `test_normalization.py::test_report_tracks_changes`. The rework removed the duplicate call and unified S3 to use the shared helper. Lesson: before adding a glyph-normalization helper, grep the existing `normalize_text` S-steps for one already handling that glyph class — extend/unify it, do not add a parallel path.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:

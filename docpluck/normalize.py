@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.7"
+NORMALIZATION_VERSION = "1.9.8"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1485,6 +1485,30 @@ def recover_minus_via_ci_pairing(text: str) -> str:
     return "\n".join(out)
 
 
+# v2.4.44 (NORMALIZATION_VERSION 1.9.8): decompose Latin typographic
+# ligatures (ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ, U+FB00-FB06). pdftotext preserves these
+# presentation-form glyphs verbatim, so words render as "conﬁdent" /
+# "inﬂuence" — broken for search, word matching, and any downstream NLP.
+# An explicit ASCII table is used (not a scoped NFKC pass): NFKC of U+FB05
+# yields "ſt" with a non-ASCII LONG S, and meta-science output must stay
+# ASCII. This is the SINGLE shared helper for all THREE text channels — the
+# S3 body step (normalize_text, below), table-cell cleaning, and the render
+# post-process. Table cells and figure/table captions bypass normalize_text
+# entirely, so a body-only fix leaves them showing raw ligature glyphs.
+_LIGATURE_MAP = {
+    "ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl",
+    "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "st", "ﬆ": "st",
+}
+_LIGATURE_RE = re.compile("[ﬀ-ﬆ]")
+
+
+def decompose_ligatures(text: str) -> str:
+    """Decompose Latin typographic ligatures (U+FB00-FB06) to ASCII."""
+    if not text:
+        return text
+    return _LIGATURE_RE.sub(lambda m: _LIGATURE_MAP[m.group(0)], text)
+
+
 def normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -1658,13 +1682,11 @@ def normalize_text(
             t = t.replace(accent + vowel, combined)
     report._track("S2_accent_recombination", before, t, "accents_recombined")
 
-    # S3: Ligature expansion
+    # S3: Ligature expansion \u2014 body channel. Calls the shared
+    # decompose_ligatures helper (full U+FB00-FB06 block, incl. \ufb05/\ufb06\u2192st) so the
+    # body, table-cell, and render-post-process channels stay in lockstep.
     before = t
-    t = t.replace("\ufb00", "ff")
-    t = t.replace("\ufb01", "fi")
-    t = t.replace("\ufb02", "fl")
-    t = t.replace("\ufb03", "ffi")
-    t = t.replace("\ufb04", "ffl")
+    t = decompose_ligatures(t)
     report._track("S3_ligature_expansion", before, t, "ligatures_expanded")
 
     # S4: Quote normalization
