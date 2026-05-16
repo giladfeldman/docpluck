@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.39] — 2026-05-16
+
+**Cycle 7 (autonomous APA-first run) — `<`-as-backslash glyph corruption (GLYPH, S0).** `efendic_2022_affect` rendered every `<` comparison operator as a literal backslash: body prose read `p \ .05` / `p \ .001` for `p < .05` / `p < .001`, every table p-value cell read `\.001` for `<.001`, and the legacy Wiley DOI `13:1<1::AID-BDM333` read `13:1\1::AID-BDM333` — 24 occurrences total. Diagnosis: a font quirk makes pdftotext map the `<` glyph to a literal backslash. A backslash is never a legitimate prose character in extracted academic text, and the renderer adds no markdown escapes.
+
+Fix — new `normalize.py::recover_corrupted_lt_operator`: a backslash immediately followed (optional single space) by a digit or a `.`-prefixed decimal is unambiguously a corrupted `<` and is recovered to `<`, preserving the space (`p \ .05` → `p < .05`). A backslash before a letter (a rare path-like artifact) is left alone. Applied at three channels (same pattern as the v2.4.34 Greek and v2.4.38 minus fixes): normalize W0c step (body), `cell_cleaning._html_escape` (Camelot table cells — runs before the `<`→`&lt;` HTML escape so the recovered operator is escaped like any other `<`), and the `render_pdf_to_markdown` post-process (final guarantee — unstructured-table fenced blocks / raw_text fallbacks).
+
+Verified on efendic (v2.4.38→v2.4.39 diff: 54 lines, all 27 `\`→`<` recoveries, no body prose touched; 0 literal backslashes remain): body `p < .001`, table p-cells `&lt;.001`. AI-gold verifier confirms the corruption is gone with zero hallucination.
+
+`NORMALIZATION_VERSION` 1.9.4 → 1.9.5 · `TABLE_EXTRACTION_VERSION` 2.1.2 → 2.1.3. 8 new tests in `tests/test_lt_operator_recovery_real_pdf.py`.
+
+~12 APA papers still FAIL Phase-5d verification (efendic itself still FAILs on pre-existing defects: standalone `2X.XX` minus-corrupted cells, table column-fusion/merge, numbered-subsection demotion); the autonomous run continues.
+
 ## [2.4.38] — 2026-05-16
 
 **Cycle 6 (autonomous APA-first run) — `2`-for-U+2212 minus-sign corruption (GLYPH, S0).** `efendic_2022_affect` rendered every negative statistic with the U+2212 minus turned into the digit `2`: the abstract read `r = 2.74 [20.92, 20.30]` for `r = −.74 [−0.92, −0.30]`, and all 29 confidence intervals in the body and tables were sign-corrupted — a sign-FLIP of published statistics. Diagnosis: a font quirk makes pdftotext map U+2212 to `2`.

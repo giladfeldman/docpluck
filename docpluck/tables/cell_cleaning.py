@@ -36,7 +36,11 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
-from docpluck.normalize import destyle_math_alphanumeric, recover_corrupted_minus_signs
+from docpluck.normalize import (
+    destyle_math_alphanumeric,
+    recover_corrupted_lt_operator,
+    recover_corrupted_minus_signs,
+)
 
 
 _MERGE_SEPARATOR = "\x00BR\x00"  # placeholder swapped to <br> after escaping
@@ -66,6 +70,12 @@ def _html_escape(s: str | None) -> str:
     # self-gating descending-bracket rule as normalize.py's W0b step; table
     # cells bypass W0b (Camelot layout channel).
     s = recover_corrupted_minus_signs(s)
+    # Recover '<'-as-backslash corruption — pdftotext/pdfminer map the '<'
+    # glyph to a literal backslash on some fonts, so a p-value cell "<.001"
+    # arrives as "\.001". Must run BEFORE the "<"->"&lt;" escape below so the
+    # recovered operator is HTML-escaped like any other "<". Same shared
+    # helper as normalize.py's W0c step (table cells bypass W0c).
+    s = recover_corrupted_lt_operator(s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")
