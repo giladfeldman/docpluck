@@ -5,6 +5,7 @@ Ported from docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py
 (iter-29 / iter-32 / iter-34 / iter-23 / iter-20 blocks).
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from docpluck.render import (
     _reformat_jama_key_points_box,
     _suppress_orphan_table_cell_text,
     _suppress_inline_duplicate_figure_captions,
+    _demote_credit_role_headings,
     _demote_inline_footnotes_to_blockquote,
     _promote_study_subsection_headings,
     _demote_false_single_word_headings,
@@ -973,6 +975,65 @@ def test_suppress_inline_dup_noop_without_blocks():
     assert _suppress_inline_duplicate_figure_captions(md) == md
 
 
+# ── _demote_credit_role_headings (HALLUC-HEAD-1) ───────────────────────────
+
+
+def test_demote_credit_role_heading_in_credit_block():
+    # `## Methodology` inside the CRediT role list is a false heading.
+    md = (
+        "Role\n"
+        "\n"
+        "## Methodology\n"
+        "\n"
+        "Project administration\n"
+        "Resources\n"
+        "Software\n"
+        "Supervision\n"
+        "Validation\n"
+    )
+    out = _demote_credit_role_headings(md)
+    assert "## Methodology" not in out
+    assert "Methodology" in out  # kept as plain content
+
+
+def test_keep_real_methodology_section_heading():
+    # A real `## Methodology` section heading is followed by method prose,
+    # not a role list — it must be kept.
+    md = (
+        "## Methodology\n"
+        "\n"
+        "Participants were recruited online and completed a survey. "
+        "We measured their responses across three conditions and "
+        "analyzed the data using a mixed-effects model.\n"
+    )
+    assert _demote_credit_role_headings(md) == md
+
+
+def test_credit_role_heading_needs_three_neighbors():
+    # Only one nearby role token — not enough signal, keep the heading.
+    md = (
+        "## Methodology\n"
+        "\n"
+        "Supervision\n"
+        "\n"
+        "Some unrelated prose paragraph follows here with normal text.\n"
+    )
+    assert _demote_credit_role_headings(md) == md
+
+
+def test_credit_role_normalization_variants():
+    # Dash / ampersand variants of the writing roles still count.
+    md = (
+        "## Methodology\n"
+        "\n"
+        "Writing - original draft\n"
+        "Writing – review & editing\n"
+        "Conceptualization\n"
+    )
+    out = _demote_credit_role_headings(md)
+    assert "## Methodology" not in out
+
+
 # ── render_pdf_to_markdown smoke (requires test fixture) ──────────────────
 
 
@@ -1005,3 +1066,23 @@ def test_chan_feldman_figure_captions_not_double_emitted():
     assert md.count("Empathy (manipulation check): Comparison of empathy") == 1, (
         "Figure 7 caption double-emitted"
     )
+
+
+@pytest.mark.skipif(
+    not (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").exists(),
+    reason="chan_feldman_2025_cogemo.pdf fixture not present",
+)
+def test_chan_feldman_no_credit_role_methodology_heading():
+    """HALLUC-HEAD-1 real-PDF: chan_feldman's CRediT contributor-roles
+    block lists the role ``Methodology``, which the partitioner promoted
+    to a ``## Methodology`` heading. It must be demoted — while the real
+    ``## Method`` section heading is kept."""
+    from docpluck import render_pdf_to_markdown
+
+    md = render_pdf_to_markdown(
+        (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").read_bytes()
+    )
+    assert not re.search(r"^#{2,4} Methodology\s*$", md, re.M), (
+        "CRediT role 'Methodology' rendered as a section heading"
+    )
+    assert re.search(r"^## Method\s*$", md, re.M), "real Method section lost"

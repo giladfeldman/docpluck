@@ -608,6 +608,86 @@ def _demote_false_single_word_headings(text: str) -> str:
     return cleaned
 
 
+# ── HALLUC-HEAD-1 (v2.4.53): CRediT contributor-role heading demotion ─────
+#
+# The CRediT (Contributor Roles Taxonomy) block of a paper lists the 14
+# standard contribution roles. One of them — "Methodology" — collides with
+# the canonical Method/Methodology *section* keyword, so the section
+# partitioner promotes that role token to a ``## Methodology`` heading even
+# though it sits inside the contributor-roles table, not at a real section
+# boundary (chan_feldman, chandrashekar, chen). A role token is only a
+# false heading when it is surrounded by OTHER role tokens — a real
+# Methodology section is followed by method prose, not a role list.
+
+# Normalized CRediT role forms: lowercased, ``&``→``and``, dash/slash → space,
+# whitespace-collapsed. See :func:`_normalize_credit_role`.
+_CREDIT_ROLES = frozenset({
+    "conceptualization",
+    "data curation",
+    "formal analysis",
+    "funding acquisition",
+    "investigation",
+    "methodology",
+    "project administration",
+    "resources",
+    "software",
+    "supervision",
+    "validation",
+    "visualization",
+    "visualisation",
+    "writing",
+    "writing original draft",
+    "writing review and editing",
+    "writing original draft preparation",
+})
+
+
+def _normalize_credit_role(line: str) -> str:
+    """Normalize a line for CRediT-role matching."""
+    s = line.strip().lstrip("#").strip()
+    s = s.replace("&", " and ")
+    s = re.sub(r"[-–—/]", " ", s)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _demote_credit_role_headings(text: str) -> str:
+    """Demote a ``## <CRediT-role>`` heading that sits inside the
+    contributor-roles block.
+
+    HALLUC-HEAD-1: the section partitioner promotes the CRediT role token
+    ``Methodology`` to a ``## Methodology`` heading because it collides
+    with the Method/Methodology section keyword. The heading is false
+    only when it is embedded in the role list — so demote it ONLY when
+    the surrounding ±10-line window holds at least 3 OTHER CRediT role
+    tokens. A real Methodology section heading is followed by method
+    prose (0 nearby role tokens) and is left untouched.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        m = re.match(r"^#{2,4}\s+(.+?)\s*$", line)
+        if m and _normalize_credit_role(m.group(1)) in _CREDIT_ROLES:
+            # Count OTHER CRediT role tokens in a ±10-line window.
+            lo = max(0, i - 10)
+            hi = min(len(lines), i + 11)
+            nearby = 0
+            for k in range(lo, hi):
+                if k == i:
+                    continue
+                s = lines[k].strip()
+                if s and _normalize_credit_role(s) in _CREDIT_ROLES:
+                    nearby += 1
+            if nearby >= 3:
+                # Demote: drop the heading markup, keep the role word as
+                # a plain line (it is real content of the role block).
+                out.append(m.group(1).strip())
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
 # ── Section C3: inline-footnote demotion + study-subsection promotion ──────
 
 
@@ -2248,6 +2328,9 @@ def render_pdf_to_markdown(
     md = _demote_inline_footnotes_to_blockquote(md)
     md = _promote_study_subsection_headings(md)
     md = _demote_false_single_word_headings(md)
+    # HALLUC-HEAD-1: demote a `## <CRediT-role>` heading (e.g. `## Methodology`)
+    # that the partitioner promoted from inside the contributor-roles block.
+    md = _demote_credit_role_headings(md)
     md = _rejoin_garbled_ocr_headers(md)
     # v2.4.34: final guarantee — strip Mathematical-Alphanumeric styling from
     # the assembled markdown. S0 (body channel) and tables/cell_cleaning

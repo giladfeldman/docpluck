@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.53] — 2026-05-17
+
+**Cycle HALLUC-HEAD-1 (APA-first run, run 7) — a CRediT contributor-role token promoted to a `## ` section heading (HALLUC-HEAD, S1).** A paper's CRediT (Contributor Roles Taxonomy) block lists the 14 standard contribution roles. One of them — `Methodology` — collides with the canonical Method/Methodology *section* keyword, so the section partitioner promotes that role token to a `## Methodology` heading even though it sits inside the contributor-roles table, not at a real section boundary. chan_feldman, chandrashekar and chen each rendered a hallucinated `## Methodology` heading in their author-contributions block (none of their AI golds has one).
+
+Fix (v2.4.53) — new render post-processor `_demote_credit_role_headings`: it demotes a `## <CRediT-role>` heading to plain text, but ONLY when the surrounding ±10-line window holds at least 3 OTHER CRediT role tokens (the closed 14-term CRediT vocabulary, normalized for dash/ampersand variants). A real Methodology section heading is followed by method prose — 0 nearby role tokens — and is left untouched. Keyed purely on the structural signature (a role token embedded in the role list), not on paper identity.
+
+chan_feldman, chandrashekar and chen each lose the hallucinated `## Methodology` heading and keep their real `## Method` section heading. Phase-5d AI-gold verify: the demoted heading is absent from all three golds; the change is heading-markup-only (0 text loss — the role word stays as plain content). 26/26 baseline PASS. Tier1==Tier2==Tier3. 5 new tests (`tests/test_render.py`).
+
+~8 APA papers still FAIL Phase-5d verification (HALLUC-HEAD residuals — `## Conclusion`/`## Supplementary Material`/`## Data Availability Statement` mid-text promotions, TBL-CAP, FIG-3c-2, G5c-2, G5d, TABLE cluster, COL); the run continues.
+
 ## [2.4.52] — 2026-05-16
 
 **Cycle FIG-4 (APA-first run, run 7) — a legitimate long figure caption truncated by the 400-char overflow trim (FIG, S2).** The FIG-1 overflow trim (`_trim_overflowing_figure_caption`, v2.4.47) treats any figure caption exceeding 400 chars as over-absorbed body prose and walks it back to the last sentence terminator before char 400. efendic Figure 1's caption is a label plus a long `Note.` (the abbreviation key + the three technologies + both samples + the negative-slope explanation) that legitimately runs ~498 chars — so the overflow trim cut it at `(MTurk and Prolific).` and dropped the final Note sentence `The negative slope shows the predicted negative relationship between risks and benefits…`.
