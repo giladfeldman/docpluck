@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.41] — 2026-05-16
+
+**Cycle 9 (autonomous APA-first run) — numbered subsection headings demoted to body text (G5, S1).** The APA Phase-5d sweep found that numbered subsection headings in the dominant Cambridge/JDM and Elsevier style — `5.1. Participants and design`, `5.3.3. Choice deferral`, `6.1.1. Replication: Retrospective hindsight bias` — were rendered as plain body text instead of `###` headings, across jdm_m.2022.2, chen_2021_jesp, jdm_.2023.15, jdm_.2023.16 and others.
+
+Root cause — `render.py::_NUMBERED_SUBSECTION_HEADING_RE` was too strict in two ways: (1) the number group `\d+(\.\d+){1,3}` was immediately followed by `\s+`, so a number written with a **trailing dot** (`5.1.`, `5.3.3.` — the overwhelmingly common style) never matched; (2) the title character class excluded the colon, rejecting headings like `Replication: Retrospective hindsight bias`.
+
+Fix (v2.4.41) — the number group tolerates an optional trailing dot (`\d+(\.\d+){1,3}\.?`) and the title may carry an internal colon. All existing guards are unchanged: a title ending in sentence-terminator punctuation (including a trailing colon), or a prose-like run of ≥5 lowercase-initial words, is still rejected — so heading text fused with a following body paragraph is correctly left alone.
+
+Verified across 4 papers: ~78 numbered subsection headings promoted to `###` (jdm_m.2022.2 +16, chen +40, jdm_.2023.15 +14, jdm_.2023.16 +22), zero false positives — every promoted line is a genuine heading confirmed against the AI gold, and fused heading-plus-prose lines stayed body text. 26/26 baseline PASS. 8 new tests in `tests/test_numbered_heading_promotion_real_pdf.py`.
+
+**Residual (separate root cause, queued):** headings with long descriptive titles (`2.4.2.2. Inference of planning strategies and strategy types`) are still rejected by the ≥5-lowercase-word prose guard — a guard tuning issue distinct from the regex fix. Single-level top-level numbered headings (`2. Omission neglect`) remain demoted — queued as a dedicated cycle (needs a document-numbering-range gate to stay safe against enumerated lists).
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.40] — 2026-05-16
 
 **Cycle 8 (autonomous APA-first run) — standalone `2`-for-U+2212 minus recovery via point-estimate ∈ CI pairing (GLYPH, S0).** The v2.4.38 fix recovered the `2`-for-minus corruption on *bracketed* CIs (descending-pair rule) but left the bracket-less point estimates corrupt: every negative regression coefficient cell in `efendic_2022_affect` Tables 2-5 still read `20.26`/`21.15` for `−0.26`/`−1.15`, and the mediation estimate read `Mposterior = 20.54` for `−0.54` — sign-corrupted published statistics.

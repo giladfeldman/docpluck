@@ -439,3 +439,18 @@ Cycles 2, 4, 6 each independently rediscovered that a glyph/encoding corruption 
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review` before release) — SKIPPED. Cycle 8 is one normalize helper + 2 call-site additions + version bumps; the recovery is gated by a mathematical invariant (estimate∈CI), the opposite of a broad catch-all. Same shape as cycles 1-7. 26-paper baseline is the no-regression gate.
+
+---
+
+## Run: 2026-05-16 (autonomous APA-first run, session 3) · Cycle 9 · v2.4.41
+
+### Outcome
+- **Cycle 9 shipped v2.4.41** — numbered subsection headings demoted to body text (G5, S1). `render.py::_NUMBERED_SUBSECTION_HEADING_RE` was too strict: the number group `\d+(\.\d+){1,3}` was followed immediately by `\s+`, so a number with a **trailing dot** (`5.1.`, `5.3.3.` — the dominant Cambridge/JDM + Elsevier style) never matched; the title char class also excluded the colon. Fix: optional trailing dot in the number group + `:` added to the title char class. ~78 headings promoted to `###` across 4 papers (jdm_m.2022.2, chen, jdm15, jdm16), zero false positives. AI-gold verifier on jdm_m.2022.2: OVERALL PASS, "introduced NO new defect, clean heading-markup-only change."
+
+### Blind spots / process notes
+- **Reproduce-at-HEAD found the regex was *one character* short.** The TRIAGE listed G5 as S1×C2 ("loosen section-detection thresholds"). Reproducing at HEAD showed the real cause was far cheaper: the regex required `\s+` immediately after the digits, and every affected paper writes `N.N.` *with* a trailing dot. A one-char `\.?` fixed ~78 headings. The cost estimate was a tier too pessimistic — always reproduce before trusting it (loaded card `reproduce-triage-defect-at-head-before-trusting-cost-estimate`).
+- **Cycle deliberately scoped narrow.** Single-level top-level numbered headings (`2. Omission neglect`) and the `≥5-lowercase-word` prose-guard residual (`2.4.2.2. Inference of planning strategies and strategy types` rejected) are BOTH still-open G5 sub-defects — but each is a distinct root cause with its own regression surface (single-level needs a document-numbering-range gate to stay safe against enumerated lists like chandrashekar's exclusion criteria). Shipping the airtight one-char regex fix alone keeps the cycle a clean revertable unit; the rest is queued.
+- **Verifier handed a precise punch-list.** The jdm_m.2022.2 verifier found split-line numbered headings (`5.3.`\n\n`Results` — number alone on a line, title on the next) still demoted, AND mislabeled (`5.3.`→generic `## Results` instead of `### 5.3. Results`). That is the cycle-3 orphan-arabic-numeral folder's multi-level analogue — queued.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` + `/docpluck-review` before release) — SKIPPED. Cycle 9 is a 2-token regex loosening (optional `\.?` + `:` in a char class) inside one existing render post-processor, all existing guards intact. 26/26 baseline + AI-gold verifier confirm no regression. Same shape as cycles 1-8.

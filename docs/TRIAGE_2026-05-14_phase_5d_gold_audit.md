@@ -242,3 +242,12 @@ The 011 verifier (gold ↔ v2.4.33 render) returned FAIL — **all findings pre-
 5. **Glyph** (`Ó`→©, hyphenation word-splits, fused tokens, superscript digits) — 4 files.
 
 **Revised cycle order session 3:** 9 = G5 numbered-heading promotion (2 gaps above) → 10 = D4 metadata leak → 11 = HALLUC-HEAD → 12 = FIG captions → TABLE cluster (C3) if budget.
+
+### Cycle 9 (v2.4.41) — G5 numbered-subsection-heading regex loosening — SHIPPED
+
+`_NUMBERED_SUBSECTION_HEADING_RE` gained an optional trailing dot in the number group + `:` in the title char class. ~78 multi-level subsection headings (`5.1.`, `5.3.3.`, `6.1.1. Replication: ...`) promoted to `###` across jdm_m.2022.2 / chen / jdm15 / jdm16, 0 false positives. AI-gold verifier (jdm_m.2022.2): OVERALL PASS, clean heading-markup-only change.
+
+**G5 RESIDUALS (queued, distinct root causes):**
+- **G5a — single-level top-level numbered headings** (`2. Omission neglect`, `3. Choice deferral`, `1. Hindsight bias`): `_NUMBERED_SUBSECTION_HEADING_RE` requires ≥1 `.\d` group, so single `N.` is never promoted. Needs a NEW render-level promoter gated on: document has ≥1 detected `#{2,4} \d` numbered heading + the candidate's number falls inside `[min,max]` of detected numbers (fills a gap) + line-isolated + short Title-Case + no terminal punct. The gate is what keeps it safe against enumerated lists (chandrashekar exclusion-criteria `1. Subjects... ; 2. ...`).
+- **G5b — long-descriptive-title prose guard** (`2.4.2.2. Inference of planning strategies and strategy types` rejected by `max_lc_run >= 5`): the `≥5-lowercase-word` guard over-rejects legitimate long numbered headings. For a numbered+isolated line the number prefix is already strong evidence; the lc-run guard is near-redundant there.
+- **G5c — split-line numbered headings** (`5.3.`\n\n`Results` — number alone on a line, title on the next; renders as orphan bare-number line, and the content gets a MISLABELED generic `## Results` instead of `### 5.3. Results`): the cycle-3 orphan-arabic-numeral folder's multi-level analogue.
