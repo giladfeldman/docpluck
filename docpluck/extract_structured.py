@@ -325,6 +325,13 @@ def _extract_caption_text(
     if pagebreak != -1:
         hard_end = pagebreak
     pos = cap.char_end
+    # FIG-4 (v2.4.52): track whether the walk stopped at a real ``\n\n``
+    # paragraph break (a complete caption paragraph) vs. ran to the 800-char
+    # hard cap / next_boundary / pagebreak (a runaway that absorbed body
+    # prose). The figure-caption overflow trim below only applies to the
+    # runaway case — a caption that overflows 400 chars but ended at a clean
+    # paragraph break is a LEGITIMATE long caption (a label + a long Note).
+    stopped_at_break = False
     while pos < hard_end:
         nxt = raw_text.find("\n\n", pos)
         if nxt == -1 or nxt >= hard_end:
@@ -334,6 +341,7 @@ def _extract_caption_text(
         # If it ends with a sentence terminator OR is empty/very short, stop.
         if not prev or len(prev.split()) < 2:
             hard_end = nxt
+            stopped_at_break = True
             break
         if re.search(r"[.!?][\"'\)\]]?$", prev):
             # Cycle 15n (v2.4.31): the paragraph-walk's sentence-terminator
@@ -353,6 +361,7 @@ def _extract_caption_text(
                 pos = nxt + 2
                 continue
             hard_end = nxt
+            stopped_at_break = True
             break
         # FIG-2 (v2.4.48): the caption ends without a ``.!?`` terminator but
         # is nonetheless COMPLETE — an APA period-less Title-Case figure
@@ -363,6 +372,7 @@ def _extract_caption_text(
             raw_text[start:nxt], cap.label
         ):
             hard_end = nxt
+            stopped_at_break = True
             break
         # Otherwise the caption continues — skip past this break and keep going.
         pos = nxt + 2
@@ -431,8 +441,17 @@ def _extract_caption_text(
         # cleanly instead of being cut mid-word with an ellipsis. Tables
         # keep the mid-word cap (their overflow is linearized cell text
         # already bounded by ``_trim_table_caption_at_cell_region``).
+        #
+        # FIG-4 (v2.4.52): only a RUNAWAY figure caption — the walk found
+        # no ``\n\n`` and ran to the 800-char hard cap — is over-absorbed
+        # body prose. A caption that overflows 400 chars but whose walk
+        # stopped at a real ``\n\n`` paragraph break is a LEGITIMATE long
+        # caption (a label + a long Note, e.g. efendic Figure 1 at ~430
+        # chars); pdftotext's own paragraph boundary bounds it, so it is
+        # kept whole rather than truncated at the last pre-400 terminator.
         if cap.kind == "figure":
-            snippet = _trim_overflowing_figure_caption(snippet)
+            if not stopped_at_break:
+                snippet = _trim_overflowing_figure_caption(snippet)
         else:
             snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
     return snippet
