@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.46] — 2026-05-16
+
+**Cycle G5c-1 (APA-first run) — orphan multi-level section number stranded above its heading (G5c, S1).** pdftotext sometimes splits a numbered subsection heading such as `5.4. Discussion` into a bare `5.4.` line and a separate `Discussion` line; the section partitioner then promotes the lone title word to a generic `## Discussion` and strands the number on its own line. In `jdm_m.2022.2` the `5.4. Discussion` subsection of Study 1 rendered as an orphan `5.4.` followed by a top-level `## Discussion`.
+
+Fix (v2.4.46) — new render post-processor `_fold_orphan_multilevel_numerals_into_headings`, the multi-level analogue of `_fold_orphan_arabic_numerals_into_headings` / `_fold_orphan_roman_numerals_into_headings`. It folds an orphan `N.N.` number into the **immediately-adjacent** generic `##`/`###` heading and emits it at subsection level: `5.4.`⏎`## Discussion` → `### 5.4. Discussion`. Keyed purely on the structural signature (an isolated multi-level dotted number is itself a strong subsection marker — body prose and list items never emit a bare `5.4.` line) plus blank-line-only adjacency. `### Figure N` / `### Table N` (library-emitted structural markers) and already-numbered headings are excluded. Only the immediately-adjacent case is folded; an orphan number whose title word the partitioner consumed elsewhere (leaving body prose below the number) is partitioner-level work (G5c-2) and is left untouched.
+
+`jdm_m.2022.2`: the `5.4. Discussion` heading is recovered and AI-gold-verified correct. The v2.4.45→v2.4.46 diff is heading-markup only (0 text loss, 0 hallucination). 26/26 baseline PASS. New real-PDF + contract tests in `tests/test_orphan_multilevel_number_real_pdf.py`.
+
+~11 APA papers still FAIL Phase-5d verification (G5c-2 partitioner split-heading rejoin, HALLUC-HEAD, FIG caption double-emission, TABLE cluster, COL); the run continues.
+
 ## [2.4.45] — 2026-05-16
 
 **Cycle 13 (autonomous APA-first run) — long descriptive numbered headings demoted to body text (G5b, S1).** `render.py`'s numbered-heading promoters carried a "long lowercase-word run" prose guard (`max_lc_run >= 5`) that rejected legitimate descriptive headings — e.g. `2.4.2.2. Inference of planning strategies and strategy types`, `3.3.2.1. The quality of planning on the previous trial moderates the effect of reflection`. jdm_.2023.16 alone had 19 multi-level numbered subsection headings demoted to body text.

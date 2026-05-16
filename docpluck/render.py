@@ -772,6 +772,48 @@ def _fold_orphan_arabic_numerals_into_headings(text: str) -> str:
     return pattern.sub(repl, text)
 
 
+def _fold_orphan_multilevel_numerals_into_headings(text: str) -> str:
+    """Cycle G5c-1: fold an orphan multi-level section-number line (``5.4.``,
+    ``6.1.2.``) into the immediately following generic ``##``/``###`` heading.
+
+    Multi-level analogue of :func:`_fold_orphan_arabic_numerals_into_headings`.
+    pdftotext sometimes splits ``5.4. Discussion`` into a bare ``5.4.`` line
+    and a separate ``Discussion`` line; the section partitioner then promotes
+    the lone title word to a generic ``## Discussion`` and strands the number::
+
+        5.4.\\n\\n## Discussion  →  ### 5.4. Discussion
+
+    A multi-level dotted number alone on a line is itself a strong subsection
+    signal — body prose and list items do not emit a bare ``5.4.`` line — so
+    the fold is keyed purely on that structural signature plus blank-line-only
+    adjacency to a heading. The result is always ``### ``: multi-level
+    numbering denotes a subsection regardless of the level the partitioner
+    happened to give the stranded title (cf. ``_NUMBERED_SUBSECTION_HEADING_RE``,
+    which likewise emits ``### `` at any depth).
+
+    The fold target must be a *generic* heading. ``### Figure N`` / ``### Table N``
+    are library-emitted structural markers, and a heading already starting with
+    a number is a real numbered section — both are excluded (the latter also
+    keeps the pass idempotent). Only the immediately-adjacent case is folded;
+    an orphan number separated from its heading by a figure block or by body
+    prose (the title word consumed elsewhere) is partitioner-level work and is
+    left untouched here.
+    """
+    if not text:
+        return text
+    pattern = re.compile(
+        r"(?m)^(\d+(?:\.\d+){1,3})\.?[ \t]*\n(?:[ \t]*\n)+"
+        r"(?P<head>#{2,3} (?!\s*\d)(?!Figure\b)(?!Table\b)[^\n]+)"
+    )
+
+    def repl(m: re.Match) -> str:
+        num = m.group(1)
+        head_text = m.group("head").split(" ", 1)[1]
+        return f"### {num}. {head_text}"
+
+    return pattern.sub(repl, text)
+
+
 def _promote_study_subsection_headings(text: str) -> str:
     """Promote ``Study N Design and Findings`` etc. to ``### {title}``.
 
@@ -2159,6 +2201,10 @@ def render_pdf_to_markdown(
     # heading post-processors so it operates on the final heading shapes.
     md = _fold_orphan_roman_numerals_into_headings(md)
     md = _fold_orphan_arabic_numerals_into_headings(md)
+    # Cycle G5c-1: multi-level analogue — fold an orphan `N.N.` number line
+    # into the immediately following generic heading (`5.4.`\n\n`## Discussion`
+    # -> `### 5.4. Discussion`). Runs alongside the single-level folders.
+    md = _fold_orphan_multilevel_numerals_into_headings(md)
     # Cycle 11 (G5a): promote single-level `N. Title` lines to `## N. Title`,
     # gated on the document already numbering its sections. Runs AFTER the
     # orphan-numeral folders so `## 1. Introduction` exists as an anchor.
