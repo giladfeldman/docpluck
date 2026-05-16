@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.44] — 2026-05-16
+
+**Cycle 12 (autonomous APA-first run) — Latin typographic ligatures not decomposed in the table/caption channels (GLYPH, S2).** pdftotext preserves presentation-form ligature glyphs (`ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ`, U+FB00-FB06) verbatim, so words rendered as `conﬁdent` / `inﬂuence` / `eﬃcient` — broken for search, word matching, and any downstream NLP. A corpus scan found the glyphs in 35 rendered papers (korbmacher 82×, jdm_.2023.16 34×, jdm_m.2022.2 8×). The body channel's `normalize.py` S3 step already expanded ligatures correctly; the leak was confined to **table cells, figure/table captions, and `unstructured-table` fenced blocks**, which bypass `normalize_text` entirely.
+
+Fix (v2.4.44) — `normalize.py::decompose_ligatures` is now the single shared helper for the full U+FB00-FB06 block, mapping each glyph to ASCII via an explicit table (`ﬁ→fi`, `ﬂ→fl`, `ﬃ→ffi`, `ﬄ→ffl`, `ﬀ→ff`, `ﬅ/ﬆ→st`). An explicit table is used rather than a scoped NFKC pass because NFKC of `ﬅ` (U+FB05) yields `ſt` with a non-ASCII LONG S. The body channel's S3 step calls the helper (and so gains `ﬅ/ﬆ` coverage); `cell_cleaning._html_escape` (table cells) and the `render_pdf_to_markdown` post-process (captions, `unstructured-table` fences, raw_text fallbacks) call it too — the established three-channel glyph-fix pattern.
+
+Verified across 3 papers: jdm_m.2022.2, korbmacher, jdm_.2023.16 — all now render 0 residual ligature glyphs (was 8 / 82 / 34); `conﬁdent`→`confident`. Superscripts and plain text untouched; the S3 body step still tracks `ligatures_expanded`. 26/26 baseline PASS. 11 tests in `tests/test_ligature_decomposition_real_pdf.py`.
+
+`NORMALIZATION_VERSION` 1.9.7 → 1.9.8.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.43] — 2026-05-16
 
 **Cycle 11 (autonomous APA-first run) — single-level numbered section headings demoted to body text (G5a, S1).** Cycle 9 (v2.4.41) promoted multi-level numbered subsection headings (`5.1.`, `6.1.1.`); single-level top-level numbered headings — `2. Omission neglect`, `3. Choice deferral`, `1. Hindsight bias` — were still rendered as plain body text when the title is not a canonical section word.

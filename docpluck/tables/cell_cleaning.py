@@ -37,6 +37,7 @@ import re
 from typing import Sequence
 
 from docpluck.normalize import (
+    decompose_ligatures,
     destyle_math_alphanumeric,
     recover_corrupted_lt_operator,
     recover_corrupted_minus_signs,
@@ -58,6 +59,10 @@ def _html_escape(s: str | None) -> str:
     # from the Camelot layout channel and bypass normalize_text's S0 step, so
     # math-italic Greek would otherwise leak raw into rendered table HTML.
     s = destyle_math_alphanumeric(s)
+    # Decompose Latin typographic ligatures (ﬁ->fi, ﬂ->fl, …) — table cells
+    # bypass normalize_text, so a cell "conﬁdent" would otherwise leak the
+    # raw presentation-form glyph into the rendered HTML (v2.4.44).
+    s = decompose_ligatures(s)
     # Recover corrupted minus signs. pdfminer (Camelot's text layer) emits
     # "(cid:0)" for a font glyph it cannot map to Unicode; in academic stat
     # tables that unmapped glyph is the U+2212 minus, always printed directly

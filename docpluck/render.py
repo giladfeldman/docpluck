@@ -34,6 +34,7 @@ from .extract_structured import extract_pdf_structured
 from .normalize import (
     NormalizationLevel,
     _rejoin_garbled_ocr_headers,
+    decompose_ligatures,
     destyle_math_alphanumeric,
     recover_corrupted_lt_operator,
     recover_corrupted_minus_signs,
@@ -2151,6 +2152,12 @@ def render_pdf_to_markdown(
     # B-coefficient table cell, the Mposterior mediation estimates — that
     # the descending-bracket rule structurally cannot see.
     md = recover_minus_via_ci_pairing(md)
+    # v2.4.44: final guarantee — decompose Latin typographic ligatures
+    # (ﬁ->fi, ﬂ->fl, …) from the assembled markdown. normalize (body) and
+    # cell_cleaning (table cells) cover their channels; this catches the
+    # remaining surfaces — figure/table captions, unstructured-table fences,
+    # raw_text fallbacks — so no presentation-form ligature reaches the .md.
+    md = decompose_ligatures(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)
