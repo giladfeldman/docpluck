@@ -402,6 +402,41 @@ before it pre-FIG-3a, a `\n\n` mid-Note). Distinct root cause — the
 walk's `\n\n`-stop firing inside a multi-sentence figure Note. Queued as
 **FIG-4** below.
 
+### Cycle FIG-3b (run 7) — caption anchored to a body-text reference — SHIPPED v2.4.50
+
+A caption-DETECTION defect (distinct from FIG-1/2/3a caption-TRIMMING).
+When a paper references a figure/table in body prose
+(`…we summarised the effects in Figure 10.`) AND has the real caption,
+pdftotext line-wraps the body sentence so `Figure 10.` lands at a line
+start and false-matches `FIGURE_CAPTION_RE`. That in-text reference
+often sits EARLIER than the real caption, and `extract_pdf_structured`'s
+dedup kept the first occurrence per `(kind, number)` — rendering body
+prose as the caption (chan_feldman Figure 10 rendered `We found support
+for the effect of perceived apology…`).
+
+New `caption_anchor_is_in_text_reference` in `tables/captions.py`: a real
+caption is set off by a paragraph break / starts a fresh sentence; an
+in-text reference continues the previous line's sentence (ends
+mid-clause). The dedup now prefers a non-reference anchor, falling back
+to first-in-order when every anchor looks like a reference (no
+regression). The helper advances past the `^\s*` the caption regex
+absorbs before inspecting line structure.
+
+Corpus scan of all 52 test PDFs: **14 mixed-anchor caption groups** —
+APA (chan_feldman Fig 10, chen Tbl 2, jamison Tbl 3/4, maier Fig 1), AOM
+(amd_2 Fig 2, annals_3 Tbl 3/4), IEEE (ieee_access_2 Tbl 1, ieee_access_2
+Fig 9, ieee_access_9 Fig 1, ieee_access_10 Fig 5/8), Vancouver
+(plos_med_1 Tbl 1) — all now resolve to the real caption. **Phase-5d
+AI-gold verify** (51 figure/table captions, 3 papers chan_feldman/maier/
+chen): **51 PASS, 0 wrong-anchor, 0 text-loss, 0 hallucination**. 26/26
+baseline; Tier1==Tier2==Tier3 byte-identical; 10 new tests.
+
+**FIG-3b NEW DEFECT (queued):** the verifier flagged (outside FIG-3b
+scope) that several table captions splice trailing column-header text
+from the grid (maier Tbl 5/9/10/11, chen Tbl 3/5/6/7/9/13/15) and chen
+Fig 1 picks up a stray page-number `8`. Pre-existing caption-walk
+over-extension. Queued as **TBL-CAP** below.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -416,21 +451,23 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | ~~**FIG caption ellipsis-truncation**~~ ✓ SHIPPED v2.4.47 (cycle FIG-1) | S2 | jdm_m2, efendic, chandrashekar, chan_feldman, jdm15, maier | ~~truncated mid-word with `…`~~ — `_trim_overflowing_figure_caption` walks overflow back to last sentence terminator; 12 → 0 corpus-wide. |
 | ~~**FIG-2 caption residual (\n\n-after-period-less-caption)**~~ ✓ SHIPPED v2.4.48 (cycle FIG-2) | S2 | efendic Fig 4/5, chandrashekar Fig 1/3 | ~~walk sailed past the `\n\n` ending a period-less caption~~ — `_caption_is_complete_without_terminator` stops it. |
 | ~~**FIG-3a caption residual lowercase `. `-boundary**~~ ✓ SHIPPED v2.4.49 (run 7) | S2 | chandrashekar Fig 4/5, jdm_.2023.16 Fig 1, jdm_m.2022.3 Fig 1/2 | ~~absorb prose via a `. `-boundary with no `\n\n`~~ — `_trim_caption_at_body_prose_boundary` lowercase-initial-tail rule; 5 trimmed, 2 legit continuations guarded. |
-| **FIG-3b chan_feldman Fig 10 caption-anchor defect** | S2 | chan_feldman Fig 10 | the caption ANCHOR latched onto a `Figure 10` reference in body prose, so the whole "caption" is body prose — a caption-DETECTION defect, distinct root cause. C2. |
+| ~~**FIG-3b caption anchored to body-text reference**~~ ✓ SHIPPED v2.4.50 (run 7) | S2 | chan_feldman, chen, jamison, maier, amd_2, annals_3, ieee_access_2/9/10, plos_med_1 (14 caption groups) | ~~caption ANCHOR latched onto an in-text `Figure N` reference~~ — `caption_anchor_is_in_text_reference` dedup tie-break; 14 groups corrected. |
 | **FIG-3c figure-caption double-emission** | S2 | ~8 papers | caption present both in body prose AND as a `### Figure N` block — render-layer body/caption de-dup. C2-C3. |
 | **FIG-4 efendic Fig 1 Note trailing-sentence loss** | S2 | efendic Fig 1 (and likely other multi-sentence figure Notes) | the caption paragraph-walk's `\n\n`-stop fires inside a multi-sentence figure Note, dropping the Note's final sentence. C2. |
+| **TBL-CAP table-caption over-extension into column headers** | S2 | maier Tbl 5/9/10/11, chen Tbl 3/5/6/7/9/13/15, chen Fig 1 (stray page-no) | the caption walk / `_trim_table_caption_at_cell_region` does not always stop at the grid boundary — trailing column-header words splice into the caption. C2. |
 | **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
 | **D4 metadata residuals** | S2 | ar_apa_011 (`doi:` line), chen, efendic masthead | see D4 RESIDUALS above. |
 | **COL column-interleave** | S0 | chan_feldman, chandrashekar | text-channel reading order. C3. |
 | **GLYPH 011 `−`→deleted / efendic `Mchange` no-CI** | S0 | 011, efendic | unrecoverable from text channel — needs layout-channel glyph identity. Escalate. |
 
-**Run 7 resumes here.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
+**Run 7 progress.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
 G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47),
-FIG-2 period-less-caption walk-stop ✓ (v2.4.48), FIG-3a lowercase-boundary trim ✓ (v2.4.49).
-Recommended order: **FIG-3b chan_feldman Fig 10 caption-anchor defect** (S2×C2)
-→ **FIG-3c figure-caption double-emission** (S2×C2-C3, ~8 papers) → **FIG-4
-efendic Fig 1 Note trailing-sentence loss** (S2×C2) → **G5d named/unnumbered
-heading demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##`
+FIG-2 period-less-caption walk-stop ✓ (v2.4.48), FIG-3a lowercase-boundary trim ✓ (v2.4.49),
+FIG-3b caption-anchor dedup ✓ (v2.4.50).
+Recommended order: **FIG-3c figure-caption double-emission** (S2×C2-C3, ~8 papers)
+→ **FIG-4 efendic Fig 1 Note trailing-sentence loss** (S2×C2) → **TBL-CAP
+table-caption over-extension** (S2×C2) → **G5d named/unnumbered heading
+demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##`
 promotion (`## Supplementary Material`/`## Appendix` — S1×C2) → **G5c-2
 partitioner split-heading rejoin** (S1×C3, 5 jdm_m2 cases) → **TABLE cluster**
 (S0/S1×C3, dedicated session, the single largest blocker) → **COL** + 011

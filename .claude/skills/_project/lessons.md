@@ -230,3 +230,11 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Why:** The TRIAGE named only 2 captions (chandrashekar Fig 4/5). A scan of all 18 APA papers for *every* `. `-then-lowercase boundary found 5 genuine + 2 legitimate lowercase continuations on OTHER papers (efendic's figure note, korbmacher's significance legend) that a naive rule would have silently destroyed. The scan enumerated the guard set.
 
 **How to detect next time:** Before designing any caption/heading boundary heuristic, scan the whole corpus for the boundary signature and classify every hit as genuine-defect vs legit-continuation. The legit-continuation hits ARE the guard list. Two figure-caption-specific traps: APA PDFs use U+2217 `∗` (asterisk operator) not ASCII `*` in significance legends; and a label word (`Note`/`Source`) needs guarding on the word BEFORE the period, distinct from the same word as a tail-opener.
+
+## 2026-05-16 · Cycle FIG-3b — m.start() of a `^\s*`-anchored regex is not the token position (v2.4.50)
+
+**What:** A figure/table caption can be anchored to a body-text *reference* ("…in Figure 10.") that line-wraps to a line start, rather than the real caption. `extract_pdf_structured`'s dedup kept the first-in-document anchor per `(kind, number)`, which is often the reference. New `caption_anchor_is_in_text_reference` lets the dedup prefer the real caption.
+
+**Why:** `FIGURE_CAPTION_RE`/`TABLE_CAPTION_RE` start with `^\s*`; the `\s*` absorbs blank lines, so `CaptionMatch.char_start` (= `m.start()`) sits ABOVE the real `Figure N` token. A first cut of the discriminator read the line at `char_start` and mis-classified a real caption (its "previous line" was actually the end of the paragraph two lines up).
+
+**How to detect next time:** Any logic that inspects the line/paragraph context of a `CaptionMatch` must first advance past the regex-absorbed whitespace to the real token (`while raw[i] in " \t\r\n": i += 1`). Make caption-anchor heuristics a dedup TIE-BREAK (consulted only on 2+ anchors, fall back to old behavior) so a mis-classification is a no-op, never a dropped figure. Corpus-scan every changed case before shipping — the scan caught this bug pre-release.
