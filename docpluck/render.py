@@ -214,9 +214,17 @@ def _merge_compound_heading_tails(text: str) -> str:
     return text
 
 
+# v2.4.41 (cycle 9, G5): the number group tolerates an optional trailing
+# dot — `5.1.`, `5.3.3.`, `1.1.` are the dominant subsection-numbering style
+# in Cambridge/JDM and Elsevier papers (`5.1. Participants`), and the prior
+# `\s+`-after-digits requirement rejected every one of them, demoting the
+# heading to body text. The title may also carry an internal colon
+# (`6.1.1. Replication: Retrospective hindsight bias`) — a colon mid-title
+# is ordinary heading typography; a colon as the LAST char is still rejected
+# downstream (`title.endswith(":")`).
 _NUMBERED_SUBSECTION_HEADING_RE = re.compile(
-    r"^(?P<num>\d+(?:\.\d+){1,3})\s+"
-    r"(?P<title>[A-Z][A-Za-z0-9][\w\-\s,&\(\)/']{1,78})\s*$"
+    r"^(?P<num>\d+(?:\.\d+){1,3}\.?)\s+"
+    r"(?P<title>[A-Z][A-Za-z0-9][\w\-\s,&\(\)/':]{1,78})\s*$"
 )
 
 
