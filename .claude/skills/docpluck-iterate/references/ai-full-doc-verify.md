@@ -68,6 +68,8 @@ generate-gold <absolute-path-to-PDF>
 
 `article-finder`'s `generate-gold` runs `gold-generation.md` end to end — the canonical extraction prompt(s), anti-hallucination rules, cross-check, schema validation, and `register-view` storage under the canonical key. It produces (and registers) the `reading`, `citations`, and `stats` views in one pass. This is the ONLY sanctioned way for docpluck-iterate to obtain a gold that does not already exist.
 
+> **Prerequisite — the `codex` CLI must be installed AND authenticated.** `gold-generation.md` runs an independent Codex / GPT-5.5 cross-model audit of every gold before storage, and `generate-gold` **blocks** (rather than shipping unverified gold) if `codex` is missing or unauthenticated. Verify ahead of time with `codex --version`. If a `generate-gold` call fails on the cross-model audit step, the user must run `codex login` — it is interactive, so the skill cannot do it; surface this to the user as a blocker rather than falling back to a local extraction.
+
 After `generate-gold` completes, the `reading` view is in the shared cache — copy it to the working path exactly as in the cache-HIT branch:
 
 ```bash
