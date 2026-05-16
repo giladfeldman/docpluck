@@ -23,6 +23,7 @@ PDF fixtures, per CLAUDE.md hard rule 0d.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -498,17 +499,29 @@ def test_jdm_m_2022_2_figure_captions_not_truncated():
 )
 def test_apa_corpus_no_ellipsis_truncated_figure_captions():
     """Structural invariant: no figure caption in the APA corpus may end
-    with ``…`` or exceed the 400-char hard cap. An overflow is always
-    over-absorbed body prose and must be walked back to a clean sentence
-    terminator (v2.4.47).
+    with ``…`` (ellipsis-truncated mid-word — v2.4.47), and any caption
+    that exceeds 400 chars must end on a real sentence terminator — i.e.
+    be a COMPLETE caption, not a mid-prose runaway.
+
+    FIG-4 (v2.4.52): a figure caption MAY legitimately exceed 400 chars —
+    efendic Figure 1 is a label + a long ``Note.`` at ~498 chars, bounded
+    by pdftotext's own ``\\n\\n`` paragraph break. The old invariant
+    ("no caption > 400 chars") was wrong; the real invariant is "no
+    ellipsis truncation, and an over-400 caption ends cleanly".
     """
-    offenders = []
+    ellipsis_offenders = []
+    runaway_offenders = []
     for pdf in sorted((TEST_PDFS / "apa").glob("*.pdf")):
         for f in extract_pdf_structured(pdf.read_bytes())["figures"]:
-            cap = f.get("caption") or ""
-            if cap.endswith("…") or len(cap) > 400:
-                offenders.append(f"{pdf.stem}/{f.get('label')} len={len(cap)}")
-    assert offenders == [], f"truncated/overflow figure captions: {offenders}"
+            cap = (f.get("caption") or "").rstrip()
+            if cap.endswith("…"):
+                ellipsis_offenders.append(f"{pdf.stem}/{f.get('label')}")
+            if len(cap) > 400 and not re.search(r"[.!?][\"'\)\]]?$", cap):
+                runaway_offenders.append(
+                    f"{pdf.stem}/{f.get('label')} len={len(cap)}"
+                )
+    assert ellipsis_offenders == [], f"ellipsis-truncated: {ellipsis_offenders}"
+    assert runaway_offenders == [], f"over-400 runaway captions: {runaway_offenders}"
 
 
 # ---- v2.4.48 figure-caption walk stop at period-less complete caption -----
@@ -688,6 +701,32 @@ def test_efendic_figure_1_note_label_kept():
     f1 = figs.get("Figure 1", "")
     assert "Note." in f1, f1
     assert "t-values" in f1, f"note content trimmed away: {f1!r}"
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").exists(),
+    reason="efendic_2022_affect.pdf fixture not present",
+)
+def test_efendic_figure_1_long_note_kept_whole():
+    """FIG-4: efendic Figure 1's caption is a label + a long ``Note.``
+    that legitimately exceeds 400 chars (~498). The paragraph-walk stops
+    at a real ``\\n\\n`` break, so it is a complete caption — the
+    400-char overflow trim must NOT truncate it at the last pre-400
+    sentence terminator (which used to drop the final Note sentence
+    ``The negative slope shows the predicted negative relationship …``)."""
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    # The full Note must survive — through to its final sentence.
+    assert "The negative slope shows the predicted" in f1, (
+        f"Note trailing sentence dropped: {f1!r}"
+    )
+    assert f1.rstrip().endswith("benefits decrease."), f1
+    assert "…" not in f1, f"caption ellipsis-truncated: {f1!r}"
 
 
 @pytest.mark.skipif(

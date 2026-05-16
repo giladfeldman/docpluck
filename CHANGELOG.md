@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.52] — 2026-05-16
+
+**Cycle FIG-4 (APA-first run, run 7) — a legitimate long figure caption truncated by the 400-char overflow trim (FIG, S2).** The FIG-1 overflow trim (`_trim_overflowing_figure_caption`, v2.4.47) treats any figure caption exceeding 400 chars as over-absorbed body prose and walks it back to the last sentence terminator before char 400. efendic Figure 1's caption is a label plus a long `Note.` (the abbreviation key + the three technologies + both samples + the negative-slope explanation) that legitimately runs ~498 chars — so the overflow trim cut it at `(MTurk and Prolific).` and dropped the final Note sentence `The negative slope shows the predicted negative relationship between risks and benefits…`.
+
+Fix (v2.4.52) — `_extract_caption_text` now tracks whether its paragraph-walk stopped at a real `\n\n` paragraph break (a complete caption paragraph) or ran to the 800-char hard cap / next-caption boundary (a runaway that welded body prose with a single `\n`). The 400-char overflow trim is applied only to the runaway case. A caption that overflows 400 chars but ended at a clean paragraph break — bounded by pdftotext's own paragraph boundary — is a legitimate long caption and is kept whole. FIG-1's ellipsis-truncation fix is unaffected: those captions are runaways (no `\n\n`), so the overflow trim still fires.
+
+efendic Figure 1's full Note is recovered (498-char caption, ends cleanly on `benefits decrease.`, no ellipsis). It is the only APA figure caption exceeding 360 chars, so the gate change is precisely scoped. Phase-5d AI-gold verify: efendic Figure 1 caption matches the gold figure note exactly, 0 text-loss, 0 body-prose absorbed. 26/26 baseline PASS. Tier1==Tier2==Tier3. 1 new real-PDF test; the FIG-1 corpus invariant test updated (a caption MAY exceed 400 chars if it is a complete caption — only ellipsis-truncation and over-400 *runaways* are defects).
+
+~8 APA papers still FAIL Phase-5d verification (FIG-3c-2 body-exceeds-block double-emission, TBL-CAP, G5c-2, G5d, HALLUC-HEAD, TABLE cluster, COL); the run continues.
+
 ## [2.4.51] — 2026-05-16
 
 **Cycle FIG-3c (APA-first run, run 7) — figure caption double-emitted (inline in body + as the `### Figure N` block) (FIG, S2).** pdftotext linearizes a figure's caption into the running text column, so a figure caption appears twice in the rendered markdown: once inline as a standalone body paragraph, and once as the spliced `### Figure N` block. chan_feldman rendered all 10 figure captions twice; chandrashekar, efendic, jdm_.2023.16 and maier likewise.
