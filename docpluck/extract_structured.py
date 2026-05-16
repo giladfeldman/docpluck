@@ -867,6 +867,23 @@ _CAPTION_CONTINUATION_OPENERS = (
     "panel", "panels",
 )
 
+# FIG-3a (v2.4.49): label words whose trailing period terminates a
+# caption-NOTE LABEL, not a sentence. ``Note. t-values are partial`` is a
+# legitimate caption note whose content starts lowercase — the period
+# after ``Note`` is a label separator, so the body-prose-boundary walk
+# must treat these the same as a non-terminal abbreviation and never trim
+# the note content away.
+_CAPTION_LABEL_WORDS = frozenset({"note", "notes", "source", "sources"})
+
+# FIG-3a (v2.4.49): a caption tail that is itself a significance legend
+# (``ns p>.05, * p<.05, ** p<.01``). It legitimately continues the
+# caption even though it starts with a lowercase ``ns`` / asterisk run,
+# so the lowercase-tail trim below must recognize and keep it. ``∗`` is
+# U+2217 ASTERISK OPERATOR — APA PDFs use it instead of ASCII ``*``.
+_SIGNIFICANCE_LEGEND_TAIL_RE = re.compile(
+    r"^\s*(?:n\.?s\.?|[*∗•·°†‡⁎]+)?\s*p\s*[<>=]", re.IGNORECASE
+)
+
 
 def _trim_caption_at_body_prose_boundary(snippet: str) -> str:
     """Trim a figure caption at the first sentence boundary where the
@@ -886,6 +903,17 @@ def _trim_caption_at_body_prose_boundary(snippet: str) -> str:
     (parenthesized year, first-person pronoun, subordinating
     conjunction, or "participants") to reduce false positives on legit
     multi-sentence captions.
+
+    FIG-3a (v2.4.49): a second, simpler boundary signature is added — a
+    ``. `` terminator followed by a *lowercase-initial* word. A figure
+    caption's own sentences always start capitalized, so a lowercase
+    continuation is absorbed body prose (a wrapped citation fragment
+    such as ``and Linos, 2022).`` or a body sentence pdftotext welded on
+    with a single ``\\n``). This branch is guarded against three legit
+    lowercase continuations: a non-terminal abbreviation before the
+    period (``vs.``/``e.g.``), a caption-NOTE label before it
+    (``Note. t-values …``), and a significance-legend tail
+    (``ns p>.05, * p<.05 …``).
     """
     if not snippet or len(snippet) < 60:
         return snippet
@@ -898,6 +926,18 @@ def _trim_caption_at_body_prose_boundary(snippet: str) -> str:
         if any(tail_lower.startswith(k) for k in _CAPTION_CONTINUATION_OPENERS):
             pos = snippet.find(". ", pos + 2)
             continue
+        # FIG-3a: a lowercase-initial tail is absorbed body prose unless
+        # the period is a non-terminator (abbreviation / note label) or
+        # the tail is a lowercase-led significance legend.
+        if tail[:1].islower():
+            prev = re.search(r"([A-Za-z.]+)$", snippet[: pos + 1])
+            prev_tok = prev.group(1).rstrip(".").lower() if prev else ""
+            if (
+                prev_tok not in _CAPTION_NON_TERMINAL_ABBREV
+                and prev_tok not in _CAPTION_LABEL_WORDS
+                and _SIGNIFICANCE_LEGEND_TAIL_RE.match(tail) is None
+            ):
+                return snippet[: pos + 1]
         m = _BODY_PROSE_BOUNDARY_RE.match(" " + tail)
         if m is not None and _looks_like_body_prose(tail):
             return snippet[: pos + 1]

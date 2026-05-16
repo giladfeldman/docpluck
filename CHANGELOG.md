@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.49] — 2026-05-16
+
+**Cycle FIG-3a (APA-first run, run 7) — figure caption absorbs body prose at a lowercase-initial `. ` boundary (FIG, S2).** After the FIG-1/FIG-2 walk-stop fixes, some figure captions still absorbed trailing body prose that pdftotext welded on at a real `. ` sentence boundary with no `\n\n` paragraph break — so the paragraph-walk could not separate it. Two shapes: a wrapped citation fragment (`...by frame and conditions. and Linos, 2022).` — chandrashekar Figure 4) and a body sentence (`...natural logarithmic scale. peoples' preferences. Given the other successful replication...` — chandrashekar Figure 5). The common structural signature: a figure caption's own sentences always start *capitalized*, so a `. ` terminator followed by a *lowercase-initial* word is absorbed body prose.
+
+Fix (v2.4.49) — `_trim_caption_at_body_prose_boundary` in `extract_structured.py` gains a second boundary signature: trim a figure caption at the first `. ` whose tail starts with a lowercase letter. Guarded against three legitimate lowercase continuations: a non-terminal abbreviation before the period (`vs.`/`e.g.`), a caption-NOTE label before it (`Note. t-values …` — new `_CAPTION_LABEL_WORDS`), and a significance-legend tail (`ns p>.05, * p<.05 …` — new `_SIGNIFICANCE_LEGEND_TAIL_RE`, recognizing the U+2217 asterisk-operator APA PDFs use). Keyed purely on the structural signature, figures only.
+
+A corpus scan of all 18 APA papers found exactly 5 genuine lowercase-boundary absorptions (chandrashekar Figs 4/5, jdm_.2023.16 Fig 1, jdm_m.2022.3 Figs 1/2) — all trimmed to their AI golds — and 2 legitimate lowercase continuations (efendic Fig 1 `Note.`, korbmacher Fig 1 significance legend) — both correctly kept. Phase-5d AI-gold verify across 18 figures in 5 papers: 18 PASS, 0 text-loss, 0 hallucination, 0 regressions. The v2.4.48→v2.4.49 diff is figure-caption-text only. 26/26 baseline PASS. 10 new real-PDF + contract tests in `tests/test_figure_caption_trim_real_pdf.py`.
+
+~10 APA papers still FAIL Phase-5d verification (FIG-3b caption-anchor defect, FIG-3c figure-caption double-emission, efendic Fig 1 Note trailing-sentence loss, G5c-2 partitioner split-heading rejoin, G5d named-heading demotion, HALLUC-HEAD, TABLE cluster, COL); the run continues.
+
 ## [2.4.48] — 2026-05-16
 
 **Cycle FIG-2 (APA-first run) — figure caption absorbs body prose past a period-less caption end (FIG, S2).** The `_extract_caption_text` paragraph-walk only stopped at a `\n\n` blank-line break when the preceding text ended with a `.`/`!`/`?` sentence terminator. Two common caption shapes end *without* a period and so the walk sailed past the `\n\n` that legitimately ends them and absorbed the following body prose: (1) an APA period-less Title-Case figure title (`The Interaction Between Change in … Non-Manipulated Attribute` — efendic Figures 4/5), and (2) a trailing significance legend (`Note. * p < .05, ** p < .01, *** p < .001` — chandrashekar Figures 1/3).
