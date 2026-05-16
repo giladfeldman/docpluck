@@ -35,6 +35,7 @@ from .normalize import (
     NormalizationLevel,
     _rejoin_garbled_ocr_headers,
     destyle_math_alphanumeric,
+    recover_corrupted_lt_operator,
     recover_corrupted_minus_signs,
 )
 from .sections import extract_sections
@@ -2014,6 +2015,12 @@ def render_pdf_to_markdown(
     # surfaces — unstructured-table fenced blocks, raw_text table fallbacks
     # when Camelot is unavailable — so no sign-flipped CI reaches the .md.
     md = recover_corrupted_minus_signs(md)
+    # v2.4.39: final guarantee — recover '<'-as-backslash glyph corruption from
+    # the assembled markdown. W0c (body channel) and cell_cleaning (Camelot
+    # table cells) already cover their channels; this catches the remaining
+    # surfaces — unstructured-table fenced blocks and raw_text table fallbacks
+    # when Camelot is unavailable — so no corrupted "p < .001" reaches the .md.
+    md = recover_corrupted_lt_operator(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)

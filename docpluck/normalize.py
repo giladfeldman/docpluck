@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.4"
+NORMALIZATION_VERSION = "1.9.5"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1364,6 +1364,25 @@ def recover_corrupted_minus_signs(text: str) -> str:
     return t
 
 
+# v2.4.39 (NORMALIZATION_VERSION 1.9.5): recover the '<' comparison operator
+# that pdftotext maps to a backslash '\' on certain fonts (e.g. efendic_2022 —
+# every "p < .001" reads "p \ .001", every table p-value cell "<.001" reads
+# "\.001", the legacy Wiley DOI "13:1<1::AID-…" reads "13:1\1::AID-…"). A
+# literal backslash never legitimately occurs glued to a numeral in extracted
+# academic-PDF text — '\' is not a prose character and the renderer adds no
+# markdown escapes — so a backslash immediately followed (optional single
+# space) by a digit or a '.'-prefixed decimal is unambiguously a corrupted
+# '<'. The space, if any, is preserved so "p \ .05" -> "p < .05".
+_CORRUPT_LT_RE = re.compile(r"\\(\s?)(?=\.?\d)")
+
+
+def recover_corrupted_lt_operator(text: str) -> str:
+    """W0c: recover pdftotext '<'-as-backslash glyph corruption."""
+    if not text or "\\" not in text:
+        return text
+    return _CORRUPT_LT_RE.sub(r"<\1", text)
+
+
 def normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -1488,6 +1507,11 @@ def normalize_text(
     before = t
     t = recover_corrupted_minus_signs(t)
     report._track("W0b_minus_sign_recovery", before, t, "minus_signs_recovered")
+
+    # ── W0c: recover '<'-as-backslash glyph corruption ─────────────────
+    before = t
+    t = recover_corrupted_lt_operator(t)
+    report._track("W0c_lt_operator_recovery", before, t, "lt_operators_recovered")
 
     # ── Standard steps (S1-S9) ──────────────────────────────────────────
 
