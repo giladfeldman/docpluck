@@ -336,6 +336,16 @@ def _extract_caption_text(
                 continue
             hard_end = nxt
             break
+        # FIG-2 (v2.4.48): the caption ends without a ``.!?`` terminator but
+        # is nonetheless COMPLETE — an APA period-less Title-Case figure
+        # title, or a trailing significance legend (``*** p < .001``). The
+        # ``\n\n`` legitimately ends it; without this the walk absorbs the
+        # following body prose.
+        if cap.kind == "figure" and _caption_is_complete_without_terminator(
+            raw_text[start:nxt], cap.label
+        ):
+            hard_end = nxt
+            break
         # Otherwise the caption continues — skip past this break and keep going.
         pos = nxt + 2
     # Cycle 15f-1 (v2.4.32, G4b): for TABLE captions, the paragraph-walk
@@ -665,6 +675,78 @@ def _accumulated_is_label_only(text: str) -> bool:
     if not text:
         return False
     return bool(_LABEL_ONLY_FULLMATCH_RE.fullmatch(text))
+
+
+# A significance-legend tail — ``* p < .05, ** p < .01, *** p < .001`` and
+# kin. When a caption's accumulated text ends with one of these, the caption
+# is complete: a significance legend is conventionally the LAST element of a
+# figure/table caption, so a ``\n\n`` after it ends the caption.
+_SIG_LEGEND_TAIL_RE = re.compile(
+    r"[*†‡]{1,4}\s*p\s*[<>=≤≥]\s*\.?\d+\s*$", re.IGNORECASE
+)
+
+# Lowercase function words that may appear inside an APA Title-Case figure
+# title without breaking it. A title is "complete" when every other word is
+# capitalized (or a digit-led token); a lowercase *content* word means the
+# accumulated text is body prose, not a title.
+_TITLE_FUNCTION_WORDS = frozenset(
+    "a an and as at between by for from in into of on or than that the to "
+    "via vs with within over under per".split()
+)
+
+
+def _caption_is_complete_without_terminator(accumulated: str, label: str) -> bool:
+    """True when ``accumulated`` (the caption text walked so far) is a
+    COMPLETE caption even though it does not end with ``.``/``!``/``?``.
+
+    Two period-less shapes occur in the academic-PDF corpus and both must
+    end the ``_extract_caption_text`` paragraph-walk at the next ``\\n\\n``:
+
+      1. **Significance legend** — ``… *** p < .001``. The legend is
+         conventionally the caption's final element (chandrashekar Figs
+         1/3).
+      2. **APA Title-Case figure title** — ``The Interaction Between Change
+         in … Non-Manipulated Attribute`` — every content word capitalized,
+         joined by lowercase function words, no terminal period (efendic
+         Figs 4/5). APA 7 figure titles are period-less Title-Case phrases.
+
+    Without this, the walk sails past the ``\\n\\n`` that legitimately ends
+    such a caption (its terminator check only recognizes ``.!?``) and
+    absorbs the following body prose.
+    """
+    flat = re.sub(r"\s+", " ", accumulated).strip()
+    # Strip the label prefix case-INsensitively — pdftotext may emit the
+    # label ALL-CAPS (``FIGURE 15.``) while ``cap.label`` is title-case.
+    m_label = _CAPTION_LABEL_PREFIX_RE.match(flat)
+    if m_label:
+        flat = flat[m_label.end():]
+    elif label and flat.startswith(label):
+        flat = flat[len(label):].lstrip(" .:")
+    # Strip a leading PMC ``Author Manuscript`` running header (one or more
+    # repeats) that pdftotext interleaves between the label and the real
+    # description — otherwise ``Author Manuscript Author Manuscript`` reads
+    # as a 4-word Title-Case "title" and the walk stops on the header.
+    flat = re.sub(
+        r"^(?:Author\s+Manuscript\s*)+", "", flat, flags=re.IGNORECASE
+    ).strip()
+    if not flat:
+        return False
+    if _SIG_LEGEND_TAIL_RE.search(flat):
+        return True
+    # APA Title-Case title: >= 4 words, no lowercase content word.
+    words = flat.split()
+    if len(words) < 4:
+        return False
+    for w in words:
+        core = w.strip("(),.;:!?\"'—–-/").strip()
+        if not core:
+            continue
+        if core.lower() in _TITLE_FUNCTION_WORDS:
+            continue
+        if core[0].isupper() or core[0].isdigit():
+            continue
+        return False  # a lowercase content word — this is prose, not a title
+    return True
 
 
 # Cycle 15n (v2.4.31): PMC running header that pdftotext interleaves

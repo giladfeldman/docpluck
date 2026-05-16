@@ -449,3 +449,92 @@ def test_apa_corpus_no_ellipsis_truncated_figure_captions():
             if cap.endswith("…") or len(cap) > 400:
                 offenders.append(f"{pdf.stem}/{f.get('label')} len={len(cap)}")
     assert offenders == [], f"truncated/overflow figure captions: {offenders}"
+
+
+# ---- v2.4.48 figure-caption walk stop at period-less complete caption -----
+#
+# The `_extract_caption_text` paragraph-walk only stopped at a `\n\n` when the
+# preceding text ended with a `.!?` terminator. It sailed past the `\n\n` that
+# legitimately ends a caption ending WITHOUT a period — an APA Title-Case
+# figure title (efendic Figs 4/5) or a trailing significance legend
+# (`*** p < .001`, chandrashekar Figs 1/3) — and absorbed the following body
+# prose. `_caption_is_complete_without_terminator` adds those two stop shapes.
+
+
+from docpluck.extract_structured import _caption_is_complete_without_terminator
+
+
+class TestCaptionCompleteWithoutTerminator:
+    def test_apa_title_case_title_is_complete(self):
+        acc = ("Figure 4. The Interaction Between Change in Manipulated "
+               "Attribute and Pleasure on Change in Non-Manipulated Attribute")
+        assert _caption_is_complete_without_terminator(acc, "Figure 4")
+
+    def test_significance_legend_tail_is_complete(self):
+        acc = ("Figure 1 Results of direct replications. Note.* p < .05, "
+               "** p< .01, *** p < .001")
+        assert _caption_is_complete_without_terminator(acc, "Figure 1")
+
+    def test_body_prose_is_not_complete(self):
+        # A lowercase content word ⇒ prose, not a period-less title.
+        acc = ("Figure 4. manipulated is mainly driven by participants "
+               "responses within the Low-Benefit condition")
+        assert not _caption_is_complete_without_terminator(acc, "Figure 4")
+
+    def test_label_only_is_not_complete(self):
+        assert not _caption_is_complete_without_terminator("Figure 4.", "Figure 4")
+
+    def test_short_phrase_is_not_complete(self):
+        # < 4 words and no legend ⇒ not enough to call a complete title.
+        assert not _caption_is_complete_without_terminator(
+            "Figure 4. The Interaction", "Figure 4"
+        )
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").exists(),
+    reason="efendic_2022_affect.pdf fixture not present",
+)
+def test_efendic_figure_captions_stop_at_titlecase_title():
+    """v2.4.48 regression: efendic Figures 4/5 are APA period-less
+    Title-Case figure titles; the walk used to sail past the `\n\n`
+    after the title and absorb the following body sentence.
+    """
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").read_bytes()
+        )["figures"]
+    }
+    f4 = figs.get("Figure 4", "")
+    assert f4.endswith("on Change in Non-Manipulated Attribute"), f4
+    assert "manipulated is mainly driven" not in f4, f"body prose absorbed: {f4!r}"
+
+    f5 = figs.get("Figure 5", "")
+    assert f5.endswith("as a Function of Risk/Benefit Manipulations"), f5
+    assert "Table S41" not in f5, f"body prose absorbed: {f5!r}"
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").exists(),
+    reason="chandrashekar_2023_mp.pdf fixture not present",
+)
+def test_chandrashekar_figure_captions_stop_at_significance_legend():
+    """v2.4.48 regression: chandrashekar Figures 1/3 captions end with a
+    significance legend (`*** p < .001`); the walk used to sail past the
+    `\n\n` after the legend and absorb the following ``We …`` body
+    sentence.
+    """
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(
+            (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").read_bytes()
+        )["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert f1.rstrip().endswith("p < .001"), f1
+    assert "We proceeded" not in f1, f"body prose absorbed: {f1!r}"
+
+    f3 = figs.get("Figure 3", "")
+    assert f3.rstrip().endswith("p < .001"), f3
+    assert "We conducted" not in f3, f"body prose absorbed: {f3!r}"

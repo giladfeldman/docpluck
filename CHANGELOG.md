@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.48] — 2026-05-16
+
+**Cycle FIG-2 (APA-first run) — figure caption absorbs body prose past a period-less caption end (FIG, S2).** The `_extract_caption_text` paragraph-walk only stopped at a `\n\n` blank-line break when the preceding text ended with a `.`/`!`/`?` sentence terminator. Two common caption shapes end *without* a period and so the walk sailed past the `\n\n` that legitimately ends them and absorbed the following body prose: (1) an APA period-less Title-Case figure title (`The Interaction Between Change in … Non-Manipulated Attribute` — efendic Figures 4/5), and (2) a trailing significance legend (`Note. * p < .05, ** p < .01, *** p < .001` — chandrashekar Figures 1/3).
+
+Fix (v2.4.48) — new helper `_caption_is_complete_without_terminator` in `extract_structured.py`, called from the figure-caption paragraph-walk. It recognizes a caption as complete-without-a-period when the accumulated text ends with a significance legend, or is a complete APA Title-Case title (≥4 words, every content word capitalized, joined by lowercase function words). The walk then stops at the `\n\n`. The label prefix is stripped case-insensitively (pdftotext may emit `FIGURE 15.` while `cap.label` is title-case) and a leading PMC `Author Manuscript` running header is stripped so it cannot read as a 4-word title. Keyed purely on the structural signature, figures only.
+
+efendic Figures 4/5 and chandrashekar Figures 1/3 recovered to their AI golds (welded body prose removed). Phase-5d AI-gold verify across 10 figures in 2 papers: 8 PASS, 2 RESIDUAL-ABSORB (untargeted — queued as FIG-3), 0 text-loss, 0 regressions. The v2.4.47→v2.4.48 diff is figure-caption-text only (0 body text loss, 0 hallucination — the absorbed prose remains intact in the body). 26/26 baseline PASS. New real-PDF + contract tests in `tests/test_figure_caption_trim_real_pdf.py`.
+
+~11 APA papers still FAIL Phase-5d verification (FIG-3 caption residual + double-emission, G5c-2 partitioner split-heading rejoin, HALLUC-HEAD, TABLE cluster, COL); the run continues.
+
 ## [2.4.47] — 2026-05-16
 
 **Cycle FIG-1 (APA-first run) — figure caption truncated mid-word with an ellipsis (FIG, S2).** When pdftotext welds a figure's following body prose onto its caption with only a single newline (no `\n\n` paragraph break), the `_extract_caption_text` paragraph-walk cannot find a stopping point and absorbs body prose up to the 800-char hard cap. The old 400-char cap then cut the caption mid-word and appended `…` — e.g. `jdm_m.2022.2` Figure 1 absorbed the `H1 :` hypothesis statement and Figure 3 absorbed a `(N = 61) performed …` body sentence, both ending in a fragment. A corpus scan found 12 such truncated figure captions across 6 APA papers.
