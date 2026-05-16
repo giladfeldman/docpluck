@@ -352,3 +352,100 @@ def test_ieee_access_no_inline_pmc_running_header():
         if "Author Manuscript" in (f["caption"] or "")
     ]
     assert offenders == [], f"Author Manuscript leak in: {offenders}"
+
+
+# ---- v2.4.47 figure-caption overflow walk-back ----------------------------
+#
+# pdftotext joins a figure caption to the following body prose with only a
+# single ``\n`` (no ``\n\n`` paragraph break), so the ``_extract_caption_text``
+# paragraph-walk can't stop and absorbs body prose up to the 800-char hard
+# cap. The old 400-char cap then cut the caption mid-word and appended ``…``.
+# ``_trim_overflowing_figure_caption`` walks the overflow back to the last
+# real sentence terminator instead. jdm_m.2022.2 Figure 1 absorbed the
+# ``H1 :`` hypothesis statement; Figure 3 absorbed a ``(N = 61) performed …``
+# body sentence.
+
+
+from docpluck.extract_structured import _trim_overflowing_figure_caption
+
+
+class TestTrimOverflowingFigureCaption:
+    def test_walks_back_to_last_sentence_terminator(self):
+        cap = ("Figure 1. A real caption that ends here. "
+               + "Absorbed body prose with no terminator inside the window "
+               + "x" * 400)
+        out = _trim_overflowing_figure_caption(cap)
+        assert out == "Figure 1. A real caption that ends here."
+        assert not out.endswith("…")
+
+    def test_skips_abbreviation_periods(self):
+        # "vs." must not be treated as a sentence end.
+        cap = ("Figure 2. Condition A vs. condition B comparison shown here. "
+               + "z" * 400)
+        out = _trim_overflowing_figure_caption(cap)
+        assert out == (
+            "Figure 2. Condition A vs. condition B comparison shown here."
+        )
+
+    def test_falls_back_to_ellipsis_when_no_terminator(self):
+        # No usable terminator past char 60 → keep the mid-word cap.
+        cap = "Figure 3. " + "wordwordword " * 60
+        out = _trim_overflowing_figure_caption(cap)
+        assert out.endswith("…")
+        assert len(out) <= 401
+
+    def test_short_caption_untouched_by_helper(self):
+        cap = "Figure 4. Short clean caption."
+        # Helper is only called on overflow, but it must be idempotent on
+        # a sub-cap caption (returns it unchanged via the terminator walk).
+        assert _trim_overflowing_figure_caption(cap) == cap
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "jdm_m.2022.2.pdf").exists(),
+    reason="jdm_m.2022.2.pdf fixture not present",
+)
+def test_jdm_m_2022_2_figure_captions_not_truncated():
+    """v2.4.47 regression: jdm_m.2022.2 Figure 1 / Figure 3 captions were
+    truncated mid-word with ``…`` after absorbing following body prose
+    (Figure 1 absorbed the ``H1 :`` hypothesis line; Figure 3 absorbed a
+    ``(N = 61) performed …`` body sentence). They must now end cleanly on
+    the real caption's sentence terminator, matching the AI gold.
+    """
+    pdf = TEST_PDFS / "apa" / "jdm_m.2022.2.pdf"
+    figs = {
+        f["label"]: (f["caption"] or "")
+        for f in extract_pdf_structured(pdf.read_bytes())["figures"]
+    }
+    f1 = figs.get("Figure 1", "")
+    assert not f1.endswith("…"), f"Figure 1 still truncated: {f1!r}"
+    assert f1.endswith("in a choice task with missing information."), f1
+    assert "H1 :" not in f1 and "H1:" not in f1, f"body prose absorbed: {f1!r}"
+
+    f3 = figs.get("Figure 3", "")
+    assert not f3.endswith("…"), f"Figure 3 still truncated: {f3!r}"
+    assert f3.endswith("(Study 2, air conditioners; N = 169)."), f3
+    assert "(N = 61)" not in f3, f"body prose absorbed: {f3!r}"
+
+    # Figures 2 and 4 were already clean — must be unchanged.
+    assert figs.get("Figure 2", "").endswith("(Study 1, cable TV plans; N = 114).")
+    assert figs.get("Figure 4", "").endswith("(Study 3; N = 238).")
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa").exists(),
+    reason="apa test-pdf corpus not present",
+)
+def test_apa_corpus_no_ellipsis_truncated_figure_captions():
+    """Structural invariant: no figure caption in the APA corpus may end
+    with ``…`` or exceed the 400-char hard cap. An overflow is always
+    over-absorbed body prose and must be walked back to a clean sentence
+    terminator (v2.4.47).
+    """
+    offenders = []
+    for pdf in sorted((TEST_PDFS / "apa").glob("*.pdf")):
+        for f in extract_pdf_structured(pdf.read_bytes())["figures"]:
+            cap = f.get("caption") or ""
+            if cap.endswith("…") or len(cap) > 400:
+                offenders.append(f"{pdf.stem}/{f.get('label')} len={len(cap)}")
+    assert offenders == [], f"truncated/overflow figure captions: {offenders}"
