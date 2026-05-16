@@ -286,6 +286,25 @@ Reproduced G5c at v2.4.45 on jdm_m.2022.2. The TRIAGE framed G5c as "the cycle-3
 
 **Re-scoped:** G5c-1 (render-layer fold of orphan `N.N.` into an adjacent generic `##/###` heading — the `5.4.`/`## Discussion` case, C1-C2) can ship independently; G5c-2 (partitioner-level split-heading rejoin — the 5 title-loss cases, C3) needs the dedicated section-partitioner session alongside G5d and the TABLE cluster.
 
+### Cycle G5c-1 (run 5, 2026-05-16) — orphan multi-level numeral render-fold — SHIPPED v2.4.46
+
+New `render.py::_fold_orphan_multilevel_numerals_into_headings` — the multi-level
+analogue of the arabic/roman orphan folders. Folds an orphan `N.N.` number into
+the **immediately-adjacent** generic `##`/`###` heading at subsection level
+(`5.4.`⏎`## Discussion` → `### 5.4. Discussion`). Keyed on the structural
+signature (isolated multi-level dotted number) + blank-line-only adjacency;
+`### Figure N`/`### Table N` and already-numbered headings excluded.
+
+jdm_m.2022.2: the `5.4. Discussion` subsection recovered. **Phase-5d AI-gold
+verdict (run 5):** jdm_m.2022.2 still **FAIL** — but the cycle's own diff is
+heading-markup-only (verifier confirms `### 5.4. Discussion` correct vs gold §5.4,
+0 sentence-level text loss, 0 hallucination, 0 regression). The FAIL is the
+pre-existing punch-list: G5c-2 stranded orphans (`5.3.`/`6.3.`/`6.4.`/`7.3.`/`7.4.`),
+HALLUC-HEAD (`## Supplementary Material`/`## Appendix` mid-sentence promotion),
+FIG caption double-emission + truncation, D5 author-block fragmentation. 26/26
+baseline; three-tier byte-identical. The 5 non-adjacent orphan numbers confirmed
+NOT render-foldable (no heading to fold into) — they are G5c-2 partitioner work.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -293,7 +312,8 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | Defect class | Sev | Papers | Notes |
 |---|---|---|---|
 | **TABLE structure destruction** | S0/S1 | efendic, ar_apa_011, xiao, jdm15/16, chen, maier, ip_feldman (~11) | grid lost → caption-bleed; flat number-dump; empty `<table>` shells; two tables merged; rows dropped. C3 — needs a render/structured coordination design. The single largest blocker. |
-| **G5c split-line numbered headings** — re-scoped run 4 → G5c-1 (render fold, C1-C2) + G5c-2 (partitioner split-heading rejoin, **C3**) | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`7.3.` etc.) | number alone on a line; only 1 of 6 cases foldable — the other 5 are partitioner title-loss. See "Cycle 14 (investigation)" above. |
+| ~~**G5c-1 split-line numbered headings — render fold**~~ ✓ SHIPPED v2.4.46 (run 5) | S1 | jdm_m.2022.2 (`5.4.`) | ~~render-layer fold of orphan `N.N.` into adjacent generic heading.~~ Done — `_fold_orphan_multilevel_numerals_into_headings`. |
+| **G5c-2 partitioner split-heading rejoin** | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`6.4.`/`7.3.`/`7.4.`) | the 5 non-adjacent cases — pdftotext splits `N.N. Title`, partitioner consumes the title word; needs partitioner-level rejoin. **C3** — dedicated session. |
 | **G5d named (unnumbered) heading demotion** | S1 | ar_apa_011 (`Participants`, `Overview`), efendic, chandrashekar, ip_feldman (~7) | section-partitioner work; largest false-positive surface. |
 | ~~**G5b long-descriptive-title prose guard**~~ ✓ FIXED v2.4.45 (cycle 13) | S1 | jdm16, jdm_m2, chen | ~~`≥5-lowercase-word` guard over-rejects legit long numbered headings.~~ Subsection promoter's lc-run guard removed; single-level raised 5→8. |
 | **FIG caption double-emission + truncation** | S2 | jdm_m2, efendic, chan_feldman, ziano, jdm15/16 (~8) | caption inline + in `## Figures` block; truncated mid-word; figure data-labels as orphan body lines. |
@@ -302,4 +322,11 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | **COL column-interleave** | S0 | chan_feldman, chandrashekar | text-channel reading order. C3. |
 | **GLYPH 011 `−`→deleted / efendic `Mchange` no-CI** | S0 | 011, efendic | unrecoverable from text channel — needs layout-channel glyph identity. Escalate. |
 
-**Next session resumes here.** Recommended order: GLYPH ligature (S2×C1 — cheapest, likely wide) → G5b prose-guard relax → G5c split-line folder → FIG caption dedup → G5d named-heading detection → TABLE cluster (C3, dedicated session) → COL + 011-minus escalated.
+**Next session resumes here.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
+G5c-1 render fold ✓ (v2.4.46). Recommended order: **FIG caption double-emission +
+truncation** (S2×C2, ~8 papers — next cheapest wide win) → **G5c-2 partitioner
+split-heading rejoin** (S1×C3, 5 jdm_m2 cases) → **G5d named/unnumbered heading
+demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##` promotion
+(`## Supplementary Material`/`## Appendix` — S1×C2) → **TABLE cluster** (S0/S1×C3,
+dedicated session, the single largest blocker) → **COL** + 011 deleted-minus
+escalated (layout-channel, C3-C4).

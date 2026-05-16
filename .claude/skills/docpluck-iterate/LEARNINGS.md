@@ -547,3 +547,23 @@ This run executed `docs/HANDOFF_2026-05-16_iterate_run_4_fix_and_continue.md`'s 
 
 ### Process note — Codex cross-model verification has a Windows UTF-8 bug
 The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibake on this Windows machine (`Västfjäll`→`VA<SI>stfjA<SI>ll`, `–`→`ƒ?"`), producing ~10-24 false "discrepancies" per paper. The gold files are confirmed clean UTF-8. Worked around by re-running Codex with an explicit "files are UTF-8; mojibake is your decode error, not a discrepancy" preamble. **This is article-finder's protocol to fix** — `gold-generation.md` Step 4 needs a UTF-8 read instruction for Windows. Flagged for coordination with the article-finder owner.
+
+---
+
+## Run: 2026-05-16 (run 5) · Cycle G5c-1 · v2.4.46
+
+### Outcome
+- SHIPPED v2.4.46. New render post-processor `_fold_orphan_multilevel_numerals_into_headings` folds an orphan multi-level `N.N.` number into the immediately-adjacent generic `##`/`###` heading: `5.4.`⏎`## Discussion` → `### 5.4. Discussion`. jdm_m.2022.2's `5.4. Discussion` recovered, AI-gold-verified correct. Three-tier parity byte-identical (Tier1=Tier2=Tier3). 26/26 baseline. 11 new tests.
+
+### Blind Spots
+- **The fix's scope is exactly 1 of 6 orphan numbers in the target paper — and that is correct.** jdm_m.2022.2 has 6 orphan multi-level numbers (`5.3.`/`5.4.`/`6.3.`/`6.4.`/`7.3.`/`7.4.`). Only `5.4.` is followed by a generic heading; the cycle-14 investigation already established the other 5 are partitioner title-loss (G5c-2). A render-layer fold can ONLY fix the immediately-adjacent case. Resisting the temptation to "make the fix fold all 6" is the discipline — the other 5 have no heading to fold into (the title word was consumed elsewhere by the partitioner). Folding `5.3.` into the `### Figure 1` that happens to sit below it would be actively wrong.
+
+### Edge Cases
+- **Must exclude `### Figure N` / `### Table N` from fold targets.** These are library-emitted structural markers, not section headings. `5.3.` sits immediately above `### Figure 1` in jdm_m.2022.2 — a naive "fold into next heading" would emit `### 5.3. Figure 1`. The fold-target regex carries `(?!Figure\b)(?!Table\b)` negative lookaheads plus `(?!\s*\d)` (skip already-numbered headings — also gives idempotency).
+- **Heading level is decided by the orphan number's depth, not the adjacent heading's level.** A multi-level dotted number always denotes a subsection, so the fold emits `### ` even when the partitioner had promoted the stranded title to `## ` (demote `## Discussion` → `### 5.4. Discussion`). This matches `_NUMBERED_SUBSECTION_HEADING_RE`, which likewise emits `### ` at any dotted depth.
+
+### Verification Gaps
+- None new. Phase 5d AI-gold verify worked as designed: it confirmed the cycle's one change correct AND surfaced the pre-existing G5c-2 / HALLUC-HEAD / FIG defects (all already in TRIAGE). The verifier returning FAIL on a paper whose cycle-specific diff is clean is the EXPECTED rule-0e-bis behavior — the cycle ships incrementally; the run's standing verdict stays FAIL while the corpus is not clean.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (user chose the lean-checks release path for context budget). Essential hard-rule checks done inline: render-layer regex-only change, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table surface touched; general fix keyed on a structural signature (no paper identity); real-PDF test added; no `.pdf` staged. 26/26 baseline + heading-markup-only three-tier diff confirm no regression.
