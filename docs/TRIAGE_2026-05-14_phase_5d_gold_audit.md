@@ -211,3 +211,34 @@ The 011 verifier (gold ↔ v2.4.33 render) returned FAIL — **all findings pre-
 | **COL** | Column-interleave / reading-order scramble — body sentences split across non-adjacent lines. | chan_feldman (Measures), chandrashekar (~2-3) | S0 | C3 | Text-channel reading order. |
 
 **Cycle order for cycles 2+ (autonomous run):** 2 = GLYPH minus-recovery (`(cid:0)`→`−` + `2`→`−` descending-CI; S0, recoverable slice) → 3 = GLYPH Greek/superscript (diagnose layer first) → 4 = D6 orphan numbers (C1 wide win) → 5 = G5 subsection demotion → 6 = HALLUC-HEAD → 7 = D4 mid-sentence banner splice → 8 = FIG captions → TABLE cluster + COL escalated as C3 (dedicated session if budget remains). Every fix keyed on a structural signature, baseline-gated (user directive 2026-05-15).
+
+---
+
+## SESSION 3 — autonomous APA-first run, 2026-05-16
+
+### Cycle 8 (v2.4.40) — standalone `2`-for-minus recovery via point-estimate ∈ CI pairing — SHIPPED
+
+`normalize.py::recover_minus_via_ci_pairing` (W0d) recovers bracket-less corrupted point estimates by pairing each `2X.XX` token with the CI in the same `<tr>` row / text line: recover iff `−X.XX` ∈ CI and literal `2X.XX` ∉ CI (a point estimate always lies in its own CI — airtight invariant). efendic 22 negative B-coefficient cells + `Mposterior` recovered, verified cell-by-cell vs AI gold, 0 text-loss/hallucination.
+
+**efendic GLYPH-cluster RESIDUALS (escalated — no text-channel signal):**
+- 4× body-prose `Mchange = 2X.XX` (`20.14` ×2, `21.01`, `20.62`) — only an SE in parens, no CI to pair.
+- 6× contrast-coding table-footnote `direction: 20.5 = low, + 0.5 = high` — **HAS a clean signature** (`2X.X = label, + X.X = label` symmetric `−X.X/+X.X` pair) — candidate for a small follow-up cycle.
+- 1× `2100` for `−100` (affective-slider range) — no CI.
+- → escalation bucket alongside 011 deleted-minus: needs layout-channel per-char glyph identity.
+
+**efendic still FAILs** (verifier-confirmed pre-existing, NOT cycle-8 regressions): Table 2 grid lost (caption-bleed replaces 8 coefficient rows), Table 5 standalone grid lost (bare p-value list), Table 1 first data row dropped + column-fusion, section-boundary shuffle (empty headings, mislabeled `## 6. References`), D4 metadata leak (masthead + corresponding-author address into body), author-bios fragmented.
+
+### G5 root-cause refinement (investigated cycle 8, queued cycle 9)
+
+`render.py::_promote_numbered_subsection_headings` (regex `_NUMBERED_SUBSECTION_HEADING_RE`) has **two gaps** causing numbered headings to stay body text:
+1. **Trailing dot after the number** — `_NUMBERED_SUBSECTION_HEADING_RE` is `^(\d+(\.\d+){1,3})\s+…` — requires whitespace immediately after the digits, so `5.3.3. Choice deferral` and `1.1. Hypotheses` (trailing `.` then space) never match. SAFE one-char fix: `…){1,3})\.?\s+`.
+2. **Single-level top-level numbers** — the regex requires ≥1 `.\d` group, so `2. Omission neglect`, `3. Choice deferral`, `1. Hindsight bias` (single `N.`) are never promoted. Needs a new render-level promoter gated on: document already has ≥1 `## \d+\. ` numbered heading + line-isolated + short Title-Case + no terminal punctuation + small lowercase-run.
+
+### Broad-read (v2.4.39, 12 FAIL APA papers) — defect-class ranking confirms queue
+1. **D4 metadata leak into body** — 8 files (efendic, chandrashekar, maier, ip_feldman, xiao, chen, ar_apa_011, chan) — several mid-sentence.
+2. **G5 heading demoted to body text** — 7 files (efendic, chandrashekar, jdm_m2, maier, ip_feldman, xiao, chen).
+3. **D2/D3 abstract bleed / missing `## Abstract`** — 4 files (chan, maier, chen, chandrashekar).
+4. **D5 author/title block fragmentation** — 4 files (chan, jdm16, ip_feldman, xiao).
+5. **Glyph** (`Ó`→©, hyphenation word-splits, fused tokens, superscript digits) — 4 files.
+
+**Revised cycle order session 3:** 9 = G5 numbered-heading promotion (2 gaps above) → 10 = D4 metadata leak → 11 = HALLUC-HEAD → 12 = FIG captions → TABLE cluster (C3) if budget.

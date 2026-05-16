@@ -132,3 +132,21 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Why:** A test written against buggy output silently protects the bug. And a normalization defect rooted in glyph handling surfaces in every channel that carries text, not just the body.
 
 **How to detect (next time):** When a fix targets a normalize/extract step, grep that step's existing tests FIRST — a test may be asserting the very behavior you're correcting; update it in the same cycle. And when a glyph/encoding defect is found, enumerate every channel that emits text (body, table cells, captions, raw_text, structured JSON) and confirm the fix — ideally a shared helper — covers all of them (Phase 0.8 cross-output check).
+
+## 2026-05-16 · Cycle 7 — `<`-as-backslash glyph corruption (v2.4.39)
+
+**What:** pdftotext maps the `<` comparison-operator glyph to a literal backslash on certain fonts. `efendic_2022_affect` rendered every `p < .001` as `p \ .001`, every table p-value cell `<.001` as `\.001`, and the legacy Wiley DOI `13:1<1::AID-BDM333` as `13:1\1::` — 24 occurrences. A new member of the same glyph-corruption family as math-italic-Greek (v2.4.34), `(cid:0)`-minus (v2.4.36), and `2`-for-minus (v2.4.38).
+
+**Fix:** `normalize.py::recover_corrupted_lt_operator` — a backslash glued (optional single space) to a digit or a `.`-prefixed decimal is unambiguously a corrupted `<`. A literal backslash is never a legitimate prose character in extracted academic-PDF text and the renderer adds no markdown escapes, so the signature is safe. Wired into all three text channels from the start (W0c body step / `cell_cleaning._html_escape` / `render_pdf_to_markdown` post-process).
+
+**How to detect (next time):** When a render shows a literal backslash, grep `\\s?\.?\d` — any backslash adjacent to a numeral is a corrupted `<`. Diagnose the channel by grepping the raw `pdftotext` output and the Camelot cell text separately (the corruption is in the pdftotext font layer). Glyph fixes ALWAYS need all three channels — body / Camelot cells / render post-process — via one shared helper.
+
+**Pytest pre-existing-failure triage:** a broad pytest returning N failures must be triaged before fixing — `git stash` (working tree back to the last release), re-run the same N node-ids, and confirm identical failures. If identical, they are pre-existing (the cycle introduced none); classify each as real-bug / test-fixture-drift / env-flag. Cycle 7's 15 failures were all test-fixture drift (snapshot regen), zero introduced.
+
+## 2026-05-16 · Cycle 8 — disambiguate a corrupted token via a co-reported invariant-bound quantity (v2.4.40)
+
+**What:** efendic's `2`-for-U+2212 minus corruption left bracket-less point estimates corrupt (`20.26` for `−0.26`) after the v2.4.38 bracketed-CI fix. A standalone `2X.XX` is locally ambiguous — it could be a literal mean of twenty-something. The fix (`normalize.py::recover_minus_via_ci_pairing`, W0d) pairs each `2X.XX` token with the confidence interval reported in the SAME record (`<tr>` table row or text line) and recovers it only when the de-corrupted `−X.XX` lands inside the CI while the literal `2X.XX` does not.
+
+**Why:** A point estimate always lies inside its own reported CI — a structural invariant of statistics, not a heuristic. So the CI co-located with the estimate resolves the ambiguity with zero false-positive risk: a genuine literal (e.g. mean age `23.45` with CI `[22.1, 24.8]`) is *consistent* with its bracket, so the recovery rule does not fire. The only mis-fire path — literal outside its bracket while the negative is inside — is a stats record whose estimate is not in its CI, which never occurs.
+
+**How to detect (next time):** When a corrupted token is locally ambiguous, do NOT reach for paper-identity or domain heuristics ("a change score is small"). Look for a co-reported quantity bound to the token by a mathematical invariant — estimate∈CI, probability∈[0,1], SD≥0, percentages summing to 100 — and use that invariant as the discriminator. If no such co-reported quantity exists (e.g. a standalone `Mchange = 2X.XX` with only an SE, or a contrast-coding footnote), the token is genuinely unrecoverable from the text channel — escalate to the layout channel, do not guess.
