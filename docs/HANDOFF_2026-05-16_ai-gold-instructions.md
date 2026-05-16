@@ -30,12 +30,10 @@ docpluck must change three things:
   now rich enough for docpluck's TABLE verifier.
 - `register-view` and `migrate` now **reject a non-canonical key** with an
   actionable error.
-- `gold-generation.md` now enforces a **100%-accuracy, zero-hallucination policy**
-  and an **independent Codex / GPT-5.5 cross-model verification**: a second-vendor
-  model re-reads the PDF and audits every gold before it is stored. **Ensure the
-  `codex` CLI is installed and authenticated** in docpluck's environment
-  (`codex --version`; `codex login` if needed) — `generate-gold` blocks without it
-  rather than shipping unverified gold.
+- `gold-generation.md` enforces a **100%-accuracy, zero-hallucination policy**:
+  dual independent extraction + cross-check, verbatim anchors, schema validation.
+  (An independent cross-vendor verification pass is planned but not yet live — see
+  article-finder's `TODO.md`.)
 
 ---
 
