@@ -233,8 +233,12 @@ def _promote_numbered_subsection_headings(text: str) -> str:
     """Promote ``1.2 Foo``-style lines to ``### 1.2 Foo`` h3 headings.
 
     Conservative: only multi-level numbering (``N.N`` or deeper), title must
-    start with a capital letter, must not end in sentence-terminator
-    punctuation, and must not look like prose (no long lowercase-word runs).
+    start with a capital letter and must not end in sentence-terminator
+    punctuation. Multi-level dotted numbering at line-start is itself a strong
+    section-heading signal — descriptive subsection titles legitimately run to
+    many lowercase words ("3.3.2.1 The quality of planning on the previous
+    trial moderates the effect of reflection"), so a lowercase-run prose guard
+    mis-rejects real headings and is not applied here (cycle 13, G5b).
     Idempotent: re-running the pass is a no-op.
     """
     if not text:
@@ -248,17 +252,6 @@ def _promote_numbered_subsection_headings(text: str) -> str:
             continue
         title = m.group("title").rstrip()
         if title.endswith((".", "?", "!", ":", ",", ";")):
-            out.append(line)
-            continue
-        tokens = title.split()
-        lc_run = max_lc_run = 0
-        for tok in tokens:
-            if tok and tok[0].islower():
-                lc_run += 1
-                max_lc_run = max(max_lc_run, lc_run)
-            else:
-                lc_run = 0
-        if max_lc_run >= 5:
             out.append(line)
             continue
         if out and out[-1].startswith(f"### {m.group('num')} "):
@@ -357,7 +350,7 @@ def _promote_numbered_section_headings(text: str) -> str:
                 max_lc = max(max_lc, lc_run)
             else:
                 lc_run = 0
-        if max_lc >= 5:  # prose-like run — not a heading
+        if max_lc >= 8:  # long prose-like run — not a heading (cycle 13, G5b)
             continue
         candidates.setdefault(int(m.group("num")), []).append((i, title))
     if not candidates:
