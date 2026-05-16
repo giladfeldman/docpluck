@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.47] — 2026-05-16
+
+**Cycle FIG-1 (APA-first run) — figure caption truncated mid-word with an ellipsis (FIG, S2).** When pdftotext welds a figure's following body prose onto its caption with only a single newline (no `\n\n` paragraph break), the `_extract_caption_text` paragraph-walk cannot find a stopping point and absorbs body prose up to the 800-char hard cap. The old 400-char cap then cut the caption mid-word and appended `…` — e.g. `jdm_m.2022.2` Figure 1 absorbed the `H1 :` hypothesis statement and Figure 3 absorbed a `(N = 61) performed …` body sentence, both ending in a fragment. A corpus scan found 12 such truncated figure captions across 6 APA papers.
+
+Fix (v2.4.47) — new helper `_trim_overflowing_figure_caption` in `extract_structured.py`. When a figure caption overflows the 400-char hard cap (which, in the 17-paper APA corpus, only ever happens on an over-absorbed caption — no legitimate figure caption exceeds ~360 chars), it walks the cap window back to the last genuine sentence terminator instead of hard-truncating mid-word. Abbreviation periods (`vs.`, `e.g.`, author initials) are skipped so the caption is not cut mid-clause, and the surviving caption is required to keep real description content past its label. Keyed purely on the structural signature (caption overflow + sentence boundary), figures only — table captions keep the existing `_trim_table_caption_at_cell_region` path.
+
+`jdm_m.2022.2` Figures 1 and 3 are recovered exactly to the AI gold; all 12 ellipsis-truncated captions across the APA corpus are eliminated (0 remain, 0 over-400). Phase-5d AI-gold verify across 28 figures in 6 papers: 0 text-loss, 0 ellipsis-truncated. 6 captions retain partial trailing body prose (a sentence-terminated residual — queued as cycle FIG-2). The v2.4.46→v2.4.47 diff is figure-caption-text only (0 body text loss, 0 hallucination — the absorbed prose remains intact in the body). 26/26 baseline PASS. New real-PDF + contract tests in `tests/test_figure_caption_trim_real_pdf.py`.
+
+~11 APA papers still FAIL Phase-5d verification (FIG-2 caption residual + double-emission, G5c-2 partitioner split-heading rejoin, HALLUC-HEAD, TABLE cluster, COL); the run continues.
+
 ## [2.4.46] — 2026-05-16
 
 **Cycle G5c-1 (APA-first run) — orphan multi-level section number stranded above its heading (G5c, S1).** pdftotext sometimes splits a numbered subsection heading such as `5.4. Discussion` into a bare `5.4.` line and a separate `Discussion` line; the section partitioner then promotes the lone title word to a generic `## Discussion` and strands the number on its own line. In `jdm_m.2022.2` the `5.4. Discussion` subsection of Study 1 rendered as an orphan `5.4.` followed by a top-level `## Discussion`.

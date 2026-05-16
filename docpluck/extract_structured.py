@@ -398,7 +398,15 @@ def _extract_caption_text(
         snippet = _trim_caption_at_running_header_tail(snippet)
         snippet = _trim_caption_at_body_prose_boundary(snippet)
     if len(snippet) > 400:
-        snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
+        # Figure captions: an overflow is over-absorbed body prose — walk
+        # back to the last real sentence terminator so the caption ends
+        # cleanly instead of being cut mid-word with an ellipsis. Tables
+        # keep the mid-word cap (their overflow is linearized cell text
+        # already bounded by ``_trim_table_caption_at_cell_region``).
+        if cap.kind == "figure":
+            snippet = _trim_overflowing_figure_caption(snippet)
+        else:
+            snippet = snippet[:400].rsplit(" ", 1)[0] + "…"
     return snippet
 
 
@@ -835,6 +843,65 @@ def _looks_like_body_prose(tail: str) -> bool:
     of intent. Caption continuations rarely contain any of these.
     """
     return _BODY_PROSE_SIGNAL_RE.search(tail) is not None
+
+
+# Abbreviations whose trailing period is NOT a sentence terminator. Used
+# by the figure-caption overflow walk-back so it doesn't cut a caption
+# mid-clause at "vs.", "e.g.", an author initial, etc.
+_CAPTION_NON_TERMINAL_ABBREV = frozenset({
+    "vs", "e.g", "i.e", "cf", "fig", "figs", "no", "nos", "eq", "eqs",
+    "al", "etc", "dr", "mr", "mrs", "ms", "prof", "ca", "approx",
+    "ref", "refs", "ed", "eds", "vol", "pp", "sd", "se", "ns",
+})
+
+# A sentence-terminator followed by whitespace or end-of-string:
+# ``.``/``!``/``?`` with an optional closing bracket/quote. ``m.start()``
+# lands on the terminator char itself.
+_CAPTION_SENTENCE_END_RE = re.compile(r"[.!?][\"'\)\]]?(?=\s|$)")
+
+# The label prefix of a caption (``Figure 12.`` / ``Fig. 3`` / ``Table 1.``).
+# Used to ensure the overflow walk-back keeps real description content and
+# doesn't collapse the caption to just its label.
+_CAPTION_LABEL_PREFIX_RE = re.compile(
+    r"(?:figure|fig\.?|table)\s+\d+(?:\.\d+)?\.?\s*", re.IGNORECASE
+)
+
+
+def _trim_overflowing_figure_caption(snippet: str, limit: int = 400) -> str:
+    """Trim a figure caption that overflows the hard cap back to its last
+    real sentence terminator instead of hard-truncating mid-word.
+
+    A figure caption longer than ``limit`` chars (after every targeted
+    trim above has already run) is, in the academic-PDF corpus, always a
+    caption that absorbed following body prose — no legitimate figure
+    caption in the 17-paper APA test corpus exceeds ~360 chars. The old
+    behavior (``snippet[:400].rsplit(" ", 1)[0] + "…"``) cut the caption
+    mid-word and appended an ellipsis, leaving the user a caption ending
+    in a fragment. This walks the cap window back to the last genuine
+    sentence terminator (skipping abbreviations like ``vs.`` and author
+    initials) so the caption ends cleanly on a real sentence boundary.
+
+    Keyed purely on the structural signature (caption overflow + sentence
+    boundary), not on paper identity. Falls back to the mid-word cap only
+    when no usable terminator exists past the label.
+    """
+    head = snippet[:limit]
+    label = _CAPTION_LABEL_PREFIX_RE.match(head)
+    label_end = label.end() if label else 0
+    best = -1
+    for m in _CAPTION_SENTENCE_END_RE.finditer(head):
+        word = re.search(r"([A-Za-z.]+)$", head[: m.start() + 1])
+        tok = word.group(1).rstrip(".").lower() if word else ""
+        if tok in _CAPTION_NON_TERMINAL_ABBREV:
+            continue
+        if len(tok) == 1 and tok.isalpha():  # author initial, e.g. "J."
+            continue
+        best = m.start() + 1  # keep through the terminator char
+    # The terminator must sit past the label, so the surviving caption
+    # retains real description content (not just ``Figure N.``).
+    if best > label_end:
+        return snippet[:best].rstrip()
+    return snippet[:limit].rsplit(" ", 1)[0] + "…"
 
 
 def _isolated_table_from_caption(
