@@ -567,3 +567,25 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (user chose the lean-checks release path for context budget). Essential hard-rule checks done inline: render-layer regex-only change, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table surface touched; general fix keyed on a structural signature (no paper identity); real-PDF test added; no `.pdf` staged. 26/26 baseline + heading-markup-only three-tier diff confirm no regression.
+
+---
+
+## Run: 2026-05-16 (run 6) · Cycle FIG-1 · v2.4.47
+
+### Outcome
+- SHIPPED v2.4.47. New helper `_trim_overflowing_figure_caption` in `extract_structured.py`: when a figure caption overflows the 400-char hard cap, walk it back to the last real sentence terminator instead of hard-truncating mid-word with `…`. jdm_m.2022.2 Figures 1/3 recovered exactly to AI gold. Corpus-wide: 12 ellipsis-truncated figure captions → 0. Phase-5d AI-gold verify (28 figures, 6 papers): 0 text-loss, 0 ellipsis-truncated, 0 cycle-blockers. 26/26 baseline; Tier1==Tier2 byte-identical. 6 new tests.
+
+### Blind Spots
+- **The overflow itself is the signal.** A corpus scan of all 17 APA papers' figure captions showed every caption >400 chars was over-absorbed body prose and every legitimate caption was ≤360 chars. So `len(caption) > 400` is a *reliable structural discriminator* for over-absorption — the fix needs no content heuristic, just "overflow → walk back to a clean sentence end." Scan the whole corpus for the metric's spread BEFORE designing the guard (same discipline as cycle 13's lc-run measurement).
+- **"Walk back to the LAST terminator in the window" over-keeps; that is the safe error direction.** For an over-absorbed caption, picking the last sentence terminator within the 400-char window can leave some absorbed prose (if that prose has its own `. ` before char 400 — chan_feldman Fig 10, chandrashekar Fig 1). Picking the FIRST terminator instead would risk cutting a legitimate multi-sentence caption short (text loss). Over-keep (residual prose) beats under-keep (text loss) for a caption — chose last-terminator deliberately. The residual is queued as FIG-2.
+
+### Edge Cases
+- **`_BODY_PROSE_BOUNDARY_RE` (the existing pre-400 trimmer) only recognizes body prose that opens with a Title-Case word.** It missed jdm_m.2022.2's two cases because the absorbed prose opened with `H1 :` (hypothesis label — `H1` is not `[A-Z][a-z]+`) and `(N = 61)` (parenthetical). The walk-back fires AFTER that trimmer as a structural backstop, so it does not need to enumerate prose-opener shapes — it just needs a sentence boundary. Backstop-by-structure beats extending an open-ended opener list.
+- **A contract test surfaced a real latent bug in the helper.** `test_short_caption_untouched_by_helper` (calling the helper directly on a sub-cap string — an unreachable production path, since the helper is gated behind `len > 400`) failed because `_CAPTION_SENTENCE_END_RE` required `(?=\s)` and missed an end-of-string `.`. Fixed to `(?=\s|$)`. A "tests an unreachable path" contract test still earned its keep.
+- **The walk-back must not collapse the caption to just its label.** First version used a `best >= 60` minimum which wrongly rejected short legitimate captions (`Figure 4. Short clean caption.` = 30 chars). Replaced with a label-prefix anchor: the chosen terminator must sit past the matched `Figure N.`/`Fig. N`/`Table N.` label, so a real first sentence (any length) survives but a label-only collapse is rejected.
+
+### Verification Gaps
+- None new. Phase 5d AI-gold verify (one Pattern-C corpus-sweep subagent over 6 papers × all figures) confirmed the cycle clean and surfaced the 6 RESIDUAL-ABSORB captions — already the known FIG-2 follow-up. Expected rule-0e-bis behavior: cycle ships incrementally, run's standing verdict stays FAIL while the corpus is not clean.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, following the run-5 precedent the handoff documents for an identically-shaped low-risk change). Inline hard-rule checks all pass: extraction-layer regex-only change in `extract_structured.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table surface touched; general fix keyed on a structural signature (overflow + sentence boundary, not paper identity); real-PDF test added; no `.pdf` staged; version bump consistent (`__init__.py` + `pyproject.toml`; NORMALIZATION_VERSION/SECTIONING_VERSION correctly unchanged — `normalize.py`/`sections/` untouched). 26/26 baseline + Tier1==Tier2 byte-identical + figure-caption-text-only diff confirm no regression.

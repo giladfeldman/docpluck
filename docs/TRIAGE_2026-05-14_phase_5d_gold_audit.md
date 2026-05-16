@@ -305,6 +305,37 @@ FIG caption double-emission + truncation, D5 author-block fragmentation. 26/26
 baseline; three-tier byte-identical. The 5 non-adjacent orphan numbers confirmed
 NOT render-foldable (no heading to fold into) — they are G5c-2 partitioner work.
 
+### Cycle FIG-1 (run 6, 2026-05-16) — figure-caption ellipsis-truncation walk-back — SHIPPED v2.4.47
+
+New `extract_structured.py::_trim_overflowing_figure_caption`. pdftotext welds
+a figure's following body prose onto its caption with a single `\n` (no `\n\n`),
+so `_extract_caption_text`'s paragraph-walk absorbs prose to the 800-char cap;
+the old 400-char cap then cut the caption mid-word with `…`. The new helper
+walks an overflowing **figure** caption back to its last real sentence
+terminator (abbreviations + author initials skipped; terminator must sit past
+the `Figure N.` label). Keyed on the structural signature (overflow + sentence
+boundary) — a corpus scan confirmed every figure caption >400 chars is
+over-absorbed and every legitimate caption is ≤360 chars. Tables keep
+`_trim_table_caption_at_cell_region`.
+
+**Result:** jdm_m.2022.2 Figures 1/3 recovered exactly to AI gold; all 12
+ellipsis-truncated figure captions across the APA corpus eliminated (0 remain).
+**Phase-5d AI-gold verify** (28 figures, 6 papers: jdm_m.2022.2, efendic,
+chandrashekar, chan_feldman, jdm15, maier): 22 PASS, 6 RESIDUAL-ABSORB, **0
+ellipsis-truncated, 0 text-loss, 0 cycle-blockers**. 26/26 baseline;
+Tier1==Tier2==Tier3 byte-identical; 6 new tests.
+
+**FIG-2 RESIDUAL (queued, distinct sub-defect):** 6 captions still carry
+*partial* trailing body prose after the legitimate caption — the walk-back
+takes the last terminator in the 400-char window (over-keep, the safe error
+direction), so absorbed prose with its own `. ` before char 400 survives:
+efendic Fig 4/5, chandrashekar Fig 1/3/5, chan_feldman Fig 10. These end on a
+sentence boundary (no `…`), so they are a clean residual, not a regression.
+FIG-2 also covers the **double-emission** (figure caption present both in body
+prose and as a `### Figure N` block). FIG-2 needs the body-prose-boundary
+detector strengthened (`_trim_caption_at_body_prose_boundary`'s opener regex
+misses `H1 :` / `(N = 61)` shapes) — a higher-false-positive-surface change.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -316,17 +347,19 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | **G5c-2 partitioner split-heading rejoin** | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`6.4.`/`7.3.`/`7.4.`) | the 5 non-adjacent cases — pdftotext splits `N.N. Title`, partitioner consumes the title word; needs partitioner-level rejoin. **C3** — dedicated session. |
 | **G5d named (unnumbered) heading demotion** | S1 | ar_apa_011 (`Participants`, `Overview`), efendic, chandrashekar, ip_feldman (~7) | section-partitioner work; largest false-positive surface. |
 | ~~**G5b long-descriptive-title prose guard**~~ ✓ FIXED v2.4.45 (cycle 13) | S1 | jdm16, jdm_m2, chen | ~~`≥5-lowercase-word` guard over-rejects legit long numbered headings.~~ Subsection promoter's lc-run guard removed; single-level raised 5→8. |
-| **FIG caption double-emission + truncation** | S2 | jdm_m2, efendic, chan_feldman, ziano, jdm15/16 (~8) | caption inline + in `## Figures` block; truncated mid-word; figure data-labels as orphan body lines. |
+| ~~**FIG caption ellipsis-truncation**~~ ✓ SHIPPED v2.4.47 (cycle FIG-1) | S2 | jdm_m2, efendic, chandrashekar, chan_feldman, jdm15, maier | ~~truncated mid-word with `…`~~ — `_trim_overflowing_figure_caption` walks overflow back to last sentence terminator; 12 → 0 corpus-wide. |
+| **FIG-2 caption residual-absorb + double-emission** | S2 | efendic, chandrashekar, chan_feldman (6 captions) + double-emission ~8 | 6 captions still carry partial trailing body prose (sentence-terminated residual); figure caption also emitted both inline in body prose AND as `### Figure N`. Needs `_trim_caption_at_body_prose_boundary` opener-regex widening + render-layer body/caption de-dup. |
 | **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
 | **D4 metadata residuals** | S2 | ar_apa_011 (`doi:` line), chen, efendic masthead | see D4 RESIDUALS above. |
 | **COL column-interleave** | S0 | chan_feldman, chandrashekar | text-channel reading order. C3. |
 | **GLYPH 011 `−`→deleted / efendic `Mchange` no-CI** | S0 | 011, efendic | unrecoverable from text channel — needs layout-channel glyph identity. Escalate. |
 
 **Next session resumes here.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
-G5c-1 render fold ✓ (v2.4.46). Recommended order: **FIG caption double-emission +
-truncation** (S2×C2, ~8 papers — next cheapest wide win) → **G5c-2 partitioner
-split-heading rejoin** (S1×C3, 5 jdm_m2 cases) → **G5d named/unnumbered heading
-demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##` promotion
+G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47).
+Recommended order: **FIG-2 caption residual-absorb + double-emission** (S2×C2-C3 —
+6 residual captions + ~8 double-emissions) → **G5c-2 partitioner split-heading
+rejoin** (S1×C3, 5 jdm_m2 cases) → **G5d named/unnumbered heading demotion**
+(S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##` promotion
 (`## Supplementary Material`/`## Appendix` — S1×C2) → **TABLE cluster** (S0/S1×C3,
 dedicated session, the single largest blocker) → **COL** + 011 deleted-minus
 escalated (layout-channel, C3-C4).
