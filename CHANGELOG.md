@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.40] — 2026-05-16
+
+**Cycle 8 (autonomous APA-first run) — standalone `2`-for-U+2212 minus recovery via point-estimate ∈ CI pairing (GLYPH, S0).** The v2.4.38 fix recovered the `2`-for-minus corruption on *bracketed* CIs (descending-pair rule) but left the bracket-less point estimates corrupt: every negative regression coefficient cell in `efendic_2022_affect` Tables 2-5 still read `20.26`/`21.15` for `−0.26`/`−1.15`, and the mediation estimate read `Mposterior = 20.54` for `−0.54` — sign-corrupted published statistics.
+
+Fix — new `normalize.py::recover_minus_via_ci_pairing` (W0d step). The discriminator is a structural invariant of statistics, not a heuristic: **a point estimate always lies inside its own reported confidence interval.** Operating on whole records — a `<tr>…</tr>` table row, or a single text line — when a token reads `2X.XX` and the same record carries a CI bracket `[lo, hi]` such that the de-corrupted value `−X.XX` falls inside `[lo, hi]` while the literal `2X.XX` falls outside, the token is unambiguously a corrupted negative. A genuine literal `2X.XX` (e.g. a mean age `23.45` reported with its own CI `[22.1, 24.8]`) is never recovered — the literal is consistent with its bracket, so the rule does not fire. Applied at the body channel (normalize W0d) and the `render_pdf_to_markdown` post-process (final guarantee — covers `<table>` HTML rows and `unstructured-table` lines alike).
+
+Verified on efendic (v2.4.39→v2.4.40 diff: 22 lines, all `2X.XX`→`−X.XX` recoveries, no body prose touched). All 22 recovered values confirmed cell-by-cell against the AI gold. **Residual (escalated, no text-channel signal):** 4 body-prose `Mchange = 2X.XX` figures and the contrast-coding table-footnote lines (`direction: 20.5 = low, + 0.5 = high`) carry no CI — a standalone `2X.XX` with no interval to pair against is information-theoretically ambiguous and needs the layout channel (per-char glyph identity), like the 011 deleted-minus case.
+
+`NORMALIZATION_VERSION` 1.9.5 → 1.9.6. 9 new tests in `tests/test_minus_sign_recovery_real_pdf.py`.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.39] — 2026-05-16
 
 **Cycle 7 (autonomous APA-first run) — `<`-as-backslash glyph corruption (GLYPH, S0).** `efendic_2022_affect` rendered every `<` comparison operator as a literal backslash: body prose read `p \ .05` / `p \ .001` for `p < .05` / `p < .001`, every table p-value cell read `\.001` for `<.001`, and the legacy Wiley DOI `13:1<1::AID-BDM333` read `13:1\1::AID-BDM333` — 24 occurrences total. Diagnosis: a font quirk makes pdftotext map the `<` glyph to a literal backslash. A backslash is never a legitimate prose character in extracted academic text, and the renderer adds no markdown escapes.

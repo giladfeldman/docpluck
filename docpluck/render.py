@@ -37,6 +37,7 @@ from .normalize import (
     destyle_math_alphanumeric,
     recover_corrupted_lt_operator,
     recover_corrupted_minus_signs,
+    recover_minus_via_ci_pairing,
 )
 from .sections import extract_sections
 from .tables.render import cells_to_html
@@ -2021,6 +2022,14 @@ def render_pdf_to_markdown(
     # surfaces — unstructured-table fenced blocks and raw_text table fallbacks
     # when Camelot is unavailable — so no corrupted "p < .001" reaches the .md.
     md = recover_corrupted_lt_operator(md)
+    # v2.4.40: recover standalone '2'-for-U+2212 minus corruption on
+    # point-estimate cells/tokens by pairing each with the confidence
+    # interval reported in the same table row or text line. The bracketed
+    # CIs are already recovered above (recover_corrupted_minus_signs); this
+    # pass reaches the bracket-less point estimates — every negative
+    # B-coefficient table cell, the Mposterior mediation estimates — that
+    # the descending-bracket rule structurally cannot see.
+    md = recover_minus_via_ci_pairing(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)

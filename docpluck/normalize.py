@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.5"
+NORMALIZATION_VERSION = "1.9.6"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1383,6 +1383,84 @@ def recover_corrupted_lt_operator(text: str) -> str:
     return _CORRUPT_LT_RE.sub(r"<\1", text)
 
 
+# v2.4.40 (NORMALIZATION_VERSION 1.9.6): recover standalone '2'-for-U+2212
+# minus corruption on point-estimate tokens/cells that the bracket-pair rule
+# (recover_corrupted_minus_signs) cannot reach because they carry no bracket
+# of their own. The discriminator is a structural invariant of statistics,
+# not a heuristic: a point estimate ALWAYS lies inside its own reported
+# confidence interval. So when a token reads "2X.XX" and the SAME record (a
+# table row <tr>…</tr>, or a single text line) carries a CI bracket [lo, hi]
+# such that the de-corrupted value -X.XX falls inside [lo, hi] while the
+# literal 2X.XX falls outside, the token is unambiguously a corrupted
+# negative. A genuine literal 2X.XX is never "recovered": that would require
+# a stats record whose estimate sits outside the CI it is paired with — which
+# does not occur. efendic_2022 Tables 2-5 every negative B-coefficient cell +
+# the Mposterior mediation estimates are recovered this way; the bracketed
+# CIs themselves are already handled upstream by recover_corrupted_minus_signs.
+_CI_PAIR_BRACKET_RE = re.compile(r"\[\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*\]")
+# A corrupted negative point estimate: a leading '2' (the mis-mapped minus)
+# glued to a small decimal of the form D.DD — one integer digit, then the
+# fraction. Not preceded by a digit/dot (so we never match inside 120.26).
+_CORRUPT_NEG_TOKEN_RE = re.compile(r"(?<![\d.])2(\d?\.\d+)\b")
+_TABLE_ROW_RE = re.compile(r"<tr\b.*?</tr>", re.DOTALL | re.IGNORECASE)
+
+
+def _recover_minus_in_record(record: str) -> str:
+    """Recover '2X.XX' tokens in a single record (a table row or a text line)
+    by pairing each with a CI bracket present in the same record."""
+    brackets: list[tuple[float, float, tuple[int, int]]] = []
+    for m in _CI_PAIR_BRACKET_RE.finditer(record):
+        try:
+            lo, hi = float(m.group(1)), float(m.group(2))
+        except ValueError:
+            continue
+        if lo > hi:
+            continue  # not a well-formed interval
+        brackets.append((lo, hi, m.span()))
+    if not brackets:
+        return record
+
+    def _sub(m: "re.Match[str]") -> str:
+        # Never touch a token that lies inside a bracket span (a CI bound).
+        for _lo, _hi, (bs, be) in brackets:
+            if bs <= m.start() < be:
+                return m.group(0)
+        frac = m.group(1)
+        try:
+            literal = float("2" + frac)
+            recovered = float("-" + frac)
+        except ValueError:
+            return m.group(0)
+        for lo, hi, _span in brackets:
+            in_recovered = (lo - 0.005) <= recovered <= (hi + 0.005)
+            in_literal = (lo - 0.005) <= literal <= (hi + 0.005)
+            if in_recovered and not in_literal:
+                return "-" + frac
+        return m.group(0)
+
+    return _CORRUPT_NEG_TOKEN_RE.sub(_sub, record)
+
+
+def recover_minus_via_ci_pairing(text: str) -> str:
+    """W0d: recover standalone '2'-for-minus corruption via point-estimate ∈ CI.
+
+    Operates on whole records — a ``<tr>…</tr>`` table row, or a single text
+    line — so a corrupted ``2X.XX`` point estimate can be checked against the
+    confidence interval reported alongside it. See the module comment above
+    ``_CI_PAIR_BRACKET_RE`` for the invariant this relies on.
+    """
+    if not text or "2" not in text:
+        return text
+    text = _TABLE_ROW_RE.sub(lambda m: _recover_minus_in_record(m.group(0)), text)
+    out = []
+    for line in text.split("\n"):
+        if "[" in line and "2" in line:
+            out.append(_recover_minus_in_record(line))
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -1512,6 +1590,11 @@ def normalize_text(
     before = t
     t = recover_corrupted_lt_operator(t)
     report._track("W0c_lt_operator_recovery", before, t, "lt_operators_recovered")
+
+    # ── W0d: recover standalone '2'-for-minus via point-estimate ∈ CI ──
+    before = t
+    t = recover_minus_via_ci_pairing(t)
+    report._track("W0d_minus_ci_pairing", before, t, "minus_signs_recovered")
 
     # ── Standard steps (S1-S9) ──────────────────────────────────────────
 
