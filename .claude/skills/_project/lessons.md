@@ -254,3 +254,11 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Why:** FIG-1 measured "no legit caption >360 chars" across 17 papers and baked `len > 400 ⇒ over-absorbed` into code + a test. The next paper exceeded it. The length was a proxy for the real signal: did pdftotext's own paragraph break bound the caption?
 
 **How to detect next time:** When a fix keys on a threshold measured from a corpus sample, treat the threshold as provisional and design the guard on the structural invariant it approximates. Also: when fixing a bug makes a *pre-existing* test go red, check whether that test encoded the old buggy contract — FIG-1's `len > 400` corpus-invariant test was green only because the bug was silently truncating the counterexample.
+
+## 2026-05-17 · Cycle HALLUC-HEAD-1 — carve the controlled-vocabulary slice out of a grab-bag defect (v2.4.53)
+
+**What:** The CRediT role `Methodology` collides with the Method/Methodology section keyword, so the partitioner promotes it to a `## Methodology` heading inside the contributor-roles block. New `_demote_credit_role_headings` demotes a `## <CRediT-role>` heading when ≥3 other CRediT role tokens sit in the ±10-line window.
+
+**Why:** HALLUC-HEAD as a whole is an open-ended grab-bag (`## Conclusion`, `## Supplementary Material`, …) with a broad false-positive surface. The CRediT sub-case is governed by a closed, standardized 14-term vocabulary — that makes it precisely detectable and safe to ship as its own narrow cycle.
+
+**How to detect next time:** When a defect class is partly governed by a controlled vocabulary (CRediT roles, ISO codes, a journal's fixed section set), split that slice into its own cycle — it ships safely while the open-ended remainder waits. Disambiguate an ambiguous token by neighborhood density (≥3 nearby vocabulary terms = inside the block), not by the token alone. Normalize the vocabulary for publisher punctuation variants (dash styles, `&` vs `and`).

@@ -203,7 +203,7 @@ The 011 verifier (gold ↔ v2.4.33 render) returned FAIL — **all findings pre-
 | **GLYPH** | pdftotext mis-maps glyphs. Minus U+2212: `−`→`2` (efendic, 29 CIs), `−`→`(cid:0)` (ziano, chen), `−`→deleted (011). Greek: `β`→`b`, `η`→`n`, `α`→`a`. Superscript: `χ²`→`ch2`/`χ2`, `η²`→`n2`, `f²`→`f2`. Other: `<`→`\`, `≠`→`∕=`, `©`→`Ó`, `°`→`◦`, `△`→`(cid:4)`, `¬`/`\|` dropped. | efendic, 011, ziano, chen, korbmacher, jdm_m2, jdm_m3, jdm15, chandrashekar (~9) | **S0** | C2-C4 | Sign-inverts published stats. `(cid:0)`→`−` is the SAFEST recoverable slice (the marker is never legitimate); `2`→`−` recoverable via descending-CI discriminator; deleted-minus unrecoverable from text channel. Greek may be docpluck S0 math-italic transliteration OR pdftotext-upstream — diagnose per case. |
 | **TABLE** | Caption welded into thead; rows dropped; body-prose bleed into table; empty `<table>` shells; two tables merged into one; mislabeled tables (Table 8 holds Table 9 grid); numeric cell SWAP (xiao Table 6 `4.91 (1.54)` vs gold `4.70 (1.64)`); G4a body-stream cell dumps (ziano ~1000 lines, chen, ip_feldman ~385 lines). | efendic, ziano, korbmacher, chan_feldman, chandrashekar, jdm15, jdm16, chen, maier, ip_feldman, xiao (~11) | **S0/S1** | C3 | Widest severe class. The G3/G4 cluster — needs design; handoff already flags as C3. |
 | **G5** | Numbered subsections (`2.1`, `3.1.1`, …) emitted as plain body text, not `###` headings. | efendic, korbmacher, ziano, chan_feldman, chandrashekar, jdm15, jdm16, jdm_m2, chen, ip_feldman, maier, 011 (~12) | S1 | C2 | `sections/annotators/text.py` Pass 3. Widest structural class. |
-| **HALLUC-HEAD** | Mid-sentence fragments / table-cell labels / TOC entries promoted to `##` headings: `## Methodology` (chan_feldman, chen — CRediT cell), `## Conclusion` (maier — none in gold), `## Supplementary Material`/`## Appendix` (jdm_m2 — mid-sentence), `## Data Availability Statement` (jdm15 — mid-Results), `## Supplemental Materials` (ip_feldman), `## Evaluation` (xiao), `## Introduction` mislabel of the Abstract (chen), `## Funding`/`## Methods` (chen). | chan_feldman, chen, maier, jdm_m2, jdm15, ip_feldman, xiao (~7) | S1 | C2 | Heading-promotion over-fires. Complement of G5 (under-fires). |
+| **HALLUC-HEAD** (partly ✓) | Mid-sentence fragments / table-cell labels / TOC entries promoted to `##` headings. **HALLUC-HEAD-1 `## Methodology` CRediT-cell ✓ SHIPPED v2.4.53.** Residual HALLUC-HEAD-2: `## Conclusion` (maier — none in gold), `## Supplementary Material`/`## Appendix` (jdm_m2), `## Data Availability Statement` (jdm15), `## Supplemental Materials` (ip_feldman), `## Evaluation` (xiao), `## Introduction` mislabel (chen), `## Funding`/`## Methods` (chen). | maier, jdm_m2, jdm15, ip_feldman, xiao, chen (~6) | S1 | C2-C3 | Heading-promotion over-fires. HALLUC-HEAD-2 has no controlled vocabulary → dedicated partitioner session. |
 | **D6** | Orphan section-number line (`1.`/`2.`/`3.`/`4.`) stranded before `## Heading`. | ziano, korbmacher, jdm15, jdm16, jdm_m2, jdm_m3, jamison, chen (~8) | S2 | **C1** | Clean single root cause; cheapest wide win. |
 | **D4** | Metadata leak: journal banner / DOI footer / copyright+CC-license banner / received-date / author-contact spliced into body — worst variant is the CC-license banner spliced MID-SENTENCE. | jdm15, jdm16, jdm_m2, jdm_m3, chan_feldman, chandrashekar, korbmacher, ip_feldman, efendic, 011, chen (~all) | S2 | C2 | |
 | **FIG** | Figure caption double-emission; truncation mid-sentence; body-prose welded into caption (chan_feldman Figure 10, jdm16 Figure 1, jdm_m3). | chan_feldman, ziano, maier, jdm16, jdm15, jdm_m2, jdm_m3, chandrashekar (~8) | S2 | C2 | |
@@ -493,6 +493,30 @@ Fig 1 caption == gold figure note, 0 text-loss, 0 body-prose absorbed.
 26/26 baseline; Tier1==Tier2==Tier3; 1 new test + the FIG-1 corpus
 invariant test corrected (a caption MAY exceed 400 chars when complete).
 
+### Cycle HALLUC-HEAD-1 (run 7) — CRediT contributor-role heading demotion — SHIPPED v2.4.53
+
+The CRediT (Contributor Roles Taxonomy) block lists 14 standard roles;
+`Methodology` collides with the Method/Methodology section keyword, so
+the section partitioner promotes that role token to a `## Methodology`
+heading inside the contributor-roles table (chan_feldman, chandrashekar,
+chen — none of their AI golds has a `## Methodology`).
+
+New render post-processor `_demote_credit_role_headings` demotes a
+`## <CRediT-role>` heading to plain text, gated on the surrounding
+±10-line window holding ≥3 OTHER CRediT role tokens (the closed 14-term
+CRediT vocabulary, normalized for dash/`&` variants). A real Methodology
+section heading is followed by method prose (0 nearby role tokens) and
+is kept. 3 papers lose the hallucinated `## Methodology`, keep
+`## Method`. **Phase-5d:** the demoted heading is absent from all three
+AI golds; heading-markup-only (0 text loss). 26/26 baseline;
+Tier1==Tier2==Tier3; 5 new tests.
+
+**HALLUC-HEAD RESIDUAL (queued as HALLUC-HEAD-2):** the open-ended
+remainder — `## Conclusion` (maier — none in gold), `## Supplementary
+Material` (jdm_m2), `## Data Availability Statement` (jdm15), `## Evaluation`
+(xiao), `## Funding`/`## Methods` mis-promotions (chen) — is NOT governed by
+a controlled vocabulary; it needs a dedicated section-partitioner session.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -521,11 +545,12 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47),
 FIG-2 period-less-caption walk-stop ✓ (v2.4.48), FIG-3a lowercase-boundary trim ✓ (v2.4.49),
 FIG-3b caption-anchor dedup ✓ (v2.4.50), FIG-3c double-emission de-dup ✓ (v2.4.51),
-FIG-4 long-caption overflow-trim gate ✓ (v2.4.52).
+FIG-4 long-caption overflow-trim gate ✓ (v2.4.52),
+HALLUC-HEAD-1 CRediT-role heading demotion ✓ (v2.4.53).
 Recommended order: **TBL-CAP table-caption over-extension** (S2×C2) → **FIG-3c-2
 body-exceeds-block double-emission** (S2×C2-C3) → **G5d named/unnumbered
-heading demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##`
-promotion (`## Supplementary Material`/`## Appendix` — S1×C2) → **G5c-2
-partitioner split-heading rejoin** (S1×C3, 5 jdm_m2 cases) → **TABLE cluster**
-(S0/S1×C3, dedicated session, the single largest blocker) → **COL** + 011
-deleted-minus escalated (layout-channel, C3-C4).
+heading demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD-2** open-ended `##`
+promotion (`## Conclusion`/`## Supplementary Material`/… — S1×C2-C3, dedicated
+partitioner session) → **G5c-2 partitioner split-heading rejoin** (S1×C3, 5
+jdm_m2 cases) → **TABLE cluster** (S0/S1×C3, dedicated session, the single
+largest blocker) → **COL** + 011 deleted-minus escalated (layout-channel, C3-C4).

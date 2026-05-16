@@ -688,3 +688,23 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 8th consecutive). Inline hard-rule checks all pass: extraction-layer change in `extract_structured.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (walk stopped at a `\n\n` paragraph break), not paper identity; real-PDF test added + a stale prior-cycle test corrected; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 confirm no regression.
+
+---
+
+## Run: 2026-05-17 (run 7) · Cycle HALLUC-HEAD-1 · v2.4.53
+
+### Outcome
+- SHIPPED v2.4.53. The CRediT (Contributor Roles Taxonomy) block lists 14 standard roles; one — `Methodology` — collides with the Method/Methodology section keyword, so the section partitioner promotes that role token to a `## Methodology` heading inside the contributor-roles table (chan_feldman, chandrashekar, chen — none in their AI golds). New render post-processor `_demote_credit_role_headings` demotes a `## <CRediT-role>` heading, gated on the ±10-line window holding ≥3 OTHER CRediT role tokens. 3 papers' hallucinated `## Methodology` removed, real `## Method` kept. 26/26 baseline; Tier1==Tier2==Tier3; 5 new tests.
+
+### Blind Spots
+- **A closed controlled vocabulary turns a risky heading heuristic into a precise one.** HALLUC-HEAD as a whole (`## Conclusion`, `## Supplementary Material`, `## Data Availability Statement`, …) is a grab-bag with a broad false-positive surface — exactly the kind of section-partitioner change the iteration discipline says needs a dedicated session. But the CRediT sub-case is different: CRediT is a *standardized, closed 14-term vocabulary*. A `## Methodology` heading whose neighbors are `Conceptualization`/`Resources`/`Software`/`Supervision`/`Validation` is *provably* inside a CRediT block. When a defect class is partly governed by a controlled vocabulary, carve out the controlled-vocabulary slice as its own cycle — it ships safely now; the open-ended remainder waits for a dedicated session. (Don't force the whole grab-bag into one rushed cycle.)
+- **The discriminator is region density, not the token itself.** `Methodology` alone is ambiguous — it is both a CRediT role and a section name. What disambiguates is the *neighborhood*: a real Methodology section heading is followed by method prose (0 role tokens nearby); a CRediT-block role token is surrounded by ≥3 other role tokens. Keying the demotion on the ≥3-neighbor count (not on the word) is what makes it safe against a paper whose Method section is literally titled "Methodology".
+
+### Edge Cases
+- **Normalize the controlled vocabulary for punctuation variants.** The CRediT writing roles appear as `Writing - original draft`, `Writing–original draft`, `Writing-original draft`, `Writing - review & editing`, `Writing-review and editing` — dash style and `&`/`and` both vary by publisher. `_normalize_credit_role` maps `&`→`and`, dashes/slash→space, collapses whitespace, lowercases, so all variants match one frozenset entry. A controlled-vocabulary check is only as good as its normalizer.
+
+### Process note — cycle scoping under a budget
+- The run-7 budget had ~3h left after FIG-4. The remaining queue (HALLUC-HEAD, TBL-CAP, FIG-3c-2, G5d, G5c-2, TABLE, COL) is all C2-C3 with entanglement or broad partitioner surface. Rather than rush a broad-surface change, scoped cycle 5 to the *controlled-vocabulary slice* of HALLUC-HEAD (CRediT roles) — a provably-safe, fully-verifiable narrow fix. The open-ended HALLUC-HEAD remainder (`## Conclusion` etc.) stays queued. Shipping a narrow verified fix beats both rushing a broad one and stopping early.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 9th consecutive). Inline hard-rule checks all pass: render-layer post-processor in `render.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (CRediT controlled vocabulary + region density), not paper identity; heading-markup-only (0 text loss); real-PDF + contract tests added; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 confirm no regression.
