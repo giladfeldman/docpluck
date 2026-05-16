@@ -671,3 +671,20 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 7th consecutive). Inline hard-rule checks all pass: render-layer post-processor in `render.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (a `Figure N`-led body run reproducing a known block caption), not paper identity; the change only REMOVES exact-duplicate lines (0 text loss by construction, Phase-5d-confirmed); real-PDF + contract tests added; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 confirm no regression.
+
+---
+
+## Run: 2026-05-16 (run 7) · Cycle FIG-4 · v2.4.52
+
+### Outcome
+- SHIPPED v2.4.52. FIG-1's overflow trim (`_trim_overflowing_figure_caption`) treats ANY figure caption >400 chars as over-absorbed body prose and walks it back to the last pre-400 sentence terminator. efendic Figure 1's caption is a label + a long legit `Note.` (~498 chars) — so the trim cut it at `(MTurk and Prolific).` and dropped the final Note sentence. `_extract_caption_text` now tracks a `stopped_at_break` flag — whether the paragraph-walk stopped at a real `\n\n` break (complete caption) or ran to the 800-char cap (runaway). The overflow trim applies ONLY to the runaway case. efendic Fig 1's full Note recovered, 0 text-loss. 26/26 baseline; Tier1==Tier2==Tier3; 1 new test + 1 corrected.
+
+### Blind Spots
+- **A heuristic threshold from a corpus sample is a snapshot, not an invariant — the structural signal is reliable.** FIG-1 (v2.4.47) scanned 17 APA papers, found "every figure caption >400 chars is over-absorbed, every legit caption ≤360 chars," and baked `len > 400 ⇒ trim` into both the code AND a corpus-invariant test. efendic Figure 1 — a legit 498-char caption — falsifies it. The reliable discriminator is NOT the length but the STRUCTURE: did the caption end at pdftotext's own `\n\n` paragraph break (→ complete, keep whole) or run to the hard cap with no `\n\n` (→ runaway, trim)? When a fix keys on a measured threshold, treat the threshold as provisional — the next paper will exceed it; design the guard on the structural invariant the threshold was a proxy for.
+- **A prior cycle's verification can hard-code its own blind spot into a test.** FIG-1 added `test_apa_corpus_no_ellipsis_truncated_figure_captions` asserting `len(cap) > 400` is always a defect. That test PASSED for 5 cycles because efendic Fig 1 was being silently truncated to ≤400 — the test was green *because the bug was active*. FIG-4 fixing the bug turned the test red. This is the cycle-2 "a test can encode the bug" lesson again: when a fix makes a *pre-existing* test fail, check whether the test encodes the old (wrong) contract before "fixing" either side. Here the test was corrected to the real invariant (no ellipsis-truncation; an over-400 caption must end on a terminator — be complete, not a runaway).
+
+### Edge Cases
+- **The flag must be set at every walk-exit that represents a clean stop.** `_extract_caption_text`'s walk `break`s at three places — short-prev `\n\n`, terminator `\n\n`, and the FIG-2 period-less-complete-caption `\n\n`. All three are real paragraph ends, so `stopped_at_break = True` is set at all three. The walk exiting via `nxt == -1 / nxt >= hard_end` (no `\n\n` found in range) leaves the flag False — that is the runaway. Missing the flag on any one break case would re-truncate a legit caption of that shape.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 8th consecutive). Inline hard-rule checks all pass: extraction-layer change in `extract_structured.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (walk stopped at a `\n\n` paragraph break), not paper identity; real-PDF test added + a stale prior-cycle test corrected; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 confirm no regression.

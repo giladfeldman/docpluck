@@ -469,6 +469,30 @@ caption copy that EXCEEDS the block caption — de-duping them needs the
 block caption completed first (entangled with the caption-trim cycles).
 Queued as **FIG-3c-2** below.
 
+### Cycle FIG-4 (run 7) — legit long figure caption truncated by the overflow trim — SHIPPED v2.4.52
+
+FIG-1's overflow trim (`_trim_overflowing_figure_caption`, v2.4.47)
+treats ANY figure caption >400 chars as over-absorbed body prose and
+walks it back to the last pre-400 sentence terminator. efendic Figure 1's
+caption is a label + a long legitimate `Note.` (~498 chars) — the trim
+cut it at `(MTurk and Prolific).`, dropping the final Note sentence
+`The negative slope shows the predicted negative relationship …`.
+
+`_extract_caption_text` now tracks `stopped_at_break` — whether its
+paragraph-walk stopped at a real `\n\n` break (a complete caption
+paragraph) or ran to the 800-char hard cap (a runaway that welded body
+prose with a single `\n`). The overflow trim applies ONLY to the runaway
+case; a caption that overflows 400 chars but ended at a clean paragraph
+break is kept whole. FIG-1's ellipsis-truncation fix is unaffected
+(those captions are runaways — no `\n\n`).
+
+efendic Figure 1's full Note recovered (498-char caption, matches the AI
+gold figure note exactly). It is the only APA figure caption exceeding
+360 chars — the gate change is precisely scoped. **Phase-5d:** efendic
+Fig 1 caption == gold figure note, 0 text-loss, 0 body-prose absorbed.
+26/26 baseline; Tier1==Tier2==Tier3; 1 new test + the FIG-1 corpus
+invariant test corrected (a caption MAY exceed 400 chars when complete).
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -486,7 +510,7 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | ~~**FIG-3b caption anchored to body-text reference**~~ ✓ SHIPPED v2.4.50 (run 7) | S2 | chan_feldman, chen, jamison, maier, amd_2, annals_3, ieee_access_2/9/10, plos_med_1 (14 caption groups) | ~~caption ANCHOR latched onto an in-text `Figure N` reference~~ — `caption_anchor_is_in_text_reference` dedup tie-break; 14 groups corrected. |
 | ~~**FIG-3c figure-caption double-emission**~~ ✓ SHIPPED v2.4.51 (run 7) | S2 | chan_feldman, chandrashekar, efendic, maier, jdm_.2023.16 (~21 captions) | ~~caption in body prose AND as a `### Figure N` block~~ — `_suppress_inline_duplicate_figure_captions` render pass; safe-subset (block caption ⊇ inline run). |
 | **FIG-3c-2 body-exceeds-block double-emission** | S2 | chandrashekar Fig 2/4/5, jdm_m.2022.3 Fig 1/2, efendic Fig 1, jdm_.2023.16 Fig 1 (~7) | the inline caption copy EXCEEDS the `### Figure N` block caption — de-dup needs the block caption completed first (entangled with caption-trim). C2-C3. |
-| **FIG-4 efendic Fig 1 Note trailing-sentence loss** | S2 | efendic Fig 1 (and likely other multi-sentence figure Notes) | the caption paragraph-walk's `\n\n`-stop fires inside a multi-sentence figure Note, dropping the Note's final sentence. C2. |
+| ~~**FIG-4 efendic Fig 1 Note trailing-sentence loss**~~ ✓ SHIPPED v2.4.52 (run 7) | S2 | efendic Fig 1 | ~~caption walk dropped the Note's final sentence~~ — root cause was the 400-char overflow trim truncating a legit 498-char caption; `stopped_at_break` gate fixes it. |
 | **TBL-CAP table-caption over-extension into column headers** | S2 | maier Tbl 5/9/10/11, chen Tbl 3/5/6/7/9/13/15, chen Fig 1 (stray page-no) | the caption walk / `_trim_table_caption_at_cell_region` does not always stop at the grid boundary — trailing column-header words splice into the caption. C2. |
 | **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
 | **D4 metadata residuals** | S2 | ar_apa_011 (`doi:` line), chen, efendic masthead | see D4 RESIDUALS above. |
@@ -496,9 +520,9 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 **Run 7 progress.** GLYPH ligature ✓ (v2.4.44), G5b prose-guard ✓ (v2.4.45),
 G5c-1 render fold ✓ (v2.4.46), FIG-1 caption ellipsis-truncation ✓ (v2.4.47),
 FIG-2 period-less-caption walk-stop ✓ (v2.4.48), FIG-3a lowercase-boundary trim ✓ (v2.4.49),
-FIG-3b caption-anchor dedup ✓ (v2.4.50), FIG-3c double-emission de-dup ✓ (v2.4.51).
-Recommended order: **FIG-4 efendic Fig 1 Note trailing-sentence loss** (S2×C2)
-→ **TBL-CAP table-caption over-extension** (S2×C2) → **FIG-3c-2
+FIG-3b caption-anchor dedup ✓ (v2.4.50), FIG-3c double-emission de-dup ✓ (v2.4.51),
+FIG-4 long-caption overflow-trim gate ✓ (v2.4.52).
+Recommended order: **TBL-CAP table-caption over-extension** (S2×C2) → **FIG-3c-2
 body-exceeds-block double-emission** (S2×C2-C3) → **G5d named/unnumbered
 heading demotion** (S1×C2-C3, ~7 papers) → **HALLUC-HEAD** mid-sentence `##`
 promotion (`## Supplementary Material`/`## Appendix` — S1×C2) → **G5c-2

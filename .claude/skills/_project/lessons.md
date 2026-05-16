@@ -246,3 +246,11 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Why:** First placement (early in the post-processor chain) was a silent no-op: the block caption still had a `ﬂ` ligature (`reﬂection`) while the body line was already decomposed (`reflection`) — `decompose_ligatures` runs late. The two spans were byte-unequal, so the equality check never fired.
 
 **How to detect next time:** A render post-processor that compares two text spans for equality/prefix must run DOWNSTREAM of every pass that normalizes glyphs in either span (`decompose_ligatures`, `destyle_math_alphanumeric`, `recover_corrupted_minus_signs`, …). Diagnostic: if a pass is a no-op in the chain but works when applied standalone to the final output, a later pass is mutating the text it matches on — bisect the passes between. When the fix removes body text, scope it to the provably-safe subset (here: block caption ⊇ inline run) and queue the rest.
+
+## 2026-05-16 · Cycle FIG-4 — a measured threshold is a snapshot; key the guard on the structural invariant (v2.4.52)
+
+**What:** The FIG-1 figure-caption overflow trim treated any caption >400 chars as over-absorbed body prose. efendic Figure 1 is a legit ~498-char caption (label + a long `Note.`). `_extract_caption_text` now tracks whether the paragraph-walk stopped at a real `\n\n` break (complete caption — keep whole) or ran to the 800-char cap (runaway — trim).
+
+**Why:** FIG-1 measured "no legit caption >360 chars" across 17 papers and baked `len > 400 ⇒ over-absorbed` into code + a test. The next paper exceeded it. The length was a proxy for the real signal: did pdftotext's own paragraph break bound the caption?
+
+**How to detect next time:** When a fix keys on a threshold measured from a corpus sample, treat the threshold as provisional and design the guard on the structural invariant it approximates. Also: when fixing a bug makes a *pre-existing* test go red, check whether that test encoded the old buggy contract — FIG-1's `len > 400` corpus-invariant test was green only because the bug was silently truncating the counterexample.
