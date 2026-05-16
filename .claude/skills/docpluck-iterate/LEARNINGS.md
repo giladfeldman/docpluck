@@ -469,3 +469,22 @@ Cycles 2, 4, 6 each independently rediscovered that a glyph/encoding corruption 
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 10 is 2 W0 watermark regexes, each anchored on the journal ISSN + a keyword guard; same shape as cycle 5's D4 patterns. 26/26 baseline + AI verifier confirm no regression.
+
+---
+
+## USER CORRECTION (2026-05-16) — gold generation is delegated to article-finder; docpluck NEVER self-generates ground truth
+
+Mid-run, ArticleFinder flagged (and the user confirmed as a directive) that docpluck-iterate carried its OWN gold-extraction prompt (`references/ai-full-doc-verify.md` Step 1b) instead of going through the shared `~/.claude/skills/article-finder/gold-generation.md` protocol. escicheck-iterate carried another private prompt. Result: the same paper extracted by two divergent prompts → two different `reading` golds (981 vs 617 lines / 97 vs 77 headings). Two ground truths for one paper is a fork — the same root bug as canonical-key fragmentation: producers acting independently instead of through one enforced path.
+
+**User directive:** "iterate should always only use articlefinder to do all groundtruths, never do things independently."
+
+**What I had done this run:** I did NOT generate any new golds this session — Phase 5d for cycles 8/9/10 REUSED pre-existing `tmp/*_gold.md` cached from prior sessions, and dispatched only *verifier* (comparison) subagents. So no fresh fork was created this run. But the SKILL itself was structured to self-generate on a cache miss — that was the latent bug.
+
+**Encoded durably (same turn):**
+- `references/ai-full-doc-verify.md` — Step 1 rewritten: on a cache miss, DELEGATE to `article-finder generate-gold`; the private extraction-prompt template (was ~115 lines) DELETED. Added the hard-prohibition section + the "What NOT to do" anti-pattern.
+- `SKILL.md` — Phase 5d, Phase 0.8 check a, the parallelization table + Pattern A + anti-patterns, hard rule 18, and the Verification Checklist all rewritten: docpluck obtains+consumes golds, never generates.
+- `docpluck/CLAUDE.md` — ground-truth hard rule updated: one producer (article-finder), one protocol (`gold-generation.md`), one gold per paper.
+- `docpluck-qa/SKILL.md` — check 7g updated the same way.
+- Memory `feedback_gold_generation_via_article_finder`.
+
+**Process note (rule 8g — user-correction ratchet):** the verifier subagent (consumer-side comparison of rendered.md vs gold on docpluck's 6 checks) STAYS docpluck's — it consumes the shared gold, it does not produce ground truth. Only *generation* is delegated. If the shared `reading` view lacks detail docpluck needs (cell-by-cell tables for the TABLE check), that enrichment goes into `gold-generation.md` coordinated with article-finder — never re-forked into a docpluck-local prompt. Flagged to the user as a follow-up for article-finder.
