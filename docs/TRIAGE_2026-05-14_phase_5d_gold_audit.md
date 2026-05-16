@@ -258,3 +258,27 @@ The 011 verifier (gold ↔ v2.4.33 render) returned FAIL — **all findings pre-
 Two `normalize.py` W0 patterns: Issue K strips the Elsevier ISSN/front-matter/copyright line (anchored on line-leading ISSN `\d{4}-\d{3}[\dX]/` + keyword guard), Issue L strips the singular `E-mail address:` corresponding-author line. ar_apa_011 + chen footer lines removed, 0 body-prose loss, AI-gold verifier OVERALL PASS.
 
 **D4 RESIDUALS (queued):** bare lowercase `doi:10.…` footer line (not stripped — indistinguishable from a reference whose DOI wrapped to its own line; would need a front-matter-position gate); plural multi-line `E-mail addresses:` author list; `Received … Accepted …` history line; `article info` fragment; efendic journal-masthead block.
+
+### Cycle 11 (v2.4.43) — G5a single-level numbered section-heading promotion — SHIPPED
+
+New `render.py::_promote_numbered_section_headings` promotes `N. Title` → `## N. Title`, gated by 5 conjunctive safety checks (document-numbering-range, number-uniqueness, list-adjacency, terminal-punctuation, ≥5-lowercase-word prose guard). jdm_m.2022.2 6/7 sections promoted, chen 6/10, chandrashekar 0 false positives (enumerated lists correctly rejected). AI-gold verifier (jdm_m.2022.2): OVERALL PASS, 0 new defects.
+
+**G5a RESIDUALS (queued):** the ≥5-lowercase-word prose guard rejects long descriptive headings (`4. Knowledge acquisition, decision delay, and choice outcomes`) — same G5b guard issue; list-number collision under-promotes a section heading whose number a body list reuses (chen 1/2/3/5 — conservative, not a false positive).
+
+### SESSION-3 STANDING VERDICT (rule 0e-bis)
+
+The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
+
+| Defect class | Sev | Papers | Notes |
+|---|---|---|---|
+| **TABLE structure destruction** | S0/S1 | efendic, ar_apa_011, xiao, jdm15/16, chen, maier, ip_feldman (~11) | grid lost → caption-bleed; flat number-dump; empty `<table>` shells; two tables merged; rows dropped. C3 — needs a render/structured coordination design. The single largest blocker. |
+| **G5c split-line numbered headings** | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`7.3.` etc.) | number alone on a line, title on the next; renders as orphan bare-number + a MISLABELED generic `## Results`. cycle-3 orphan-folder multi-level analogue. |
+| **G5d named (unnumbered) heading demotion** | S1 | ar_apa_011 (`Participants`, `Overview`), efendic, chandrashekar, ip_feldman (~7) | section-partitioner work; largest false-positive surface. |
+| **G5b long-descriptive-title prose guard** | S1 | jdm16, jdm_m2, chen | `≥5-lowercase-word` guard over-rejects legit long numbered headings. |
+| **FIG caption double-emission + truncation** | S2 | jdm_m2, efendic, chan_feldman, ziano, jdm15/16 (~8) | caption inline + in `## Figures` block; truncated mid-word; figure data-labels as orphan body lines. |
+| **GLYPH ligature** `ﬁ`/`ﬂ` not decomposed | S2 | jdm_m2 (and likely many) | `conﬁdent`, `inﬂuence` — NFKC would fix; check why current NFC pass misses U+FB01/FB02. |
+| **D4 metadata residuals** | S2 | ar_apa_011 (`doi:` line), chen, efendic masthead | see D4 RESIDUALS above. |
+| **COL column-interleave** | S0 | chan_feldman, chandrashekar | text-channel reading order. C3. |
+| **GLYPH 011 `−`→deleted / efendic `Mchange` no-CI** | S0 | 011, efendic | unrecoverable from text channel — needs layout-channel glyph identity. Escalate. |
+
+**Next session resumes here.** Recommended order: GLYPH ligature (S2×C1 — cheapest, likely wide) → G5b prose-guard relax → G5c split-line folder → FIG caption dedup → G5d named-heading detection → TABLE cluster (C3, dedicated session) → COL + 011-minus escalated.

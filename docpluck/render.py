@@ -273,6 +273,119 @@ def _promote_numbered_subsection_headings(text: str) -> str:
     return cleaned
 
 
+# ── Single-level numbered section-heading promotion (cycle 11, G5a) ─────────
+
+_SINGLE_LEVEL_NUM_HEADING_RE = re.compile(
+    r"^(?P<num>\d{1,2})\.\s+"
+    r"(?P<title>[A-Z][A-Za-z0-9][\w\-\s,&\(\)/':]{1,78})\s*$"
+)
+# An already-emitted numbered heading at any depth (## / ### / ####). The
+# captured group is the TOP-level number.
+_EXISTING_NUMBERED_HEADING_RE = re.compile(r"^#{2,4}\s+(\d{1,2})(?:\.\d+)*\.?\s")
+
+
+def _promote_numbered_section_headings(text: str) -> str:
+    """Promote single-level ``N. Title`` lines (e.g. ``2. Omission neglect``)
+    to ``## N. Title`` h2 headings.
+
+    Single-level top-level numbered headings are demoted to body text when the
+    title is not a canonical section word. Promoting them safely needs a
+    document-internal-consistency gate: the document must already number its
+    sections (≥1 existing ``#{2,4} N`` heading), and the candidate's number
+    must fall in a contiguous integer run that connects to a proven number.
+    That gate is what prevents an enumerated list (e.g. exclusion criteria
+    ``1. … 2. … 3. …``) from being promoted — list numbers do not connect to
+    the document's section-numbering range, and a number that repeats (a list
+    restarting at 1) is excluded by the uniqueness test.
+
+    Runs AFTER the orphan-numeral folders so ``## 1. Introduction`` exists as
+    an anchor. Idempotent.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    proven_any: set[int] = set()   # top-numbers of any existing #/##/### heading
+    proven_h2: set[int] = set()    # top-numbers that already have a real `## N.`
+    for line in lines:
+        m = _EXISTING_NUMBERED_HEADING_RE.match(line)
+        if not m:
+            continue
+        n = int(m.group(1))
+        proven_any.add(n)
+        if line.startswith("## ") and not line.startswith("### "):
+            proven_h2.add(n)
+    if not proven_any:
+        return text
+
+    def _adjacent_numbered(idx_iter) -> bool:
+        # True if the nearest non-blank line in idx_iter is itself a
+        # single-level `N. ` line — i.e. the candidate sits inside a numbered
+        # LIST, not at a section boundary.
+        for j in idx_iter:
+            s = lines[j].strip()
+            if not s:
+                continue
+            return bool(re.match(r"^\d{1,2}\.\s", s))
+        return False
+
+    # Clean single-level numbered candidates. A demoted section heading sits
+    # on its own line BETWEEN body paragraphs (not blank-separated); a list
+    # item sits adjacent to a sibling `N. ` line. We require the former.
+    candidates: dict[int, list[tuple[int, str]]] = {}
+    in_fence = False
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _SINGLE_LEVEL_NUM_HEADING_RE.match(line)
+        if not m:
+            continue
+        if _adjacent_numbered(range(i - 1, -1, -1)) or _adjacent_numbered(
+            range(i + 1, len(lines))
+        ):
+            continue  # inside a numbered list, not a section boundary
+        title = m.group("title").rstrip()
+        if title.endswith((".", "?", "!", ":", ",", ";")):
+            continue
+        lc_run = max_lc = 0
+        for tok in title.split():
+            if tok and tok[0].islower():
+                lc_run += 1
+                max_lc = max(max_lc, lc_run)
+            else:
+                lc_run = 0
+        if max_lc >= 5:  # prose-like run — not a heading
+            continue
+        candidates.setdefault(int(m.group("num")), []).append((i, title))
+    if not candidates:
+        return text
+    # Only numbers that appear exactly once are section-heading candidates;
+    # a repeated number is a restarting list, not a section sequence.
+    uniq = {n for n, occ in candidates.items() if len(occ) == 1}
+    # Eligible = numbers in a contiguous integer run (over proven ∪ uniq)
+    # that contains at least one proven number.
+    universe = sorted(proven_any | uniq)
+    eligible: set[int] = set()
+    run: list[int] = []
+    for n in universe:
+        if run and n == run[-1] + 1:
+            run.append(n)
+        else:
+            if any(x in proven_any for x in run):
+                eligible |= set(run)
+            run = [n]
+    if any(x in proven_any for x in run):
+        eligible |= set(run)
+    for num in uniq & eligible:
+        if num in proven_h2:
+            continue  # section N already has its own `## N.` heading
+        i, title = candidates[num][0]
+        lines[i] = f"## {num}. {title}"
+    return "\n".join(lines)
+
+
 # ── H1 hyphen-broken-word rejoin (post-render, on rendered markdown) ────────
 
 
@@ -2046,6 +2159,10 @@ def render_pdf_to_markdown(
     # heading post-processors so it operates on the final heading shapes.
     md = _fold_orphan_roman_numerals_into_headings(md)
     md = _fold_orphan_arabic_numerals_into_headings(md)
+    # Cycle 11 (G5a): promote single-level `N. Title` lines to `## N. Title`,
+    # gated on the document already numbering its sections. Runs AFTER the
+    # orphan-numeral folders so `## 1. Introduction` exists as an anchor.
+    md = _promote_numbered_section_headings(md)
 
     # 5. Title rescue — only available when pdfplumber layout extracts cleanly.
     if _layout_doc is not None:

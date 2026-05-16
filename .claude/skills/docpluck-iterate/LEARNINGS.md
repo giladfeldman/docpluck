@@ -488,3 +488,18 @@ Mid-run, ArticleFinder flagged (and the user confirmed as a directive) that docp
 - Memory `feedback_gold_generation_via_article_finder`.
 
 **Process note (rule 8g — user-correction ratchet):** the verifier subagent (consumer-side comparison of rendered.md vs gold on docpluck's 6 checks) STAYS docpluck's — it consumes the shared gold, it does not produce ground truth. Only *generation* is delegated. If the shared `reading` view lacks detail docpluck needs (cell-by-cell tables for the TABLE check), that enrichment goes into `gold-generation.md` coordinated with article-finder — never re-forked into a docpluck-local prompt. Flagged to the user as a follow-up for article-finder.
+
+---
+
+## Run: 2026-05-16 (autonomous APA-first run, session 3) · Cycle 11 · v2.4.43
+
+### Outcome
+- **Cycle 11 shipped v2.4.43** — single-level numbered section headings demoted to body text (G5a, S1). New `render.py::_promote_numbered_section_headings` promotes `N. Title` → `## N. Title`. jdm_m.2022.2 6/7 sections promoted, chen 6/10, chandrashekar 0 false positives.
+
+### Blind spots / process notes
+- **Single-level numbered promotion needs a document-internal-consistency gate, not a pattern match.** `2. Omission neglect` and an enumerated-list item `2. Subjects who...` are pattern-identical. Five conjunctive gates make the promotion safe: (1) the document must already number its sections (≥1 `#{2,4} N` heading); (2) the candidate's number must be in a contiguous integer run that connects to a proven section number — a `1.` list item in a paper whose sections run 30-32 is out of range; (3) a number that appears >1× is a restarting list → uniqueness test drops it; (4) a line adjacent to a sibling `N.` line is inside a list → dropped; (5) terminal punctuation / ≥5-lowercase-word prose runs → dropped. chandrashekar's exclusion-criteria and analysis-step lists were rejected by ALL of (2)/(3)/(4)/(5) independently — defense in depth.
+- **The isolation heuristic was wrong on the first try.** v1 required the candidate line to be blank-line-isolated (blank before AND after). But a demoted section heading sits BETWEEN BODY PARAGRAPHS with no blank separation — `2. Omission neglect` has prose on line i-1 and line i+1. The blank-isolation check rejected exactly the headings to promote (0 promotions on jdm_m2). Fixed: replaced blank-isolation with "not adjacent to a sibling numbered line" — which correctly distinguishes a heading-before-section-body from a list-item-before-list-item. Lesson: a demoted heading is wedged in prose, not floating in whitespace — never gate heading-detection on blank-line isolation.
+- **Conservative under-promotion is the correct failure mode.** chen sections 1/2/3/5 were NOT promoted because survey-question lists elsewhere in the paper reuse numbers 1/2/3/5 → the uniqueness test (rightly) drops them. That is an under-promotion, not a false positive — exactly the right trade. 6/10 with 0 false positives beats 10/10 with a risk of promoting list items.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 11 is one new render post-processor, gated by 5 conjunctive safety checks; 26/26 baseline + AI-gold verifier confirm 0 false positives. Same shape as cycles 1-10.

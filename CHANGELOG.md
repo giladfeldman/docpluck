@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.43] — 2026-05-16
+
+**Cycle 11 (autonomous APA-first run) — single-level numbered section headings demoted to body text (G5a, S1).** Cycle 9 (v2.4.41) promoted multi-level numbered subsection headings (`5.1.`, `6.1.1.`); single-level top-level numbered headings — `2. Omission neglect`, `3. Choice deferral`, `1. Hindsight bias` — were still rendered as plain body text when the title is not a canonical section word.
+
+Fix (v2.4.43) — new `render.py::_promote_numbered_section_headings` promotes a single-level `N. Title` line to `## N. Title`. Single-level promotion has a large false-positive surface (enumerated lists also look like `N. Title`), so it is gated by a **document-internal-consistency** rule, not a bare pattern match:
+- the document must already number its sections (≥1 existing `#{2,4} N` heading);
+- the candidate's number must fall in a contiguous integer run that connects to a proven section number — a number outside the section-numbering range (e.g. a `1.` list item in a paper whose sections run 30-32) is never promoted;
+- a number that appears more than once is a restarting list, not a section sequence — excluded by a uniqueness test;
+- a line adjacent to a sibling `N.` line is inside a list, not at a section boundary — excluded;
+- titles with terminal punctuation or a prose-like run of ≥5 lowercase-initial words are excluded.
+
+Verified across 3 papers: jdm_m.2022.2 promoted 6 of 7 single-level sections (`## 2.`–`## 8.`; one blocked by the lowercase-run prose guard — a known separate residual); chen 6 of 10 (the rest blocked because survey-question lists reuse section numbers 1/2/3/5 — a conservative under-promotion, not a false positive); **chandrashekar 0 false positives** — its exclusion-criteria and analysis-step enumerated lists were correctly NOT promoted (every gate held). 26/26 baseline PASS. 7 new tests in `tests/test_numbered_section_promotion_real_pdf.py`.
+
+**Residual (queued):** the ≥5-lowercase-word prose guard still rejects long descriptive headings (`4. Knowledge acquisition, decision delay, and choice outcomes`); list-number collision blocks a section heading whose number a body list reuses.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.42] — 2026-05-16
 
 **Cycle 10 (autonomous APA-first run) — Elsevier page-1 footer spliced into the Introduction body (D4, S2).** The APA Phase-5d sweep found that the Elsevier page-1 footer block — the corresponding-author e-mail line and the ISSN / front-matter / copyright line — was extracted by pdftotext at the page boundary and welded into the Introduction body (`ar_apa_j_jesp_2009_12_011`: `E-mail address: muraven@albany.edu` / `0022-1031/$ - see front matter Ó 2009 Elsevier Inc. All rights reserved.` spliced between two Introduction paragraphs; `chen_2021_jesp`: the `0022-1031/© 2021 …` line in the front matter).
