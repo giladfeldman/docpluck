@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.42] — 2026-05-16
+
+**Cycle 10 (autonomous APA-first run) — Elsevier page-1 footer spliced into the Introduction body (D4, S2).** The APA Phase-5d sweep found that the Elsevier page-1 footer block — the corresponding-author e-mail line and the ISSN / front-matter / copyright line — was extracted by pdftotext at the page boundary and welded into the Introduction body (`ar_apa_j_jesp_2009_12_011`: `E-mail address: muraven@albany.edu` / `0022-1031/$ - see front matter Ó 2009 Elsevier Inc. All rights reserved.` spliced between two Introduction paragraphs; `chen_2021_jesp`: the `0022-1031/© 2021 …` line in the front matter).
+
+Fix (v2.4.42) — two `normalize.py` W0 watermark patterns. **Issue K** strips the Elsevier ISSN / front-matter / copyright line: anchored on the line-leading journal ISSN `\d{4}-\d{3}[\dX]/` (academic body prose and references never begin with an ISSN-slash) and additionally requiring an `Elsevier` / `All rights reserved` / `see front matter` keyword, so a coincidental digit run can never match. The pre-existing Issue-H copyright pattern only fired when the line *started* with `©`/`Ó`; these lines start with the ISSN. **Issue L** strips the singular `E-mail address:` corresponding-author line (must contain an `@`). The plural multi-author `E-mail addresses:` list is intentionally left alone — it wraps across several lines, so a one-line strip would shred it.
+
+Verified on ar_apa_011 (2 footer lines removed, both surrounding Introduction paragraphs intact) and chen (ISSN line removed) — surgical deletions, zero body-prose loss. 26/26 baseline PASS. 7 new tests in `tests/test_elsevier_footer_strip_real_pdf.py`.
+
+**Residual (queued):** the standalone lowercase `doi:10.…` footer line is intentionally not stripped — a reference whose DOI wraps onto its own line would be indistinguishable, risking text loss. The plural `E-mail addresses:` multi-author list and the `Received … Accepted …` history line remain.
+
+`NORMALIZATION_VERSION` 1.9.6 → 1.9.7.
+
+~12 APA papers still FAIL Phase-5d verification; the autonomous run continues.
+
 ## [2.4.41] — 2026-05-16
 
 **Cycle 9 (autonomous APA-first run) — numbered subsection headings demoted to body text (G5, S1).** The APA Phase-5d sweep found that numbered subsection headings in the dominant Cambridge/JDM and Elsevier style — `5.1. Participants and design`, `5.3.3. Choice deferral`, `6.1.1. Replication: Retrospective hindsight bias` — were rendered as plain body text instead of `###` headings, across jdm_m.2022.2, chen_2021_jesp, jdm_.2023.15, jdm_.2023.16 and others.

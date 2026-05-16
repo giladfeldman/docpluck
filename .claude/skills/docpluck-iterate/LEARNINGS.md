@@ -454,3 +454,18 @@ Cycles 2, 4, 6 each independently rediscovered that a glyph/encoding corruption 
 
 ### SPINE-SKIPs
 - R3 (`/docpluck-cleanup` + `/docpluck-review` before release) — SKIPPED. Cycle 9 is a 2-token regex loosening (optional `\.?` + `:` in a char class) inside one existing render post-processor, all existing guards intact. 26/26 baseline + AI-gold verifier confirm no regression. Same shape as cycles 1-8.
+
+---
+
+## Run: 2026-05-16 (autonomous APA-first run, session 3) · Cycle 10 · v2.4.42
+
+### Outcome
+- **Cycle 10 shipped v2.4.42** — Elsevier page-1 footer spliced into the Introduction body (D4, S2). Two `normalize.py` W0 watermark patterns: Issue K strips the Elsevier ISSN/front-matter/copyright line (`0022-1031/$ - see front matter Ó 2009 Elsevier Inc. All rights reserved.`), Issue L strips the singular `E-mail address:` corresponding-author line. ar_apa_011: 2 footer lines removed, both bracketing Introduction paragraphs intact. chen: ISSN line removed. 26/26 baseline. 7 new tests.
+
+### Blind spots / process notes
+- **The line-leading journal ISSN is a bulletproof anchor.** `\d{4}-\d{3}[\dX]/` at line start — no academic body prose or reference ever begins with an ISSN-slash. A keyword guard (`Elsevier`/`All rights reserved`/`see front matter`) is added belt-and-suspenders so a coincidental `NNNN-NNNN/` digit run (a year range like `2009-2011/2012`) can never match. The pre-existing Issue-H copyright pattern only fired on a line *starting* with `©`/`Ó`; the Elsevier line starts with the ISSN, so Issue-H structurally could not reach it — a reminder to check WHERE an existing anchored pattern anchors before assuming it covers a variant.
+- **Singular vs plural is the multi-line discriminator.** `E-mail address:` (singular) = one corresponding author = one short line → safe to strip whole-line. `E-mail addresses:` (plural) = multi-author list → pdftotext wraps it across 3+ lines → a one-line strip would shred it, leaving orphan continuation lines. Matching only the singular form is the safe call; the plural list is left intact (queued).
+- **Deliberately did NOT strip the bare `doi:10.…` footer line.** A reference whose trailing DOI wraps onto its own line is textually indistinguishable from the page-footer `doi:` line; stripping it would risk reference text loss (rule 0a). Left as a documented residual rather than guessed at. A positional gate (front-matter-only) could recover it safely in a later cycle.
+
+### SPINE-SKIPs
+- R3 (`/docpluck-cleanup` + `/docpluck-review`) — SKIPPED. Cycle 10 is 2 W0 watermark regexes, each anchored on the journal ISSN + a keyword guard; same shape as cycle 5's D4 patterns. 26/26 baseline + AI verifier confirm no regression.
