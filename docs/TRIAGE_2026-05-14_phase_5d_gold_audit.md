@@ -275,6 +275,17 @@ New `render.py::_promote_numbered_section_headings` promotes `N. Title` → `## 
 
 `render.py`'s numbered-heading promoters carried a `max_lc_run >= 5` "long lowercase-word run" prose guard that mis-rejected legitimate descriptive headings. Reproduced at HEAD: jdm_.2023.16 alone had **19** multi-level numbered subsection headings demoted to body text, with `max_lc` up to **12** (`3.3.2.1. The quality of planning on the previous trial moderates the effect of reflection`) — far deeper than the TRIAGE's "raise 5→8" estimate. Re-scoped: the lc-run guard is **removed entirely from `_promote_numbered_subsection_headings`** (multi-level dotted numbering + capital-start + no-terminal-punctuation + single ≤80-char line is itself a sufficient heading signature; the lc-run guard cannot distinguish a descriptive heading from prose). For `_promote_numbered_section_headings` (single-level `N.`, real list-collision risk) the guard is kept but raised `5→8`, alongside its existing numbering-range/uniqueness/list-adjacency gates. jdm16: 19 headings recovered; v2.4.44→v2.4.45 diff is heading-promotion only (0 text loss/hallucination); 26/26 baseline.
 
+### Cycle 14 (investigation, run 4) — G5c re-scoped C2 → C3 (no release)
+
+Reproduced G5c at v2.4.45 on jdm_m.2022.2. The TRIAGE framed G5c as "the cycle-3 orphan-arabic-numeral folder's multi-level analogue" (C2, a render-layer fold). Reproduction shows it is **deeper** — section-partitioner work, C3:
+
+- jdm_m.2022.2 has **6** orphan bare-number lines: `5.3.` (L114), `5.4.` (L185), `6.3.` (L260), `6.4.` (L285), `7.3.` (L329), `7.4.` (L403).
+- Only **1** is the clean foldable case the TRIAGE described — `5.4.` immediately followed by a generic `## Discussion` (→ should be `### 5.4. Discussion`). A render-layer fold-into-next-heading handles this one.
+- The other **5** are NOT foldable: pdftotext splits `6.3. Results` into `6.3.\n\nResults`; the section partitioner then consumes the bare word `Results` as a canonical section keyword (building/relocating a `## Results` block elsewhere) and strands `6.3.` with no title and the section body (`We performed one-way ANOVAs…`) starting directly after it. The title word is *gone from that position* — there is no following heading to fold into. `5.3.` (L114) is stranded above `### Figure 1` — same shape.
+- Correct fix layer: `docpluck/sections/` — the partitioner must recognise `N.N.\n\n<CanonicalKeyword>` as ONE numbered heading `N.N. <Keyword>` and not detach the number. That is partitioner work with broad-corpus false-positive surface — a dedicated session, C3.
+
+**Re-scoped:** G5c-1 (render-layer fold of orphan `N.N.` into an adjacent generic `##/###` heading — the `5.4.`/`## Discussion` case, C1-C2) can ship independently; G5c-2 (partitioner-level split-heading rejoin — the 5 title-loss cases, C3) needs the dedicated section-partitioner session alongside G5d and the TABLE cluster.
+
 ### SESSION-3 STANDING VERDICT (rule 0e-bis)
 
 The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixes (v2.4.40-43), each AI-gold-verified OVERALL PASS with 0 regressions. But ~12 APA papers still FAIL Phase-5d on PRE-EXISTING defects the cycles did not reach. Verifier-confirmed open punch-list:
@@ -282,7 +293,7 @@ The APA corpus is **NOT clean**. Cycles 8-11 shipped 4 verified incremental fixe
 | Defect class | Sev | Papers | Notes |
 |---|---|---|---|
 | **TABLE structure destruction** | S0/S1 | efendic, ar_apa_011, xiao, jdm15/16, chen, maier, ip_feldman (~11) | grid lost → caption-bleed; flat number-dump; empty `<table>` shells; two tables merged; rows dropped. C3 — needs a render/structured coordination design. The single largest blocker. |
-| **G5c split-line numbered headings** | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`7.3.` etc.) | number alone on a line, title on the next; renders as orphan bare-number + a MISLABELED generic `## Results`. cycle-3 orphan-folder multi-level analogue. |
+| **G5c split-line numbered headings** — re-scoped run 4 → G5c-1 (render fold, C1-C2) + G5c-2 (partitioner split-heading rejoin, **C3**) | S1 | jdm_m.2022.2 (`5.3.`/`6.3.`/`7.3.` etc.) | number alone on a line; only 1 of 6 cases foldable — the other 5 are partitioner title-loss. See "Cycle 14 (investigation)" above. |
 | **G5d named (unnumbered) heading demotion** | S1 | ar_apa_011 (`Participants`, `Overview`), efendic, chandrashekar, ip_feldman (~7) | section-partitioner work; largest false-positive surface. |
 | ~~**G5b long-descriptive-title prose guard**~~ ✓ FIXED v2.4.45 (cycle 13) | S1 | jdm16, jdm_m2, chen | ~~`≥5-lowercase-word` guard over-rejects legit long numbered headings.~~ Subsection promoter's lc-run guard removed; single-level raised 5→8. |
 | **FIG caption double-emission + truncation** | S2 | jdm_m2, efendic, chan_feldman, ziano, jdm15/16 (~8) | caption inline + in `## Figures` block; truncated mid-word; figure data-labels as orphan body lines. |
