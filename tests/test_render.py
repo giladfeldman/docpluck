@@ -5,6 +5,8 @@ Ported from docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py
 (iter-29 / iter-32 / iter-34 / iter-23 / iter-20 blocks).
 """
 
+from pathlib import Path
+
 import pytest
 
 from docpluck.render import (
@@ -15,6 +17,7 @@ from docpluck.render import (
     _promote_numbered_subsection_headings,
     _reformat_jama_key_points_box,
     _suppress_orphan_table_cell_text,
+    _suppress_inline_duplicate_figure_captions,
     _demote_inline_footnotes_to_blockquote,
     _promote_study_subsection_headings,
     _demote_false_single_word_headings,
@@ -892,9 +895,113 @@ def test_render_unlocated_table_kept_when_caption_present():
     assert "Table 1. A useful summary." in md
 
 
+# ── _suppress_inline_duplicate_figure_captions (FIG-3c) ────────────────────
+
+
+def test_suppress_inline_dup_figure_caption_exact():
+    # The figure caption appears once inline in body prose and once as
+    # the spliced "### Figure N" block — the inline copy is dropped.
+    md = (
+        "increased empathy for\n"
+        "\n"
+        "Figure 1. Empathy model of forgiveness reconstructed from McCullough et al.\n"
+        "\n"
+        "the offender and (b) forgiving is uniquely related to behaviour.\n"
+        "\n"
+        "### Figure 1\n"
+        "\n"
+        "*Figure 1. Empathy model of forgiveness reconstructed from McCullough et al.*\n"
+    )
+    out = _suppress_inline_duplicate_figure_captions(md)
+    # Inline body copy gone; the block + its *caption* survive.
+    assert out.count("Empathy model of forgiveness reconstructed") == 1
+    assert "### Figure 1" in out
+    assert "*Figure 1. Empathy model of forgiveness reconstructed" in out
+    assert "increased empathy for" in out
+    assert "the offender and (b)" in out
+
+
+def test_suppress_inline_dup_block_covers_body():
+    # The block caption is a superset of the inline run (block absorbed a
+    # continuation line) — still safe to drop the inline copy.
+    md = (
+        "Figure 2. Mean ratings by condition\n"
+        "\n"
+        "### Figure 2\n"
+        "\n"
+        "*Figure 2. Mean ratings by condition across the three studies.*\n"
+    )
+    out = _suppress_inline_duplicate_figure_captions(md)
+    assert out.count("Mean ratings by condition") == 1
+    assert "*Figure 2. Mean ratings by condition across the three studies.*" in out
+
+
+def test_suppress_inline_dup_keeps_body_exceeding_block():
+    # The inline run EXCEEDS the block caption (the block caption was
+    # trimmed shorter) — dropping the inline copy would lose text, so it
+    # must be KEPT.
+    md = (
+        "Figure 3. Scatterplot of the correlation. interaction between "
+        "scenario and scores (F(1, 96) = 4.58).\n"
+        "\n"
+        "### Figure 3\n"
+        "\n"
+        "*Figure 3. Scatterplot of the correlation.*\n"
+    )
+    out = _suppress_inline_duplicate_figure_captions(md)
+    # Inline copy retained (text-loss guard).
+    assert out.count("interaction between scenario") == 1
+    assert "Figure 3. Scatterplot of the correlation. interaction" in out
+
+
+def test_suppress_inline_dup_keeps_body_reference():
+    # A body sentence merely *referencing* a figure ("...in Figure 1, the
+    # results...") must never be removed.
+    md = (
+        "Figure 1 below illustrates the design used in the study.\n"
+        "\n"
+        "### Figure 1\n"
+        "\n"
+        "*Figure 1. Study design overview across the three conditions.*\n"
+    )
+    out = _suppress_inline_duplicate_figure_captions(md)
+    assert "Figure 1 below illustrates the design" in out
+
+
+def test_suppress_inline_dup_noop_without_blocks():
+    md = "Some body text.\n\nFigure 1. A caption-shaped line with no block.\n"
+    assert _suppress_inline_duplicate_figure_captions(md) == md
+
+
 # ── render_pdf_to_markdown smoke (requires test fixture) ──────────────────
 
 
 def test_render_module_importable():
     from docpluck import render_pdf_to_markdown
     assert callable(render_pdf_to_markdown)
+
+
+_TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+
+
+@pytest.mark.skipif(
+    not (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").exists(),
+    reason="chan_feldman_2025_cogemo.pdf fixture not present",
+)
+def test_chan_feldman_figure_captions_not_double_emitted():
+    """FIG-3c real-PDF: chan_feldman's figure captions are linearized by
+    pdftotext into the body text AND spliced as ``### Figure N`` blocks.
+    Each caption must appear exactly once in the rendered .md."""
+    from docpluck import render_pdf_to_markdown
+
+    md = render_pdf_to_markdown(
+        (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").read_bytes()
+    )
+    # Figure 1's caption text must not be double-emitted.
+    assert md.count("Empathy model of forgiveness reconstructed from") == 1, (
+        "Figure 1 caption double-emitted"
+    )
+    # Figure 7's caption (with a Note) likewise.
+    assert md.count("Empathy (manipulation check): Comparison of empathy") == 1, (
+        "Figure 7 caption double-emitted"
+    )

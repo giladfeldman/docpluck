@@ -1122,6 +1122,95 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
     return cleaned
 
 
+# FIG-3c (v2.4.51): a body line that begins a figure-caption run inline.
+# pdftotext linearizes a figure's caption into the running text column, so
+# the caption appears once inline in body prose and once as the spliced
+# ``### Figure N`` block — a double-emission.
+_INLINE_FIG_CAPTION_LABEL_RE = re.compile(r"^(?:Figure|FIGURE|Fig\.)\s+\d+\b")
+
+
+def _suppress_inline_duplicate_figure_captions(text: str) -> str:
+    """Drop a figure caption that pdftotext also left inline in the body
+    text, when the figure already has a dedicated ``### Figure N`` block.
+
+    pdftotext linearizes a figure caption into the running text column, so
+    the caption is rendered twice: once inline in a section's body prose,
+    once as the spliced ``### Figure N`` block. This removes the inline
+    body copy.
+
+    Safe-subset only (FIG-3c): the inline run is dropped ONLY when the
+    ``### Figure N`` block's caption *fully covers* it — the block caption
+    equals, or is a superset (prefix-wise) of, the normalized inline run.
+    An inline run that EXCEEDS the block caption (the block caption was
+    trimmed shorter, or the run accumulated trailing body prose) is left
+    untouched so no caption text can be lost. Keyed purely on the
+    structural signature (a ``Figure N``-led body run reproducing a known
+    figure block's caption), not on paper identity.
+    """
+    lines = text.split("\n")
+    # 1. Collect "### Figure N" block captions (label included).
+    block_cap: dict[int, str] = {}
+    for i, ln in enumerate(lines):
+        m = re.match(r"^#{2,4} Figure (\d+)\s*$", ln)
+        if not m:
+            continue
+        for j in range(i + 1, min(i + 5, len(lines))):
+            cm = re.match(r"^\*(Figure\s+\d+.+?)\*\s*$", lines[j])
+            if cm:
+                block_cap[int(m.group(1))] = re.sub(
+                    r"\s+", " ", cm.group(1)
+                ).strip()
+                break
+    if not block_cap:
+        return text
+    # 2. Walk body lines; drop an inline run fully covered by a block caption.
+    drop: set[int] = set()
+    n = len(lines)
+    i = 0
+    while i < n:
+        s = lines[i].strip()
+        if (
+            s
+            and _INLINE_FIG_CAPTION_LABEL_RE.match(s)
+            and not s.startswith(("#", "*", "<", "|", "`", ">"))
+        ):
+            num = int(re.match(r"^(?:Figure|FIGURE|Fig\.)\s+(\d+)\b", s).group(1))
+            bc = block_cap.get(num)
+            if bc:
+                # Accumulate the inline run: consecutive non-blank body
+                # lines until a blank line / structural element / new caption.
+                run = [i]
+                acc = s
+                j = i + 1
+                while j < n:
+                    sj = lines[j].strip()
+                    if (
+                        not sj
+                        or sj.startswith(("#", "*", "<", "|", "`", ">"))
+                        or _INLINE_FIG_CAPTION_LABEL_RE.match(sj)
+                        or re.match(r"^(?:Table|TABLE)\s+\d", sj)
+                    ):
+                        break
+                    run.append(j)
+                    acc = f"{acc} {sj}"
+                    j += 1
+                acc_norm = re.sub(r"\s+", " ", acc).strip()
+                # Drop iff the block caption fully covers the inline run
+                # (>=30 chars matched, so a coincidental short prefix can't
+                # trigger removal).
+                if len(acc_norm) >= 30 and bc.lower().startswith(acc_norm.lower()):
+                    drop.update(run)
+                    i = j
+                    continue
+        i += 1
+    if not drop:
+        return text
+    kept = [ln for k, ln in enumerate(lines) if k not in drop]
+    out = "\n".join(kept)
+    # Collapse blank-line runs left by the removal.
+    return re.sub(r"\n{3,}", "\n\n", out)
+
+
 def _is_cell_like_in_post_caption_context(p: str) -> bool:
     """Like `_is_orphan_cell_paragraph` but accepts digit-period prefix
     lines (``1. Degree of apology``) which look like list items in
@@ -2193,6 +2282,14 @@ def render_pdf_to_markdown(
     # remaining surfaces — figure/table captions, unstructured-table fences,
     # raw_text fallbacks — so no presentation-form ligature reaches the .md.
     md = decompose_ligatures(md)
+    # FIG-3c: drop a figure caption pdftotext also left inline in the body
+    # text, when a ``### Figure N`` block already carries it (double-emission).
+    # Runs AFTER every glyph-normalization pass (destyle / minus-recovery /
+    # ligature decomposition) so the inline body line and the figure block's
+    # caption are compared in the SAME final glyph form — a stray ligature in
+    # the block caption (``reﬂection`` vs body ``reflection``) would otherwise
+    # defeat the equality check.
+    md = _suppress_inline_duplicate_figure_captions(md)
     md = _merge_compound_heading_tails(md)
     md = _reformat_jama_key_points_box(md)
     md = _promote_numbered_subsection_headings(md)

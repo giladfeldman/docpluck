@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.51] — 2026-05-16
+
+**Cycle FIG-3c (APA-first run, run 7) — figure caption double-emitted (inline in body + as the `### Figure N` block) (FIG, S2).** pdftotext linearizes a figure's caption into the running text column, so a figure caption appears twice in the rendered markdown: once inline as a standalone body paragraph, and once as the spliced `### Figure N` block. chan_feldman rendered all 10 figure captions twice; chandrashekar, efendic, jdm_.2023.16 and maier likewise.
+
+Fix (v2.4.51) — new render post-processor `_suppress_inline_duplicate_figure_captions`: it collects every `### Figure N` block's caption, then drops a body-text run that begins with a `Figure N` label and reproduces that block's caption. **Safe-subset only:** the inline run is removed ONLY when the block caption *fully covers* it (equals, or is a prefix-superset of, the normalized inline run). An inline run that EXCEEDS the block caption — because the block caption was trimmed shorter, or the inline run accumulated trailing body prose — is left untouched, so no caption text can be lost. The pass runs after every glyph-normalization pass (destyle / minus-recovery / ligature decomposition) so the inline line and the block caption are compared in the same final glyph form (a stray `ﬂ` ligature in one would otherwise defeat the equality check).
+
+Across the APA corpus ~21 double-emitted captions in 5 papers are de-duplicated (chan_feldman Figs 1–10, chandrashekar Figs 1/3, efendic Figs 2–5, maier Figs 1/2, jdm_.2023.16 Figs 2–4). ~7 body-exceeds-block cases are deliberately skipped and queued (FIG-3c-2). Phase-5d AI-gold verify across 3 papers: 3 PASS, 0 text-loss, 0 hallucination — every removed line was an exact duplicate of a surviving `### Figure N` block. 26/26 baseline PASS. Tier1==Tier2==Tier3. 6 new tests (`tests/test_render.py`).
+
+~9 APA papers still FAIL Phase-5d verification (FIG-3c-2 body-exceeds-block double-emission, FIG-4 Note trailing-sentence loss, TBL-CAP, G5c-2, G5d, HALLUC-HEAD, TABLE cluster, COL); the run continues.
+
 ## [2.4.50] — 2026-05-16
 
 **Cycle FIG-3b (APA-first run, run 7) — figure/table caption anchored to a body-text reference instead of the real caption (FIG, S2).** When a paper both *references* a figure/table in body prose ("…we summarised the effects in Figure 10.") and has the figure/table's real caption, pdftotext line-wraps the body sentence so the "Figure 10." token lands at a line start and false-matches the caption regex. That in-text reference often sits *earlier* in the document than the real caption, and `extract_pdf_structured`'s dedup kept the first occurrence per `(kind, number)` — so the renderer showed body prose as the caption (chan_feldman Figure 10 rendered the sentence `We found support for the effect of perceived apology…` as its caption).
