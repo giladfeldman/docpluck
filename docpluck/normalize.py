@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.6"
+NORMALIZATION_VERSION = "1.9.7"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -100,6 +100,30 @@ _WATERMARK_PATTERNS = [
     # the trailing newline so we don't leave a blank line behind.
     re.compile(
         r"(?im)^\s*[©Ó]\s*\d{4}[^\n]*?All\s+rights\s+reserved\.?\s*\n?",
+    ),
+    # Issue K (cycle 10, D4) — Elsevier page-1 ISSN / front-matter / copyright
+    # line. pdftotext extracts it at the page-1 footer and downstream
+    # paragraph-rejoin splices it into the Introduction body. Formats:
+    #   "0022-1031/$ - see front matter Ó 2009 Elsevier Inc. All rights reserved."
+    #   "0022-1031/© 2021 Elsevier Inc. All rights reserved."
+    # The Issue-H pattern above only fires when the line STARTS with ©/Ó;
+    # these lines start with the journal ISSN. The line-leading ISSN
+    # `NNNN-NNNX/` is the anchor — academic body prose and references never
+    # begin with it — and we additionally require an Elsevier/front-matter/
+    # rights-reserved keyword so a coincidental digit run can never match.
+    re.compile(
+        r"(?im)^\s*\d{4}-\d{3}[\dX]/[^\n]*?"
+        r"(?:see\s+front\s+matter|Elsevier|All\s+rights\s+reserved)[^\n]*\n?",
+    ),
+    # Issue L (cycle 10, D4) — Elsevier single-author corresponding-author
+    # e-mail footer line, e.g. "E-mail address: muraven@albany.edu". This is
+    # page-1 footer metadata that pdftotext splices mid-Introduction. Only
+    # the SINGULAR "E-mail address:" form is matched — it is a single short
+    # line (one corresponding author). The plural "E-mail addresses:" form is
+    # a long multi-author list that pdftotext wraps across several lines, so
+    # it is intentionally left alone (a one-line strip would shred it).
+    re.compile(
+        r"(?im)^\s*E-mail\s+address:\s*\S*@\S+[^\n]*\n?",
     ),
     # Issue I — Two-column running header that pdftotext extracts at page
     # boundaries.  Format:
