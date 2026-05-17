@@ -262,3 +262,16 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Why:** HALLUC-HEAD as a whole is an open-ended grab-bag (`## Conclusion`, `## Supplementary Material`, …) with a broad false-positive surface. The CRediT sub-case is governed by a closed, standardized 14-term vocabulary — that makes it precisely detectable and safe to ship as its own narrow cycle.
 
 **How to detect next time:** When a defect class is partly governed by a controlled vocabulary (CRediT roles, ISO codes, a journal's fixed section set), split that slice into its own cycle — it ships safely while the open-ended remainder waits. Disambiguate an ambiguous token by neighborhood density (≥3 nearby vocabulary terms = inside the block), not by the token alone. Normalize the vocabulary for publisher punctuation variants (dash styles, `&` vs `and`).
+
+## Harness `extract.py` skips on source-sha1, not docpluck version (caught 2026-05-17, run 9 cycle 1, v2.4.54)
+
+**What:** `scripts/harness/extract.py`'s idempotency skip fires when `status == "ok" AND source_sha1 unchanged AND docpluck_version is truthy` — it does NOT compare the recorded `docpluck_version` to the running service's version. So after a library code change, a plain `python -m scripts.harness.extract` SKIPS every document (the PDF/DOCX bytes never change) and the Tier-D gate then diffs stale pre-change output against the baseline — a green gate that proves nothing.
+
+**Why:** the harness is the per-cycle regression gate. Without `--force` after a code change it silently verifies the OLD library.
+
+**Fix / how to use it:**
+1. Always pass `--force` to `scripts.harness.extract` after any library change.
+2. A signature-gated no-op fix (a helper that early-returns when its trigger glyph/pattern is absent) is *provably* byte-identical on unaffected docs — so `--force --only <affected-docs>` is a sound per-cycle gate; run one full whole-corpus `--force` sweep before release as the corpus-wide backstop. (A full whole-corpus academic-level extract is ~70 min on this machine — per-cycle full extracts do not fit a normal iterate budget.)
+3. Never run the harness `extract` and the broad `pytest` concurrently — CPU contention starves the FastAPI service and produces false `extraction` timeouts (3 docs timed out this way in run 9 cycle 1, surfacing as phantom `extraction` pass→fail "regressions").
+
+**Possible harness improvement (queued):** make the `extract.py` skip compare `docpluck_version` to the live `/health` version so a plain `extract` re-does docs whose extracting build is stale — then `--force` is only needed to override a *same-version* re-extract.

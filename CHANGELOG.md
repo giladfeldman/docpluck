@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.54] — 2026-05-17
+
+**Cycle 1 (run 9, harness-gated) — Adobe-Symbol-font glyphs surfaced as Private-Use-Area codepoints (glyph, S1).** Some PDF/DOCX producers embed the Adobe "Symbol" font with no ToUnicode CMap, so pdftotext / mammoth surface each Symbol glyph as a Private-Use codepoint U+F000+<symbol-byte> — the standardized regression coefficient β reads as U+F062, the χ of a χ² test statistic as U+F063, a bullet • as U+F0B7. A PUA codepoint carries no Unicode identity; it is purely a font-encoding artifact and is never legitimate in extracted academic text. The verification harness's Tier-D `glyph` check flagged it on `docxtests/BH1988_manuscript` (β ×2) and `escicheck Xiao-etal-2024 Monin&Miller` (χ ×2, bullet ×2).
+
+Fix (v2.4.54) — new `normalize.py::recover_pua_glyphs`: it maps the Adobe Symbol StandardEncoding (U+F020–F0FF — the full Greek alphabet, math operators and relations, and extensible-bracket pieces; 185 entries) back to real Unicode. The encoding is a fixed, decades-stable standard, so the recovery is zero-false-positive and fully general — keyed on the structural signature "codepoint in the Symbol-font PUA block", never on paper identity. A PUA codepoint outside the Symbol block, or an unassigned Symbol position, is left untouched — never guessed. Greek stays Greek (CLAUDE.md hard rule 4 — the A5 step transliterates β→"beta" for ASCII-form callers; the rendered .md keeps β). The helper is wired into all three text channels: the body channel's new W0e step (`normalize_text`), `cell_cleaning._html_escape` (Camelot table cells), and the `render_pdf_to_markdown` post-process (figure/table captions, unstructured-table fences, raw_text fallbacks).
+
+Harness Tier-D gate (academic level, whole corpus): `bh1988` and `xiao-monin-miller` both flip the `glyph` check fail→pass; 0 new fails; the cycle's diff (a signature-gated glyph map that early-returns on PUA-free text) provably cannot regress any other corpus document. Broad pytest 1319 passed (the one failure, `test_request_09`, is the pre-existing COL-class column-interleave defect, unrelated). NORMALIZATION_VERSION 1.9.9, TABLE_EXTRACTION_VERSION 2.1.4. 11 new tests (`tests/test_pua_glyph_recovery_real_pdf.py`).
+
+The harness Tier-D backlog still has open fail cells — the other two glyph docs (`ieee_access_10` CMEX10 matrix-bracket pieces, `plos_med_1` U+FFFD), 15 `table_parity`, 9 `text_loss`; the run continues.
+
 ## [2.4.53] — 2026-05-17
 
 **Cycle HALLUC-HEAD-1 (APA-first run, run 7) — a CRediT contributor-role token promoted to a `## ` section heading (HALLUC-HEAD, S1).** A paper's CRediT (Contributor Roles Taxonomy) block lists the 14 standard contribution roles. One of them — `Methodology` — collides with the canonical Method/Methodology *section* keyword, so the section partitioner promotes that role token to a `## Methodology` heading even though it sits inside the contributor-roles table, not at a real section boundary. chan_feldman, chandrashekar and chen each rendered a hallucinated `## Methodology` heading in their author-contributions block (none of their AI golds has one).

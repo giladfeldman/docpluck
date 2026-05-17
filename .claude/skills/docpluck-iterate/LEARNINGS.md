@@ -708,3 +708,23 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED (lean-checks release path, 9th consecutive). Inline hard-rule checks all pass: render-layer post-processor in `render.py`, no `-layout`/AGPL/tool-swap/U+2212/ImportError/HTML-table/`normalize.py`-S-step surface; general fix keyed on a structural signature (CRediT controlled vocabulary + region density), not paper identity; heading-markup-only (0 text loss); real-PDF + contract tests added; version bump consistent. 26/26 baseline + Tier1==Tier2==Tier3 confirm no regression.
+
+---
+
+## Run: 2026-05-17 (run 9) · Cycle 1 · v2.4.54 — Adobe-Symbol-font PUA glyph recovery
+
+### Outcome
+- SHIPPED v2.4.54. First harness-gated cycle of run 9. New `normalize.py::recover_pua_glyphs` maps the Adobe Symbol StandardEncoding (U+F020-F0FF, 185 entries) back to real Unicode — recovering β/χ/• that pdftotext/mammoth surfaced as raw Private-Use codepoints. Wired into all 3 text channels (W0e body step / `cell_cleaning._html_escape` / `render_pdf_to_markdown` post-process). Harness Tier-D: `bh1988` + `xiao-monin-miller` flip `glyph` fail→pass, 0 new fails. 11 new tests. Broad pytest 1319 pass (1 pre-existing COL fail).
+
+### Blind Spots
+- **The harness `extract.py` idempotency skip is keyed on `source_sha1`, NOT the docpluck version.** After a library code change, a plain `extract` SKIPS every doc (source bytes unchanged) — it does NOT re-extract against the new code. `--force` is mandatory after any library change, or the regression gate silently compares stale output. A signature-gated no-op fix (like `recover_pua_glyphs`, which early-returns on PUA-free text) is *provably* byte-identical on unaffected docs, so a per-cycle whole-corpus `--force` extract (~70 min) is mostly redundant work; the budget-sound protocol is targeted `--force --only <affected>` per cycle + one full whole-corpus regression sweep before release.
+
+### Edge Cases
+- **A literal Private-Use (or any invisible) codepoint typed into a Write/Edit `content` parameter is silently stripped** — the JSON layer interprets `\uXXXX` as the actual char, which then does not survive. Three Write attempts at the test file lost every ``-class char. The fix: write non-ASCII codepoints as `chr(0xF062)` (pure-ASCII source that builds the char at runtime) — never as a literal glyph, and never trust a hand-typed `\u` escape to land. The `normalize.py` regex literal had to be repaired with a binary-safe `re.subn` rewrite for the same reason.
+- **Running the harness `extract` and the broad `pytest` concurrently caused 3 docs to time out** (`TimeoutError`/`ConnectionResetError`) → 3 false `extraction` pass→fail "regressions". CPU contention starves the FastAPI service. The `_shared/lessons` card "run pytest + verify_corpus sequentially" extends to the harness: extract and the broad pytest must not run concurrently. Re-extracting the 3 docs on an un-contended service cleared 2 immediately; the 3rd (`nat-comms-3`) is a genuinely heavy extraction needing investigation independent of this cycle's diff.
+
+### Verification Gaps
+- **Tier-A (AI-gold) was not run for cycle 1** — `gold_keys.json` maps only Adelina, and a deterministic glyph map verified by Tier-D (`glyph` check = 0 PUA) plus 11 unit/real-PDF tests against the fixed Adobe Symbol standard does not need semantic AI verification the way a table-restructure would. Tier-A golds will be generated (via `article-finder`) for the cycles where structure/semantics matter (table_parity, text_loss).
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean-checks release path, 10th consecutive). Inline hard-rule checks pass: extraction/normalize/render glyph-recovery change, no `-layout`/AGPL/tool-swap/U+2212-rule/ImportError/HTML-table surface; general fix keyed on a structural signature (Symbol-font PUA block), not paper identity; real-PDF + real-DOCX + contract tests added; version bumps consistent (`__init__`/`pyproject`/NORMALIZATION_VERSION/TABLE_EXTRACTION_VERSION). Harness Tier-D 0 new fails + provable no-op scoping confirm no regression.
