@@ -40,3 +40,6 @@ verify_*.err
 pytest_run.txt
 pytest_err.txt
 tmp/
+
+# Verification harness outputs (scripts/harness) — extraction artifacts, not committed.
+verify_out/
