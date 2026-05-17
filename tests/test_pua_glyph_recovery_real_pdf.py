@@ -159,3 +159,38 @@ def test_bh1988_no_symbol_pua_real_docx():
     leftover = _SYMBOL_PUA_RE.findall(normalized)
     assert not leftover, f"Symbol-PUA glyphs remain: {[hex(ord(c)) for c in leftover]}"
     assert "W0e_pua_glyph_recovery" in report.steps_changed
+
+
+# -- cycle 3 (v2.4.56): CMEX10 extensible matrix-bracket pieces ----------
+
+# The whole Private Use Area -- the harness Tier-D `glyph` check fails on any.
+_PUA_RE = re.compile("[" + chr(0xE000) + "-" + chr(0xF8FF) + "]")
+
+
+def test_recovers_cmex_extensible_brackets():
+    """CMEX10 extensible square-bracket pieces U+F8EE-F8FB map to the Unicode
+    Miscellaneous-Technical bracket-piece block U+23A1-23A6 (left
+    upper/extension/lower corner, then right). Confirmed by glyph geometry on
+    ieee_access_10 (left column F8EE/EF/F0, right column F8F9/FA/FB)."""
+    for pua, want in [
+        (0xF8EE, 0x23A1), (0xF8EF, 0x23A2), (0xF8F0, 0x23A3),
+        (0xF8F9, 0x23A4), (0xF8FA, 0x23A5), (0xF8FB, 0x23A6),
+    ]:
+        got = recover_pua_glyphs(chr(pua))
+        assert len(got) == 1 and ord(got) == want, (
+            f"U+{pua:04X} -> U+{ord(got):04X}, want U+{want:04X}"
+        )
+
+
+def test_ieee_access_10_no_pua_real_pdf():
+    """ieee_access_10: a matrix typeset with CMEX10 extensible square brackets
+    reaches the rendered .md as U+F8EE-F8FB PUA codepoints at v2.4.55. Drives
+    the public render entry; no PUA codepoint may survive."""
+    pdf = _META / "PDFextractor" / "test-pdfs" / "ieee" / "ieee_access_10.pdf"
+    if not pdf.exists():
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(pdf.read_bytes())
+    leftover = _PUA_RE.findall(md)
+    assert not leftover, (
+        f"PUA codepoints remain: {sorted({hex(ord(c)) for c in leftover})}"
+    )

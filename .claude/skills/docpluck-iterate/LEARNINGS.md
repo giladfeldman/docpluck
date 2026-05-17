@@ -747,3 +747,20 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path, 11th consecutive). Render-layer-only change; no `-layout`/AGPL/tool-swap/normalize-S-step/HTML-table-format surface; general fix keyed on a structural signature; real-PDF + corrected contract test; version bump consistent (`__init__`/`pyproject` only — render layer has no NORMALIZATION/SECTIONING/TABLE_EXTRACTION constant). Harness Tier-D 15 fixed + 0 new fails confirm no regression.
+
+---
+
+## Run: 2026-05-17 (run 9) · Cycle 3 · v2.4.56 — CMEX10 extensible matrix-bracket PUA glyphs
+
+### Outcome
+- SHIPPED v2.4.56. Extended `recover_pua_glyphs` with the CMEX10 extensible-bracket block U+F8EE-F8FB → U+23A1-23A6. `ieee_access_10` flips the Tier-D `glyph` check fail→pass. 2 new tests.
+
+### Blind Spots
+- **A PUA codepoint alone is ambiguous; glyph geometry from the layout channel disambiguates it definitively.** F8EE-F8FB could in principle be any 6 glyphs. pdfplumber's per-char `(fontname, x0, top)` resolved it with certainty: font `MOHBGE+CMEX10` (the TeX math-extension font), and the six chars sit in two vertical columns — left (x≈350): F8EE/F8EF×3/F8F0 top→bottom; right (x≈546): F8F9/F8FA×3/F8FB — i.e. each is a {upper-corner, extension×3, lower-corner} bracket triple. When a PUA codepoint's identity is uncertain, do NOT guess from the bare codepoint — pull the layout channel's font name + glyph coordinates; the geometry is the proof.
+- **The text channel cannot see font identity — so a font-specific PUA mapping keyed on the bare codepoint is only as general as the codepoint convention.** F8EE-F8FB is the observed CMEX assignment on this PDF; it is mapped as a fixed 6-entry block (geometry-confirmed). Unlike the Adobe Symbol F0xx block (a decades-stable published standard), the F8xx CMEX assignment is per-PDF-producer — a truly general CMEX recovery would key on the layout-channel font name. Recorded as a known scope limit; revisit if another CMEX PDF surfaces different F8xx codepoints.
+
+### Verification Gaps
+- None new. Tier-D `glyph` directly verifies (0 PUA in rendered .md); 2 tests (codepoint-checked unit test + ieee_access_10 real-PDF) lock it.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path, 12th consecutive). normalize.py glyph-map extension, no `-layout`/AGPL/tool-swap/U+2212-rule/ImportError/HTML-table surface; general fix keyed on a structural signature (geometry-confirmed CMEX bracket block); real-PDF test added; version bumps consistent (`__init__`/`pyproject`/NORMALIZATION_VERSION/TABLE_EXTRACTION_VERSION). Harness Tier-D 0 new fails.
