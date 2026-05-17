@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.55] — 2026-05-17
+
+**Cycle 2 (run 9, harness-gated) — a caption-only / isolated table rendered with no `### Table N` heading (table_parity, S1).** When `extract_pdf_structured` detects a table only by its caption — Camelot reconstructed no grid AND there is no linearized `raw_text` fallback (the table is a flat image, or sits on a page Camelot could not parse) — render.py emitted just the italic `*Table N. <caption>*` line, with no `### Table N` heading. The v2.4.2 rationale was that a bare heading "falsely promises structured content"; but dropping the heading hid the table from every structural view. A reader scanning `### Table` headings, and the verification harness's Tier-D `table_parity` check (the count of `### Table` headings must equal the count of tables in `tables.json`), both lost it — the check failed on 15 corpus documents (escicheck chan / chandrashekar / imada / jacobs / lee / wong / zhu / ziano-ppnumbing / ziano-mp; pdfextractor jama-open-5 / ar-royal-society / bjpsych-open-1 / ieee-access-5 / sci-rep-2 / sci-rep-3).
+
+Fix (v2.4.55) — render.py's in-section caption-only-table branch now emits `### {label}` + the italic caption, consistent with the appendix leftover-table path (which already emitted `### {label}` for a caption-only table — so the two paths were silently inconsistent). The `*{caption}*` italic line is kept immediately after the heading, so `_suppress_orphan_table_cell_text` still recognizes it and drops any linearized orphan cell-rows beneath. Keyed purely on the structural signature (an in-section table with a caption but no html/raw_text), not on paper identity.
+
+Harness Tier-D gate (academic level, whole corpus): all 15 `table_parity` documents flip fail→pass; 0 new fails; 0 regressions attributable to the change (a render-layer caption fix cannot affect any other corpus document's checks). The v2.4.2 contract test that asserted the heading is *absent* is corrected to the new contract and renamed; 3 new real-PDF tests assert the `### Table` heading count equals the `extract_pdf_structured` table count.
+
+The harness Tier-D backlog still has open fail cells — 2 glyph (`ieee_access_10` CMEX10 matrix-bracket pieces, `plos_med_1` U+FFFD), 9 `text_loss`; the run continues.
+
 ## [2.4.54] — 2026-05-17
 
 **Cycle 1 (run 9, harness-gated) — Adobe-Symbol-font glyphs surfaced as Private-Use-Area codepoints (glyph, S1).** Some PDF/DOCX producers embed the Adobe "Symbol" font with no ToUnicode CMap, so pdftotext / mammoth surface each Symbol glyph as a Private-Use codepoint U+F000+<symbol-byte> — the standardized regression coefficient β reads as U+F062, the χ of a χ² test statistic as U+F063, a bullet • as U+F0B7. A PUA codepoint carries no Unicode identity; it is purely a font-encoding artifact and is never legitimate in extracted academic text. The verification harness's Tier-D `glyph` check flagged it on `docxtests/BH1988_manuscript` (β ×2) and `escicheck Xiao-etal-2024 Monin&Miller` (χ ×2, bullet ×2).
