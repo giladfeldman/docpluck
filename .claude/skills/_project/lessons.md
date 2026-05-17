@@ -275,3 +275,11 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 3. Never run the harness `extract` and the broad `pytest` concurrently — CPU contention starves the FastAPI service and produces false `extraction` timeouts (3 docs timed out this way in run 9 cycle 1, surfacing as phantom `extraction` pass→fail "regressions").
 
 **Possible harness improvement (queued):** make the `extract.py` skip compare `docpluck_version` to the live `/health` version so a plain `extract` re-does docs whose extracting build is stale — then `--force` is only needed to override a *same-version* re-extract.
+
+## A "defensive" render choice that drops a structural marker is usually wrong (caught 2026-05-17, run 9 cycle 2, v2.4.55)
+
+**What:** `render.py`'s in-section caption-only-table branch skipped the `### Table N` heading (added v2.4.2, reasoning a bare heading "falsely promises structured content" when no grid was extracted). That hid the table from the rendered heading outline AND from the harness Tier-D `table_parity` check — and was inconsistent with the appendix leftover-table path, which emitted `### {label}` for the identical caption-only case. 15 corpus documents failed `table_parity` for this one reason.
+
+**Why:** omitting a structural marker to avoid "over-promising" instead loses the artifact entirely from every structural view. The honest output is the marker plus the available content (here: heading + caption), not no marker.
+
+**How to detect:** when a render branch deliberately omits a structural marker (`### `, `<table>`, a label), grep for a SIBLING branch handling a similar input — if the sibling emits the marker, the omission is an inconsistency, not a feature. And ask: does omitting it lose the artifact from a downstream structural view (a count/parity check, a heading outline)? If yes, emit the marker.

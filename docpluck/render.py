@@ -2167,13 +2167,23 @@ def _render_sections_to_markdown(
                     body_chunks.append(raw_t)
                     body_chunks.append("\n```\n")
                 elif cap:
-                    # v2.4.2: Camelot returned no cells AND we have no
-                    # raw_text fallback for this caption. Skip the
-                    # `### Table N` heading (which would falsely promise
-                    # structured content) and emit the caption as a
-                    # plain italicized paragraph so the table reference is
-                    # preserved in body flow.
-                    body_chunks.append(f"\n*{cap}*\n")
+                    # v2.4.55: Camelot returned no cells AND there is no
+                    # raw_text fallback — an isolated table detected only by
+                    # its caption. v2.4.2 emitted just the italic caption with
+                    # NO `### Table N` heading, reasoning a bare heading
+                    # "falsely promises structured content". But that drops
+                    # the table from every structural view: a reader scanning
+                    # `### Table` headings and the harness Tier-D
+                    # `table_parity` check (### Table heading count must match
+                    # tables.json count) both lose it. Emit the heading +
+                    # caption so the table is visible AS a table — consistent
+                    # with the appendix leftover-table path below, which
+                    # already emits `### {label}` for a caption-only table.
+                    # The `*{cap}*` italic line is kept immediately after the
+                    # heading so `_suppress_orphan_table_cell_text` still
+                    # recognizes it and drops any linearized orphan cell-rows.
+                    body_chunks.append(f"\n### {label}\n")
+                    body_chunks.append(f"*{cap}*\n")
             else:
                 body_chunks.append(f"\n### {label}\n")
                 if cap:

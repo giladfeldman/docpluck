@@ -728,3 +728,22 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean-checks release path, 10th consecutive). Inline hard-rule checks pass: extraction/normalize/render glyph-recovery change, no `-layout`/AGPL/tool-swap/U+2212-rule/ImportError/HTML-table surface; general fix keyed on a structural signature (Symbol-font PUA block), not paper identity; real-PDF + real-DOCX + contract tests added; version bumps consistent (`__init__`/`pyproject`/NORMALIZATION_VERSION/TABLE_EXTRACTION_VERSION). Harness Tier-D 0 new fails + provable no-op scoping confirm no regression.
+
+---
+
+## Run: 2026-05-17 (run 9) · Cycle 2 · v2.4.55 — table_parity: caption-only table emits no `### Table` heading
+
+### Outcome
+- SHIPPED v2.4.55. render.py's in-section caption-only-table branch (`elif cap:` — a table with a caption but no Camelot html and no raw_text) emitted only `*Table N. caption*` with NO `### Table N` heading (a deliberate v2.4.2 choice "to not falsely promise structured content"). Changed it to emit `### {label}` + caption. Harness Tier-D: all 15 `table_parity` docs flip fail→pass, 0 new fails. 3 new real-PDF tests; the v2.4.2 contract test corrected + renamed.
+
+### Blind Spots
+- **The v2.4.2 "don't falsely promise structured content" choice created a worse defect than it avoided.** Skipping the `### Table N` heading didn't avoid a false promise — it made the table *invisible as a table*: gone from the heading outline a reader scans, gone from the harness Tier-D `table_parity` count. And it was INCONSISTENT — the appendix leftover-table path already emitted `### {label}` for the identical caption-only case. When a "defensive" rendering choice removes a structural marker, check (a) whether a sibling code path handles the same input differently, and (b) whether downstream structural views (a count check, a heading outline) lose the artifact.
+
+### Edge Cases
+- **A render change near `_suppress_orphan_table_cell_text` must keep the `*Table N. caption*` italic line.** That post-processor keys on the italic caption line to find + drop pdftotext-linearized orphan cell-rows. The fix adds the `### {label}` heading BEFORE the italic line — the heading line is skipped by the orphan-suppressor (it starts with `#`, not `*`), so orphan-suppression still fires on the italic line. Adding a `>`-blockquote note AFTER the caption would have blocked the orphan-row scan — deliberately omitted.
+
+### Verification Gaps
+- None new. The Tier-D `table_parity` check directly verifies the fix (heading count == tables.json count); 3 real-PDF tests lock the invariant.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path, 11th consecutive). Render-layer-only change; no `-layout`/AGPL/tool-swap/normalize-S-step/HTML-table-format surface; general fix keyed on a structural signature; real-PDF + corrected contract test; version bump consistent (`__init__`/`pyproject` only — render layer has no NORMALIZATION/SECTIONING/TABLE_EXTRACTION constant). Harness Tier-D 15 fixed + 0 new fails confirm no regression.

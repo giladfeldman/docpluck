@@ -683,7 +683,7 @@ def test_render_strips_duplicate_heading_word_from_body():
     assert "Abstract Lynching" not in md
 
 
-# ── v2.4.2: H tag fix — no `### Table N` heading when html is empty ──────
+# ── Table-heading emission for caption-only / isolated tables ──────────────
 
 
 def _make_section_with_caption_text(caption_text: str, label_value: str = "results"):
@@ -717,16 +717,20 @@ def _make_section_with_caption_text(caption_text: str, label_value: str = "resul
     )
 
 
-def test_render_skips_table_heading_when_html_empty():
-    """When Camelot returned no cells (no html) AND there is no
-    ``raw_text`` fallback either, the renderer should NOT emit a bare
-    `### Table N` heading in the body — that promises structured content
-    that isn't there. Instead, the caption renders as a plain italic
-    paragraph so the table reference is still visible.
+def test_render_emits_table_heading_for_caption_only_table():
+    """A table detected only by its caption (Camelot found no cells AND
+    there is no ``raw_text`` fallback) must still emit a `### Table N`
+    heading + caption, so the table is structurally visible in the
+    rendered view.
 
-    Regression target for v2.4.2 H-tag failures (bjps_4,
-    ar_apa_j_jesp_2009_12_011). v2.4.14 keeps this behavior for the
-    truly-empty case; when raw_text IS populated the new fenced
+    v2.4.2 emitted only the italic caption with NO heading, reasoning a
+    bare heading "falsely promises structured content". v2.4.55 reverses
+    that: dropping the heading hid the table from every structural view —
+    a reader scanning `### Table` headings, and the harness Tier-D
+    ``table_parity`` check (### Table heading count must match tables.json
+    count), both lost it. The caption-only table now renders consistently
+    with the appendix leftover-table path, which already emits
+    `### {label}`. When ``raw_text`` IS populated the fenced
     ``unstructured-table`` path runs instead — see
     ``test_render_emits_raw_text_block_when_html_empty_but_raw_text_present``.
     """
@@ -742,9 +746,9 @@ def test_render_skips_table_heading_when_html_empty():
         "page": 1,
     }]
     md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
-    # No bare `### Table 1` heading.
-    assert "### Table 1" not in md
-    # The caption is preserved as an italicized paragraph.
+    # The `### Table 1` heading IS emitted — the table is visible as a table.
+    assert "### Table 1" in md
+    # The caption is preserved as an italic paragraph immediately after.
     assert "*Table 1. Summary of predictions across conditions.*" in md
 
 
