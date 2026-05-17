@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.56] — 2026-05-17
+
+**Cycle 3 (run 9, harness-gated) — CMEX10 extensible matrix-bracket pieces surfaced as Private-Use codepoints (glyph, S1).** A matrix or tall bracketed expression typeset with the TeX `CMEX10` math-extension font is built from extensible square-bracket *pieces* — an upper corner, a repeated extension segment, a lower corner — for each side. Embedded with no ToUnicode CMap, both pdftotext and pdfplumber surface these as U+F8EE–F8FB Private-Use codepoints. `ieee_access_10` rendered a 5-row matrix carrying 10 such raw PUA glyphs; the verification harness's Tier-D `glyph` check flagged it.
+
+Fix (v2.4.56) — `normalize.py::recover_pua_glyphs` (the shared PUA-recovery helper introduced in v2.4.54) is extended with the CMEX bracket-piece block: U+F8EE/F8EF/F8F0 → U+23A1/23A2/23A3 (left square bracket upper-corner / extension / lower-corner) and U+F8F9/F8FA/F8FB → U+23A4/23A5/23A6 (right). The mapping is confirmed by glyph geometry — on `ieee_access_10` page 5 the six codepoints sit in two vertical columns (left x≈350, right x≈546), each a top corner / three extensions / bottom corner ordered by y-coordinate. The recovery flows through all three text channels already wired for the helper (W0e body step, `cell_cleaning._html_escape`, render post-process).
+
+Harness Tier-D gate (academic level): `ieee_access_10` flips the `glyph` check fail→pass; 0 new fails. NORMALIZATION_VERSION 1.9.10, TABLE_EXTRACTION_VERSION 2.1.5. 2 new tests.
+
+The harness Tier-D backlog still has open fail cells — 1 glyph (`plos_med_1`: both engines drop the `≥` glyph to U+FFFD — needs context-based recovery), 9 `text_loss` (largely Tier-D check false-positives — `_fingerprint` drops the raw Greek glyph but keeps the rendered ASCII transliteration, breaking window matches), and `nat_comms_3` (a Camelot table-extraction timeout — environmental, not a code regression); the run continues.
+
 ## [2.4.55] — 2026-05-17
 
 **Cycle 2 (run 9, harness-gated) — a caption-only / isolated table rendered with no `### Table N` heading (table_parity, S1).** When `extract_pdf_structured` detects a table only by its caption — Camelot reconstructed no grid AND there is no linearized `raw_text` fallback (the table is a flat image, or sits on a page Camelot could not parse) — render.py emitted just the italic `*Table N. <caption>*` line, with no `### Table N` heading. The v2.4.2 rationale was that a bare heading "falsely promises structured content"; but dropping the heading hid the table from every structural view. A reader scanning `### Table` headings, and the verification harness's Tier-D `table_parity` check (the count of `### Table` headings must equal the count of tables in `tables.json`), both lost it — the check failed on 15 corpus documents (escicheck chan / chandrashekar / imada / jacobs / lee / wong / zhu / ziano-ppnumbing / ziano-mp; pdfextractor jama-open-5 / ar-royal-society / bjpsych-open-1 / ieee-access-5 / sci-rep-2 / sci-rep-3).

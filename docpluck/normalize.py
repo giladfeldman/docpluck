@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.9"
+NORMALIZATION_VERSION = "1.9.10"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1571,7 +1571,21 @@ _SYMBOL_BYTE_TO_CHAR: dict[int, str] = {
 _SYMBOL_PUA_MAP: dict[str, str] = {
     chr(0xF000 + _b): _c for _b, _c in _SYMBOL_BYTE_TO_CHAR.items()
 }
-_SYMBOL_PUA_RE = re.compile("[-]")
+# CMEX10 / Computer-Modern extensible square-bracket pieces. pdftotext and
+# pdfplumber both surface these as U+F8EE-F8FB PUA codepoints (font
+# *+CMEX10, the TeX math-extension font); glyph geometry confirms the
+# assignment -- the left column F8EE/F8EF/F8F0 are the upper-corner /
+# extension / lower-corner of a tall left square bracket, F8F9/F8FA/F8FB
+# the right -- so they map to the Unicode Miscellaneous-Technical
+# bracket-piece block U+23A1-U+23A6.
+_SYMBOL_PUA_MAP.update({
+    chr(0xF8EE): chr(0x23A1), chr(0xF8EF): chr(0x23A2), chr(0xF8F0): chr(0x23A3),
+    chr(0xF8F9): chr(0x23A4), chr(0xF8FA): chr(0x23A5), chr(0xF8FB): chr(0x23A6),
+})
+# Symbol-font PUA block U+F020-F0FF plus the CMEX extensible-bracket pieces.
+_SYMBOL_PUA_RE = re.compile(
+    "[" + chr(0xF020) + "-" + chr(0xF0FF) + chr(0xF8EE) + "-" + chr(0xF8FB) + "]"
+)
 
 
 def recover_pua_glyphs(text: str) -> str:
