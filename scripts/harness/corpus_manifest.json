@@ -1,0 +1,1095 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-17T09:07:06.582303+00:00",
+  "vibe_root": "~/Dropbox/Vibe",
+  "counts": {
+    "total": 180,
+    "by_format": {
+      "pdf": 152,
+      "docx": 25,
+      "html": 3
+    }
+  },
+  "documents": [
+    {
+      "id": "pdfextractor__ama__jama-open-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_1.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-10",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_10.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-11",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_11.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-12",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_12.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_2.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_3.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_4.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_5.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_6.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-7",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_7.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amc-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amc_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amd-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amd_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amd-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amd_2.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amj-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amj_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amle-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amle_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amp-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amp_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_2.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_3.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_4.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ar-apa-j-jesp-2009-12-010",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ar_apa_j_jesp_2009_12_010.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ar-apa-j-jesp-2009-12-011",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ar_apa_j_jesp_2009_12_011.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ar-apa-j-jesp-2009-12-012",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ar_apa_j_jesp_2009_12_012.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__chan-feldman-2025-cogemo",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chan_feldman_2025_cogemo.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__chandrashekar-2023-mp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chandrashekar_2023_mp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__chen-2021-jesp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chen_2021_jesp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__efendic-2022-affect",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/efendic_2022_affect.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ip-feldman-2025-pspb",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ip_feldman_2025_pspb.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jamison-2020-jesp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jamison_2020_jesp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-2023-10",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_.2023.10.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-2023-15",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_.2023.15.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-2023-16",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_.2023.16.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-m-2022-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_m.2022.2.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-m-2022-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_m.2022.3.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__korbmacher-2022-kruger",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/korbmacher_2022_kruger.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__maier-2023-collabra",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/maier_2023_collabra.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__xiao-2021-crsp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/xiao_2021_crsp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ziano-2021-joep",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ziano_2021_joep.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__am-sociol-rev-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/am_sociol_rev_3.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__am-sociol-rev-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/am_sociol_rev_4.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__j-health-soc-behav-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/j_health_soc_behav_1.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__j-health-soc-behav-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/j_health_soc_behav_2.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__social-forces-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/social_forces_1.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_1.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_2.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_3.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_4.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_5.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_1.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_2.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_3.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_4.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_5.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_6.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__jmf-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/jmf_1.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__jmf-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/jmf_2.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__jmf-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/jmf_3.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__sociology-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/sociology_1.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__ar-royal-society-rsos-140066",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/ar_royal_society_rsos_140066.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__ar-royal-society-rsos-140072",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/ar_royal_society_rsos_140072.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__ar-royal-society-rsos-140081",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/ar_royal_society_rsos_140081.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_1.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_2.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_3.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_4.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_5.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_6.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-7",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_7.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-8",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_8.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjpsych-open-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjpsych_open_1.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__brjpsych-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/brjpsych_1.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-10",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_10.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_2.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_3.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_4.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_5.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_6.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-7",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_7.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-8",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_8.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-9",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_9.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-alt",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_alt.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_1.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_2.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_3.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_4.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_5.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nathumbeh-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nathumbeh_2.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_1.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_2.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_3.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_4.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_2.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_3.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_4.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-pub-health-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_pub_health_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-pub-health-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_pub_health_2.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmj-open-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmj_open_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__cmaj-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/cmaj_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__cmaj-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/cmaj_2.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__plos-med-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/plos_med_1.pdf"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "escicheck__redacted",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "docxtests__redacted",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/redacted"
+    },
+    {
+      "id": "fulltext-html__10-1073-pnas-2115228119",
+      "source": "fulltext-html",
+      "format": "html",
+      "rel_path": "ArticleRepository/fulltext/10.1073__pnas.2115228119.html"
+    },
+    {
+      "id": "fulltext-html__10-1073-pnas-2120481119",
+      "source": "fulltext-html",
+      "format": "html",
+      "rel_path": "ArticleRepository/fulltext/10.1073__pnas.2120481119.html"
+    },
+    {
+      "id": "fulltext-html__10-1111-bjop-12368",
+      "source": "fulltext-html",
+      "format": "html",
+      "rel_path": "ArticleRepository/fulltext/10.1111__bjop.12368.html"
+    }
+  ]
+}
