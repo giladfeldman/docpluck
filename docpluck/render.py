@@ -39,6 +39,7 @@ from .normalize import (
     recover_corrupted_lt_operator,
     recover_corrupted_minus_signs,
     recover_minus_via_ci_pairing,
+    recover_pua_glyphs,
 )
 from .sections import extract_sections
 from .tables.render import cells_to_html
@@ -2365,6 +2366,14 @@ def render_pdf_to_markdown(
     # remaining surfaces — figure/table captions, unstructured-table fences,
     # raw_text fallbacks — so no presentation-form ligature reaches the .md.
     md = decompose_ligatures(md)
+    # v2.4.54: final guarantee — recover Adobe-Symbol-font glyphs surfaced as
+    # U+F0xx PUA codepoints (β→U+F062, χ→U+F063, •→U+F0B7). W0e (body channel)
+    # and cell_cleaning (Camelot table cells) cover their channels; this
+    # catches the remaining surfaces — figure/table captions, unstructured-
+    # table fences, raw_text fallbacks — so no Symbol-PUA glyph reaches the .md
+    # from ANY channel. Runs with the other glyph passes, before the caption
+    # de-dup that compares spans for equality (FIG-3c lesson).
+    md = recover_pua_glyphs(md)
     # FIG-3c: drop a figure caption pdftotext also left inline in the body
     # text, when a ``### Figure N`` block already carries it (double-emission).
     # Runs AFTER every glyph-normalization pass (destyle / minus-recovery /
