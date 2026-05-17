@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.8"
+NORMALIZATION_VERSION = "1.9.9"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1509,6 +1509,88 @@ def decompose_ligatures(text: str) -> str:
     return _LIGATURE_RE.sub(lambda m: _LIGATURE_MAP[m.group(0)], text)
 
 
+# ── PUA glyph recovery — Adobe Symbol font (shared, v2.4.54) ───────────────
+# Some PDF/DOCX producers embed the Adobe "Symbol" font with no ToUnicode
+# CMap, so pdftotext / mammoth surface each glyph as a Private-Use-Area
+# codepoint U+F000+<symbol-byte> — β reads as U+F062, χ as U+F063, • as
+# U+F0B7 (e.g. efendic-style "χ²(1) = 0.34" arriving as a raw  2(1)).
+# A PUA codepoint is never a legitimate character in extracted academic text
+# — it carries no Unicode identity, it is purely a font-encoding artifact —
+# so mapping the Adobe Symbol StandardEncoding (a fixed, decades-stable
+# standard) back to real Unicode is a zero-false-positive, fully general
+# recovery keyed on the structural signature "codepoint in the Symbol-font
+# PUA block U+F020-F0FF". Greek stays Greek (CLAUDE.md hard rule 4 — the A5
+# step transliterates β→"beta" for ASCII-form callers; the rendered .md keeps
+# β). SHARED by all three text channels: normalize_text's W0e step (body),
+# tables/cell_cleaning (Camelot layout channel) and the render post-process
+# (caption / fenced-table / raw-text surfaces), so no Symbol-PUA glyph
+# reaches any output view. The lowercase-Greek block follows the Symbol
+# typist mnemonic — key 'b'→β, 'c'→χ, 'd'→δ, 'h'→η, 'm'→μ, 'p'→π, 's'→σ …
+_SYMBOL_BYTE_TO_CHAR: dict[int, str] = {
+    # ASCII-shared punctuation + digits (Symbol shares these positions)
+    0x20: " ", 0x21: "!", 0x23: "#", 0x25: "%", 0x26: "&", 0x28: "(",
+    0x29: ")", 0x2B: "+", 0x2C: ",", 0x2E: ".", 0x2F: "/",
+    0x30: "0", 0x31: "1", 0x32: "2", 0x33: "3", 0x34: "4",
+    0x35: "5", 0x36: "6", 0x37: "7", 0x38: "8", 0x39: "9",
+    0x3A: ":", 0x3B: ";", 0x3C: "<", 0x3D: "=", 0x3E: ">", 0x3F: "?",
+    0x5B: "[", 0x5D: "]", 0x5F: "_", 0x7B: "{", 0x7C: "|", 0x7D: "}",
+    # uppercase Greek (0x41-0x5A)
+    0x41: "Α", 0x42: "Β", 0x43: "Χ", 0x44: "Δ", 0x45: "Ε", 0x46: "Φ",
+    0x47: "Γ", 0x48: "Η", 0x49: "Ι", 0x4A: "ϑ", 0x4B: "Κ", 0x4C: "Λ",
+    0x4D: "Μ", 0x4E: "Ν", 0x4F: "Ο", 0x50: "Π", 0x51: "Θ", 0x52: "Ρ",
+    0x53: "Σ", 0x54: "Τ", 0x55: "Υ", 0x56: "ς", 0x57: "Ω", 0x58: "Ξ",
+    0x59: "Ψ", 0x5A: "Ζ",
+    # lowercase Greek (0x61-0x7A)
+    0x61: "α", 0x62: "β", 0x63: "χ", 0x64: "δ", 0x65: "ε", 0x66: "φ",
+    0x67: "γ", 0x68: "η", 0x69: "ι", 0x6A: "ϕ", 0x6B: "κ", 0x6C: "λ",
+    0x6D: "μ", 0x6E: "ν", 0x6F: "ο", 0x70: "π", 0x71: "θ", 0x72: "ρ",
+    0x73: "σ", 0x74: "τ", 0x75: "υ", 0x76: "ϖ", 0x77: "ω", 0x78: "ξ",
+    0x79: "ψ", 0x7A: "ζ",
+    # math operators / relations
+    0x22: "∀", 0x24: "∃", 0x27: "∋", 0x2A: "∗", 0x2D: "−",
+    0x40: "≅", 0x5C: "∴", 0x5E: "⊥", 0x60: "‾", 0x7E: "∼",
+    0xA1: "ϒ", 0xA2: "′", 0xA3: "≤", 0xA4: "⁄", 0xA5: "∞", 0xA6: "ƒ",
+    0xA7: "♣", 0xA8: "♦", 0xA9: "♥", 0xAA: "♠",
+    0xAB: "↔", 0xAC: "←", 0xAD: "↑", 0xAE: "→", 0xAF: "↓",
+    0xB0: "°", 0xB1: "±", 0xB2: "″", 0xB3: "≥", 0xB4: "×", 0xB5: "∝",
+    0xB6: "∂", 0xB7: "•", 0xB8: "÷", 0xB9: "≠", 0xBA: "≡", 0xBB: "≈",
+    0xBC: "…", 0xBF: "↵",
+    0xC0: "ℵ", 0xC1: "ℑ", 0xC2: "ℜ", 0xC3: "℘", 0xC4: "⊗", 0xC5: "⊕",
+    0xC6: "∅", 0xC7: "∩", 0xC8: "∪", 0xC9: "⊃", 0xCA: "⊇", 0xCB: "⊄",
+    0xCC: "⊂", 0xCD: "⊆", 0xCE: "∈", 0xCF: "∉",
+    0xD0: "∠", 0xD1: "∇", 0xD2: "®", 0xD3: "©", 0xD4: "™", 0xD5: "∏",
+    0xD6: "√", 0xD7: "⋅", 0xD8: "¬", 0xD9: "∧", 0xDA: "∨", 0xDB: "⇔",
+    0xDC: "⇐", 0xDD: "⇑", 0xDE: "⇒", 0xDF: "⇓", 0xE0: "◊",
+    0xE2: "®", 0xE3: "©", 0xE4: "™", 0xE5: "∑",
+    # extensible bracket / paren / brace / integral pieces
+    0xE1: "⟨", 0xE6: "⎛", 0xE7: "⎜", 0xE8: "⎝", 0xE9: "⎡", 0xEA: "⎢",
+    0xEB: "⎣", 0xEC: "⎧", 0xED: "⎨", 0xEE: "⎩", 0xEF: "⎪", 0xF1: "⟩",
+    0xF2: "∫", 0xF3: "⌠", 0xF5: "⌡", 0xF6: "⎞", 0xF7: "⎟", 0xF8: "⎠",
+    0xF9: "⎤", 0xFA: "⎥", 0xFB: "⎦", 0xFC: "⎫", 0xFD: "⎬", 0xFE: "⎭",
+}
+_SYMBOL_PUA_MAP: dict[str, str] = {
+    chr(0xF000 + _b): _c for _b, _c in _SYMBOL_BYTE_TO_CHAR.items()
+}
+_SYMBOL_PUA_RE = re.compile("[-]")
+
+
+def recover_pua_glyphs(text: str) -> str:
+    """Recover Adobe-Symbol-font glyphs surfaced as Private-Use codepoints.
+
+    pdftotext / mammoth emit a Symbol-font glyph that has no ToUnicode CMap as
+    ``U+F000 + <symbol-byte>`` (β→U+F062, χ→U+F063, •→U+F0B7). Each is mapped
+    back to real Unicode via the fixed Adobe Symbol StandardEncoding. A PUA
+    codepoint at an unassigned Symbol position — or outside the Symbol block —
+    is left untouched, never guessed. No-op when the text holds no
+    Symbol-block PUA codepoint.
+    """
+    if not text or not _SYMBOL_PUA_RE.search(text):
+        return text
+    return _SYMBOL_PUA_RE.sub(
+        lambda m: _SYMBOL_PUA_MAP.get(m.group(0), m.group(0)), text
+    )
+
+
 def normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -1643,6 +1725,15 @@ def normalize_text(
     before = t
     t = recover_minus_via_ci_pairing(t)
     report._track("W0d_minus_ci_pairing", before, t, "minus_signs_recovered")
+
+    # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
+    # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a
+    # U+F0xx Private-Use codepoint (β→U+F062, χ→U+F063, •→U+F0B7). The fixed
+    # Adobe Symbol StandardEncoding maps each back to real Unicode. No-op on
+    # text with no Symbol-block PUA codepoint.
+    before = t
+    t = recover_pua_glyphs(t)
+    report._track("W0e_pua_glyph_recovery", before, t, "pua_glyphs_recovered")
 
     # ── Standard steps (S1-S9) ──────────────────────────────────────────
 
