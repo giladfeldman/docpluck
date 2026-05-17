@@ -270,9 +270,46 @@ Code with the Edit / Write tools. Do not delegate the actual code change to a su
 
 ---
 
+## Phase 5H · Verification harness — the regression-safe gate (every cycle)
+
+**THE primary verification surface.** Built 2026-05-17 after a post-mortem
+([`docs/ITERATION_VERIFICATION_LESSONS.md`](../../../docs/ITERATION_VERIFICATION_LESSONS.md))
+found the loop verified the *library* in isolation (never the app the user
+runs), per-cycle/per-target only (no corpus-wide regression backcheck), against
+snapshot baselines that could themselves be broken — so missing text,
+misplaced tables, and mojibake survived ~14 green cycles. The harness fixes all
+four holes. Phases 5–8 still run, but the harness is what makes verification
+regression-safe and corpus-wide.
+
+The harness lives at `scripts/harness/` (see its `README.md`). It drives the
+**local app** — the FastAPI service the deployed product uses — saves every
+output view × normalization level, and gates on deterministic + AI-gold checks.
+
+**Prerequisite:** the local service runs the current library:
+`cd ../PDFextractor/service && python -m uvicorn app.main:app --port 6117 --env-file .env --workers 4`
+(verify `curl -s localhost:6117/health` reports the working-tree `docpluck` version).
+
+| Step | What | Gate |
+|---|---|---|
+| 5H-a | `python -m scripts.harness.extract --workers 4` — re-extract the affected docs AND, for the regression gate, the whole corpus (drives the app `/analyze`, saves every view). | all extractions `ok` |
+| 5H-b | `python -m scripts.harness.checks` — Tier-D deterministic checks over the WHOLE corpus; diff vs committed `baseline_matrix.json`. | **HARD GATE: 0 regressions (no `pass→fail` cell) and 0 new fails.** A regression anywhere blocks the cycle — even on a paper this cycle did not target. |
+| 5H-c | `python -m scripts.harness.inspect prepare --affected <ids>`, dispatch one Tier-A verifier agent per `ready` job (`scripts/harness/VERIFIER_PROMPT.md`), then `inspect collect`. | TEXT-LOSS = 0, HALLUCINATION = 0 across the tiered subset (affected docs + every open Tier-D fail + rotating slice) |
+
+**Regression-backcheck rule (HARD — rule 19).** A fix is NEVER "done forever."
+Every cycle re-extracts and re-checks the whole corpus; any cell that was
+`pass` and is now `fail` is a regression and blocks the cycle. The baseline
+stores *verdicts*, not output snapshots — a broken baseline cannot mask a
+defect (a `fail` stays a `fail`; only a new `pass→fail` blocks).
+
+After a cycle ships clean, run `python -m scripts.harness.checks --update-baseline`
+to record the new accepted state. Tier-A verdicts (`ai_verdict.json`) persist
+per cell. A `gold_blocked` job is recorded as such — never treated as passing.
+
+---
+
 ## Phase 5 · Tier 1 — Library verification (the real library, the real PDFs)
 
-This is meta-science software — zero text loss, zero hallucinations, full structural correctness. Phase 5 verifies the LIBRARY tier (standalone Python). Phase 6 verifies LOCAL-APP parity. Phase 8 verifies PRODUCTION parity. **All three tiers must match.**
+This is meta-science software — zero text loss, zero hallucinations, full structural correctness. Phase 5 runs the fast library-level pre-checks; **Phase 5H is the regression-safe corpus gate** and supersedes the old snapshot baseline. Phase 6 verifies LOCAL-APP parity. Phase 8 verifies PRODUCTION parity.
 
 Per memory `feedback_ai_verification_mandatory`: AI-verification + visual inspection are mandatory. If budget is tight, scope the **code change** smaller — never scope verification smaller. Use `awk '{print; fflush()}'` after every `python -u` to defeat Windows pipe buffering.
 
@@ -282,7 +319,7 @@ Per memory `feedback_ai_verification_mandatory`: AI-verification + visual inspec
 |------|------|------|------|
 | 5a | Targeted unit tests (real-PDF fixtures + contract tests both) | ≤30s | Must pass; 3-retry max before revert |
 | 5b | Broad pytest (no camelot fixtures) | ~5 min | Must pass; run in background + Monitor |
-| 5c | `scripts/verify_corpus.py` 26-paper baseline | ~10 min | **Hard gate: 26/26 PASS, single WARN blocks** |
+| 5c | Harness Tier-D whole-corpus regression gate (Phase 5H-b) — `scripts/verify_corpus.py` is retained only as a fast supplementary smoke, NOT the gate (it compares against snapshot baselines that can themselves be broken) | ~varies | **Hard gate: Phase 5H-b shows 0 regressions + 0 new fails** |
 | 5d | **Full-document AI verify against AI gold** (every affected paper, every cycle, every affected output view) | ~2-4 min/paper × N-views | MANDATORY — no text loss, no hallucinations, structural correctness across ALL output views (raw / normalized / sections / tables JSON / figures JSON / rendered .md / frontend tabs) |
 | 5e | Camelot-bearing tests (only if touched table extraction) | ~10 min | Required only when relevant |
 | 5f | **Cross-output consistency check** (mandatory cycle-15+ requirement) | ~1 min/paper | Verifies that the same fact appears identically across views (section labels in sections JSON match the `##` headings in rendered .md; table cells in structured JSON match the `<table>` HTML in rendered .md; etc.). Cross-view drift is its own defect class. |
@@ -327,6 +364,41 @@ Once **all** Phase 5 gates pass, ship the cycle:
 3. **Invoke `/docpluck-review`** — hard-rule check on staged changes. Blockers must be fixed before tag push.
 4. **Commit + tag + push library** — `git tag vX.Y.Z && git push --tags`. Never `--amend`/`--no-verify`/`--force`/`git add -A`.
 5. **Wait for auto-bump bot PR** in `docpluckapp` (~30s after tag push), then merge it (`gh pr merge <N> --repo giladfeldman/docpluckapp --squash --delete-branch`).
+
+### Lean release path (user-approved 2026-05-17, after 9 consecutive SPINE-SKIPs)
+
+Steps 2–3 (`/docpluck-cleanup` + `/docpluck-review`) **MAY be skipped** when the
+cycle is a low-risk library-internal change AND **every** item of the
+eligibility checklist below holds. When the lean path is taken, the
+hard-rule checks step 3 would run are done INLINE in Phase 7 and recorded as a
+`spine_skips` entry in run-meta (not a per-cycle judgement call any more — this
+is a documented branch). When ANY checklist item fails, the full path (steps
+2–3) is MANDATORY.
+
+**Lean-path eligibility checklist — ALL must be true:**
+
+1. The diff touches only library-internal extraction/render/normalize logic — no
+   docs, no `pyproject.toml` dependency list, no app/service code, no CI/workflow.
+2. No `pdftotext -layout` flag added.
+3. No AGPL dependency (`pymupdf4llm`/`fitz`/`column_boxes`) added.
+4. No text-extraction-tool swap (`extract_pdf` ⇄ `extract_pdf_layout`).
+5. No change to `normalize.py` S-step ordering or the U+2212→hyphen rule.
+6. No new `except ImportError` silent-fallback for a settled-on dep.
+7. Tables still emit as HTML `<table>` (no pipe-table regression).
+8. The fix is keyed on a STRUCTURAL SIGNATURE, not paper identity / filename /
+   a hard-coded one-PDF string.
+9. At least one real-PDF (`*_real_pdf`) regression test added this cycle.
+10. Version bumps consistent (`__version__` / `pyproject.toml` / and
+    `NORMALIZATION_VERSION` iff `normalize.py` changed / `SECTIONING_VERSION`
+    iff `sections/` changed).
+11. 26-paper baseline 26/26 PASS and Tier1==Tier2==Tier3 byte-identical — the
+    no-regression evidence the cleanup/review sub-skills would otherwise gate.
+
+If the lean path is taken, the Phase 7 sequence becomes: bump versions →
+inline hard-rule checklist (the 11 items) → commit + tag + push → merge
+auto-bump PR. Record `SPINE-SKIP: phase-7-cleanup-review — reason: lean release
+path (eligibility checklist passed)` in run-meta so accumulated lean-path use
+stays auditable.
 
 ---
 
@@ -414,13 +486,17 @@ Then run the postflight (Phase 12). The handoff doc is committed to the library 
 
 Before declaring a cycle PASS / PARTIAL, confirm each item below. If you can't tick all relevant items, the verdict is **FAIL** or **REVERT** — even if individual phase tables show PASS.
 
+- [ ] **Phase 5H — verification harness (the regression-safe gate)**
+  - [ ] Local app extracted via the harness (`scripts.harness.extract`) — drives the real app, not a bare library call
+  - [ ] Tier-D `scripts.harness.checks`: **0 regressions** (no `pass→fail` cell vs `baseline_matrix.json`) and **0 new fails** — corpus-wide (rule 19)
+  - [ ] Tier-A `scripts.harness.inspect`: **TEXT-LOSS = 0**, **HALLUCINATION = 0** across the tiered subset; `gold_blocked` jobs recorded as such, not passed
+  - [ ] Baseline updated (`checks --update-baseline`) only after the cycle ships clean
 - [ ] **Tier 1 — library standalone**
   - [ ] Targeted unit tests passed (5a)
   - [ ] Broad pytest passed (5b)
-  - [ ] 26-paper baseline PASS 26/26 (5c) — single WARN counts as fail
-  - [ ] Full-doc AI verify per affected paper: **TEXT-LOSS = 0**, **HALLUCINATION = 0** (5d)
+  - [ ] Full-doc AI verify per affected paper: **TEXT-LOSS = 0**, **HALLUCINATION = 0** (Phase 5H-c)
   - [ ] At least one `*_real_pdf` test added or modified this cycle (rule 0d) — verify by git diff of `tests/`
-  - [ ] **Fix is GENERAL, not a one-PDF hack** — keyed on a structural signature, not paper identity; 26-paper baseline confirms no regression (Phase 4 discipline #2)
+  - [ ] **Fix is GENERAL, not a one-PDF hack** — keyed on a structural signature, not paper identity; harness Tier-D confirms no corpus-wide regression (Phase 4 discipline #2)
 - [ ] **Tier 2 — local-app parity**
   - [ ] uvicorn restarted post version-bump; `/_diag::docpluck_version` matches working-tree
   - [ ] `diff Tier1 Tier2` = empty for every affected paper (6c)
@@ -490,6 +566,8 @@ If you skip these, future runs of `docpluck-iterate` (and other docpluck skills 
 
 0e-bis. **NEVER REPORT A CYCLE OR RUN AS "CLEAN" / "SHIPPABLE" / "PASS" / DONE WHILE KNOWN FAIL VERDICTS REMAIN UNFIXED.** (User directive 2026-05-15, after a cycle-1 report framed a 13-paper FAIL sweep as "cycle 1 is clean and shippable.") A verification sweep that returns N FAILs means N sets of defects to fix — full stop. The word "pre-existing" must NEVER be used as a reassurance, as a reason to downgrade a verdict, or as a frame that makes a broken corpus sound acceptable. It is legitimate and expected to *ship an incremental per-cycle fix* (one root-cause class, tagged release) — but the cycle report must then state plainly: "N papers still FAIL; the run continues." The run's standing verdict is **FAIL** for as long as any corpus FAIL is open. The run ends only when (a) the corpus is clean, or (b) the budget is exhausted — and in case (b) you report an honest **PARTIAL** with the exact remaining punch-list, never "clean". If there are issues, you fix them. Always. Reflect this in every cycle report and in the Phase 11 handoff.
 
+0e-ter. **LEAVE NOTHING BEHIND** (user directive 2026-05-17; docpluck CLAUDE.md "Critical hard rules"). The generalization of the 0e family beyond verification findings: if you see an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to the cycle's target — you fix it in the same run. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to leave a defect in place; noticing a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product/architecture decision only the user can make — surface it explicitly and immediately, never bury it; **(b)** the fix is genuinely too entangled to land in the current cycle — then queue it as an *immediate next cycle in the same run*, never as "later", never as a handoff-doc footnote. Never end a task, cycle, or run with a known issue unaddressed.
+
 ### Library / API hard rules (from LESSONS.md + CLAUDE.md)
 
 1. **Never use `pdftotext -layout`** (column interleaving). Enforced in `docpluck/extract.py:13–16`.
@@ -513,6 +591,7 @@ If you skip these, future runs of `docpluck-iterate` (and other docpluck skills 
 16. **Every fix must be GENERAL — never a one-PDF quick-hack** (CLAUDE.md hard rule, user directive 2026-05-15; memory `feedback_general_fixes_not_pdf_specific`). Key fixes on a structural signature, never paper identity. A fix that helps one paper but risks others is the wrong fix. The 26-paper baseline is the no-regression gate.
 17. **Use subagents to parallelize whenever possible** (user directive 2026-05-14, re-stated 2026-05-15; memory `feedback_use_subagents_aggressively`). Any batch of 2+ independent units is fanned out to parallel subagents — see the Subagent-parallelization MANDATE. Doing independent work serially inline is a process defect.
 18. **ALL ground truth comes from article-finder — docpluck-iterate NEVER generates it** (user directive 2026-05-16; memories `feedback_gold_generation_via_article_finder`, `feedback_gold_canonical_key`, `feedback_ground_truth_is_ai_not_pdftotext`). Gold is produced by exactly ONE skill (`article-finder`) through ONE shared protocol (`~/.claude/skills/article-finder/gold-generation.md`). docpluck-iterate **obtains and consumes** golds — it does not write extraction prompts, does not dispatch gold-extraction subagents, does not call `ai-gold.py store`/`register-view`. On a cache miss it invokes `article-finder generate-gold <pdf>`, which extracts AND registers all views under the canonical key. A consumer that carries its own extraction prompt forks the ground truth (the 2026-05-16 audit found docpluck-iterate and escicheck-iterate had extracted the same paper with two divergent private prompts → two different `reading` golds). The `reading` view docpluck consumes is resolved to the paper's CANONICAL key (DOI) via `ai-gold.py resolve`. Per-cycle AI-verifier verdicts are persisted into the active `TRIAGE_*.md` (committed), never left only in conversation.
+19. **Verify the APP via the harness, corpus-wide, with a regression backcheck — every cycle** (user directive 2026-05-17; post-mortem `docs/ITERATION_VERIFICATION_LESSONS.md`). Verification runs through `scripts/harness/` against the **local app** (the FastAPI service the deployed product uses), not a bare library call — defects in the app↔library gap are otherwise invisible. Every cycle re-extracts and re-checks the **whole corpus** (Phase 5H): Tier-D deterministic checks gate on **0 regressions** (no `pass→fail` cell vs the committed `baseline_matrix.json`) and 0 new fails; Tier-A AI-gold inspection covers the tiered subset. A fix is never "done forever" — a per-paper fix that regresses another paper is caught the same cycle. The Tier-D baseline stores verdicts, never output snapshots, so a broken baseline cannot mask a defect. `scripts/verify_corpus.py` (snapshot/char-ratio) is a fast supplementary smoke only — NOT the gate.
 
 ---
 

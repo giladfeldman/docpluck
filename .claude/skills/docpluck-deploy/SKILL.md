@@ -18,6 +18,10 @@ If you skip these steps, /ship will detect the missing heartbeat and FAIL this p
 
 Deploy Docpluck to production on Vercel (frontend) and Railway (extraction service).
 
+## Core working directive — LEAVE NOTHING BEHIND
+
+If a pre-flight or post-deploy check surfaces an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to this deploy — it MUST be fixed before the deploy is called done, not merely noted. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to ship around a defect; spotting a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product/architecture decision only the user can make — surface it explicitly and immediately, and do NOT deploy past a real defect without that decision; **(b)** the fix is genuinely too entangled to land now — then queue it as an *immediate next step in the same run*, never as "later". Never report a deploy as done with a known issue merely listed-and-left. (User directive 2026-05-17; docpluck CLAUDE.md "Critical hard rules".)
+
 ## Two-Repo Architecture (CRITICAL — read before deploying)
 
 Docpluck is split across **two repos** under `C:\Users\filin\Dropbox\Vibe\MetaScienceTools\`:

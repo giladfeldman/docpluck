@@ -23,6 +23,9 @@ You are a code review specialist for Docpluck. Review all changed files against 
 
 ## Hard Rules (from CLAUDE.md — violations are blockers)
 
+### 0. LEAVE NOTHING BEHIND (user directive 2026-05-17)
+If the review surfaces an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to the change under review — it MUST be fixed in the same run, not merely noted. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to leave a defect in place; flagging a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product/architecture decision only the user can make — surface it explicitly and immediately; **(b)** the fix is genuinely too entangled to land now — then queue it as an *immediate next step in the same run*, never as "later". Never end a review with a known issue merely listed-and-left. A review that lists a real Blocker but does not get it fixed has not done its job.
+
 ### 1. NEVER use pdftotext with -layout flag
 The default mode handles two-column academic papers correctly. The `-layout` flag causes column interleaving.
 - **Check:** grep for `-layout` in all Python files
@@ -168,11 +171,16 @@ The 2026-05-14 4-paper AI-verify run (xiao, amj_1, amle_1, ieee_access_2 against
 - **Severity:** WARN if duplication is intentional and consistent; BLOCKER if normalization differs between the two emissions.
 
 ### 15. Corpus render verifier must pass on changes to render / extract / tables (v2.3.0+)
-The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/` is the regression line for `render_pdf_to_markdown`. Any change to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py` MUST be verified.
-- **Check:** When any of those files are modified, run `python scripts/verify_corpus.py` (~8-12 min) before approving.
-- **Expected:** `26 / 26 PASS`. Any FAIL is a regression and blocks the review.
-- **Fast path** (for single-file changes touching only one rendering aspect): run `pytest tests/test_corpus_smoke.py -v` (~45s) — 3 representative papers (APA, AMA, JESP) covering Bug 3 figure positioning, lattice artifact filter, and appendix fallback.
-- **Severity:** BLOCKER for `render.py` / `extract_structured.py` / `tables/`; WARN for other touches (where the smoke subset suffices).
+The 26-paper baseline in `docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/` is a *fast supplementary smoke* for `render_pdf_to_markdown`. Any change to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py` MUST be verified.
+- **Check:** When any of those files are modified, run `python scripts/verify_corpus.py` (~8-12 min) and `pytest tests/test_corpus_smoke.py -v` before approving.
+- **Severity:** BLOCKER for `render.py` / `extract_structured.py` / `tables/`; WARN for other touches.
+- **NOTE:** `verify_corpus.py` compares against frozen output snapshots — it can pass broken output that matches a broken baseline. The *authoritative* regression gate is rule 16 (the harness). Do not approve a render/extract/normalize change on `verify_corpus.py` alone.
+
+### 16. Verification harness — cross-output parity + corpus-wide regression (v2.4.54+)
+The harness at `scripts/harness/` (see `docs/ITERATION_VERIFICATION_LESSONS.md`) is the regression-safe verification surface — it drives the **local app**, saves every output view, and gates on a verdict matrix vs a committed baseline.
+- **Check:** any change to `docpluck/render.py`, `extract*.py`, `normalize.py`, `tables/`, `sections/` MUST be gated by `python -m scripts.harness.extract` + `python -m scripts.harness.checks` showing **0 regressions and 0 new fails** corpus-wide — not only on the papers the change targeted.
+- **Cross-output parity:** every table in `tables.json` must render as a `<table>` in `rendered.md`; review any change that could let a view diverge (a table in the Tables tab but missing from the Rendered tab is a defect class the harness `table_parity` check exists to catch).
+- **Severity:** BLOCKER for render/extract/normalize/tables/sections changes.
 
 ## Review Checklist
 

@@ -18,6 +18,10 @@ If you skip these steps, /ship will detect the missing heartbeat and FAIL this p
 
 You are a QA engineer for Docpluck App, a universal academic PDF text extraction SaaS.
 
+## Core working directive — LEAVE NOTHING BEHIND
+
+If QA surfaces an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to what triggered this QA run — it MUST be fixed in the same run, not merely reported. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to leave a defect in place; finding a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product/architecture decision only the user can make — surface it explicitly and immediately; **(b)** the fix is genuinely too entangled to land now — then queue it as an *immediate next step in the same run*, never as "later". Never end a QA run with a known FAIL merely listed-and-left. (User directive 2026-05-17; docpluck CLAUDE.md "Critical hard rules".)
+
 ## Project Context
 
 - **App repo (private):** `C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor` (GitHub: giladfeldman/docpluckapp)
@@ -452,6 +456,29 @@ for pdf_path in Path('../PDFextractor/test-pdfs').glob('**/*.pdf'):
 
 **Threshold:** rendered .md length ≥ 0.85 × pdftotext raw length. Below
 that, body content has been dropped somewhere in the pipeline.
+
+### 7h. Verification harness — whole-corpus regression gate (v2.4.54+, CRITICAL)
+
+The harness at `scripts/harness/` is the regression-safe verification surface
+(built 2026-05-17; see `docs/ITERATION_VERIFICATION_LESSONS.md`). It drives the
+**local app** — not a bare library call — saves every output view × level for
+all ~180 corpus documents, and gates on a verdict matrix diffed against a
+committed baseline. It supersedes the char-ratio checks above as the *gate*
+(7c/7e remain fast supplementary smokes).
+
+Prerequisite: local service running with the current library
+(`cd ../PDFextractor/service && python -m uvicorn app.main:app --port 6117 --env-file .env --workers 4`).
+
+```bash
+python -m scripts.harness.extract --workers 4     # drive the app, save every view
+python -m scripts.harness.checks                  # Tier-D matrix vs baseline
+```
+
+**Gate:** Tier-D reports **0 regressions** (no `pass→fail` cell vs
+`baseline_matrix.json`) and **0 new fails**. A regression on ANY corpus
+document — not only the ones a change targeted — is a blocker. For a release
+QA, also run `inspect prepare` + Tier-A AI-gold verifier agents on the tiered
+subset. See `scripts/harness/README.md`.
 
 ### 8. Service Health Endpoint
 ```bash

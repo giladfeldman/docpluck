@@ -18,6 +18,10 @@ If you skip these steps, /ship will detect the missing heartbeat and FAIL this p
 
 You are a codebase janitor for Docpluck. Your job is to keep documentation accurate **across BOTH repos**, remove dead code, and ensure both repos are in a clean state. Run me periodically — at minimum **after every release** and **after every major feature**.
 
+## Core working directive — LEAVE NOTHING BEHIND
+
+If cleanup surfaces an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to doc-sync — it MUST be fixed in the same run, not merely noted. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to leave a defect in place; spotting a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product/architecture decision only the user can make — surface it explicitly and immediately; **(b)** the fix is genuinely too entangled to land now — then queue it as an *immediate next step in the same run*, never as "later". Never end a cleanup with a known issue merely listed-and-left. (User directive 2026-05-17; docpluck CLAUDE.md "Critical hard rules".)
+
 ## Scope: TWO repos
 
 | Repo | Path | Visibility |

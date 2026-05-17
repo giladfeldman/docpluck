@@ -1,0 +1,1095 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-17T09:07:06.582303+00:00",
+  "vibe_root": "~/Dropbox/Vibe",
+  "counts": {
+    "total": 180,
+    "by_format": {
+      "pdf": 152,
+      "docx": 25,
+      "html": 3
+    }
+  },
+  "documents": [
+    {
+      "id": "pdfextractor__ama__jama-open-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_1.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-10",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_10.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-11",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_11.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-12",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_12.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_2.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_3.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_4.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_5.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_6.pdf"
+    },
+    {
+      "id": "pdfextractor__ama__jama-open-7",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_7.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amc-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amc_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amd-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amd_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amd-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amd_2.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amj-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amj_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amle-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amle_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__amp-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amp_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_1.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_2.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_3.pdf"
+    },
+    {
+      "id": "pdfextractor__aom__annals-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/annals_4.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ar-apa-j-jesp-2009-12-010",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ar_apa_j_jesp_2009_12_010.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ar-apa-j-jesp-2009-12-011",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ar_apa_j_jesp_2009_12_011.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ar-apa-j-jesp-2009-12-012",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ar_apa_j_jesp_2009_12_012.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__chan-feldman-2025-cogemo",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chan_feldman_2025_cogemo.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__chandrashekar-2023-mp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chandrashekar_2023_mp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__chen-2021-jesp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chen_2021_jesp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__efendic-2022-affect",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/efendic_2022_affect.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ip-feldman-2025-pspb",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ip_feldman_2025_pspb.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jamison-2020-jesp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jamison_2020_jesp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-2023-10",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_.2023.10.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-2023-15",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_.2023.15.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-2023-16",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_.2023.16.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-m-2022-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_m.2022.2.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__jdm-m-2022-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/jdm_m.2022.3.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__korbmacher-2022-kruger",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/korbmacher_2022_kruger.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__maier-2023-collabra",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/maier_2023_collabra.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__xiao-2021-crsp",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/xiao_2021_crsp.pdf"
+    },
+    {
+      "id": "pdfextractor__apa__ziano-2021-joep",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ziano_2021_joep.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__am-sociol-rev-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/am_sociol_rev_3.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__am-sociol-rev-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/am_sociol_rev_4.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__j-health-soc-behav-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/j_health_soc_behav_1.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__j-health-soc-behav-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/j_health_soc_behav_2.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__social-forces-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/social_forces_1.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_1.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_2.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_3.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_4.pdf"
+    },
+    {
+      "id": "pdfextractor__asa__socius-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/asa/socius_5.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_1.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_2.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_3.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_4.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_5.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__demography-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/demography_6.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__jmf-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/jmf_1.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__jmf-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/jmf_2.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__jmf-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/jmf_3.pdf"
+    },
+    {
+      "id": "pdfextractor__chicago-ad__sociology-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/chicago-ad/sociology_1.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__ar-royal-society-rsos-140066",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/ar_royal_society_rsos_140066.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__ar-royal-society-rsos-140072",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/ar_royal_society_rsos_140072.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__ar-royal-society-rsos-140081",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/ar_royal_society_rsos_140081.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_1.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_2.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_3.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_4.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_5.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_6.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-7",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_7.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjps-8",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjps_8.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__bjpsych-open-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/bjpsych_open_1.pdf"
+    },
+    {
+      "id": "pdfextractor__harvard__brjpsych-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/harvard/brjpsych_1.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-10",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_10.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_2.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_3.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_4.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_5.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-6",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_6.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-7",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_7.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-8",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_8.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-9",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_9.pdf"
+    },
+    {
+      "id": "pdfextractor__ieee__ieee-access-alt",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_alt.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_1.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_2.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_3.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_4.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nat-comms-5",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_5.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__nathumbeh-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nathumbeh_2.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_1.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_2.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_3.pdf"
+    },
+    {
+      "id": "pdfextractor__nature__sci-rep-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_4.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_2.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-3",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_3.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-med-4",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_4.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-pub-health-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_pub_health_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmc-pub-health-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_pub_health_2.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__bmj-open-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmj_open_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__cmaj-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/cmaj_1.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__cmaj-2",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/cmaj_2.pdf"
+    },
+    {
+      "id": "pdfextractor__vancouver__plos-med-1",
+      "source": "pdfextractor",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/plos_med_1.pdf"
+    },
+    {
+      "id": "escicheck__adelina-feldman-2021-pronin-ross-2006-replication-and-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Adelina & Feldman 2021-Pronin & Ross 2006-replication and extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__aiyer-etal-2024-collabra-gino-etal-2009-replication-extensions-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Aiyer-etal-2024-Collabra-Gino-etal-2009-replication-extensions-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__anvari-olsen-hung-feldman-2021-jesp-hsee-zhang-2004-replication-extension-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Anvari Olsen Hung & Feldman 2021 JESP Hsee & Zhang 2004 replication extension-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__brick-et-al-miller-ratner-1998-replications-extensions-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Brick et al-Miller & Ratner 1998 replications & extensions-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chan-etal-2025-pcirr-rsos-tsang2006-replication-extension-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chan-etal-2025-PCIRR-RSOS-Tsang2006-replication-extension-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__chan-feldman-2025-cogemo-mccullough-etal-1997-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chan-Feldman-2025-CogEmo-McCullough-etal-1997-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chan-feldman-2025-rsos-baron-szymanska-2011-replication-extension-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chan-Feldman-2025-RSOS-Baron-Szymanska-2011-replication-extension-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__chandrashekar-et-al-2020-shafir-1993-replication-and-extensions-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chandrashekar et al 2020 Shafir (1993) replication and extensions-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chandrashekar-et-al-2021-mp-mellers-et-al-2001-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chandrashekar et al 2021 MP Mellers et al 2001 replication extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chandrashekar-et-al-malle-knobe-1997-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chandrashekar et al-Malle & Knobe 1997-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chandrashekar-etal-2021-jdm-bias-blind-spot-replications-and-agency-extensions-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chandrashekar-etal-2021-JDM-Bias Blind Spot-replications and agency extensions-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chandrashekar-etal-2023-mp-default-effects-replications-extensions-print",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chandrashekar-etal-2023-MP-Default-effects-replications-extensions-print.pdf"
+    },
+    {
+      "id": "escicheck__chandrashekar-etal-2024-irsp-pronin-kugler-2010-replication-extension-print",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chandrashekar-etal-2024-IRSP-Pronin-Kugler-2010-replication-extension-print.pdf"
+    },
+    {
+      "id": "escicheck__chen-et-al-2021-jesp-hindsight-bias-replications-extensions-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chen et al-2021-JESP-hindsight-bias-replications-extensions-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chen-et-al-2021-spps-inaction-inertia-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chen et al-2021-SPPS-inaction-inertia-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__chen-etal-2023-collabra-carter-gilovich2012-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Chen-etal-2023-Collabra-Carter&Gilovich2012-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ding-feldman-2025-rsos-pcirr-fox-rottenstreich-2003-rrr-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ding-Feldman-2025-RSOS-PCIRR-Fox-Rottenstreich-2003-RRR-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__efendic-et-al-2022-affect-heuristic-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Efendic et al-2022-affect-heuristic-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__elhalabi-etal-2022-joep-tva-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/ElHalabi-etal-2022-JOEP-TVA-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__horsham-etal-2025-pcirr-rsos-norton-etal-2007-rep-ext-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Horsham-etal-2025-PCIRR-RSOS-Norton-etal-2007-rep-ext-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__imada-etal-heyman-ariely-2004-reps-exts-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Imada etal-Heyman & Ariely 2004-reps-exts-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ip-feldman-2025-pspb-misestimation-of-emotional-experiences-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ip&Feldman-2025-PSPB-misestimation-of-emotional-experiences-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__jacobs-etal-2024-irsp-pcirr-endorsed-bastian-etal-2012-replication-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Jacobs-etal-2024-IRSP-PCIRR-endorsed-Bastian-etal-2012-replication-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__jamison-yay-feldman-2020-jesp-omission-bias-replication-extension-print-final-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Jamison, Yay, & Feldman-2020-JESP-omission-bias-replication-extension-print-final-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__koppel-et-al-2023-svenson1981-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Koppel et al-2023-Svenson1981-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__korbmacher-etal-2022-kruger-1999-rep-exts-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Korbmacher-etal-2022-Kruger-1999-rep-exts-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__lee-feldman-2025-rsos-pcirrr-newman-etal-2014-rrr-print-with-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Lee-Feldman-2025-RSOS-PCIRRR-Newman-etal-2014-RRR-print-with-supp.pdf"
+    },
+    {
+      "id": "escicheck__li-feldman-2025-rsos-pcirr-revisiting-mental-accounting-thaler1999-rrr-print",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Li&Feldman-2025-RSOS-PCIRR-Revisiting-mental-accounting-Thaler1999-RRR-print.pdf"
+    },
+    {
+      "id": "escicheck__li-feldman-2025-pcirr-fox-etal-2005-partition-dependence-rrr-preprint-final",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Li-Feldman-2025-PCIRR-Fox-etal-2005-partition-dependence-RRR-preprint-final.pdf"
+    },
+    {
+      "id": "escicheck__lu-etal-2025-jpsp-ppid-pcirr-lerner-keltner-2001-rrr-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Lu-etal-2025-JPSP-PPID-PCIRR-Lerner-Keltner-2001-RRR-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__maier-etal-2023-collabra-small-etal-2007-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Maier-etal-2023-Collabra-Small-etal-2007-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__majumder-etal-2024-jdm-kogut-ritov-2005-replication-extension-print",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Majumder-etal-2024-JDM-Kogut-Ritov-2005-replication-extension-print.pdf"
+    },
+    {
+      "id": "escicheck__mayiwar-etal-2024-qjep-kahneman-tversky-1972-replication-extension-print-with-supplementary-final-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Mayiwar-etal-2024-QJEP-Kahneman-Tversky-1972-replication-extension-print-with-supplementary-final-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__petrov-etal-2023-irsp-soman-2001-replication-extension-official-print-nosupp-compressed",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Petrov-etal-2023-IRSP-Soman-2001-replication-extension-official-print-nosupp_compressed.pdf"
+    },
+    {
+      "id": "escicheck__vonasch-etal-2023-collabra-less-is-better-hsee1998-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Vonasch-etal-2023-Collabra-Less-is-better-Hsee1998-replication-extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__wong-feldman-2025-rsos-read-etal-1999-rrr-print-with-suppl",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Wong-Feldman-2025-RSOS-Read-etal-1999-RRR-print-with-suppl.pdf"
+    },
+    {
+      "id": "escicheck__xiao-et-al-status-quo-bias-samuelson-zeckhauser-1988-replication-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Xiao et al-status quo bias-Samuelson & Zeckhauser (1988)-replication-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__xiao-zeng-feldman-2021-crsp-revisiting-decoy-effect-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Xiao, Zeng, & Feldman-2021-CRSP-revisiting-decoy-effect-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__xiao-etal-2024-irsp-monin-miller2001-replication-extensions-preprint-v9",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Xiao-etal-2024-IRSP-Monin&Miller2001-replication-extensions-preprint-v9.pdf"
+    },
+    {
+      "id": "escicheck__xiao-etal-2024-poc-pcirr-epley-2008-replication-extensions-anthropomorphism-loneliness-print",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Xiao-etal-2024-POC-PCIRR-Epley-2008-replication-extensions-anthropomorphism-loneliness-print.pdf"
+    },
+    {
+      "id": "escicheck__yeung-feldman-2022-collabra-gilovich-medvec-1994-replication-extension-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Yeung & Feldman-2022-Collabra-Gilovich Medvec 1994 Replication Extension-print-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__yeung-feldman-2025-collabra-pcirr-weiner-etal-1988-rrr-preprint-v6-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Yeung-Feldman-2025-Collabra-PCIRR-Weiner-etal-1988-RRR-preprint-v6-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__zhang-etal-2023-collabra-smith-etal-2002-replication-extention-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Zhang-etal-2023-Collabra-Smith-etal-2002-replication-extention-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__zhu-feldman2023collabra-numeracy-decision-making-peters-etal-2006-rep-ext-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Zhu&Feldman2023Collabra-Numeracy&decision-making-Peters-etal-2006-rep-ext-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__zhu-feldman-2025-pcirr-rsos-arkes-1996-replication-extension-registered-report-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Zhu-Feldman-2025-PCIRR-RSOS-Arkes-1996-replication-extension-registered-report-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ziano-et-al-2021-joep-disjunction-effect-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ziano et al 2021 JOEP Disjunction effect-replication extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ziano-et-al-2021-money-illusion-shafir-etal-1997-replication-extension-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ziano et al 2021 Money illusion Shafir-etal-1997 Replication Extension-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ziano-et-al-jesp-ppnumbing-replications-extensions-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ziano et al-JESP-PPnumbing-replications-extensions-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ziano-etal-2021-mp-replications-of-the-preference-for-indirect-harm-effect-print-nosupp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ziano etal 2021 MP Replications of the preference for indirect harm effect-print-nosupp.pdf"
+    },
+    {
+      "id": "escicheck__ziano-mok-feldman-2021-spps-better-than-average-alicke-1985-replication-extension-finalprint-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ziano, Mok, & Feldman (2021) SPPS Better-than-average-alicke-1985-replication-extension-finalprint-no-supp.pdf"
+    },
+    {
+      "id": "escicheck__ziano-etal-2023-collabra-effort-heuristic-kruger-etal-2004-replication-extension-print-no-supp",
+      "source": "escicheck",
+      "format": "pdf",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/testpdfs/Ziano-etal-2023-Collabra-Effort-heuristic-Kruger-etal-2004-replication-extension-print-no-supp.pdf"
+    },
+    {
+      "id": "docxtests__revised-version-hku-replication-extension-main-manuscript-template-johnson-goldstein-2003-johnson-et-al-2",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/(Revised Version) HKU replication & extension main manuscript template (Johnson & Goldstein, 2003 & Johnson et al 2.docx"
+    },
+    {
+      "id": "docxtests__ames-et-al-2004-group-a-replication-extension-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Ames et al. (2004) [Group A] Replication Extension Main Manuscript.docx"
+    },
+    {
+      "id": "docxtests__bh1988-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/BH1988_manuscript.docx"
+    },
+    {
+      "id": "docxtests__collabra-rnr-small-etal-2007-replication-and-extension-main-manuscript-v1-compare",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Collabra-RNR-Small etal 2007 replication and extension-main manuscript-v1 - compare.docx"
+    },
+    {
+      "id": "docxtests__collabra-rnr-small-etal-2007-replication-and-extension-main-manuscript-v4-g",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Collabra-RNR-Small etal 2007 replication and extension-main manuscript-v4-G.docx"
+    },
+    {
+      "id": "docxtests__fw-universe-knobe-effect-manuscript-v3-a",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/FW universe Knobe Effect -manuscript -V3-A.docx"
+    },
+    {
+      "id": "docxtests__goals-as-reference-points-1999-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Goals As Reference Points 1999 main manuscript.docx"
+    },
+    {
+      "id": "docxtests__hku-replication-extension-main-manuscript-template-johnson-goldstein-2003-johnson-et-al-2002-group-b",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/HKU replication & extension main manuscript template (Johnson & Goldstein 2003 & Johnson et al 2002 - Group B).docx"
+    },
+    {
+      "id": "docxtests__hsee-and-rottenstreich-2004-replication-extension-main-manuscript-iz",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Hsee and Rottenstreich (2004) replication & extension_ Main manuscript_IZ.docx"
+    },
+    {
+      "id": "docxtests__irsp-rnr-bh1988-rep-ext-main-manuscript-trackedchanges",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/IRSP-RNR-BH1988-rep-ext-main-manuscript-TrackedChanges.docx"
+    },
+    {
+      "id": "docxtests__irsp-rnr2-bh1988-rep-ext-main-manuscript-v2-s",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/IRSP-RNR2-BH1988-rep-ext-main-manuscript-v2-S.docx"
+    },
+    {
+      "id": "docxtests__jep-disjunction-bias-rep-ext-manuscript-v2-g-after-requests",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/JEP-Disjunction Bias-rep-ext-manuscript-v2-G-after-requests.docx"
+    },
+    {
+      "id": "docxtests__mp-accepted-svenson-1981-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/MP-accepted-Svenson 1981-Manuscript.docx"
+    },
+    {
+      "id": "docxtests__pcirr-s1-arkes-etal-1994-rr-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PCIRR-S1-Arkes-etal-1994-RR-main-manuscript.docx"
+    },
+    {
+      "id": "docxtests__pcirr-s1-rnr2-newman-etal-2011-replication-main-manuscript-track-changes",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PCIRR-S1-RNR2-Newman-etal-2011-replication-main-manuscript-track-changes.docx"
+    },
+    {
+      "id": "docxtests__pcirr-s1-rnr3-norton-etal-2007-rep-ext-main-manuscript-track-changes",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PCIRR-S1-RNR3-Norton-etal-2007-rep-ext-main-manuscript-track-changes.docx"
+    },
+    {
+      "id": "docxtests__pcirr-s2-final-monin-miller-2001-manuscript-v1",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PCIRR-S2-final-Monin-Miller-2001-manuscript-v1.docx"
+    },
+    {
+      "id": "docxtests__pcirr-s2-rnr-epley-et-al-rep-ext-manuscript-v2-g",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PCIRR-S2-RNR-Epley-et-al-rep-ext-manuscript-v2-G.docx"
+    },
+    {
+      "id": "docxtests__pcirr-s2-soman-2001-replication-manuscript-v3-g-trackchanges",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PCIRR-S2-Soman 2001-Replication-Manuscript-v3-G-trackchanges.docx"
+    },
+    {
+      "id": "docxtests__prereg-rr-style-vastfjall-etal-2014-replication-extension-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Prereg-RR-style-Vastfjall-etal-2014-replication-extension-main-manuscript.docx"
+    },
+    {
+      "id": "docxtests__psysci-heyman-ariely2004-rep-ext-manuscript-v1",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/PsySci-Heyman&Ariely2004-rep-ext-manuscript-v1.docx"
+    },
+    {
+      "id": "docxtests__spps-rnr3-ah-replication-extension-main-manuscript-v1",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/SPPS-RNR3-AH-Replication-extension-main-manuscript-v1.docx"
+    },
+    {
+      "id": "docxtests__van-boven-gilovich-2003-group-b-replication-extension-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Van Boven & Gilovich (2003) [Group B] Replication Extension - Main Manuscript.docx"
+    },
+    {
+      "id": "docxtests__waytz-et-al-2010-group-a-replication-extension-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Waytz et al. (2010) [Group A] Replication  Extension - Main Manuscript.docx"
+    },
+    {
+      "id": "docxtests__weinstein-1984-replication-extension-main-manuscript",
+      "source": "docxtests",
+      "format": "docx",
+      "rel_path": "MetaScienceTools/ESCIcheckapp/docxtests/Weinstein 1984 Replication & Extension_ Main manuscript.docx"
+    },
+    {
+      "id": "fulltext-html__10-1073-pnas-2115228119",
+      "source": "fulltext-html",
+      "format": "html",
+      "rel_path": "ArticleRepository/fulltext/10.1073__pnas.2115228119.html"
+    },
+    {
+      "id": "fulltext-html__10-1073-pnas-2120481119",
+      "source": "fulltext-html",
+      "format": "html",
+      "rel_path": "ArticleRepository/fulltext/10.1073__pnas.2120481119.html"
+    },
+    {
+      "id": "fulltext-html__10-1111-bjop-12368",
+      "source": "fulltext-html",
+      "format": "html",
+      "rel_path": "ArticleRepository/fulltext/10.1111__bjop.12368.html"
+    }
+  ]
+}
