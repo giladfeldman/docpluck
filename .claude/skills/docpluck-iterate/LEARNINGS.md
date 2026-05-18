@@ -781,3 +781,27 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - None. Phase 7 ran the FULL path — `/docpluck-cleanup` (PASS, no doc drift) + `/docpluck-review` (APPROVE, 0 blockers). This breaks the 12-cycle lean-path streak: lean-path eligibility item 11 ("Tier1==Tier2==Tier3 byte-identical") did not hold because of the pre-existing DELTA-1, so the full path was mandatory per the lean-path spec.
+
+---
+
+## Run: 2026-05-18 (run 9 continued) · Cycle 5 · app service_version 1.5.1 — DELTA-1 preserve_math_glyphs
+
+### Outcome
+- SHIPPED cycle 5 (docpluckapp; service_version 1.5.0->1.5.1; NO docpluck library bump). The `/analyze` handler built the sectioned document with the default `preserve_math_glyphs=False`, then reused it as `_sectioned=` in `render_pdf_to_markdown` — which skips its own `preserve_math_glyphs=True` call. So the app's user-facing rendered view ASCII-transliterated math/Greek glyphs (DELTA-1). Both the `/analyze` AND `/sections` `extract_sections` call sites now pass `preserve_math_glyphs=True`. Phase 6c: app `/analyze` rendered byte-matches the library `render_pdf_to_markdown` (plos_med_1 56678==56678; chan_feldman 87202==87202). Harness Tier-D: 0 regressions / 0 new fails across 180 docs; xiao-status-quo text_loss fixed (1 fail->pass). 3 new regression tests. Prod verified live (service_version 1.5.1).
+
+### Blind Spots
+- **The handoff scoped the fix to ONE call site (main.py:786); a grep found TWO.** `extract_sections(file_bytes=content)` was also at the `/sections` endpoint (line 506) with the same default. The general fix (hard rule 16) covers both — fixing only the handoff-named site would have left `/sections` inconsistent with `/analyze`'s sections view. Always enumerate EVERY call site of the function being fixed, not just the one the handoff names.
+- **Only 1 of 9 text_loss Tier-D fails cleared after cycle 5.** The cycle-6 plan expected the glyph-transliteration text_loss false-positives to mostly clear once the rendered view preserves glyphs. 8 of 9 remain -> most text_loss residuals are NOT glyph-representation artifacts. Cycle 6's adjudication must treat them as candidate-genuine text loss, not assume check artifacts.
+
+### New defect found (queued per rule 0e — cycle 7)
+- **normalize_text single-pass word-rejoin incompleteness.** `normalize_text(raw, academic)` — the production single pass — leaves broken words (`repli cations`, `differ ences`, `con ducted`); a 2nd pass joins them (norm1 79436 -> norm2 79385 chars). Surfaced by `PDFextractor/service/tests/test_benchmark.py::test_normalization_idempotent`. Real production bug: broken words ship in normalized/sections/rendered output corpus-wide. Library cycle (normalize.py). The idempotency test is left intentionally RED as the regression witness until cycle 7 ships.
+
+### Verification Gaps (METHODOLOGY)
+- **The docpluckapp SERVICE test suite (`PDFextractor/service/tests/`) is not in the iterate verification loop.** The loop runs the docpluck LIBRARY pytest + the harness; it never runs the service suite. Result: 5 test-drift failures (stale `sectioning_version=="1.0.0"` vs live 1.2.2 — drifted across ~2 minor bumps; 2 Xpdf-era SMP-recovery mechanism assertions; 1 empty-`docx/`-folder test-logic bug) PLUS 1 real library bug (idempotency) accumulated UNDETECTED. Cycle 5 was the first cycle to touch app code and run the service suite. See PROPOSED AMENDMENT.
+- Prod render smoke not run — prod `INTERNAL_SERVICE_TOKEN` is a Railway env var, unavailable locally (401 with both local tokens). Tier-3 verified instead by version-confirmation (prod `/health`: service_version 1.5.1 + docpluck_version 2.4.57; CI green) + deterministic-code equivalence: the cycle-5 diff is byte-identical service code across tiers, and glyph preservation is a `normalize` flag (pdftotext-version-INdependent, unlike Delta 2's line-break skew). Sound for this change; would NOT be sound for a pdftotext-version-sensitive change.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` sub-skills — SKIPPED. Cycle 5 is a 2-line app `preserve_math_glyphs` flag flip + test-drift fixes; it touches NO docpluck library code, so library hard rules 1-6 (pdftotext-layout / AGPL / tool-swap / U+2212 / ImportError / HTML-table) have provably zero surface. Inline 11-item hard-rule checklist done + passed; doc sync done inline (tmp/known-tier-deltas.md Delta 3 marked resolved). Lean-checklist item 1 ("no app/service code") fails by construction — the change IS the app fix — but the lean reasoning holds: an app argument-flip to an already-supported library parameter cannot violate any docpluck library hard rule.
+
+### PROPOSED AMENDMENT (awaiting user approval)
+- The iterate loop should run the docpluckapp service test suite (`cd PDFextractor/service && python -m pytest tests/`) whenever a cycle touches app/service code, and periodically regardless. Cycle 5 surfaced 6 issues in that suite (5 drift + 1 real bug) invisible for many cycles because the suite sits outside the loop. Add a Phase 5/Phase 6 step: "if the cycle touched app code, run the service test suite; triage failures per the 3-bucket rule."
