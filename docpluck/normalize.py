@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.10"
+NORMALIZATION_VERSION = "1.9.11"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1605,6 +1605,74 @@ def recover_pua_glyphs(text: str) -> str:
     )
 
 
+# v2.4.57 (NORMALIZATION_VERSION 1.9.11): recover the cmsy10 (TeX Computer
+# Modern math-symbol font) >= / <= comparison glyphs that pdftotext AND
+# pdfplumber both destroy to U+FFFD on tightly-kerned PDFs. The glyph identity
+# is gone from BOTH engines, so the layout channel cannot recover it --
+# recovery is context-based. Sibling of S5a (FFFD->eta).
+#
+# Rule 1 -- complement pairing: a corrupted "<FFFD>N" contrasted with a clean
+# "<N" / ">N" of the SAME number N is a set-partition (every value is either
+# <N or >=N, resp. >N or <=N). The same-number constraint is enforced by a
+# regex backreference, so a non-matching pair simply does not match. The
+# separator class excludes digits/newlines/FFFD so the two operands stay in
+# one clause. (?!\d) anchors the trailing number so "<20...[FFFD]200" cannot
+# match a prefix.
+_FFFD_OP_THEN_RE = re.compile(
+    r"([<>])(\s*)(\d+)([^\d�\n]{0,18}?)�(\s*)\3(?!\d)"
+)
+_FFFD_RE_THEN_OP = re.compile(
+    r"�(\s*)(\d+)([^\d�\n]{0,18}?)([<>])(\s*)\2(?!\d)"
+)
+# Rule 2 -- a lone "<FFFD>N": FFFD token-initial (not glued to a letter or
+# digit -- a comparison operator is always set off by space/paren/slash/line
+# start, never welded to a word or another number) immediately before a digit.
+_FFFD_LONE_RE = re.compile(r"(?<![A-Za-z0-9])�(\s*\d)")
+_FFFD_COMPLEMENT = {"<": "≥", ">": "≤"}
+
+
+def recover_fffd_comparison_operators(text: str) -> str:
+    """Recover cmsy10 >= / <= glyphs that pdftotext destroyed to U+FFFD.
+
+    Rule 1 -- complement pairing (airtight): a corrupted ``<FFFD>N`` in a
+    partition contrast with a clean ``<N`` / ``>N`` of the same number N is the
+    set-complement (``<`` -> ``>=``, ``>`` -> ``<=``). Zero false-positive
+    risk -- a partition like ``(<20/[FFFD]20 mm)`` is complementary by
+    construction.
+
+    Rule 2 -- document consensus: a lone ``<FFFD>N`` with no local complement
+    is recovered only when Rule 1 has already fired in this document AND every
+    recovery agreed on one operator. One PDF == one font == one corruption
+    shape, so an airtight unanimous mapping generalises to a lone occurrence.
+    If Rule-1 recoveries disagree, or none fired, a lone FFFD is left alone for
+    the caller's quality scoring to flag (the S5a policy for prose FFFD).
+
+    No-op when the text holds no U+FFFD.
+    """
+    if not text or "�" not in text:
+        return text
+
+    def _op_then(m: "re.Match[str]") -> str:
+        op, ws1, num, sep, ws2 = m.groups()
+        return f"{op}{ws1}{num}{sep}{_FFFD_COMPLEMENT[op]}{ws2}{num}"
+
+    def _re_then(m: "re.Match[str]") -> str:
+        ws1, num, sep, op, ws2 = m.groups()
+        return f"{_FFFD_COMPLEMENT[op]}{ws1}{num}{sep}{op}{ws2}{num}"
+
+    before = text
+    text = _FFFD_OP_THEN_RE.sub(_op_then, text)
+    text = _FFFD_RE_THEN_OP.sub(_re_then, text)
+    # Rule 2 fires only on a unanimous, evidence-based consensus.
+    n_ge = text.count("≥") - before.count("≥")
+    n_le = text.count("≤") - before.count("≤")
+    if n_ge > 0 and n_le == 0:
+        text = _FFFD_LONE_RE.sub(lambda m: "≥" + m.group(1), text)
+    elif n_le > 0 and n_ge == 0:
+        text = _FFFD_LONE_RE.sub(lambda m: "≤" + m.group(1), text)
+    return text
+
+
 def normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -1835,6 +1903,22 @@ def normalize_text(
     if _fffd_recovered > 0:
         report.changes_made["fffd_context_recovered"] = _fffd_recovered
         report.steps_changed.append("S5a_fffd_context_recovery")
+
+    # S5b: Context-aware U+FFFD -> comparison-operator (>= / <=) recovery.
+    # pdftotext AND pdfplumber destroy the cmsy10 (TeX Computer Modern
+    # math-symbol font) >= / <= glyphs to U+FFFD on tightly-kerned PDFs -- the
+    # layout channel cannot recover it (the glyph identity is gone from both
+    # engines), so recover_fffd_comparison_operators rebuilds it from context:
+    # airtight complement pairing ("<N" partitioned against "[FFFD]N"), then a
+    # document-consensus rule for a lone "[FFFD]N". Sibling of S5a.
+    before = t
+    _fffd_cmp_before = t.count("�")
+    t = recover_fffd_comparison_operators(t)
+    _fffd_cmp_recovered = _fffd_cmp_before - t.count("�")
+    report.steps_applied.append("S5b_fffd_comparison_recovery")
+    if _fffd_cmp_recovered > 0:
+        report.changes_made["fffd_comparison_recovered"] = _fffd_cmp_recovered
+        report.steps_changed.append("S5b_fffd_comparison_recovery")
 
     # S6: Whitespace and invisible character normalization
     before = t
