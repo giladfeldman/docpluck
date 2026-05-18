@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.57] — 2026-05-18
+
+**Cycle 4 (run 9, harness-gated) — pdftotext and pdfplumber destroy the cmsy10 `≥`/`≤` glyph to U+FFFD (glyph, S0).** On a tightly-kerned PDF that typesets comparison operators with the TeX Computer Modern math-symbol font (`cmsy10`), neither pdftotext nor pdfplumber can decode the `≥`/`≤` glyph — both emit U+FFFD. The glyph identity is destroyed in *both* engines, so the layout channel cannot recover it; recovery must be context-based. `plos_med_1` (PLOS Medicine, PROSECCO trial) rendered three prose comparisons — `age �18 years`, `(<20/�20 mm)`, `<20 mm versus �20 mm` — as raw U+FFFD; the harness Tier-D `glyph` check flagged it.
+
+Fix (v2.4.57) — `normalize.py::recover_fffd_comparison_operators` (pipeline step S5b, sibling of S5a FFFD→eta):
+- **Rule 1 — complement pairing (airtight).** A corrupted `[FFFD]N` contrasted with a clean `<N`/`>N` of the *same* number N is a set-partition — every value is either `<N` or `≥N` (resp. `>N` or `≤N`). A regex backreference enforces the same-number constraint, so a non-matching pair never matches. Recovers `(<20/≥20 mm)` and `<20 mm versus ≥20 mm` with zero false-positive risk.
+- **Rule 2 — document consensus.** A lone `[FFFD]N` with no local complement is recovered only when Rule 1 already fired in the document AND every recovery agreed on one operator (one PDF == one font == one corruption shape). Recovers the lone `age ≥18 years` and the six fibroid-size bins `≥5–10 mm`…`≥40 mm`. Confirmed against the paper's AI-multimodal gold.
+
+Harness Tier-D gate (academic level): `plos_med_1` flips the `glyph` check fail→pass; 0 regressions, 0 new fails corpus-wide. NORMALIZATION_VERSION 1.9.11. 14 new tests (`test_fffd_comparison_recovery_real_pdf.py`).
+
+Phase-5d AI-gold verification confirmed the cmsy10 fix is clean (every recovered `≥` matches the gold) but surfaced pre-existing defects beyond this cycle's scope: `plos_med_1`'s structured tables are badly broken (Table 2 emits 1 of 11 rows, Table 5 is an empty shell, Tables 3/4 swap bodies under each other's captions), the section annotator promotes front-matter sidebar labels to `##` headings, and front-matter metadata leaks into the body. The Tier-D backlog also still has 9 `text_loss` fails (largely `_fingerprint` glyph-representation false-positives) and 2 extraction timeouts (`nat_comms_3`, `xiao-poc-epley` — environmental Camelot perf). The run continues.
+
 ## [2.4.56] — 2026-05-17
 
 **Cycle 3 (run 9, harness-gated) — CMEX10 extensible matrix-bracket pieces surfaced as Private-Use codepoints (glyph, S1).** A matrix or tall bracketed expression typeset with the TeX `CMEX10` math-extension font is built from extensible square-bracket *pieces* — an upper corner, a repeated extension segment, a lower corner — for each side. Embedded with no ToUnicode CMap, both pdftotext and pdfplumber surface these as U+F8EE–F8FB Private-Use codepoints. `ieee_access_10` rendered a 5-row matrix carrying 10 such raw PUA glyphs; the verification harness's Tier-D `glyph` check flagged it.
