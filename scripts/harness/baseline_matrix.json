@@ -3603,12 +3603,8 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
-        "checked_paragraphs": 48,
-        "missing_count": 1,
-        "missing_samples": [
-          "neutral framing did not result significant difference though the effect was the"
-        ]
+        "verdict": "pass",
+        "checked_paragraphs": 48
       },
       "table_parity": {
         "verdict": "pass",
