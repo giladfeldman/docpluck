@@ -764,3 +764,20 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path, 12th consecutive). normalize.py glyph-map extension, no `-layout`/AGPL/tool-swap/U+2212-rule/ImportError/HTML-table surface; general fix keyed on a structural signature (geometry-confirmed CMEX bracket block); real-PDF test added; version bumps consistent (`__init__`/`pyproject`/NORMALIZATION_VERSION/TABLE_EXTRACTION_VERSION). Harness Tier-D 0 new fails.
+
+---
+
+## Run: 2026-05-18 (run 9 continued) · Cycle 4 · v2.4.57 — cmsy10 >= / <= glyphs destroyed to U+FFFD
+
+### Outcome
+- SHIPPED v2.4.57. New `normalize.py::recover_fffd_comparison_operators` (pipeline step S5b, sibling of S5a FFFD→eta). pdftotext AND pdfplumber both destroy the TeX cmsy10 `≥`/`≤` glyphs to U+FFFD on tightly-kerned PDFs — the glyph identity is gone from both engines, so recovery is context-based. Rule 1 (airtight): a corrupted `[FFFD]N` paired with a clean `<N`/`>N` of the SAME number (regex backreference) is the set-complement. Rule 2 (doc-consensus): a lone `[FFFD]N` recovers only when Rule 1 fired unanimously. `plos_med_1` Tier-D `glyph` fail→pass; 0 regressions corpus-wide; 14 tests. AI gold (via article-finder generate-gold) confirmed all 9 corrupted glyphs are `≥`.
+
+### Blind Spots
+- **A glyph destroyed identically by BOTH extraction engines cannot be recovered from the layout channel — document structure is the only signal.** Unlike cycle 1/3's PUA glyphs (which carry a recoverable codepoint + pdfplumber font geometry), cmsy10 `≥` becomes a bare U+FFFD in pdftotext AND pdfplumber — zero glyph identity survives either engine. Recovery had to be built from document structure: a set-partition (`<N` vs `[FFFD]N`, same N) is mathematically complementary, so the corrupted operator is deducible with zero false-positive risk. When a glyph is unrecoverable per-occurrence, look for a co-located structural invariant (here the complement partition; cf. cycle 8's estimate-∈-CI invariant).
+- **Tier-D green ≠ paper clean — Phase 5d AI-verify must run even when the harness passes.** The harness Tier-D `glyph` check passed the moment FFFD was gone, but the Phase 5d AI-gold verify of the same paper surfaced catastrophic pre-existing defects invisible to Tier-D's mechanical checks: `plos_med_1` Table 2 emits 1 of 11 rows, Table 5 is an empty shell, Tables 3/4 swap bodies under each other's captions; section annotator promotes front-matter sidebars to `##`; metadata leaks into body. Tier-D is necessary, not sufficient — 5d is the semantic gate.
+
+### Verification Gaps
+- **Phase 6c (Tier1 vs Tier2) surfaced an app↔library divergence the harness Tier-D is blind to.** The app `/analyze` rendered view transliterates `≥`→`>=`, `χ`→`chi2` (DELTA-1: `PDFextractor/service/app/main.py:786` builds the sectioned doc with default `preserve_math_glyphs=False` and reuses it as `_sectioned=` for the rendered view, bypassing `render_pdf_to_markdown`'s own `preserve_math_glyphs=True`). Tier-D `glyph` passes `>=` (ASCII). Only a Tier1-vs-Tier2 byte comparison caught it. Documented `tmp/known-tier-deltas.md` Delta 3; queued cycle 5. This delta is also the root cause of several Tier-D `text_loss` false-positives (`checks.py::_fingerprint` tokenizes raw `χ2` and rendered `chi2` inconsistently).
+
+### SPINE-SKIPs
+- None. Phase 7 ran the FULL path — `/docpluck-cleanup` (PASS, no doc drift) + `/docpluck-review` (APPROVE, 0 blockers). This breaks the 12-cycle lean-path streak: lean-path eligibility item 11 ("Tier1==Tier2==Tier3 byte-identical") did not hold because of the pre-existing DELTA-1, so the full path was mandatory per the lean-path spec.
