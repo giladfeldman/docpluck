@@ -13,7 +13,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 49
+        "checked_paragraphs": 49,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -39,7 +40,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 43
+        "checked_paragraphs": 43,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -65,7 +67,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 40
+        "checked_paragraphs": 40,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -91,7 +94,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 36
+        "checked_paragraphs": 36,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -117,7 +121,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 40
+        "checked_paragraphs": 40,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -143,7 +148,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 46
+        "checked_paragraphs": 46,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -169,7 +175,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 33
+        "checked_paragraphs": 33,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -195,7 +202,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 42
+        "checked_paragraphs": 42,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -221,7 +229,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 43
+        "checked_paragraphs": 43,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -247,7 +256,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 38
+        "checked_paragraphs": 38,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -273,7 +283,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 63
+        "checked_paragraphs": 63,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -299,7 +310,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 22
+        "checked_paragraphs": 22,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -325,7 +337,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 65
+        "checked_paragraphs": 65,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -351,7 +364,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 94
+        "checked_paragraphs": 94,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -377,7 +391,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 123
+        "checked_paragraphs": 123,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -403,7 +418,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 85
+        "checked_paragraphs": 85,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -429,7 +445,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 101
+        "checked_paragraphs": 101,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -455,7 +472,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 139
+        "checked_paragraphs": 139,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -481,7 +499,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 89
+        "checked_paragraphs": 89,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -507,7 +526,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 46
+        "checked_paragraphs": 46,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -533,7 +553,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 38
+        "checked_paragraphs": 38,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -559,7 +580,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 16
+        "checked_paragraphs": 16,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -585,7 +607,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 13
+        "checked_paragraphs": 13,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -611,7 +634,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 98
+        "checked_paragraphs": 98,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -637,7 +661,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 103
+        "checked_paragraphs": 103,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -663,7 +688,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 97
+        "checked_paragraphs": 97,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -689,7 +715,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 48
+        "checked_paragraphs": 48,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -715,7 +742,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 87
+        "checked_paragraphs": 87,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -741,7 +769,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 43
+        "checked_paragraphs": 43,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -767,7 +796,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 3
+        "checked_paragraphs": 3,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -793,7 +823,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 29
+        "checked_paragraphs": 29,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -819,7 +850,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 66
+        "checked_paragraphs": 66,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -845,7 +877,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 34
+        "checked_paragraphs": 34,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -871,7 +904,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 23
+        "checked_paragraphs": 23,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -896,13 +930,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 105,
-        "missing_count": 2,
-        "missing_samples": [
-          "higher numbers reflect greater difficulty mean percentile estimates above reflect above average effect estimates below",
-          "cohen and original study each easy ability each difficult ability excluding telling jokes"
-        ]
+        "reflowed_exempt": 2
       },
       "table_parity": {
         "verdict": "pass",
@@ -928,7 +958,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 101
+        "checked_paragraphs": 101,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -954,7 +985,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 76
+        "checked_paragraphs": 76,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -980,7 +1012,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 16
+        "checked_paragraphs": 16,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1006,7 +1039,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 76
+        "checked_paragraphs": 76,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1032,7 +1066,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 60
+        "checked_paragraphs": 60,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1058,7 +1093,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 62
+        "checked_paragraphs": 62,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1084,7 +1120,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 61
+        "checked_paragraphs": 61,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1110,7 +1147,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 53
+        "checked_paragraphs": 53,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1136,7 +1174,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 69
+        "checked_paragraphs": 69,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1162,7 +1201,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 98
+        "checked_paragraphs": 98,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1188,7 +1228,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 59
+        "checked_paragraphs": 59,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1214,7 +1255,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 101
+        "checked_paragraphs": 101,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1240,7 +1282,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 70
+        "checked_paragraphs": 70,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1266,7 +1309,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 77
+        "checked_paragraphs": 77,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1292,7 +1336,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 61
+        "checked_paragraphs": 61,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1318,7 +1363,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 72
+        "checked_paragraphs": 72,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1344,7 +1390,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 77
+        "checked_paragraphs": 77,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1370,7 +1417,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 76
+        "checked_paragraphs": 76,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1396,7 +1444,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 74
+        "checked_paragraphs": 74,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1422,7 +1471,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 64
+        "checked_paragraphs": 64,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1448,7 +1498,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 68
+        "checked_paragraphs": 68,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1474,7 +1525,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 55
+        "checked_paragraphs": 55,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1500,7 +1552,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 41
+        "checked_paragraphs": 41,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1526,7 +1579,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 15
+        "checked_paragraphs": 15,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1552,7 +1606,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 35
+        "checked_paragraphs": 35,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1578,7 +1633,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 38
+        "checked_paragraphs": 38,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1604,7 +1660,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 50
+        "checked_paragraphs": 50,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1630,7 +1687,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 40
+        "checked_paragraphs": 40,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1656,7 +1714,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 37
+        "checked_paragraphs": 37,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1682,7 +1741,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 50
+        "checked_paragraphs": 50,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1708,7 +1768,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 45
+        "checked_paragraphs": 45,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1734,7 +1795,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 57
+        "checked_paragraphs": 57,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1760,7 +1822,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 51
+        "checked_paragraphs": 51,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1786,7 +1849,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 33
+        "checked_paragraphs": 33,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1812,7 +1876,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 65
+        "checked_paragraphs": 65,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1838,7 +1903,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 51
+        "checked_paragraphs": 51,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1864,7 +1930,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 57
+        "checked_paragraphs": 57,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1890,7 +1957,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 88
+        "checked_paragraphs": 90,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1916,7 +1984,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 61
+        "checked_paragraphs": 61,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1942,7 +2011,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 80
+        "checked_paragraphs": 80,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1968,7 +2038,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 62
+        "checked_paragraphs": 62,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -1994,7 +2065,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 82
+        "checked_paragraphs": 82,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2020,7 +2092,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 90
+        "checked_paragraphs": 90,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2046,7 +2119,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 39
+        "checked_paragraphs": 39,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2072,7 +2146,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 41
+        "checked_paragraphs": 41,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2098,7 +2173,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 76
+        "checked_paragraphs": 76,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2124,7 +2200,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 63
+        "checked_paragraphs": 63,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2150,7 +2227,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 59
+        "checked_paragraphs": 59,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2197,7 +2275,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 54
+        "checked_paragraphs": 54,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2223,7 +2302,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 72
+        "checked_paragraphs": 72,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2249,7 +2329,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 102
+        "checked_paragraphs": 102,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2275,7 +2356,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 31
+        "checked_paragraphs": 31,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2301,7 +2383,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 31
+        "checked_paragraphs": 31,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2327,7 +2410,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 24
+        "checked_paragraphs": 24,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2353,7 +2437,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 25
+        "checked_paragraphs": 25,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2379,7 +2464,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 39
+        "checked_paragraphs": 39,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2405,7 +2491,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 34
+        "checked_paragraphs": 34,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2431,7 +2518,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 57
+        "checked_paragraphs": 57,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2457,7 +2545,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 70
+        "checked_paragraphs": 70,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2483,7 +2572,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 25
+        "checked_paragraphs": 25,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2509,7 +2599,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 74
+        "checked_paragraphs": 74,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2535,7 +2626,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 25
+        "checked_paragraphs": 25,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2561,7 +2653,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 58
+        "checked_paragraphs": 58,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2587,7 +2680,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 61
+        "checked_paragraphs": 61,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2614,6 +2708,7 @@
       "text_loss": {
         "verdict": "fail",
         "checked_paragraphs": 82,
+        "reflowed_exempt": 0,
         "missing_count": 1,
         "missing_samples": [
           "new hysteroscopic myomectomy after perforation first session heavy bleeding with overnight admission"
@@ -2643,7 +2738,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 90
+        "checked_paragraphs": 90,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2669,7 +2765,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 78
+        "checked_paragraphs": 78,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2695,7 +2792,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 49
+        "checked_paragraphs": 49,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2721,7 +2819,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 97
+        "checked_paragraphs": 97,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2747,7 +2846,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 105
+        "checked_paragraphs": 105,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2773,7 +2873,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 98
+        "checked_paragraphs": 98,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2799,7 +2900,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 84
+        "checked_paragraphs": 84,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2825,7 +2927,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 49
+        "checked_paragraphs": 49,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2851,7 +2954,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 54
+        "checked_paragraphs": 54,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2877,7 +2981,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 30
+        "checked_paragraphs": 30,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2903,7 +3008,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 32
+        "checked_paragraphs": 32,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2929,7 +3035,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 103
+        "checked_paragraphs": 103,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2955,7 +3062,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 113
+        "checked_paragraphs": 113,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -2981,7 +3089,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 97
+        "checked_paragraphs": 97,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3007,7 +3116,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 45
+        "checked_paragraphs": 45,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3033,7 +3143,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 76
+        "checked_paragraphs": 76,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3058,12 +3169,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 97,
-        "missing_count": 1,
-        "missing_samples": [
-          "binary case partition target event will happen versus target event will not happen"
-        ]
+        "reflowed_exempt": 1
       },
       "table_parity": {
         "verdict": "pass",
@@ -3089,7 +3197,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 48
+        "checked_paragraphs": 48,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3115,7 +3224,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 18
+        "checked_paragraphs": 18,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3141,7 +3251,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 82
+        "checked_paragraphs": 82,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3167,7 +3278,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 56
+        "checked_paragraphs": 56,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3193,7 +3305,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 87
+        "checked_paragraphs": 87,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3219,7 +3332,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 86
+        "checked_paragraphs": 86,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3245,7 +3359,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 43
+        "checked_paragraphs": 43,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3271,7 +3386,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 35
+        "checked_paragraphs": 35,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3296,13 +3412,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 105,
-        "missing_count": 2,
-        "missing_samples": [
-          "higher numbers reflect greater difficulty mean percentile estimates above reflect above average effect estimates below",
-          "cohen and original study each easy ability each difficult ability excluding telling jokes"
-        ]
+        "reflowed_exempt": 2
       },
       "table_parity": {
         "verdict": "pass",
@@ -3328,7 +3440,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 115
+        "checked_paragraphs": 115,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3353,15 +3466,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 211,
-        "missing_count": 4,
-        "missing_samples": [
-          "participants imagine winning then choose between uncertain gain loss further gain loss problem single within compared against",
-          "risk taking choice participants imagine losing then choose between uncertain gain loss further gain loss",
-          "risk taking choice imagine losing participants then choose between uncertain gain sure gain",
-          "willingness take the bet choice decision under single coin flip coin flips"
-        ]
+        "reflowed_exempt": 4
       },
       "table_parity": {
         "verdict": "pass",
@@ -3387,7 +3494,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 141
+        "checked_paragraphs": 141,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3413,7 +3521,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 96
+        "checked_paragraphs": 96,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3439,7 +3548,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 101
+        "checked_paragraphs": 101,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3465,7 +3575,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 128
+        "checked_paragraphs": 129,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3490,13 +3601,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 112,
-        "missing_count": 2,
-        "missing_samples": [
-          "sample population similarity high school programme sampling distributions likelihood sampling outcomes babies more extreme",
-          "less than equal more than bbbggg equally more probable gbbgbg more probable programme programme distribution non uniform distribution"
-        ]
+        "reflowed_exempt": 2
       },
       "table_parity": {
         "verdict": "pass",
@@ -3522,7 +3629,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 97
+        "checked_paragraphs": 97,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3548,7 +3656,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 79
+        "checked_paragraphs": 79,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3573,12 +3682,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 103,
-        "missing_count": 1,
-        "missing_samples": [
-          "two separate studies combined two bracketing and investigations into outcome editing one unified investigation"
-        ]
+        "reflowed_exempt": 1
       },
       "table_parity": {
         "verdict": "pass",
@@ -3604,7 +3710,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 48
+        "checked_paragraphs": 48,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3630,7 +3737,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 76
+        "checked_paragraphs": 76,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3655,14 +3763,9 @@
         ]
       },
       "text_loss": {
-        "verdict": "fail",
+        "verdict": "pass",
         "checked_paragraphs": 104,
-        "missing_count": 3,
-        "missing_samples": [
-          "monin and miller replication and extension supplementary non sexist credential condition name",
-          "monin and miller replication and extension supplementary non racist credential condition name",
-          "monin and miller replication and extension supplementary comparisons and deviations original replication original"
-        ]
+        "reflowed_exempt": 3
       },
       "table_parity": {
         "verdict": "pass",
@@ -3709,7 +3812,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 88
+        "checked_paragraphs": 88,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3735,7 +3839,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 129
+        "checked_paragraphs": 129,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3761,7 +3866,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 95
+        "checked_paragraphs": 95,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3787,7 +3893,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 119
+        "checked_paragraphs": 119,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3813,7 +3920,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 105
+        "checked_paragraphs": 105,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3839,7 +3947,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 16
+        "checked_paragraphs": 16,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3865,7 +3974,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 35
+        "checked_paragraphs": 35,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3891,7 +4001,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 110
+        "checked_paragraphs": 110,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3917,7 +4028,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 45
+        "checked_paragraphs": 45,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3943,7 +4055,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 53
+        "checked_paragraphs": 53,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3969,7 +4082,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 82
+        "checked_paragraphs": 82,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "pass",
@@ -3993,7 +4107,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 8
+        "checked_paragraphs": 8,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4016,7 +4131,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 4
+        "checked_paragraphs": 4,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4039,7 +4155,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 1
+        "checked_paragraphs": 1,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4062,7 +4179,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4085,7 +4203,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4108,7 +4227,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 4
+        "checked_paragraphs": 4,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4131,7 +4251,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 5
+        "checked_paragraphs": 5,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4154,7 +4275,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 3
+        "checked_paragraphs": 3,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4177,7 +4299,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4200,7 +4323,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 1
+        "checked_paragraphs": 1,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4223,7 +4347,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4246,7 +4371,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4269,7 +4395,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 2
+        "checked_paragraphs": 2,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4292,7 +4419,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 1
+        "checked_paragraphs": 1,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4315,7 +4443,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 2
+        "checked_paragraphs": 2,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4338,7 +4467,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 1
+        "checked_paragraphs": 1,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4361,7 +4491,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4384,7 +4515,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4407,7 +4539,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 1
+        "checked_paragraphs": 1,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4430,7 +4563,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 5
+        "checked_paragraphs": 5,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4453,7 +4587,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 13
+        "checked_paragraphs": 13,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4476,7 +4611,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 0
+        "checked_paragraphs": 0,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4499,7 +4635,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 3
+        "checked_paragraphs": 3,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4522,7 +4659,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 4
+        "checked_paragraphs": 4,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4545,7 +4683,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 1
+        "checked_paragraphs": 1,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4568,7 +4707,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 18
+        "checked_paragraphs": 18,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4591,7 +4731,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 19
+        "checked_paragraphs": 19,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
@@ -4614,7 +4755,8 @@
       },
       "text_loss": {
         "verdict": "pass",
-        "checked_paragraphs": 150
+        "checked_paragraphs": 150,
+        "reflowed_exempt": 0
       },
       "table_parity": {
         "verdict": "skip",
