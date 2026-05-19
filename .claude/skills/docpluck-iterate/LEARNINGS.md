@@ -830,3 +830,22 @@ The `gold-generation.md` Step-4 Codex audit misreads UTF-8 gold files as mojibak
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED. Cycle 6 changes only `scripts/harness/checks.py` (the verification harness) + adds a harness test; it touches NO docpluck library package code and NO app code, so library hard rules 1–6 have provably zero surface. The harness README's high-level `text_loss` description ("every substantive source paragraph survives") still holds — the reflow exemption refines *how* "survives" is detected. Harness-only → no `__version__`/`pyproject`/`NORMALIZATION_VERSION` bump, no tag, no auto-bump.
+
+---
+
+## Run: 2026-05-19 (run 9 continued, session 3) · USER DIRECTIVE — LEAVE NOTHING BEHIND re-affirmed
+
+### USER CORRECTION (2026-05-19)
+Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIND directive — *"make sure to always address all the issues that come up, leave nothing behind, small/big issues, doesn't matter pre-existing or not"* — and asked that it *"hold for all future runs as well, through all project skills and claude.md ... clear and always followed, not just for this session."*
+
+**Substance:** unchanged — the directive was already docpluck CLAUDE.md rule 1 + rules 0e/0e-bis/0e-ter, a Core/rule-0 directive in all five docpluck-* skills, and memory `feedback_fix_every_bug_found`. The re-statement was about DURABILITY and VISIBILITY, not new content.
+
+**Why it needed re-stating (the real lesson):** the directive existed but was not maximally *prominent* — in both CLAUDE.md files it sat as bullet ~1 of a deep "Critical hard rules" section, easy to skim past on a fast read. When a user re-raises an already-encoded directive, that is itself the signal: the encoding was not visible/durable enough.
+
+**Action taken this session:**
+- Added a prominent **top-of-file "Working directive — LEAVE NOTHING BEHIND" section** to BOTH `docpluck/CLAUDE.md` and `PDFextractor/CLAUDE.md` — now the first substantive content read in every session, before any architecture detail.
+- Re-affirmed the directive's date-stamp (→ 2026-05-14/15/17/19, "binds ALL future runs and every skill") in all five docpluck-* skills (`-iterate` 0e-ter, `-qa`/`-cleanup`/`-deploy` Core directive, `-review` rule 0).
+- Refreshed memory `feedback_fix_every_bug_found` (description + a Re-affirmation 2026-05-19 paragraph + the meta-lesson) and the `MEMORY.md` index hook.
+- Logged in run-meta `user_corrections`.
+
+**Meta-lesson encoded:** when the user re-raises an already-encoded directive, strengthen the ENCODING — prominence, position, cross-file coverage — do not merely acknowledge and continue.

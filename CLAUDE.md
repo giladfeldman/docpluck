@@ -1,5 +1,31 @@
 # Docpluck — Library Repo (giladfeldman/docpluck, public)
 
+## Working directive — LEAVE NOTHING BEHIND (read first; binds every task, skill, and run)
+
+**Fix every issue you find, in the same run that finds it.** Any issue — small
+or large, pre-existing or newly introduced, in code, docs, tests, or config,
+"out of scope" or unrelated to the task at hand — is fixed now, not merely
+reported and left behind. "Pre-existing", "known", "not introduced by this
+change", and "out of scope" are NEVER grounds to leave a defect in place;
+noticing a defect and walking past it is itself a defect.
+
+Two — and only two — exceptions: **(a)** the fix needs a product or architecture
+decision only the user can make → surface it immediately and explicitly, never
+bury it; **(b)** the fix is genuinely too entangled to land in the current
+change → queue it as an *immediate next step in the same run*, never as "later",
+never as a handoff-doc footnote. Never end a task, cycle, or run with a known
+issue unaddressed; never report work as "clean" / "done" / "shippable" / "PASS"
+while a known issue is open.
+
+This is the project's first rule. It binds every `docpluck-*` skill
+(`-iterate`, `-qa`, `-review`, `-cleanup`, `-deploy`) and overrides any skill
+step that would permit a defect to be merely reported-and-left. It applies to
+**every future run**, not just the run in which it was last stated. Established
+by user directive 2026-05-14; re-affirmed 2026-05-15, 2026-05-17, and 2026-05-19
+("address all the issues that come up, leave nothing behind, small/big,
+doesn't matter pre-existing or not"). Full statement under "Critical hard
+rules" below; durable cross-session record in memory `feedback_fix_every_bug_found`.
+
 ## Two-Repo Architecture
 
 Docpluck is split across **two repos** under `Vibe/MetaScienceTools/`:
@@ -51,7 +77,7 @@ Skipping step 5 is the most common failure mode. The deploy skill catches it.
 > **READ [`LESSONS.md`](./LESSONS.md) BEFORE TOUCHING `extract*.py`, `normalize.py`, or `sections/`.**
 > It is the durable incident log for the recurring mistakes below.  When in doubt about a change, the answer is almost always already there.
 
-- **LEAVE NOTHING BEHIND.** If you see an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to the task at hand — you fix it in the same run. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to leave a defect in place; noticing a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product or architecture decision only the user can make — surface it explicitly and immediately, never bury it; **(b)** the fix is genuinely too entangled to land in the current change — then it is queued as an *immediate next cycle in the same run*, never as "later", never as a handoff-doc footnote. Never end a task, cycle, or run with a known issue unaddressed. Established by user directive 2026-05-17. This generalizes and strengthens the rule-0e family (memory `feedback_fix_every_bug_found`).
+- **LEAVE NOTHING BEHIND.** If you see an issue — any issue, however small, whether pre-existing, already-known, "out of scope", or unrelated to the task at hand — you fix it in the same run. "Pre-existing", "known", "not introduced by this change", and "out of scope" are NEVER grounds to leave a defect in place; noticing a defect and walking past it is itself a defect. Two — and only two — exceptions: **(a)** the fix needs a product or architecture decision only the user can make — surface it explicitly and immediately, never bury it; **(b)** the fix is genuinely too entangled to land in the current change — then it is queued as an *immediate next cycle in the same run*, never as "later", never as a handoff-doc footnote. Never end a task, cycle, or run with a known issue unaddressed. Established by user directive 2026-05-14, re-affirmed 2026-05-15, 2026-05-17, and **2026-05-19** ("doesn't matter pre-existing or not; this directive holds for all future runs, every skill"). This generalizes and strengthens the rule-0e family (memory `feedback_fix_every_bug_found`). See the prominent top-of-file statement under "Working directive — LEAVE NOTHING BEHIND".
 - **EVERY FIX MUST BE GENERAL — serve all future PDFs, never a one-PDF quick-hack.** docpluck is a meta-science tool that processes arbitrary academic PDFs across many publishers. Every change must be keyed on a STRUCTURAL SIGNATURE — a typographic pattern, layout invariant, glyph-corruption shape, section-structure rule — never on paper identity, filename, or a string hard-coded from one PDF. A change that resolves one paper's quirk but risks regressions on others is the WRONG fix; find the general root cause. Regression tests use specific PDF fixtures, but the fix *logic* must generalize to any PDF with the same structural signature. Always run the full 26-paper baseline to confirm no regression; widen verification (broad-read, more AI-golds) when a fix touches a shared code path. Established by user directive 2026-05-15. See memory `feedback_general_fixes_not_pdf_specific`.
 - **NEVER swap the PDF text-extraction tool as a fix for downstream problems.** The TEXT channel is `extract_pdf` (pdftotext default mode); the LAYOUT channel is `extract_pdf_layout` (pdfplumber).  They are not interchangeable text sources.  Sections / normalize / batch consume the text channel; tables / figures / F0-layout-strip consume the layout channel.  Real-world-paper bugs (watermarks in body, abstract not detected, column interleaving) must be fixed in the layer that owns the artifact (`normalize.py` W0, `sections/annotators/text.py`, `sections/taxonomy.py`, `sections/core.py`) — not by switching extraction tools.  See [LESSONS.md L-001](./LESSONS.md#l-001--never-swap-the-pdf-text-extraction-tool-as-a-fix-for-downstream-problems) for the full incident record.
 - **NEVER use pdftotext with `-layout` flag** — causes column interleaving. See `docpluck/extract.py:13–16` and [LESSONS.md L-002](./LESSONS.md#l-002--never-use-pdftotext--layout-flag).
