@@ -554,3 +554,31 @@ promotion (`## Conclusion`/`## Supplementary Material`/… — S1×C2-C3, dedica
 partitioner session) → **G5c-2 partitioner split-heading rejoin** (S1×C3, 5
 jdm_m2 cases) → **TABLE cluster** (S0/S1×C3, dedicated session, the single
 largest blocker) → **COL** + 011 deleted-minus escalated (layout-channel, C3-C4).
+
+---
+
+## RUN 9 CYCLE 6 — Tier-D `text_loss` adjudication (2026-05-19)
+
+Adjudicated the 8 harness Tier-D `text_loss` fails (raw-vs-rendered + plos-med-1
+vs its cached AI gold). Verdict: **7 of 8 are CHECK ARTIFACTS** — the text fully
+survives to `rendered.md`; the `text_loss` 8-word-window proxy mismatches a
+table/stimulus region the renderer reflowed (column-major raw → row-major
+`<table>` or prose). Cycle 6 added a coverage+run reflow exemption to
+`scripts/harness/checks.py` (harness-only); the 7 flipped fail→pass.
+
+**The 1 genuine loss confirmed as a Group B work item:**
+
+- **B1 confirmed — plos-med-1 SAE Table 5: 13 serious-adverse-event rows lost.**
+  The AI gold (`10.1371__journal.pmed.1004323`) has `New hysteroscopic
+  myomectomy after perforation in first session` / `Heavy bleeding with
+  overnight admission` and 11 more SAE rows; `rendered.md` has 0 hits — the
+  `<table>` shell renders, the rows do not. This is the existing B1 TABLE-builder
+  cluster (plos_med_1 Table 5 empty shell). Still S0×C3 — queued.
+
+**B1/B3 new instances confirmed (folded into the existing clusters):**
+
+- **li-feldman, mayiwar** — problem-design / stimulus tables NOT structure-extracted
+  by Camelot; emitted as linearized vertical body-text dumps (one cell per line,
+  no `<table>`). The text is present (so not `text_loss`), but the table quality
+  is wrong. Same root as B1 (tables not structured) / B3 (body-stream cell dump).
+  Adds li-feldman + mayiwar to the ~11-paper TABLE-builder corpus list.

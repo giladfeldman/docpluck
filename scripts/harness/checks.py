@@ -55,6 +55,17 @@ MATCH_WINDOW = 8        # a contiguous N-word run must survive for the para to c
 RUNNING_REPEAT = 3      # a paragraph signature recurring >= N times is a per-page
                         # running element (watermark / header) — legitimately
                         # stripped, exempt from text-loss.
+# A flagged paragraph whose words almost entirely survive (>= REFLOW_COVERAGE)
+# WITH a contiguous run of >= REFLOW_MIN_RUN words intact — but no full
+# MATCH_WINDOW run — is a table / stimulus region that pdftotext linearized
+# column-major and the renderer reflowed (into a <table> or into prose). The
+# text survived; only word order changed. The MATCH_WINDOW proxy assumes prose
+# word order, so a reflowed grid trips it — but that is not text loss.
+# Calibrated 2026-05-19: across 7 papers, 16 reflowed paragraphs all sit at
+# >= 0.94 coverage + run >= 3; the one genuine loss (plos-med-1 SAE Table 5)
+# is 0.83 + run 2.
+REFLOW_COVERAGE = 0.90
+REFLOW_MIN_RUN = 3
 # Mathematical Alphanumeric Symbols block — font-corruption when in body text
 # (pdftotext mis-decodes e.g. ηp² as U+1D709 MATHEMATICAL ITALIC SMALL XI).
 _MATH_ALNUM = (0x1D400, 0x1D7FF)
@@ -64,14 +75,36 @@ _PUA = (0xE000, 0xF8FF)
 # --------------------------------------------------------------------------
 # tokenisation
 # --------------------------------------------------------------------------
+# Greek letters carry no [a-z] projection, and pdftotext vs the renderer may
+# disagree on glyph-vs-ASCII-name (χ ↔ "chi"). Transliterating every Greek
+# letter to its spelled name on every fingerprinted string keeps raw and
+# rendered comparable regardless of which representation each side emitted.
+# Names are space-padded so adjacent letters/digits never glue into one token.
+_GREEK_TO_ASCII = {
+    "α": " alpha ", "β": " beta ", "γ": " gamma ",
+    "δ": " delta ", "ε": " epsilon ", "ζ": " zeta ",
+    "η": " eta ", "θ": " theta ", "ι": " iota ",
+    "κ": " kappa ", "λ": " lambda ", "μ": " mu ",
+    "ν": " nu ", "ξ": " xi ", "ο": " omicron ",
+    "π": " pi ", "ρ": " rho ", "ς": " sigma ",
+    "σ": " sigma ", "τ": " tau ", "υ": " upsilon ",
+    "φ": " phi ", "χ": " chi ", "ψ": " psi ",
+    "ω": " omega ",
+}
+
+
 def _fingerprint(text: str) -> list[str]:
     """Lowercased alphabetic-word sequence — the glyph/whitespace-tolerant
     projection used for text-loss matching. Digits and symbols are dropped
     (they are exactly what legitimate normalization rewrites); a trailing
-    hyphen line-break is rejoined first."""
+    hyphen line-break is rejoined first; Greek letters are transliterated to
+    their spelled names so a glyph/ASCII-name divergence cannot create a
+    spurious mismatch."""
     text = text.replace("­", "")              # soft hyphen
     text = re.sub(r"-\s*\n\s*", "", text)          # hard hyphen line-break rejoin
-    norm = unicodedata.normalize("NFKD", text.lower())
+    text = text.lower()
+    text = "".join(_GREEK_TO_ASCII.get(c, c) for c in text)
+    norm = unicodedata.normalize("NFKD", text)
     norm = "".join(c for c in norm if not unicodedata.combining(c))
     return re.findall(r"[a-z]{3,}", norm)
 
@@ -177,6 +210,11 @@ def check_text_loss(out_dir: Path, fmt: str) -> dict:
     target_windows = {
         tuple(target_fp[i : i + MATCH_WINDOW]) for i in range(len(target_fp) - MATCH_WINDOW + 1)
     }
+    target_word_set = set(target_fp)
+    target_runs = {
+        tuple(target_fp[i : i + REFLOW_MIN_RUN])
+        for i in range(len(target_fp) - REFLOW_MIN_RUN + 1)
+    }
     paras = _paragraphs(raw)
     para_fps = [_fingerprint(p) for p in paras]
     # A run of N words that recurs across the document is a per-page running
@@ -190,6 +228,7 @@ def check_text_loss(out_dir: Path, fmt: str) -> dict:
     running = {g for g, n in gram_counts.items() if n >= RUNNING_REPEAT}
     missing: list[str] = []
     checked = 0
+    reflowed = 0
     n_paras = len(paras)
     for idx, (para, fp) in enumerate(zip(paras, para_fps)):
         if len(fp) < MIN_PARA_WORDS:
@@ -206,15 +245,27 @@ def check_text_loss(out_dir: Path, fmt: str) -> dict:
             # Publisher boilerplate and linearized table/list regions are not.
             if _is_nonbody_paragraph(para):
                 continue
+            # Right words, reordered: near-total word survival plus an intact
+            # contiguous run is a linearized table / stimulus region the
+            # renderer reflowed — not text loss (see REFLOW_* above).
+            coverage = sum(w in target_word_set for w in fp) / len(fp)
+            has_run = any(
+                tuple(fp[i : i + REFLOW_MIN_RUN]) in target_runs
+                for i in range(len(fp) - REFLOW_MIN_RUN + 1)
+            )
+            if coverage >= REFLOW_COVERAGE and has_run:
+                reflowed += 1
+                continue
             missing.append(" ".join(fp[:18]))
     if missing:
         return {
             "verdict": "fail",
             "checked_paragraphs": checked,
+            "reflowed_exempt": reflowed,
             "missing_count": len(missing),
             "missing_samples": missing[:8],
         }
-    return {"verdict": "pass", "checked_paragraphs": checked}
+    return {"verdict": "pass", "checked_paragraphs": checked, "reflowed_exempt": reflowed}
 
 
 def check_table_parity(out_dir: Path, fmt: str) -> dict:
