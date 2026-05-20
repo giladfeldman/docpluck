@@ -44,7 +44,7 @@ _TEST_PDFS = os.path.normpath(
 #   cycle 10 (CHARSUB) -> 0
 # Do NOT raise this number to make the test pass — a higher count is a
 # regression. Lower it (only) when a cycle genuinely fixes papers.
-_IDEMPOTENCY_RATCHET = 10
+_IDEMPOTENCY_RATCHET = 6
 
 
 def _norm_twice(raw):

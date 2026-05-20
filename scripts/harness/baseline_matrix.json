@@ -2243,21 +2243,27 @@
   "pdfextractor__nature__nat-comms-3": {
     "academic": {
       "extraction": {
-        "verdict": "fail",
-        "reason": "error",
-        "detail": "TimeoutError: timed out"
+        "verdict": "pass",
+        "views": [
+          "raw.txt",
+          "normalized.txt",
+          "rendered.md",
+          "sections.json",
+          "tables.json"
+        ]
       },
       "text_loss": {
-        "verdict": "skip",
-        "reason": "extraction failed"
+        "verdict": "pass",
+        "checked_paragraphs": 77,
+        "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "skip",
-        "reason": "extraction failed"
+        "verdict": "pass",
+        "tables_json": 0,
+        "html_tables": 0
       },
       "glyph": {
-        "verdict": "skip",
-        "reason": "extraction failed"
+        "verdict": "pass"
       }
     }
   },
@@ -3780,21 +3786,27 @@
   "escicheck__xiao-etal-2024-poc-pcirr-epley-2008-replication-extensions-anthropomorphism-loneliness-print": {
     "academic": {
       "extraction": {
-        "verdict": "fail",
-        "reason": "error",
-        "detail": "TimeoutError: timed out"
+        "verdict": "pass",
+        "views": [
+          "raw.txt",
+          "normalized.txt",
+          "rendered.md",
+          "sections.json",
+          "tables.json"
+        ]
       },
       "text_loss": {
-        "verdict": "skip",
-        "reason": "extraction failed"
+        "verdict": "pass",
+        "checked_paragraphs": 65,
+        "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "skip",
-        "reason": "extraction failed"
+        "verdict": "pass",
+        "tables_json": 4,
+        "html_tables": 3
       },
       "glyph": {
-        "verdict": "skip",
-        "reason": "extraction failed"
+        "verdict": "pass"
       }
     }
   },
