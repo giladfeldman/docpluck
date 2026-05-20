@@ -30,10 +30,17 @@ requires_pdftotext = pytest.mark.skipif(
 
 # Test PDF directories — optional, tests skip if not present
 _HERE = os.path.dirname(__file__)
+# docpluck's sibling repos under the same parent (e.g. MetaScienceTools/).
+# Derived from this file so paths are robust to where the tree is checked out.
+_SIBLINGS = os.path.dirname(os.path.dirname(_HERE))  # parent of the docpluck repo
 _VIBE = os.path.join(os.path.expanduser("~"), "Dropbox", "Vibe")
 
 PDF_PATHS = {
-    "docpluck": os.path.join(_VIBE, "PDFextractor", "test-pdfs"),
+    # docpluck's test corpus = sibling PDFextractor repo's test-pdfs/.
+    "docpluck": os.path.join(_SIBLINGS, "PDFextractor", "test-pdfs"),
+    # Other-project corpora — if not under `_SIBLINGS`, dependent tests skip
+    # gracefully (pdf_available returns False). Update to repo-relative once
+    # the locations of these sibling repos are confirmed.
     "escicheck": os.path.join(_VIBE, "ESCIcheck", "testpdfs", "Coded already"),
     "metaesci": os.path.join(_VIBE, "MetaESCI", "data", "pdfs"),
     "metamiscitations": os.path.join(_VIBE, "MetaMisCitations", "data", "pretest_a", "pdfs"),

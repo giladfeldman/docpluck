@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.58] — 2026-05-20
+
+**Cycle 7 (run 9) — `normalize_text` non-idempotence on space-broken compounds + position-gated header banners.** Calling `normalize_text` on its own output produced a different result than calling it once — the single (production) pass left work that a second pass completed. Two mechanisms fixed this cycle:
+
+- **S7a `_rejoin_space_broken_compounds`** stripped only the literal `" "` separator from a matched compound, so a curated compound separated by a *newline* (e.g. `repli\ncations`, common after S6 strips a soft hyphen and pdftotext line-wraps the compound) matched the regex's `\s+` but its replacement was a no-op. S8 (line-join) then converted the newline to a space — too late for S7a, which had already run. The 2nd normalize pass finally joined it. **Fix:** strip *all* whitespace in the match (`re.sub(r"\s+", "", m.group(0))`). Rejoins compounds regardless of separator; idempotent and pipeline-order-independent.
+
+- **H0 `_strip_document_header_banners`** scans only the first 30 lines (the header zone). Un-cleaned front-matter noise can push a real banner — e.g. a bare `https://doi.org/…` URL — past the cap on raw input, so H0 misses it. P0/P1/S9/A1/A7/R3 then strip that noise and shift lines up; on a 2nd normalize pass the banner is now inside the zone and H0 catches it. **Fix:** re-apply H0 to a fixed point at the *end* of the pipeline, on stabilized line positions — `H0r_header_banner_restrip`. A second normalize pass finds the header already clean.
+
+`test_normalize_idempotent_chan_feldman` (real PDF) — chan_feldman exercised both mechanisms (curated `repli`/`differ`/`con` compounds split across newlines + a `https://doi.org/10.1080/…` banner shifted into the header zone) and now converges in one pass.
+
+**Honest corpus-wide gate.** A 180-doc scan revealed `normalize_text` is *systemically* non-idempotent: 85 papers across three root-cause buckets — JOIN (54: line-join `re.sub` steps consume the boundary char, so chained joins need N passes), STRIP (24: position/cluster-gated strips fire only on pass 2), CHARSUB (7: destructive char-substitution on re-application — e.g. minus-recovery `−2.68 → −−.68`). Cycles 8-10 take those buckets per-mechanism. The new `tests/test_normalize_idempotent_real_pdf.py::test_normalize_idempotent_corpus` is a strided-sample ratchet (currently 10) tightened by each idempotency cycle toward 0; a cycle that raises it is a regression.
+
+NORMALIZATION_VERSION 1.9.12. 4 new tests. Harness Tier-D: 0 regressions, 0 new fails (cycle 7 ships, run continues).
+
+**Also (test-infra):** `tests/conftest.py` `PDF_PATHS["docpluck"]` was stale — pointed to `~/Dropbox/Vibe/PDFextractor` when the repo lives at `~/Dropbox/Vibe/MetaScienceTools/PDFextractor`. Three real-PDF tests (`test_extraction.py`, `test_metaesci_followups.py`, `test_sections_real_corpus.py`) were silently skipping. Now derived as the sibling-repo path, robust to checkout location.
+
 ## [2.4.57] — 2026-05-18
 
 **Cycle 4 (run 9, harness-gated) — pdftotext and pdfplumber destroy the cmsy10 `≥`/`≤` glyph to U+FFFD (glyph, S0).** On a tightly-kerned PDF that typesets comparison operators with the TeX Computer Modern math-symbol font (`cmsy10`), neither pdftotext nor pdfplumber can decode the `≥`/`≤` glyph — both emit U+FFFD. The glyph identity is destroyed in *both* engines, so the layout channel cannot recover it; recovery must be context-based. `plos_med_1` (PLOS Medicine, PROSECCO trial) rendered three prose comparisons — `age �18 years`, `(<20/�20 mm)`, `<20 mm versus �20 mm` — as raw U+FFFD; the harness Tier-D `glyph` check flagged it.
