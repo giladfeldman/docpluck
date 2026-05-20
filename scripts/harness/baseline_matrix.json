@@ -689,7 +689,7 @@
       "text_loss": {
         "verdict": "pass",
         "checked_paragraphs": 97,
-        "reflowed_exempt": 0
+        "reflowed_exempt": 1
       },
       "table_parity": {
         "verdict": "pass",
@@ -3090,7 +3090,7 @@
       "text_loss": {
         "verdict": "pass",
         "checked_paragraphs": 97,
-        "reflowed_exempt": 0
+        "reflowed_exempt": 1
       },
       "table_parity": {
         "verdict": "pass",
