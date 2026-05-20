@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.11"
+NORMALIZATION_VERSION = "1.9.12"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1238,16 +1238,24 @@ _DEHYPHEN_PATTERNS: list[re.Pattern[str]] = [
 
 
 def _rejoin_space_broken_compounds(text: str) -> str:
-    """H1b: rejoin pdftotext-space-broken compound words.
+    """S7a: rejoin pdftotext-broken compound words.
 
-    Applies the curated (prefix, suffix) regex list. Each match's
-    interior space is removed; the rest of the text is preserved
-    verbatim. Idempotent.
+    Applies the curated (prefix, suffix) regex list. Each pattern is
+    ``\\bprefix\\s+suffix\\b`` — the ``\\s+`` separator matches a space, a
+    tab, OR a newline, because pdftotext breaks these compounds two ways:
+    ``experi ments`` (soft hyphen dropped, a space left) and
+    ``repli\\ncations`` (line-wrapped — no hyphen, or a soft hyphen that S6
+    has already stripped). The whole separating run is removed, so the
+    compound rejoins regardless of separator. Stripping only the literal
+    space (the pre-v2.4.58 behavior) left newline-separated compounds
+    un-joined until a second pipeline pass — that broke idempotency, since
+    S8 converts the mid-word newline to a space only AFTER this step runs.
+    Idempotent and pipeline-order-independent.
     """
     if not text:
         return text
     for pat in _DEHYPHEN_PATTERNS:
-        text = pat.sub(lambda m: m.group(0).replace(" ", ""), text)
+        text = pat.sub(lambda m: re.sub(r"\s+", "", m.group(0)), text)
     return text
 
 
@@ -2479,5 +2487,23 @@ def normalize_text(
         if r3_joins_total > 0:
             report.changes_made["ref_continuations_joined"] = r3_joins_total
             report.steps_changed.append("R3_continuation_join")
+
+    # ── H0r: header-banner re-strip on stabilized line positions ─────────
+    # The early H0 (top of the pipeline) scans only the first 30 lines of
+    # RAW pdftotext output. Un-cleaned front-matter noise can push a real
+    # banner line (e.g. a bare publisher/DOI URL) past that 30-line cap, so
+    # H0 misses it on the first pass. P0/P1/S9/A1/A7/R3 then strip that
+    # noise and shift lines up — the banner lands inside the header zone
+    # only AFTER the pipeline has run. Re-running H0 here, to a fixed point
+    # on the final line positions, makes normalize_text idempotent: a second
+    # normalize pass finds the header already clean. (run 9 cycle 7 — fixes
+    # the test_normalization_idempotent regression.)
+    before = t
+    while True:
+        _restripped = _strip_document_header_banners(t)
+        if _restripped == t:
+            break
+        t = _restripped
+    report._track("H0r_header_banner_restrip", before, t, "header_banners_restripped")
 
     return t.strip(), report
