@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.59] — 2026-05-20
+
+**Cycle 8 (run 9) — `normalize_text` non-idempotence: JOIN bucket.** A 180-doc scan found 85 papers non-idempotent post-cycle-7. The dominant cause was line-join `re.sub` patterns that consume *both* boundary characters in each match — so a run of N consecutive joinable lines halves per pass and the chain never fully converges in one call. A second cause: `S8` (`[a-z,;]\n[a-z]`) did not match Greek-initial lines, so a `,\nσ²(ξ)` boundary survived S8 on pass 1, the A5 academic step then transliterated `σ`→`sigma`, and only pass 2's S8 finally joined it. A third cause: S9's repeated-line / page-number strips remove lines via `"\n".join` of a filtered list, putting the surrounding lines adjacent with a single `\n` — re-exposing line-break boundaries that S7/S8/A1 had already passed over (e.g. chen_2021_jesp's `...predictions on the\nprobability of the future...`).
+
+Three fixes packaged this cycle:
+
+- **S7 + S8 → non-consuming lookahead form.** The trailing-letter group is matched as a lookahead (`(?=[a-z])`) so a chained run of joinable adjacencies fully merges in one pass: `re.sub(r"([a-z,;])\n(?=[a-zα-ω])", r"\1 ", t)` for S8; analogous form for S7's hyphenation repair.
+- **S8 Greek-aware.** Trailing class extended to lowercase Greek (U+03B1–U+03C9) so a Greek-initial line joins on pass 1 — fixing the S8-runs-before-A5 ordering gap without reordering the pipeline.
+- **Late line-join re-application before H0r.** S7/S8 + the academic A1 stat-line-repair patterns are re-run, all in lookahead form, on the stabilized end-of-pipeline line positions. Catches any line-break boundary that S9 / R3 created by stripping or rearranging lines after the original S7/S8/A1 ran.
+
+**Impact:** 180-doc idempotency scan post-cycle-8 = **36 non-idempotent (down from 85)** — 49 papers cleared. The remaining buckets are STRIP (24→3, via H0r already in cycle 7; the residual is the S9 4-digit page-number cluster detector still firing only on pass 2 — cycle 9) and CHARSUB (5 — destructive char-substitution on re-application, including `recover_minus_via_ci_pairing` `−2.68 → −−.68` — cycle 10). The new corpus-wide ratchet test (`test_normalize_idempotent_corpus`) drops from 10 → 6 in the strided sample.
+
+Harness Tier-D academic: pending re-extract + check. NORMALIZATION_VERSION 1.9.13.
+
 ## [2.4.58] — 2026-05-20
 
 **Cycle 7 (run 9) — `normalize_text` non-idempotence on space-broken compounds + position-gated header banners.** Calling `normalize_text` on its own output produced a different result than calling it once — the single (production) pass left work that a second pass completed. Two mechanisms fixed this cycle:

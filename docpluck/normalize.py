@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.12"
+NORMALIZATION_VERSION = "1.9.13"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1958,9 +1958,13 @@ def normalize_text(
     t = re.sub(r"[ \t]{2,}", " ", t)
     report._track("S6_whitespace_normalization", before, t, "whitespace_normalized")
 
-    # S7: Hyphenation repair
+    # S7: Hyphenation repair. The trailing letter is matched as a lookahead so a
+    # run of consecutive `word-\nword-\nword` breaks all join in one pass — a
+    # `re.sub` of `(g1)-\n(g2)` consumes g2 and resumes after it, missing the
+    # `g2-\ng3` join (an N-break chain takes N passes to fully repair, breaking
+    # normalize_text idempotency).
     before = t
-    t = re.sub(r"([a-z])-\n([a-z])", r"\1\2", t)
+    t = re.sub(r"([a-z])-\n(?=[a-z])", r"\1", t)
     report._track("S7_hyphenation_repair", before, t, "hyphenations_repaired")
 
     # S7a (v2.4.20, NORMALIZATION_VERSION 1.8.7): space-broken-compound
@@ -1972,9 +1976,20 @@ def normalize_text(
     report._track("S7a_space_broken_compound_rejoin", before, t,
                   "space_broken_compounds_rejoined")
 
-    # S8: Mid-sentence line break joining
+    # S8: Mid-sentence line break joining. Two fixes packaged here, both
+    # idempotency-driven:
+    # 1) Trailing char is a lookahead (not a captured group) so a run of N
+    #    consecutive joinable lines fully merges in one pass — `re.sub(g1\ng2)`
+    #    used to consume g2 and resume past it, missing every other adjacency
+    #    in a chained run (an N-line paragraph needed log2(N)+1 passes).
+    # 2) The trailing class includes lowercase Greek (U+03B1-03C9). pdftotext
+    #    surfaces Greek letters as their actual Unicode glyph; the A5 academic
+    #    step transliterates them to ASCII names (`σ`→`sigma`) LATER in the
+    #    pipeline. So a `,\nσ²(ξ)` line break used to escape S8 on pass 1
+    #    (Greek not in `[a-z]`), A5 then turned it into `,\nsigma2(xi)`, and
+    #    only the NEXT normalize pass joined it — breaking idempotency.
     before = t
-    t = re.sub(r"([a-z,;])\n([a-z])", r"\1 \2", t)
+    t = re.sub(r"([a-z,;])\n(?=[a-zα-ω])", r"\1 ", t)
     report._track("S8_line_break_joining", before, t, "line_breaks_joined")
 
     # For academic level: join stat line breaks BEFORE stripping page numbers,
@@ -2487,6 +2502,42 @@ def normalize_text(
         if r3_joins_total > 0:
             report.changes_made["ref_continuations_joined"] = r3_joins_total
             report.steps_changed.append("R3_continuation_join")
+
+    # ── Late line-join re-application on stabilized line positions ──────
+    # S9 strips repeated header/footer lines via ``"\n".join`` over a filtered
+    # list — when an intermediate line is dropped, the two surrounding lines
+    # become adjacent with a single `\n` between them. If those neighbours are
+    # body prose, stats, or hyphenated word parts, the join produces a fresh
+    # line-break boundary that S7/S8/A1 already ran past. R2/R3 reference
+    # continuation joins can also shift line positions late. Same idempotency
+    # pattern as H0r: re-apply the line-join patterns now, on the stabilized
+    # line positions, so a second normalize pass finds nothing to do.
+    # (run 9 cycle 8 — JOIN bucket.)
+    before = t
+    # S7r: hyphenation
+    t = re.sub(r"([a-z])-\n(?=[a-z])", r"\1", t)
+    # S8r: general prose line-break (Greek-aware as in S8)
+    t = re.sub(r"([a-z,;])\n(?=[a-zα-ω])", r"\1 ", t)
+    if level == NormalizationLevel.academic:
+        # A1r: re-apply the stat line-break patterns (same as the A1 block
+        # above, in lookahead form so a chained run converges in one pass).
+        # The whitespace-around-newline class is `[ \t]*` (horizontal only),
+        # NOT `\s*` — `\s*` would match `\n` too and so cross a `\n\n`
+        # paragraph break. After S9 strips column-bleed fragments (e.g. the
+        # `01\n02\n03\n04\n05` between `p` and `= .05`), the residue is
+        # `p\n\n= .05`, a paragraph break — the test_column_bleed
+        # _too_many_fragments_ignored contract requires that be LEFT alone.
+        # Single-line-removal by S9 / R3 leaves a *single* `\n` between
+        # neighbours (`"\n".join` of a filtered list), which is exactly what
+        # the strict `[ \t]*\n[ \t]*` boundary matches and joins.
+        t = re.sub(r"([pP])[ \t]*\n[ \t]*(?=[=<>])", r"\1 ", t)
+        t = re.sub(r"([pP]\s*[=<>])[ \t]*\n[ \t]*(?=\d)", r"\1 ", t)
+        t = re.sub(r"(OR|CI|RR)[ \t]*\n[ \t]*(?=\d)", r"\1 ", t)
+        t = re.sub(r"(95\s*%)[ \t]*\n[ \t]*(?=CI)", r"\1 ", t)
+        t = re.sub(r"([=<>])[ \t]*\n[ \t]*(?=[-\d.])", r"\1 ", t)
+        t = re.sub(r"([,;])[ \t]*\n[ \t]*(?=p\s*[<=>])", r"\1 ", t)
+        t = re.sub(r"([,;])[ \t]*\n[ \t]*(?=\d+%\s*CI)", r"\1 ", t)
+    report._track("LateJoin_line_break_rejoin", before, t, "late_line_joins")
 
     # ── H0r: header-banner re-strip on stabilized line positions ─────────
     # The early H0 (top of the pipeline) scans only the first 30 lines of

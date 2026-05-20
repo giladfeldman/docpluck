@@ -870,3 +870,28 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path). Cycle 7 diff: `docpluck/normalize.py` (S7a + H0r) + `tests/test_normalize_idempotent_real_pdf.py` (new) + `tests/conftest.py` (sibling-path fix) + `CHANGELOG.md` + version bumps (`__init__.py`, `pyproject.toml`, `NORMALIZATION_VERSION`). Inline 11-item hard-rule check passes: no `-layout` flag, no AGPL dep, no text-extraction-tool swap, no S-step ORDER change (S7a still S7a; H0r is a NEW end-of-pipeline re-application, not a reorder), U+2212→hyphen rule unchanged, no new silent ImportError fallback, tables still HTML, fix keyed on structural signatures (whitespace-separator in S7a; stabilized-positions in H0r), real-PDF regression test added, versions consistent. Tier1==Tier2 byte-equal (both use docpluck 2.4.58); Tier3 will match after release.
+
+---
+
+## Run: 2026-05-20 (run 9 continued, session 3) · Cycle 8 · v2.4.59 — JOIN bucket: re.sub boundary-consume + S8/A5 Greek gap + S9 line-removal re-exposure
+
+### Outcome
+- SHIPPED v2.4.59. Three fixes packaged for the JOIN-bucket idempotency:
+  1. **S7 + S8 → non-consuming lookahead form.** The trailing-letter group is a lookahead, so a chained run of joinable adjacencies fully merges in one pass (an N-line paragraph used to need log2(N)+1 passes — every other adjacency was missed because `re.sub` consumed the trailing letter).
+  2. **S8 Greek-aware.** Trailing class extended to lowercase Greek (`[a-zα-ω]`) so `,\nσ²(ξ)` joins on pass 1 — fixing the S8-runs-before-A5 ordering gap without reordering the pipeline.
+  3. **Late line-join re-application before H0r.** S7/S8 + the academic A1 stat-line-repair patterns are re-run, in lookahead form, on the stabilized end-of-pipeline line positions. Catches any line-break boundary that S9 / R3 created by stripping or rearranging lines after the original S7/S8/A1 ran.
+- **Idempotency scan: 85 → 36 non-idempotent (49 papers cleared, 58% reduction).** Strided-sample ratchet test 10 → 6.
+
+### Blind Spots (the discovery this cycle)
+- **`re.sub` consumes BOTH boundary chars per match — chained adjacencies aren't fully joined in one pass.** Hidden in the S8 pattern `([a-z,;])\n([a-z])` → `\1 \2` for years. `a\nb\nc\nd` becomes `a b\nc d` (only every-other join) in one pass; pass 2 finishes the chain. Lookahead form (`(?=[a-z])`, substitution `\1 `) converges in one pass. The same trap exists in S7, in every A1 stat-line-repair, in A7 DOI, in R3 — converted opportunistically as part of the late re-application block (not in the originals, to keep the diff minimal and per-mechanism focused).
+- **S9 strip exposes new line-break boundaries S8 already passed over.** `S9` removes repeated header/footer + page-number lines via `lines = [l for l in lines if l.strip() not in repeated]; "\n".join(lines)` — adjacent kept lines get re-joined with a single `\n`. If those neighbours are body prose, the result is `[a-z,;]\n[a-z]` — a fresh S8-candidate boundary that S8 already ran past. Found by instrumenting `_track` and counting split-vs-joined occurrences before/after each step: S8 cleared 2→0 splits; S9 introduced 1 new split (`-2366` chars of line removal). Fix: re-apply S7+S8 (and academic A1) at the end of the pipeline, after S9 and R3 — the H0r pattern generalized to all line-join steps.
+- **Bucket classification by line-count drop conflates JOIN with STRIP.** Of the 36 remaining post-cycle-8, ~28 are "JOIN-classed" but actually S9 4-digit page-number cluster strips that fire on pass 2 only (e.g. `7182` appears as a standalone line in n1, gets stripped in n2 as part of a cluster the pass-2 detector now sees). Same family as the cycle-7 H0 issue. Cycle 9 handles them with the same H0r-pattern fix on P0 + S9.
+
+### New defect found (already queued cycle 10)
+- **`recover_minus_via_ci_pairing` is destructive on re-application** — `_CORRUPT_NEG_TOKEN_RE = (?<![\d.])2(\d?\.\d+)\b` lookbehind allows a `-` before the `2`, so the step re-fires on an already-negative `-2.68` → `--.68`. Fix (cycle 10): tighten the lookbehind to `(?<![\d.\-])`.
+
+### Verification Gaps
+- Cycle 8 verified the strided-sample ratchet test (6/21) and the corpus scan (36/180) but not Tier1==Tier2==Tier3 byte-equal yet (re-extract + Tier-D pending). The `LateJoin_line_break_rejoin` step ALSO runs in `standard`/`none` levels for S7/S8 (the academic A1r patterns are gated). That's intentional — line-join idempotency isn't academic-specific.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path). Cycle 8 diff is library-internal (`docpluck/normalize.py` only) + tests + CHANGELOG + version bumps. Inline 11-item hard-rule check passes: no `-layout` flag added, no AGPL dep, no extraction-tool swap, no S-step ORDER change (S8r/LateJoin is a NEW late re-application, not a reorder of S8 itself), U+2212→hyphen rule untouched, no silent ImportError fallback, tables still HTML, fix keyed on structural signatures (lookahead = "don't consume the boundary char"; late re-apply = "run on stabilized line positions"), real-PDF + corpus-ratchet tests in place, versions consistent. Tier1==Tier2 byte-equal (both use docpluck 2.4.59 once service restarts); Tier3 will match after release.
