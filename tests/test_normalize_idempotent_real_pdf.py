@@ -27,6 +27,7 @@ from docpluck.normalize import (
     _rejoin_space_broken_compounds,
     _strip_document_header_banners,
     _strip_page_footer_lines,
+    recover_minus_via_ci_pairing,
 )
 
 requires_pdftotext = pytest.mark.skipif(
@@ -45,7 +46,9 @@ _TEST_PDFS = os.path.normpath(
 #   cycle 8  (JOIN)        -> 10 -> 6
 #   cycle 9  (STRIP JAMA)  -> 6 -> 4
 #   cycle 9b (STRIP S9-4d) -> 4 -> 2
-#   cycle 10 (CHARSUB)     -> 2 -> ~0
+#   cycle 10 (CHARSUB)     -> 2 -> 2 (ip-feldman cleared corpus-wide but NOT
+#                                     in the strided slice — stride miss)
+#   cycle 11 (long-tail)   -> 2 -> ~0
 # Do NOT raise this number to make the test pass — a higher count is a
 # regression. Lower it (only) when a cycle genuinely fixes papers.
 _IDEMPOTENCY_RATCHET = 2
@@ -229,6 +232,47 @@ def test_s9_4digit_pattern_a_still_strips_isolated_page_numbers():
         f"S9 should have stripped isolated `1228` page numbers; "
         f"{n1.count('1228')} survived"
     )
+
+
+def test_recover_minus_via_ci_pairing_idempotent_on_already_recovered():
+    """Cycle 10: an already-recovered `-2.68` next to a CI bracket
+    [-4.65, -0.68] must NOT be re-corrupted into `--.68` on a second pass.
+    Pre-cycle-10 the lookbehind `(?<![\\d.])` allowed `-` before the `2`,
+    so pass-2 fired and produced `--.68`. Cycle 10 tightens to
+    `(?<![\\d.\\-])`."""
+    # Already-recovered: must be a fixed point.
+    text = "B = -2.68 [-4.65, -0.68]"
+    out1 = recover_minus_via_ci_pairing(text)
+    out2 = recover_minus_via_ci_pairing(out1)
+    assert out1 == text, f"already-recovered text was modified: {out1!r}"
+    assert out1 == out2, f"recover_minus_via_ci_pairing is not idempotent: {out2!r}"
+    assert "--.68" not in out1, "lookbehind regression: --.68 appeared"
+
+    # Original corruption: STILL gets recovered.
+    corrupted = "B = 22.68 [-4.65, -0.68]"
+    rec = recover_minus_via_ci_pairing(corrupted)
+    assert "-2.68" in rec, f"original-corruption recovery broken: {rec!r}"
+
+
+@requires_pdftotext
+def test_normalize_idempotent_ip_feldman_2025():
+    """ip-feldman 2025 PSPB exercises recover_minus_via_ci_pairing's
+    non-idempotence: the table cell `B = -2.68 [-4.65, -0.68]` (already-
+    recovered negative point estimate paired with a CI) was re-corrupted to
+    `--.68` on pass 2. Cycle 10 (v2.4.62) tightens the corrupt-neg-token
+    lookbehind to forbid a preceding literal minus."""
+    pdf = os.path.join(
+        _TEST_PDFS,
+        "escicheck",
+        "ip-feldman-2025-pspb-misestimation-of-emotional-experiences-print-nosupp.pdf",
+    )
+    if not os.path.isfile(pdf):
+        pytest.skip("ip-feldman test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on ip-feldman"
+    assert "--.68" not in n1, "double-minus corruption appeared in normalized text"
 
 
 @requires_pdftotext

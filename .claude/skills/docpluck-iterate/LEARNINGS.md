@@ -984,3 +984,32 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 - Cycle 11 — diagnose remaining ~11 individual cases from verify_out scan (whitespace-only diffs + the 7+ "OTHER" papers).
 - Cycle 12 — Group B B1 plos-med-1 (text_loss → TABLE-builder cluster). Architectural — surface options to user before coding.
 - Phase 8 Tier-3 verify — v2.4.61 → v2.4.60 currently live on Railway after this cycle's release lands (auto-bump + redeploy).
+
+---
+
+## Run: 2026-05-21 (run 9 continued, session 4) · Cycle 10 · v2.4.62 — CHARSUB: recover_minus_via_ci_pairing re-recovery
+
+### Outcome
+- SHIPPED v2.4.62. One-char lookbehind tighten: `(?<![\d.])` → `(?<![\d.\-])` in `_CORRUPT_NEG_TOKEN_RE`. Prevents the `-2.68` → `--.68` re-corruption on pass 2.
+- Strided ratchet unchanged at 2 (ip-feldman isn't in the slice). Tier-D academic: 0 regressions / 0 new fails / 1 still failing (plos-med-1 / B1).
+- Broad pytest 1352 pass + 1 known pre-existing B6 fail (+ 2 new tests).
+
+### Blind Spots
+- **This is NOT only an idempotence fix — it's a production correctness fix.** The pre-cycle-10 `recover_minus_via_ci_pairing` was non-deterministic on already-recovered input: depending on how many times it ran (once vs twice; depends on the calling pipeline's structure), ip-feldman would ship `-2.68` (correct) or `--.68` (corrupted). The harness happened to call `normalize_text` once per `render`, so production was usually OK — but ANY code path that re-normalizes (e.g. caching, structural-extract reuse, future spec changes) hits the bug. The function should have been a fixed-point operation from day one; the missing `-` in the lookbehind was a latent landmine.
+- **The lookbehind class `[\d.]` is the SIGNATURE of "is this number-mid-tokenized?".** It should always also exclude `-`, `+`, `±`, and similar number-prefix chars to mean "this `2` is actually the start of a free-standing number, not the prefix of something already-recovered". Other regex-based recovery steps in normalize.py should be audited against this pattern.
+
+### Improvements
+- **The "would a second call to this function corrupt anything?" check** is now part of the project review checklist for any regex-based recovery / substitution step. Cycle 7 (H0r), 8 (S7/S8/LateJoin), 9 (P0r) were all "missing strip" idempotence bugs — they fixed themselves by re-running the step. Cycle 9b (S9 false-positive) and 10 (recover-minus re-fire) are "wrong action" idempotence bugs — they require tightening the step, not re-running. Each new recovery / substitution step should be tested in BOTH directions:
+  1. `step(step(input)) == step(input)` — fixed point on its own output.
+  2. `step(input_that_should_NOT_change) == input` — no spurious matches.
+
+### Verification Gaps
+- ip-feldman is the only paper I verified post-fix; the cycle 10 change is a regex tightening that could in principle affect other papers with `-2.XX` or `-2X.XX` tokens. The corpus Tier-D run is the no-regression gate — and it passed 0 regressions, so the tightening doesn't break anything else.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path). One-char regex change + tests + version bumps + CHANGELOG. Inline 11-item hard-rule check passes. Tier1==Tier2 byte-equal (local at 2.4.62). Tier3 pending v2.4.62 Railway deploy.
+
+### Queue update
+- Cycle 11 — diagnose remaining individual non-idempotent cases (verify_out scan post-cycle-10 expected ~10-15 from initial 40). Many are likely whitespace-only or single-paper quirks.
+- Group B / B1 — plos-med-1 TABLE-builder cluster. ARCHITECTURAL — needs user direction before coding.
+- Phase 8 Tier-3 verify — confirm v2.4.62 on Railway after this cycle's auto-bump deploys.

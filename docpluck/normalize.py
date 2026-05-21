@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.15"
+NORMALIZATION_VERSION = "1.9.16"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1464,8 +1464,13 @@ def recover_corrupted_lt_operator(text: str) -> str:
 _CI_PAIR_BRACKET_RE = re.compile(r"\[\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*\]")
 # A corrupted negative point estimate: a leading '2' (the mis-mapped minus)
 # glued to a small decimal of the form D.DD — one integer digit, then the
-# fraction. Not preceded by a digit/dot (so we never match inside 120.26).
-_CORRUPT_NEG_TOKEN_RE = re.compile(r"(?<![\d.])2(\d?\.\d+)\b")
+# fraction. Not preceded by a digit/dot (so we never match inside 120.26),
+# AND not preceded by a literal minus (so we never re-recover an already-
+# recovered `-2.68`, which would yield `--.68`). Cycle 10 (v2.4.62) — the
+# missing `-` in the lookbehind was the cause of `normalize_text` non-
+# idempotence on ip-feldman 2025 (the value first recovers correctly as
+# `-2.68`, then pass 2 re-fires and corrupts it to `--.68`).
+_CORRUPT_NEG_TOKEN_RE = re.compile(r"(?<![\d.\-])2(\d?\.\d+)\b")
 _TABLE_ROW_RE = re.compile(r"<tr\b.*?</tr>", re.DOTALL | re.IGNORECASE)
 
 
