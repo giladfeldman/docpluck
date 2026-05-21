@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.14"
+NORMALIZATION_VERSION = "1.9.15"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -984,6 +984,38 @@ def _rejoin_letterspaced_lowercase_labels(text: str) -> str:
         lines[i] = lead + compact
         changed = True
     return "\n".join(lines) if changed else text
+
+
+# Cycle 9b (v2.4.61) — context discriminator used by S9 Pattern A to protect
+# table sample-size values from being stripped as page numbers.
+_NUMERIC_ONLY_LINE_RE = re.compile(r"^[\d\s.,()+\-*∗;:]+$")
+
+
+def _is_numeric_only_line(line: str) -> bool:
+    """True if the (stripped) line contains only digits + common stat-table
+    punctuation (decimal point, comma, parens, asterisks/sig-stars, minus,
+    plus, semicolon, colon, whitespace) AND has at least one digit. Used as
+    a "this line is a table cell, not prose" signal."""
+    s = line.strip()
+    if not s:
+        return False
+    if not _NUMERIC_ONLY_LINE_RE.match(s):
+        return False
+    return any(c.isdigit() for c in s)
+
+
+def _is_in_numeric_block(lines: list[str], idx: int) -> bool:
+    """True if the line at ``idx`` sits in a vertical block of numeric-only
+    lines — its nearest non-blank neighbor above OR below is itself
+    numeric-only. Used by S9 to distinguish per-page markers (isolated in
+    prose) from table cells (in a column of other numeric values)."""
+    for direction in (-1, +1):
+        i = idx + direction
+        while 0 <= i < len(lines) and not lines[i].strip():
+            i += direction
+        if 0 <= i < len(lines) and _is_numeric_only_line(lines[i]):
+            return True
+    return False
 
 
 def _strip_page_footer_lines(text: str) -> str:
@@ -2107,11 +2139,40 @@ def normalize_text(
             if mean_diff <= 3.0:
                 strip_set.update(str(v) for v in cluster)
 
+    # Cycle 9b (v2.4.61 / NORMALIZATION_VERSION 1.9.15) — per-occurrence
+    # gating to protect table sample-size values.
+    #
+    # The previous "strip every occurrence in strip_set" rule was a corpus-
+    # level false-positive: A3 (academic level) strips thousands-separator
+    # commas in N contexts (`Observations: 7,182` → `Observations: 7182`),
+    # and pdftotext sometimes lands the bare N on its own line (right-aligned
+    # in a regression table). chandrashekar 2020 has 4 regression columns
+    # citing the SAME N=7182 → 4 standalone `7182` lines → Pattern A flags
+    # `7182` as a page number → all 4 get stripped on pass 2 (pass 1 hasn't
+    # seen A3 yet, so the line still reads `7,182` and S9 doesn't flag it;
+    # this is what causes the non-idempotence). Stripping table N is real
+    # production text loss.
+    #
+    # Discriminator: a per-page marker (page number / volume number) sits
+    # ISOLATED — surrounded by prose, blank lines, or section headings. A
+    # table cell value sits in a VERTICAL BLOCK of other numeric values
+    # (other table cells in the same column). So: keep the line if EITHER
+    # its nearest non-blank neighbor above OR below is numeric-only.
     if strip_set:
-        t = "\n".join(
-            "" if ln.strip() in strip_set else ln
-            for ln in t.split("\n")
-        )
+        lines = t.split("\n")
+        new_lines: list[str] = []
+        for idx, ln in enumerate(lines):
+            if ln.strip() not in strip_set:
+                new_lines.append(ln)
+                continue
+            if _is_in_numeric_block(lines, idx):
+                # Table-like context: keep. (Cycle 9b — clears chandrashekar
+                # `7182`, aiyer `1118`/`1265`, and ~7 sibling regression-
+                # table papers from the non-idempotent set.)
+                new_lines.append(ln)
+            else:
+                new_lines.append("")
+        t = "\n".join(new_lines)
     report._track("S9_header_footer_removal", before, t, "headers_removed")
 
     # Limit consecutive newlines
