@@ -155,6 +155,15 @@ _BOILERPLATE_MARKERS = (
     "creative commons", "sagepub", "tandfonline", "doi.org", "https",
     "issn", "published under the license", "published by", "the author(s)",
     "downloaded from", "journalinformation", "journalcode",
+    # 2026-05-21 (cycle 9): JAMA Network Open sidebar pointer that the cycle-9
+    # P0r late re-strip now removes from rendered.md. This is a "scroll to the
+    # end for affiliations" hint for the online reader, not body prose —
+    # safely stripped by the renderer on purpose. Pre-cycle-9 it shipped in
+    # rendered.md because P0's anchored ^...$ pattern failed against the
+    # two-line pdftotext form; the text_loss check tolerated it because the
+    # renderer kept it. Now that the renderer correctly strips it, the
+    # check must recognize it as boilerplate. Affects 10 jama_open_* papers.
+    "author affiliations and article information",
 )
 
 # Common English function words — body prose runs ~25-45% function words; a

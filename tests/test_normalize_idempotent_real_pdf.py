@@ -24,6 +24,7 @@ from docpluck import extract_pdf, normalize_text, NormalizationLevel
 from docpluck.normalize import (
     _rejoin_space_broken_compounds,
     _strip_document_header_banners,
+    _strip_page_footer_lines,
 )
 
 requires_pdftotext = pytest.mark.skipif(
@@ -39,12 +40,13 @@ _TEST_PDFS = os.path.normpath(
 # Honest corpus-wide gate. The ratchet is the count of still-non-idempotent
 # papers in the strided sample below. Each idempotency cycle lowers it:
 #   cycle 7  -> set to the post-cycle-7 baseline
-#   cycle 8  (JOIN)    -> lower
-#   cycle 9  (STRIP)   -> lower
-#   cycle 10 (CHARSUB) -> 0
+#   cycle 8  (JOIN)        -> 10 -> 6
+#   cycle 9  (STRIP JAMA)  -> 6 -> 4
+#   cycle 9b (STRIP S9-4d) -> 4 -> ~3
+#   cycle 10 (CHARSUB)     -> 0
 # Do NOT raise this number to make the test pass — a higher count is a
 # regression. Lower it (only) when a cycle genuinely fixes papers.
-_IDEMPOTENCY_RATCHET = 6
+_IDEMPOTENCY_RATCHET = 4
 
 
 def _norm_twice(raw):
@@ -100,6 +102,67 @@ def test_h0_header_banner_strip_reaches_fixed_point():
     s2 = _strip_document_header_banners(s1)
     assert "doi.org/10.1234/x" not in s1, "H0 did not strip the bare DOI banner"
     assert s1 == s2, "H0 strip is not a fixed point"
+
+
+def test_p0_jama_affiliations_sentinel_strips_after_line_join():
+    """JAMA papers emit the sidebar sentinel line `Author affiliations and
+    article information are listed at the end of this article.` as TWO
+    pdftotext rows (`...are\\nlisted at the end of this article.`). P0's
+    anchored ``^...$`` pattern matches only the joined form, so the early P0
+    pass misses it. After S7/S8/LateJoin merge the rows, P0r (the cycle-9
+    late re-strip) catches the now-single-line form and removes it.
+
+    Cycle 9 (v2.4.60): adds P0r — generalization of cycle-7's H0r pattern.
+    Clears 10 jama_open_* papers from the post-cycle-8 non-idempotent set.
+    """
+    # The 2-row pdftotext form: pre-LateJoin, the sentinel spans two lines.
+    split_form = (
+        "Some body text.\n"
+        "+ Visual Abstract\n"
+        "+ Supplemental content\n"
+        "Author affiliations and article information are\n"
+        "listed at the end of this article.\n"
+        "More body text."
+    )
+    # P0 on the split form: the sentinel survives (line-anchor fails).
+    s_split = _strip_page_footer_lines(split_form)
+    assert "Author affiliations and article information are" in s_split
+    # The joined form: P0 strips it.
+    joined_form = split_form.replace(
+        "Author affiliations and article information are\nlisted at the end of this article.",
+        "Author affiliations and article information are listed at the end of this article.",
+    )
+    s_joined = _strip_page_footer_lines(joined_form)
+    assert "Author affiliations and article information" not in s_joined
+    # P0 is idempotent (a fixed point) — running it twice changes nothing.
+    s_joined2 = _strip_page_footer_lines(s_joined)
+    assert s_joined == s_joined2
+
+    # End-to-end via normalize_text: split → joined-and-stripped in ONE pass.
+    n1, _ = normalize_text(split_form, NormalizationLevel.academic)
+    n2, _ = normalize_text(n1, NormalizationLevel.academic)
+    assert "Author affiliations and article information" not in n1, (
+        "P0r did not strip the JAMA sentinel after LateJoin merged the rows"
+    )
+    assert n1 == n2, "normalize_text is not idempotent on the JAMA split-sentinel form"
+
+
+@requires_pdftotext
+def test_normalize_idempotent_jama_open_1():
+    """jama-open-1 has the canonical JAMA affiliation-sidebar sentinel split
+    across two pdftotext lines — P0 (early) cannot match the anchored pattern
+    on the two-row form; only the cycle-9 P0r re-strip catches it after
+    LateJoin merges the rows."""
+    pdf = os.path.join(_TEST_PDFS, "ama", "jama_open_1.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip("jama_open_1 test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on jama_open_1"
+    assert "Author affiliations and article information" not in n1, (
+        "JAMA affiliations sentinel should be stripped by P0r"
+    )
 
 
 @requires_pdftotext

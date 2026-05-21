@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.60] — 2026-05-21
+
+**Cycle 9 (run 9) — `normalize_text` non-idempotence: STRIP bucket, JAMA P0 anchored-pattern misses split lines.** A 180-doc scan post-cycle-8 found 40 papers still non-idempotent. The dominant single root cause (10 papers — every JAMA Network Open paper in the corpus, `jama_open_1`/.../`jama_open_12`) is the sidebar sentinel `Author affiliations and article information are listed at the end of this article.` arriving from pdftotext as TWO lines: `Author affiliations and article information are\nlisted at the end of this article.` P0's `_strip_page_footer_lines` matches anchored `^...$` patterns, so the two-row form escapes the strip; S7/S8 then join the rows, and only a second `normalize_text` pass catches the now-single-line form.
+
+**Fix — P0r `_page_footer_lines_restripped` (generalization of cycle-7's H0r pattern).** A new block at the end of `normalize_text`, right after H0r, re-applies `_strip_page_footer_lines` to a fixed point on the now-stabilized line positions. P0 itself is idempotent on its own output, so the loop converges in 1-2 iterations. The early P0 (near the top of the pipeline) is retained for performance — most P0 lines are already single-row from pdftotext; P0r catches the small subset that needed S7/S8/LateJoin to be joined first.
+
+**Impact:** 180-doc idempotency scan post-cycle-9 = **29 non-idempotent (down from 40)** — 11 papers cleared (the 10 JAMA papers + 1 incidental). Strided-sample ratchet test 6 → 4. Remaining residuals are: S9 4-digit page-number cluster false-positive on table sample-size values (9 papers — cycle 9b, requires Pattern A tightening, NOT propagation), CHARSUB bucket (5 papers — cycle 10), and 14 individual cases.
+
+**Defect re-classification (methodology):** The handoff plan classified the chandrashekar `7182` case (and aiyer `1118`/`1265`) as "same H0r-pattern fix needed". HEAD reproduction showed the `7182` lines are sample-size values from regression tables (`Observations: 7,182` → after A3 thousands-separator removal → `7182`), legitimately preserved by pass 1 but **incorrectly stripped** by pass 2 via S9 Pattern A (`≥3 repeats of a 4-digit value = page number`). Propagating that strip to pass 1 would silently lose data in production. Cycle 9b instead tightens S9 Pattern A to distinguish per-page markers from clustered table cell values.
+
+Harness Tier-D academic: pending re-extract + check at v2.4.60. NORMALIZATION_VERSION 1.9.14. New tests: `test_p0_jama_affiliations_sentinel_strips_after_line_join` + `test_normalize_idempotent_jama_open_1`.
+
 ## [2.4.59] — 2026-05-20
 
 **Cycle 8 (run 9) — `normalize_text` non-idempotence: JOIN bucket.** A 180-doc scan found 85 papers non-idempotent post-cycle-7. The dominant cause was line-join `re.sub` patterns that consume *both* boundary characters in each match — so a run of N consecutive joinable lines halves per pass and the chain never fully converges in one call. A second cause: `S8` (`[a-z,;]\n[a-z]`) did not match Greek-initial lines, so a `,\nσ²(ξ)` boundary survived S8 on pass 1, the A5 academic step then transliterated `σ`→`sigma`, and only pass 2's S8 finally joined it. A third cause: S9's repeated-line / page-number strips remove lines via `"\n".join` of a filtered list, putting the surrounding lines adjacent with a single `\n` — re-exposing line-break boundaries that S7/S8/A1 had already passed over (e.g. chen_2021_jesp's `...predictions on the\nprobability of the future...`).

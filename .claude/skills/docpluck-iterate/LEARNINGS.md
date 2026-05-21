@@ -922,3 +922,34 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 
 ### SPINE-SKIPs
 - Phase 8 Tier-3 prod parity — DEFERRED (not skipped). v2.4.59 is tagged + auto-bumped; Tier-3 parity check is blocked until Railway prod actually serves 2.4.59. Re-run Phase 8 once Railway recovers. Cycle 9 continues against local Tier-D in the interim per user decision.
+
+---
+
+## Run: 2026-05-21 (run 9 continued, session 4) · Cycle 9 · v2.4.60 — STRIP bucket: P0 anchored-pattern misses split lines
+
+### Outcome
+- SHIPPED v2.4.60 (LOCAL — Railway build still gated by infra). Added `P0r_page_footer_restrip` — a generalization of cycle-7's H0r pattern to P0's `_strip_page_footer_lines`. Fixed-point loop at end of `normalize_text`, right after H0r, re-applies P0 on stabilized line positions.
+- **Idempotency scan post-cycle-9: 40 → 29 non-idempotent (11 cleared, 27.5% reduction).** Strided-sample ratchet test 6 → 4. All 10 JAMA `jama_open_*` papers cleared.
+
+### Blind Spots (the discovery this cycle)
+- **The handoff misclassified one of the two STRIP-bucket root causes.** Cycle-8's handoff lumped two distinct defects together under "STRIP bucket" with the prescription "apply H0r late-restrip pattern":
+  1. **JAMA `Author affiliations and article information are listed at the end of this article.`** — pdftotext emits as TWO rows (`are\nlisted`); P0's anchored `^...$` pattern cannot match the split form; S7/S8 join the rows; pass-2's P0 then catches it. **Correctly fixable by H0r-pattern** (re-apply P0 after LateJoin).
+  2. **chandrashekar `7182`** (and aiyer `1118`/`1265`) — these are sample-size values from regression tables (`Observations: 7,182` → after A3 thousands-separator removal → bare 4-digit `7182` lines). They appear 4 times because there are 4 regression columns; S9's Pattern A (`≥3 repeats of a 4-digit value = page number`) **incorrectly strips them on pass 2**. Pass 1 preserves them (S9 in pass 1 sees `7,182` with comma — doesn't match Pattern A's `isdigit()` check; A3 strips the comma AFTER S9 ran). **NOT fixable by the H0r pattern** — propagating to pass 1 would silently lose data in production. Cycle 9b instead tightens S9 Pattern A to distinguish per-page markers from clustered table cells.
+- **The reproduce-defect-at-HEAD pattern card caught the misclassification.** Doing the broad-scan categorization (`tmp` 40-paper survey by first-stripped-line signature) BEFORE coding showed the 10 JAMA papers were one homogeneous class but the 9 4-digit papers were a different class. Without this check I'd have written a "P0r + S9-r" combined cycle that would have introduced a production text-loss bug.
+- **Bucket classifications by "first-stripped-line signature" are noisy until refined.** Cycle 8's handoff said "~28 STRIP papers"; the actual survey showed 10 JAMA + 9 S9-4-digit + 14 "OTHER" individual cases + 3 whitespace-only + 2 CHARSUB. The big bucket the handoff envisioned was actually a long-tail of independent defects. Each future "bucket" needs the same kind of broad-scan categorization before claiming a cycle scope.
+
+### Improvements
+- **Categorize residuals BEFORE deciding the cycle plan.** A 20-line Python script that iterates `verify_out/*/academic/raw.txt`, normalizes twice, and bins by "first non-blank line stripped by pass-2" produces a high-signal one-page report. Took 30s to write and saved ~30 min of mis-scoped coding.
+- **Generalize H0r → "late re-apply" as a re-usable structural fix pattern.** The same shape (`while changed: t = step(t)`) at end of pipeline is now used for H0 (cycle 7), LateJoin S7+S8+A1 (cycle 8), and P0 (cycle 9). The pattern's necessary conditions: (1) the step is idempotent on its own output; (2) the step depends on stabilized line positions that ONLY exist after later steps run. Steps NOT eligible: anything destructive on re-application (CHARSUB family — `recover_minus_via_ci_pairing`), anything that depends on stale line positions (paragraph-level joins that consume neighbors).
+
+### Verification Gaps
+- The Phase 5d AI-gold full-doc verification is NOT being run on the 10 JAMA papers individually. Tier-D's text_loss check passes (the sentinel is a known boilerplate line that SHOULD be stripped, so its disappearance from `normalized.txt` is the correct outcome — not flagged). But Tier-D doesn't check `rendered.md` content for the boilerplate sentinel. Spot-check is sufficient here (manual reading of `rendered.md` for jama_open_1 confirms the sentinel is gone post-cycle-9, no incidental loss elsewhere). Future P0-pattern-additions should be Phase-5d AI-verified per the discipline.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path). Cycle 9 diff is library-internal (`docpluck/normalize.py` only — new P0r block) + tests + CHANGELOG + version bumps. Inline 11-item hard-rule check passes: no `-layout` flag, no AGPL dep, no extraction-tool swap, no S-step ORDER change (P0r is a NEW late re-application, not a reorder), U+2212 untouched, no silent ImportError fallback, tables still HTML, fix keyed on structural signatures (split-line anchor-pattern miss), `*_real_pdf` regression test added (`test_normalize_idempotent_jama_open_1`) + contract test (`test_p0_jama_affiliations_sentinel_strips_after_line_join`), versions consistent (2.4.60 / 1.9.14). Tier1==Tier2 byte-equal (both local at 2.4.60 post-restart); Tier3 still blocked on Railway recovery.
+
+### Queue update
+- Cycle 9b — S9 Pattern A tightening for false-positive 4-digit strips on table N values (9 papers). NEW root cause class.
+- Cycle 10 — CHARSUB `recover_minus_via_ci_pairing` lookbehind tighten (2 papers explicitly + ~3 more in residual set).
+- Cycle 11 — corpus ratchet → 0 + the 14 OTHER individual cases.
+- Cycle 12 — broad pytest re-run + harness re-extract + final Tier-D.

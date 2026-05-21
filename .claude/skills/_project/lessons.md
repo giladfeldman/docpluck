@@ -378,3 +378,22 @@ RUN apt-get update \
 3. If mode 2: do NOT push more Dockerfile fixes. They will keep failing on the same builder.
 
 **Anti-pattern caught:** ignoring the verify-railway-deploy workflow's failure as "lag" and just waiting for prod to converge. The 8-min poll was already exhausted; longer waits did NOT help because the build itself never finished. Always pull the deployment status (`railway deployment list --json`) BEFORE deciding "lag vs failure" — the verify workflow only polls `/health`, it can't tell building/crashed/deployed-old apart.
+
+## Anchored ^...$ line-strips need a late re-apply if any earlier step joins lines (caught 2026-05-21, run 9 cycle 9)
+
+**What:** `_strip_page_footer_lines` (P0) drops lines matching anchored `^...$` patterns. Several patterns target known boilerplate lines (JAMA's "Author affiliations and article information are listed at the end of this article."). pdftotext sometimes emits a single conceptual line as TWO rows (`...are\nlisted at the end of this article.`). P0's anchored regex cannot match the split form. S7/S8/LateJoin join the rows on the same pass, but P0 has already run by then — so a second `normalize_text` pass is the only way the joined line gets stripped, making the function non-idempotent and (worse) shipping the boilerplate in production single-pass output.
+
+**Why / Fix:** add a "P0r" block at end of pipeline, after LateJoin and H0r, that re-applies `_strip_page_footer_lines` to a fixed point on the now-stabilized line positions. The early P0 is retained for performance (most P0 lines are already single-row from pdftotext). P0 is idempotent on its own output, so the fixed-point loop converges in 1-2 iterations. Same shape as cycle 7's H0r and cycle 8's LateJoin.
+
+**Generalization — the "late re-apply" pattern (collected, 3 cycles in):** any anchored `^...$` line-strip whose patterns target SINGLE-LINE forms is eligible for a late re-apply if (and only if):
+1. **The step is idempotent on its own output** — re-applying it to already-stripped text is a no-op. Strips with simple "remove matching lines" semantics satisfy this; transformations that produce new strippable lines (cascades) do NOT.
+2. **The step depends on stabilized line positions that LATER steps create** — pdftotext line-wraps that S7/S8 join, S9's repeated-line removal exposing new neighbors, etc.
+
+The pattern does NOT apply to:
+- **Destructive char-substitutions** on re-application (CHARSUB family — `recover_minus_via_ci_pairing` would loop-corrupt `−2.68 → −−.68`).
+- **Steps that consume their neighbors** (paragraph-level joins, footnote-extraction).
+- **Steps whose patterns depend on stale line positions** (line-N-of-document checks).
+
+**How to detect:** after every "STRIP" cycle that adds a new anchored `^...$` pattern, run `normalize_text(normalize_text(raw))` on a corpus sample and look for any line stripped by pass 2 but not pass 1. If found, candidates for late re-apply. Conversely, look for lines KEPT by pass 1 but stripped by pass 2 where the stripped value is legitimate content (e.g. `7182` sample-size in chandrashekar 2020) — those are FALSE POSITIVES, NOT late-re-apply candidates; they require step-tightening, not propagation. **Discriminator question:** "would I be happy if production's single-pass output ALSO stripped this line?" If yes → late re-apply. If no → tighten the step that strips on pass 2.
+
+**Anti-pattern caught:** the cycle-8 handoff lumped JAMA-affil-sentinel and chandrashekar-7182 into one "STRIP bucket" with one prescription ("apply H0r pattern"). HEAD reproduction showed they are OPPOSITE-direction defects — JAMA wants pass-2-strip in pass-1 (legitimate sentinel), chandrashekar wants pass-2 to STOP stripping (table N values). Splitting them into cycle 9 + 9b instead of one combined cycle avoided shipping a text-loss bug. Always reproduce at HEAD and confirm directionality before coding.
