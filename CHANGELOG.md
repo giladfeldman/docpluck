@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.4.63] — 2026-05-21
+
+**Cycle 11 (run 9) — `recover_minus_via_ci_pairing` proximity gate.** A 180-doc scan post-cycle-10 found 19 papers still non-idempotent. Among them, 8 (majumder, korbmacher×2, van-boven, chan-feldman-baron, ziano, xiao-poc, amp-1, annals-2) shared a structural defect that ALSO ships in single-pass production: the `_recover_minus_in_record` helper paired every candidate `2X.XX` token with EVERY CI bracket in the same record. A record like `M = 5.37, SD = 2.01), t(1827) = 1.83, p tukey = .067, d = 0.09 [-1.86, 0.04]` contains:
+
+- `2.01` — the standard deviation, a valid positive number that happens to start with `2`.
+- `[-1.86, 0.04]` — the CI for `d = 0.09`, not for `2.01`.
+
+`-0.01` falls inside `[-1.86, 0.04]`, so the old logic recovered `2.01` → `-.01`, silently corrupting a valid SD in shipped output. (In stat reporting the CI is canonically adjacent to its point estimate; the brackets are NOT free-floating record-scoped pairings.)
+
+**Fix — proximity gate.** A candidate token only pairs with a CI bracket if:
+
+1. The bracket's start is within `_CI_PAIR_MAX_GAP = 30` chars of the token's end.
+2. The intervening text contains no sentence break (`. ` or `; `) and no new stat-label-then-assignment pattern (` SD =`, ` t(`, ` p =`, ` d =`, ` η =`, ...).
+
+If multiple brackets satisfy both, the NEAREST one wins (canonical adjacency).
+
+**Impact:** corpus-wide non-idempotency 19 → 17. 3 papers cleared (van-boven, chan-feldman-baron, ziano); 5 others (majumder, korbmacher×2, xiao-poc, amp-1, annals-2) had OTHER defects flagged by the same diff signature and stay non-idempotent — their root causes are diverse (footnote sentinel stripping, acknowledgment-block reclassification, etc.) and will be addressed cycle-by-cycle. The fix is also a production correctness improvement: the false-positives shipped in single-pass output too, so any paper with a stat-table mixing SDs and CIs was at risk.
+
+Broad pytest 1355 pass + 1 known pre-existing B6 fail (+ 3 new tests). Harness Tier-D academic: 0 regressions, 0 new fails (1 still failing — plos-med-1 / B1 / TABLE-builder cluster).
+
+NORMALIZATION_VERSION 1.9.17. New tests: `test_recover_minus_proximity_gate_rejects_distant_unrelated_brackets` + `test_recover_minus_proximity_gate_keeps_adjacent_recovery` + `test_recover_minus_proximity_gate_rejects_sentence_broken_bracket`.
+
 ## [2.4.62] — 2026-05-21
 
 **Cycle 10 (run 9) — `normalize_text` non-idempotence: CHARSUB bucket, `recover_minus_via_ci_pairing` re-recovery.** ip-feldman 2025 PSPB has table cells of the form `B = -2.68 [-4.65, -0.68]` — an already-recovered negative point estimate paired with its CI bracket. The first `normalize_text` pass had recovered the corrupted `22.68` → `-2.68` correctly. On the second pass, the recovery regex re-matched the `2.68` (now preceded by the `-` left by the first recovery), and the substitution produced `--.68` — a destructive corruption. The defect: `_CORRUPT_NEG_TOKEN_RE`'s lookbehind `(?<![\d.])` allowed a literal `-` before the `2`, so a second pass on already-recovered output found new matches.

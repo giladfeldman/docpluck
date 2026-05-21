@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.16"
+NORMALIZATION_VERSION = "1.9.17"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1474,6 +1474,31 @@ _CORRUPT_NEG_TOKEN_RE = re.compile(r"(?<![\d.\-])2(\d?\.\d+)\b")
 _TABLE_ROW_RE = re.compile(r"<tr\b.*?</tr>", re.DOTALL | re.IGNORECASE)
 
 
+# Cycle 11 (v2.4.63) — proximity gate for the CI-pairing recovery.
+#
+# In stat reporting the point estimate is IMMEDIATELY followed by its CI:
+# `B = -2.68 [-4.65, -0.68]`. The previous "pair with any bracket in the
+# record" rule false-positives when a record contains an unrelated SD value
+# and a separately-reported CI:
+#   `M = 5.37, SD = 2.01, t(1827) = 1.83, d = 0.09 [-1.86, 0.04]`
+#                  ^^^^                            ^^^^^^^^^^^^^^
+# The `2.01` is a valid SD; the `[-1.86, 0.04]` is the CI for `d = 0.09`.
+# `-0.01` happens to fall inside `[-1.86, 0.04]`, so the old logic
+# recovered `2.01` → `-.01`, corrupting the SD. 8 papers in the corpus
+# (majumder, korbmacher, van-boven, ...) had this defect.
+#
+# Fix: require the CI bracket to follow the candidate token closely. The
+# bracket's start must be within _CI_PAIR_MAX_GAP chars of the token's
+# end, AND the intervening text must not contain a sentence break (period
+# followed by space, or semicolon, or a comma followed by a new statistic
+# label like ` SD =`/` t(`/` p =`/` d =`).
+_CI_PAIR_MAX_GAP = 30
+_SENTENCE_BREAK_RE = re.compile(
+    r"[.;]\s|,\s+(?:SD|SE|t|F|p|d|g|η|χ|r|R²|β|B|γ|R|N|M|Q|Z)\s*[=(]",
+    re.IGNORECASE,
+)
+
+
 def _recover_minus_in_record(record: str) -> str:
     """Recover '2X.XX' tokens in a single record (a table row or a text line)
     by pairing each with a CI bracket present in the same record."""
@@ -1500,11 +1525,32 @@ def _recover_minus_in_record(record: str) -> str:
             recovered = float("-" + frac)
         except ValueError:
             return m.group(0)
-        for lo, hi, _span in brackets:
-            in_recovered = (lo - 0.005) <= recovered <= (hi + 0.005)
-            in_literal = (lo - 0.005) <= literal <= (hi + 0.005)
-            if in_recovered and not in_literal:
-                return "-" + frac
+        # Cycle 11 proximity gate: only consider brackets that closely
+        # follow the token, with no sentence break or new stat label in
+        # between. Pick the NEAREST eligible bracket (the one that would
+        # canonically pair with the point estimate).
+        token_end = m.end()
+        nearest = None
+        nearest_dist = None
+        for lo, hi, (bs, be) in brackets:
+            if bs < token_end:
+                continue  # bracket precedes the token — not its CI
+            gap = bs - token_end
+            if gap > _CI_PAIR_MAX_GAP:
+                continue
+            intervening = record[token_end:bs]
+            if _SENTENCE_BREAK_RE.search(intervening):
+                continue
+            if nearest_dist is None or gap < nearest_dist:
+                nearest = (lo, hi)
+                nearest_dist = gap
+        if nearest is None:
+            return m.group(0)
+        lo, hi = nearest
+        in_recovered = (lo - 0.005) <= recovered <= (hi + 0.005)
+        in_literal = (lo - 0.005) <= literal <= (hi + 0.005)
+        if in_recovered and not in_literal:
+            return "-" + frac
         return m.group(0)
 
     return _CORRUPT_NEG_TOKEN_RE.sub(_sub, record)
