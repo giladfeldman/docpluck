@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.13"
+NORMALIZATION_VERSION = "1.9.14"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2556,5 +2556,27 @@ def normalize_text(
             break
         t = _restripped
     report._track("H0r_header_banner_restrip", before, t, "header_banners_restripped")
+
+    # ── P0r: page-footer-line re-strip on stabilized line positions ──────
+    # Same shape as H0r, applied to P0's anchored ^...$ patterns. P0 runs
+    # near the top of the pipeline, where some P0-targeted lines are still
+    # SPLIT across two pdftotext rows (e.g. JAMA's
+    # `Author affiliations and article information are\nlisted at the end
+    # of this article.` — the `^...$` anchors fail because the line is two
+    # rows). S7/S8 + the LateJoin block above merge the rows into a single
+    # line, but P0 has already run by then. P0r re-applies P0 on the joined
+    # line positions and catches the now-single-line forms.
+    #
+    # Idempotent by construction: _strip_page_footer_lines is a no-op when
+    # no pattern matches, so the fixed-point loop converges in 1-2 passes.
+    # (run 9 cycle 9 — clears the 10 JAMA `jama_open_*` papers from the
+    # 40-paper non-idempotent set; same H0r-pattern generalized.)
+    before = t
+    while True:
+        _restripped = _strip_page_footer_lines(t)
+        if _restripped == t:
+            break
+        t = _restripped
+    report._track("P0r_page_footer_restrip", before, t, "page_footer_lines_restripped")
 
     return t.strip(), report
