@@ -22,6 +22,8 @@ import pytest
 
 from docpluck import extract_pdf, normalize_text, NormalizationLevel
 from docpluck.normalize import (
+    _is_in_numeric_block,
+    _is_numeric_only_line,
     _rejoin_space_broken_compounds,
     _strip_document_header_banners,
     _strip_page_footer_lines,
@@ -42,11 +44,11 @@ _TEST_PDFS = os.path.normpath(
 #   cycle 7  -> set to the post-cycle-7 baseline
 #   cycle 8  (JOIN)        -> 10 -> 6
 #   cycle 9  (STRIP JAMA)  -> 6 -> 4
-#   cycle 9b (STRIP S9-4d) -> 4 -> ~3
-#   cycle 10 (CHARSUB)     -> 0
+#   cycle 9b (STRIP S9-4d) -> 4 -> 2
+#   cycle 10 (CHARSUB)     -> 2 -> ~0
 # Do NOT raise this number to make the test pass — a higher count is a
 # regression. Lower it (only) when a cycle genuinely fixes papers.
-_IDEMPOTENCY_RATCHET = 4
+_IDEMPOTENCY_RATCHET = 2
 
 
 def _norm_twice(raw):
@@ -145,6 +147,113 @@ def test_p0_jama_affiliations_sentinel_strips_after_line_join():
         "P0r did not strip the JAMA sentinel after LateJoin merged the rows"
     )
     assert n1 == n2, "normalize_text is not idempotent on the JAMA split-sentinel form"
+
+
+def test_is_numeric_only_line_distinguishes_table_cells_from_prose():
+    """Cycle 9b context discriminator: identifies a line as a table cell vs
+    prose. Used by S9 Pattern A to protect N values from being stripped as
+    page numbers."""
+    # Numeric-only (table cells)
+    assert _is_numeric_only_line("7182")
+    assert _is_numeric_only_line("-4455.54")
+    assert _is_numeric_only_line("2.12∗∗∗ (0.201)")
+    assert _is_numeric_only_line("  1,234,567  ")  # whitespace + thousands
+    assert _is_numeric_only_line("-0.05 (0.058)")
+    # Prose / mixed (NOT numeric-only)
+    assert not _is_numeric_only_line("Observations: 7,182")
+    assert not _is_numeric_only_line("Table 3")
+    assert not _is_numeric_only_line("p < 0.001")  # contains 'p'
+    assert not _is_numeric_only_line("")
+    assert not _is_numeric_only_line("   ")
+    assert not _is_numeric_only_line("(observations only)")  # no digit
+
+
+def test_s9_4digit_pattern_a_preserves_table_n_values():
+    """Cycle 9b: a 4-digit value repeated ≥3 times in a regression-table
+    column (where its NEAREST non-blank neighbour is itself numeric) MUST be
+    preserved. Pre-9b: any such value was stripped corpus-wide as a "page
+    number". Post-9b: per-occurrence context gate."""
+    # Simulated chandrashekar regression table block: 4 columns × same N
+    raw = (
+        "Body prose introducing the regression model.\n\n"
+        "Column A    Column B    Column C    Column D\n"
+        "-0.05 (0.058)    0.12 (0.044)    -0.09 (0.041)    0.21 (0.052)\n"
+        "2.12∗∗∗ (0.201)  -1.88∗ (0.198)  1.45 (0.220)    0.87 (0.190)\n\n"
+        "7182\n"
+        "-4455.54\n"
+        "8919.07\n"
+        "8946.59\n\n"
+        "7182\n"
+        "-3210.45\n"
+        "6450.11\n"
+        "6477.62\n\n"
+        "7182\n"
+        "-2107.88\n"
+        "4240.50\n"
+        "4267.99\n\n"
+        "7182\n"
+        "-1500.22\n"
+        "3024.88\n"
+        "3052.30\n\n"
+        "Body prose continuing with results discussion."
+    )
+    n1, _ = normalize_text(raw, NormalizationLevel.academic)
+    n2, _ = normalize_text(n1, NormalizationLevel.academic)
+    # All four N values must survive — they are sample-size for the four columns
+    assert n1.count("7182") == 4, (
+        f"S9 stripped table N=7182 values from regression columns; got "
+        f"{n1.count('7182')} occurrences (expected 4)"
+    )
+    # And the result must be idempotent — pass 1 stripped what it should
+    assert n1 == n2, "normalize_text is not idempotent on chandrashekar-style N values"
+
+
+def test_s9_4digit_pattern_a_still_strips_isolated_page_numbers():
+    """Cycle 9b kept Pattern A's page-number strip working. A 4-digit value
+    repeated ≥3 times in ISOLATED context (surrounded by prose, not numeric
+    neighbours) MUST still be stripped — that's the original Pattern A
+    contract for continuous-pagination journals."""
+    raw = (
+        "Page one body prose ends here.\n\n"
+        "1228\n\n"
+        "Page two body prose continues from the previous page.\n\n"
+        "1228\n\n"
+        "More page-two body prose carrying the discussion forward.\n\n"
+        "1228\n\n"
+        "Conclusion section starts with this longer paragraph "
+        "of synthesis and so on, more prose more prose more prose."
+    )
+    n1, _ = normalize_text(raw, NormalizationLevel.academic)
+    # All three page-number repeats should be stripped — isolated context
+    assert n1.count("1228") == 0, (
+        f"S9 should have stripped isolated `1228` page numbers; "
+        f"{n1.count('1228')} survived"
+    )
+
+
+@requires_pdftotext
+def test_normalize_idempotent_chandrashekar_regression_table():
+    """chandrashekar 2020 (Shafir 1993 replication) has 4 regression columns
+    citing the same N=7182 → 4 standalone `7182` lines. Pre-cycle-9b S9
+    Pattern A stripped them all as a "page number" on pass 2, while pass 1
+    preserved them (A3's comma-strip hadn't run yet). Cycle 9b's per-
+    occurrence numeric-block gate keeps them under both passes."""
+    pdf = os.path.join(
+        _TEST_PDFS,
+        "escicheck",
+        "chandrashekar-et-al-2020-shafir-1993-replication-and-extensions-print-nosupp.pdf",
+    )
+    if not os.path.isfile(pdf):
+        pytest.skip("chandrashekar test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on chandrashekar"
+    # Sanity: the table N must survive
+    assert n1.count("7182") >= 4, (
+        f"S9 should preserve the 4 regression-column N=7182 lines; "
+        f"only {n1.count('7182')} survived"
+    )
 
 
 @requires_pdftotext

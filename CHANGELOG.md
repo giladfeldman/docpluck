@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.4.61] — 2026-05-21
+
+**Cycle 9b (run 9) — `normalize_text` non-idempotence: STRIP bucket, S9 Pattern A false-positives on table N values.** A 180-doc scan post-cycle-9 found 29 papers still non-idempotent. 9 of them were chandrashekar 2020 + aiyer + ~7 sibling regression-table papers — pdftotext emits the regression-column N (sample size, e.g. `Observations: 7,182`) as a standalone right-aligned line; A3's thousands-separator removal (academic level) strips the comma → bare `7182`; S9's Pattern A (`≥3 repeats of a 4-digit value = page number`) then flags `7182` (because the table has 4 regression columns all citing N=7182) and strips it on pass 2. Pass 1 preserved them (A3 hadn't run yet — `7,182` had a comma, so the line failed `isdigit()`). This non-idempotence was also a real production text-loss bug: in single-pass production, A3 still runs before S9 strips, so the N values WOULD also be stripped on a clean run if the comma-strip order were swapped. Either way the per-column N gets silently lost.
+
+**Fix — per-occurrence numeric-block discriminator.** S9 Pattern A no longer strips every occurrence of a candidate page-number value; it strips only occurrences that sit ISOLATED (nearest non-blank neighbour above and below is not numeric-only). A line surrounded by other numeric-only lines is a table cell, kept. New module helpers:
+
+  - `_NUMERIC_ONLY_LINE_RE` — `^[\d\s.,()+\-*∗;:]+$` — identifies lines containing only digits + common stat-table punctuation.
+  - `_is_numeric_only_line(line)` — exposed for tests.
+  - `_is_in_numeric_block(lines, idx)` — checks both directions for a numeric neighbour; used as the "this is a table cell" signal.
+
+S9 Pattern A's `strip_set` is unchanged (the candidate-detection logic still works the same way); only the application step is now per-occurrence-gated. Pattern B's cluster check (sequential 4-digit values within spread ≤50 and mean diff ≤3) reuses the same gate, so a journal whose volume-number cluster overlaps with a regression-table N cluster is also protected.
+
+**Impact:** corpus-wide idempotency scan (source-PDF, n=101): **9 non-idempotent**, down from ~20 at v2.4.60. Verify_out scan (n=180): pending re-check, expected ~20→11. Strided-sample ratchet test 4 → 2. Broad pytest 1350 pass + 1 known pre-existing B6 fail. Harness Tier-D academic: 0 regressions, 0 new fails (1 still failing — plos-med-1 Group B / B1, run continues).
+
+**Methodology note (this cycle's BLIND SPOT):** the handoff plan grouped this case with the JAMA-affil-sentinel case under "STRIP bucket" with one prescription — apply the H0r late-restrip pattern. HEAD reproduction showed they are OPPOSITE-direction defects: JAMA wants pass-2-strip in pass-1; chandrashekar wants pass-2 to STOP stripping. Propagating S9's strip to pass 1 (the H0r pattern) would have made the production text-loss bug worse — silent corpus-wide loss of regression-column sample sizes. Cycle 9 + cycle 9b shipped as two cycles instead. Project lessons.md "late re-apply pattern eligibility" expanded with the discriminator question: *would I be happy if production's single-pass output ALSO stripped this line?* Yes → late re-apply. No → tighten the step.
+
+NORMALIZATION_VERSION 1.9.15. New tests: `test_is_numeric_only_line_distinguishes_table_cells_from_prose` + `test_s9_4digit_pattern_a_preserves_table_n_values` + `test_s9_4digit_pattern_a_still_strips_isolated_page_numbers` + `test_normalize_idempotent_chandrashekar_regression_table`.
+
 ## [2.4.60] — 2026-05-21
 
 **Cycle 9 (run 9) — `normalize_text` non-idempotence: STRIP bucket, JAMA P0 anchored-pattern misses split lines.** A 180-doc scan post-cycle-8 found 40 papers still non-idempotent. The dominant single root cause (10 papers — every JAMA Network Open paper in the corpus, `jama_open_1`/.../`jama_open_12`) is the sidebar sentinel `Author affiliations and article information are listed at the end of this article.` arriving from pdftotext as TWO lines: `Author affiliations and article information are\nlisted at the end of this article.` P0's `_strip_page_footer_lines` matches anchored `^...$` patterns, so the two-row form escapes the strip; S7/S8 then join the rows, and only a second `normalize_text` pass catches the now-single-line form.

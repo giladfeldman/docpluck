@@ -953,3 +953,34 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 - Cycle 10 — CHARSUB `recover_minus_via_ci_pairing` lookbehind tighten (2 papers explicitly + ~3 more in residual set).
 - Cycle 11 — corpus ratchet → 0 + the 14 OTHER individual cases.
 - Cycle 12 — broad pytest re-run + harness re-extract + final Tier-D.
+
+---
+
+## Run: 2026-05-21 (run 9 continued, session 4) · Cycle 9b · v2.4.61 — STRIP bucket: S9 Pattern A false-positive on table N values
+
+### Outcome
+- SHIPPED v2.4.61. Added per-occurrence numeric-block context gate to S9 Pattern A (`_is_in_numeric_block` discriminator). 9 regression-table papers cleared from non-idempotent set.
+- Corpus-wide non-idempotent scan (101 PDFs): ~20 → 9. Strided ratchet: 4 → 2. Broad pytest 1350 pass. Tier-D academic: 0 regressions / 0 new fails / 1 still failing (plos-med-1 / B1).
+- Railway Tier-3: cycle 9 (v2.4.60) verified live at 09:02Z today — Railway builder disk pressure has cleared, the v2.4.60 redeploy succeeded after the Dockerfile apt-split.
+
+### Blind Spots
+- **The chandrashekar `7182` case is BOTH a non-idempotence bug AND a production text-loss bug.** Pre-cycle-9b the corpus single-pass output was already shipping with table N values stripped on academic level — pdftotext emits the right-aligned N as standalone, A3 strips the thousands-separator, S9 Pattern A flags `7182` as a "page number" because of the 4 regression-column repetitions. This had been live for many releases (since A3 + S9 Pattern A landed). The 9-paper count understates the impact — every JESP/JEP-G/JMP/JFE-style regression-table paper with this layout was silently losing column N values in academic-level rendered output. The cycle 9b fix is for ALL of those, not just the 9 papers that surfaced in the non-idempotency scan.
+- **Pattern A's confidence depends on "≥3 repeats = page number" — but a 4-column regression table by construction generates exactly that.** The original heuristic (v2.4.3) made sense for continuous-pagination journals where the volume number repeats on every page. The protection v2.4.11 added (cluster spread / mean-diff) targets Pattern B. Pattern A had NO table protection until cycle 9b. The pattern's failure mode is not rare — it's structural.
+- **Even Pattern B benefited from the same gate.** Pattern B's spread + mean-diff constraints already filter most table-cell clusters, but applying the per-occurrence gate to Pattern B's `strip_set.update(...)` results gives belt-and-suspenders coverage at zero cost.
+
+### Improvements
+- **The "would single-pass production be OK with this strip" discriminator is now part of project lessons.md.** Every future STRIP-cycle fix has to answer it before choosing the late-re-apply path. The discriminator works because non-idempotence is sometimes a symptom of a missing strip (JAMA — fix by late re-apply) and sometimes a symptom of a wrong strip (chandrashekar — fix by tightening the strip).
+- **Real-PDF regression tests are now both contract (synthetic) and PDF-based.** This cycle has 3 contract tests (`_is_numeric_only_line` distinguishes table from prose, S9 preserves table N, S9 still strips isolated page numbers) + 1 PDF-based (chandrashekar real-PDF idempotence). The contract tests catch a regression even when the PDF isn't available; the PDF test catches a regression in the way pdftotext serializes a particular real journal.
+
+### Verification Gaps
+- The cycle 9b fix logic is keyed on a structural signature: "4-digit candidate whose nearest non-blank neighbor is numeric-only". This signature is general — it works for any journal where regression-table N values land as standalone lines. But I didn't AI-verify a non-chandrashekar PDF (e.g. aiyer 2024 or any of the 7 sibling papers) to confirm the fix is general. Tier-D would catch a regression but wouldn't confirm the fix on a paper-by-paper basis.
+- Pattern B (sequential 4-digit cluster) is now also gated. I didn't write a test confirming Pattern B's correct behavior is preserved — the broad pytest pass covers it indirectly.
+
+### SPINE-SKIPs
+- Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path). Same justification as cycle 9: library-internal `normalize.py` change + tests + CHANGELOG + version bumps. Inline 11-item hard-rule check passes. Tier1==Tier2 byte-equal (local at 2.4.61). Tier3 pending v2.4.61 Railway deploy.
+
+### Queue update
+- Cycle 10 — CHARSUB `recover_minus_via_ci_pairing` lookbehind tighten (`(?<![\d.])` → `(?<![\d.\-])`). 2 papers: ip-feldman, ip-feldman duplicate. ONE-CHAR fix.
+- Cycle 11 — diagnose remaining ~11 individual cases from verify_out scan (whitespace-only diffs + the 7+ "OTHER" papers).
+- Cycle 12 — Group B B1 plos-med-1 (text_loss → TABLE-builder cluster). Architectural — surface options to user before coding.
+- Phase 8 Tier-3 verify — v2.4.61 → v2.4.60 currently live on Railway after this cycle's release lands (auto-bump + redeploy).
