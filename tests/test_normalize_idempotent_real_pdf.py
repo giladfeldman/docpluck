@@ -234,6 +234,45 @@ def test_s9_4digit_pattern_a_still_strips_isolated_page_numbers():
     )
 
 
+def test_recover_minus_proximity_gate_rejects_distant_unrelated_brackets():
+    """Cycle 11: a stat-table row that mixes an unrelated SD value with a
+    separately-reported CI bracket must NOT have the SD recovered as a
+    negative. The CI belongs to the point estimate it IMMEDIATELY follows;
+    a corrupted-looking token whose nearest bracket is far away (or
+    sentence-broken from it) is left alone.
+
+    majumder 2024 had `SD = 2.01), t(1827) = 1.83, d = 0.09 [-1.86, 0.04]`
+    — the `[-1.86, 0.04]` is the CI for `d = 0.09`, not for `2.01`. Pre-
+    cycle-11 the recovery fired on `2.01` (because `-0.01` is inside
+    `[-1.86, 0.04]`), corrupting a valid SD."""
+    text = "M = 5.37, SD = 2.01, t(1827) = 1.83, p tukey = .067, d = 0.09 [-1.86, 0.04]"
+    out = recover_minus_via_ci_pairing(text)
+    assert out == text, f"recovery falsely fired on a distant unrelated bracket: {out!r}"
+    # Sanity: the SD value 2.01 is unchanged.
+    assert "SD = 2.01" in out
+
+
+def test_recover_minus_proximity_gate_keeps_adjacent_recovery():
+    """The proximity gate doesn't break the original corruption-recovery
+    contract. A corrupted `22.68` IMMEDIATELY followed by its CI bracket
+    still recovers correctly — bracket is within 30 chars + no sentence
+    break between."""
+    corrupted = "B = 22.68 [-4.65, -0.68]"
+    rec = recover_minus_via_ci_pairing(corrupted)
+    assert "-2.68" in rec, f"original-corruption recovery broken: {rec!r}"
+    assert "22.68" not in rec
+
+
+def test_recover_minus_proximity_gate_rejects_sentence_broken_bracket():
+    """A CI bracket separated from a candidate token by a sentence break
+    (period + space, or a new stat label like `d = ...`) doesn't pair.
+    Defends against the cross-statistic false-positive."""
+    text = "We found 2.45 in the control group. Treatment d = 0.05 [-1.00, 1.10]."
+    out = recover_minus_via_ci_pairing(text)
+    assert "2.45" in out, "sentence break should prevent recovery"
+    assert "-.45" not in out
+
+
 def test_recover_minus_via_ci_pairing_idempotent_on_already_recovered():
     """Cycle 10: an already-recovered `-2.68` next to a CI bracket
     [-4.65, -0.68] must NOT be re-corrupted into `--.68` on a second pass.
