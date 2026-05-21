@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.62] — 2026-05-21
+
+**Cycle 10 (run 9) — `normalize_text` non-idempotence: CHARSUB bucket, `recover_minus_via_ci_pairing` re-recovery.** ip-feldman 2025 PSPB has table cells of the form `B = -2.68 [-4.65, -0.68]` — an already-recovered negative point estimate paired with its CI bracket. The first `normalize_text` pass had recovered the corrupted `22.68` → `-2.68` correctly. On the second pass, the recovery regex re-matched the `2.68` (now preceded by the `-` left by the first recovery), and the substitution produced `--.68` — a destructive corruption. The defect: `_CORRUPT_NEG_TOKEN_RE`'s lookbehind `(?<![\d.])` allowed a literal `-` before the `2`, so a second pass on already-recovered output found new matches.
+
+**Fix — extend the lookbehind to forbid a preceding minus:**
+
+  `(?<![\d.])2(\d?\.\d+)\b` → `(?<![\d.\-])2(\d?\.\d+)\b`
+
+One-char change. Original corruption recovery (`22.68 [-4.65, -0.68]` → `-2.68 [-4.65, -0.68]`) still works — the corrupted form has no preceding `-`. Already-recovered output is now a fixed point.
+
+**Impact:** 1 paper (ip-feldman) cleared from the non-idempotent set. NOT just an idempotence fix: pre-cycle-10 single-pass production output on ip-feldman was ALSO non-deterministic — under certain extraction orders the same cell could ship as `-2.68` or `--.68` depending on whether the recovery pass ran once or twice. Cycle 10 makes the recovery a fixed-point operation. Broad pytest 1352 pass + 1 known pre-existing B6 fail. Harness Tier-D academic: 0 regressions, 0 new fails (1 still failing — plos-med-1 / B1 / TABLE-builder cluster, run continues).
+
+NORMALIZATION_VERSION 1.9.16. New tests: `test_recover_minus_via_ci_pairing_idempotent_on_already_recovered` (contract) + `test_normalize_idempotent_ip_feldman_2025` (real-PDF).
+
 ## [2.4.61] — 2026-05-21
 
 **Cycle 9b (run 9) — `normalize_text` non-idempotence: STRIP bucket, S9 Pattern A false-positives on table N values.** A 180-doc scan post-cycle-9 found 29 papers still non-idempotent. 9 of them were chandrashekar 2020 + aiyer + ~7 sibling regression-table papers — pdftotext emits the regression-column N (sample size, e.g. `Observations: 7,182`) as a standalone right-aligned line; A3's thousands-separator removal (academic level) strips the comma → bare `7182`; S9's Pattern A (`≥3 repeats of a 4-digit value = page number`) then flags `7182` (because the table has 4 regression columns all citing N=7182) and strips it on pass 2. Pass 1 preserved them (A3 hadn't run yet — `7,182` had a comma, so the line failed `isdigit()`). This non-idempotence was also a real production text-loss bug: in single-pass production, A3 still runs before S9 strips, so the N values WOULD also be stripped on a clean run if the comma-strip order were swapped. Either way the per-column N gets silently lost.
