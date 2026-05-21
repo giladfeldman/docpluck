@@ -206,7 +206,7 @@ def run(
     *,
     force: bool = False,
     workers: int = 1,
-    timeout: int = 300,
+    timeout: int = 900,  # see argparse default below — Camelot-heavy papers need >300s
 ) -> list[dict]:
     cfg = service_config()
     health = service_health(cfg[0])
@@ -271,7 +271,14 @@ def main() -> int:
     ap.add_argument("--limit", type=int)
     ap.add_argument("--force", action="store_true", help="re-extract even if unchanged")
     ap.add_argument("--workers", type=int, default=1)
-    ap.add_argument("--timeout", type=int, default=300)
+    # Default 900s (15 min): Camelot-heavy papers — nat-comms-3, xiao-poc-epley
+    # — legitimately need 600-1200s of table extraction work. The previous 300s
+    # default manufactured persistent false-FAILs on every full-corpus run (the
+    # 2026-05-20 handoff chased these for two sessions as if they were code
+    # bugs; they were always just the timeout being too tight). Cycle 10
+    # follow-up: keep `--workers 2` recommended for big runs but stop forcing
+    # users to know the right `--timeout 1200` invocation.
+    ap.add_argument("--timeout", type=int, default=900)
     args = ap.parse_args()
 
     manifest = corpus.load_manifest()
