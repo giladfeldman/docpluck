@@ -348,3 +348,33 @@ Plus three golden snapshot files (`tests/golden/sections/*.json`) had the versio
 **Also (architectural — line-removal steps re-expose join boundaries):** S9's repeated-line / page-number strip operates as `lines = [l for l in lines if l.strip() not in repeated]; "\n".join(lines)`. When an intermediate line is dropped, the two surrounding kept lines become adjacent with a SINGLE `\n` between them. If those neighbours are body prose, the join creates a fresh `[a-z,;]\n[a-z]` boundary that S7/S8/A1 already ran past. The H0r pattern from cycle 7 generalizes: re-apply the line-join steps at the END of the pipeline, after all line-removal steps, on stabilized line positions. The new `LateJoin_line_break_rejoin` block does this.
 
 **How to detect:** an idempotency scan post-fix. The remaining residuals (currently 36/180) are mostly S9 4-digit page-number cluster strips that fire on pass 2 only — same family as the H0 issue, cycle 9 handles them. **Anti-pattern caught:** an instinct to "just run normalize twice" (a fixed-point loop) would seem elegant but the destructive `recover_minus_via_ci_pairing` step (cycle 10) would loop-corrupt `-2.68` → `--.68` → `---.68`. Fix per-step root causes; don't wrap the whole pipeline in a converge-loop until every step is provably re-application-safe.
+
+## Railway Metal builder disk exhaustion has TWO distinct failure modes — only one is Dockerfile-fixable (caught 2026-05-20, run 9 cycle 8 deploy)
+
+**What:** The v2.4.59 deploy hit two consecutive Railway build failures on the same `production-builderv3-us-west1-s3s1` Metal builder. The first failed at `[2/6] RUN apt-get update && apt-get install ...` with `E: You don't have enough free space in /var/cache/apt/archives/`. After we split the apt install into 3 chunks with `apt-get clean` between (docpluckapp commit `ea69192`), the next two retries failed at step 0 — `[internal] load build definition from service/Dockerfile` — with `ResourceExhausted: failed to create lease: write /var/lib/buildkit/runc-overlayfs/containerdmeta.db: no space left on device`. The Dockerfile fix was never even read.
+
+**Why:** Two different filesystems are involved.
+1. `/var/cache/apt/archives/` is INSIDE the build container's writable layer. When `apt-get install` pulls 130 packages totalling ~105 MB before the install + cleanup, the writable layer fills. **This is Dockerfile-fixable.** Splitting the install caps peak archive size to whichever single chunk is largest (e.g. ghostscript ≈ 70 MB).
+2. `/var/lib/buildkit/runc-overlayfs/containerdmeta.db` is on the BUILDER NODE's host filesystem, owned by the buildkit daemon. It tracks every project's build leases, snapshots, and image cache. When this fills, the daemon can't even allocate a lease to read the user-supplied Dockerfile. **This is NOT Dockerfile-fixable.** The only recovery is for Railway to clean / rotate the builder node, or for the service to be scheduled onto a different builder (which `railway redeploy` does not force — three consecutive redeploys landed on the same broken builder).
+
+**Fix (mode 1, apt cache):**
+```Dockerfile
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends poppler-utils git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ghostscript \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+```
+
+**Fix (mode 2, builder node):** wait + retry, or contact Railway support. No code change can help — the buildkit daemon is below the Dockerfile abstraction. Continue local work in the interim (local FastAPI service runs the working-tree library; verification harness gates against local, not prod).
+
+**How to detect / discriminate:**
+1. After a `verify-railway-deploy.yml` failure, ALWAYS fetch the FAILED deployment's build logs (not the linked-service default logs which show the last SUCCESS): `railway deployment list --json | jq -r '.[0].id'` then `railway logs --build --lines 800 <full-uuid>`. The `--build` flag is critical.
+2. Search the tail for either `/var/cache/apt/archives/` (mode 1 — Dockerfile-fix the apt-get) OR `/var/lib/buildkit/runc-overlayfs/` (mode 2 — Railway infra, stop Dockerfile changes).
+3. If mode 2: do NOT push more Dockerfile fixes. They will keep failing on the same builder.
+
+**Anti-pattern caught:** ignoring the verify-railway-deploy workflow's failure as "lag" and just waiting for prod to converge. The 8-min poll was already exhausted; longer waits did NOT help because the build itself never finished. Always pull the deployment status (`railway deployment list --json`) BEFORE deciding "lag vs failure" — the verify workflow only polls `/health`, it can't tell building/crashed/deployed-old apart.

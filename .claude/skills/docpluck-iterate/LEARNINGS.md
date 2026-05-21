@@ -895,3 +895,30 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 
 ### SPINE-SKIPs
 - Phase 7 `/docpluck-cleanup` + `/docpluck-review` — SKIPPED (lean path). Cycle 8 diff is library-internal (`docpluck/normalize.py` only) + tests + CHANGELOG + version bumps. Inline 11-item hard-rule check passes: no `-layout` flag added, no AGPL dep, no extraction-tool swap, no S-step ORDER change (S8r/LateJoin is a NEW late re-application, not a reorder of S8 itself), U+2212→hyphen rule untouched, no silent ImportError fallback, tables still HTML, fix keyed on structural signatures (lookahead = "don't consume the boundary char"; late re-apply = "run on stabilized line positions"), real-PDF + corpus-ratchet tests in place, versions consistent. Tier1==Tier2 byte-equal (both use docpluck 2.4.59 once service restarts); Tier3 will match after release.
+
+---
+
+## Run: 2026-05-20 / 21 (run 9 continued, session 4) · Cycle 8 post-release · Railway builder-node disk exhaustion blocked the v2.4.59 deploy
+
+### Outcome
+- v2.4.59 library is tagged + on GitHub + auto-bump landed on docpluckapp/master (commit 170606a). **Prod is STILL on docpluck 2.4.58** because the Railway BUILD daemon ran out of disk on every attempt — three consecutive deployments all FAILED on the same Metal builder node `production-builderv3-us-west1-s3s1`. The first failure (deployment 95a3a78b) was at step 2/6 (the apt-get install of 130 packages — ~105 MB into /var/cache/apt/archives/). I optimized the Dockerfile to split apt-get into 3 groups with `apt-get clean` between (docpluckapp commit ea69192), but the next two redeploys both failed at step 0 ("[internal] load build definition from service/Dockerfile") with `ResourceExhausted: failed to create lease: write /var/lib/buildkit/runc-overlayfs/containerdmeta.db: no space left on device`. The builder node itself is out of disk on its OWN buildkit overlayfs, before reading anything user-supplied. User decision: ship v2.4.59 to prod later when Railway recovers; continue cycle 9 locally (the local service is already 2.4.59 and Tier-D gates against the harness, not prod).
+
+### Blind Spots (the discovery this cycle)
+- **Two distinct out-of-disk failure modes on Railway, with very different fix paths.**
+  1. **`/var/cache/apt/archives/` exhaustion** (Dockerfile-fixable). The build container's user-writable layer fills during `apt-get install` because the .deb downloads accumulate before install + cleanup. Splitting the install into multiple `apt-get install ... && apt-get clean && rm -rf /var/cache/apt/archives/*` chunks caps peak archive size to whichever single chunk is largest. This is what we did in docpluckapp `ea69192`.
+  2. **`/var/lib/buildkit/runc-overlayfs/containerdmeta.db` exhaustion** (NOT Dockerfile-fixable). The buildkit daemon's OWN persistent storage (where it tracks leases, snapshots, image cache) is full — this is on the builder node's host filesystem, not in the build container. Fails at step 0 before reading the Dockerfile. The only user-side recovery is: wait for the builder to be rotated/cleaned, OR switch builders/regions. A Dockerfile change cannot help because the Dockerfile is never even read.
+- **Railway redeploys are sticky to the same Metal builder for the same service.** Three back-to-back redeploys (deployments 95a3a78b, 438df3c5, def05d73, 401b8bc8) all scheduled onto `production-builderv3-us-west1-s3s1`. `railway redeploy --service ... --from-source --yes` does NOT round-robin to a healthier builder when one is broken. There's no exposed flag to force a different builder.
+
+### How to detect each failure mode (paste into LEARNINGS-Verification next cycle)
+- After a `verify-railway-deploy.yml` workflow failure, ALWAYS pull the BUILD logs of the specific failed deployment ID — not the linked-service's default logs. The CLI flow: `railway deployment list --json | jq -r '.[0].id'` then `railway logs --build --lines 800 <full-uuid>`. The `--build` flag is critical — without it you'll get RUNTIME logs from the last SUCCEEDED deployment (which obscures the failed one).
+- Failure-mode discrimination: search the tail of the build log for either `/var/cache/apt/archives/` (Dockerfile-fixable apt cache) OR `/var/lib/buildkit/runc-overlayfs/` (Railway-infra builder disk). If the latter — STOP trying Dockerfile fixes; surface to user as infra.
+
+### Improvements
+- **Add a docpluckapp-side Dockerfile lesson card** documenting the apt-split pattern. Future Railway builds of multi-library Dockerfiles (especially those installing Camelot's full system-dep set: ghostscript + poppler-utils + libgl1 + libglib2.0-0) should start with the 3-chunk split, not the single-chunk install. Same fix applies to other docpluck-derivative apps.
+- **Railway deploy-verification workflows should distinguish "build failure" from "deploy lag"** in their error messages. The current `verify-railway-deploy.yml` only polls `/health`; it can't tell whether the deploy is BUILDING/CRASHED/DEPLOYED-OLD. Future improvement: when the verify workflow times out, have it also fetch the latest deployment status from Railway's API and include that in the error message — would short-cut the "is it a deploy lag or a build failure?" diagnostic step that took ~30 min this cycle.
+
+### Verification Gaps
+- The harness Tier-D gate is library-local — it ran clean against the LOCAL FastAPI service (2.4.59) regardless of what Railway prod was serving. That's correct (harness verifies the library-app combo we ship FROM, not the live prod state), but it means a stale Tier-D PASS does not imply prod is healthy. The Tier-3 prod-parity check in `docpluck-iterate` Phase 8 is what catches the gap — and it correctly caught it this cycle.
+
+### SPINE-SKIPs
+- Phase 8 Tier-3 prod parity — DEFERRED (not skipped). v2.4.59 is tagged + auto-bumped; Tier-3 parity check is blocked until Railway prod actually serves 2.4.59. Re-run Phase 8 once Railway recovers. Cycle 9 continues against local Tier-D in the interim per user decision.
