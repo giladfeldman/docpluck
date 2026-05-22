@@ -182,6 +182,37 @@ The harness at `scripts/harness/` (see `docs/ITERATION_VERIFICATION_LESSONS.md`)
 - **Cross-output parity:** every table in `tables.json` must render as a `<table>` in `rendered.md`; review any change that could let a view diverge (a table in the Tables tab but missing from the Rendered tab is a defect class the harness `table_parity` check exists to catch).
 - **Severity:** BLOCKER for render/extract/normalize/tables/sections changes.
 
+### 17. No in-band `sendEmail()` outside allowed call sites (SES + notifications, 2026-05-22)
+The app's email path is queue-based: anywhere outside the cron/security/fatal-admin call sites, code MUST `enqueueNotification(...)`, NOT `await sendEmail(...)` synchronously. In-band sends inside a request handler block the response, ignore the allowlist/EMAIL_MODE switch, and bypass the `email_events` audit trail. Allowed call sites:
+- `frontend/src/app/api/cron/daily-digest/route.ts`
+- `frontend/src/lib/notifications/security-alerts.ts`
+- `frontend/src/lib/notifications/fatal-admin.ts`
+- `frontend/src/lib/email/__tests__/**`
+- Any line with the explicit allow comment `/* allow-in-band: <reason> */` immediately preceding the call.
+- **Check:** `grep -rn 'sendEmail(' frontend/src/ | grep -v -E '(api/cron/daily-digest|notifications/security-alerts|notifications/fatal-admin|__tests__|/\* allow-in-band:)' | grep -v 'function sendEmail\|export.*sendEmail'` — must return zero lines.
+- **Severity:** BLOCKER. Replace with `enqueueNotification({ kind, ... })`.
+
+### 18. No `react-dom/server` in email templates (WU-001 reapplied)
+The RSC stub for `react-dom/server` throws at runtime in the Next.js app router. Email templates render via `@react-email/render`, NOT `renderToStaticMarkup` from `react-dom/server`.
+- **Check:** `grep -rn 'react-dom/server' frontend/src/lib/email/` — must be ZERO hits.
+- **Severity:** BLOCKER.
+
+### 19. Every fail-able Route Handler wrapped in `withRouteErrorLogging`
+Unwrapped Route Handlers throw raw 500s that never reach the `admin_log` audit trail, so production failures become invisible. Every `export async function (GET|POST|PUT|PATCH|DELETE)` in `frontend/src/app/api/**/route.ts` must either directly call `withRouteErrorLogging(...)` OR be in the explicit allow-list.
+- **Allow-list:** the SNS webhook route (`/api/email/webhook`), the cron route (`/api/cron/daily-digest`), and the existing health-check route.
+- **Check:** grep all `route.ts` under `frontend/src/app/api/`, list `export async function (GET|POST|PUT|PATCH|DELETE)` sites, intersect with `withRouteErrorLogging` usages, flag every uncovered site not in the allow-list.
+- **Severity:** BLOCKER.
+
+### 20. Every `enqueueNotification` call uses a declared `NotificationKind`
+A typo in `kind:` silently produces unfilterable garbage in `notification_queue` and is invisible until a digest runs.
+- **Check:** grep `frontend/src/` for `enqueueNotification({ kind: '<X>'`. Each `<X>` must appear in the `NotificationKind` union at `frontend/src/lib/notifications/types.ts`.
+- **Severity:** BLOCKER on any unknown kind.
+
+### 21. Vercel cron count cap — exactly 2 entries
+The product principle is "one nightly server-resource-bounded cron per concern." Adding a third Vercel cron is a smell — surface it for the user before approving.
+- **Check:** parse `frontend/vercel.json`; assert exactly two cron entries, namely `/api/admin/blob-cleanup` at `0 3 * * *` AND `/api/cron/daily-digest` at `0 9 * * *`.
+- **Severity:** BLOCKER on any third cron — REQUEST CHANGES with the question "why isn't daily-digest enough?"
+
 ## Review Checklist
 
 ### Python Service (`service/`)

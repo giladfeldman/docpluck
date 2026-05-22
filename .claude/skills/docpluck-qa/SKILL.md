@@ -480,6 +480,71 @@ document — not only the ones a change targeted — is a blocker. For a release
 QA, also run `inspect prepare` + Tier-A AI-gold verifier agents on the tiered
 subset. See `scripts/harness/README.md`.
 
+### 7i. SES identity status (CRITICAL — email deliverability)
+
+The app's transactional email path (security alerts, daily digest, fatal-admin) depends on AWS SES being verified for `mail.docpluck.app`. If the identity drops out of `SUCCESS`, every queued notification will silently fail downstream.
+
+```bash
+aws sesv2 get-email-identity --email-identity mail.docpluck.app --region eu-west-1
+```
+
+**Gate:** `VerificationStatus: SUCCESS` AND `DkimAttributes.Status: SUCCESS`. WARN if `VerifiedForSendingStatus: false` (identity verified but sending paused — usually a bounce/complaint pause; see check 7m).
+
+### 7j. SES simulator round-trip (opt-in via `--smoke-email`)
+
+Only when invoked with `--smoke-email` (do NOT run on every QA — costs an SES message and a webhook hop). From the production preview env, POST a test message to `success@simulator.amazonses.com` via the app's `sendEmail()` helper, then poll `email_events` for the matching `messageId` with `type='delivered'` within 30s.
+
+```bash
+# (paths illustrative — adapt to current frontend test harness)
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/frontend && \
+  node scripts/qa_email_smoke.mjs success@simulator.amazonses.com 2>&1 | tail -10
+```
+
+**Gate:** FAIL if no `email_events` row with matching `messageId` and `type='delivered'` appears within 30s — the SES→SNS→webhook→DB path is broken end-to-end.
+
+### 7k. Notification queue health
+
+The daily-digest cron drains `notification_queue`. Any row with `sent_at IS NULL` older than ~36h means the cron missed at least one nightly run (a 24h overlap window plus 12h grace).
+
+```bash
+psql "$DATABASE_URL" -c "SELECT count(*) FROM notification_queue WHERE sent_at IS NULL AND created_at < NOW() - INTERVAL '36 hours'"
+```
+
+**Gate:** count must be `0`. Non-zero = FAIL; investigate Vercel cron logs for `/api/cron/daily-digest`.
+
+### 7l. SNS webhook signature unit test (regression guard, WU-007 class)
+
+```bash
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/frontend && \
+  pnpm vitest run src/lib/email/__tests__/webhook-handler.test.ts 2>&1 | tail -15
+```
+
+**Gate:** all tests pass. If the file is missing entirely → FAIL (regression guard removed; refuse to ship).
+
+### 7m. SES bounce / complaint rate (7-day window)
+
+AWS auto-pauses sending at bounce >5% or complaint >0.1% — catch the trend before SES does.
+
+```bash
+aws sesv2 get-domain-statistics-report \
+  --domain mail.docpluck.app \
+  --start-date $(date -d '7 days ago' --iso) \
+  --end-date $(date --iso) \
+  --region eu-west-1
+```
+
+**Gate:** WARN at `bounce > 5%` OR `complaint > 0.1%`; FAIL at `bounce > 10%` OR `complaint > 0.5%`. (AWS will already have auto-paused at the FAIL threshold — surface immediately.)
+
+### 7n. EMAIL_MODE env in production
+
+The app's `sendEmail()` switches on `EMAIL_MODE`: `console` (dev no-op), `allowlist` (staging), `live` (production). Shipping production with `console` or unset silently drops every alert.
+
+```bash
+vercel env ls production --token $VERCEL_TOKEN | grep EMAIL_MODE
+```
+
+**Gate:** value must equal `live` for production (or `allowlist` if the deploy is explicitly staging — note in the QA report). FAIL if `console` or unset.
+
 ### 8. Service Health Endpoint
 ```bash
 curl -s http://localhost:6117/health
@@ -583,6 +648,12 @@ Opt-in cross-format benchmark suite --- DOCX corpus integrity, DOCX↔PDF parity
 | 7b | Corpus render verifier (26-paper) | PASS/FAIL | X/26 PASS, failure tags listed |
 | 7f | Content-fidelity linter (GT/TS/CMP/PEC/CC/CBT/HIH/ORN/ABL/ET/PHE/FCD) | PASS/FAIL | tag counts per paper |
 | 7g | Phase-5d AI verify on 4 canonical papers | PASS/FAIL | 4/4 PASS or list TEXT-LOSS / HALLUCINATION findings |
+| 7i | SES identity status | PASS/FAIL/WARN | VerificationStatus / DKIM / VerifiedForSendingStatus |
+| 7j | SES simulator round-trip (--smoke-email) | PASS/FAIL/SKIP | messageId delivered within 30s |
+| 7k | Notification queue health | PASS/FAIL | unsent rows >36h old |
+| 7l | SNS webhook signature unit test | PASS/FAIL | webhook-handler.test.ts |
+| 7m | SES bounce / complaint rate (7d) | PASS/WARN/FAIL | bounce% / complaint% |
+| 7n | EMAIL_MODE env in production | PASS/FAIL | live / allowlist / console |
 | 8 | Service health | PASS/FAIL | pdftotext version |
 | 9 | Database connectivity | PASS/FAIL | 7/7 tables |
 | 10 | Admin API | PASS/FAIL | health + stats |

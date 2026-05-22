@@ -107,6 +107,55 @@ Required variables (all must show as "Encrypted"):
 
 If any are missing, refer to SETUP_GUIDE.md.
 
+### 5. SES Environment Variables Present in Vercel Production (CRITICAL)
+
+Same pattern as check 4 (Vercel env vars) but for the SES + notification surface. Missing any of these means the app boots in production with a broken email path (queued notifications, no send; webhook signature checks fail; admin alerts silently dropped).
+
+```bash
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/frontend
+vercel env ls production --token "$VERCEL_TOKEN" | tee /tmp/vercel-env-prod.txt
+for v in AWS_SES_REGION AWS_SES_ACCESS_KEY_ID AWS_SES_SECRET_ACCESS_KEY \
+         EMAIL_FROM_ADDRESS EMAIL_FROM_NAME EMAIL_MODE EMAIL_CONFIG_SET \
+         SNS_WEBHOOK_SECRET EMAIL_UNSUB_SECRET ADMIN_EMAIL CRON_SECRET; do
+  grep -q "^$v\b" /tmp/vercel-env-prod.txt || echo "❌ MISSING: $v"
+done
+```
+
+**Gate:** all listed vars present (Encrypted). Any missing = FAIL the deploy.
+
+### 6. SES Identity SUCCESS
+
+```bash
+aws sesv2 get-email-identity --email-identity mail.docpluck.app --region eu-west-1 \
+  | jq -r '.VerificationStatus'
+```
+
+**Gate:** must equal `SUCCESS`. Anything else = FAIL the deploy.
+
+### 7. DKIM + SPF + DMARC DNS Resolve
+
+```bash
+# DKIM token list — read live from SES, do NOT hard-code:
+DKIM_TOKENS=$(aws sesv2 get-email-identity --email-identity mail.docpluck.app --region eu-west-1 \
+  | jq -r '.DkimAttributes.Tokens[]')
+for t in $DKIM_TOKENS; do
+  dig +short CNAME "${t}._domainkey.mail.docpluck.app" | grep -q amazonses.com \
+    || { echo "❌ DKIM token $t did not resolve"; exit 1; }
+done
+
+# SPF on bounces subdomain:
+dig +short TXT bounces.mail.docpluck.app | grep -q 'v=spf1 include:amazonses.com -all' \
+  || { echo "❌ SPF missing on bounces.mail.docpluck.app"; exit 1; }
+
+# DMARC on root:
+dig +short TXT _dmarc.docpluck.app | grep -q 'v=DMARC1' \
+  || { echo "❌ DMARC missing on _dmarc.docpluck.app"; exit 1; }
+
+echo "✅ DKIM + SPF + DMARC resolve"
+```
+
+**Gate:** all three queries must resolve to the expected values. Any failure = FAIL the deploy. (DKIM tokens are parameterized — pulled live from SES at check time.)
+
 ## Library Release Step (run BEFORE app deploy)
 
 If the library version changed since the last deploy, the library must be tagged + pushed FIRST so `service/requirements.txt` (now pointing at the new version) can resolve.
@@ -222,6 +271,18 @@ print('Smoke test: PASS')
 "
 ```
 
+### 5. Daily-Digest Dry-Run Smoke (post-deploy, CRITICAL)
+
+After the Vercel deploy reports `Ready`, hit the digest cron in dry-run mode to confirm the route, auth, and queue read all work end-to-end on the deployed bundle:
+
+```bash
+curl -s -w '\nHTTP %{http_code}\n' \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  "https://docpluck.app/api/cron/daily-digest?dryRun=1"
+```
+
+**Gate:** HTTP 200 AND JSON body shaped like `{ "dryRun": true, "wouldSend": <number>, ... }`. Anything else (401, 500, missing `wouldSend`, `dryRun: false`) = FAIL the deploy verdict; investigate before declaring the deploy done.
+
 ## Rollback
 
 If deployment fails:
@@ -246,6 +307,9 @@ railway redeploy
 | Frontend build | PASS/FAIL |
 | Service modules | PASS/FAIL |
 | Env vars | X/Y present |
+| SES env vars (11) | X/11 present |
+| SES identity SUCCESS | PASS/FAIL |
+| DKIM + SPF + DMARC | PASS/FAIL |
 
 ### Deployment
 | Target | Status | URL |
@@ -259,6 +323,7 @@ railway redeploy
 | Frontend 200 | PASS/FAIL |
 | Service health | PASS/FAIL |
 | Smoke test | PASS/FAIL/SKIP |
+| Daily-digest dry-run | PASS/FAIL |
 ```
 
 ## Final step: read ~/.claude/skills/_shared/postflight.md and follow it.

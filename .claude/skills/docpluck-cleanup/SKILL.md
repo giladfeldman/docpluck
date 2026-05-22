@@ -249,6 +249,49 @@ A frequent regression: a `<nav>` or CTA gets `className="hidden sm:flex"` for de
 
 If parity gaps are found, REPORT them in the cleanup output (do NOT silently rewrite the mobile UX — that's a design decision the user owns; flag it and let `/docpluck-review` enforce on the next PR).
 
+### 2.4d — SES + notification doc / config parity (2026-05-22)
+
+The SES + queue-based notification system introduces a sizable env-var surface, a webhook endpoint, a daily-digest cron, and product-stance promises on the marketing pages. All four can drift silently across PRs. Audit on every cleanup pass.
+
+#### Env-var documentation parity
+
+The following env vars are required for the email + notification system and MUST be listed (with the same hints) in ALL of: `frontend/.env.example`, `PDFextractor/CLAUDE.md`, and `docpluck/docs/SETUP_GUIDE.md`:
+
+- `AWS_SES_REGION`
+- `AWS_SES_ACCESS_KEY_ID`
+- `AWS_SES_SECRET_ACCESS_KEY`
+- `EMAIL_FROM_ADDRESS`
+- `EMAIL_FROM_NAME`
+- `EMAIL_MODE` (`console` | `allowlist` | `live`)
+- `EMAIL_ALLOWLIST` (comma-separated when `EMAIL_MODE=allowlist`)
+- `EMAIL_CONFIG_SET` (SES configuration set tied to SNS topic)
+- `SNS_WEBHOOK_SECRET`
+- `EMAIL_UNSUB_SECRET`
+- `ADMIN_EMAIL`
+- `CRON_SECRET`
+
+- [ ] Diff the three files; any var missing from any of them = WARN, fix in-run.
+
+#### API.md endpoint documentation
+
+- [ ] `PDFextractor/API.md` describes `/api/email/webhook` (SNS bounce/complaint/delivery ingest) AND `/api/cron/daily-digest` (Vercel cron, requires `Authorization: Bearer $CRON_SECRET`). Grep API.md for both paths; WARN if either is missing.
+
+#### Marketing-page email honesty
+
+The product stance is: **we don't email unless you ask**. The homepage and any `/about*` page must not contradict this.
+
+- [ ] grep `frontend/src/app/page.tsx` and `frontend/src/app/about*/page.tsx` for copy promising default email delivery: `weekly insights`, `delivered to your inbox`, `daily digest of`, `we'll email you when` (outside an explicit opt-in setting). Any match = WARN; either remove or qualify with "opt-in".
+
+#### `vercel.json` cron drift guard
+
+- [ ] Parse `frontend/vercel.json`; assert exactly two cron entries — `/api/admin/blob-cleanup` at `0 3 * * *` AND `/api/cron/daily-digest` at `0 9 * * *`. A third cron = WARN; flag to the user (same gate as `/docpluck-review` rule 21).
+
+#### Notification queue retention self-contained
+
+The daily-digest handler is responsible for its own retention sweep (no separate cron).
+
+- [ ] grep `frontend/src/app/api/cron/daily-digest/route.ts` for `DELETE FROM notification_queue WHERE created_at < NOW() - INTERVAL '90 days'` (or an equivalent Drizzle expression). WARN if absent — table grows unboundedly.
+
 ### 2.4 — App memory
 
 - [ ] `C:\Users\filin\.claude\projects\c--Users-filin-Dropbox-Vibe-MetaScienceTools-PDFextractor\memory\` — check for stale memories
