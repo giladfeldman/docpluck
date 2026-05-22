@@ -103,7 +103,7 @@ The homepage (`frontend/src/app/page.tsx`) and any "About" / "Features" / "How i
   - Hard-coded counts ("14 normalization steps", "16 normalization steps", "29/29 verified passages"): do they still match `NORMALIZATION_VERSION` and the current corpus size? Either update the number or replace with a code-derived count.
   - "Choose your level" / pipeline-step cards: list of steps must include everything currently in `normalize.py` (W0, R2, R3, A7, F0 in addition to S0–S9, A1–A6, A3a, A3b).
   - Major-feature absence: if a public capability shipped (section identification, table extraction via Camelot, figure extraction, layout-aware footnote stripping, render-to-markdown), the homepage Features grid should mention it OR a deliberate "marketing decision to hold back" note should exist in the PR description.
-  - Hard-coded URLs in code samples (`https://docpluck.vercel.app/api/extract`, etc.) must match the actual production URL — prefer `process.env.NEXT_PUBLIC_API_BASE` or a constant in `frontend/src/lib/`.
+  - Hard-coded URLs in code samples (`https://docpluck.app/api/extract`, etc.) must match the actual production URL — prefer `process.env.NEXT_PUBLIC_API_BASE` or a constant in `frontend/src/lib/`.
 - **Check:** the same audit applies to `frontend/src/app/about-normalization/page.tsx`, `frontend/src/app/api-docs/page.tsx`, `frontend/src/app/sections/page.tsx`, and `frontend/src/app/benchmarks/page.tsx` whenever the underlying library surface they describe changed.
 - **Severity:** WARN (non-blocker) on isolated stale numbers; BLOCKER if the homepage actively contradicts shipped functionality (e.g., claims "PDF-only" while DOCX/HTML endpoints are live, or omits a feature gated behind a deploy that already happened).
 

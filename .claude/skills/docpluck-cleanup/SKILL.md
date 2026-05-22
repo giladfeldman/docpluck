@@ -218,7 +218,7 @@ Note the supported formats (any `extract_pdf*`, `extract_docx*`, `extract_html*`
 - [ ] Features grid mentions each MAJOR capability the library exposes today: column-aware reading order, ligature expansion, Unicode recovery, statistical line-break repair, minus-sign normalization, quality scoring, **section identification**, **table extraction**, **figure extraction**, **layout-aware footnote stripping**, **render-to-markdown**. Missing capability = stale homepage.
 - [ ] "How it works" step list reflects the actual pipeline (e.g., "Extract → Normalize → Sections → Tables → Render", not just "Extract → Normalize → Score" if more is happening).
 - [ ] "Choose your level" / normalization-tier cards list every step active in `normalize.py` for that tier.
-- [ ] Code-sample URL (e.g., `https://docpluck.vercel.app/api/extract`) matches the actual production URL — flag if the frontend hard-codes an outdated host.
+- [ ] Code-sample URL (e.g., `https://docpluck.app/api/extract`) matches the actual production URL — flag if the frontend hard-codes an outdated host.
 - [ ] CTA copy ("5 PDFs/day", "Free for researchers") matches the active rate-limit constants in `frontend/src/lib/`.
 
 #### `frontend/src/app/about-normalization/page.tsx`

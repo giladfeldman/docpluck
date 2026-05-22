@@ -24,7 +24,7 @@ for fname in pdfs:
         content = f.read()
     try:
         r = requests.post(
-            'https://docpluck.vercel.app/api/extract?normalize=academic&quality=true',
+            'https://docpluck.app/api/extract?normalize=academic&quality=true',
             files={'file': (fname, content, 'application/pdf')},
             headers={'Authorization': f'Bearer {API_KEY}'},
             timeout=120

@@ -610,7 +610,7 @@ print('F0 sentinel (preserved): PASS')
 ### 12. Production Deployment (Vercel + Railway)
 ```bash
 # Vercel frontend
-curl -s -o /dev/null -w "Vercel: HTTP %{http_code}\n" https://docpluck.vercel.app/login
+curl -s -o /dev/null -w "Vercel: HTTP %{http_code}\n" https://docpluck.app/login
 
 # Railway extraction service
 curl -s https://extraction-service-production-d0e5.up.railway.app/health | python -c "import sys,json; d=json.load(sys.stdin); print('Railway:', d.get('status','error'), d.get('pdftotext','unknown'))"

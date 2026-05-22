@@ -245,7 +245,7 @@ Latest deployment must show `Ready`.
 
 ### 2. Frontend Health
 ```bash
-curl -s -o /dev/null -w "%{http_code}" https://docpluck.vercel.app/login
+curl -s -o /dev/null -w "%{http_code}" https://docpluck.app/login
 ```
 Must return 200.
 
@@ -314,7 +314,7 @@ railway redeploy
 ### Deployment
 | Target | Status | URL |
 |--------|--------|-----|
-| Vercel | DEPLOYED/FAILED | https://docpluck.vercel.app |
+| Vercel | DEPLOYED/FAILED | https://docpluck.app |
 | Railway | DEPLOYED/FAILED | https://extraction-service-production-d0e5.up.railway.app |
 
 ### Post-Deploy
