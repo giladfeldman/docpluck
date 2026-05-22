@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.68] — 2026-05-22
+
+**Cycle 15 (run 9) — long-tail non-idempotent papers cleared (4 → 0; 180/180 idempotent corpus-wide) + pre-existing two-column-bibliography regression fixed.** `NORMALIZATION_VERSION` 1.9.20 → 1.9.21. Five structural fixes:
+
+1. **Cross-paragraph `(OR|CI|RR|HR)\n\n\d` A1r variant** in the LateJoin block — clears `demography-5` (Mortality Hazard Ratio and Odds Ratio tables where `CI`/`HR` sit one paragraph above their `\d+\.\d` value). Lookahead requires a STAT-VALUE-shaped token (`\d+\.\d`, `\d{2,}`, or digit+operator) to avoid colliding with bibliography reference-number form `\d+\.\s+[A-Z]`.
+2. **`_LABELED_NUMERIC_LINE_RE` + `_is_in_numeric_block` extension** to recognize labeled stat-variable comparisons (`S<= 10000`, `M = 5.2`, `N = 200`) as numeric-block context — clears `nat-comms-2` (S9 was stripping the figure-axis tick label `1000` because the labeled neighbor wasn't seen as numeric).
+3. **S9 repeated-line caption guard** — exclude lines containing a parenthesized 4-digit year/year-range `(YYYY)` / `(YYYY-YYYY)` OR ≥6 spaces ending in sentence punctuation. Protects table source-attribution captions like `socius-4` `Source: Authors' calculation, American Time Use Survey (2003-2023).` (×13 in the doc) from being false-stripped as a min_gap≥20 running header — real silent caption loss in production.
+4. **Final NFC composition pass** at the end of `normalize_text` — clears `ieee-access-7` (`σ̂` math block where A5 transliteration `σ → sigma` orphaned U+0302 onto the trailing `a`; pass 1 left `sigma + U+0302`, pass 2 composed to `â`). Generally protective for any future transliteration step that leaves a combining mark on an ASCII tail.
+5. **Two-column-bibliography pairing pre-pass for R3** (`_pair_two_column_bibliography`) — pdftotext renders some 2-column bibliographies (Royal Society Open Science is the canonical case) by streaming the entire NUMBER column first, then the entire ENTRY column. R3's continuation-join used to smash all the bare `\d+\.` lines into one header and detach the entries. The pre-pass detects a leading run of ≥3 sequential bare-number lines + matching entry column and pairs them up. Fixes Li&Feldman 2025 RSOS regression caught by `test_request_09_reference_normalization.py::test_bibliography_splits_into_45_consecutive` — a pre-existing failure latent at HEAD before cycle 15 (`requires_fixture` skipped it in CI without the Dropbox PDF, masking the regression for several cycles).
+
+Tests added: `test_late_join_crosses_paragraph_for_ci_or_rr_hr`, `test_labeled_numeric_line_protects_figure_axis_value`, `test_s9_preserves_caption_with_year_range`, `test_final_nfc_pass_composes_orphan_combining_after_a5`, plus 4 real-PDF `*_real_pdf` regression tests for each of the cleared papers. Idempotency ratchet lowered 2 → 0 (corpus is now fully idempotent on the strided sample). Run 9 closes at 180/180 idempotent corpus-wide.
+
+## [2.4.67] — 2026-05-22
+
+**Docs-only patch — domain cutover to `docpluck.app`.** `[project.urls]` Homepage now `https://docpluck.app`, Documentation now `https://docpluck.app/api-docs` (was GitHub tree URLs). No code changes; `NORMALIZATION_VERSION` unchanged at 1.9.21. Push to PyPI to refresh package-page links — the GitHub repo is unchanged. See `PDFextractor/docs/superpowers/handoffs/2026-05-22-domain-cutover-docpluck-app-COMPLETED.md` for the cross-repo sweep.
+
 ## [2.4.66] — 2026-05-22
 
 **Cycle 14 (run 9) — S9 numeric-line widening + year-range gate + repeat-line distribution heuristic.** A 180-doc scan post-cycle-13 found 7 papers non-idempotent. Cycle 14 packages three corpus-wide S9 hardening fixes that together clear 4 of them while also FIXING two latent production text-loss bugs.
