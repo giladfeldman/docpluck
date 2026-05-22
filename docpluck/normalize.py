@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.18"
+NORMALIZATION_VERSION = "1.9.19"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1504,6 +1504,25 @@ _SENTENCE_BREAK_RE = re.compile(r"[.;]\s")
 # directly before the opening `[`. Allow optional whitespace and an `=` /
 # `:` between the label and the bracket.
 _CI_LABEL_PREFIX_RE = re.compile(r"(?:\bCI|\b\d+\s*%\s*CI)\s*[=:]?\s*$", re.IGNORECASE)
+# Cycle 13 (v2.4.65) — even a LABELED CI cannot reach back ACROSS an
+# independent-test-statistic label. The discriminator: between the
+# candidate token and the labeled bracket, allow ONLY variance-family
+# labels (SD, SE, M, Mdn, Var, CI, 95% CI itself, %), reject anything
+# that introduces a NEW estimate (t, F, p, d, g, η, χ, r, R², β, OR, RR,
+# HR, B, Z, Q).
+#
+# Why: `Mposterior = 20.54, SD=0.04, CI = [-0.61, -0.47]` (efendic) has
+# only SD between the candidate and the CI — same estimate, paired OK.
+# `M = 5.37, SD = 2.01, t(1827) = 1.83, p tukey = .067, d = 0.09, 95% CI
+# [-0.006, 0.18]` (majumder) has t, p, d — three independent estimates —
+# between `2.01` and the CI; the CI is for `d`, not `2.01`. Reject.
+_INDEPENDENT_STAT_BETWEEN_RE = re.compile(
+    r"(?:^|[,;\s])\s*"
+    r"(?:t|F|d|g|R|R²|β|γ|B|OR|RR|HR|H|Q|Z|f|n|η|χ|η²|χ²|r|"
+    r"p\s+tukey|p\s+holm|p\s+bonf(?:erroni)?|p\s+adj|"
+    r"\bp(?:\s*[=<>]))"
+    r"\s*[=(\(]",
+)
 
 
 def _recover_minus_in_record(record: str) -> str:
@@ -1553,13 +1572,17 @@ def _recover_minus_in_record(record: str) -> str:
             if bs < token_end:
                 continue
             gap = bs - token_end
+            intervening = record[token_end:bs]
             if is_labeled:
-                # Labeled bracket: only constraint is "comes after the token".
-                pass
+                # Labeled bracket: relaxed proximity, but still reject if
+                # an independent-stat label intervenes. The label gates the
+                # pairing to the variance-family (SD/SE/M/CI/%) of the
+                # SAME estimate. See _INDEPENDENT_STAT_BETWEEN_RE notes.
+                if _INDEPENDENT_STAT_BETWEEN_RE.search(intervening):
+                    continue
             else:
                 if gap > _CI_PAIR_MAX_GAP:
                     continue
-                intervening = record[token_end:bs]
                 if _SENTENCE_BREAK_RE.search(intervening):
                     continue
             if nearest_dist is None or gap < nearest_dist:
@@ -2685,6 +2708,16 @@ def normalize_text(
         # Clears korbmacher (2 papers) from the non-idempotent set.
         t = re.sub(r"([,;])\s*\n\s*\n\s*(?=\d+%\s*CI)", r"\1 ", t)
         t = re.sub(r"([,;])\s*\n\s*\n\s*(?=p\s*[<=>])", r"\1 ", t)
+        # Cycle 13 (v2.4.65) — same shape, applied to `=/<>` → digit/dot
+        # continuations. li-feldman-fox has `p =\n\n\x0cFox et al. (2005)...
+        # \n\n38\n\n.25, OR = .96, 95%CI [.90, 1.03])` where A1's
+        # `([=<>])\s*\n\s*([-\d.])` pattern fails on pass 1 (the journal-
+        # header text isn't `\s`); S9 strips the header + page number,
+        # leaving `p =\n\n.25` — but A1 is over. Pass 2 joins on the
+        # cleaned form. The lookahead `(?=[-\d.])` is the load-bearing
+        # constraint — real paragraphs rarely START with a leading dot
+        # or `-digit`.
+        t = re.sub(r"([=<>])\s*\n\s*\n\s*(?=[-.]?\d)", r"\1 ", t)
     report._track("LateJoin_line_break_rejoin", before, t, "late_line_joins")
 
     # ── H0r: header-banner re-strip on stabilized line positions ─────────
@@ -2724,6 +2757,34 @@ def normalize_text(
     # Add the collapse here so the function is idempotent regardless of
     # which late step produced the blank-line run.
     t = re.sub(r"\n{3,}", "\n\n", t)
+
+    # ── P1r: front-matter metadata-leak re-strip on stabilized lines ─────
+    # Same shape as H0r and P0r. P1's `_strip_frontmatter_metadata_leaks`
+    # matches an acknowledgment-style line by ANCHORED prefix + a keyword
+    # check within the first 300 chars (e.g. `^We\s+thank...reviewers|
+    # editor|feedback|comments|suggestions|insights|helpful`). pdftotext
+    # often line-wraps the acknowledgment before the keyword fires (e.g.
+    # `We thank the target article's authors - Prof. Craig Fox and Prof.
+    # Rebecca Ratner, for being very` — the raw line stops before
+    # `helpful`). S7/S8 join the continuation; the joined line now contains
+    # the keyword, but P1 has already run by then. Pass 2's P1 catches the
+    # joined form and strips — non-idempotence + a missed production strip.
+    #
+    # Re-running here on the post-LateJoin line positions catches every
+    # form (the original short line where the keyword was already in
+    # window, AND the post-join long line where it's only in window after
+    # the join).
+    #
+    # Cycle 13 (v2.4.65) — clears li-feldman-fox + amp-1 + annals-2 +
+    # xiao-poc-epley (4 acknowledgment-block papers) from the
+    # non-idempotent set.
+    before = t
+    while True:
+        _restripped = _strip_frontmatter_metadata_leaks(t)
+        if _restripped == t:
+            break
+        t = _restripped
+    report._track("P1r_frontmatter_leak_restrip", before, t, "frontmatter_leaks_restripped")
 
     # ── P0r: page-footer-line re-strip on stabilized line positions ──────
     # Same shape as H0r, applied to P0's anchored ^...$ patterns. P0 runs
