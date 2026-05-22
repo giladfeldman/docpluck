@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.4.66] — 2026-05-22
+
+**Cycle 14 (run 9) — S9 numeric-line widening + year-range gate + repeat-line distribution heuristic.** A 180-doc scan post-cycle-13 found 7 papers non-idempotent. Cycle 14 packages three corpus-wide S9 hardening fixes that together clear 4 of them while also FIXING two latent production text-loss bugs.
+
+### 1. `_NUMERIC_ONLY_LINE_RE` extended with `<>=%`
+
+S9 Pattern A's per-occurrence numeric-block gate (cycle 9b) keeps a 4-digit candidate when its nearest non-blank neighbor is itself a "numeric-only" line — protects table sample-size N values. The original regex (`^[\d\s.,()+\-*∗;:]+$`) did NOT match common stat-table operator forms like `<.001` (p-value), `S<= 10000` (set-builder), `>= 0.05` (threshold). lee-feldman's `1801` (a regression-table F-statistic) and nat-comms-2's `1000` (figure-axis tick) had neighbors with `<`/`>=`/`%` — the gate failed, the values got stripped as "page numbers". Extended regex to `^[\d\s.,()+\-*∗;:<>=%]+$`.
+
+### 2. S9 Pattern A excludes citation-year range 1900-2100
+
+`1971` in amle-1 was a citation year (`House, R. J. 1971`) repeating across multiple table-row + ref-list mentions. Pattern A flagged it as a page number (≥3 repeats) and stripped it. Page numbers in the citation-year range (1900-2100) are extremely rare; corrupting citation years by stripping them is common and harmful. Cycle 14 excludes `1900 <= int(s) <= 2100` from Pattern A's `strip_set`.
+
+### 3. S9 repeated-line strip — distribution heuristic
+
+The original repeated-line strip (`≥5 occurrences of a 15-120 char line`) false-positives on TABLE ROW LABELS that repeat across columns of a regression table within a single page: socius-3 `Intend vs. Later` ×5, majumder `eta2p = .001, ⸸` ×9, collabra-rnr `Identifiability` ×5, social-forces-1 `Emotional neglect` ×5. Stripping these REMOVES legitimate row labels from production output — a real text-loss bug, not just an idempotence issue.
+
+New rule: a repeated line qualifies as a header/footer only if:
+  - **min_gap ≥ 20**: cleanly-spaced running header (one per page) — corpus data shows table labels max at 14 lines between occurrences, real headers at ≥25; or
+  - **count ≥ 20**: super-frequently-repeated watermark / sidebar (e.g. PMC's `Author Manuscript` ×220 in ieee_access_2 with min_gap=1) that repeats multiple times per page.
+
+The composite rule preserves table labels while still stripping page-headers regardless of inter-occurrence layout.
+
+**Impact:** corpus-wide non-idempotency 7 → 4 (cleared lee-feldman, amle-1, socius-3, majumder). Cycle 13's IEEE Roman-numeral promotion test now also passes (was failing because `Author Manuscript` watermark stayed — composite rule catches it via the count path). Broad pytest 1357 pass + 1 known pre-existing B6 fail. Harness Tier-D academic: 0 regressions, 0 new fails (1 still failing — plos-med-1 / B1).
+
+Two existing tests updated to reflect new (correct) behavior:
+  - `test_4digit_below_1000_preserved` (old test asserted years were stripped — wrong) → renamed `test_4digit_year_range_preserved` + companion `test_4digit_pagenum_outside_year_range_still_stripped`.
+  - `test_repeated_line_stripped` (synthetic 6-line doc was unrealistic for the new gate) → rewritten with realistic multi-page structure + companion `test_clustered_table_label_preserved`.
+
+NORMALIZATION_VERSION 1.9.20.
+
 ## [2.4.65] — 2026-05-22
 
 **Cycle 13 (run 9) — three further normalize_text idempotence fixes.** Post-cycle-12: 11 papers non-idempotent. Cycle 13 packages three independent fixes that together clear 4.

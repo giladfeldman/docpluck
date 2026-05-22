@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.19"
+NORMALIZATION_VERSION = "1.9.20"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -986,9 +986,11 @@ def _rejoin_letterspaced_lowercase_labels(text: str) -> str:
     return "\n".join(lines) if changed else text
 
 
-# Cycle 9b (v2.4.61) — context discriminator used by S9 Pattern A to protect
-# table sample-size values from being stripped as page numbers.
-_NUMERIC_ONLY_LINE_RE = re.compile(r"^[\d\s.,()+\-*∗;:]+$")
+# Cycle 9b (v2.4.61) / 14 (v2.4.66) — context discriminator used by S9
+# Pattern A to protect table sample-size values from being stripped as
+# page numbers. Cycle 14 added `<>=%` so lines like `<.001` (p-value),
+# `S<= 10000`, `>= 0.05` are detected as table-cell content, not prose.
+_NUMERIC_ONLY_LINE_RE = re.compile(r"^[\d\s.,()+\-*∗;:<>=%]+$")
 
 
 def _is_numeric_only_line(line: str) -> bool:
@@ -2169,11 +2171,47 @@ def normalize_text(
     before = t
     lines = t.split("\n")
     line_counts: dict[str, int] = {}
-    for line in lines:
+    line_positions: dict[str, list[int]] = {}
+    for idx, line in enumerate(lines):
         stripped = line.strip()
         if 15 <= len(stripped) <= 120:
             line_counts[stripped] = line_counts.get(stripped, 0) + 1
-    repeated = {line for line, count in line_counts.items() if count >= 5}
+            line_positions.setdefault(stripped, []).append(idx)
+    # Cycle 14 (v2.4.66) — minimum-gap discriminator.
+    # A repeated line that appears ≥5 times is a candidate header/footer.
+    # The old rule stripped every candidate; this false-positives on
+    # TABLE ROW LABELS that repeat across columns of a regression table
+    # (socius-3 `Intend vs. Later` ×5, majumder `eta2p = .001, ⸸` ×9,
+    # collabra-rnr `Identifiability` ×5, social-forces-1 `Emotional
+    # neglect` ×5 — all cluster within a small region).
+    #
+    # The MINIMUM GAP between consecutive occurrences cleanly separates
+    # the two classes:
+    #   - Table labels cluster in adjacent rows → min_gap ≤ 14 (range
+    #     3-14 across 4 corpus cases).
+    #   - Running headers appear once per page → min_gap ≥ 25 (range
+    #     25-100 across multiple corpus papers).
+    # Threshold at min_gap ≥ 20 separates the two with margin on both
+    # sides. The range-coverage approach was abandoned because doc length
+    # is too variable — short docs can have running-header range only
+    # 65-72% (below the natural 90% mark seen in long docs), causing
+    # idempotence drift when pass 2 has a shorter input.
+    repeated: set[str] = set()
+    for s, count in line_counts.items():
+        if count < 5:
+            continue
+        positions = line_positions[s]
+        gaps = [positions[i + 1] - positions[i] for i in range(len(positions) - 1)]
+        if not gaps:
+            continue
+        # Two paths qualify a repeated line as a header/footer:
+        #   - min_gap ≥ 20: cleanly-spaced running header (one per page).
+        #   - count ≥ 20: super-frequently-repeated watermark / sidebar /
+        #     PMC-style "Author Manuscript" boilerplate that repeats multiple
+        #     times per page (consecutive occurrences yield min_gap = 1).
+        # Both forms are publisher boilerplate, never body content.
+        if min(gaps) >= 20 or count >= 20:
+            repeated.add(s)
     if repeated:
         lines = [l for l in lines if l.strip() not in repeated]
         t = "\n".join(lines)
@@ -2201,7 +2239,17 @@ def normalize_text(
             four_digit_counts[s] = four_digit_counts.get(s, 0) + 1
 
     # Pattern A: same value recurs ≥3 times.
-    strip_set: set[str] = {s for s, c in four_digit_counts.items() if c >= 3}
+    # Cycle 14 (v2.4.66) — exclude citation-year range (1900-2100). A
+    # 4-digit value that repeats ≥3 times is most-often a citation year
+    # ("House, R. J. 1971" cited in multiple table rows or the references
+    # section), not a page number. Page numbers in the citation-year
+    # range are extremely rare; corrupting a citation year by stripping
+    # it is common and harmful (amle-1 had `1971` stripped under the old
+    # rule).
+    strip_set: set[str] = {
+        s for s, c in four_digit_counts.items()
+        if c >= 3 and not (1900 <= int(s) <= 2100)
+    }
 
     # Pattern B: ≥3 distinct values clustered tightly together.
     #
