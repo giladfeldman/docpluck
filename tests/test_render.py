@@ -1217,3 +1217,69 @@ def test_render_appendix_empty_shell_emits_marker():
     # The current renderer keeps the appendix entry when caption is present.
     assert "## Tables (unlocated in body)" in md
     assert "<!-- table-empty-shell:" in md
+
+
+# ── B2 HALLUC-HEAD-2 (2026-05-22): packed CRediT-line demote ──
+
+
+def test_demote_credit_methodology_packed_roles_line():
+    """B2 fix: when ±10-line window holds a single line with ≥3 distinct
+    CRediT role substrings (chan_feldman packed-table shape), demote the
+    `## Methodology` heading even though no other whole line is itself
+    a CRediT role name."""
+    from docpluck.render import _demote_credit_role_headings
+
+    text = (
+        "Continued.\n"
+        "Role\n"
+        "## Methodology\n"
+        "\n"
+        "Project administration Resources Software Supervision Validation "
+        "Visualisation Writing-original draft Writing-review and editing\n"
+        "\n"
+        "Chi-Fung Chan X\n"
+        "X\n"
+        "Gilad Feldman\n"
+    )
+    out = _demote_credit_role_headings(text)
+    # Heading demoted to plain text.
+    assert "## Methodology" not in out
+    assert "Methodology" in out
+
+
+def test_demote_credit_methodology_keeps_real_methods_heading():
+    """Regression guard: a real `## Methodology` section (followed by
+    method prose, no nearby role-table line) MUST NOT be demoted, even
+    if the prose mentions one or two CRediT role-like words."""
+    from docpluck.render import _demote_credit_role_headings
+
+    text = (
+        "## Methodology\n"
+        "\n"
+        "We pre-registered our hypotheses on AsPredicted and conducted\n"
+        "the study online via Prolific. Our investigation used a 2x2\n"
+        "between-subjects design. The software we used was R 4.2.\n"
+        "Participants completed measures of empathy and forgiveness.\n"
+        "Power analysis indicated a target sample size of N=200.\n"
+    )
+    out = _demote_credit_role_headings(text)
+    assert "## Methodology" in out  # real heading preserved
+
+
+def test_max_distinct_roles_in_any_line_helper():
+    """Helper recognises a packed CRediT line and rejects prose, via a
+    coverage gate (≥70% of alphabetic words must lie inside role spans).
+    A packed list is virtually all role tokens; prose mixes role words
+    with verbs/prepositions/connectives and drops below the threshold."""
+    from docpluck.render import _max_distinct_roles_in_any_line
+
+    packed = (
+        "Project administration Resources Software Supervision Validation "
+        "Visualisation Writing-original draft"
+    )
+    assert _max_distinct_roles_in_any_line([packed], exclude="methodology") >= 6
+
+    prose = "Our investigation used the software available in our resources."
+    # 3 distinct role words but only ~33% of the words are inside role
+    # spans — coverage gate filters this line out so the helper returns 0.
+    assert _max_distinct_roles_in_any_line([prose], exclude="methodology") == 0
