@@ -51,7 +51,7 @@ _TEST_PDFS = os.path.normpath(
 #   cycle 11 (long-tail)   -> 2 -> ~0
 # Do NOT raise this number to make the test pass — a higher count is a
 # regression. Lower it (only) when a cycle genuinely fixes papers.
-_IDEMPOTENCY_RATCHET = 2
+_IDEMPOTENCY_RATCHET = 0
 
 
 def _norm_twice(raw):
@@ -394,6 +394,144 @@ def test_normalize_idempotent_jama_open_1():
     assert "Author affiliations and article information" not in n1, (
         "JAMA affiliations sentinel should be stripped by P0r"
     )
+
+
+def test_late_join_crosses_paragraph_for_ci_or_rr_hr():
+    """Cycle 15 (v2.4.67) — cross-paragraph variant of the (OR|CI|RR|HR) →
+    digit A1r join. demography-5 has
+
+        Mortality Hazard Ratio
+
+        95% CI
+
+        2.046***
+
+    A1 (the single-newline form) fails on pass 1 because S9 has not yet
+    stripped the intervening column-header noise; once it does, the cleaned
+    form `CI\\n\\n2.046***` is what pass 2 sees and A1 joins it — that is
+    the non-idempotence. The cycle-15 cross-paragraph variant catches the
+    cleaned form in pass 1 inside the LateJoin block.
+    """
+    body = "Mortality Hazard Ratio\n\n95% CI\n\n2.046***\n\n1.632-2.564"
+    n1, _ = normalize_text(body, NormalizationLevel.academic)
+    n2, _ = normalize_text(n1, NormalizationLevel.academic)
+    assert n1 == n2
+    assert "95% CI 2.046***" in n1, (
+        "Cross-paragraph CI→digit A1r join should fire on pass 1"
+    )
+
+
+def test_labeled_numeric_line_protects_figure_axis_value():
+    """Cycle 15 (v2.4.67) — figure-axis tick labels accompanied by a labeled
+    stat-variable comparison (`S<= 10000`) are now seen as a numeric block
+    by `_is_in_numeric_block`, so S9 Pattern A does NOT strip the trailing
+    `1000` tick value (nat-comms-2 regression).
+    """
+    lines = ["S<= 10000", "1000", ""]
+    assert _is_in_numeric_block(lines, 1), (
+        "1000 below `S<= 10000` should be detected as numeric-block context"
+    )
+
+
+def test_s9_preserves_caption_with_year_range():
+    """Cycle 15 (v2.4.67) — table source-attribution captions that repeat
+    once per table (socius-4 `Source: Authors' calculation, American Time
+    Use Survey (2003-2023).` ×13) used to qualify as a running header
+    under the min_gap≥20 rule. The cycle-15 caption guard skips lines
+    containing a parenthesized year/year-range — caption-style markers
+    are body content, not page-footer boilerplate.
+    """
+    caption = "Source: Authors' calculation, American Time Use Survey (2003-2023)."
+    # Build a synthetic doc with the caption repeated every 25 lines so
+    # min_gap qualifies. Without the guard, S9 would strip it.
+    block = (["filler"] * 24 + [caption]) * 6
+    text = "\n".join(block)
+    out, _ = normalize_text(text, NormalizationLevel.academic)
+    assert caption in out, (
+        "Year-range caption should NOT be stripped by S9 even when it "
+        "matches the running-header gap distribution"
+    )
+
+
+def test_final_nfc_pass_composes_orphan_combining_after_a5():
+    """Cycle 15 (v2.4.67) — A5 transliterates `σ` → `sigma`, but a
+    combining diacritic attached to the source Greek letter is left
+    floating, now attached to the trailing `a` of `sigma`. The final
+    NFC pass composes `a + U+0302` → `â`, making the output idempotent.
+    Before the fix, ieee-access-7's math block `4(σ̂ 2 + λ)` rendered as
+    `sigm` + `a` + U+0302 on pass 1 and `sigmâ` (precomposed) on pass 2.
+    """
+    body = "4(σ̂ 2 + λ)"
+    n1, _ = normalize_text(body, NormalizationLevel.academic)
+    n2, _ = normalize_text(n1, NormalizationLevel.academic)
+    assert n1 == n2, "Final NFC pass should make normalize idempotent"
+    # The precomposed â should be present (not decomposed `a + U+0302`).
+    assert "â" in n1
+    assert "â" not in n1
+
+
+@requires_pdftotext
+def test_normalize_idempotent_demography_5_real_pdf():
+    """Cycle 15 (v2.4.67) — demography-5 has Hazard-Ratio and Odds-Ratio
+    table cells with CI labels one paragraph above their numeric values.
+    The cross-paragraph CI→digit A1r join makes the rendered .md idempotent.
+    """
+    pdf = os.path.join(_TEST_PDFS, "chicago-ad", "demography-5.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip("demography-5 test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on demography-5"
+
+
+@requires_pdftotext
+def test_normalize_idempotent_socius_4_real_pdf():
+    """Cycle 15 (v2.4.67) — socius-4 has 13 table source-attribution
+    captions (`Source: Authors' calculation, ... (2003-2023).`). The
+    caption guard in S9 prevents S9 from stripping them.
+    """
+    pdf = os.path.join(_TEST_PDFS, "asa", "socius-4.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip("socius-4 test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on socius-4"
+    assert n1.count("American Time Use Survey") >= 10, (
+        "Table source captions should be preserved (cycle-15 guard)"
+    )
+
+
+@requires_pdftotext
+def test_normalize_idempotent_ieee_access_7_real_pdf():
+    """Cycle 15 (v2.4.67) — ieee-access-7 has σ̂ in math blocks; A5
+    transliterates σ → sigma and the combining circumflex orphans onto
+    the trailing `a`. The final NFC pass composes it idempotently.
+    """
+    pdf = os.path.join(_TEST_PDFS, "ieee", "ieee-access-7.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip("ieee-access-7 test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on ieee-access-7"
+
+
+@requires_pdftotext
+def test_normalize_idempotent_nat_comms_2_real_pdf():
+    """Cycle 15 (v2.4.67) — nat-comms-2 has figure-axis tick labels with a
+    labeled stat-variable line (`S<= 10000`) above the `1000` tick. The
+    extended `_is_in_numeric_block` now recognizes the labeled neighbor as
+    numeric-block context, protecting the `1000` from S9 Pattern A.
+    """
+    pdf = os.path.join(_TEST_PDFS, "nature", "nat-comms-2.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip("nat-comms-2 test PDF not available")
+    with open(pdf, "rb") as fh:
+        raw, _ = extract_pdf(fh.read())
+    n1, n2 = _norm_twice(raw)
+    assert n1 == n2, "normalize_text is not idempotent on nat-comms-2"
 
 
 @requires_pdftotext
