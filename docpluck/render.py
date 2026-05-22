@@ -671,6 +671,68 @@ _CREDIT_ROLES = frozenset({
 })
 
 
+# Word-boundary regex per role, allowing the inner spaces in multi-word roles
+# (e.g. "data curation") to match across hyphens / slashes too. Built once
+# at module load so the demote function stays cheap on every render.
+_ROLE_TOKEN_PATTERNS: list[tuple[str, "re.Pattern[str]"]] = [
+    (
+        role,
+        re.compile(
+            r"\b" + re.escape(role).replace(r"\ ", r"[\s\-/]+") + r"\b",
+            re.IGNORECASE,
+        ),
+    )
+    for role in _CREDIT_ROLES
+]
+
+
+_WORD_RE = re.compile(r"[A-Za-z]+")
+
+
+def _max_distinct_roles_in_any_line(window_lines: list[str], exclude: str) -> int:
+    """Largest count of distinct CRediT roles on a 'packed' line.
+
+    A packed CRediT-roles table line ("Project administration Resources
+    Software Supervision Validation Visualisation Writing-original draft …")
+    is the highest-signal indicator we are inside the contributor-roles
+    block. To avoid demoting a real Methodology section whose prose happens
+    to mention 3 role-like words ('our investigation used the software in
+    our resources'), the line is only counted when its words are MOSTLY
+    inside role tokens — ≥70 % of the line's alphabetic words must belong
+    to one of the matched role spans. Prose mixes role words with verbs,
+    prepositions, and connectives and falls well under that threshold."""
+    best = 0
+    for line in window_lines:
+        if not line.strip():
+            continue
+        words = _WORD_RE.findall(line)
+        if len(words) < 3:
+            continue
+        # Find role matches and the words they cover.
+        hits: set[str] = set()
+        covered_chars: list[tuple[int, int]] = []
+        for role, pat in _ROLE_TOKEN_PATTERNS:
+            if role == exclude:
+                continue
+            for m in pat.finditer(line):
+                hits.add(role)
+                covered_chars.append(m.span())
+        if len(hits) < 3:
+            continue
+        # Count words whose span overlaps any role-covered span.
+        words_in_roles = 0
+        for wm in _WORD_RE.finditer(line):
+            ws, we = wm.span()
+            for cs, ce in covered_chars:
+                if ws < ce and we > cs:
+                    words_in_roles += 1
+                    break
+        coverage = words_in_roles / max(1, len(words))
+        if coverage >= 0.70 and len(hits) > best:
+            best = len(hits)
+    return best
+
+
 def _normalize_credit_role(line: str) -> str:
     """Normalize a line for CRediT-role matching."""
     s = line.strip().lstrip("#").strip()
@@ -698,9 +760,11 @@ def _demote_credit_role_headings(text: str) -> str:
     for i, line in enumerate(lines):
         m = re.match(r"^#{2,4}\s+(.+?)\s*$", line)
         if m and _normalize_credit_role(m.group(1)) in _CREDIT_ROLES:
-            # Count OTHER CRediT role tokens in a ±10-line window.
+            heading_role = _normalize_credit_role(m.group(1))
             lo = max(0, i - 10)
             hi = min(len(lines), i + 11)
+            # Signal A — whole-line role neighbours (original v2.4.53 logic):
+            # the role list with each role on its own line.
             nearby = 0
             for k in range(lo, hi):
                 if k == i:
@@ -708,7 +772,14 @@ def _demote_credit_role_headings(text: str) -> str:
                 s = lines[k].strip()
                 if s and _normalize_credit_role(s) in _CREDIT_ROLES:
                     nearby += 1
-            if nearby >= 3:
+            # Signal B (B2 fix 2026-05-22) — at least one line in the window
+            # packs ≥3 distinct OTHER CRediT role substrings. This catches
+            # the chan_feldman-style table where roles are
+            # space-concatenated onto a single line. Prose virtually never
+            # hits this density on one line.
+            window_lines = [lines[k] for k in range(lo, hi) if k != i]
+            packed_max = _max_distinct_roles_in_any_line(window_lines, heading_role)
+            if nearby >= 3 or packed_max >= 3:
                 # Demote: drop the heading markup, keep the role word as
                 # a plain line (it is real content of the role block).
                 out.append(m.group(1).strip())
