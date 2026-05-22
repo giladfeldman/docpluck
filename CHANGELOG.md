@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.4.69] — 2026-05-22
+
+**Docs-only patch — domain cutover to `docpluck.app`.** `[project.urls]` Homepage now `https://docpluck.app`, Documentation now `https://docpluck.app/api-docs` (was GitHub tree URLs). Project-skill SKILL.md files updated to reference the canonical `docpluck.app` host. No code changes; `NORMALIZATION_VERSION` unchanged at 1.9.21. Push to PyPI to refresh package-page links — the GitHub repo is unchanged. See `PDFextractor/docs/superpowers/handoffs/2026-05-22-domain-cutover-docpluck-app-COMPLETED.md` for the cross-repo sweep.
+
 ## [2.4.68] — 2026-05-22
 
 **Cycle 15 (run 9) — long-tail non-idempotent papers cleared (4 → 0; 180/180 idempotent corpus-wide) + pre-existing two-column-bibliography regression fixed.** `NORMALIZATION_VERSION` 1.9.20 → 1.9.21. Five structural fixes:
