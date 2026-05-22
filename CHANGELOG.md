@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.4.64] — 2026-05-22
+
+**Cycle 12 (run 9) — three independent normalize_text idempotence fixes.** A 180-doc scan post-cycle-11 found 17 papers still non-idempotent. This cycle packages three independent fixes that together clear 6 of them:
+
+### 1. Final blank-line collapse (5 papers — chan-etal, horsham, lee-feldman, li-feldman-mental-acct, kassambara)
+
+Raw pdftotext output contains form-feed `\x0c` characters at page boundaries. S9's `re.sub(r"\n{3,}", "\n\n", t)` collapses consecutive blank lines, but the form-feed survives upstream stripping into the references region, where R3 (continuation join) processes line-by-line — `"\x0c".strip() == ""` so the form-feed line becomes an empty entry, surrounded by other empty entries. R3 outputs `"\n".join(["...", "", "", "...", ""])` = `\n\n\n\n` (4 newlines). S9's collapse already ran upstream; nothing else collapses. Pass 2 sees the `\n{4}` run and S9 collapses it — non-idempotence.
+
+Fix: add a final `re.sub(r"\n{3,}", "\n\n", t)` right before the H0r/P0r blocks. Any late strip step that empties a line is now safely followed by the collapse, regardless of which step produced the gap.
+
+### 2. Cross-paragraph stat-continuation join (2 papers — korbmacher×2)
+
+A1 (the early stat-line-repair step using `\s*`) crosses paragraph breaks but runs BEFORE S9 strips header/footer noise. A row like
+
+  `r(1798) = -0.27,\n\n472\n\nJournal of Decision Making, Vol. 17...\n\n95% CI [-0.31, ...]`
+
+has so much intervening junk that A1's lookahead fails on pass 1. S9 then strips `472` (page num) and the journal-masthead/page-header (repeated ≥5 times), leaving `-0.27,\n\n95% CI`. A1 is over; LateJoin's A1r uses strict `[ \t]*\n[ \t]*` (single-newline only) and so doesn't fire. Pass 2's A1 sees the now-clean `,\n\n95% CI` and joins — non-idempotence.
+
+Fix: add two paragraph-crossing variants to the LateJoin A1r block, restricted to high-confidence prefixes — `\d+% CI` and `p [<=>]`. No real paragraph STARTS with `95% CI` or `p < .001`, so joining across `\n\n` is safe. The `test_column_bleed_too_many_fragments_ignored` contract is unaffected — its input has no leading `,`/`;`.
+
+### 3. LABELED vs BARE CI bracket discriminator (refines cycle 11)
+
+Cycle 11's proximity gate broke 2 pre-existing tests:
+  - `test_ci_pairing_recovers_body_line`: `Mposterior = 20.54, SD=0.04, CI = [-0.61, -0.47]` — `, SD=` falsely tripped the "new stat label" sentence-break check, blocking the legitimate recovery of `20.54` → `-0.54`.
+  - `test_efendic_table_point_estimates_recovered_via_ci`: efendic's body-line CI recoveries no longer fired.
+
+Fix: discriminate LABELED brackets (`CI = [...]` / `95% CI [...]` / `CI: [...]`) from BARE brackets (`[lo, hi]` alone). LABELED brackets can pair with any candidate token in the row (the chain `M = X, SD = Y, CI = [...]` is all describing the same estimate). BARE brackets retain the strict 30-char + period/semicolon-break proximity gate (catches the majumder false-positive — bare bracket ~50 chars after `2.01`, attached to a different stat). The `_CI_LABEL_PREFIX_RE` looks back ≤8 chars from the `[` for `CI` / `\d+% CI` (with optional `=`/`:`).
+
+**Impact:** corpus-wide non-idempotency 17 → 11 (cycle 12 cleared 6: 5 bibliography-shift + 2 korbmacher; 3 new bibliography cases of the same shape are now caught by the final collapse). Broad pytest 1356 pass + 1 known pre-existing B6 fail. Harness Tier-D academic: 0 regressions, 0 new fails (1 still failing — plos-med-1 / B1).
+
+NORMALIZATION_VERSION 1.9.18. New tests: `test_normalize_collapses_late_blank_line_runs` + `test_late_join_crosses_paragraph_for_stat_continuation`. Cycle 11's tests (`*_proximity_gate_*`) still pass under the LABELED/BARE refinement.
+
 ## [2.4.63] — 2026-05-21
 
 **Cycle 11 (run 9) — `recover_minus_via_ci_pairing` proximity gate.** A 180-doc scan post-cycle-10 found 19 papers still non-idempotent. Among them, 8 (majumder, korbmacher×2, van-boven, chan-feldman-baron, ziano, xiao-poc, amp-1, annals-2) shared a structural defect that ALSO ships in single-pass production: the `_recover_minus_in_record` helper paired every candidate `2X.XX` token with EVERY CI bracket in the same record. A record like `M = 5.37, SD = 2.01), t(1827) = 1.83, p tukey = .067, d = 0.09 [-1.86, 0.04]` contains:
