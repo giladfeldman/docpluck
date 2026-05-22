@@ -397,3 +397,48 @@ The pattern does NOT apply to:
 **How to detect:** after every "STRIP" cycle that adds a new anchored `^...$` pattern, run `normalize_text(normalize_text(raw))` on a corpus sample and look for any line stripped by pass 2 but not pass 1. If found, candidates for late re-apply. Conversely, look for lines KEPT by pass 1 but stripped by pass 2 where the stripped value is legitimate content (e.g. `7182` sample-size in chandrashekar 2020) — those are FALSE POSITIVES, NOT late-re-apply candidates; they require step-tightening, not propagation. **Discriminator question:** "would I be happy if production's single-pass output ALSO stripped this line?" If yes → late re-apply. If no → tighten the step that strips on pass 2.
 
 **Anti-pattern caught:** the cycle-8 handoff lumped JAMA-affil-sentinel and chandrashekar-7182 into one "STRIP bucket" with one prescription ("apply H0r pattern"). HEAD reproduction showed they are OPPOSITE-direction defects — JAMA wants pass-2-strip in pass-1 (legitimate sentinel), chandrashekar wants pass-2 to STOP stripping (table N values). Splitting them into cycle 9 + 9b instead of one combined cycle avoided shipping a text-loss bug. Always reproduce at HEAD and confirm directionality before coding.
+
+## Non-idempotent normalize_text — bisect via NormalizationReport._track + classify into JOIN / STRIP / CHARSUB (cycle 15, 2026-05-22)
+
+**What:** Run 9 closed at 0/180 non-idempotent after 9 shipped cycles (85 → 0). Cycle 15 cleared the final 4 long-tail papers + 1 latent pre-existing 2-column-bibliography regression in one bundled commit (5 distinct mechanisms, each independently revertible).
+
+**Why:** Non-idempotence is the *canary* for the entire normalization pipeline. A `normalize(raw) != normalize(normalize(raw))` divergence almost always indicates one of three structural defects, each of which corrupts output silently in single-pass production:
+
+| Bucket | Mechanism | Cycle-15 example |
+|---|---|---|
+| **JOIN** | A line-join regex fires only after an earlier strip removes intervening noise | `(OR\|CI\|RR\|HR)\n\n\d` joined only on pass 2 because S9 hadn't stripped the column header between `CI` and `2.046***` yet on pass 1 |
+| **STRIP** | A repeat/cluster-gated strip fires only when an earlier pass's residue puts content into the gated shape | S9 figure-axis tick label `1000` survived pass 1 because `_is_in_numeric_block` rejected the labeled `S<= 10000` neighbor; pass 2 had same shape → same strip — but the *real* defect was that the neighbor SHOULD have qualified |
+| **CHARSUB** | A char-substitution leaves an orphaned combining mark on an ASCII tail that NFC composes on pass 2 | A5 `σ→sigma` orphaned U+0302 on `a`; pass-1 left decomposed, pass-2 NFC composed to `â` |
+
+**Investigation recipe (proven across cycles 7-15):**
+
+```python
+from docpluck.normalize import normalize_text, NormalizationLevel, NormalizationReport
+n1, _ = normalize_text(raw, NormalizationLevel.academic)
+orig = NormalizationReport._track
+events = []
+def cap(self, name, before, after, key=None):
+    if SIGNATURE in before and SIGNATURE not in after:
+        events.append((name, 'REMOVED'))
+    if SIGNATURE not in before and SIGNATURE in after:
+        events.append((name, 'ADDED'))
+    return orig(self, name, before, after, key)
+NormalizationReport._track = cap
+n2, _ = normalize_text(n1, NormalizationLevel.academic)
+NormalizationReport._track = orig
+print(events)
+```
+
+Run it once with the strip signature (e.g. the disappearing line) and once with the inverse signature (e.g. the appearing joined-line). The (step, REMOVED/ADDED) tuple identifies the responsible step. Cost: ~30s per paper. Saved ~2-3 hours across cycle 15.
+
+**The classification then dictates the fix shape:**
+
+- **JOIN-bucket pass-2-only** → add a LateJoin cross-paragraph variant (`\s*\n\s*\n\s*` form) AFTER the strip pass, with a STAT-VALUE-shaped lookahead to avoid colliding with prose-leading-digit forms (bibliography `\d+\.\s+[A-Z]`, ordered lists, etc.).
+- **STRIP-bucket false-strip of legitimate content** → tighten the gate (numeric-block widening, year-range exclusion, caption-shape detection).
+- **STRIP-bucket true boilerplate that survived early pass** → add a late re-strip (cycles 7 H0r, 9 P0r, 13 P1r).
+- **CHARSUB-bucket pass-2-only** → tighten the substitution OR add a final fixed-point pass (NFC, recover-minus). NFC is idempotent by construction, so a final NFC pass at end of pipeline is the safest fix when the drift is a combining-mark orphan.
+
+**Real-PDF regression test is MANDATORY** — synthetic-text contract tests catch the helper but not the surrounding-context shape that actually triggers the bug in production. Every cycle-15 fix has a `*_real_pdf` regression test in `tests/test_normalize_idempotent_real_pdf.py`.
+
+**Bundling N distinct mechanisms in one cycle is OK when each is independently revertible** — the discipline rule "one class of defect per cycle" exists to prevent un-revertible co-fixes. When each fix is a contiguous block touching a different code path with its own test, bundling halves the release/deploy cost vs. N separate cycles. Cycle 14 packaged 3 fixes; cycle 15 packaged 5. Both shipped clean.
+
