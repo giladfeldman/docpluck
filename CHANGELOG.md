@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.4.65] — 2026-05-22
+
+**Cycle 13 (run 9) — three further normalize_text idempotence fixes.** Post-cycle-12: 11 papers non-idempotent. Cycle 13 packages three independent fixes that together clear 4.
+
+### 1. P1r late re-strip — front-matter metadata leak (4 papers: li-feldman-fox, amp-1, annals-2, xiao-poc-epley)
+
+`_strip_frontmatter_metadata_leaks` matches acknowledgment lines by anchored prefix + keyword guard (`reviewers|editor|feedback|comments|suggestions|insights|helpful`) within 300 chars. pdftotext often line-wraps the acknowledgment BEFORE the guard keyword fires: `We thank the target article's authors - Prof. Craig Fox and Prof. Rebecca Ratner, for being very` (96 chars; no keyword yet). S7/S8 join the continuation; the joined line now contains `helpful in providing us with materials...` — but P1 has already run by then. Pass 2's P1 catches the joined form — non-idempotence + a real missed production strip.
+
+Fix: P1r block at end of `normalize_text`, after H0r and before P0r. Same shape as cycle 7's H0r and cycle 9's P0r — fixed-point re-application of an idempotent line-strip on stabilized line positions.
+
+### 2. Cross-paragraph `=`/`<`/`>` → digit join — same shape as cycle 12 (1 paper: li-feldman-fox additional defect)
+
+A1's `re.sub(r"([=<>])\s*\n\s*([-\d.])", r"\1 \2", t)` uses `\s*` (crosses paragraphs) but runs BEFORE S9 strips header/footer junk. `p =\n\n\x0cFox et al. (2005)...\n\n38\n\n.25, OR = .96, 95%CI [.90, 1.03]` fails on pass 1 (the header text isn't `\s`); S9 strips, leaves `p =\n\n.25`; A1 is over.
+
+Fix: add `re.sub(r"([=<>])\s*\n\s*\n\s*(?=[-.]?\d)", r"\1 ", t)` to the LateJoin block. The lookahead `(?=[-.]?\d)` is the load-bearing constraint — real paragraphs rarely START with a leading dot or `-digit`. Same shape as cycle 12's cross-paragraph `,/;` → `CI/p` joins.
+
+### 3. LABELED CI bracket — intervening-stat-label gate (refines cycle 12; 1 paper: majumder)
+
+Cycle 12's LABELED-bracket discriminator was too permissive. `M = 5.37, SD = 2.01), t(1827) = 1.83, p tukey = .067, d = 0.09, 95% CI [-0.006, 0.18]` has a LABELED `95% CI [...]` that incorrectly paired with `SD = 2.01` (across `t(`, `p tukey =`, `d =` — three INDEPENDENT-statistic labels). The CI is for `d = 0.09`, not for the SD.
+
+Fix: even a LABELED bracket cannot reach back across an independent-stat label. `_INDEPENDENT_STAT_BETWEEN_RE` rejects pairings whose intervening text contains a NEW estimate label (`t`, `F`, `d`, `g`, `OR`, `RR`, `β`, `R²`, `Z`, …) — only variance-family labels (`SD`, `SE`, `M`, `CI`, `%`) are allowed between the candidate token and the labeled CI. efendic's `Mposterior = 20.54, SD=0.04, CI = [-0.61, -0.47]` (only `SD` between) still pairs correctly.
+
+**Impact:** corpus-wide non-idempotency 11 → 7. Broad pytest 1356 pass + 1 known pre-existing B6 fail. Harness Tier-D academic: 0 regressions, 0 new fails (1 still failing — plos-med-1 / B1).
+
+NORMALIZATION_VERSION 1.9.19. Cycle 11/12 contract tests still pass under the refined LABELED-bracket gate.
+
 ## [2.4.64] — 2026-05-22
 
 **Cycle 12 (run 9) — three independent normalize_text idempotence fixes.** A 180-doc scan post-cycle-11 found 17 papers still non-idempotent. This cycle packages three independent fixes that together clear 6 of them:
