@@ -578,11 +578,37 @@ class TestP0_RunningHeaderFooterPatterns_v246:
 
 class TestS9_HeaderFooter:
     def test_repeated_line_stripped(self):
+        # Realistic structure: header appears once per page across a multi-
+        # page article (each "page" has ~30 body lines between headers).
+        # Cycle 14 (v2.4.66) requires the repeated-line range to span
+        # ≥75% of the doc — distinguishes running headers (which DO span
+        # the whole doc) from table row labels (which cluster in a small
+        # region — see ``test_clustered_table_label_preserved`` below).
         header = "Journal of Example Studies Vol. 1"
-        text = "\n".join([header] * 6 + ["Actual content here"])
+        page_body = "\n".join(f"Body line {i}." for i in range(30))
+        text = "\n\n".join([f"{header}\n{page_body}"] * 6 + ["End matter line."])
         result = norm(text, "standard")
-        assert header not in result
-        assert "Actual content" in result
+        assert header not in result, "running header should be stripped"
+        assert "Body line 5." in result, "body content should be preserved"
+
+    def test_clustered_table_label_preserved(self):
+        """Cycle 14 (v2.4.66): a label that recurs ≥5 times but only within
+        a small region (a regression table's row labels across columns) is
+        NOT a running header and must be preserved. socius-3, majumder,
+        collabra-rnr, social-forces-1 all had table labels false-stripped
+        under the old rule."""
+        # 50 lines of body prose, then 5 occurrences of a table label
+        # clustered in lines 50-60, then more body prose. Range
+        # coverage is ≤15% — well under the 75% threshold.
+        body_before = "\n".join(f"Intro line {i}." for i in range(50))
+        label = "Intend vs. Later"
+        table_block = "\n".join([f"{label}\n0.{i}5*" for i in range(5)])
+        body_after = "\n".join(f"Discussion line {i}." for i in range(200))
+        text = "\n".join([body_before, table_block, body_after])
+        result = norm(text, "standard")
+        assert label in result, (
+            "clustered table label was stripped — cycle 14 gate broken"
+        )
 
     def test_page_numbers_stripped(self):
         text = "content\n42\nmore content\n43\nstill more"
@@ -695,17 +721,27 @@ class TestS9_HeaderFooter:
         result = norm(text, "standard")
         assert "2024" in result
 
-    def test_4digit_below_1000_preserved(self):
-        """Values below 1000 are page-number range only via the 1-3-digit
-        pattern; 4-digit values <1000 don't exist (would be 3-digit)."""
-        # Mostly a sanity check; values like 0999 wouldn't naturally occur.
+    def test_4digit_year_range_preserved(self):
+        """Citation years (1900-2100) are excluded from S9 Pattern A — a
+        4-digit value repeating ≥3 times in that range is overwhelmingly a
+        citation year (`House, R. J. 1971` cited across multiple table rows
+        or in the references list), not a page number.
+
+        Cycle 14 (v2.4.66) added this exclusion after amle-1 had `1971`
+        stripped as a "page number" under the old rule. The earlier test
+        documented the old behavior — incorrect. See CHANGELOG."""
         text = "abc\n2020\ndef\n2020\nxyz\n2020\nfinal\n"
         result = norm(text, "standard")
-        # 2020 recurs 3+ but is a year; the heuristic ALSO strips this
-        # case (1000-9999 range), which is acceptable since
-        # standalone-line years are a rare verbatim pattern in academic
-        # prose. Document the behavior here.
-        assert "2020" not in result
+        # Years are now PRESERVED — they're almost never page numbers.
+        assert "2020" in result, "citation year was stripped — cycle 14 gate broken"
+
+    def test_4digit_pagenum_outside_year_range_still_stripped(self):
+        """A 4-digit value OUTSIDE the citation-year range (1900-2100) is
+        still treated as a page number when it repeats ≥3 times. Continuous-
+        pagination journals like PSPB run page numbers into the 5000s+."""
+        text = "abc\n5432\ndef\n5432\nxyz\n5432\nfinal\n"
+        result = norm(text, "standard")
+        assert "5432" not in result, "continuous-pagination page number not stripped"
 
     def test_short_lines_preserved(self):
         """Lines < 15 chars should NOT be treated as headers."""
