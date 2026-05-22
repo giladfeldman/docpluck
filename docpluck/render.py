@@ -70,6 +70,34 @@ _PRETTY_LABELS: dict[str, str] = {
 }
 
 
+def _table_completeness_marker(cells, raw_text: str) -> str:
+    # Approach-C instrumentation (B1, 2026-05-22): emit a machine-greppable
+    # HTML comment when the structured table is degenerate, so the harness +
+    # broad-pytest can count silent-failure shapes corpus-wide before any
+    # repair pass lands. STRUCTURAL signals only (cell counts) — no per-PDF
+    # heuristics, no caption text mining (caption "N=K" is sample size, not
+    # row count). The three diagnostic shapes:
+    #   - empty-shell:      cells=0 AND no raw_text fallback (B1 canonical:
+    #                       plos-med-1 Table 5)
+    #   - unstructured:     cells=0 but raw_text fallback present (Camelot
+    #                       returned nothing; linearized fenced block used)
+    #   - single-row:       cells=1 (almost always headers-only, body lost)
+    if cells:
+        try:
+            n_rows = max(c["r"] for c in cells) + 1
+        except (KeyError, TypeError, ValueError):
+            n_rows = 0
+    else:
+        n_rows = 0
+    if n_rows == 0 and not (raw_text or "").strip():
+        return "<!-- table-empty-shell: 0 rows recovered, no raw_text fallback -->\n"
+    if n_rows == 0:
+        return "<!-- table-unstructured: 0 structured rows, raw_text fallback only -->\n"
+    if n_rows == 1:
+        return "<!-- table-single-row: 1 row recovered (likely headers-only, body lost) -->\n"
+    return ""
+
+
 def _pretty_label(label: str) -> str:
     """Return a presentable heading for a canonical section label."""
     s = (label or "").strip()
@@ -2142,8 +2170,11 @@ def _render_sections_to_markdown(
                 cells = item.get("cells") or []
                 html = item.get("html") or (cells_to_html(cells) if cells else "")
                 raw_t = (item.get("raw_text") or "").strip()
+                completeness_marker = _table_completeness_marker(cells, raw_t)
                 if html:
                     body_chunks.append(f"\n### {label}\n")
+                    if completeness_marker:
+                        body_chunks.append(completeness_marker)
                     if cap:
                         body_chunks.append(f"*{cap}*\n")
                     body_chunks.append(html)
@@ -2157,6 +2188,8 @@ def _render_sections_to_markdown(
                     # tab's behaviour in the SaaS UI (it shows raw_text
                     # under an amber notice when no html is present).
                     body_chunks.append(f"\n### {label}\n")
+                    if completeness_marker:
+                        body_chunks.append(completeness_marker)
                     if cap:
                         body_chunks.append(f"*{cap}*\n")
                     body_chunks.append(
@@ -2183,6 +2216,8 @@ def _render_sections_to_markdown(
                     # heading so `_suppress_orphan_table_cell_text` still
                     # recognizes it and drops any linearized orphan cell-rows.
                     body_chunks.append(f"\n### {label}\n")
+                    if completeness_marker:
+                        body_chunks.append(completeness_marker)
                     body_chunks.append(f"*{cap}*\n")
             else:
                 body_chunks.append(f"\n### {label}\n")
@@ -2219,7 +2254,10 @@ def _render_sections_to_markdown(
                 cells = t.get("cells") or []
                 html = t.get("html") or (cells_to_html(cells) if cells else "")
                 raw_t = (t.get("raw_text") or "").strip()
+                completeness_marker = _table_completeness_marker(cells, raw_t)
                 out_chunks.append(f"### {label}\n")
+                if completeness_marker:
+                    out_chunks.append(completeness_marker)
                 if cap:
                     out_chunks.append(f"*{cap}*\n")
                 if html:

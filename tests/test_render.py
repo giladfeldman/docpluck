@@ -1090,3 +1090,130 @@ def test_chan_feldman_no_credit_role_methodology_heading():
         "CRediT role 'Methodology' rendered as a section heading"
     )
     assert re.search(r"^## Method\s*$", md, re.M), "real Method section lost"
+
+
+# ── B1 Approach C: table-completeness parity instrumentation (2026-05-22) ──
+
+
+def test_table_completeness_marker_helper_empty_shell():
+    """Helper returns the empty-shell marker when cells=0 and no raw_text."""
+    from docpluck.render import _table_completeness_marker
+    assert "table-empty-shell" in _table_completeness_marker([], "")
+    assert "table-empty-shell" in _table_completeness_marker(None, None)
+
+
+def test_table_completeness_marker_helper_unstructured():
+    """Helper returns the unstructured marker when cells=0 but raw_text present."""
+    from docpluck.render import _table_completeness_marker
+    out = _table_completeness_marker([], "Age\n42\nGender\nF")
+    assert "table-unstructured" in out
+    assert "table-empty-shell" not in out
+
+
+def test_table_completeness_marker_helper_single_row():
+    """Helper flags single-row tables as likely headers-only."""
+    from docpluck.render import _table_completeness_marker
+    cells = [
+        {"r": 0, "c": 0, "rowspan": 1, "colspan": 1, "text": "Header1"},
+        {"r": 0, "c": 1, "rowspan": 1, "colspan": 1, "text": "Header2"},
+    ]
+    out = _table_completeness_marker(cells, "")
+    assert "table-single-row" in out
+
+
+def test_table_completeness_marker_helper_healthy_returns_empty():
+    """Helper returns no marker for healthy multi-row tables."""
+    from docpluck.render import _table_completeness_marker
+    cells = [
+        {"r": r, "c": c, "rowspan": 1, "colspan": 1, "text": f"{r},{c}"}
+        for r in range(3) for c in range(2)
+    ]
+    assert _table_completeness_marker(cells, "") == ""
+
+
+def test_render_inline_empty_shell_emits_marker():
+    """B1 plos-med-1 Table 5 shape: caption-only structured block with
+    no cells and no raw_text — must emit the empty-shell marker inline."""
+    from docpluck.render import _render_sections_to_markdown
+
+    caption = "Table 5. Serious adverse events."
+    sectioned = _make_section_with_caption_text(caption)
+    tables = [{
+        "label": "Table 5",
+        "caption": caption,
+        "cells": [],
+        "html": "",
+        "raw_text": "",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "### Table 5" in md
+    assert "<!-- table-empty-shell:" in md
+
+
+def test_render_inline_unstructured_emits_marker():
+    """Camelot returned no cells but raw_text fallback exists — emit
+    the unstructured marker AND keep the existing unstructured fenced block."""
+    from docpluck.render import _render_sections_to_markdown
+
+    caption = "Table 1. Hypotheses."
+    sectioned = _make_section_with_caption_text(caption)
+    tables = [{
+        "label": "Table 1",
+        "caption": caption,
+        "cells": [],
+        "html": "",
+        "raw_text": "Hypothesis\nDescription\n1\nEmpathy mediates ...",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "<!-- table-unstructured:" in md
+    assert "```unstructured-table" in md
+
+
+def test_render_inline_healthy_table_no_marker():
+    """Healthy multi-row tables must NOT carry a completeness marker — the
+    instrumentation is invisible in the happy case."""
+    from docpluck.render import _render_sections_to_markdown
+    from docpluck.tables.render import cells_to_html
+
+    caption = "Table 2. Demographics."
+    sectioned = _make_section_with_caption_text(caption)
+    rows = [("Var", "Mean"), ("Age", "42"), ("Edu", "16"), ("IQ", "112")]
+    cells = [
+        {"r": r, "c": c, "rowspan": 1, "colspan": 1, "text": v}
+        for r, row in enumerate(rows) for c, v in enumerate(row)
+    ]
+    tables = [{
+        "label": "Table 2",
+        "caption": caption,
+        "cells": cells,
+        "html": cells_to_html(cells),
+        "raw_text": "",
+        "page": 1,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    assert "<!-- table-empty-shell" not in md
+    assert "<!-- table-unstructured" not in md
+    assert "<!-- table-single-row" not in md
+
+
+def test_render_appendix_empty_shell_emits_marker():
+    """Appendix path mirrors inline: caption-only unlocated table emits
+    the empty-shell marker too, so the harness can scan one consistent token."""
+    from docpluck.render import _render_sections_to_markdown
+
+    sectioned = _make_section_with_caption_text("body sentence only.")
+    tables = [{
+        "label": "Table 1",
+        "caption": "Table 1. Demographics.",
+        "cells": [],
+        "html": "",
+        "raw_text": "",
+        "page": 99,
+    }]
+    md = _render_sections_to_markdown(sectioned, tables=tables, figures=[])
+    # Only flagged when there's enough to render; here there's caption only.
+    # The current renderer keeps the appendix entry when caption is present.
+    assert "## Tables (unlocated in body)" in md
+    assert "<!-- table-empty-shell:" in md
