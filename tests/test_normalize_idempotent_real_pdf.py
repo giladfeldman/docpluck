@@ -234,6 +234,45 @@ def test_s9_4digit_pattern_a_still_strips_isolated_page_numbers():
     )
 
 
+def test_normalize_collapses_late_blank_line_runs():
+    """Cycle 12: a late strip step that empties a line (e.g. R3 stripping a
+    form-feed `\\x0c` between two blank lines) leaves a `\\n{3+}` run that
+    S9's earlier collapse no longer reaches. The final collapse at the end
+    of normalize_text catches it."""
+    # Simulate: paragraph + form-feed + paragraph (pdftotext page-break case)
+    text = "First paragraph ending here.\n\n\x0c\n\nSecond paragraph begins."
+    out, _ = normalize_text(text, NormalizationLevel.academic)
+    # Should produce one paragraph break, not two
+    assert "\n\n\n" not in out, f"normalize_text left a \\n{{3+}} run: {out!r}"
+    assert "First paragraph" in out
+    assert "Second paragraph" in out
+
+
+def test_late_join_crosses_paragraph_for_stat_continuation():
+    """Cycle 12: a comma/semicolon followed by a paragraph break and a
+    high-confidence stat-continuation token (95% CI / p [<=>]) is a
+    serializer artifact — joined on pass 1. Pre-cycle-12, only pass 2
+    joined it (after S9 stripped the intervening header/footer noise).
+
+    Defends against the corpus-wide korbmacher pattern where a regression-
+    coefficient row was broken by a per-page header insertion."""
+    # The full korbmacher pre-S9 pattern is a couple of headers between;
+    # post-S9 the input to LateJoin is just `,\n\n95% CI`.
+    text = "r(1798) = -0.27,\n\n95% CI [-0.31, -0.22]"
+    out, _ = normalize_text(text, NormalizationLevel.academic)
+    assert "-0.27, 95% CI" in out, f"cross-paragraph stat join failed: {out!r}"
+
+    # Same for p-value continuation
+    text2 = "t(23) = 2.34,\n\np < .001, d = 0.45"
+    out2, _ = normalize_text(text2, NormalizationLevel.academic)
+    assert "2.34, p < .001" in out2 or "p < .001" in out2.replace("\n\n", " ")
+
+    # The column-bleed contract is NOT broken — its input has no leading `,;`.
+    cb = "p\n01\n02\n03\n04\n05\n= .05"
+    out_cb, _ = normalize_text(cb, NormalizationLevel.academic)
+    assert "p = .05" not in out_cb, "column-bleed test contract broken by cycle 12"
+
+
 def test_recover_minus_proximity_gate_rejects_distant_unrelated_brackets():
     """Cycle 11: a stat-table row that mixes an unrelated SD value with a
     separately-reported CI bracket must NOT have the SD recovered as a

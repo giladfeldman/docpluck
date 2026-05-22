@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.17"
+NORMALIZATION_VERSION = "1.9.18"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1474,35 +1474,45 @@ _CORRUPT_NEG_TOKEN_RE = re.compile(r"(?<![\d.\-])2(\d?\.\d+)\b")
 _TABLE_ROW_RE = re.compile(r"<tr\b.*?</tr>", re.DOTALL | re.IGNORECASE)
 
 
-# Cycle 11 (v2.4.63) — proximity gate for the CI-pairing recovery.
+# Cycle 11 (v2.4.63) / 12 (v2.4.64) — proximity gate for the CI-pairing recovery.
 #
-# In stat reporting the point estimate is IMMEDIATELY followed by its CI:
-# `B = -2.68 [-4.65, -0.68]`. The previous "pair with any bracket in the
-# record" rule false-positives when a record contains an unrelated SD value
-# and a separately-reported CI:
-#   `M = 5.37, SD = 2.01, t(1827) = 1.83, d = 0.09 [-1.86, 0.04]`
-#                  ^^^^                            ^^^^^^^^^^^^^^
-# The `2.01` is a valid SD; the `[-1.86, 0.04]` is the CI for `d = 0.09`.
-# `-0.01` happens to fall inside `[-1.86, 0.04]`, so the old logic
-# recovered `2.01` → `-.01`, corrupting the SD. 8 papers in the corpus
-# (majumder, korbmacher, van-boven, ...) had this defect.
+# In stat reporting a BARE bracket `[lo, hi]` attaches to the IMMEDIATELY-
+# preceding point estimate; a LABELED bracket `CI = [lo, hi]` or
+# `95% CI [lo, hi]` can attach to ANY earlier point estimate on the same
+# row (the SD/SE/df-pair tokens in between are descriptive of the same
+# estimate). The cycle 11 proximity gate treated both as needing strict
+# adjacency, which broke efendic's body-line recovery
+#   `Mposterior = 20.54, SD=0.04, CI = [-0.61, -0.47]`
+# where `, SD=` falsely tripped the "new stat label" sentence-break check.
 #
-# Fix: require the CI bracket to follow the candidate token closely. The
-# bracket's start must be within _CI_PAIR_MAX_GAP chars of the token's
-# end, AND the intervening text must not contain a sentence break (period
-# followed by space, or semicolon, or a comma followed by a new statistic
-# label like ` SD =`/` t(`/` p =`/` d =`).
+# Cycle 12 fix: discriminate LABELED vs BARE brackets.
+#   - LABELED bracket (`CI =`/`95% CI`/`CI:` immediately precedes `[`):
+#     pairs with any candidate token in its record (the old wide rule).
+#   - BARE bracket: pairs ONLY with candidates within 30 chars + no
+#     sentence break (period/semicolon + space — NOT comma + new label,
+#     because stat-row labels are comma-separated by convention).
+#
+# This keeps the majumder fix (bare bracket far from `2.01`) AND
+# preserves efendic-style labeled CIs that pair across SD/SE annotations.
 _CI_PAIR_MAX_GAP = 30
-_SENTENCE_BREAK_RE = re.compile(
-    r"[.;]\s|,\s+(?:SD|SE|t|F|p|d|g|η|χ|r|R²|β|B|γ|R|N|M|Q|Z)\s*[=(]",
-    re.IGNORECASE,
-)
+# Bare-bracket sentence break: only period/semicolon + space.  A comma is
+# NOT a break because stat rows are comma-separated.  The majumder false-
+# positive is now caught by the per-bracket proximity check (the bare
+# bracket sits ~50 chars after `2.01` — beyond _CI_PAIR_MAX_GAP).
+_SENTENCE_BREAK_RE = re.compile(r"[.;]\s")
+# A bracket is "labeled" when prefixed by `CI`, `95 % CI`, or similar
+# directly before the opening `[`. Allow optional whitespace and an `=` /
+# `:` between the label and the bracket.
+_CI_LABEL_PREFIX_RE = re.compile(r"(?:\bCI|\b\d+\s*%\s*CI)\s*[=:]?\s*$", re.IGNORECASE)
 
 
 def _recover_minus_in_record(record: str) -> str:
     """Recover '2X.XX' tokens in a single record (a table row or a text line)
     by pairing each with a CI bracket present in the same record."""
-    brackets: list[tuple[float, float, tuple[int, int]]] = []
+    # Each entry: (lo, hi, (bs, be), is_labeled). `is_labeled` is True when
+    # the bracket is prefixed by `CI`/`95% CI`/etc. — see cycle 12 notes
+    # at _CI_LABEL_PREFIX_RE.
+    brackets: list[tuple[float, float, tuple[int, int], bool]] = []
     for m in _CI_PAIR_BRACKET_RE.finditer(record):
         try:
             lo, hi = float(m.group(1)), float(m.group(2))
@@ -1510,13 +1520,17 @@ def _recover_minus_in_record(record: str) -> str:
             continue
         if lo > hi:
             continue  # not a well-formed interval
-        brackets.append((lo, hi, m.span()))
+        # Look back ≤8 chars for a `CI` / `95 % CI` label.
+        bs, be = m.span()
+        prefix = record[max(0, bs - 8): bs]
+        is_labeled = bool(_CI_LABEL_PREFIX_RE.search(prefix))
+        brackets.append((lo, hi, (bs, be), is_labeled))
     if not brackets:
         return record
 
     def _sub(m: "re.Match[str]") -> str:
         # Never touch a token that lies inside a bracket span (a CI bound).
-        for _lo, _hi, (bs, be) in brackets:
+        for _lo, _hi, (bs, be), _lab in brackets:
             if bs <= m.start() < be:
                 return m.group(0)
         frac = m.group(1)
@@ -1525,22 +1539,29 @@ def _recover_minus_in_record(record: str) -> str:
             recovered = float("-" + frac)
         except ValueError:
             return m.group(0)
-        # Cycle 11 proximity gate: only consider brackets that closely
-        # follow the token, with no sentence break or new stat label in
-        # between. Pick the NEAREST eligible bracket (the one that would
-        # canonically pair with the point estimate).
+        # Cycle 12: pick the NEAREST bracket whose pairing rules accept this
+        # token. LABELED brackets accept any candidate in the record (legacy
+        # wide rule — efendic body line `Mposterior = 20.54, SD=0.04,
+        # CI = [-0.61, -0.47]` is the canonical case). BARE brackets only
+        # accept the immediately-preceding stat (within 30 chars, no
+        # sentence break) — this is what blocks the majumder false-positive
+        # `M = 5.37, SD = 2.01, t = ..., d = 0.09 [-1.86, 0.04]`.
         token_end = m.end()
         nearest = None
         nearest_dist = None
-        for lo, hi, (bs, be) in brackets:
+        for lo, hi, (bs, be), is_labeled in brackets:
             if bs < token_end:
-                continue  # bracket precedes the token — not its CI
+                continue
             gap = bs - token_end
-            if gap > _CI_PAIR_MAX_GAP:
-                continue
-            intervening = record[token_end:bs]
-            if _SENTENCE_BREAK_RE.search(intervening):
-                continue
+            if is_labeled:
+                # Labeled bracket: only constraint is "comes after the token".
+                pass
+            else:
+                if gap > _CI_PAIR_MAX_GAP:
+                    continue
+                intervening = record[token_end:bs]
+                if _SENTENCE_BREAK_RE.search(intervening):
+                    continue
             if nearest_dist is None or gap < nearest_dist:
                 nearest = (lo, hi)
                 nearest_dist = gap
@@ -2649,6 +2670,21 @@ def normalize_text(
         t = re.sub(r"([=<>])[ \t]*\n[ \t]*(?=[-\d.])", r"\1 ", t)
         t = re.sub(r"([,;])[ \t]*\n[ \t]*(?=p\s*[<=>])", r"\1 ", t)
         t = re.sub(r"([,;])[ \t]*\n[ \t]*(?=\d+%\s*CI)", r"\1 ", t)
+        # Cycle 12 (v2.4.64) — cross-paragraph stat-continuation join.
+        # A1 (which uses `\s*` and so crosses paragraph breaks) runs BEFORE
+        # S9 strips header/footer lines. So a stat row like
+        #   `r(1798) = -0.27,\n\n472\n\nJournal of Decision Making, ...\n\n95% CI [-0.31, ...]`
+        # has so much intervening junk that A1's lookahead fails on pass 1;
+        # only after S9 strips the junk (producing `,\n\n95% CI`) can the
+        # join happen, and that's pass 2. The two patterns below are the
+        # paragraph-crossing variants of the comma-to-stat-continuation
+        # patterns above — restricted to the high-confidence prefixes
+        # `\d+% CI` and `p [<=>]` because no real paragraph STARTS with
+        # those tokens (test_column_bleed_too_many_fragments_ignored is
+        # unaffected — its input has no leading `,`/`;`).
+        # Clears korbmacher (2 papers) from the non-idempotent set.
+        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=\d+%\s*CI)", r"\1 ", t)
+        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=p\s*[<=>])", r"\1 ", t)
     report._track("LateJoin_line_break_rejoin", before, t, "late_line_joins")
 
     # ── H0r: header-banner re-strip on stabilized line positions ─────────
@@ -2668,6 +2704,26 @@ def normalize_text(
             break
         t = _restripped
     report._track("H0r_header_banner_restrip", before, t, "header_banners_restripped")
+
+    # ── Final blank-line collapse ────────────────────────────────────────
+    # S9 enforces `re.sub(r"\n{3,}", "\n\n", t)` once near the top of the
+    # pipeline. Later steps that REMOVE non-blank content can leave blank
+    # gaps that S9's earlier collapse no longer reaches:
+    #
+    #   - R3 (refs-section continuation join) walks the refs span line by
+    #     line. A bare form-feed `\x0c` (pdftotext page-break) between two
+    #     blank lines becomes `"".strip() == ""` and is preserved as a blank
+    #     entry; R3 outputs three consecutive blank entries surrounded by
+    #     `"\n".join(...)` — `\n\n\n\n`. Pass 1 leaves this; pass 2's S9
+    #     collapses it, producing the bibliography-shift non-idempotence
+    #     (cycle 12 — 5 papers: chan-etal, horsham, lee-feldman,
+    #     li-feldman-mental, + 1 incidental).
+    #   - Same pattern for any late strip step that empties a line without
+    #     re-collapsing.
+    #
+    # Add the collapse here so the function is idempotent regardless of
+    # which late step produced the blank-line run.
+    t = re.sub(r"\n{3,}", "\n\n", t)
 
     # ── P0r: page-footer-line re-strip on stabilized line positions ──────
     # Same shape as H0r, applied to P0's anchored ^...$ patterns. P0 runs
