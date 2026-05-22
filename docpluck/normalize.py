@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.20"
+NORMALIZATION_VERSION = "1.9.21"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -476,6 +476,88 @@ def _looks_like_ref_start(line: str) -> bool:
         or _REF_START_IEEE.match(line)
         or _REF_START_APA.match(line)
     )
+
+
+_BARE_REF_NUM_RE = re.compile(r"^(\d{1,3})\.\s*$")
+
+
+def _pair_two_column_bibliography(refs_text: str) -> str:
+    """Pair a column of bare `N.` lines with the column of entry lines that
+    follows it. Used when pdftotext streams a 2-column bibliography as
+    "all numbers first, then all entries" — the canonical Royal Society
+    layout that broke Li&Feldman 2025 RSOS.
+
+    Conservative: only acts when (a) the refs span begins with ≥3 bare
+    `\\d+\\.` lines, (b) their numeric sequence is monotonic and starts at
+    1 or 2 (no big gaps), (c) at least the same count of entry-shaped
+    lines (start with capital letter or `[` for IEEE) follows after a
+    blank-line break. If any precondition fails, return the input
+    unchanged — R3's normal continuation join handles the standard
+    single-column case.
+    """
+    lines = refs_text.split("\n")
+    # Skip leading blanks / "References" header line.
+    start = 0
+    while start < len(lines) and not _BARE_REF_NUM_RE.match(lines[start].strip()):
+        start += 1
+        if start > 5:
+            # not a leading bare-number column
+            return refs_text
+    if start >= len(lines):
+        return refs_text
+    # Collect the run of bare numbered lines.
+    nums: list[tuple[int, int]] = []  # (line index, ref number)
+    i = start
+    while i < len(lines):
+        m = _BARE_REF_NUM_RE.match(lines[i].strip())
+        if not m:
+            break
+        nums.append((i, int(m.group(1))))
+        i += 1
+    if len(nums) < 3:
+        return refs_text
+    # Monotonic + small step (1 or 2) and starts ≤ 2.
+    if nums[0][1] > 2:
+        return refs_text
+    for (_, a), (_, b) in zip(nums, nums[1:]):
+        if not (1 <= b - a <= 2):
+            return refs_text
+    # Skip the blank-line gap.
+    end_of_nums = nums[-1][0] + 1
+    j = end_of_nums
+    while j < len(lines) and not lines[j].strip():
+        j += 1
+    if j == end_of_nums:
+        # No blank-line gap separates the two columns — likely not the
+        # two-column form.
+        return refs_text
+    # Collect the run of entry-shaped lines (start with capital letter or
+    # `[` for IEEE), at least one per number.
+    entries: list[int] = []
+    k = j
+    while k < len(lines) and len(entries) < len(nums):
+        s = lines[k].strip()
+        if not s:
+            break
+        if s[0].isupper() or s.startswith("["):
+            entries.append(k)
+        else:
+            # continuation of previous entry — append to it
+            if entries:
+                lines[entries[-1]] = lines[entries[-1]].rstrip() + " " + s
+                lines[k] = ""
+            else:
+                # entry column did not start with a capital — bail.
+                return refs_text
+        k += 1
+    if len(entries) < len(nums):
+        # Not enough entries to pair — bail.
+        return refs_text
+    # Pair: prepend `N. ` to each entry, blank out the bare-number lines.
+    for (num_idx, num), entry_idx in zip(nums, entries):
+        lines[entry_idx] = f"{num}. {lines[entry_idx].lstrip()}"
+        lines[num_idx] = ""
+    return "\n".join(lines)
 
 
 # ── H0 / T0 / P0 / H1 : document-shape strips (NORMALIZATION_VERSION 1.8.0) ──
@@ -992,6 +1074,22 @@ def _rejoin_letterspaced_lowercase_labels(text: str) -> str:
 # `S<= 10000`, `>= 0.05` are detected as table-cell content, not prose.
 _NUMERIC_ONLY_LINE_RE = re.compile(r"^[\d\s.,()+\-*∗;:<>=%]+$")
 
+# Cycle 15 (v2.4.67) — extends numeric-block detection to LABELED numeric
+# lines like `S<= 10000`, `M = 5.2`, `N = 200`, `t = -1.4`. These are
+# table-cell or figure-axis content that pdftotext emits with a 1-4-char
+# stat-variable prefix. Without this signature the line above a stripped
+# 4-digit value (e.g. `1000` in nat-comms-2 figure axis below `S<= 10000`)
+# fails the _is_in_numeric_block check and the value is stripped as a page
+# number → real text loss.
+_LABELED_NUMERIC_LINE_RE = re.compile(
+    r"^[A-Za-zβμσπτλωαδ²]{1,4}\s*[<=>≤≥]+\s*[\d.,()+\-*∗;:<>=%\s]+$"
+)
+
+# Cycle 15 (v2.4.67) — parenthesized year / year-range. Used by S9 to
+# protect table source-attribution captions (`(2003-2023)`, `(2024)`)
+# from being false-stripped as running-header boilerplate.
+_LINE_HAS_YEAR_PARENS_RE = re.compile(r"\((?:19|20)\d{2}(?:\s*[-–]\s*(?:19|20)\d{2})?\)")
+
 
 def _is_numeric_only_line(line: str) -> bool:
     """True if the (stripped) line contains only digits + common stat-table
@@ -1008,15 +1106,28 @@ def _is_numeric_only_line(line: str) -> bool:
 
 def _is_in_numeric_block(lines: list[str], idx: int) -> bool:
     """True if the line at ``idx`` sits in a vertical block of numeric-only
-    lines — its nearest non-blank neighbor above OR below is itself
-    numeric-only. Used by S9 to distinguish per-page markers (isolated in
-    prose) from table cells (in a column of other numeric values)."""
+    (or labeled-numeric) lines — its nearest non-blank neighbor above OR
+    below is itself numeric-only or labeled-numeric. Used by S9 to
+    distinguish per-page markers (isolated in prose) from table cells or
+    figure-axis values (in a column of other numeric values).
+
+    Cycle 15 (v2.4.67): accept labeled-numeric neighbors (e.g. `S<= 10000`,
+    `M = 5.2`) — these are stat-variable comparisons that pdftotext emits
+    above/below figure-axis values, and treating them as prose caused
+    figure tick labels to be stripped as page numbers (nat-comms-2 `1000`).
+    """
     for direction in (-1, +1):
         i = idx + direction
         while 0 <= i < len(lines) and not lines[i].strip():
             i += direction
-        if 0 <= i < len(lines) and _is_numeric_only_line(lines[i]):
-            return True
+        if 0 <= i < len(lines):
+            neighbor = lines[i].strip()
+            if _is_numeric_only_line(neighbor):
+                return True
+            if _LABELED_NUMERIC_LINE_RE.match(neighbor) and any(
+                c.isdigit() for c in neighbor
+            ):
+                return True
     return False
 
 
@@ -2211,6 +2322,26 @@ def normalize_text(
         #     times per page (consecutive occurrences yield min_gap = 1).
         # Both forms are publisher boilerplate, never body content.
         if min(gaps) >= 20 or count >= 20:
+            # Cycle 15 (v2.4.67) — caption/citation guard. Some table
+            # source-attribution captions are repeated once per table and
+            # land in the same min_gap≥20 distribution as a running header,
+            # but they are LEGITIMATE body content (the data-source caption
+            # under each table, e.g. socius-4 `Source: Authors' calculation,
+            # American Time Use Survey (2003-2023).` ×13). Caption text has
+            # a structural signature page-footer boilerplate never has:
+            # natural-prose density with rich punctuation. Two cheap and
+            # generally-applicable discriminators:
+            #   (a) parenthesized 4-digit year or year-range, e.g.
+            #       `(2003-2023)`, `(2024)` — citation/data-source marker.
+            #   (b) ≥6 spaces (≥7 words) AND ends with sentence-ending
+            #       punctuation — caption-style prose.
+            # Page-footer boilerplate is shorter and either lacks `.` or has
+            # no parenthesized year. Both checks are content-shape, not
+            # paper-specific.
+            if _LINE_HAS_YEAR_PARENS_RE.search(s):
+                continue
+            if s.count(" ") >= 6 and s.rstrip().endswith((".", "!", "?")):
+                continue
             repeated.add(s)
     if repeated:
         lines = [l for l in lines if l.strip() not in repeated]
@@ -2644,6 +2775,27 @@ def normalize_text(
         for r_start, r_end in reversed(_refs_spans):
             refs_text = t[r_start:r_end]
 
+            # R3 pre-pass (Cycle 15 v2.4.67): two-column bibliography
+            # pairing. pdftotext renders some 2-column bibliographies by
+            # streaming the entire NUMBER column first, then the entire
+            # ENTRY column. The result looks like
+            #     References
+            #     1.
+            #     2.
+            #     ...
+            #     16.
+            #
+            #     Thaler RH. 1999 ...
+            #     Zhang CY, Sussman AB. 2018 ...
+            #     ...
+            # R3's continuation-join would smash `1.\n2.\n3.\n...` into one
+            # line and detach the entries entirely (Li&Feldman 2025 RSOS).
+            # Detect a leading run of bare `\d+\.` lines that form a
+            # sequential 1..N or 1..N-with-gaps sequence followed by the
+            # same number of entry-shaped lines, and pair them up before
+            # the continuation pass runs.
+            refs_text = _pair_two_column_bibliography(refs_text)
+
             # R3 first: continuation join must run before R2 because R2's
             # lowercase-surround guard relies on the page-number being
             # surrounded by content from the SAME logical line.
@@ -2766,6 +2918,31 @@ def normalize_text(
         # constraint — real paragraphs rarely START with a leading dot
         # or `-digit`.
         t = re.sub(r"([=<>])\s*\n\s*\n\s*(?=[-.]?\d)", r"\1 ", t)
+        # Cycle 15 (v2.4.67) — cross-paragraph variant of the
+        # (OR|CI|RR) → digit A1r join. Same JOIN-after-STRIP pattern as
+        # cycles 12/13: A1 (single-newline form) runs BEFORE S9 strips
+        # column headers / footer noise between the stat label and its
+        # value, so a `Mortality Hazard Ratio\n\n95% CI\n\n2.046***`
+        # block fails to join in pass 1; S9 then strips the intervening
+        # boilerplate, leaving `CI\n\n2.046***`, which A1 has already
+        # missed. Pass 2's A1 catches it — that is the non-idempotence.
+        # Clears demography-5 (Hazard-Ratio + Odds-Ratio tables) and any
+        # sibling paper whose CI/OR/RR/HR cell sits one paragraph above
+        # its numeric value. The `(?=\d)` lookahead is the load-bearing
+        # constraint — real paragraphs rarely START with a digit.
+        # The lookahead requires a STATISTICAL-VALUE-shaped token (decimal
+        # `\d+\.\d`, multi-digit `\d{2,}`, or digit followed by operator/
+        # delimiter `\d[-*<>=,]`) — NOT a bare `\d+\.\s+[A-Z]` which is a
+        # bibliography-reference-number signature (`2. Thaler RH. 1999 ...`).
+        # Excluding the bibliography form prevents this join from collapsing
+        # the references-section reference numbers onto a header line when
+        # an earlier line ends with `CI`/`OR`/`RR`/`HR` (e.g. Cochran et al.
+        # in-text mentions of CIs preceding the bibliography start).
+        t = re.sub(
+            r"(OR|CI|RR|HR)\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))",
+            r"\1 ",
+            t,
+        )
     report._track("LateJoin_line_break_rejoin", before, t, "late_line_joins")
 
     # ── H0r: header-banner re-strip on stabilized line positions ─────────
@@ -2855,5 +3032,20 @@ def normalize_text(
             break
         t = _restripped
     report._track("P0r_page_footer_restrip", before, t, "page_footer_lines_restripped")
+
+    # ── Final NFC composition (Cycle 15 v2.4.67) ─────────────────────────
+    # The early NFC at the top of normalize composes only the decomposed
+    # forms present in raw pdftotext (NFD authors like `Förster`). Later
+    # A5 Greek-letter transliteration (`σ` → `sigma`) can SHIFT an
+    # immediately-following combining mark from its Greek base onto the
+    # last ASCII letter of the transliteration — `σ̂` becomes `sigma` +
+    # U+0302 (combining circumflex), which now combines with the trailing
+    # `a` of `sigma` and DOES have a precomposed form (`â`, U+00E2). NFC
+    # leaves it alone on pass 1 (composition is byte-by-byte and the
+    # combining mark wasn't there at NFC time); pass 2 sees the shifted
+    # mark and composes it → non-idempotence (ieee-access-7 `sigmâ` math
+    # block). NFC is idempotent by definition, so a final pass here is a
+    # safe fixed-point. Generally protective against any future transliteration step that leaves an orphan combining mark on an ASCII tail.
+    t = unicodedata.normalize("NFC", t)
 
     return t.strip(), report
