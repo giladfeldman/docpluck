@@ -1313,3 +1313,157 @@ class TestA3_StatBracketLookbehind:
         # The original D2 repro case — must still work after tightening
         result = norm("interaction (F[7,140]= 1927, p<.0001)")
         assert "F(7, 140)" in result or "F(7,140)" in result
+
+
+# ── B5 / G5c-2 (2026-05-22): split-numbered-heading rejoin ──
+
+
+class TestG5c2SplitNumberedHeadingRejoin:
+    """B5: pdftotext linearisation can split ``2.1. Methods`` onto two
+    lines (``2.1.\n\nMethods``); the section partitioner then drops the
+    orphan number and the numeric prefix is lost. Normalize rejoins
+    them when the next line resolves to a canonical SectionLabel."""
+
+    def test_rejoins_split_numbered_heading_methods(self):
+        text = (
+            "Some intro prose ending here.\n"
+            "\n"
+            "2.1.\n"
+            "\n"
+            "Methods\n"
+            "\n"
+            "Participants were recruited via Prolific.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "2.1. Methods" in out
+        # Orphan number must not survive as a stranded line.
+        assert "\n2.1.\n" not in out
+
+    def test_rejoins_three_level_numbering(self):
+        text = (
+            "Intro line.\n"
+            "\n"
+            "3.2.1.\n"
+            "Results\n"
+            "\n"
+            "We found a significant effect.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "3.2.1. Results" in out
+
+    def test_preserves_unrelated_orphan_numbers(self):
+        # ``2.1.`` followed by prose (not a canonical heading) must NOT
+        # be rejoined — the number could be a list bullet, an equation
+        # reference, or a footnote anchor.
+        text = (
+            "We computed the mean.\n"
+            "\n"
+            "2.1.\n"
+            "\n"
+            "Although the result was small, it replicated.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "2.1. Although" not in out
+
+    def test_no_rejoin_when_next_line_too_long(self):
+        # A long line is prose, not a heading — even if its first words
+        # form a canonical label.
+        long_line = "Methods used in this study included a 2x2 between-subjects design with " * 2
+        text = "Intro.\n\n2.1.\n\n" + long_line + "\n"
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        # Must NOT collapse the long body line under the number.
+        assert "2.1. Methods" not in out
+
+
+# ── B3 / D4 (2026-05-22): metadata-leak strips ──
+
+
+class TestB3MetadataLeakStrips:
+    """B3: additional P0 page-furniture / sidebar patterns. Each pattern
+    is a complete standalone line; in-text variants must pass through."""
+
+    def test_strips_plos_a1111_watermark(self):
+        text = (
+            "Introduction prose continues here.\n"
+            "\n"
+            "a1111111111\n"
+            "\n"
+            "More body content follows.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "a1111111111" not in out
+
+    def test_strips_doi_footer_lowercase(self):
+        text = (
+            "Body line one.\n"
+            "doi: 10.1371/journal.pone.0123456\n"
+            "Body line two.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "doi: 10.1371" not in out
+
+    def test_strips_doi_url_footer(self):
+        text = (
+            "Body line one.\n"
+            "https://doi.org/10.1371/journal.pone.0123456\n"
+            "Body line two.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "https://doi.org/10.1371" not in out
+
+    def test_strips_plural_email_addresses_sidebar(self):
+        text = (
+            "Body line.\n"
+            "E-mail addresses: foo@example.com, bar@example.com\n"
+            "More body.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "foo@example.com" not in out
+
+    def test_strips_received_accepted_published_line(self):
+        text = (
+            "Abstract content.\n"
+            "Received: 12 March 2020; Accepted: 8 May 2020; Published: 3 June 2020\n"
+            "Introduction begins here.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "Accepted: 8 May 2020" not in out
+
+    def test_strips_n_over_m_page_furniture(self):
+        text = (
+            "Body content here.\n"
+            "3 / 14\n"
+            "More body content.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        # The page-furniture line itself should be stripped.
+        assert "\n3 / 14\n" not in out
+
+    def test_preserves_in_text_fractions(self):
+        # ``1/2 of participants completed both arms`` must NOT be stripped —
+        # the pattern only matches a line that contains ONLY ``N / M``.
+        text = (
+            "Body line.\n"
+            "Approximately 1/2 of participants completed both arms.\n"
+            "More body.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "1/2 of participants" in out
+
+    def test_strips_competing_interests_declaration_sidebar(self):
+        text = (
+            "Discussion paragraph.\n"
+            "Competing interests: The authors declare no competing interests.\n"
+            "Next paragraph.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "The authors declare no competing interests" not in out
+
+    def test_strips_inline_abbreviations_glossary(self):
+        text = (
+            "Method body line.\n"
+            "Abbreviations: RCT, randomised controlled trial; SE, standard error\n"
+            "Result follows.\n"
+        )
+        out, _ = normalize_text(text, NormalizationLevel.academic)
+        assert "RCT, randomised controlled trial" not in out
