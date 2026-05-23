@@ -179,3 +179,81 @@ def test_amj_1_table_captions_clean():
     ), caps["Table 2"]
     for label, cap in caps.items():
         assert len(cap) < 200, f"{label} caption too long ({len(cap)}): {cap!r}"
+
+
+@pytest.mark.skipif(
+    not (TEST_PDFS / "apa" / "maier_2023_collabra.pdf").exists(),
+    reason="maier_2023_collabra.pdf fixture not present",
+)
+def test_maier_apa_titlecase_captions_cut_at_title():
+    """B4 (2026-05-22): maier table titles are APA-Title-Case with NO
+    terminal period ("Table 6. Aggregated Feelings: Descriptives").  The
+    primary period-terminated rule misses them and the fallback cell-run
+    rule wrongly protects ``nonblank[1]`` (a column header). The B4
+    intermediate rule cuts at ``nonblank[1]`` when line 0 is multi-word
+    (≥4 tokens) and the next 3 nonblank lines are all
+    ``_is_table_header_like_short_line`` — so column headers don't leak."""
+    pdf = TEST_PDFS / "apa" / "maier_2023_collabra.pdf"
+    result = extract_pdf_structured(pdf.read_bytes())
+    caps = {t["label"]: (t.get("caption") or "") for t in result["tables"]}
+    # Table 6 — "Aggregated Feelings: Descriptives" must not leak
+    # "Identifiable victim" (col header).
+    if "Table 6" in caps:
+        assert "Identifiable victim" not in caps["Table 6"], caps["Table 6"]
+        assert "Aggregated Feelings" in caps["Table 6"], caps["Table 6"]
+    # Table 7 — "Perceived Impact (Extension): Descriptives" must not
+    # leak "Statistical victim".
+    if "Table 7" in caps:
+        assert "Statistical victim" not in caps["Table 7"], caps["Table 7"]
+    # Table 1 — "Replication and Extension: Experimental Design" must
+    # not leak "Identifiability" (col header).
+    if "Table 1" in caps:
+        assert "Identifiability" not in caps["Table 1"], caps["Table 1"]
+
+
+def test_b4_unit_apa_titlecase_caption_cuts_at_first_column_header():
+    """Unit test for the B4 intermediate rule: explicit period-less
+    APA Title-Case caption with multi-word title on line 0 followed by
+    three header-like column-header lines."""
+    from docpluck.extract_structured import _trim_table_caption_at_cell_region
+
+    region = (
+        "\n"
+        "Table 6. Aggregated Feelings: Descriptives\n"
+        "Identifiable victim\n"
+        "\n"
+        "Statistical victim\n"
+        "\n"
+        "Joint\n"
+        "\n"
+        "Total\n"
+        "\n"
+        "3.82 [0.91]\n"
+    )
+    out = _trim_table_caption_at_cell_region(region)
+    assert "Identifiable victim" not in out
+    assert "Aggregated Feelings" in out
+
+
+def test_b4_unit_apa_titlecase_short_title_preserved():
+    """B4 guard: a SHORT title (<4 words) on line 0 must NOT trigger
+    the intermediate cut — preserving the existing short-title-wrap
+    protection."""
+    from docpluck.extract_structured import _trim_table_caption_at_cell_region
+
+    region = (
+        "\n"
+        "Table 1. Correlations\n"
+        "Variable A\n"
+        "\n"
+        "Variable B\n"
+        "\n"
+        "Variable C\n"
+        "\n"
+        "0.12\n"
+    )
+    out = _trim_table_caption_at_cell_region(region)
+    # Title has only 3 words — the B4 rule's ``len(first.split()) >= 4``
+    # guard prevents the cut at nonblank[1]; the fallback cell-run rule
+    # protects ``Variable A`` as a possible title wrap.
+    assert "Correlations" in out
