@@ -680,6 +680,29 @@ def _trim_table_caption_at_cell_region(region: str) -> str:
         return lines[nonblank[0][0]] if nonblank[0][0] == 0 else "\n".join(
             lines[: nonblank[0][0] + 1]
         )
+    # B4 intermediate rule (2026-05-22): the APA-Title-Case caption.
+    # When nonblank[0] carries label + a multi-word Title-Case title
+    # but lacks a terminal ``.``/``!``/``?`` (APA tables uniformly
+    # omit the trailing period — "Table 6. Aggregated Feelings:
+    # Descriptives"), and the next 3 nonblank lines are ALL
+    # header-like short lines (column headers / linearized cell
+    # tokens), the title is complete on line 0 and the run starts at
+    # nonblank[1]. Cut there. Title-wrap protection still holds: a
+    # real wrap line ends in a conjunction/article (rejected by
+    # ``_is_table_header_like_short_line``) or starts with lowercase
+    # (also rejected). Requires ≥4 words on line 0 so a bare
+    # ``TABLE 13`` (caught by ``label_only``) and short ``Table 1.
+    # Foo`` (3 words) don't accidentally collapse here.
+    if (
+        not label_only
+        and len(nonblank) >= 4
+        and len(first.split()) >= 4
+        and all(
+            _is_table_header_like_short_line(ln) for _, ln in nonblank[1:4]
+        )
+    ):
+        cut_line_idx = nonblank[1][0]
+        return "\n".join(lines[:cut_line_idx])
     # Fallback rule: nonblank[0] is just a bare label ("TABLE 13") or an
     # unterminated title that may wrap. Locate the linearized cell region
     # as the first run of >=3 consecutive header-like short lines, and cut
