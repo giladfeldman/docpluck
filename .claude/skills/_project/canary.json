@@ -1,0 +1,57 @@
+{
+  "schema_version": 2,
+  "project": "docpluck",
+  "skill": "docpluck-iterate",
+  "comment_for_humans": "Originally 2026-05-23; updated same day to DOI keys after the canary papers were onboarded into article-finder (memory feedback_paper_locating_via_article_finder). The `key` is now the canonical DOI key (lowercased, `/`→`__`). `stem` retains the project-local label for human readability and matches `paper_stem` in run-meta phase_5d_runs entries — but the gate's locator queries article-finder via `key`. Fixed-3 + rotating-pool together exercise B1/B2/B3/B4/B6/B7 defect classes.",
+  "canary": {
+    "fixed": [
+      {
+        "stem": "ip_feldman_2025_pspb",
+        "key": "10.1177/01461672251327169",
+        "doi": "10.1177/01461672251327169",
+        "rationale": "Triggered the 2026-05-23 iterate-loop spine. Single paper exercising 4 distinct defect classes: G5d hallucinated subsection headings (Supplemental Materials mid-Method), B3 affiliation/running-header leak into body, B4 mid-text Table 3 caption, running-header 'Ip and Feldman' surfacing as a paragraph. The litmus test for whether the library's structural-defect cluster is closed.",
+        "max_gold_age_days": 30
+      },
+      {
+        "stem": "plos_med_1",
+        "key": "10.1371/journal.pmed.1004323",
+        "doi": "10.1371/journal.pmed.1004323",
+        "rationale": "B1 text_loss canary — Tables 2-5; Table 5 has 13 SAE rows lost. The 1 still-failing Tier-D cell as of run 9 close. Forces the table-completeness story to stay covered every cycle. The architectural decision around modified-Approach-B bbox computation has been outstanding since 2026-05-22 — this canary keeps it visible.",
+        "max_gold_age_days": 30
+      },
+      {
+        "stem": "chandrashekar_2023_mp",
+        "key": "10.15626/MP.2022.3108",
+        "doi": "10.15626/MP.2022.3108",
+        "rationale": "B6 column-interleave canary — pdftotext two-column reading order serialises a multi-column page interleaved. Distinct defect class from ip_feldman / plos_med_1 (extraction-layer, not normalize-layer). Keeps the column-interleave architectural decision (R4 in 2026-05-22-residual handoff) from being silently forgotten.",
+        "max_gold_age_days": 30
+      }
+    ],
+    "rotating_pool": [
+      {
+        "stem": "chan_feldman_2025_cogemo",
+        "key": "10.1080/02699931.2024.2434156",
+        "doi": "10.1080/02699931.2024.2434156",
+        "exercises": "B2 hallucinated/demoted headings; B6 column interleave (Measures section)"
+      },
+      {
+        "stem": "ar_apa_j_jesp_2009_12_011",
+        "key": "10.1016/j.jesp.2009.12.011",
+        "doi": "10.1016/j.jesp.2009.12.011",
+        "exercises": "B2 hallucinated headings (Participants/Overview); B7 deleted-minus glyph (b = .022 → should be -0.022)"
+      }
+    ],
+    "rotation_size": 2,
+    "_pool_size_note": "Pool currently has 2 entries == rotation_size, so every cycle covers both (no rotation effect). Expand to 5+ once efendic_2022_affect, maier_2023_collabra, xiao_2021_crsp are onboarded into article-finder per the locator-via-AF directive. See `onboarding_status.still_to_onboard_before_use`."
+  },
+  "limits": {
+    "max_cycles_without_corpus_sweep": 3,
+    "default_max_gold_age_days": 30
+  },
+  "onboarding_status": {
+    "onboarded_to_article_finder": ["ip_feldman_2025_pspb", "plos_med_1", "chandrashekar_2023_mp", "chan_feldman_2025_cogemo", "ar_apa_j_jesp_2009_12_011"],
+    "still_to_onboard_before_use": ["efendic_2022_affect", "maier_2023_collabra", "xiao_2021_crsp"],
+    "onboarding_date": "2026-05-23",
+    "onboarding_record": "tmp/onboard_canary.py — run again to onboard the remaining 3 (DOIs need to be extracted first)"
+  }
+}

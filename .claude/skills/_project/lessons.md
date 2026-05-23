@@ -431,6 +431,66 @@ print(events)
 
 Run it once with the strip signature (e.g. the disappearing line) and once with the inverse signature (e.g. the appearing joined-line). The (step, REMOVED/ADDED) tuple identifies the responsible step. Cost: ~30s per paper. Saved ~2-3 hours across cycle 15.
 
+## Iterate-loop spine substrate — audit findings (2026-05-23 origin commit)
+
+**What:** Built `~/.claude/skills/_shared/iterate-loop/` as a hard-gated discipline for `<prefix>-iterate` skills (rules I1–I8 enforced by `iterate-gate.sh`, exit 1 on violation). Origin was the 2026-05-23 ip_feldman defect cluster — run 9 shipped 15 cycles on the idempotency proxy while the canary paper kept rendering with affiliation-leak, hallucinated `## Supplemental Materials` headings mid-Method, and Table 3 caption mid-prose.
+
+**Why this is in lessons.md and not memory:** the bugs below were found during the substrate's own first audit. Documenting them here so future sessions (mine or another agent's) don't re-introduce them when retrofitting other `<prefix>-iterate` skills (citationguard, escicheck, 2rmarkdown, future scimeto).
+
+**Bug 1 (CRITICAL, fixed in same commit): heredoc variable interpolation breaks on JSON containing quotes / backslashes.**
+
+The first `iterate-gate.sh` shipped with `get()` and `DIGEST_OK` helpers that did `json.loads('''$DIGEST''')` inside an unquoted `<<PY` heredoc. Bash performed variable expansion BEFORE feeding the script to Python — meaning `$DIGEST` was inlined as a Python literal. If a paper title contained a quote, backslash, or `'''` sequence, the resulting Python source was malformed. Even with json.dumps's normal escaping, this is a footgun waiting on the wrong input.
+
+**Detection:** the first `--close` run had a SyntaxError ("expression expected after dictionary key and ':'") buried in stderr while the gate still printed its FAIL line — masking the bug behind correct-looking output.
+
+**Fix:** stash `$DIGEST` in a temp file via `mktemp` + `trap 'rm -f' EXIT`; helpers read the file path, not inline JSON. Always use quoted heredocs (`<<'PY'`) and pass dynamic data via env vars or file paths. See `iterate-gate.sh` `get()` / `DIGEST_OK` blocks for the corrected pattern.
+
+**General rule for skill-substrate scripts:** any time you write `<<PY` (unquoted) and reference `$VARIABLE` inside the Python body, you have this bug. Use `<<'PY'` plus env vars (`FOO=value "$PY" - <<'PY'\nimport os\nfoo = os.environ['FOO']`).
+
+**Bug 2 (MEDIUM, fixed): self-referential gate-skip detection was missing.**
+
+Original spine: rule I1 fires if `phase_5d_runs[cycle=N]` is empty. But the agent could skip calling `iterate-gate.sh --cycle N` entirely — and then there'd be no log entry, no heartbeat, no signal that the skill ran any cycles at all. Detection deferred to the next preflight reading `effectiveness.jsonl` and noticing zero entries for the run — too slow.
+
+**Fix:** added **I8 gate-was-actually-called** (in `core.md`). The gate now appends to `cycle_gate_runs[]` in run-meta on every `--cycle` invocation (via `record_gate_run` helper). At `--close`, I8 checks `{1..current_cycle} - {called cycles}` and fails the run-close if any cycle was skipped. Validated: setting `current_cycle=3` + gate-runs for cycles 1+3 → I8 fires: `cycles [2] never invoked iterate-gate.sh --cycle (the agent skipped the gate)`.
+
+**Bug 3 (MEDIUM, documented): I3 doc-vs-code mismatch.**
+
+`core.md` originally said "I3 fires if `cycle_status[N] == PASS` AND verdict != PASS." But the gate-script implementation fires unconditionally on any FAIL/STALE verdict in `--cycle` mode (regardless of `cycle_status`). The code is stricter, which is correct for the failure mode we're defending against (the agent forgetting to set cycle_status while still emitting cycle artifacts) — but the doc was misleading. **Doc updated to match the code** with an explicit "this is intentionally stricter than the literal reading" note.
+
+**General rule:** when the doc and the script disagree, the script wins; align the doc.
+
+**Bug 4 (LOW, documented): STALE_GOLD detection is not automated by the gate.**
+
+The gate trusts the agent to compute `gold_age_days` and set `verdict: "STALE_GOLD"` when appropriate. If the agent forgets, a stale gold is silently treated as fresh. The gate has no independent check — it can't, without knowing the gold cache path schema and SHA semantics for every project. **The agent's Phase 5d step must compute age from the gold file's mtime (or its `stored_at` field in `<gold>.meta.json`) and set the verdict accordingly.** Documented in `core.md` paragraph "BLOCKED-NEEDS-GOLD" and reinforced in `docpluck-iterate/SKILL.md` "Recording during the cycle" subsection.
+
+A future improvement: a project-specific helper (`<project>/.claude/skills/_project/check-gold-age.sh`) that the gate calls in `--cycle` mode to independently compute age. Not implemented yet.
+
+**Bug 5 (LOW, documented): canary `key` field is the storage stem, not the canonical DOI.**
+
+Memory `feedback_gold_canonical_key` says all golds should be registered under their DOI-stem key (`10.1177__01461672251234567`). But many existing golds in `~/ArticleRepository/ai_gold/` use bare project stems (`ip_feldman_2025_pspb`) — they were created by `docpluck-iterate` BEFORE the 2026-05-16 directive that moved gold generation to `article-finder`. The canary file matches papers by `stem`, not DOI, to work with the legacy state.
+
+**Migration path (queued, not done):** for each canary paper without a DOI-key gold, run `article-finder generate-gold <pdf>` to register under the canonical DOI key, then update canary.json's `key` field to the DOI. The gate's coverage check then continues to match by `paper_stem`, which is logged in the gold's meta either way.
+
+**Bug 6 (LOW): canary rotation is deterministic by cycle integer, which works for any starting cycle but has a subtle property.**
+
+Rotation picks `pool[(N mod L) : (N mod L) + rotation_size]` wrapping. Over `ceil(L / rotation_size)` consecutive cycles, every pool member is covered. For docpluck (pool L=5, rotation_size=2), the cycle-coverage cycle is 3 cycles long. **Implication:** if a defect class is only exercised by one pool member, it gets AI-verified every ~3 cycles, not every cycle. The canary fixed-3 is the "every cycle" set; the rotating pool is the "every-few-cycles" set. Be deliberate about which set each defect class lives in.
+
+**Bug 7 (LOW): preflight.md schema example and core.md schema example diverged slightly.**
+
+`preflight.md` listed `blocked_reason` in `phase_5d_runs`; `core.md` did not. Reconciled — both now list it. **General rule:** whenever the spine substrate has schema documented in two places, write a small alignment-check (`diff <(extract-schema preflight.md) <(extract-schema core.md)`) and run it on substrate-touching commits.
+
+**Bug 8 (LOW, observed but not fixed): codex prerequisite asserted in docpluck reference but absent from canonical protocol.**
+
+`docpluck-iterate/references/ai-full-doc-verify.md` line 71 claimed `gold-generation.md` required the `codex` CLI for a cross-model audit. The actual `~/.claude/skills/article-finder/gold-generation.md` uses two independent `general-purpose` Claude subagents — no codex anywhere. The line was wrong / outdated. Fixed in the same commit; also saved as user memory `feedback_no_codex_in_gold_audit` (codex tokens are limited; gold must use Claude subagents).
+
+**General rule:** when a consumer skill asserts a prerequisite for a protocol it doesn't own, verify against the protocol's canonical source — don't trust the consumer's claim.
+
+**Bug 9 (LOW): redundant spine-load documentation between SKILL.md and preflight.md.**
+
+`docpluck-iterate/SKILL.md` step 4 explicitly says "Load the iterate-loop spine — read core.md." `_shared/preflight.md` step 7.5 says the same thing for any `-iterate` / `-fix` skill. Not strictly a bug (defense in depth) but a doc-rot risk — if the call sequence changes, both files need updating. **Convention going forward:** preflight.md is the authoritative source for spine-load procedure; per-skill SKILL.md references it ("see preflight.md step 7.5") rather than restating.
+
+**How these were detected:** self-audit after the initial substrate landed and validated on docpluck. Triggered by the user's request to "look for other inconsistencies and logical bugs." The lesson: substrate code that gates everyone else's discipline must be audited at the same rigor as the code it gates. A foolproof gate that has a heredoc bug is not foolproof.
+
 **The classification then dictates the fix shape:**
 
 - **JOIN-bucket pass-2-only** → add a LateJoin cross-paragraph variant (`\s*\n\s*\n\s*` form) AFTER the strip pass, with a STAT-VALUE-shaped lookahead to avoid colliding with prose-leading-digit forms (bibliography `\d+\.\s+[A-Z]`, ordered lists, etc.).

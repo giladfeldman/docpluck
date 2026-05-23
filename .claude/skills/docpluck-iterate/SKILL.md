@@ -6,15 +6,80 @@ user-invocable: true
 argument-hint: "[--goal time:60m | iters:5 | baseline:26/26+full:95/101 | until:\"description\"] [--no-broad-read] [--dry-run]"
 ---
 
-## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
+## [MANDATORY FIRST ACTION] preflight + iterate-loop spine (do NOT skip, even if orchestrated by /ship)
 
 **Your very first action in this skill, BEFORE reading anything else, is:**
 
 1. Run: `bash ~/.claude/skills/_shared/bin/preflight-filter.sh docpluck-iterate` and print its `🔧 skill-optimize pre-check · ...` heartbeat as your first visible output line.
-2. Initialize `~/.claude/skills/_shared/run-meta/docpluck-iterate.json` per `~/.claude/skills/_shared/preflight.md` step 6 (include `phase_start_sha` from `git rev-parse HEAD`).
+2. Initialize `~/.claude/skills/_shared/run-meta/docpluck-iterate.json` per `~/.claude/skills/_shared/preflight.md` step 6 — including the **iterate-skill extension fields** (`project_root`, `current_cycle`, `cycle_status`, `cycle_targets`, `phase_5d_runs`, `corpus_sweeps`, `open_findings`, `iterate_skips`, `run_closeout`). Set `project_root` to the absolute path of the docpluck repo so `iterate-gate.sh` can find the canary file when running outside a git CWD.
 3. Load `~/.claude/skills/_shared/quality-loop/core.md` into working memory. Although `docpluck-iterate` is not a `-qa`/`-review`/`-cleanup`/`-deploy` skill itself, it ORCHESTRATES those skills cycle-by-cycle and the spine rules R1–R5 apply transitively. Treat any FAIL from those orchestrated skills as a phase failure for this skill.
+4. **Load the iterate-loop spine** — read `~/.claude/skills/_shared/iterate-loop/core.md` and hold rules I1–I7 in working memory. Confirm `<docpluck-repo>/.claude/skills/_project/canary.json` exists (it MUST; missing canary = immediate gate fail). This spine — not prose in this file — is what makes the cycle/run discipline foolproof. Rules I1 / I2 / I3 / I5 / I7 are checked after every cycle by `iterate-gate.sh --cycle N`; rules I4 / I6 are checked at run-close by `iterate-gate.sh --close`. A non-zero exit BLOCKS the corresponding write (cycle PASS, run closeout). See "Iterate-loop spine integration" below for the exact call sequence.
 
 If you skip these steps, the postflight heartbeat will be missing and the run will produce no learning signal — defeating the whole point of a self-improving loop.
+
+---
+
+## Iterate-loop spine integration (the foolproof gate — read once at preflight, follow throughout)
+
+This skill — like every `<prefix>-iterate` and `<prefix>-fix` skill across the portfolio — is gated by `~/.claude/skills/_shared/iterate-loop/`. The spine exists because three prior fixes (2026-05-14, -15, -19) all added prose rules to CLAUDE.md / SKILL.md / memory cards; the next iterate run still drifted to the cheapest available "done" signal (idempotency=0 across run 9's 15 cycles, while ip_feldman kept rendering with affiliation-leak / hallucinated headings / mid-text table captions). Prose rules are aspirational; gate scripts are enforced.
+
+**What the spine enforces (full text in `~/.claude/skills/_shared/iterate-loop/core.md`):**
+
+| Rule | Hard check |
+|---|---|
+| **I1** phase-5d-actually-ran | Cycle must record ≥1 `phase_5d_runs` entry |
+| **I2** canary-coverage | Cycle must AI-verify every (target ∪ canary) paper |
+| **I3** verdict-on-truth-not-proxy | Cycle PASS requires every `phase_5d_runs` verdict == PASS |
+| **I4** blocked-gold-is-a-cycle-status | BLOCKED-NEEDS-GOLD is a legal cycle status; blocks run-close (not cycle) |
+| **I5** corpus-sweep-not-stale | Sweep must have run within last 3 cycles |
+| **I6** no-open-canary-findings-at-close | Run-close requires zero open canary findings + zero BLOCKED canary papers |
+| **I7** deterministic-metric-is-not-a-verdict | Idempotency / char-ratio / snapshot diff are INPUTS to I3, not substitutes for it |
+
+**The two mandatory gate calls (cannot be skipped):**
+
+1. **End of every cycle** — after Phase 5d completes and BEFORE you set `cycle_status["<N>"] = "PASS"`:
+   ```bash
+   bash ~/.claude/skills/_shared/iterate-loop/iterate-gate.sh --cycle <N> docpluck-iterate
+   ```
+   Exit 0 ⇒ proceed to mark PASS. Exit 1 ⇒ the gate printed `❌ I<n> — …` lines; address every one before re-running. Never override silently — if you need to override I3 or I7, you cannot (those rules don't allow override). I1/I2/I5 can be overridden only via an explicit user-signed `iterate_skips` entry, and you must ask the user inline before adding it.
+
+2. **End of run** — BEFORE writing any `run_<N>_closed.json` artifact or declaring the run "CLOSED" in a handoff:
+   ```bash
+   bash ~/.claude/skills/_shared/iterate-loop/iterate-gate.sh --close docpluck-iterate
+   ```
+   Exit 0 ⇒ write `run_closeout.closed_at = <ISO timestamp>` and emit the close handoff. Exit 1 ⇒ the run does NOT close. The gate prints the punch-list (open canary findings, BLOCKED papers, NEVER_VERIFIED fixed-3). Resolve each, or surface to the user with an explicit I6 override request (`iterate_skips: [{"rule": "I6", "reason": "<text>", "user_confirmed": true}]`).
+
+**Recording during the cycle (the data the gate reads):**
+
+As you do the cycle's Phase 5d, append to run-meta the moment events happen — never reconstruct at the end. For each paper verified:
+```json
+{
+  "cycle": <N>,
+  "paper_key": "<canonical-key>",
+  "paper_stem": "<stem>",
+  "gold_sha": "<sha256 of the reading.md gold>",
+  "gold_age_days": <int>,
+  "rendered_sha": "<sha256 of the rendered .md being checked>",
+  "verdict": "PASS" | "FAIL" | "BLOCKED_NEEDS_GOLD" | "STALE_GOLD",
+  "findings_count": <int>,
+  "findings": [{"severity": "TEXT-LOSS"|"HALLUCINATION"|"SECTION-BOUNDARY"|"TABLE"|"FIGURE"|"METADATA-LEAK", "excerpt": "..."}, ...],
+  "timestamp": "<ISO>"
+}
+```
+
+For each open structural finding (the kind that can persist across cycles), append to `open_findings`:
+```json
+{"paper_stem": "<stem>", "first_seen_cycle": <N>, "severity": "...", "excerpt": "...", "status": "open"}
+```
+Mark `status: "resolved"` when a subsequent cycle's AI-verify returns PASS for that paper.
+
+For each cycle's `cycle_targets`, record the papers this cycle's fix specifically targets BEFORE running Phase 5d — the gate uses this for I2 ("did you AI-verify what you said you were fixing?").
+
+**Why these rules supersede the old prose-only enforcement:**
+
+This file used to enforce the same intent via Rule 0e ("fix every bug found in the same run"), Rule 19 ("regression-backcheck — every cycle"), and the Phase 0 "Methodology smell-test." Those rules remain in the prose (Phase 0, the Verification Checklist, Hard Rules) as orientation — but the **authoritative enforcement** is now `iterate-gate.sh`. If the prose and the gate ever disagree (e.g. you read a sentence here that contradicts an I-rule), the gate wins; flag the contradiction to the user.
+
+The canary set itself is at `<docpluck-repo>/.claude/skills/_project/canary.json`. As of 2026-05-23 the fixed-3 are `ip_feldman_2025_pspb`, `plos_med_1`, `chandrashekar_2023_mp`. They are the papers whose continued breakage is most embarrassing — Phase 5d runs against them EVERY cycle, no exceptions.
 
 ---
 
