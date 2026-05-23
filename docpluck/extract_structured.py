@@ -170,16 +170,74 @@ def extract_pdf_structured(
             )
             tables.append(ct)
 
-    # If a table caption had no Camelot match, emit an "isolated" Table dict so
-    # downstream consumers still see something at that page.
-    for cap in table_captions:
-        if id(cap) in used_caption_ids:
-            continue
-        tables.append(
-            _isolated_table_from_caption(
-                cap, rejoined, next_boundary_by_id.get(id(cap))
+    # §A R1 / B1 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): whitespace_cells
+    # fallback for caption-detected tables that Camelot could not recover.
+    # The library has a `docpluck.tables.whitespace.whitespace_cells` helper
+    # (column-gap clustering using layout-channel words) that was built
+    # months ago but never wired into the main pipeline. The B1 marker harvest
+    # (tmp/b1-marker-harvest.txt) shows 15 isolated tables in the canary
+    # set — try whitespace_cells on each before falling back to the cellless
+    # isolated dict.
+    #
+    # Lazy-import the layout extraction + whitespace helper so the rest of
+    # the pipeline works in environments without pdfplumber-layout deps; any
+    # failure here falls back transparently to the isolated path.
+    layout_doc = None
+    _whitespace_cells = None
+    _region_for_caption_fn = None
+    unmatched_caps = [
+        cap for cap in table_captions if id(cap) not in used_caption_ids
+    ]
+    if unmatched_caps:
+        try:
+            from .extract_layout import extract_pdf_layout
+            from .tables.detect import _region_for_caption as _rfc
+            from .tables.whitespace import whitespace_cells as _wc
+            layout_doc = extract_pdf_layout(pdf_bytes)
+            _whitespace_cells = _wc
+            _region_for_caption_fn = _rfc
+        except Exception:
+            layout_doc = None
+
+    for cap in unmatched_caps:
+        cells: list[Cell] = []
+        if layout_doc is not None and _whitespace_cells is not None and _region_for_caption_fn is not None:
+            try:
+                region = _region_for_caption_fn(layout_doc, cap)
+                if region is not None:
+                    cells = _whitespace_cells(layout_doc, region=region)
+            except Exception:
+                cells = []
+        if cells:
+            n_rows = max((c["r"] for c in cells), default=-1) + 1
+            n_cols = max((c["c"] for c in cells), default=-1) + 1
+            cap_text = _extract_caption_text(
+                rejoined, cap, next_boundary_by_id.get(id(cap))
             )
-        )
+            tables.append({
+                "id": f"t{cap.number}",
+                "label": cap.label,
+                "page": cap.page,
+                "bbox": (0.0, 0.0, 0.0, 0.0),
+                "caption": cap_text,
+                "footnote": None,
+                "kind": "whitespace",
+                "rendering": "structured",
+                "confidence": None,
+                "n_rows": n_rows,
+                "n_cols": n_cols,
+                "header_rows": 1 if any(c.get("is_header") for c in cells) else 0,
+                "cells": cells,
+                "html": cells_to_html(cells),
+                "raw_text": None,
+            })
+            method_pieces.append("whitespace_cells")
+        else:
+            tables.append(
+                _isolated_table_from_caption(
+                    cap, rejoined, next_boundary_by_id.get(id(cap))
+                )
+            )
 
     # ---- Figures ----
     for cap in captions:
@@ -614,6 +672,31 @@ _TITLE_WRAP_TAIL_WORDS = frozenset({
 })
 
 
+# §A R3a (2026-05-23): citation-cell signature — a linearized table cell
+# that is a citation like ``Small et al. (2007)`` or just ``(2007)``. These
+# fail the ≤3-word / ≤35-char gates (``Small et al. (2007)`` is 4 words)
+# but are structurally cells, not title wraps. Detect explicitly so the
+# B4 cell-run cut can fire on maier Table 3 ("Comparison of Original
+# Study and Replication") where nonblank[2] is `Small et al. (2007)`.
+_CITATION_CELL_RE = re.compile(
+    r"^[A-Z][A-Za-z\-']{1,30}"                        # surname (Title-case)
+    r"(?:\s+(?:et\s+al\.?|and\s+[A-Z][A-Za-z\-']{1,30}|&\s+[A-Z][A-Za-z\-']{1,30}))?"
+    r"\s*\(\d{4}[a-z]?\)\s*$"
+)
+_YEAR_ONLY_CELL_RE = re.compile(r"^\(\d{4}[a-z]?\)\s*$")
+
+
+def _is_citation_cell(line: str) -> bool:
+    """True if ``line`` is a citation-cell shape (``Small et al. (2007)``,
+    ``(2007)``, ``Smith and Jones (2009)``). These are linearized table
+    cells, not title wraps — accept for the B4 cell-run cut even though
+    they exceed the generic ≤3-word / ≤35-char gates."""
+    s = line.strip()
+    if not s:
+        return False
+    return bool(_CITATION_CELL_RE.match(s) or _YEAR_ONLY_CELL_RE.match(s))
+
+
 def _is_table_header_like_short_line(line: str) -> bool:
     """True if ``line`` looks like a table column header or linearized
     cell token rather than a caption title (or a wrapped title line).
@@ -627,6 +710,10 @@ def _is_table_header_like_short_line(line: str) -> bool:
     s = line.strip()
     if not s:
         return False
+    # §A R3a (2026-05-23): accept citation cells — they exceed the generic
+    # ≤3-word gate but are structurally linearized table cells.
+    if _is_citation_cell(s):
+        return True
     words = s.split()
     # Column headers / linearized cell tokens are short — almost always
     # <=3 words ("Academic Rank", "Number of Citations", "Impact Factor").

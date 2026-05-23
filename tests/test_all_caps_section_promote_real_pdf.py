@@ -187,13 +187,22 @@ def test_ieee_access_2_promotes_all_caps_headings():
 def test_xiao_no_false_positive_promotion():
     """xiao_2021_crsp.pdf uses Title Case for its section headings —
     the ALL-CAPS post-processor should NOT promote any line that isn't
-    already a real ALL-CAPS heading."""
+    already a real ALL-CAPS heading.
+
+    §B-new-2 update (2026-05-23): ``## KEYWORDS`` is now demoted to inline
+    metadata (``**KEYWORDS:**``) by `_demote_metadata_label_headings` when
+    followed by metadata-shape content (semicolon/comma keyword list). The
+    cycle-3 verifier sweep flagged ``## KEYWORDS`` as a hallucinated
+    heading (HALLUC-HEAD-3) — the bare label was over-promoted. Now only
+    ABSTRACT remains as the ALL-CAPS h2 frontmatter label.
+    """
     pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
     md = render_pdf_to_markdown(pdf.read_bytes())
-    # xiao has known ALL-CAPS frontmatter labels (ABSTRACT, KEYWORDS)
-    # which legitimately get `##`. Verify they're present but no
-    # surprise additions show up.
     headings = _headings(md)
     h2_caps = [h for h in headings if h.startswith("## ") and h[3:].isupper()]
-    # Expect only ABSTRACT + KEYWORDS, no body-prose fragments.
-    assert h2_caps == ["## ABSTRACT", "## KEYWORDS"], h2_caps
+    # Expect only ABSTRACT (KEYWORDS now demoted by §B-new-2).
+    assert h2_caps == ["## ABSTRACT"], h2_caps
+    # Verify KEYWORDS still appears as inline metadata (not lost).
+    assert "**KEYWORDS:**" in md or "Keywords" in md, (
+        "KEYWORDS content must be preserved as inline metadata"
+    )

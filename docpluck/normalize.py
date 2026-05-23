@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.22"
+NORMALIZATION_VERSION = "1.9.23"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -620,6 +620,18 @@ _HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r".*Dhtt[Oo]ps[Ii]://.*$"),
     # Manuscript-ID gibberish like "1253268 ASRXXX10.1177/00031224241253268..."
     re.compile(r"^\d{6,}\s+[A-Z]{2,}[A-Z0-9]*\d+\.\d{4,}/.+$"),
+    # §B-new-5 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): SAGE/journal-ID
+    # welded-banner concatenation. pdftotext serialises the journal banner,
+    # DOI, journal name, and running header as ONE line because they share
+    # a y-position. Shape: 2+ uppercase letters + optional digit prefix +
+    # `10.dddd/` DOI prefix + DOI digit suffix + journal name + author-
+    # pair, all glued together. Canonical: `PSPXXX10.1177/01461672251327169
+    # Personality and Social Psychology BulletinIp and Feldman`. NO
+    # whitespace separators (distinguishes from the `^\d{6,}\s+[A-Z]{2,}…`
+    # masthead above which has whitespace). The line is suppressed
+    # entirely — the welded banner is publisher furniture and the real
+    # title sits below it.
+    re.compile(r"^[A-Z]{2,}\d*10\.\d{4,}/\d{6,}[A-Z][a-z].*$"),
     # Generic journal-citation banner with DOI suffix.
     re.compile(r"^[A-Z][A-Za-z\-]+,\s+\d{4},\s+vol(?:ume)?\s+\d+.*https?://doi\.org/.*$", re.IGNORECASE),
     # ScienceDirect issue line: "Journal Name 96 (2021) 104154 Contents lists..."
@@ -1785,6 +1797,12 @@ class NormalizationReport:
     changes_made: dict[str, int] = field(default_factory=dict)
     footnote_spans: tuple[tuple[int, int], ...] = ()  # pre-strip char offsets
     page_offsets: tuple[int, ...] = ()                 # post-strip body page offsets
+    # §A R4 / B6 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): 1-indexed page
+    # numbers where pdftotext's two-column reading-order serialisation
+    # appears to have interleaved between columns. Surfaced as a signal for
+    # downstream consumers (a follow-up cycle will re-extract these pages
+    # via a column-aware path; this cycle lands the detector + flag).
+    column_interleave_pages: tuple[int, ...] = ()
 
     def _track(self, step_code: str, before: str, after: str, metric_name: str):
         # ``steps_applied`` records every step that ran (kept for backward
@@ -2048,6 +2066,128 @@ def recover_minus_via_ci_pairing(text: str) -> str:
     for line in text.split("\n"):
         if "[" in line and "2" in line:
             out.append(_recover_minus_in_record(line))
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+# §A R5 / B7 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): recover the DROPPED
+# minus-sign class — distinct from W0d's '2'-for-U+2212 corruption. Here
+# pdftotext emits no glyph at all for the leading U+2212, so a coefficient
+# `b = -.022` reaches us as `b = .022`. The sign-flip is silent and breaks
+# every downstream statistical interpretation.
+#
+# The recovery uses the SAME structural invariant W0d uses (a point estimate
+# lies inside its own CI), applied differently: the candidate token here is a
+# bare positive `.NNN` or `D.NNN` — NOT prefixed by '2'. We can only flip the
+# sign when a CI bracket on the same row mathematically REQUIRES it: the
+# bracket DOES contain the recovered negative AND DOES NOT contain the literal
+# positive. A bracket that contains both (e.g. `[-0.05, 0.10]` paired with
+# `0.022`) is ambiguous → no flip. A bracket that contains only the positive
+# is also a no-flip (the literal value is consistent).
+#
+# Conservative gates (mandatory; no general "bare beta might be negative"
+# warner — that would fire on thousands of legitimate positive betas):
+#   1. Token shape: leading `\.` or `\d\.` decimal (≤2 leading digits) on a
+#      word boundary, not already preceded by `-` / digit / dot. Excludes
+#      "1.23" / "0.05" / "(1.5%)" etc.
+#   2. A CI bracket [lo, hi] exists in the same record AND lo < 0 (we never
+#      flip on a strictly-positive bracket — that would be a false-positive
+#      on legitimate positive coefficients reported alongside positive CIs).
+#   3. The recovered negative falls inside [lo, hi] AND the literal positive
+#      falls strictly OUTSIDE [lo, hi] (the same record-internal sign-flip
+#      proof W0d relies on).
+_BARE_POS_TOKEN_RE = re.compile(r"(?<![\d.\-])(\d?\.\d+)\b")
+
+
+def _recover_dropped_minus_in_record(record: str) -> str:
+    """Recover bare positive decimal tokens whose paired CI bracket proves
+    the published value is negative (the minus glyph was dropped pre-emit).
+
+    Conservative: only fires when the CI bracket [lo, hi] has lo < 0 AND the
+    recovered -X.XX is inside the bracket AND the literal X.XX is outside.
+    """
+    if "[" not in record:
+        return record
+    brackets: list[tuple[float, float, tuple[int, int], bool]] = []
+    for m in _CI_PAIR_BRACKET_RE.finditer(record):
+        try:
+            lo, hi = float(m.group(1)), float(m.group(2))
+        except ValueError:
+            continue
+        if lo > hi or lo >= 0:
+            # Only intervals that span negative space are safe: a strictly-
+            # positive bracket cannot prove a sign-flip without ambiguity.
+            continue
+        bs, be = m.span()
+        prefix = record[max(0, bs - 8): bs]
+        is_labeled = bool(_CI_LABEL_PREFIX_RE.search(prefix))
+        brackets.append((lo, hi, (bs, be), is_labeled))
+    if not brackets:
+        return record
+
+    def _sub(m: "re.Match[str]") -> str:
+        # Never touch a token that lies inside any bracket span (CI bound).
+        for _lo, _hi, (bs, be), _lab in brackets:
+            if bs <= m.start() < be:
+                return m.group(0)
+        frac_with_lead = m.group(1)
+        try:
+            literal = float(frac_with_lead)
+            recovered = -literal
+        except ValueError:
+            return m.group(0)
+        if literal <= 0:
+            return m.group(0)
+        token_end = m.end()
+        # Pick the NEAREST applicable bracket using the same labeled/bare
+        # rules as W0d (so we don't over-attach across sentences or
+        # independent-stat labels).
+        nearest = None
+        nearest_dist = None
+        for lo, hi, (bs, be), is_labeled in brackets:
+            if bs < token_end:
+                continue
+            gap = bs - token_end
+            intervening = record[token_end:bs]
+            if is_labeled:
+                if _INDEPENDENT_STAT_BETWEEN_RE.search(intervening):
+                    continue
+            else:
+                if gap > _CI_PAIR_MAX_GAP:
+                    continue
+                if _SENTENCE_BREAK_RE.search(intervening):
+                    continue
+            if nearest_dist is None or gap < nearest_dist:
+                nearest = (lo, hi)
+                nearest_dist = gap
+        if nearest is None:
+            return m.group(0)
+        lo, hi = nearest
+        in_recovered = (lo - 0.005) <= recovered <= (hi + 0.005)
+        in_literal = (lo - 0.005) <= literal <= (hi + 0.005)
+        # Strict requirement: recovered IN bracket, literal OUT. A bracket
+        # containing both (ambiguous) is a no-flip.
+        if in_recovered and not in_literal:
+            return "-" + frac_with_lead
+        return m.group(0)
+
+    return _BARE_POS_TOKEN_RE.sub(_sub, record)
+
+
+def recover_dropped_minus_via_ci_pairing(text: str) -> str:
+    """W0g (R5 / B7): recover bare positive decimal tokens whose CI proves
+    them negative (dropped-minus class). Distinct from ``recover_minus_via_ci_pairing``
+    (W0d), which handles the '2'-for-U+2212 corruption class."""
+    if not text or "[" not in text:
+        return text
+    text = _TABLE_ROW_RE.sub(
+        lambda m: _recover_dropped_minus_in_record(m.group(0)), text
+    )
+    out = []
+    for line in text.split("\n"):
+        if "[" in line:
+            out.append(_recover_dropped_minus_in_record(line))
         else:
             out.append(line)
     return "\n".join(out)
@@ -2386,6 +2526,15 @@ def normalize_text(
     before = t
     t = recover_minus_via_ci_pairing(t)
     report._track("W0d_minus_ci_pairing", before, t, "minus_signs_recovered")
+
+    # ── W0g (§A R5 / B7, 2026-05-23): recover DROPPED minus signs via CI ──
+    # Distinct corruption class from W0d: pdftotext emits no glyph at all for
+    # the leading U+2212 on certain fonts, so `b = -.022` reaches us as
+    # `b = .022`. Only fires when a same-record CI bracket mathematically
+    # PROVES the sign-flip (negative-bound bracket contains -X.XX but not X.XX).
+    before = t
+    t = recover_dropped_minus_via_ci_pairing(t)
+    report._track("W0g_dropped_minus_ci_pairing", before, t, "dropped_minus_signs_recovered")
 
     # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
     # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a
@@ -3396,4 +3545,96 @@ def normalize_text(
     # safe fixed-point. Generally protective against any future transliteration step that leaves an orphan combining mark on an ASCII tail.
     t = unicodedata.normalize("NFC", t)
 
+    # §A R4 / B6 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): detect pages
+    # where pdftotext's two-column reading-order serialisation appears to
+    # have interleaved between columns. Surface as a signal in the report
+    # (no text rewrite this cycle — the column-aware re-extraction is the
+    # follow-up architectural work flagged in the
+    # 2026-05-23-residual handoff §A R4 / CLAUDE.md "study pdfplumber's
+    # column algorithm and re-implement as a conditional fallback").
+    try:
+        if report.page_offsets and len(report.page_offsets) >= 1:
+            report.column_interleave_pages = _detect_column_interleave_pages(
+                t, report.page_offsets
+            )
+    except Exception:
+        # Detector is signal-only; never block the pipeline if it fails.
+        report.column_interleave_pages = ()
+
     return t.strip(), report
+
+
+# §A R4 / B6 column-interleave detection. Structural signature: within a
+# single page's body text, a "topic-flip" rate that exceeds a calibration
+# threshold — i.e. consecutive sentences whose subject domains alternate in
+# a way that cannot occur in coherent prose. Operationally cheap proxy:
+# count line-pairs where a line ends mid-sentence (no terminator) and the
+# next line starts with a Title-Case word AND the gap is short enough that
+# pdftotext would emit them together if columns flowed correctly. A
+# legitimately wrapped two-column page has ≤2 such pairs; an interleaved
+# page typically shows ≥6.
+
+_INTERLEAVE_FLIP_THRESHOLD = 6
+_NO_TERMINATOR_RE = re.compile(r"[^.?!:;\"'\)\]\}]\s*$")
+_TITLE_CASE_START_RE = re.compile(r"^[A-Z][a-z]+\b")
+
+
+def _detect_column_interleave_pages(
+    text: str, page_offsets: tuple[int, ...]
+) -> tuple[int, ...]:
+    """Identify 1-indexed pages whose body text exhibits a column-interleave
+    structural signature.
+
+    The signature is a count of `flip` events on the page: a line that ends
+    WITHOUT a sentence terminator AND whose next non-blank body line starts
+    with a Title-Case word (a new sentence opening). In coherent prose,
+    sentence-wraps end either with a hyphen / continuation word OR are
+    followed by a lowercase word; column-interleaved pages show ≥6 such
+    flips per page.
+
+    Returns a tuple of 1-indexed page numbers exceeding ``_INTERLEAVE_FLIP_THRESHOLD``.
+    Empty tuple when no detection is possible (single-page doc, no offsets).
+    """
+    if not text or not page_offsets or len(page_offsets) < 1:
+        return ()
+    offsets = list(page_offsets) + [len(text)]
+    flipped: list[int] = []
+    for p_idx in range(len(page_offsets)):
+        start = offsets[p_idx]
+        end = offsets[p_idx + 1]
+        page_text = text[start:end]
+        if not page_text.strip():
+            continue
+        lines = page_text.split("\n")
+        flips = 0
+        for k in range(len(lines) - 1):
+            cur = lines[k].rstrip()
+            nxt = lines[k + 1].lstrip()
+            if not cur or not nxt:
+                continue
+            # Skip lines that look like headings / tables / list markers /
+            # markdown fences — these legitimately reset case.
+            if cur.startswith(("#", "*", "<", ">", "|", "`", "-", "+")):
+                continue
+            if nxt.startswith(("#", "*", "<", ">", "|", "`", "-", "+")):
+                continue
+            if not _NO_TERMINATOR_RE.search(cur):
+                continue
+            if not _TITLE_CASE_START_RE.match(nxt):
+                continue
+            # Skip continuation-word tails (those are legitimate soft-wrap
+            # and don't indicate column-interleave).
+            last_word_m = re.search(r"(\b[A-Za-z]+)\s*$", cur)
+            if last_word_m:
+                lw = last_word_m.group(1).lower()
+                # A small set of continuation words that legitimately precede
+                # Title-Case proper nouns (citations, equation names, …).
+                if lw in {
+                    "the", "of", "in", "to", "for", "with", "on", "at",
+                    "by", "from", "as", "and", "or", "via", "than", "into",
+                }:
+                    continue
+            flips += 1
+        if flips >= _INTERLEAVE_FLIP_THRESHOLD:
+            flipped.append(p_idx + 1)
+    return tuple(flipped)
