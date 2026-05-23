@@ -1283,3 +1283,239 @@ def test_max_distinct_roles_in_any_line_helper():
     # 3 distinct role words but only ~33% of the words are inside role
     # spans — coverage gate filters this line out so the helper returns 0.
     assert _max_distinct_roles_in_any_line([prose], exclude="methodology") == 0
+
+
+# ── B2a HALLUC-HEAD (2026-05-22): split-form CRediT role demote ──
+
+
+def test_demote_credit_split_role_funding_acquisition():
+    """B2a: `## Funding` followed by orphan word `acquisition` is the
+    CRediT role 'Funding acquisition' with the second word linearised
+    onto its own line by the partitioner. Demote and rejoin."""
+    from docpluck.render import _demote_credit_role_headings
+
+    text = (
+        "Continued.\n"
+        "Conceptualization Data curation Formal analysis Investigation "
+        "Methodology Resources\n"
+        "\n"
+        "## Funding\n"
+        "\n"
+        "acquisition\n"
+        "\n"
+        "Chi-Fung Chan X\n"
+    )
+    out = _demote_credit_role_headings(text)
+    assert "## Funding" not in out
+    assert "Funding acquisition" in out
+    # The orphan-completion line itself is consumed into the combined
+    # plain-text line; it must not also remain as a stray bare word.
+    assert "\nacquisition\n" not in out
+
+
+def test_demote_credit_split_role_writing_original_draft():
+    """B2a: `## Writing` + `original draft` is the role
+    'Writing original draft'. ``writing`` is a prefix of several CRediT
+    roles; the orphan-line content is what disambiguates."""
+    from docpluck.render import _demote_credit_role_headings
+
+    text = (
+        "Conceptualization Data curation Formal analysis Investigation "
+        "Methodology Resources Software Supervision Validation\n"
+        "\n"
+        "## Writing\n"
+        "original draft\n"
+        "\n"
+        "Gilad Feldman X\n"
+    )
+    out = _demote_credit_role_headings(text)
+    assert "## Writing" not in out
+    assert "Writing original draft" in out
+
+
+def test_keep_real_funding_section_when_no_role_context():
+    """Regression guard: ``## Funding`` followed by funding prose (no
+    nearby CRediT-role-list line, no orphan that completes a CRediT
+    role) MUST NOT be demoted — it is a real Funding section."""
+    from docpluck.render import _demote_credit_role_headings
+
+    text = (
+        "## Funding\n"
+        "\n"
+        "This research was supported by Grant 12345 from the National\n"
+        "Science Foundation awarded to the second author. The funders\n"
+        "had no role in study design, data collection, or analysis.\n"
+    )
+    out = _demote_credit_role_headings(text)
+    assert "## Funding" in out
+
+
+def test_demote_credit_split_role_no_match_when_orphan_unrelated():
+    """B2a guard: ``## Funding`` followed by an unrelated word (not a
+    valid completion of any CRediT role) is left as a heading — we
+    never demote on prefix alone."""
+    from docpluck.render import _demote_credit_role_headings
+
+    text = (
+        "Conceptualization Data curation Formal analysis Investigation "
+        "Methodology Resources Software Supervision\n"
+        "\n"
+        "## Funding\n"
+        "\n"
+        "The grant was awarded last year.\n"
+    )
+    out = _demote_credit_role_headings(text)
+    # `the` is not a valid completion of `funding <X>`, so no demotion
+    # even though the role-context window is dense.
+    assert "## Funding" in out
+
+
+# ── B2b (2026-05-22): orphan generic-label heading demote ──
+
+
+def test_demote_orphan_conclusion_with_no_prose():
+    """B2b: `## Conclusion` immediately followed by another `##`
+    heading (no body prose between) is an orphan label promoted from
+    a front-matter sidebar — demote to body text."""
+    from docpluck.render import _demote_orphan_generic_headings
+
+    text = (
+        "Some intro prose ending here.\n"
+        "\n"
+        "## Conclusion\n"
+        "\n"
+        "## References\n"
+        "\n"
+        "[1] Some reference.\n"
+    )
+    out = _demote_orphan_generic_headings(text)
+    assert "## Conclusion" not in out
+    assert "## References" in out  # untouched
+
+
+def test_keep_real_conclusion_with_prose_after():
+    """B2b guard: a real Conclusion section with prose after MUST NOT
+    be demoted — even with very short follow-up."""
+    from docpluck.render import _demote_orphan_generic_headings
+
+    text = (
+        "## Conclusion\n"
+        "\n"
+        "We replicated the original findings with a much larger sample\n"
+        "and extended them to a new domain. These results support the\n"
+        "claim that the effect is robust across populations.\n"
+    )
+    out = _demote_orphan_generic_headings(text)
+    assert "## Conclusion" in out
+
+
+def test_demote_orphan_findings_followed_by_appendix_label():
+    """B2b: `## Findings` followed directly by another heading is the
+    appendix-label shape — demote."""
+    from docpluck.render import _demote_orphan_generic_headings
+
+    text = (
+        "Body prose.\n"
+        "\n"
+        "## Findings\n"
+        "\n"
+        "## Limitations\n"
+        "\n"
+        "We did not measure long-term outcomes in this study.\n"
+    )
+    out = _demote_orphan_generic_headings(text)
+    assert "## Findings" not in out
+    # Limitations has prose right after — must stay a heading.
+    assert "## Limitations" in out
+
+
+# ── B2c (2026-05-22): isolated method-subsection promotion ──
+
+
+def test_promote_isolated_participants_label():
+    """B2c: a bare ``Participants`` line, paragraph-isolated, followed
+    by prose, is the G5d method-subsection shape — promote to
+    ``### Participants``."""
+    from docpluck.render import _promote_isolated_method_subsection_headings
+
+    text = (
+        "## Method\n"
+        "\n"
+        "Participants\n"
+        "\n"
+        "We recruited 200 undergraduates from a large public university\n"
+        "via the Prolific platform during the spring of 2024.\n"
+    )
+    out = _promote_isolated_method_subsection_headings(text)
+    assert "### Participants" in out
+
+
+def test_promote_isolated_materials_label():
+    """B2c: same shape for ``Materials``."""
+    from docpluck.render import _promote_isolated_method_subsection_headings
+
+    text = (
+        "## Method\n"
+        "\n"
+        "Materials\n"
+        "\n"
+        "We adapted the original questionnaire from Smith and colleagues\n"
+        "by translating it into Mandarin and back-translating it for\n"
+        "verification.\n"
+    )
+    out = _promote_isolated_method_subsection_headings(text)
+    assert "### Materials" in out
+
+
+def test_no_promote_when_not_isolated():
+    """B2c guard: a ``Participants`` token in mid-paragraph body text
+    must NOT be promoted — the blank-before/after isolation gate
+    rejects this case."""
+    from docpluck.render import _promote_isolated_method_subsection_headings
+
+    text = (
+        "The study used three groups.\n"
+        "Participants\n"
+        "in Group A received the manipulation first.\n"
+    )
+    out = _promote_isolated_method_subsection_headings(text)
+    assert "### Participants" not in out
+
+
+def test_no_promote_when_followed_by_table_cell_tokens():
+    """B2c guard: a ``Materials`` line followed by short cell tokens
+    (no prose) is a table cell, not a subsection — leave alone."""
+    from docpluck.render import _promote_isolated_method_subsection_headings
+
+    text = (
+        "## Some table follows\n"
+        "\n"
+        "Materials\n"
+        "\n"
+        "N\n"
+        "M\n"
+        "SD\n"
+    )
+    out = _promote_isolated_method_subsection_headings(text)
+    assert "### Materials" not in out
+
+
+def test_no_promote_back_to_back_labels():
+    """B2c guard: ``Participants`` then ``Materials`` back-to-back
+    (sibling-label sidebar / glossary) — neither should be promoted."""
+    from docpluck.render import _promote_isolated_method_subsection_headings
+
+    text = (
+        "## Sidebar\n"
+        "\n"
+        "Participants\n"
+        "\n"
+        "Materials\n"
+        "\n"
+        "We recruited 200 undergraduates from a large public university.\n"
+    )
+    out = _promote_isolated_method_subsection_headings(text)
+    # The second one (Materials) has prose after, but the previous
+    # non-blank is itself a sibling label — both should pass through
+    # untouched.
+    assert "### Materials" not in out

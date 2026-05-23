@@ -752,40 +752,383 @@ def _demote_credit_role_headings(text: str) -> str:
     the surrounding ±10-line window holds at least 3 OTHER CRediT role
     tokens. A real Methodology section heading is followed by method
     prose (0 nearby role tokens) and is left untouched.
+
+    B2a (2026-05-22): also recognises SPLIT-FORM roles where the heading
+    text is a single-word prefix of a multi-word CRediT role and the
+    next non-blank line completes it — e.g. ``## Funding`` + blank +
+    ``acquisition`` is the role "Funding acquisition" with the second
+    word orphaned onto its own line by the partitioner. ``## Writing``
+    + ``original draft`` (and variants) are handled the same way.
     """
     if not text:
         return text
     lines = text.split("\n")
     out: list[str] = []
-    for i, line in enumerate(lines):
+    n = len(lines)
+    i = 0
+    while i < n:
+        line = lines[i]
         m = re.match(r"^#{2,4}\s+(.+?)\s*$", line)
-        if m and _normalize_credit_role(m.group(1)) in _CREDIT_ROLES:
-            heading_role = _normalize_credit_role(m.group(1))
-            lo = max(0, i - 10)
-            hi = min(len(lines), i + 11)
-            # Signal A — whole-line role neighbours (original v2.4.53 logic):
-            # the role list with each role on its own line.
-            nearby = 0
-            for k in range(lo, hi):
-                if k == i:
-                    continue
-                s = lines[k].strip()
-                if s and _normalize_credit_role(s) in _CREDIT_ROLES:
-                    nearby += 1
-            # Signal B (B2 fix 2026-05-22) — at least one line in the window
-            # packs ≥3 distinct OTHER CRediT role substrings. This catches
-            # the chan_feldman-style table where roles are
-            # space-concatenated onto a single line. Prose virtually never
-            # hits this density on one line.
-            window_lines = [lines[k] for k in range(lo, hi) if k != i]
-            packed_max = _max_distinct_roles_in_any_line(window_lines, heading_role)
-            if nearby >= 3 or packed_max >= 3:
-                # Demote: drop the heading markup, keep the role word as
-                # a plain line (it is real content of the role block).
-                out.append(m.group(1).strip())
-                continue
-        out.append(line)
+        demoted = False
+        if m:
+            heading_text = m.group(1).strip()
+            heading_role = _normalize_credit_role(heading_text)
+            full_role: Optional[str] = None
+            orphan_idx: Optional[int] = None
+            # B2a: split-form completion is tried FIRST — single role-word
+            # PREFIX of a multi-word _CREDIT_ROLES entry, completed by the
+            # next non-blank line. Preferred over the standalone match
+            # because the longer form is the more accurate role attribution
+            # when both shapes are present (e.g. ``## Writing`` is itself
+            # the bare role ``writing`` AND a prefix of ``writing original
+            # draft``; the orphan line on the next non-blank decides).
+            if heading_role and " " not in heading_role:
+                prefix_with_space = heading_role + " "
+                candidates = {
+                    r for r in _CREDIT_ROLES if r.startswith(prefix_with_space)
+                }
+                if candidates:
+                    for j in range(i + 1, min(n, i + 4)):
+                        s = lines[j].strip()
+                        if not s:
+                            continue
+                        combined = _normalize_credit_role(heading_role + " " + s)
+                        if combined in candidates:
+                            full_role = combined
+                            orphan_idx = j
+                        # First non-blank line decides; whether or not it
+                        # matched, stop the lookahead.
+                        break
+            # Fall back to the standalone match if no split-form was found.
+            if full_role is None and heading_role in _CREDIT_ROLES:
+                full_role = heading_role
+            if full_role is not None:
+                lo = max(0, i - 10)
+                hi = min(n, i + 11)
+                # Signal A — whole-line role neighbours.
+                nearby = 0
+                for k in range(lo, hi):
+                    if k == i or k == orphan_idx:
+                        continue
+                    s = lines[k].strip()
+                    if s and _normalize_credit_role(s) in _CREDIT_ROLES:
+                        nearby += 1
+                # Signal B — packed CRediT-line in window.
+                window_lines = [
+                    lines[k]
+                    for k in range(lo, hi)
+                    if k != i and k != orphan_idx
+                ]
+                packed_max = _max_distinct_roles_in_any_line(
+                    window_lines, full_role
+                )
+                if nearby >= 3 or packed_max >= 3:
+                    if orphan_idx is not None:
+                        # Split-form: emit the combined role as plain text,
+                        # preserve any blank lines that sat between heading
+                        # and orphan, drop the orphan line itself.
+                        out.append(
+                            (heading_text + " " + lines[orphan_idx].strip()).strip()
+                        )
+                        for k in range(i + 1, orphan_idx):
+                            out.append(lines[k])
+                        i = orphan_idx + 1
+                    else:
+                        out.append(heading_text)
+                        i += 1
+                    demoted = True
+        if not demoted:
+            out.append(line)
+            i += 1
     return "\n".join(out)
+
+
+# ── B2b (2026-05-22): orphan generic-label heading demote ─────────────────
+#
+# The section partitioner promotes single-word canonical labels
+# (``Conclusion``, ``Evaluation``, ``Findings``, ``Implications``,
+# ``Limitations``) to ``##`` headings whenever they appear on a line by
+# themselves. In front-matter sidebars and appendix labels these words
+# stand alone with NO body prose after them — the next paragraph is
+# another heading or another short label. A real Conclusion / Evaluation
+# / Findings section is always followed by ≥3 prose lines.
+
+_GENERIC_DEMOTE_LABELS = frozenset({
+    "Conclusion",
+    "Conclusions",
+    "Evaluation",
+    "Evaluations",
+    "Findings",
+    "Implications",
+    "Limitations",
+})
+
+_PROSE_LINE_RE = re.compile(r"\b[a-z]{2,}\b")
+
+
+def _is_prose_line(line: str) -> bool:
+    """A line counts as PROSE for the B2b orphan test when it has both
+    real word content AND at least one lowercase-letter word (so a
+    string of column-header tokens like ``CI BF01`` doesn't satisfy)."""
+    s = line.strip()
+    if len(s) < 20:
+        return False
+    if s.startswith("#"):
+        return False
+    if not _PROSE_LINE_RE.search(s):
+        return False
+    return True
+
+
+def _demote_orphan_generic_headings(text: str) -> str:
+    """B2b: demote ``## <generic-label>`` headings that have no body
+    prose after them (front-matter sidebar / appendix-marker shape).
+
+    A real Conclusion / Evaluation / Findings section is followed by ≥3
+    lowercase prose lines within a small window. When the window after
+    the heading contains 0 prose lines (only blank lines and further
+    headings), the heading is the orphan label — demote to body text.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    i = 0
+    while i < n:
+        line = lines[i]
+        m = re.match(r"^#{2,4}\s+(.+?)\s*$", line)
+        demoted = False
+        if m and m.group(1).strip() in _GENERIC_DEMOTE_LABELS:
+            # Look forward up to 15 lines for prose evidence; stop early
+            # at the next heading line (which definitively ends the
+            # current section's "body").
+            window_end = min(n, i + 16)
+            prose_lines = 0
+            for j in range(i + 1, window_end):
+                if lines[j].lstrip().startswith("#"):
+                    break
+                if _is_prose_line(lines[j]):
+                    prose_lines += 1
+                    if prose_lines >= 1:
+                        # Even ONE prose line within the window is
+                        # enough to treat the heading as legitimate —
+                        # this is a conservative gate (we only demote
+                        # the obvious orphan case, never tighten a real
+                        # section).
+                        break
+            if prose_lines == 0:
+                out.append(m.group(1).strip())
+                i += 1
+                demoted = True
+        if not demoted:
+            out.append(line)
+            i += 1
+    return "\n".join(out)
+
+
+# ── HALLUC-HEAD-2 / G5d-2 (2026-05-23 cycle 3): continuation-promoted heading demote ─
+
+# Words that, when appearing as the last token of a line with no sentence
+# terminator, signal the line continues onto the next (soft-wrap split).
+# Articles + the most common prepositions + coordinating conjunctions.
+# Conservative set — we only demote when the prior line ENDS in one of these
+# AND has no terminating punctuation. Excludes adverbs / pronouns / verbs
+# (false-positive risk too high) and conjunctions like "but" / "or" / "yet"
+# (legitimately ending a sentence as a stylistic device).
+_CONTINUATION_TAIL_WORDS = frozenset({
+    # Articles
+    "a", "an", "the",
+    # Prepositions (top 20 by academic-prose frequency)
+    "of", "in", "to", "for", "with", "on", "at", "by", "from",
+    "about", "into", "through", "during", "before", "after",
+    "against", "between", "among", "via", "across", "within",
+    # Coordinating "and" only (NOT "but" / "or" / "yet" / "nor")
+    "and",
+    # Subordinating that clearly continues
+    "as", "than",
+})
+
+
+# Labels that, when starting a heading, indicate the heading is a structural
+# label (Table 1, Figure 3, Appendix A, etc.) and should NEVER be demoted by
+# the continuation-word guard. Established 2026-05-23 cycle 3 after the
+# initial guard demoted `### Table 1` in chandrashekar_2023_mp because the
+# prior body line ended in "of" (legitimate soft-wrap continuation context
+# but legitimate heading too).
+_LABEL_STYLE_HEADING_PREFIXES = (
+    "Table ", "Tab. ", "Tab ",
+    "Figure ", "Fig. ", "Fig ",
+    "Appendix ", "App. ",
+    "Box ",
+    "Scheme ",
+    "Equation ", "Eq. ", "Eq ",
+    "Algorithm ", "Alg. ",
+    "Listing ",
+    "Section ", "Sec. ",
+    "Chapter ", "Ch. ",
+    "Note ",
+    "Example ",
+    "Supplementary ",
+)
+
+
+def _demote_continuation_promoted_headings(text: str) -> str:
+    """HALLUC-HEAD-2 / G5d-2: demote ``## <Title>`` when the immediately-prior
+    non-empty line ends in a continuation word (``the``, ``in``, ``of``, …)
+    AND has no sentence terminator.
+
+    The partitioner sees the second half of a soft-wrap-split sentence as
+    a candidate heading and promotes it. This guard fires when that
+    promotion is unsafe — when the prior text grammatically continues into
+    what was promoted.
+
+    Specific cycle-3 case (2026-05-23): on ``ip_feldman_2025_pspb``,
+    "The calculated effect sizes are summarized in the\\n\\n## Supplemental
+    Materials\\n" — the partitioner promoted ``## Supplemental Materials``
+    because pdftotext column-broke "in the / Supplemental Materials".
+
+    SCOPE LIMITS (to avoid false-positive demotions):
+
+    * **h2 only.** Only ``## <Title>`` is at risk of over-promotion via this
+      mechanism. ``### `` and ``#### `` headings have additional context
+      (parent ``##`` already established) and over-promotions are rare. The
+      cycle-3 chandrashekar render had ``### Table 1`` after "experimental
+      design of" — legitimate h3 label, must not be demoted.
+    * **Skip label-style headings.** "Table 1", "Figure 3", "Appendix A",
+      "Box 2", etc. are structural labels — always legitimate even when the
+      surrounding prose is technically continuation-shaped.
+
+    Returns the demoted text with the ``## `` marker stripped (leaving the
+    title as a bare line). A separate normalize pass can rejoin it to the
+    prior line if needed; for now we just stop the false-heading.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    i = 0
+    while i < n:
+        line = lines[i]
+        # Only h2 headings — h3+ have lower over-promotion risk and h3 labels
+        # like `### Table 1` would false-positive on legitimate cases.
+        m = re.match(r"^(##)\s+(.+?)\s*$", line)
+        demoted = False
+        if m and not line.startswith("###"):
+            heading_text = m.group(2).strip()
+            # Skip label-style headings (Table N, Figure N, Appendix, …).
+            is_label = any(heading_text.startswith(p) for p in _LABEL_STYLE_HEADING_PREFIXES)
+            if not is_label:
+                # Find the immediately-prior non-empty line.
+                j = i - 1
+                while j >= 0 and not lines[j].strip():
+                    j -= 1
+                if j >= 0:
+                    prev = lines[j].rstrip()
+                    # Don't fire if prev is itself a heading, list-item, table
+                    # row, blockquote, or any markdown-structural line.
+                    is_structural_prev = bool(re.match(
+                        r"^\s*(?:#|[*+\-]\s|\d+\.\s|>|<|\||```|\*Table\b|\*Figure\b)",
+                        prev,
+                    ))
+                    if not is_structural_prev:
+                        # Sentence terminator check — prev must NOT end in
+                        # one of these.
+                        last_char_terminates = prev.endswith(
+                            (".", "?", "!", ":", ";", ")", "]", "}", "\"", "'", "*", "—", "–")
+                        )
+                        if not last_char_terminates:
+                            last_word_match = re.search(r"(\b[A-Za-z]+)\s*$", prev)
+                            if last_word_match:
+                                last_word = last_word_match.group(1).lower()
+                                if last_word in _CONTINUATION_TAIL_WORDS:
+                                    out.append(heading_text)
+                                    i += 1
+                                    demoted = True
+        if not demoted:
+            out.append(line)
+            i += 1
+    return "\n".join(out)
+
+
+# ── B2c (2026-05-22): isolated method-subsection promotion ────────────────
+#
+# G5d: real subsection headings (``Participants``, ``Materials``,
+# ``Procedure``, ``Measures``, ``Stimuli``, ``Design``, ``Apparatus``,
+# ``Analysis``) appear alone on a line as titles for a method
+# subsection. The general partitioner Pass 3 requires ≥5 chars AND
+# ≥2 words for weak headings, so these single-word labels never get
+# promoted. Render layer rescues them when they sit fully paragraph-
+# isolated AND are immediately followed by prose.
+
+_METHOD_SUBSECTION_LABELS = frozenset({
+    "Participants",
+    "Materials",
+    "Procedure",
+    "Procedures",
+    "Measures",
+    "Stimuli",
+    "Design",
+    "Apparatus",
+    "Analysis",
+    "Analyses",
+    "Sample",
+    "Subjects",
+})
+
+
+def _promote_isolated_method_subsection_headings(text: str) -> str:
+    """B2c: promote a bare single-word method-subsection label to a
+    ``### {label}`` heading when it is paragraph-isolated and the
+    immediately following non-blank line is prose.
+
+    Conservative gates that prevent false positives on table cells:
+      * Line must be FULLY isolated (blank line before AND after).
+      * Line content must be exactly one of ``_METHOD_SUBSECTION_LABELS``.
+      * Next non-blank line must be PROSE (lowercase word, ≥20 chars)
+        — table cells fail this gate because they are short tokens.
+      * Previous non-blank line must NOT itself be a single token
+        from ``_METHOD_SUBSECTION_LABELS`` (back-to-back labels are
+        almost certainly a glossary or sidebar, not real subsections).
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped in _METHOD_SUBSECTION_LABELS and stripped:
+            blank_before = i == 0 or not lines[i - 1].strip()
+            blank_after = i == n - 1 or not lines[i + 1].strip()
+            if blank_before and blank_after:
+                # Find next non-blank line.
+                j = i + 1
+                while j < n and not lines[j].strip():
+                    j += 1
+                if j < n and _is_prose_line(lines[j]):
+                    # Find previous non-blank line and reject if it is
+                    # itself a labels-only sibling (sidebar / glossary).
+                    k = i - 1
+                    while k >= 0 and not lines[k].strip():
+                        k -= 1
+                    prev_is_sibling_label = (
+                        k >= 0 and lines[k].strip() in _METHOD_SUBSECTION_LABELS
+                    )
+                    if not prev_is_sibling_label:
+                        # Pad with a blank line above and below the
+                        # promoted heading, matching the convention used
+                        # by ``_promote_study_subsection_headings``.
+                        if out and out[-1] != "":
+                            out.append("")
+                        out.append(f"### {stripped}")
+                        out.append("")
+                        continue
+        out.append(line)
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
 
 
 # ── Section C3: inline-footnote demotion + study-subsection promotion ──────
@@ -2451,6 +2794,25 @@ def render_pdf_to_markdown(
     # HALLUC-HEAD-1: demote a `## <CRediT-role>` heading (e.g. `## Methodology`)
     # that the partitioner promoted from inside the contributor-roles block.
     md = _demote_credit_role_headings(md)
+    # B2b (2026-05-22): demote orphan generic-label `##` headings that the
+    # partitioner promoted from a front-matter sidebar or appendix marker
+    # (``## Conclusion`` / ``## Evaluation`` / ``## Findings`` /
+    # ``## Implications`` / ``## Limitations`` with no body prose after).
+    md = _demote_orphan_generic_headings(md)
+    # HALLUC-HEAD-2 / G5d-2 (2026-05-23 cycle 3): demote ``## <Title>`` that
+    # the partitioner over-promoted from the second half of a soft-wrap-split
+    # sentence. Fires when the IMMEDIATELY-PRIOR non-empty line ends in a
+    # continuation word (the, in, of, and, …) AND has no sentence terminator.
+    # Specific defect: ip_feldman_2025_pspb cycle-2 line 409
+    # ``## Supplemental Materials`` promoted from "summarized in the\n
+    # Supplemental Materials".
+    md = _demote_continuation_promoted_headings(md)
+    # B2c (2026-05-22): promote isolated bare method-subsection labels
+    # (``Participants`` / ``Materials`` / ``Procedure`` / ``Measures`` /
+    # ``Stimuli`` / ``Design`` / ``Apparatus`` / ``Analysis``) sitting on
+    # their own line with paragraph isolation, after the demote passes
+    # have settled the major heading layout.
+    md = _promote_isolated_method_subsection_headings(md)
     md = _rejoin_garbled_ocr_headers(md)
     # v2.4.34: final guarantee — strip Mathematical-Alphanumeric styling from
     # the assembled markdown. S0 (body channel) and tables/cell_cleaning
