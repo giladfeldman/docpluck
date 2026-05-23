@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.21"
+NORMALIZATION_VERSION = "1.9.22"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -626,6 +626,15 @@ _HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^[A-Z][A-Za-z &]+\s+\d+\s+\(\d{4}\)\s+\d+(?:\s+Contents.*)?$"),
     # Standalone Digital Object Identifier line.
     re.compile(r"^Digital Object Identifier\s+10\.\d+/.+$"),
+    # B3 (2026-05-22): bare "DOI: 10.xxxx/..." header-zone banner.
+    # The brjpsych_1 masthead is "DOI: 10.1111/bjop.12757" on its own
+    # line. P0 has a sibling lowercase-``doi:`` pattern for in-body
+    # footers; H0 needs the case-insensitive variant here so the
+    # header-zone strip happens in the SAME pass as the bare-URL strip
+    # below it — otherwise H0's 30-line cap will catch a later
+    # wileyonlinelibrary.com line in pass 2 only (after pass 1's P0
+    # strip shifted lines up), breaking idempotence.
+    re.compile(r"^DOI:?\s+10\.\d{3,5}/\S+\s*$", re.IGNORECASE),
     # Curated bare journal-name lines (small-font running banner above title).
     re.compile(r"^Journal of Economic Psychology$"),
     re.compile(r"^Cognition and Emotion$"),
@@ -972,6 +981,58 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
         r"^(?:https?://doi\.org/\S+\s+)?Received\s+\d{1,2}\s+\w+\s+\d{4};"
         r".*(?:©|All\s+rights\s+reserved\.?).*$"
     ),
+    # B3 / D4 (2026-05-22): PLOS-template "a1111111111" page watermark.
+    # PLOS journals stamp a row of ``a1111111111`` (one ``a`` followed by 8+
+    # ``1`` digits) as a positional watermark on every page; pdftotext emits
+    # it as a standalone line that leaks into body prose. No legitimate body
+    # text matches this shape — anchored on the full literal.
+    re.compile(r"^a1{8,}\s*$"),
+    # B3 / D4 (2026-05-22): bare ``doi:`` or ``https?://doi.org/...`` footer
+    # line standing alone on its own line. The DOI is part of the journal
+    # footer template, not body content. ``doi:`` lower-case form (Wiley,
+    # JAMA, Elsevier) and the URL form (PLOS, Frontiers, Springer) both
+    # leak. Distinct from in-text DOI mentions which never appear alone.
+    re.compile(r"^doi:\s*10\.\d{3,5}/\S+\s*$", re.IGNORECASE),
+    re.compile(r"^https?://(?:dx\.)?doi\.org/10\.\d{3,5}/\S+\s*$", re.IGNORECASE),
+    # B3 / D4 (2026-05-22): plural "E-mail addresses:" sidebar followed by
+    # one or more comma/semicolon-joined emails. The existing
+    # ``^E-?mail(?:s)?:\s*\S+@.+$`` matches the singular form
+    # "E-mail: foo@bar"; this adds the plural form
+    # "E-mail addresses: foo@bar, baz@qux".
+    re.compile(
+        r"^E-?mail\s+addresses?:\s*\S+@\S+(?:[\s,;]+\S+@\S+)*\s*$",
+        re.IGNORECASE,
+    ),
+    # B3 / D4 (2026-05-22): publication-history line "Received DD Mon YYYY;
+    # Accepted DD Mon YYYY[; Published DD Mon YYYY]" — semicolon-joined
+    # dates as the masthead template. Distinct from the
+    # ``^Received\s+\d{1,2}\s+\w+\s+\d{4}\s*$`` standalone-Received line
+    # already above; this catches the chained form.
+    re.compile(
+        r"^Received[:]?\s+\d{1,2}\s+\w+\s+\d{4}\s*[;,]\s*"
+        r"Accepted[:]?\s+\d{1,2}\s+\w+\s+\d{4}"
+        r"(?:\s*[;,]\s*Published[:]?\s+\d{1,2}\s+\w+\s+\d{4})?\s*\.?\s*$",
+        re.IGNORECASE,
+    ),
+    # B3 / D4 (2026-05-22): bare "N / M" or "N/M" page-furniture marker
+    # (Frontiers, F1000, eLife render "3 / 14" on every page). Anchored to
+    # 1-3 digit / 1-3 digit only — never matches in-text fractions like
+    # "1/2" inside sentence prose because prose lines have other tokens.
+    re.compile(r"^\d{1,3}\s*/\s*\d{1,3}\s*$"),
+    # B3 / D4 (2026-05-22): standalone "Competing interests" / "Conflict of
+    # interest" sidebar HEADER line (not the section heading itself —
+    # standalone fragments mid-body, leaked from sidebar serialisation).
+    # Must end with sentence terminator OR colon to distinguish from a
+    # real heading the partitioner should consume.
+    re.compile(
+        r"^(?:Competing\s+[Ii]nterests?|Conflicts?\s+of\s+[Ii]nterest)"
+        r"\s*[:.]\s*(?:None|The\s+author(?:s)?\s+declare).*$",
+    ),
+    # B3 / D4 (2026-05-22): "Abbreviations:" inline glossary sidebar that
+    # leaks mid-page (PLOS / BMJ). Distinct from a "## Abbreviations"
+    # section heading — this matches a line that starts with "Abbreviations:"
+    # AND has content after the colon (the inline expansion list).
+    re.compile(r"^Abbreviations:\s+\S.+$"),
 ]
 
 
@@ -1152,6 +1213,198 @@ def _strip_page_footer_lines(text: str) -> str:
         out_lines.append(line)
     if not dropped_any:
         return text
+    cleaned = "\n".join(out_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+# ── P0r (v2.4.70 / NORMALIZATION_VERSION 1.9.22) ────────────────────────
+# Repetition-driven running-header / page-footer strip.
+#
+# `_strip_page_footer_lines` (P0 above) handles publisher-specific patterns
+# we've curated by hand. But there's a long tail of running-header / page-
+# footer shapes that aren't worth a hand-curated pattern each, yet share a
+# common structural signature: a short line that repeats ≥3 times across
+# the pdftotext serialization, AND looks like a journal banner / author-
+# pair running head / DOI-and-date page footer (NOT like body prose, NOT
+# like a table cell).
+#
+# Established 2026-05-23 cycle 2 after the end-to-end iterate-loop test
+# surfaced these specific defects on the docpluck canary:
+#
+# - ip_feldman_2025_pspb: "Ip and Feldman" running header appearing
+#   7 times standalone PLUS welded into a Discussion sentence at
+#   line 2612 ("Ip and Feldman events (Srivastava et al., 2009) yet
+#   are less able …") and into a LeBel et al. reference at line 2699.
+#   Also "Personality and Social Psychology Bulletin 00(0)" footer
+#   (issue-proof placeholder) repeating 8 times.
+# - plos_med_1: "PLOS Medicine | https://doi.org/10.1371/journal.pmed.1004323
+#   December 28, 2023" footer × 16 + "PLOS MEDICINE" banner × 15.
+# - chan_feldman_2025_cogemo: "COGNITION AND EMOTION" banner × 12 +
+#   "C. F. CHAN AND G. FELDMAN" running header × 11, including injection
+#   INTO Table 2 thead cell at line 261 and Table 5 thead at line 596.
+#
+# The structural signatures (see `_looks_like_running_header_or_footer`):
+#   A. All-caps multi-word journal banner ("PLOS MEDICINE", "COGNITION
+#      AND EMOTION", "JAMA NETWORK OPEN") — ≥2 ASCII-uppercase words.
+#   B. All-caps author-pair with initials and AND — "C. F. CHAN AND G.
+#      FELDMAN" (and the page-numbered variant "1234 C. F. …").
+#   C. Mixed-case bare author-pair — "Ip and Feldman", "Smith & Jones".
+#   D. Journal name + `|` separator + DOI URL + date — the PLOS footer.
+#   E. Journal name + issue-proof placeholder `NN(N)` / `00(0)` — the
+#      PSPB pre-print/proof header.
+#
+# Critical safeguards:
+#   1. The line MUST repeat ≥3 times standalone (the de-facto guard
+#      against false-positive on body prose or table cells — neither
+#      repeats this often, while running headers/footers always do).
+#   2. The line must match one of the 5 content shapes — bare repetition
+#      alone is not enough (table cells can repeat 4+ times: "0/4 (0.0%)",
+#      "PSA", "<.001"; these must NOT be stripped).
+#   3. When a body line STARTS with a detected running-header string
+#      followed by space/period/comma, the running-header prefix is
+#      stripped (the welded-into-sentence variant — but ONLY when the
+#      header itself was independently detected via ≥3 standalone
+#      repetitions, so a real surname sentence ("Smith and Jones (2009)
+#      showed …") is not at risk unless the doc actually contains a
+#      "Smith and Jones" running header.
+
+# Author-pair patterns (recognised as ≥3-standalone candidates):
+_AUTHOR_PAIR_ALL_CAPS_AND = re.compile(
+    r"^(?:\d{1,4}\s+)?"                        # optional leading page number
+    r"(?:[A-Z]\.\s*)*[A-Z]{2,}"                # author1: optional initials + ALL-CAPS surname
+    r"(?:\s+[A-Z]\.)*"                          # optional trailing initial(s) of author1
+    r"\s+AND\s+"
+    r"(?:[A-Z]\.\s*)*[A-Z]{2,}"                # author2: same shape
+    r"(?:\s+[A-Z]\.)*"
+    r"\s*$"
+)
+_AUTHOR_PAIR_MIXED_CASE_AND = re.compile(
+    r"^[A-Z][a-z]{1,25}"                       # author1 surname (Title-case)
+    r"(?:\s+and\s+|\s+&\s+)"
+    r"[A-Z][a-z]{1,25}"                        # author2 surname
+    r"\s*$"
+)
+# Journal-DOI-date page footer (e.g. "PLOS Medicine | https://doi.org/... <date>"):
+_JOURNAL_DOI_DATE_FOOTER = re.compile(
+    r"^.{3,60}\|\s*https?://doi\.org/\S+\s+\S+\s+\d{1,2},?\s*\d{4}\s*$"
+)
+# Journal banner / journal + issue-proof placeholder:
+_JOURNAL_PROOF_HEADER = re.compile(
+    r"^[A-Z][A-Za-z][A-Za-z &\-]{4,60}\s+\d{1,3}\(\d{1,3}\)\s*$"
+)
+
+
+def _is_all_caps_journal_banner(line: str) -> bool:
+    """All-caps multi-word journal banner: e.g. ``PLOS MEDICINE``,
+    ``COGNITION AND EMOTION``, ``JAMA NETWORK OPEN``.
+
+    Rules:
+    - Length ≥ 7 chars (PSA, ECG etc. with 1-3 letters are excluded — too
+      common as table cell labels).
+    - Contains a space (≥2 words; AND / & count as words).
+    - Letters are ASCII A-Z only; allow spaces, ``&``, ``-``, ``.``.
+    - At least one alphabetic character.
+    - No digits, no commas, no parentheses (excludes table column headers
+      like ``OR [95% CI]`` and ``PSA, N=98``).
+    """
+    if len(line) < 7:
+        return False
+    if " " not in line:
+        return False
+    if not any(c.isalpha() for c in line):
+        return False
+    for c in line:
+        if c.isalpha():
+            if not ("A" <= c <= "Z"):
+                return False
+        elif c not in " &-.":
+            return False
+    # Reject if there are only 1 alphabetic words (avoid "PSA  " etc.)
+    words = [w for w in line.split() if w]
+    if len(words) < 2:
+        return False
+    return True
+
+
+def _looks_like_running_header_or_footer(line: str) -> bool:
+    """Return True if the line shape matches one of the 5 P0r signatures.
+
+    Used as a content guard on top of the ≥3-standalone-repetition guard.
+    Together they keep the strip from touching table cells (which repeat
+    but don't match these shapes) and body prose (which neither repeats
+    nor matches).
+    """
+    if not line or len(line) > 100:
+        return False
+    if _is_all_caps_journal_banner(line):
+        return True
+    if _AUTHOR_PAIR_ALL_CAPS_AND.match(line):
+        return True
+    if _AUTHOR_PAIR_MIXED_CASE_AND.match(line):
+        return True
+    if _JOURNAL_DOI_DATE_FOOTER.match(line):
+        return True
+    if _JOURNAL_PROOF_HEADER.match(line):
+        return True
+    return False
+
+
+def _detect_recurring_running_headers(text: str) -> set[str]:
+    """Identify lines that (a) repeat ≥3 times standalone AND (b) match a
+    running-header / page-footer shape (per ``_looks_like_running_header
+    _or_footer``). Returns the set of header strings to strip."""
+    counts: dict[str, int] = {}
+    for line in text.split("\n"):
+        s = line.strip()
+        if 3 <= len(s) <= 100:
+            counts[s] = counts.get(s, 0) + 1
+    return {
+        line for line, n in counts.items()
+        if n >= 3 and _looks_like_running_header_or_footer(line)
+    }
+
+
+def _strip_recurring_running_headers(text: str) -> str:
+    """P0r: drop running-header / page-footer lines that repeat ≥3 times
+    AND match one of the 5 shape patterns. Also strip them as a LEADING
+    prefix on body lines (the welded-into-sentence variant)."""
+    if not text:
+        return text
+    headers = _detect_recurring_running_headers(text)
+    if not headers:
+        return text
+    # Sort by length descending so longer headers are matched first when
+    # prefix-stripping (avoids "Smith" matching before "Smith and Jones").
+    headers_by_len = sorted(headers, key=len, reverse=True)
+    out_lines: list[str] = []
+    for line in text.split("\n"):
+        s = line.strip()
+        if s in headers:
+            continue  # standalone occurrence — drop
+        # Welded case: the body line begins with the running header followed
+        # by whitespace or punctuation. Strip the prefix so the body sentence
+        # survives without the header injection.
+        stripped = line
+        for h in headers_by_len:
+            # Match if line.lstrip() starts with h + (space|.|,) at the
+            # word boundary. We compare on the lstripped form to ignore
+            # leading whitespace that pdftotext may have inserted.
+            ls = stripped.lstrip()
+            if ls == h:
+                stripped = ""
+                break
+            if (
+                ls.startswith(h + " ")
+                or ls.startswith(h + ".")
+                or ls.startswith(h + ",")
+            ):
+                # Preserve the indent prefix, strip the welded header.
+                indent = stripped[: len(stripped) - len(ls)]
+                rest = ls[len(h):].lstrip(" .,")
+                stripped = indent + rest
+                break
+        out_lines.append(stripped)
     cleaned = "\n".join(out_lines)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
@@ -1402,6 +1655,73 @@ def _rejoin_space_broken_compounds(text: str) -> str:
     for pat in _DEHYPHEN_PATTERNS:
         text = pat.sub(lambda m: re.sub(r"\s+", "", m.group(0)), text)
     return text
+
+
+_NUMBERED_HEADING_ORPHAN_RE = re.compile(r"^\s*(\d{1,2}(?:\.\d{1,2}){0,3}\.?)\s*$")
+
+
+def _rejoin_split_numbered_headings(text: str) -> str:
+    """B5 / G5c-2 (2026-05-22): rejoin a numbered section heading whose
+    leading ``N.N.`` number got linearised onto its own line by pdftotext.
+
+    Pattern (jdm_m.2022.2: 5 cases):
+        ``2.1.``           <- bare number, no body content
+        (blank line(s))
+        ``Methods``        <- canonical section keyword
+
+    pdftotext column-linearisation can split ``2.1. Methods`` onto two
+    lines. The section partitioner then drops the orphan ``2.1.`` line
+    (it's not a recognised heading on its own) and the ``Methods`` line
+    is correctly promoted, but the numeric prefix is permanently lost
+    from the heading text.
+
+    Conservative: a candidate orphan is rejoined ONLY when the next
+    non-blank line lies within 3 lines, is ≤80 chars, and maps to a
+    canonical SectionLabel via ``lookup_canonical_label``. Prose words
+    that happen to capitalise (``Although``, ``However``) never resolve
+    to a canonical label so they are safe.
+
+    No-op when the next line is itself another orphan number, when the
+    orphan is at end of text, or when the heading doesn't resolve.
+    """
+    # Lazy import avoids the normalize → sections → normalize import cycle
+    # (sections/__init__.py imports normalize_text from this module).
+    from .sections.taxonomy import lookup_canonical_label
+
+    lines = text.split("\n")
+    out: list[str] = []
+    n = len(lines)
+    i = 0
+    while i < n:
+        m = _NUMBERED_HEADING_ORPHAN_RE.match(lines[i])
+        if m:
+            # Find next non-blank line within a 3-line lookahead.
+            j = i + 1
+            blanks: list[int] = []
+            while j < n and not lines[j].strip():
+                blanks.append(j)
+                j += 1
+            if (
+                j < n
+                and j - i <= 3
+                and 1 <= len(lines[j].strip()) <= 80
+                # Don't consume two stacked orphans — the second might be
+                # the real heading number for a SUBSEQUENT line.
+                and not _NUMBERED_HEADING_ORPHAN_RE.match(lines[j])
+                and lookup_canonical_label(lines[j].strip()) is not None
+            ):
+                num = m.group(1)
+                # Ensure trailing dot so the combined form is the
+                # conventional ``N.N. Heading`` shape.
+                if not num.endswith("."):
+                    num = num + "."
+                out.append(f"{num} {lines[j].strip()}")
+                # Skip the blanks between and the consumed heading line.
+                i = j + 1
+                continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out)
 
 
 def _fix_hyphenated_line_breaks(text: str) -> str:
@@ -2012,6 +2332,17 @@ def normalize_text(
     before = t
     t = _strip_page_footer_lines(t)
     report._track("P0_page_footer_strip", before, t, "page_footer_lines_stripped")
+
+    # ── P0r: repetition-driven running-header strip (NORMALIZATION_VERSION 1.9.22) ─
+    # Strips short lines that repeat ≥3 times AND match one of the 5
+    # running-header / page-footer shape signatures (all-caps banner,
+    # all-caps author-pair-AND, mixed-case author-pair-and, journal-DOI-
+    # date footer, journal+issue-proof header). Also strips them as a
+    # leading prefix on welded body lines. See _strip_recurring_running_
+    # headers docstring for the 2026-05-23 cycle-2 origin.
+    before = t
+    t = _strip_recurring_running_headers(t)
+    report._track("P0r_recurring_running_header_strip", before, t, "recurring_running_headers_stripped")
 
     # ── P1: front-matter metadata-leak paragraph strip (NORMALIZATION_VERSION 1.8.4) ─
     # Drops orphan acknowledgments / license / "previous version" / supplemental
@@ -3032,6 +3363,23 @@ def normalize_text(
             break
         t = _restripped
     report._track("P0r_page_footer_restrip", before, t, "page_footer_lines_restripped")
+
+    # ── G5c-2: rejoin pdftotext-split numbered section headings ─────────
+    # B5 (2026-05-22): ``N.N.\n\n<CanonicalKeyword>`` is a single split
+    # heading the partitioner would otherwise consume as two artefacts
+    # (the orphan number is dropped, the keyword line is promoted, the
+    # numeric prefix is lost). Runs LAST in academic — after every other
+    # rejoin has settled — so the lookup_canonical_label gate is judged
+    # against fully-normalized text. Gated on canonical-label resolution
+    # so prose words can never trigger.
+    before = t
+    t = _rejoin_split_numbered_headings(t)
+    report._track(
+        "G5c2_split_numbered_heading_rejoin",
+        before,
+        t,
+        "split_numbered_headings_rejoined",
+    )
 
     # ── Final NFC composition (Cycle 15 v2.4.67) ─────────────────────────
     # The early NFC at the top of normalize composes only the decomposed
