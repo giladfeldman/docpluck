@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.23"
+NORMALIZATION_VERSION = "1.9.25"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -82,6 +82,20 @@ _WATERMARK_PATTERNS = [
         # <year>" anchor prevents runaway captures into body prose.
         r"Downloaded\s+from\s+https?://[^\s]+(?:\s+by\s+[^\n]+?)?"
         r"\s+on\s+\d{1,2}\s+\w+\s+\d{4}",
+        re.IGNORECASE,
+    ),
+    # v2.4.74 (jama-open-1 RUNNING_HEADER_LEAK fix, 2026-05-25): JAMA-style
+    # watermark variant — domain without scheme, MM/DD/YYYY date format.
+    #   "Downloaded from jamanetwork.com by Medizinisch-Biologische
+    #    Fachbibliothek user on 03/18/2026"
+    # The previous pattern required `https?://` prefix and `DD Month YYYY`
+    # date format, missing every JAMA Open paper. Structural signature
+    # (per CLAUDE.md hard rule 16): "Downloaded from <bare-domain>...
+    # user on <numeric date>". The trailing date format is the disambiguator
+    # (no body prose ends with `\d{1,2}/\d{1,2}/\d{4}`).
+    re.compile(
+        r"Downloaded\s+from\s+[\w.-]+\.\w{2,}(?:\s+by\s+[^\n]+?)?"
+        r"\s+on\s+\d{1,2}/\d{1,2}/\d{4}",
         re.IGNORECASE,
     ),
     re.compile(r"Provided\s+by\s+[\w\s.,&-]+\s+on\s+\d{4}-\d{2}-\d{2}", re.IGNORECASE),
@@ -794,6 +808,16 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     # Page-N-of-M with date prefix: "October 27, 2023 1/13".
     re.compile(
         r"^(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*20\d{2}\s+\d+/\d+\s*$"
+    ),
+    # v2.4.74 (jama-open-1 RUNNING_HEADER_LEAK fix, 2026-05-25): bare date
+    # line as page-footer ("October 27, 2023" alone on its own line). JAMA
+    # Open paginates with the publication date repeated at the foot of every
+    # page. Structural signature: a complete-line, full-month-name + day +
+    # comma + 4-digit year, NOTHING ELSE. Distinguished from the legitimate
+    # "Published: October 27, 2023. doi:10.1001/..." metadata line (which
+    # has the "Published:" prefix and DOI suffix and survives this strip).
+    re.compile(
+        r"^(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*20\d{2}\s*$"
     ),
     # Bare "(continued)" page-break marker.
     re.compile(r"^\([Cc]ontinued\)\s*$"),
@@ -3152,6 +3176,23 @@ def normalize_text(
 
         # A4: CI delimiter harmonization
         before = t
+        # A4a: middle-period → comma inside CI-shaped brackets/parens (ESCIcheck
+        # 2026-05-24 D2: `[0.25.0.54]` → `[0.25, 0.54]`). Some PDFs render the
+        # CI comma glyph as a period (font substitution or pdftotext mapping),
+        # which downstream parsers cannot disambiguate from a decimal-continuation
+        # and so they drop the CI entirely. Each side must be `\d+\.\d+`
+        # (digits-dot-digits) — this blocks false-positives on section refs like
+        # `[1.2.3]` where the trailing token has no decimal.
+        t = re.sub(
+            r"\[(\s*[-+]?\d+\.\d+)\s*\.\s*([-+]?\d+\.\d+\s*)\]",
+            r"[\1, \2]",
+            t,
+        )
+        t = re.sub(
+            r"\((\s*[-+]?\d+\.\d+)\s*\.\s*([-+]?\d+\.\d+\s*)\)",
+            r"(\1, \2)",
+            t,
+        )
         # Semicolons → commas inside square brackets and parens
         t = re.sub(r"\[(\s*[-+]?\d*\.?\d+)\s*;\s*([-+]?\d*\.?\d+\s*)\]", r"[\1, \2]", t)
         t = re.sub(r"\((\s*[-+]?\d*\.?\d+)\s*;\s*([-+]?\d*\.?\d+\s*)\)", r"(\1, \2)", t)

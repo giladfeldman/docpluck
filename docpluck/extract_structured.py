@@ -55,6 +55,7 @@ def extract_pdf_structured(
     *,
     thorough: bool = False,
     table_text_mode: TableTextMode = "raw",
+    _layout_doc=None,
 ) -> StructuredResult:
     """Extract text + structured tables + figures from a PDF.
 
@@ -65,6 +66,13 @@ def extract_pdf_structured(
         table_text_mode: ``"raw"`` (default; text identical to ``extract_pdf``)
             or ``"placeholder"`` (caption lines for tables/figures are replaced
             with ``[Label: caption]`` markers).
+        _layout_doc: Optional pre-computed ``extract_pdf_layout(pdf_bytes)``
+            result. When provided, the §A R1 whitespace_cells fallback path
+            reuses it instead of re-extracting (saves one pdfplumber pass
+            per render — typically 1-3s on real papers). Underscored to
+            discourage casual library users from depending on the shape.
+            Introduced 2026-05-25 (v2.4.73 R1-perf follow-up) after the
+            R1 AI-gold sweep flagged the 2x layout extraction cost.
 
     Returns:
         StructuredResult dict.
@@ -182,7 +190,7 @@ def extract_pdf_structured(
     # Lazy-import the layout extraction + whitespace helper so the rest of
     # the pipeline works in environments without pdfplumber-layout deps; any
     # failure here falls back transparently to the isolated path.
-    layout_doc = None
+    layout_doc = _layout_doc  # reuse caller-supplied doc when available
     _whitespace_cells = None
     _region_for_caption_fn = None
     unmatched_caps = [
@@ -190,10 +198,11 @@ def extract_pdf_structured(
     ]
     if unmatched_caps:
         try:
-            from .extract_layout import extract_pdf_layout
             from .tables.detect import _region_for_caption as _rfc
             from .tables.whitespace import whitespace_cells as _wc
-            layout_doc = extract_pdf_layout(pdf_bytes)
+            if layout_doc is None:
+                from .extract_layout import extract_pdf_layout
+                layout_doc = extract_pdf_layout(pdf_bytes)
             _whitespace_cells = _wc
             _region_for_caption_fn = _rfc
         except Exception:
