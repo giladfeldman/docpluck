@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.4.75] — 2026-05-25
+
+**EC-T3: CI bracket middle-period → comma (ESCIcheck 2026-05-24 D2).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25. Closes one of the three defect clusters filed by escicheck-iterate against docpluck ([handoff](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md), [triage EC-T3](docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md)).
+
+- **A4a CI period→comma** (`docpluck/normalize.py`, A4 block)
+  - New sub-rule at the top of A4: `\[(\d+\.\d+)\s*\.\s*(\d+\.\d+)\]` → `[\1, \2]` (and analogous for parens). Each side must be `\d+\.\d+` (digits-dot-digits), which blocks false-positives on section refs like `[1.2.3]` (trailing token has no decimal).
+  - Verbatim from the handoff: `collabra_57785` abstract emitted `d=0.39[0.25.0.54]` — pdftotext mapped the CI comma glyph to a period, so effectcheck's CI-binder couldn't disambiguate `0.25.0.54` from a decimal continuation and dropped the CI entirely. Now rewrites to `d=0.39 [0.25, 0.54]`.
+  - Both signed negatives (`[-0.19.0.27]` → `[-0.19, 0.27]`) and tight no-space forms (`d=0.39[0.25.0.54]`) covered.
+  - 8 new tests in `tests/test_a4_ci_period_to_comma.py` — square brackets, parens, no-space, negative lower bound, idempotent on already-correct input, section-ref non-match, single-decimal non-match, full t-test-with-CI shape.
+
+Outstanding from the same handoff (queued in triage, not addressed in this release):
+- **EC-T1** — table column-header df / N / per-arm propagation into row cells (~78 effectcheck rows blocked across 6 canary papers). Needs a design call (sentence-stream alongside HTML vs HTML cell rewrite) — open question for the user.
+- **EC-T2** — trial-arm RR/RD/MD cell flattening (`plosmed_1004323`). Specialization of EC-T1, queued after.
+
+## [2.4.74] — 2026-05-25
+
+**jama-open-1 cluster (4 of 5 defects) + R1-perf threading + R3b widening.** `NORMALIZATION_VERSION` 1.9.23 → 1.9.24. Closes 4 of the 5 defects surfaced by the 2026-05-25 Haiku-orchestration pretest on `jama_open_1.pdf` ([handoff Issue 1](docs/HANDOFF_2026-05-25_pretest-followups.md)). Defect 4 (MISSING_SECTION / Key Points sidebar) is fundamentally a column-interleave problem (R4 territory) — left for the next cycle.
+
+- **D1 RUNNING_HEADER_LEAK** (`docpluck/normalize.py`)
+  - New `_WATERMARK_PATTERNS` entry: JAMA-style `Downloaded from <bare-domain> ... user on MM/DD/YYYY`. Previous pattern required `https?://` prefix + `DD Month YYYY` date — missed every JAMA Open paper.
+  - New `_PAGE_FOOTER_LINE_PATTERNS` entry: bare standalone `Month DD, YYYY` line. Distinguished from the legitimate `Published: October 27, 2023. doi:...` metadata line by line-completeness.
+  - Clears all 13 `Downloaded from jamanetwork.com ...` leaks and 15 standalone `October 27, 2023` leaks.
+
+- **D2 HALLUC_HEAD** (`docpluck/render.py` `_demote_isolated_table_cell_headings`)
+  - New post-processor that demotes `### {label}` headings stranded inside table-cell regions. Decision logic — ANY of: bidirectional cell-cluster + zero real sentences | ≥2 single-token-cell prev signals (column-header-row signature) | heading carries data-unit-suffix shape (`, kg` / `, %` / `, mg/dL`) + ≥1 cell neighbour | next-non-blank-line is data-unit-label + prev cell anchor.
+  - Strict `_looks_like_real_sentence` gate (≥4 words AND terminator AND lowercase word) prevents table-footer-note prose from blocking legitimate demotion.
+  - Clears all 4 surfaced cases: `### 1.0. Mean glucose level`, `### Control`, `### Body weight, kg`, `### Total cholesterol`.
+
+- **D3 ABSTRACT_LEVEL_MISMATCH** (`docpluck/render.py` `_demote_abstract_zone_inline_labels`)
+  - New zone-bounded demoter: between `## Abstract` and the next body-section h2 (Introduction / Methods / Background / etc., or after 80 lines as a hard cap), demote any `## X` heading whose text is in the explicit `_STRUCTURED_ABSTRACT_INLINE_LABELS` allowlist (JAMA structured-abstract labels: IMPORTANCE / OBJECTIVE / RESULTS / CONCLUSIONS AND RELEVANCE / MAIN OUTCOMES AND MEASURES / DESIGN, SETTING, AND PARTICIPANTS / INTERVENTIONS + Key Points sidebar trio: Question / Findings / Meaning).
+  - Conservative allowlist preserves legitimate body-section h2s like `## THEORETICAL DEVELOPMENT` (amj_1) and numbered headings like `## III. RESULTS` (ieee_access_2).
+  - 80-line hard cap prevents zone overrun when the body-section h2 has a non-canonical label (numbered prefix etc.) that bypasses the end-set match.
+
+- **D5 TABLE_STRUCTURE_CORRUPT** (`docpluck/render.py` `_strip_phantom_camelot_tables`)
+  - New post-processor that strips Camelot `<table>` blocks whose `<th>` matches running-header / masthead patterns (JAMA Network Open / NEJM / generic `Journal | Subsection`) AND whose `<tbody>` is ≤1 non-empty cell OR has a section-name leak (Discussion / Conclusion / Methods / etc.).
+  - Leaves the `### Table N` heading and `*Table N. ...*` caption line intact so the reader knows the table existed.
+  - Conservative — bypassed when `<tbody>` has >3 non-empty cells (real table with masthead-shaped header text).
+
+- **R1-perf threading** (`docpluck/extract_structured.py` + `docpluck/render.py`)
+  - New `_layout_doc` kwarg on `extract_pdf_structured(...)`. When passed, the §A R1 whitespace_cells fallback path reuses the caller-supplied layout doc instead of re-extracting via pdfplumber.
+  - `render_pdf_to_markdown` now pre-extracts the layout doc once at step 0 (used for title rescue) and passes it to `extract_pdf_structured` — eliminates the 2x `extract_pdf_layout(pdf_bytes)` pass flagged by the v2.4.73 R1 AI-gold sweep. Typical 1-3s saved per render on real papers.
+
+- **R3b widening** (`docpluck/render.py` `_suppress_inline_duplicate_figure_captions`)
+  - Conservative form preserved (≤120 chars, no stat shape, sentence-terminated). New wider form allows up to 250 chars overhang when the overhang additionally starts with lowercase / `(A) (B)` panel labels / etc. (caption-continuation shape) AND ends with a sentence terminator AND has no body-prose starter (`We ` / `In ` / `Although ` / etc.).
+  - Block-caption-completion path remains a follow-up.
+
+**Regression tests:** `tests/test_jama_open_cluster_real_pdf.py` (5 cases: D1 download-leak, D1 standalone-date, D2 table-cell-heading, D3 abstract-zone, D5 phantom-table). All assert real-PDF behaviour on `jama_open_1.pdf`.
+
+**Two previously-RED amj_1 / ieee_access_2 cases:** the abstract-zone demoter went through two regression rounds during development (over-demoted `## THEORETICAL DEVELOPMENT` then `## III. RESULTS`); current allowlist + 80-line cap clears both. Full pytest (TBD on commit).
+
 ## [2.4.73] — 2026-05-25
 
 **R1-repair — wake up the dead `whitespace_cells` wiring.** The §A R1 fix in v2.4.72 (`docpluck/extract_structured.py` `whitespace_cells` fallback for caption-detected tables Camelot couldn't recover) shipped structurally dead in production: a 2026-05-25 AI-gold sweep across the 11 B1 papers found `_region_for_caption` returned `None` in 100% of unmatched-caption cases, so `whitespace_cells` was never invoked. Root cause: `_bbox_of_caption_line` in `docpluck/tables/detect.py` matched the first-20-char `cap.line_text` prefix (e.g. `'Table 5. Reflection'`) against joined layout chars — but layout chars on a single y-row drop inter-word whitespace and keep raw PDF ligatures (e.g. `'Table5.Reﬂection…'`), so the prefix never matched. The silent fallback to `_isolated_table_from_caption` hid the no-op behind v2.4.71-identical output.
