@@ -1478,6 +1478,373 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
     return cleaned
 
 
+_CELL_FRAGMENT_NO_TERMINATOR_RE = re.compile(
+    r"^[^.!?]{0,60}$"  # no sentence terminator anywhere in the line
+)
+# Data-cell signature patterns (any-match → cell fragment).
+_DATA_UNIT_SUFFIX_RE = re.compile(
+    r",\s*(?:%|kg|cm|mm|mg/dL|mL|g/L|g/dL|U/L|nmol/L|mmol/L|pg/mL|ng/mL|"
+    r"min|h|d|y|years|wk|weeks|months|mo|s)\b\s*$"
+)
+_STATS_LABEL_SUFFIX_RE = re.compile(
+    r"\b(?:Mean|Median|SD|IQR|SE|CI|No\.|%)\b\s*=?\s*$"
+)
+_SINGLE_TITLECASE_TOKEN_RE = re.compile(r"^[A-Z][a-z]*$")
+_SINGLE_ACRONYM_TOKEN_RE = re.compile(r"^[A-Z]{1,6}$")
+_NUMERIC_PREFIX_RE = re.compile(r"^\d+(?:\.\d+)*\.?\s+\S")
+
+
+def _is_table_cell_fragment(line: str) -> bool:
+    """Stricter than ``not _is_prose_line``: a line counts as a TABLE-CELL
+    FRAGMENT when it is short AND lacks a sentence terminator anywhere
+    (`.` / `!` / `?`) OR carries an unambiguous data-label suffix
+    (`, %` / `, mg/dL` / `, kg`) / numeric prefix / single-word column-
+    label shape.
+    """
+    s = line.strip()
+    if not s or len(s) > 60 or len(s.split()) > 8:
+        return False
+    if s.startswith(("#", ">", "|", "`", "<", "*", "_")):
+        return False
+    if (_DATA_UNIT_SUFFIX_RE.search(s)
+        or _STATS_LABEL_SUFFIX_RE.search(s)
+        or _SINGLE_TITLECASE_TOKEN_RE.match(s)
+        or _SINGLE_ACRONYM_TOKEN_RE.match(s)
+        or _NUMERIC_PREFIX_RE.match(s)):
+        return True
+    if _CELL_FRAGMENT_NO_TERMINATOR_RE.match(s):
+        return True
+    return False
+
+
+_PHANTOM_TABLE_HEADER_PATTERNS = [
+    # JAMA Open journal masthead leak.
+    re.compile(r"JAMA\s+Network\s+Open\s*[|]", re.IGNORECASE),
+    re.compile(r"JAMA\s+Network\s+Open\s+\|\s+\S", re.IGNORECASE),
+    # NEJM masthead.
+    re.compile(r"The\s+NEW\s+ENGLAND\s+JOURNAL", re.IGNORECASE),
+    # Generic "Journal of X | Subsection" running header.
+    re.compile(r"^[A-Z][\w\s]+\s+\|\s+[A-Z]\w+", re.MULTILINE),
+]
+
+_PHANTOM_TABLE_BODY_LEAK_TOKENS = frozenset({
+    "Discussion", "Conclusion", "Conclusions", "Introduction", "Methods",
+    "Method", "Results", "Limitations", "References", "Background",
+    "Materials", "Procedure", "Participants",
+})
+
+
+def _strip_phantom_camelot_tables(text: str) -> str:
+    """jama-open-1 TABLE_STRUCTURE_CORRUPT fix (v2.4.74, 2026-05-25):
+    drop Camelot-emitted ``<table>`` blocks whose content is structurally
+    page-content (journal masthead, paper title, next-section name), not
+    real tabular data.
+
+    Structural signature for a PHANTOM table — ALL must hold:
+      1. ``<thead>`` exists AND ≥1 ``<th>`` cell matches a running-header /
+         masthead pattern (JAMA Network Open, NEJM masthead, generic
+         `<Journal> | <Section>` form).
+      2. ``<tbody>`` has ≤1 row total, OR the only non-empty body cell is
+         a single section-name token (Discussion / Conclusion / Methods).
+
+    When both hold, the "table" is Camelot picking up a page-spanning row
+    above or below the real table caption — false positive that bleeds the
+    journal masthead into a `<th>` and the next section name into a `<td>`.
+    Removed in place; the caption line (``*Table N. …*``) and the
+    ``### Table N`` heading remain so the reader sees the caption and
+    knows the table itself wasn't recoverable. This is intentionally
+    LOSSY (we drop garbage HTML) — preferred to emitting structurally
+    wrong table content per CLAUDE.md hard rule 0b (no hallucinated text).
+    """
+    if not text or "<table" not in text:
+        return text
+    # Process each <table>...</table> block independently.
+    pattern = re.compile(r"<table\b[^>]*>.*?</table>\s*", re.DOTALL | re.IGNORECASE)
+
+    def is_phantom(block: str) -> bool:
+        # Extract <th> contents.
+        th_cells = re.findall(r"<th[^>]*>(.*?)</th>", block, re.DOTALL | re.IGNORECASE)
+        if not th_cells:
+            return False
+        th_text = " | ".join(c.strip() for c in th_cells)
+        masthead_match = any(
+            p.search(th_text) for p in _PHANTOM_TABLE_HEADER_PATTERNS
+        )
+        if not masthead_match:
+            return False
+        # Inspect tbody: count non-empty body cells, look for section-name leak.
+        body_cells = re.findall(r"<td[^>]*>(.*?)</td>", block, re.DOTALL | re.IGNORECASE)
+        non_empty = [c.strip() for c in body_cells if c.strip()]
+        if len(non_empty) > 3:
+            # Not a phantom — real table with content despite masthead-shaped header.
+            return False
+        # Either ≤1 body cell OR an obvious section-name leak.
+        if not non_empty:
+            return True
+        for cell_text in non_empty:
+            cleaned = re.sub(r"<[^>]+>", "", cell_text).strip()
+            if cleaned in _PHANTOM_TABLE_BODY_LEAK_TOKENS:
+                return True
+        if len(non_empty) <= 1:
+            return True
+        return False
+
+    def replacement(m):
+        return "" if is_phantom(m.group(0)) else m.group(0)
+
+    return pattern.sub(replacement, text)
+
+
+_ABSTRACT_ZONE_END_HEADINGS = frozenset({
+    "Introduction", "Background", "Methods", "Method", "Materials",
+    "Materials and Methods", "Patients and Methods", "Subjects and Methods",
+    "Participants and Procedure", "Participants", "Procedure",
+    "Theoretical Development", "Theory", "Literature Review",
+})
+
+# Structured-abstract / Key Points inline labels that get wrongly promoted
+# to ## headings when column-interleave drops them on their own lines.
+# Title-cased + uppercase variants both included since promoters can produce
+# either depending on the source casing. CONSERVATIVE allowlist — never
+# demote a heading not in this exact set (avoids over-demoting legitimate
+# body-section h2s like `## THEORETICAL DEVELOPMENT` per the 2026-05-25
+# amj_1 regression).
+_STRUCTURED_ABSTRACT_INLINE_LABELS = frozenset({
+    # JAMA structured-abstract labels (uppercase per JAMA house style).
+    "IMPORTANCE", "Importance",
+    "OBJECTIVE", "Objective",
+    "OBJECTIVES", "Objectives",
+    "DESIGN, SETTING, AND PARTICIPANTS", "Design, Setting, and Participants",
+    "INTERVENTIONS", "Interventions",
+    "MAIN OUTCOMES AND MEASURES", "Main Outcomes and Measures",
+    "RESULTS", "CONCLUSIONS", "CONCLUSIONS AND RELEVANCE",
+    "Conclusions and Relevance",
+    # Other structured-abstract conventions.
+    "PURPOSE", "Purpose",
+    "DESIGN", "Design",
+    "FINDINGS",
+    # JAMA Key Points sidebar trio.
+    "Question", "Findings", "Meaning",
+})
+
+
+def _demote_abstract_zone_inline_labels(text: str) -> str:
+    """jama-open-1 ABSTRACT_LEVEL_MISMATCH fix (v2.4.74, 2026-05-25):
+    between ``## Abstract`` and the next genuine body-section h2 (e.g.
+    ``## Introduction`` / ``## Methods``), demote ``## X`` headings whose
+    text is in ``_STRUCTURED_ABSTRACT_INLINE_LABELS`` to inline bold
+    ``**X**``. JAMA structured-abstract inline labels (`IMPORTANCE`,
+    `RESULTS`, `CONCLUSIONS AND RELEVANCE`, `MAIN OUTCOMES AND MEASURES`)
+    and Key Points sidebar labels (`Question`, `Findings`, `Meaning`) get
+    promoted to h2 by upstream rules when column-interleave drops them on
+    their own lines — this demoter undoes the misplaced promotions.
+
+    Conservative: only demotes headings in the explicit allowlist, never
+    a heading whose text is "any all-caps phrase". A real body-section h2
+    like ``## THEORETICAL DEVELOPMENT`` (amj_1 fixture) is preserved.
+    Belt-and-braces against R4 column-interleave's structural cause being
+    unfixed yet.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    i = 0
+    in_zone = False
+    abstract_line_idx = -1
+    # Hard cap: structured-abstract labels appear within ~80 lines of
+    # `## Abstract` in every JAMA Open paper observed. Beyond that, ANY
+    # `## RESULTS` is a body-section heading (e.g. `## III. RESULTS` in
+    # ieee_access_2, where `## I. INTRODUCTION` doesn't match the
+    # _ABSTRACT_ZONE_END_HEADINGS set because of the roman-numeral prefix
+    # and so `in_zone` would otherwise stay True for the whole paper).
+    ZONE_LINE_CAP = 80
+    while i < n:
+        line = lines[i]
+        m = re.match(r"^##\s+(.+?)\s*$", line)
+        if m:
+            heading = m.group(1).strip()
+            if heading == "Abstract":
+                in_zone = True
+                abstract_line_idx = i
+                out.append(line)
+                i += 1
+                continue
+            if in_zone:
+                if (i - abstract_line_idx) > ZONE_LINE_CAP:
+                    in_zone = False
+                elif heading in _ABSTRACT_ZONE_END_HEADINGS:
+                    in_zone = False
+                    out.append(line)
+                    i += 1
+                    continue
+                if in_zone and heading in _STRUCTURED_ABSTRACT_INLINE_LABELS:
+                    # Inside zone AND known inline label — demote to bold.
+                    out.append(f"**{heading}**")
+                    i += 1
+                    continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
+def _looks_like_real_sentence(line: str) -> bool:
+    """A line counts as a REAL SENTENCE for the demote-blocking test when
+    it ends with `.`, `?`, or `!` AND has ≥4 words AND contains at least
+    one lowercase token. Strict — table footnotes ("This table summarises
+    the key findings.") are sentences; column labels like "Change from
+    baseline, %" are not.
+    """
+    s = line.strip()
+    if len(s) < 25:
+        return False
+    if not s.endswith((".", "?", "!")):
+        return False
+    if len(s.split()) < 4:
+        return False
+    if not re.search(r"\b[a-z]{3,}\b", s):
+        return False
+    return True
+
+
+def _demote_isolated_table_cell_headings(text: str) -> str:
+    """jama-open-1 HALLUC_HEAD fix (v2.4.74, 2026-05-25): demote a
+    ``### {label}`` heading that was wrongly promoted from a table cell.
+
+    Structural signature: the heading line is short (≤6 words, ≤60 chars,
+    no sentence terminator) AND BOTH of its surrounding non-blank windows
+    (3 lines each side, stopping at fences / blockquotes / other headings)
+    contain ≥1 ``_is_table_cell_fragment``-shape line and ZERO
+    ``_looks_like_real_sentence``-shape lines. That's the canonical
+    table-cell-region signature — column-label fragments, single letters,
+    short value labels, none of which are real sentences.
+
+    Conservative — gated by the strict ``_looks_like_real_sentence`` test
+    (must end with terminator + ≥4 words + lowercase token) rather than
+    the loose ``_is_prose_line`` (which catches non-sentence labels like
+    "Change from baseline, %" as "prose" because they contain a lowercase
+    word). A real ``### Subsection`` heading is always immediately followed
+    by real-sentence prose, so the bidirectional cluster gate makes
+    false-positive demotion extremely unlikely. Skips ``### Table N`` /
+    ``### Figure N`` (legitimate caption headings).
+
+    Surfaced by the 2026-05-25 jama-open-1 cluster: `### 1.0. Mean glucose
+    level`, `### Control`, `### Body weight, kg`, `### Total cholesterol`
+    — all stranded inside Table 2 / Table 4 cell regions.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    i = 0
+    while i < n:
+        line = lines[i]
+        m = re.match(r"^###\s+(.+?)\s*$", line)
+        demoted = False
+        if m:
+            heading = m.group(1).strip()
+            # Skip legitimate splice-anchor headings.
+            if not (heading.startswith("Table ") or heading.startswith("Figure ")):
+                # Heading itself must look like a table-cell fragment OR have
+                # the data-shape signature (numeric prefix etc.).
+                if _is_table_cell_fragment(heading):
+                    # Walk backward up to 3 non-blank lines, stopping at fences.
+                    prev_cell = 0
+                    prev_sent = 0
+                    prev_single_token_cells = 0  # column-header-row signal
+                    k = i - 1
+                    walked_back = 0
+                    while k >= 0 and walked_back < 3:
+                        s = lines[k].strip()
+                        if not s:
+                            k -= 1
+                            continue
+                        if s.startswith(("#", ">", "|", "`", "<")):
+                            break
+                        if _looks_like_real_sentence(s):
+                            prev_sent += 1
+                        elif _is_table_cell_fragment(s):
+                            prev_cell += 1
+                            # Single Title-Case word or single short acronym = column header.
+                            if (_SINGLE_TITLECASE_TOKEN_RE.match(s)
+                                or _SINGLE_ACRONYM_TOKEN_RE.match(s)):
+                                prev_single_token_cells += 1
+                        walked_back += 1
+                        k -= 1
+                    # Walk forward symmetrically.
+                    next_cell = 0
+                    next_sent = 0
+                    next_single_token_cells = 0
+                    k = i + 1
+                    walked_fwd = 0
+                    while k < n and walked_fwd < 3:
+                        s = lines[k].strip()
+                        if not s:
+                            k += 1
+                            continue
+                        if s.startswith(("#", ">", "|", "`", "<")):
+                            break
+                        if _looks_like_real_sentence(s):
+                            next_sent += 1
+                        elif _is_table_cell_fragment(s):
+                            next_cell += 1
+                            if (_SINGLE_TITLECASE_TOKEN_RE.match(s)
+                                or _SINGLE_ACRONYM_TOKEN_RE.match(s)):
+                                next_single_token_cells += 1
+                        walked_fwd += 1
+                        k += 1
+                    # Demotion rules — any of these is enough:
+                    #   (a) bidirectional cell cluster with no real sentences anywhere.
+                    #   (b) prev side has ≥2 single-token-cell signals (column-header
+                    #       row signature) — unambiguous table-region stranding even
+                    #       when the forward side has the table footer note prose.
+                    #   (c) heading text itself carries an unambiguous data-cell
+                    #       signature: data-unit comma-suffix (`, %` / `, kg` /
+                    #       `, mg/dL`) or numeric-prefix-shape (`1.0. X`). These
+                    #       shapes are STRUCTURALLY table-cell content (no real
+                    #       section heading ends in `, kg`) — demote regardless
+                    #       of surrounding context, as long as ≥1 cell-fragment
+                    #       neighbour exists on either side (anchors it in a
+                    #       table region rather than free body text).
+                    #   (d) next non-blank line is a data-unit suffix cell label
+                    #       (e.g. `Plasma lipid levels, mg/dL`). Heading is then
+                    #       a row label whose value column follows.
+                    bidirectional = (
+                        prev_cell >= 1 and next_cell >= 1
+                        and prev_sent == 0 and next_sent == 0
+                    )
+                    column_header_stranded = prev_single_token_cells >= 2
+                    heading_is_data_shape = bool(
+                        _DATA_UNIT_SUFFIX_RE.search(heading)
+                        or _NUMERIC_PREFIX_RE.match(heading)
+                    )
+                    next_is_data_unit_label = False
+                    k_nb = i + 1
+                    while k_nb < n and not lines[k_nb].strip():
+                        k_nb += 1
+                    if k_nb < n:
+                        next_is_data_unit_label = bool(
+                            _DATA_UNIT_SUFFIX_RE.search(lines[k_nb].strip())
+                        )
+                    data_shape_with_anchor = heading_is_data_shape and (
+                        prev_cell >= 1 or next_cell >= 1
+                    )
+                    next_label_with_anchor = next_is_data_unit_label and (
+                        prev_cell >= 1 or prev_single_token_cells >= 1
+                    )
+                    if (bidirectional or column_header_stranded
+                        or data_shape_with_anchor or next_label_with_anchor):
+                        out.append(heading)
+                        i += 1
+                        demoted = True
+        if not demoted:
+            out.append(line)
+            i += 1
+    return "\n".join(out)
+
+
 # ── Section C3: inline-footnote demotion + study-subsection promotion ──────
 
 
@@ -2139,9 +2506,46 @@ def _suppress_inline_duplicate_figure_captions(text: str) -> str:
                         r"|\b\d+\s*,\s*\d+\)\s*=\s*\d",
                         overhang,
                     ))
+                    # Body-prose signature: first-person / sentence-starter
+                    # words at the START of the overhang. If the overhang
+                    # starts with "We ", "In ", "Although ", "However ", etc.,
+                    # it's body text after the caption sentence ended.
+                    body_prose_start = bool(re.match(
+                        r"^(?:We\s|Our\s|This\s+study|In\s+(?:this|the|sum|summary|particular|addition|contrast)|"
+                        r"Although\s|However\s|Therefore\s|Thus\s|Importantly\s|Notably\s|"
+                        r"Specifically\s|First\s*,|Second\s*,|Third\s*,|Furthermore\s|"
+                        r"Moreover\s|Additionally\s|Finally\s|Consequently\s|"
+                        r"As\s+(?:we|expected|predicted|shown|noted)\s)",
+                        overhang,
+                    ))
                     if (
                         not has_stat_shape
+                        and not body_prose_start
                         and 0 < len(overhang) <= 120
+                        and overhang[-1] in ".?!"
+                    ):
+                        drop.update(run)
+                        i = j
+                        continue
+                    # R3b wider form (v2.4.74, 2026-05-25): allow up to 250
+                    # chars overhang when the overhang is clearly caption-
+                    # continuation shape. Stricter than the ≤120 path —
+                    # the overhang must additionally start with a lowercase
+                    # word (caption continuation typical: "showing the …")
+                    # OR a parenthesis-bracketed phrase ("(A) … (B) …" —
+                    # multi-panel figure caption pattern). And must end
+                    # with a sentence terminator. No stat shape, no body-
+                    # prose starter.
+                    overhang_extension_shape = bool(
+                        re.match(r"^[a-z]", overhang)
+                        or re.match(r"^\(\w\)", overhang)
+                        or re.match(r"^[A-Z]\.\s+[A-Z]", overhang)  # panel labels
+                    )
+                    if (
+                        not has_stat_shape
+                        and not body_prose_start
+                        and overhang_extension_shape
+                        and 120 < len(overhang) <= 250
                         and overhang[-1] in ".?!"
                     ):
                         drop.update(run)
@@ -3175,11 +3579,28 @@ def render_pdf_to_markdown(
         Markdown text suitable for direct ``.md`` output. Includes a ``# Title``
         line when the layout-channel title rescue succeeds.
     """
+    # 0. Pre-extract layout doc once (v2.4.74 R1-perf). Used downstream by
+    #    BOTH extract_pdf_structured (§A R1 whitespace_cells fallback) AND
+    #    the title-rescue step at line ~3335. Sharing eliminates the duplicate
+    #    pdfplumber pass that the R1 AI-gold sweep flagged as 2x cost on
+    #    every render path with unmatched captions. extract_pdf_structured's
+    #    `_layout_doc` parameter is None-tolerant — falls back to its own
+    #    extraction if the shared doc isn't available, preserving the existing
+    #    caller contract.
+    if _layout_doc is not None:
+        layout_doc = _layout_doc
+    else:
+        try:
+            from .extract_layout import extract_pdf_layout
+            layout_doc = extract_pdf_layout(pdf_bytes)
+        except Exception:
+            layout_doc = None
+
     # 1. Structured extraction (text + Camelot tables + figures).
     if _structured is not None:
         structured = _structured
     else:
-        structured = extract_pdf_structured(pdf_bytes)
+        structured = extract_pdf_structured(pdf_bytes, _layout_doc=layout_doc)
     if structured["text"].startswith("ERROR:"):
         return structured["text"]
 
@@ -3247,6 +3668,24 @@ def render_pdf_to_markdown(
     # Title-Case short line (≤6 words, ≤60 chars) followed by prose, gated
     # by strict shape checks. Runs AFTER B2c so the narrow set still wins.
     md = _promote_isolated_titlecase_subsection_headings(md)
+    # v2.4.74 (jama-open-1 HALLUC_HEAD fix): demote ### headings that the
+    # promoters just stranded inside table-cell-region clusters. Runs AFTER
+    # all promoters so it sees the final ### state and can target promotions
+    # that landed in cell-cluster contexts.
+    md = _demote_isolated_table_cell_headings(md)
+    # v2.4.74 (jama-open-1 ABSTRACT_LEVEL_MISMATCH fix): demote misplaced
+    # ## headings between ## Abstract and the next body-section h2. JAMA-
+    # style structured-abstract inline labels (IMPORTANCE / OBJECTIVE /
+    # RESULTS / CONCLUSIONS AND RELEVANCE) and Key Points sidebar labels
+    # (Question / Findings / Meaning) get wrongly promoted by upstream
+    # promoters when column-interleave drops them onto their own lines.
+    # Belt-and-braces until R4 column-aware re-extraction lands.
+    md = _demote_abstract_zone_inline_labels(md)
+    # v2.4.74 (jama-open-1 TABLE_STRUCTURE_CORRUPT fix): strip Camelot
+    # phantom tables whose <th> cells carry running-header/masthead text
+    # and whose body is essentially empty or a single section-name leak
+    # (Discussion / Conclusion / Methods).
+    md = _strip_phantom_camelot_tables(md)
     md = _rejoin_garbled_ocr_headers(md)
     # v2.4.34: final guarantee — strip Mathematical-Alphanumeric styling from
     # the assembled markdown. S0 (body channel) and tables/cell_cleaning
@@ -3323,15 +3762,7 @@ def render_pdf_to_markdown(
     # orphan-numeral folders so `## 1. Introduction` exists as an anchor.
     md = _promote_numbered_section_headings(md)
 
-    # 5. Title rescue — only available when pdfplumber layout extracts cleanly.
-    if _layout_doc is not None:
-        layout_doc = _layout_doc
-    else:
-        try:
-            from .extract_layout import extract_pdf_layout
-            layout_doc = extract_pdf_layout(pdf_bytes)
-        except Exception:
-            layout_doc = None
+    # 5. Title rescue — uses the layout_doc computed once at step 0 (v2.4.74).
     md = _rescue_title_from_layout(md, layout_doc)
     md = _italicize_known_subtitle_badges(md)
 
