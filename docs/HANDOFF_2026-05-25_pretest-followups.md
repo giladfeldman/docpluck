@@ -126,12 +126,10 @@ Both follow-ups close the loop on the 2026-05-25 pretest's deferred findings. Af
 - Update [`HANDOFF_2026-05-25_haiku-orchestration-pretest.md`](HANDOFF_2026-05-25_haiku-orchestration-pretest.md) "Approved follow-ups" section to mark items 1 and 2 as complete (with commit SHAs).
 - The third approved follow-up — "Design and run the next pretest: Haiku-drafted code patches reviewed by Opus" — remains open. That's a separate brainstorm session; do not roll it into either of these.
 
-## Files to clean up
+## Files to clean up — DONE 2026-05-25
 
-These were created during the pretest and can be removed (they are not under version control but live on disk):
+All pretest artifacts removed in the same session that produced this handoff:
 
-- `C:\Users\filin\Dropbox\Vibe\ArticleRepository\_pretest_haiku_golds\maier_2023_collabra\` — quarantined Haiku gold, no longer needed
-- `C:\Users\filin\Dropbox\Vibe\ArticleRepository\_pretest_haiku_golds\efendic_2022_affect\` — quarantined Haiku gold, no longer needed
-- `tmp/pretest_*.json`, `tmp/pretest_*.txt`, `tmp/run_meta_*.json` in docpluck — pretest instrumentation artifacts, all gitignored
-
-Either cleanup session can do this, or it can sit until the next docpluck cleanup pass.
+- ✅ `C:\Users\filin\Dropbox\Vibe\ArticleRepository\_pretest_haiku_golds\` (whole dir) — removed
+- ✅ `tmp/pretest_*.json`, `tmp/pretest_*.txt`, `tmp/run_meta_*.json` in docpluck — removed
+- ✅ `tmp/test-2026-05-23-haiku-orchestration-findings.md` — removed (findings already merged into this handoff and the pretest report)
