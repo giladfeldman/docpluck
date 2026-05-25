@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.4.73] — 2026-05-25
+
+**R1-repair — wake up the dead `whitespace_cells` wiring.** The §A R1 fix in v2.4.72 (`docpluck/extract_structured.py` `whitespace_cells` fallback for caption-detected tables Camelot couldn't recover) shipped structurally dead in production: a 2026-05-25 AI-gold sweep across the 11 B1 papers found `_region_for_caption` returned `None` in 100% of unmatched-caption cases, so `whitespace_cells` was never invoked. Root cause: `_bbox_of_caption_line` in `docpluck/tables/detect.py` matched the first-20-char `cap.line_text` prefix (e.g. `'Table 5. Reflection'`) against joined layout chars — but layout chars on a single y-row drop inter-word whitespace and keep raw PDF ligatures (e.g. `'Table5.Reﬂection…'`), so the prefix never matched. The silent fallback to `_isolated_table_from_caption` hid the no-op behind v2.4.71-identical output.
+
+**Fix (`docpluck/tables/detect.py::_bbox_of_caption_line`):** three-pass matcher.
+- Pass 1: exact prefix match against joined chars (legacy path, preserved for compatibility).
+- Pass 2: normalized prefix match — fold ligatures (`ﬁ`→`fi`, `ﬂ`→`fl`, etc.), strip whitespace, lowercase on both sides. Catches the dominant B1 failure shape.
+- Pass 3: label-only fallback — search for the normalized `cap.label` (e.g. `table5`) anywhere in the joined row, gated to start near the left margin and within the first ~4 chars of the row to avoid false positives on body prose ("(see Table 5)") and right-column 2-column-page rows.
+
+**Verification:** post-fix region resolution went from 0/22 captions (jdm_.2023.16 / chan_feldman / maier) to 22/22 (100%). `whitespace_cells` now fires and yields **72 cells on chan_feldman_2025_cogemo (8 captions)** and **100 cells on maier_2023_collabra (11 captions)** — verified by the new `tests/test_r1_whitespace_cells_wiring_real_pdf.py` regression test (3 cases: 2 real-PDF + 1 unit ligature/whitespace normalization).
+
+No `NORMALIZATION_VERSION` bump (no normalize.py change). Real-PDF regression test asserts the wiring stays live (catches future regressions in ligature handling, caption-line shape, or region bbox sizing).
+
+Follow-ups (queued in `todo.md`, not blocking this ship): (a) thread `_layout_doc` through `extract_pdf_structured` to eliminate the second `extract_pdf_layout(pdf_bytes)` pass `render.py` already triggers (perf only — measured 2x on every render path with unmatched caps); (b) for jdm_.2023.16-shape narrow tables, regions resolve but `whitespace_cells`'s ≥3-stable-column threshold leaves cells empty — needs per-page table-region detection per the 2026-05-22 R1 decision table.
+
 ## [2.4.72] — 2026-05-23
 
 **Bundled cycle — 2026-05-23 residual handoff (§A R1, R3a, R3b, R4, R5; §B-new-1..5; §C P0r-F).** `NORMALIZATION_VERSION` 1.9.22 → 1.9.23. Eleven fixes landed in one cycle per user directive ("implement and fix all in one go, leave nothing behind"):

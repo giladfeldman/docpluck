@@ -121,8 +121,36 @@ class _Footnote:
     bbox: Bbox
 
 
+_LIGATURE_FOLD = str.maketrans({
+    "ﬀ": "ff", "ﬁ": "fi", "ﬂ": "fl",
+    "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "ft", "ﬆ": "st",
+})
+
+
+def _normalize_for_char_match(s: str) -> str:
+    """Fold ligatures, drop whitespace, lowercase — for matching caption text
+    against layout-channel joined chars (which routinely drop spaces between
+    words inside a y-row and keep PDF ligature glyphs unchanged)."""
+    return s.translate(_LIGATURE_FOLD).replace(" ", "").replace("\t", "").lower()
+
+
 def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
-    """Find the y-cluster of chars whose joined text contains the start of the caption line."""
+    """Find the y-cluster of chars whose joined text contains the start of the caption line.
+
+    Robustness layers (each successively more forgiving — added 2026-05-25 after
+    the R1 sweep showed _region_for_caption returning None 11/11 on the B1 corpus
+    because layout chars join without inter-word spaces and contain raw PDF
+    ligatures, while cap.line_text comes from the de-ligatured text channel with
+    spaces preserved):
+      1. Exact prefix match against joined chars (legacy path).
+      2. Normalized prefix match — fold ligatures, strip whitespace, lowercase
+         on both sides. Catches the dominant B1 failure shape (Table5.Reﬂection…
+         vs Table 5. Reflection…).
+      3. Label-only match — search for the normalized cap.label (e.g. ``table5``)
+         anywhere in the joined row. Catches captions whose body text on the
+         page differs from the text-channel line_text (cross-page caption,
+         glyph substitution).
+    """
     chars = page_obj.chars or ()
     if not chars:
         return None
@@ -130,20 +158,49 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
     if not target:
         return None
     target_prefix = target[:20]
+    target_prefix_norm = _normalize_for_char_match(target_prefix)
+    label_norm = _normalize_for_char_match(cap.label)  # e.g. "table5"
 
     rows: dict[int, list[dict]] = defaultdict(list)
     for c in chars:
         rows[round(c.get("top", 0))].append(c)
 
+    # Pass 1+2: prefix-based match (legacy or normalized).
     for top_key in sorted(rows.keys()):
         row_chars = sorted(rows[top_key], key=lambda c: c.get("x0", 0))
         joined = "".join(c.get("text", "") for c in row_chars)
-        if target_prefix in joined:
+        joined_norm = _normalize_for_char_match(joined)
+        if target_prefix in joined or (
+            target_prefix_norm and target_prefix_norm in joined_norm
+        ):
             x0 = min(c["x0"] for c in row_chars)
             x1 = max(c["x1"] for c in row_chars)
             top = min(c["top"] for c in row_chars)
             bottom = max(c["bottom"] for c in row_chars)
             return (x0, top, x1, bottom)
+
+    # Pass 3: label-only fallback. The row must additionally start near the
+    # left margin (label-style caption, not an inline back-reference like
+    # "(see Table 5)") to avoid false-positive matches on body prose.
+    page_width = float(getattr(page_obj, "width", 0.0) or 0.0)
+    left_margin_cap = page_width * 0.5 if page_width else float("inf")
+    for top_key in sorted(rows.keys()):
+        row_chars = sorted(rows[top_key], key=lambda c: c.get("x0", 0))
+        joined = "".join(c.get("text", "") for c in row_chars)
+        joined_norm = _normalize_for_char_match(joined)
+        if not label_norm or label_norm not in joined_norm:
+            continue
+        # Reject if the label appears mid-row rather than at/near the start.
+        label_pos = joined_norm.find(label_norm)
+        if label_pos > 4:  # tolerate a couple leading chars (e.g., "*Table 5")
+            continue
+        x0 = min(c["x0"] for c in row_chars)
+        if x0 > left_margin_cap:
+            continue  # right column of a 2-column page, not a caption row
+        x1 = max(c["x1"] for c in row_chars)
+        top = min(c["top"] for c in row_chars)
+        bottom = max(c["bottom"] for c in row_chars)
+        return (x0, top, x1, bottom)
     return None
 
 
