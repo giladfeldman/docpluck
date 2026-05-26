@@ -121,10 +121,40 @@ def _cmd_sections(args: argparse.Namespace) -> int:
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
-    from . import render_pdf_to_markdown, NormalizationLevel
+    from . import (
+        NormalizationLevel,
+        extract_pdf_structured,
+        flatten_tables_for_paper,
+        render_pdf_to_markdown,
+    )
+
     blob = _read_bytes(args.file)
     level = NormalizationLevel(args.level)
-    md = render_pdf_to_markdown(blob, normalization_level=level)
+    flatten_inline = bool(getattr(args, "flatten_tables_inline", False))
+    tables_jsonl = getattr(args, "tables_jsonl", None)
+
+    # If the user asked for a JSONL sidecar, run structured extraction once
+    # and pass it to render so we don't pay Camelot twice.
+    if tables_jsonl:
+        structured = extract_pdf_structured(blob)
+        md = render_pdf_to_markdown(
+            blob,
+            normalization_level=level,
+            flatten_tables_inline=flatten_inline,
+            _structured=structured,
+        )
+        records = flatten_tables_for_paper(structured["tables"])
+        out_path = Path(tables_jsonl)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as fh:
+            for r in records:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    else:
+        md = render_pdf_to_markdown(
+            blob,
+            normalization_level=level,
+            flatten_tables_inline=flatten_inline,
+        )
     sys.stdout.write(md)
     return 0
 
@@ -141,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args_in[0] in ("-h", "--help", "help"):
-        print("usage: docpluck [--version | extract <file> [--sections L1,L2] [--structured [--thorough] [--text-mode raw|placeholder] [--tables-only|--figures-only] [--html-tables-to DIR]] | sections <file> [--format json|summary] | render <file> [--level none|standard|academic]]")
+        print("usage: docpluck [--version | extract <file> [--sections L1,L2] [--structured [--thorough] [--text-mode raw|placeholder] [--tables-only|--figures-only] [--html-tables-to DIR]] | sections <file> [--format json|summary] | render <file> [--level none|standard|academic] [--flatten-tables-inline] [--tables-jsonl PATH]]")
         return 0
 
     parser = argparse.ArgumentParser(prog="docpluck", add_help=True)
@@ -181,6 +211,25 @@ def main(argv: list[str] | None = None) -> int:
         default="standard",
         choices=["none", "standard", "academic"],
         help="Normalization level applied during section detection. Default: standard.",
+    )
+    render.add_argument(
+        "--flatten-tables-inline",
+        action="store_true",
+        dest="flatten_tables_inline",
+        help="Emit a human-readable 'rendered as text' block below each <table> "
+             "with one labelled sentence per body row (e.g. "
+             "'Importance: t(741) = 3.93, p < .001, d = 0.29'). Bounded by "
+             "HTML-comment sentinels. Default off — pass --tables-jsonl for "
+             "the structured form consumed by downstream stat-verification tools.",
+    )
+    render.add_argument(
+        "--tables-jsonl",
+        metavar="PATH",
+        default=None,
+        dest="tables_jsonl",
+        help="Write one FlattenedRow JSON record per line to PATH. Canonical "
+             "extraction contract for downstream stat-verification tools "
+             "(effectcheck, escimate, scimeto).",
     )
     render.set_defaults(func=_cmd_render)
 

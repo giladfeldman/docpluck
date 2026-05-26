@@ -582,3 +582,104 @@ table/stimulus region the renderer reflowed (column-major raw → row-major
   no `<table>`). The text is present (so not `text_loss`), but the table quality
   is wrong. Same root as B1 (tables not structured) / B3 (body-stream cell dump).
   Adds li-feldman + mayiwar to the ~11-paper TABLE-builder corpus list.
+
+---
+
+## ESCICHECK HANDOFFS — table-flattening defects (2026-05-24 → 2026-05-25)
+
+Source: `ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-24.md` and
+`ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md`. Filed by escicheck-iterate
+cycles 1-11 against an expanded 19-paper canary corpus. ~50–80 effectcheck rows
+across the corpus blocked on docpluck table flattening; not effectcheck's
+parser (sentence-oriented, can't reconstitute a verifiable test from a bare
+cell). Triage boundary confirmed by user 2026-05-24: table-cell flattening is
+docpluck's responsibility — fix upstream, never inside effectcheck.
+
+### Cluster EC-T1 — Header-df propagation into per-row table cells (S0×C3) — ✅ SHIPPED v2.4.76 (2026-05-25)
+
+**Shipped as a non-mutating sidecar contract** rather than rewriting `<table>` HTML. New `docpluck.tables.flatten` module produces per-row `FlattenedRow` records (`{raw_cells, header, row_label, sentence, fields}`) consumed by effectcheck/escimate/scimeto via the `docpluck render --tables-jsonl <path>` CLI flag or the `docpluck.flatten_tables_for_paper` public API. Header→cell consolidations include `t + df → t(df)`, `F + (df1,df2)` from `F(1, 998)` headers, `r + n → r(n-2)`, separate `lower/upper` CI columns → `95% CI [lo, hi]`, and `p_op + p → p < .001`. Opt-in `render_pdf_to_markdown(flatten_tables_inline=True)` additionally emits a human-readable block bounded by `<!-- docpluck:flattened-table id="…" start --> … end -->` sentinels, derived from the same records (no drift). `<table>` HTML is unchanged — markdown output byte-identical to v2.4.75 for non-opt-in callers. 19 regression tests in `tests/test_tables_flatten.py` cover the 6 canary shapes below.
+
+Cells emit as `t = 37.7, p < .001` / `F = 0.01, p = .938` / `r = .63 [...]`
+with the df / N / per-arm context living only in the table header row, so a
+sentence-level parser sees no df anchor and either drops the test or grades it
+NOTE (p-value not exact-checkable). Request: propagate the column-header df
+into each row's cell so the flattened sentence reads `t(801) = 37.7,
+p < .001` / `F(1, 998) = 0.01, p = .938` / `r(168) = .63, 95% CI [0.53, 0.72]`.
+
+**Confirmed instances (canary):**
+
+- **D1a** — `collabra_90203` Table 8: 6 ANOVA rows R11-R16 (`F = X, p = Y`,
+  df=(1, 998) in header only).
+- **D1b** — `collabra_90203` Table 9: 4 bare-number rows R20-R23
+  (`Replication 1, 114 0.09 .764` column-dump style; header carries labels).
+- **D1c** — `collabra_90203` Table 10: 6 correlation cells R32-R37
+  (`r .63 95% CI [...]` with `n` in a separate cell; df = n − 2 needs to bind).
+- **D1d** — `collabra_57785` Table 8: 2 t-rows 5-r09/5-r10 (`Importance | 3.93 |
+  741 | <.001 | d = 0.29`).
+- **D-2026-05-25-B** — `imada_collabra_32572` (Heyman-Ariely repl) Tables 4-5:
+  ~13 paired-t / Welch-t per-cell dumps.
+- **D-2026-05-25-D** — `brick_collabra_23443` Tables 5+7: ~12 one-sample /
+  paired t per-cell dumps.
+- **D-2026-05-25-E** — `lee_feldman_rsos_250908` Tables 10-15: 24 bare
+  `t = X, p < .001` rows (df=801 in header). NOTE: effectcheck v0.6.1 added
+  `pat_t_p_nodf` and now NOTE-extracts these without docpluck change; the
+  docpluck header-propagation fix would lift them from NOTE → OK (exact
+  p-check available).
+- **D-2026-05-25-F** — `majumder_jdm_2024_31` Tables 2/5/6: 13 replication
+  effect-size summary rows (`H1 single | 0.04 | -0.19 | 0.27`); needs flatten
+  to `H1 single: d = 0.04, 95% CI [-0.19, 0.27]`.
+
+**Total impact:** ~78 rows across 6 canary papers blocked on this single fix.
+
+**Likely fix layer:** `docpluck/tables/` (cell extraction) +
+`docpluck/render.py` / `extract_structured.py` (per-row sentence emission).
+Open design question: should the flatten emit a parallel sentence stream
+alongside the `<table>` HTML, or rewrite the HTML cell contents? Surface to
+user before implementing — sentence stream is lower-risk (consumers opt in)
+but duplicates content; HTML rewrite mutates the visual table.
+
+### Cluster EC-T2 — Trial-arm / RR/RD/MD cell sentence-flattening (S1×C2)
+
+- **D-2026-05-25-G** — `plosmed_1004323` (PROSECCO RCT) Tables 3-5: 3 DOCPLUCK
+  + 5 WEAK_GOLD rows. Per-arm cell stripes carry the RR/rdpct/md_hl values
+  without surrounding sentence anchor that effectcheck's RR/RD/MD detector
+  requires. Distinct from EC-T1 in that the missing context is per-arm
+  identity (intervention vs control) not df, but same family: header → row
+  context propagation.
+
+### Cluster EC-T3 — CI delimiter rendered as period not comma (S1×C1)
+
+- **D2** — `collabra_57785` abstract: `d=0.39[0.25.0.54]` should be
+  `d=0.39 [0.25, 0.54]`. effectcheck's CI-binder drops the bracket because
+  `0.25.0.54` cannot be disambiguated from a decimal-continuation. Likely
+  font-substitution or normalize.py defect (real comma → period). Fix:
+  detect `[num.num]` where one side already carries a `.` decimal and rewrite
+  to `[num, num]`; alternately verify the PDF text layer carries the original
+  Unicode comma and stop a normalize step from collapsing it. Single paper
+  but a clean self-contained recipe — viable as its own small cycle.
+
+### Non-defects from the 2026-05-25 sweep (closed, no docpluck action)
+
+- **D-2026-05-25-A** — `anvari_jesp_2020_104052`: 18 stats parse end-to-end,
+  baseline-clean. No defect.
+- **D-2026-05-25-C** — `chandr_jesp_104372`: 4 bare `r = .XX` cells are
+  **inter-rater agreement** (descriptive), not inferential tests. **Gold-label
+  mismatch upstream** (gold marked `test_type: "correlation"`); effectcheck
+  v0.5.10 conservatively declines. Not a docpluck defect; flagged for the
+  gold-quality pass at `article-finder` (consider `effect_size_only` label).
+- **D-2026-05-25-E** — already resolved upstream in effectcheck v0.6.1 (NOTE
+  status). docpluck header-propagation would upgrade NOTE → OK but is not
+  required to unblock; tracked under EC-T1 for the upgrade path only.
+
+### Recommended cycle order
+
+1. **EC-T3** first — small, self-contained CI-bracket-period rewrite; clean
+   win, low regression surface.
+2. **EC-T1** as a dedicated multi-cycle effort — design decision required
+   (sentence stream vs HTML rewrite); ~78-row unblock; needs the standard
+   26-paper baseline + AI-gold verify gate per CLAUDE.md "general-fixes"
+   rule. Do NOT key the fix on the canary papers' filenames; the structural
+   signature is "table column-header carries a df/N/arm-label that the cell
+   does not." Generalize across publishers.
+3. **EC-T2** after EC-T1 lands the header→row propagation primitive; per-arm
+   RCT tables are a specialization of the same primitive.

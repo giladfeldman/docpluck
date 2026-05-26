@@ -6,6 +6,27 @@ user-invocable: true
 argument-hint: "[--goal time:60m | iters:5 | baseline:26/26+full:95/101 | until:\"description\"] [--no-broad-read] [--dry-run]"
 ---
 
+<!--
+2026-05-25 — canary-audit integration (Sonnet-watches-Opus pattern, no API, Claude Max).
+
+At cycle-end (after `iterate-gate.sh --cycle N` returns PASS on deterministic
+rules I1-I11) AND at run-close, invoke the canary audit. The audit is Phase 5d's
+deterministic-gate companion: I1-I11 surface fix targets, Sonnet-via-Claude-Max
+independently judges whether the rendered artifact still matches the AI gold.
+
+Invocation paths:
+- In-session: `Agent(subagent_type="general-purpose", model="sonnet", prompt=<assembled-from-audit-subagent-prompt.md>)`.
+- Headless (after `claude setup-token`): `bash ~/.claude/skills/_shared/iterate-loop/canary-audit.sh --full docpluck-iterate`.
+
+Required reading:
+- `~/.claude/skills/_shared/iterate-loop/audit-subagent-prompt.md` (Sonnet's audit-role prompt template)
+- `.claude/skills/_project/canary.json::verification_protocol` (project-specific defect taxonomy + render command)
+
+Memories: `project_sonnet_watches_opus_audit`, `feedback_audit_nondeterminism_mitigation`, `feedback_no_apis_only_claude_max`.
+
+Reference handoff: `docs/superpowers/handoffs/2026-05-25-canary-audit-architecture-and-cluster-A-B-C-landed.md`.
+-->
+
 ## [MANDATORY FIRST ACTION] preflight + iterate-loop spine (do NOT skip, even if orchestrated by /ship)
 
 **Your very first action in this skill, BEFORE reading anything else, is:**

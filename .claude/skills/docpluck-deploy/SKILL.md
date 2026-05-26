@@ -4,6 +4,24 @@ description: Deploy Docpluck to production. Pre-flight checks (Next.js build, Py
 tags: [docpluck, nextjs, python, vercel, railway, neon, auth, deploy]
 ---
 
+<!--
+2026-05-25 — Pre-flight Phase 0 gate: canary-audit MUST pass before `git tag v*`.
+
+Before any tag operation, run the canary audit. If FAIL → block the tag with
+the punch-list of findings (see Sonnet's verdict at
+`tmp/iterate/canary-verdict-<HEAD-SHA>.json`).  Do NOT bypass with --no-verify
+on the pre-tag git hook; the audit exists to prevent the v2.4.72-style failure
+mode (cycle declared "shippable" on pytest green while the canary paper was
+demonstrably broken).
+
+Invocation paths:
+- In-session: `Agent(subagent_type="general-purpose", model="sonnet", prompt=<assembled-from-audit-subagent-prompt.md>)`.
+- Headless (after one-time `claude setup-token`): `bash ~/.claude/skills/_shared/iterate-loop/canary-audit.sh --full docpluck-iterate`.
+
+Both paths use Claude Max ONLY — never the Anthropic API (per
+`feedback_no_apis_only_claude_max`).
+-->
+
 ## [MANDATORY FIRST ACTION] preflight (do NOT skip, even if orchestrated by /ship)
 
 **Your very first action in this skill, BEFORE reading anything else, is:**

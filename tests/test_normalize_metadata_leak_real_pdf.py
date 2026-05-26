@@ -246,3 +246,130 @@ def test_ieee_access_2_license_and_running_header_real_pdf():
     )
     # Body integrity (the Petri-net Introduction must still be there).
     assert "Petri net" in md or "Petri Net" in md
+
+
+# ── 2026-05-26 Cluster C-bis: orphan affiliation wrap-tail ─────────────────
+
+
+def test_p1_strips_orphan_affiliation_wrap_tail_pspb_style():
+    """ip_feldman_2025_pspb finding #1 wrap-tail residual.
+
+    pdftotext serialises a corresponding-author paragraph across two
+    wrapped lines because the source PDF column wraps after a Place-Region
+    phrase. The Cluster C name-led pattern matches the first line, but the
+    wrap-tail second line ("Fu Lam, Hong Kong SAR.") survives because no
+    line-level pattern matched it. This regression covers that orphan.
+    """
+    text = (
+        "Intro body paragraph one.\n"
+        "Fu Lam, Hong Kong SAR.\n"
+        "Intro body paragraph two."
+    )
+    # Use a long-enough doc so the position gate (8000-char cutoff with a
+    # _min_ of 8000 chars) covers the whole text.
+    text = text + "\n\nbody. " * 200
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert "Fu Lam, Hong Kong SAR." not in out, (
+        "orphan affiliation wrap-tail 'Fu Lam, Hong Kong SAR.' should be stripped"
+    )
+    assert "Intro body paragraph one." in out
+    assert "Intro body paragraph two." in out
+
+
+def test_p1_strips_orphan_affiliation_wrap_tail_variants():
+    """The pattern targets a STRUCTURAL signature, not a specific PDF.
+
+    Cover the canonical orphan-tail shapes the pattern matches.
+    """
+    cases = [
+        "Fu Lam, Hong Kong SAR.",        # title-case place + all-caps region
+        "Berkeley, CA.",                   # all-caps state code only
+        "Cambridge, MA 02138.",            # state code + zip
+        "Atlanta, Georgia.",               # title-case + title-case
+        "Pok Fu Lam, Hong Kong SAR.",      # multi-word place + region + suffix
+        "New York, NY.",
+        "New York, NY 10027.",
+    ]
+    body = "\n\nbody. " * 200
+    for case in cases:
+        text = f"Body sentence one.\n{case}\nBody sentence two." + body
+        out = _strip_frontmatter_metadata_leaks(text)
+        assert case not in out, (
+            f"orphan wrap-tail variant {case!r} should be stripped"
+        )
+
+
+def test_p1_preserves_body_lines_resembling_affiliation_tail():
+    """Negative cases — common body-text shapes must NOT be stripped.
+
+    These are the high-risk false-positive shapes: short comma-separated
+    title-case phrases that appear in body prose, citations, and figure
+    captions. The pattern's anchors (period required, ≤60 char lookahead,
+    structural signature) reject all of them.
+    """
+    body = "\n\nbody. " * 200
+    cases = [
+        # Citations
+        "(Miller & Prentice, 1994).",
+        "(Liu et al., 2019).",
+        # Author-year-only references (no period after place)
+        "Liu, Wang, and Chen, 2019",
+        "Smith and Brown, 1999",
+        # Journal-citation tails
+        "Personality and Social Psychology Bulletin, 37(1), 120-135.",
+        # Body sentences ending with a place phrase (exceed length OR have
+        # lowercase prefix words)
+        "We collected data in Cambridge, MA.",
+        "the city of Boston, MA.",
+        "Boston, MA was the chosen site.",
+        # Affiliations that are NOT the wrap-tail shape
+        "Department of Psychology, University of Minnesota",  # no period, no place at end
+        "Cambridge University Press.",   # single token after no comma
+        # Long sentences with embedded place
+        "It was developed by Smith, Jones, and Lee.",
+        # Single-token (e.g. country) after comma
+        "Hong Kong was the location.",
+    ]
+    for case in cases:
+        text = f"Body sentence one.\n{case}\nBody sentence two." + body
+        out = _strip_frontmatter_metadata_leaks(text)
+        assert case in out, (
+            f"body-line {case!r} was incorrectly stripped as affiliation tail"
+        )
+
+
+def test_p1_position_gate_protects_late_affiliations_wrap_tail():
+    """Even orphan wrap-tails past the position cutoff (e.g. inside author
+    bios at the END of doc) must be preserved.
+    """
+    body = "Body sentence. " * 1200  # ~18,000 chars
+    late_tail = "Fu Lam, Hong Kong SAR."
+    text = (
+        "Front matter.\n\n"
+        + body
+        + "\n\n## Author bios\n\n"
+        + late_tail + "\n"
+        + "End."
+    )
+    assert text.index(late_tail) > 8000, (
+        "test fixture too short to exercise position gate"
+    )
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert late_tail in out, (
+        "wrap-tail past front-matter position gate must be preserved"
+    )
+
+
+def test_ip_feldman_orphan_affiliation_real_pdf():
+    """Rule 0d: real-PDF regression. The wrap-tail orphan that survived
+    Cluster C's multi-line name-led pattern must be gone after Cluster C-bis.
+    """
+    md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
+    assert "Fu Lam, Hong Kong SAR." not in md, (
+        "orphan affiliation wrap-tail still present in rendered front-matter"
+    )
+    # Body integrity — the funding section legitimately mentions the
+    # University of Hong Kong by name; the strip must not touch end-matter.
+    assert "University of Hong Kong" in md, (
+        "legitimate end-matter affiliation mention was over-stripped"
+    )

@@ -73,3 +73,66 @@ Deferred richer modes to consider once the two-mode default is in production and
 - **Custom placeholder template** — caller supplies `f"[{label}: {caption}]"` or similar.
 
 Add only when a real downstream consumer asks for one. YAGNI until then.
+
+---
+
+## 2026-05-25 wrapup punch-list — canary-audit + Cluster A/B/C + leftover v2.4.76
+
+> **Source:** Two-session wrapup combining R4 cycle work (uncommitted v2.4.76 from earlier today) and the canary-audit architecture session. See `docs/superpowers/handoffs/2026-05-25-canary-audit-architecture-and-cluster-A-B-C-landed.md` and `docs/superpowers/handoffs/2026-05-25-wrapup-r4-cycle.md` for full details. The 11th defect (`test_plos_med_1_no_fence_footer`) was fixed in the wrapup itself before commits.
+
+### Must do before v2.4.77 tag
+
+- [ ] **Run full pytest** to confirm combined v2.4.76 (R4 + EC-T1 + A4) + canary-audit (Cluster A/B/C/D-partial + PSPB-style heading + plos_med_1 P0r fix) state is clean. Estimated 24 min.
+- [ ] **Run `scripts/verify_corpus.py`** — R4 fires aggressively on chandrashekar_2023 (24 pages) and ip_feldman (14 pages). Confirm no regression vs the 26-paper baseline before tagging.
+- [ ] **Commit shape** (per 2026-05-25 wrapup decision): single combined v2.4.76 commit for R4 + EC-T1 + A4 + jama-open-1 D4 + plos_med_1 P0r fix, then separate `feat(canary-audit)` commit on top for Cluster A/B/C + audit infrastructure.
+
+### Canary-audit infrastructure — operational
+
+- [ ] **`claude setup-token`** — user runs this once in a regular terminal (interactive browser auth) so headless `claude -p --model sonnet` works from git hooks / scheduled tasks. Required before Phase 1 of canary-audit deploy.
+- [ ] **Wire git hooks** in `.git/hooks/`: pre-commit (quick canary on `docpluck/*.py` changes), pre-push (full canary on push to main), pre-tag (full canary, no exceptions). Each shells out to `~/.claude/skills/_shared/iterate-loop/canary-audit.sh`.
+- [ ] **Wire scheduled-tasks watchdog** via `mcp__scheduled-tasks__create_scheduled_task` — daily audit of HEAD against canary, PushNotification on FAIL.
+- [ ] **Double-audit + finding-union** mode in `canary-audit.sh` — runs Sonnet twice and unions findings (per `feedback_audit_nondeterminism_mitigation.md`). Currently the script runs Sonnet once.
+- [ ] **Persistent open-finding ledger** at `.claude/skills/_project/canary-findings-ledger.json` — once a defect is reported at HEAD SHA X, stays open until a later audit confirms clear.
+
+### Remaining ip_feldman_2025_pspb defects (14 in final audit)
+
+- [ ] **Front-matter leak lines 0-16** — article ID, journal banner, society copyright, DOI fragment emitted as body before Abstract. Needs P0 pre-pass for journal masthead block detection.
+- [ ] **Affiliation fragment "Fu Lam, Hong Kong SAR." (line 37)** — corresponding-author paragraph wrap-tail. Either pre-join wrapped affiliation paragraphs at P0 level OR add an orphan-wrap-tail pattern.
+- [ ] **Missing Method subsections** — `Design and Procedure`, `Power Analysis and Sensitivity Test`, `Measures`, `Data Analysis Strategy` still plain text. Investigate why these specific ones don't promote (others on same paper do).
+- [ ] **Missing Discussion subsection** `Challenging and Reframing Misestimation`.
+- [ ] **Table 10 phantom-guard** — th_section_leak heuristic didn't fire (cell content has hyphens splitting words like "cau-tion"). Debug + retune word-shape detection.
+- [ ] **Data Availability section absent from end-matter** — Cluster A demote-fix may have over-stripped the legitimate `## Data Availability` section that should remain after Author Contributions.
+- [ ] **False positive `### Reasons for change` (line 554)** — over-promotion in some context post-Cluster-B; investigate scope.
+- [ ] **Table 3 malformed** (cluster D-full Camelot — multi-session)
+- [ ] **Table 4 truncated** (Cluster D-full Camelot)
+- [ ] **Table 6 split rows** for multi-word items
+- [ ] **Table 8 split rows** for variable names
+- [ ] **Table 9 caption truncated mid-word** ("Versus" cut off, missing "Replication.")
+- [ ] **Table 9 Interpretation column** split across two `<tr>` rows.
+- [ ] **Table 10 no body** (caption only).
+
+### Cluster D-full Camelot tuning (deferred to its own session)
+
+- [ ] Stream-flavor column-tolerance tuning (`column_tol`, `row_tol`, `edge_tol` per-page or per-paper).
+- [ ] Post-Camelot header-cell splitter for concatenated columns (e.g. "Study 3Replication").
+- [ ] Multi-line cell wrap detection for body rows that span two PDF lines.
+- [ ] Multi-row header collapse (Table 5 fragmented headers).
+- [ ] Full 26-paper corpus regression-test infrastructure (table-specific AI gold view, not just `reading.md`).
+
+### R4 cycle residuals (from `2026-05-25-wrapup-r4-cycle.md`)
+
+- [ ] **R4 title truncation** — `Effect of Time-Restricted Eating on Weight Loss in Adu` cut at column midline.
+- [ ] **R4 multi-word-label splits** — `CONCLUSIONS AND RELEVANCE` becomes `**CONCLUSIONS**` heading + `AND RELEVANCE` orphan.
+- [ ] **R4 (continued) fragment** — `(continued)` page marker splits as `(contin` / `ued)`.
+- [ ] **R5 Path 1** — layout-channel per-char glyph identity recovery (bare table-cell betas, ar_apa_j_jesp_2009_12_011). Architectural multi-day work.
+
+### Article-finder skill issues (separate skill, separate session)
+
+- [ ] **Task #8**: `ai-gold.py resolve` should accept stem names + source-PDF paths (or docs redirect to `check`).
+- [ ] **Task #9**: `ai-gold.py onboard` needs `--skip-legacy` / `--ignore-unresolvable` flag (citationguard onboard halted on 3,018 legacy bare-stem keys).
+
+### Replicate canary-audit pattern to other iterate skills (after docpluck proven)
+
+- [ ] **escicheck-iterate** — easiest pilot (46 successful phase_5d_runs already, well-defined stats-family defect taxonomy). Update `verification_protocol` in its `canary.json`.
+- [ ] **2rmarkdown-iterate** — needs 3-tier verdict-vocabulary (GREEN/YELLOW/RED → PASS/FAIL/FAIL) integration in the orchestrator. Fixture-keyed corpus.
+- [ ] **citationguard-iterate** — needs corpus onboarding into article-finder FIRST (`corpus-query --source citationguard` returns 0 currently). Two-view-per-paper (`citations.v2` + `intext_citations.v1`).

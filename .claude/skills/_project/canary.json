@@ -48,6 +48,60 @@
     "max_cycles_without_corpus_sweep": 3,
     "default_max_gold_age_days": 30
   },
+  "verification_protocol": {
+    "kind": "library-render-vs-ai-gold",
+    "rendered_ext": ".md",
+    "gold_cache_filename": "reading.md",
+    "gold_view": "reading",
+    "locator_via_article_finder": "python ~/.claude/skills/article-finder/cache-check.py <doi>",
+    "gold_via_article_finder": "python ~/.claude/skills/article-finder/ai-gold.py get <key> --view reading",
+    "render_command": "python tools/render_for_audit.py --key {key} --out {out}",
+    "audit_subagent_prompt": "~/.claude/skills/_shared/iterate-loop/audit-subagent-prompt.md",
+    "audit_subagent_model": "sonnet",
+    "audit_invocation": {
+      "headless": "claude -p --model sonnet --append-system-prompt @<prompt-file> <payload-json>",
+      "in_session": "Agent(subagent_type='general-purpose', model='sonnet', prompt=<assembled-prompt>)",
+      "MUST_NOT_USE": "anthropic SDK, ANTHROPIC_API_KEY, direct api.anthropic.com calls, GH Actions calling Anthropic API. Per memory feedback_no_apis_only_claude_max + Vibe/CLAUDE.md hard rule."
+    },
+    "defect_taxonomy": [
+      {
+        "class": "TEXT-LOSS",
+        "description": "Body text present in the source PDF is missing from rendered .md (entire paragraph, sentence, or table row dropped).",
+        "examples": ["Table 5's 13 SAE rows missing from plos_med_1", "Last paragraph of Method section absent on chan_feldman"]
+      },
+      {
+        "class": "HALLUCINATION",
+        "description": "Text or structure in rendered .md that has no source in the PDF. Subclass G5d covers hallucinated subsection headings (e.g. body text promoted to '### Heading' inappropriately).",
+        "examples": ["'### Supplemental Materials' appearing as a heading mid-Method on ip_feldman when in gold it is body text", "'## KEYWORDS' inserted as heading on xiao_2021"]
+      },
+      {
+        "class": "SECTION-BOUNDARY",
+        "description": "Section headings missing, misplaced, or wrong level. Content attributed to the wrong section.",
+        "examples": ["Discussion content rendered under Method section", "Abstract heading missing entirely"]
+      },
+      {
+        "class": "TABLE",
+        "description": "Table content wrong: missing rows/columns, mid-text caption duplication, column interleave from extraction, header rows in body cells. Subclass B1 covers row-loss, B4 covers mid-text caption duplication, B6 covers column interleave.",
+        "examples": ["'Table 3. Comparison of...' caption appearing in body text on ip_feldman (B4)", "Multi-column page serialized interleaved on chandrashekar_2023 (B6)"]
+      },
+      {
+        "class": "FIGURE",
+        "description": "Figure references missing, captions misplaced, figure caption appearing twice or duplicated as inline text.",
+        "examples": ["Figure 3c caption duplicated inline after the figure block"]
+      },
+      {
+        "class": "METADATA-LEAK",
+        "description": "Front-matter (affiliations, authors, running header, journal banner, page number) leaking into body text. Subclass B3 covers affiliation/banner leak mid-Intro.",
+        "examples": ["'University of Hong Kong, Pok Fu Lam' appearing between Introduction paragraphs on ip_feldman (B3)", "'Ip and Feldman' running header surfacing as a body line"]
+      },
+      {
+        "class": "GLYPH",
+        "description": "Unicode glyph corruption: dropped minus signs (U+2212 → space), Greek letter loss on tight-kerned PDFs, sign-flipped statistics. Subclass B7 covers dropped-minus glyph.",
+        "examples": ["b = .022 rendered when source shows b = -0.022 (B7)"]
+      }
+    ],
+    "_note": "The audit subagent (Sonnet) is dispatched per-paper. For each canary paper: render via render_command, fetch gold via gold_via_article_finder, dispatch Sonnet with this taxonomy + paper-specific signals from canary.fixed[].rationale. Sonnet emits STRICT JSON verdict. The orchestrator (canary-audit.sh) aggregates per-paper verdicts and exits 0/1. Per feedback_no_apis_only_claude_max, Sonnet is ONLY invoked via Claude Max (headless `claude -p --model sonnet` or in-session Agent tool) — NEVER via the Anthropic API."
+  },
   "onboarding_status": {
     "onboarded_to_article_finder": ["ip_feldman_2025_pspb", "plos_med_1", "chandrashekar_2023_mp", "chan_feldman_2025_cogemo", "ar_apa_j_jesp_2009_12_011"],
     "still_to_onboard_before_use": ["efendic_2022_affect", "maier_2023_collabra", "xiao_2021_crsp"],

@@ -984,6 +984,32 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
         r"^Department\s+of\s+[A-Z][A-Za-z]+(?:\s+and\s+[A-Z][A-Za-z]+)?,\s+"
         r"University\s+of\s+[A-Z][A-Za-z]+(?:\s+Kong)?,\s+.{2,80}$"
     ),
+    # 2026-05-25 (Cluster C, ip_feldman finding #1): bare-university and
+    # name-led affiliation shapes that pdftotext emits when the front-matter
+    # block is column-wrapped.  The above pattern (v2.4.6) requires "Department
+    # of X" prefix; PSPB's ip_feldman_2025_pspb has two other publisher-
+    # furniture shapes:
+    #
+    #   (1) "University of <Place>, <City>, <Region>"
+    #       — Hong Kong-style: "University of Hong Kong, Pok Fu Lam, Hong Kong SAR"
+    #   (2) "<Name>, Department of <Field>, University of <Place>, <City>, <Region>."
+    #       — corresponding-author paragraph leading with the name.
+    #
+    # Both are publisher-furniture (running header / corresponding-author),
+    # not body prose.  Anchored on the affiliation core ("University of …"
+    # + comma + place) so legitimate body sentences that mention a university
+    # never match (body uses "the University of …" or "<U> researchers" —
+    # neither starts the line bare-cap or ends with "City, Region").
+    re.compile(
+        r"^University\s+of\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?,\s+"
+        r"[A-Z][A-Za-z]+(?:\s+[A-Z][\w\-]+)*,\s+[A-Z][\w\s]{1,40}\.?$"
+    ),
+    re.compile(
+        r"^[A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){0,3},\s+"
+        r"Department\s+of\s+[A-Z][A-Za-z]+(?:\s+and\s+[A-Z][A-Za-z]+)?,\s+"
+        r"University\s+of\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?,\s+"
+        r".{2,80}\.?$"
+    ),
     # v2.4.7: journal-footer URLs and volume markers that recur on every
     # page in Nature / Sci Rep / Royal Society OA journals — pdftotext
     # extracts them as standalone lines that leak into body prose.
@@ -1321,9 +1347,30 @@ _AUTHOR_PAIR_MIXED_CASE_AND = re.compile(
     r"[A-Z][a-z]{1,25}"                        # author2 surname
     r"\s*$"
 )
-# Journal-DOI-date page footer (e.g. "PLOS Medicine | https://doi.org/... <date>"):
+# Journal-DOI-date page footer (e.g. "PLOS Medicine | https://doi.org/... <date>").
+# 2026-05-25 fix: pdftotext column-wraps the date suffix on PLOS Medicine layouts —
+# the actual rendered line is `PLOS Medicine | https://doi.org/<doi> Dec` (3-letter
+# month only, day+year wrapped to next line).  Original regex required a complete
+# `<month> <day>, <year>` tail and missed the wrapped form on every plos_med_1 page
+# (test_plos_med_1_no_fence_footer was failing at HEAD).  Relaxed so the date suffix
+# is OPTIONAL — the journal+pipe+DOI structure alone is publisher-furniture and
+# can't appear in body prose.  Conservative because (a) the `^.{3,60}\|` anchor +
+# DOI URL is a tight typographic signature, (b) the 3-60 char journal-name length
+# range excludes long body sentences, (c) DOI URLs in body prose appear in
+# `(<URL>)` parentheses or as full sentences, never at the start of a line with
+# a pipe separator.
 _JOURNAL_DOI_DATE_FOOTER = re.compile(
-    r"^.{3,60}\|\s*https?://doi\.org/\S+\s+\S+\s+\d{1,2},?\s*\d{4}\s*$"
+    r"^.{3,60}\|\s*https?://doi\.org/\S+"
+    r"(?:\s+\S+(?:\s+\d{1,2},?\s*\d{4})?)?"
+    r"\s*$"
+)
+# Companion: orphan date-tail line ("Dec 28, 2023" / "December 28, 2023" /
+# "28, 2023") that appears AFTER a journal-DOI footer line when pdftotext
+# wrapped the date.  Matches only when paragraph-isolated (the surrounding
+# stripper checks the prev/next context).
+_JOURNAL_DATE_TAIL_ORPHAN = re.compile(
+    r"^(?:\d{1,2}\s*,\s*\d{4}"
+    r"|[A-Z][a-z]{2,8}\s+\d{1,2}\s*,\s*\d{4})\s*$"
 )
 # Journal banner / journal + issue-proof placeholder:
 _JOURNAL_PROOF_HEADER = re.compile(
@@ -1440,6 +1487,18 @@ def _strip_recurring_running_headers(text: str) -> str:
                 rest = ls[len(h):].lstrip(" .,")
                 stripped = indent + rest
                 break
+            # 2026-05-25 wrapup: truncated-prefix case (R4 column-aware
+            # extraction sometimes crops a page footer mid-token, leaving
+            # e.g. ``PLOS Medicine | https://doi.org/10.1371/journal.pmed.
+            # 1004323 Dec`` instead of the canonical ``... December 28, 2023``
+            # form). The truncated form appears once, the full form ≥3 times,
+            # so P0r's repetition detector catches the full but lets the
+            # truncated survive. Strip when the line is a prefix of a known
+            # header AND is at least 30 chars (avoids false positives on
+            # short shared prefixes).
+            if len(ls) >= 30 and h.startswith(ls):
+                stripped = ""
+                break
         out_lines.append(stripped)
     cleaned = "\n".join(out_lines)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
@@ -1531,6 +1590,22 @@ _FRONTMATTER_LEAK_PARA_PATTERNS: list[re.Pattern[str]] = [
         r"addressed\s+to\b",
         re.IGNORECASE,
     ),
+    # 2026-05-25 (Cluster C, ip_feldman finding #1): name-led corresponding-
+    # author paragraph emitted by Sage / PSPB style when pdftotext serialises
+    # the front-matter into a body-zone paragraph.  Shape:
+    #   "<First> <Last>, Department of <Field>, University of <Place>,
+    #    <City>, <Region>."
+    # Spans multiple wrapped lines (\s+ matches the embedded `\n`).
+    # Position-gated to front-matter (first 8000 chars), so legitimate
+    # late-doc author-bio paragraphs are preserved.  Anchored on the
+    # Name-comma + "Department of" + "University of" + comma-comma tail —
+    # not by name identity, by furniture shape.
+    re.compile(
+        r"^[A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){0,3},\s+"
+        r"Department\s+of\s+[A-Z][A-Za-z]+(?:\s+(?:and|of)\s+[A-Z][A-Za-z]+)?,\s+"
+        r"University\s+of\s+[A-Z][\w\s]+,\s+[A-Z][\w\s]+,\s+[A-Z][\w\s]+\.?\s*$",
+        re.DOTALL,
+    ),
 ]
 
 # Note: the three "globally safe" LINE patterns originally drafted here
@@ -1543,7 +1618,47 @@ _FRONTMATTER_LEAK_PARA_PATTERNS: list[re.Pattern[str]] = [
 # false-positive risk in the body. P1 keeps only the multi-sentence
 # paragraph-level patterns that DO carry false-positive risk in the late
 # Acknowledgments section and need the position gate.
-_FRONTMATTER_LEAK_LINE_PATTERNS: list[re.Pattern[str]] = []
+#
+# 2026-05-26 (Cluster C-bis, ip_feldman finding #1 wrap-tail residual):
+# pdftotext sometimes serialises a corresponding-author paragraph across
+# multiple wrapped lines because the source PDF column wraps after a
+# Place-Region phrase. Example from PSPB / Sage layout:
+#     line N:    "Gilad Feldman, Department of Psychology, University of Hong Kong, Pok"
+#     line N+1:  "Fu Lam, Hong Kong SAR."
+# The Cluster C name-led pattern in ``_FRONTMATTER_LEAK_PARA_PATTERNS``
+# matches the first line (anchored on "Department of" + "University of"
+# furniture), but the wrap-tail second line survives because no line-level
+# pattern matched it — line-by-line iteration in
+# ``_strip_frontmatter_metadata_leaks`` can't see across the line boundary.
+#
+# This pattern matches the orphan wrap-tail shape: 1-3 title-case place
+# tokens separated by commas, optionally with an all-caps region code (SAR,
+# USA, U.K.) or a state-code + zip (MA 02138), ending in a period. The
+# leading ``(?=.{1,60}$)`` lookahead bounds the whole line to 60 chars so
+# legitimate body sentences that happen to end with a Place, Region phrase
+# (typically much longer than 60 chars) are not absorbed.
+#
+# Position-gated to front-matter (first 8000 chars) by the outer strip
+# function — citations in References and figure captions in body are
+# preserved.
+_ORPHAN_AFFIL_WRAP_TAIL = re.compile(
+    r"^"
+    r"(?=.{1,60}$)"                                   # whole line ≤ 60 chars
+    r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}"             # first place token: 1-3 title-case words
+    r",\s+"                                            # comma + space
+    r"(?:"
+        r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\s+[A-Z]{2,5}"   # title-case + all-caps region (Hong Kong SAR)
+        r"|"
+        r"[A-Z]{2,5}(?:\s+\d{4,5}(?:-\d{4})?)?"               # all-caps + optional zip (CA, MA 02138)
+        r"|"
+        r"[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}"                 # title-case only (Atlanta, Georgia)
+    r")"
+    r"\.\s*$"                                          # required period
+)
+
+_FRONTMATTER_LEAK_LINE_PATTERNS: list[re.Pattern[str]] = [
+    _ORPHAN_AFFIL_WRAP_TAIL,
+]
 
 
 def _strip_frontmatter_metadata_leaks(text: str) -> str:
@@ -3626,15 +3741,26 @@ def _detect_column_interleave_pages(
     """Identify 1-indexed pages whose body text exhibits a column-interleave
     structural signature.
 
-    The signature is a count of `flip` events on the page: a line that ends
-    WITHOUT a sentence terminator AND whose next non-blank body line starts
-    with a Title-Case word (a new sentence opening). In coherent prose,
-    sentence-wraps end either with a hyphen / continuation word OR are
-    followed by a lowercase word; column-interleaved pages show ≥6 such
-    flips per page.
+    Two complementary signatures (a page is flagged if EITHER fires):
 
-    Returns a tuple of 1-indexed page numbers exceeding ``_INTERLEAVE_FLIP_THRESHOLD``.
-    Empty tuple when no detection is possible (single-page doc, no offsets).
+    **Signature A — sentence-flip count.** A `flip` is a line that ends
+    WITHOUT a sentence terminator AND whose next non-blank body line starts
+    with a Title-Case word. In coherent prose, sentence-wraps end either
+    with a hyphen / continuation word OR are followed by a lowercase word;
+    column-interleaved pages show ≥6 such flips per page.
+
+    **Signature B — short-line density (v2.4.76, jama-open-1 D4 closure).**
+    Column-interleaved pages also exhibit unusually short average line
+    lengths because the columns get serialised line-by-line. A substantial-
+    content page (≥40 non-blank lines) whose average non-blank line length
+    is ≤45 characters is almost certainly column-fragmented — real prose
+    on a single-column page averages 70-100+ chars per line. JAMA Open's
+    abstract page exhibits this without firing Signature A (the structured-
+    abstract labels and Key Points sidebar both produce period-terminated
+    sentences that escape the no-terminator+Title-Case flip test).
+
+    Returns a tuple of 1-indexed page numbers exceeding either threshold.
+    Empty tuple when no detection is possible.
     """
     if not text or not page_offsets or len(page_offsets) < 1:
         return ()
@@ -3678,4 +3804,24 @@ def _detect_column_interleave_pages(
             flips += 1
         if flips >= _INTERLEAVE_FLIP_THRESHOLD:
             flipped.append(p_idx + 1)
+            continue
+        # Signature B: bimodal-line-length distribution (v2.4.76, jama-open-1
+        # D4). A page with a substantial body (≥30 non-blank, non-markup
+        # lines) where ≥30% of lines are SHORT (<40 chars) AND ≥30% are
+        # LONG (>70 chars) is structurally bimodal — the canonical fingerprint
+        # of column-interleaved text where the narrower sidebar column
+        # produces short fragments and the main column produces long lines.
+        # Coherent single-column prose has a unimodal distribution (mostly
+        # long lines, <20% short).
+        body_lines = [
+            ln.rstrip() for ln in lines
+            if ln.strip() and not ln.lstrip().startswith(("#", "*", ">", "|", "`", "<"))
+        ]
+        if len(body_lines) >= 30:
+            short_count = sum(1 for ln in body_lines if len(ln) < 40)
+            long_count = sum(1 for ln in body_lines if len(ln) > 70)
+            short_frac = short_count / len(body_lines)
+            long_frac = long_count / len(body_lines)
+            if short_frac >= 0.30 and long_frac >= 0.30:
+                flipped.append(p_idx + 1)
     return tuple(flipped)

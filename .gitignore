@@ -37,9 +37,13 @@ REQUESTS_FROM_ESCIMATE.md
 # captures. Useful locally during iteration but not committed.
 verify_*.txt
 verify_*.err
+verify_*.log
 pytest_run.txt
 pytest_err.txt
 tmp/
+# Ad-hoc one-shot diagnostic scripts dropped at the repo root during
+# iteration (worktree-aware verify runners, scratch reproducers, etc.).
+tmp_*.py
 
 # Verification harness outputs (scripts/harness) — extraction artifacts, not committed.
 verify_out/
