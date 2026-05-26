@@ -330,6 +330,51 @@ def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolate
     return False
 
 
+def _prior_paragraph_is_sentence_terminated(text: str, line_start: int) -> bool:
+    """Return True if the paragraph immediately preceding the character at
+    ``text[line_start]`` ends with a sentence terminator (``.`` ``!`` ``?``,
+    possibly followed by close-quote / close-paren).  Returns True at
+    start-of-text (no prior paragraph).
+
+    2026-05-25 — Cluster A guard.  Pdftotext column-wraps routinely insert
+    artificial blank lines mid-sentence, making canonical heading keywords
+    (``Funding``, ``Keywords``, etc.) appear paragraph-isolated when they
+    are actually mid-list continuations.  This helper is the corroboration
+    that "preceded by blank line" really meant "preceded by a real paragraph
+    break" — without it, ``## Funding`` gets emitted between
+    ``...Data curation;`` and ``acquisition; Preregistration...``, silently
+    splitting authorship credit across two sections.
+    """
+    p = line_start - 1
+    while p > 0 and text[p] in " \t\n":
+        p -= 1
+    if p <= 0:
+        return True  # start-of-text; nothing prior to corrupt
+    # Find the START of the prior non-blank line to check for structural
+    # boundary markers (headings, fences, etc.).
+    line_start_of_prev = text.rfind("\n", 0, p) + 1
+    prev_line = text[line_start_of_prev:p + 1].lstrip()
+    # Structural-boundary equivalents — these are always "paragraph end".
+    if prev_line.startswith(("#", "*", "<", ">", "|", "`")):
+        return True
+    # 2026-05-25 wrapup refinement: a URL filling the trailing part of the
+    # prior paragraph counts as a "complete line" — URLs almost never end
+    # with sentence terminators but the line IS structurally finished. The
+    # original guard rejected legitimate ``Keywords`` after ``...data, and
+    # code: https://osf.io/bwmtr/`` because the URL trailing-``/`` isn't in
+    # ``.!?``. Cheap detector: ``://`` in the prior line.
+    if "://" in prev_line:
+        return True
+    # Walk back past any closing quotes/parens to expose the real terminator
+    # (handles ``."``, ``?")``, ``…”``). Also accept ``/`` (URL trailing
+    # slash) as a paragraph terminator — same rationale as the ``://``
+    # check above, defending against URLs that didn't include the scheme.
+    q = p
+    while q > 0 and text[q] in "\"”’)]":
+        q -= 1
+    return text[q] in ".!?/"
+
+
 def annotate_text(text: str) -> list[BlockHint]:
     """Scan `text` for heading candidates.
 
@@ -412,6 +457,22 @@ def annotate_text(text: str) -> list[BlockHint]:
         if not (preceded_by_blank or followed_by_capital or at_end_of_line):
             continue
 
+        # 2026-05-25 guard (Cluster A, finding #10 on ip_feldman_2025_pspb):
+        # When ONLY rule (a) preceded_by_blank admits, additionally require
+        # the prior paragraph to be sentence-terminated.  Pdftotext column-
+        # wraps routinely insert an artificial blank line mid-sentence,
+        # making canonical heading keywords like "Funding" appear paragraph-
+        # isolated when in truth they're the next token of a wrapped CRediT
+        # list ("...Data curation;\n\nFunding acquisition;...").  Rules (b)
+        # and (c) are strong typographic patterns on their own; (a) alone
+        # is weak and needs corroboration.  Adding to seen_offsets BEFORE
+        # the continue ensures Pass 1b (which would otherwise re-admit
+        # "Funding" via _CANONICAL_AFTER_BLANK) also respects the rejection.
+        if preceded_by_blank and not (followed_by_capital or at_end_of_line):
+            if not _prior_paragraph_is_sentence_terminated(text, line_start):
+                seen_offsets.add(start)
+                continue
+
         # Table-cell filter: if the heading was line-isolated (not followed by a
         # Capital body word on the same line) and the next non-blank line is < 20
         # chars, this is likely a CRediT table row label, not a real heading.
@@ -458,6 +519,21 @@ def annotate_text(text: str) -> list[BlockHint]:
         if _looks_like_table_cell(text, m.end(), True):
             seen_offsets.add(start)
             continue
+        # 2026-05-25 guard (Cluster A): same prior-paragraph-terminator
+        # check as Pass 1a.  Pass 1b is the second locus where pdftotext
+        # column-wrap artifacts can produce a false "canonical heading
+        # preceded by blank line" — without this guard, "Funding" surfacing
+        # between "...Data curation;" and "acquisition; ..." (ip_feldman
+        # finding #10) is admitted even though Pass 1a now rejects it.
+        # seen_offsets propagation from Pass 1a closes most of this hole;
+        # the explicit guard here is defense in depth for cases where Pass
+        # 1a's match didn't fire (different regex anchors) but Pass 1b's
+        # does.
+        line_start_1b = text.rfind("\n", 0, start) + 1
+        if not _prior_paragraph_is_sentence_terminated(text, line_start_1b):
+            seen_offsets.add(start)
+            continue
+
         # v2.4.18 (SECTIONING fix): same function-word reject as Pass 1a.
         # "Results from our study…" matches Pass 1b too — block it here.
         # Pass 1b's intent is to catch "Keywords emotional pluralistic…"

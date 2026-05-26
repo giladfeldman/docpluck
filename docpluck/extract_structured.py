@@ -36,7 +36,7 @@ from .tables.captions import (
 from .tables.render import cells_to_html
 
 
-TABLE_EXTRACTION_VERSION = "2.1.5"  # v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
+TABLE_EXTRACTION_VERSION = "2.2.0"  # v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 
@@ -93,6 +93,13 @@ def extract_pdf_structured(
     method_pieces = [base_method]
     if thorough:
         method_pieces.append("thorough")
+
+    # §A R4 / B6 column-aware re-extraction now lives in extract.py
+    # (v2.4.76, 2026-05-25) so sections / normalize / render all see the
+    # corrected text via the single extract_pdf call. The base_method
+    # returned by extract_pdf already includes `+column_corrected:N,M,...`
+    # when R4 fires; surfaced via method_pieces[0].
+
     # Preprocess: pdftotext sometimes splits captions like "Table 1: X" into
     # "T\n\n1: X". Join these so the caption regex matches consistently.
     # We work on a SHADOW string for caption detection only — raw_text returned

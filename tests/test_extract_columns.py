@@ -56,18 +56,65 @@ def test_words_to_column_text_row_order():
 
 
 def test_extract_page_text_columns_returns_empty_when_signal_weak():
-    """A non-column page (single-column or too-few-words) returns empty string."""
+    """A non-column page (single-column or too-few-words) returns empty string.
+
+    The v2.4.76 R4 rewrite reads ``page.width``, ``page.height``, and
+    ``page.words`` (was: ``page.chars`` in v2.4.74 scaffold). The FakePage
+    here mirrors the real LayoutDoc page schema with all three fields
+    present-but-empty so the function exercises its empty-signal fallthrough
+    rather than crashing on missing attributes.
+    """
 
     class FakePage:
         page_index = 0
         width = 600.0
+        height = 800.0
+        words = ()
         chars = ()
 
     class FakeDoc:
         pages = (FakePage(),)
 
     out = extract_page_text_columns(FakeDoc(), 0, column_count=2)
-    assert out == "", f"empty-chars page should return empty, got {out!r}"
+    assert out == "", f"empty-words page should return empty, got {out!r}"
+
+
+def test_extract_page_text_columns_rejects_table_layout_via_y_bilateral_gate():
+    """A page where most y-rows have words on BOTH sides of the candidate
+    midline is a TABLE (rows have cells in both columns at matching y),
+    not a real 2-column body-text layout (where each text row lives in
+    one column). The bilateral-rows gate rejects this case so R4 doesn't
+    misread table pages and rewrite them.
+
+    Synthesizes 30 rows × 2 cells each (left cell x=50-200, right cell
+    x=400-550) — the classic 2-col-table shape — and asserts the column
+    extractor returns "" rather than treating the table as a page layout.
+    """
+
+    class FakePage:
+        page_index = 0
+        width = 600.0
+        height = 800.0
+        chars = ()
+
+        @property
+        def words(self):
+            ws = []
+            # 30 table rows. Each row has cells at y=20+10n in BOTH columns.
+            for r in range(30):
+                y = 20 + 10 * r
+                ws.append({"x0": 50, "x1": 200, "top": y, "bottom": y + 8, "text": "L"})
+                ws.append({"x0": 400, "x1": 550, "top": y, "bottom": y + 8, "text": "R"})
+            return ws
+
+    class FakeDoc:
+        pages = (FakePage(),)
+
+    out = extract_page_text_columns(FakeDoc(), 0, column_count=2)
+    assert out == "", (
+        f"table-shaped layout (every row bilateral) must NOT be treated as "
+        f"a page-column layout; got {out!r}"
+    )
 
 
 def test_splice_column_corrected_pages_no_op_when_no_pages_flagged():

@@ -68,96 +68,170 @@ _MIN_COLUMN_FRACTION = 0.25
 _LINE_Y_TOLERANCE = 5.0
 
 
-def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2) -> str:
+def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2,
+                              pdf_bytes: bytes | None = None) -> str:
     """Re-extract a single page's text via column-aware ordering.
+
+    Strategy: detect the column midline via word-center histogram on the
+    layout doc, then use pdfplumber's `crop().extract_text()` on each
+    column's bbox to preserve pdfplumber's native word-spacing (better
+    than our char-cluster heuristic which loses spaces on tight-kerned
+    PDFs). Concatenate left column then right column.
 
     Args:
         layout_doc: LayoutDoc from docpluck.extract_layout.extract_pdf_layout.
         page_index: 0-based page index.
-        column_count: Number of columns to detect (currently only 2 supported;
-            3-column layouts are rare in academic publishing and need a
-            different geometric signal).
+        column_count: Number of columns to detect (currently only 2 supported).
+        pdf_bytes: Raw PDF bytes — required for the crop-extract strategy.
+            When None, falls back to the older word-join approach (less
+            reliable spacing on tight-kerned papers).
 
     Returns:
         The page text in left-then-right column order. Empty string if the
-        column-detection signal is too weak (caller falls back to the
-        original page text).
+        column-detection signal is too weak.
     """
     if column_count != 2:
-        return ""  # only 2-column supported in v2.4.75
+        return ""
     if page_index < 0 or page_index >= len(layout_doc.pages):
         return ""
     page = layout_doc.pages[page_index]
-    chars = page.chars or ()
-    if not chars:
-        return ""
 
     page_width = float(page.width or 0.0)
-    if page_width <= 0:
+    page_height = float(page.height or 0.0)
+    if page_width <= 0 or page_height <= 0:
         return ""
 
-    # Step 1: cluster chars into lines by `top` coordinate (round to int for bucketing).
-    rows: dict[int, list[dict]] = defaultdict(list)
-    for c in chars:
-        top_bucket = int(round(c.get("top", 0) / _LINE_Y_TOLERANCE) * _LINE_Y_TOLERANCE)
-        rows[top_bucket].append(c)
-
-    # Step 2: for each row, compute its word groups by x. Within a row, chars
-    # with x-gap > median-char-width are in different words.
-    words_per_line: list[list[dict]] = []
-    for top_key in sorted(rows.keys()):
-        row_chars = sorted(rows[top_key], key=lambda c: c.get("x0", 0))
-        if not row_chars:
-            continue
-        # Compute median char width for this row.
-        widths = [c["x1"] - c["x0"] for c in row_chars if c.get("x1", 0) > c.get("x0", 0)]
-        median_w = sorted(widths)[len(widths) // 2] if widths else 5.0
-        word_gap = max(median_w * 0.5, 1.0)
-        # Group adjacent chars into words.
-        words: list[dict] = []
-        current: list[dict] = [row_chars[0]]
-        for c in row_chars[1:]:
-            if c["x0"] - current[-1]["x1"] > word_gap:
-                # New word.
-                if current:
-                    words.append(_chars_to_word(current))
-                current = [c]
-            else:
-                current.append(c)
-        if current:
-            words.append(_chars_to_word(current))
-        for w in words:
-            words_per_line.append([w])
-
-    # Step 3: collect all words on the page.
-    all_words: list[dict] = []
-    for line_words in words_per_line:
-        all_words.extend(line_words)
+    all_words = list(page.words or ())
     if len(all_words) < _MIN_WORDS_FOR_COLUMN_MODE:
         return ""
 
-    # Step 4: detect column boundary via x-center histogram. For a 2-column
-    # page, the histogram has a clear gap in the middle ~10-30% of page width.
+    # Step 1: detect column midline.
     midline_x = _detect_2col_midline(all_words, page_width)
     if midline_x is None:
         return ""
 
-    # Step 5: partition words into left / right columns.
-    left_words = [w for w in all_words if (w["x0"] + w["x1"]) / 2 < midline_x]
-    right_words = [w for w in all_words if (w["x0"] + w["x1"]) / 2 >= midline_x]
-    if (len(left_words) < len(all_words) * _MIN_COLUMN_FRACTION
-        or len(right_words) < len(all_words) * _MIN_COLUMN_FRACTION):
-        return ""  # not really a 2-column page
-
-    # Step 6: render each column as text (top-to-bottom, joining adjacent-y
-    # words with space, separating distinct lines with newline).
-    left_text = _words_to_column_text(left_words)
-    right_text = _words_to_column_text(right_words)
-
-    if not left_text.strip() or not right_text.strip():
+    # Step 2: confirm both columns have substantial content.
+    left_count = sum(1 for w in all_words if (w["x0"] + w["x1"]) / 2 < midline_x)
+    right_count = len(all_words) - left_count
+    if (left_count < len(all_words) * _MIN_COLUMN_FRACTION
+        or right_count < len(all_words) * _MIN_COLUMN_FRACTION):
         return ""
 
+    # Step 2b (2026-05-25 EC-T1/R4 wrapup): Y-row bilateral gate.
+    #
+    # A real 2-column body-text page has each TEXT ROW in ONE column at a
+    # time — left-column lines and right-column lines run at independent
+    # y-positions (different baselines). Cross-column row matching is the
+    # exception (a header / title spanning both columns).
+    #
+    # A table embedded in a single-column page produces a histogram that
+    # LOOKS bilateral (left cell-column vs right cell-column with a gutter)
+    # but every table row has cells on BOTH sides at the SAME y. So if a
+    # high fraction of y-rows have words on both sides of the candidate
+    # midline, we're looking at a table not a column layout.
+    #
+    # Empirical thresholds (sampled 2026-05-25):
+    #   - JAMA Open p1 (real 2-column abstract+sidebar): 12.5% bilateral
+    #   - amle_1 page 10 (table-heavy): 65.5% bilateral
+    #   - amle_1 page 13 (table-heavy): 53.0% bilateral
+    #   - amle_1 page 29 (table-heavy): 38.5% bilateral
+    # Gate: reject when bilateral fraction ≥ 30%.
+    from collections import defaultdict
+    rows_lr: dict[int, list[bool]] = defaultdict(lambda: [False, False])
+    for w in all_words:
+        y_bucket = int(round(w["top"] / _LINE_Y_TOLERANCE) * _LINE_Y_TOLERANCE)
+        x_center = (w["x0"] + w["x1"]) / 2
+        if x_center < midline_x:
+            rows_lr[y_bucket][0] = True
+        else:
+            rows_lr[y_bucket][1] = True
+    if rows_lr:
+        bilateral = sum(1 for r in rows_lr.values() if r[0] and r[1])
+        if bilateral / len(rows_lr) >= 0.30:
+            return ""
+
+    # Step 3: use pdfplumber crop+extract_text if pdf_bytes supplied. This
+    # preserves pdfplumber's spacing semantics (which handle kerned text the
+    # word-join approach loses).
+    if pdf_bytes is not None:
+        text = _crop_and_extract(pdf_bytes, page_index, midline_x, page_width, page_height)
+        if text:
+            return text
+
+    # Fallback: word-join approach (no inter-word spacing fix).
+    left_words = [w for w in all_words if (w["x0"] + w["x1"]) / 2 < midline_x]
+    right_words = [w for w in all_words if (w["x0"] + w["x1"]) / 2 >= midline_x]
+    left_text = _words_to_column_text(left_words)
+    right_text = _words_to_column_text(right_words)
+    if not left_text.strip() or not right_text.strip():
+        return ""
     return left_text + "\n\n" + right_text
+
+
+def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
+                       page_width: float, page_height: float) -> str:
+    """Crop each column and run pdftotext to preserve proper word spacing.
+
+    pdfplumber's `extract_text()` on tight-kerned PDFs (JAMA Open et al.)
+    drops inter-word spaces because the PDF positions characters without
+    explicit space chars. pdftotext does its own gap analysis to insert
+    spaces correctly. pdftotext supports cropping via `-x -y -W -H` flags:
+    we run it twice per flagged page (once per column) and concatenate.
+
+    Returns empty string on any failure — caller falls back to the
+    pdfplumber word-join path (which at least preserves column separation
+    even when spacing is lost).
+    """
+    try:
+        import os
+        import subprocess
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        try:
+            page_arg = str(page_index + 1)  # pdftotext is 1-indexed
+            # Left column: x=0, width=midline_x.
+            left_proc = subprocess.run(
+                [
+                    "pdftotext", "-enc", "UTF-8",
+                    "-f", page_arg, "-l", page_arg,
+                    "-x", "0", "-y", "0",
+                    "-W", str(int(midline_x)),
+                    "-H", str(int(page_height)),
+                    tmp_path, "-",
+                ],
+                capture_output=True, timeout=30,
+                encoding="utf-8", errors="replace",
+            )
+            if left_proc.returncode != 0:
+                return ""
+            right_proc = subprocess.run(
+                [
+                    "pdftotext", "-enc", "UTF-8",
+                    "-f", page_arg, "-l", page_arg,
+                    "-x", str(int(midline_x)), "-y", "0",
+                    "-W", str(int(page_width - midline_x)),
+                    "-H", str(int(page_height)),
+                    tmp_path, "-",
+                ],
+                capture_output=True, timeout=30,
+                encoding="utf-8", errors="replace",
+            )
+            if right_proc.returncode != 0:
+                return ""
+            left_text = (left_proc.stdout or "").rstrip("\f").strip()
+            right_text = (right_proc.stdout or "").rstrip("\f").strip()
+            if not left_text or not right_text:
+                return ""
+            return left_text + "\n\n" + right_text
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    except Exception:
+        return ""
 
 
 def splice_column_corrected_pages(
@@ -165,6 +239,7 @@ def splice_column_corrected_pages(
     layout_doc,
     page_offsets: Iterable[int],
     pages_to_fix: Iterable[int],
+    pdf_bytes: bytes | None = None,
 ) -> str:
     """Splice column-aware re-extracted text into flagged pages of raw_text.
 
@@ -195,7 +270,9 @@ def splice_column_corrected_pages(
             out_parts.append(raw_text[cursor:start])
         page_number_1idx = page_idx + 1
         if page_number_1idx in pages_set:
-            rewritten = extract_page_text_columns(layout_doc, page_idx, column_count=2)
+            rewritten = extract_page_text_columns(
+                layout_doc, page_idx, column_count=2, pdf_bytes=pdf_bytes
+            )
             if rewritten:
                 out_parts.append(rewritten)
                 cursor = end
@@ -258,6 +335,7 @@ def _detect_2col_midline(words: list[dict], page_width: float) -> float | None:
     if surrounding_max == 0:
         return None
     threshold = surrounding_max * 0.2
+
     # Find the LONGEST contiguous run of central buckets under the threshold.
     best_run: tuple[int, int] | None = None
     run_start: int | None = None
@@ -272,15 +350,54 @@ def _detect_2col_midline(words: list[dict], page_width: float) -> float | None:
                 if best_run is None or length > (best_run[1] - best_run[0] + 1):
                     best_run = (run_start, run_end)
                 run_start = None
-    if best_run is None:
+    # Contiguous-run gate (2026-05-25): require best_run to span ≥2 buckets.
+    # A length-1 run inside an otherwise populated central region is an
+    # alternating-zeros artifact of periodic word x-positioning (justified
+    # text, monospaced layouts, synthetic test fixtures) — not a real gutter.
+    # Real 2-column pages always produce a sustained low-density valley
+    # (≥2 contiguous buckets under threshold) because both column peaks are
+    # wide enough to push down a stretch of central density, not just one
+    # bucket. Confirmed against jama_open_1 page 1, whose central counts
+    # [8, 12, 4, 9, 4, 2, 2, 2] yield a 3-contiguous-bucket run at the
+    # right edge that this gate accepts.
+    if best_run is not None and (best_run[1] - best_run[0] + 1) >= 2:
+        return (best_run[0] + best_run[1] + 1) / 2 * bucket_width
+
+    # Relaxed fallback: when no contiguous ≥2-bucket run exists, check for
+    # a SINGLE deep gutter (count < surrounding_max * 0.10 — half the loose
+    # threshold). Real PDFs with narrow sidebars can produce histograms
+    # where the gutter is one bucket wide because words from the narrower
+    # sidebar fill adjacent buckets at lower density than the main-column
+    # peaks.
+    #
+    # Two gates distinguish a real narrow-sidebar gutter from a periodic-
+    # grid false positive (synthetic uniform-spacing fixture, sparse figure-
+    # only pages):
+    #   (1) Surrounding-density gate — most of the surrounding buckets must
+    #       exceed the loose threshold (≥50%). A real text page has dense
+    #       prose populating most x-positions; a sparse grid does not.
+    #   (2) Neighbor-peak gate — the candidate bucket's immediate neighbors
+    #       must both be populated above the loose threshold, confirming
+    #       the trough is sandwiched by real peaks rather than by other
+    #       scattered zeros.
+    surrounding_populated = sum(1 for c in surrounding if c >= threshold)
+    if surrounding_populated < len(surrounding) * 0.5:
         return None
-    # Require a run of ≥2 contiguous low-density buckets — a single low
-    # bucket can be a regular-spacing artifact of a single-column page.
-    if best_run[1] - best_run[0] + 1 < 2:
+
+    deep_threshold = surrounding_max * 0.10
+    best_single = None
+    for b in central:
+        if counts[b] >= deep_threshold:
+            continue
+        left = counts[b - 1] if b - 1 >= 0 else 0
+        right = counts[b + 1] if b + 1 < n_buckets else 0
+        if left < threshold or right < threshold:
+            continue
+        if best_single is None or counts[b] < counts[best_single]:
+            best_single = b
+    if best_single is None:
         return None
-    # Midline = midpoint of the run.
-    midline = (best_run[0] + best_run[1] + 1) / 2 * bucket_width
-    return midline
+    return (best_single + 0.5) * bucket_width
 
 
 def _words_to_column_text(words: list[dict]) -> str:
