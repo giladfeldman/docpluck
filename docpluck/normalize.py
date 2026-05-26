@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.25"
+NORMALIZATION_VERSION = "1.9.26"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -839,6 +839,16 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"^JAMA\s+Network\s+Open\.\s+20\d{2};\d+\(\d+\):e\d+\.\s*doi:10\.\d+/.+$"
     ),
+    # 2026-05-26 (Cluster E, ip_feldman + chan_feldman): Sage / PSPB
+    # publisher front-matter boilerplate. "Article reuse guidelines:"
+    # appears alone on its own line as part of the publisher furniture
+    # block. Tight enough to be P0-globally-safe (this phrase doesn't
+    # appear in legitimate body prose). Unlike the other Cluster E
+    # patterns (article-ID + article-type code, both reverted because
+    # they exposed a wrapped-title duplicate), this one is safe to keep:
+    # the label is a leaf node in the masthead block, not the load-
+    # bearing separator the others turned out to be.
+    re.compile(r"^Article\s+reuse\s+guidelines:?\s*$", re.IGNORECASE),
     # JAMA category banner.
     re.compile(r"^JAMA\s+Network\s+Open\s+\|\s+\S.*$"),
     # Compound license + citation footer.
@@ -1656,6 +1666,18 @@ _ORPHAN_AFFIL_WRAP_TAIL = re.compile(
     r"\.\s*$"                                          # required period
 )
 
+# 2026-05-26 (Cluster E attempted in run 11, REVERTED): stripping bare
+# article ID + article-type code at top of doc successfully cleared the
+# masthead noise BUT exposed a previously-suppressed wrapped-title
+# duplicate immediately under the H1 (pdftotext serialises the title
+# twice on PSPB layouts; the metadata lines previously absorbed/separated
+# the duplicate). Net effect: 1 finding cleared (METADATA-LEAK),
+# 1 finding introduced (HALLUCINATION ### Title duplicate). Reverted.
+#
+# Next session: do this together with a wrapped-title-duplicate detector
+# that runs AFTER metadata strips. See handoff for the structural
+# signature (consecutive lines starting with a title-token, all under
+# the H1, formerly absorbed by metadata).
 _FRONTMATTER_LEAK_LINE_PATTERNS: list[re.Pattern[str]] = [
     _ORPHAN_AFFIL_WRAP_TAIL,
 ]

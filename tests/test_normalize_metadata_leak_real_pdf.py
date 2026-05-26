@@ -373,3 +373,32 @@ def test_ip_feldman_orphan_affiliation_real_pdf():
     assert "University of Hong Kong" in md, (
         "legitimate end-matter affiliation mention was over-stripped"
     )
+
+
+# ── 2026-05-26 Cluster E (partial — see handoff for full story) ─────────
+
+
+def test_p0_strips_article_reuse_guidelines_label():
+    """Sage / PSPB publisher boilerplate appears anywhere in doc; tight
+    pattern in P0 is globally safe. ('Article reuse guidelines:' alone
+    on its own line is never legitimate body content.)
+    """
+    text = (
+        "Body before.\n"
+        "Article reuse guidelines:\n"
+        "Body after."
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Article reuse guidelines:" not in out
+    assert "Body before." in out
+
+
+def test_ip_feldman_article_reuse_guidelines_stripped_real_pdf():
+    """ip_feldman_2025_pspb: 'Article reuse guidelines:' was a leaf node
+    in the publisher masthead block. P0 strip removes it cleanly without
+    disrupting other masthead lines.
+    """
+    md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
+    assert "Article reuse guidelines:" not in md, (
+        "'Article reuse guidelines:' boilerplate line should be stripped"
+    )

@@ -1922,6 +1922,18 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
             if prev.startswith("###"):
                 out.append(line)
                 continue
+            # 2026-05-26 (Cluster E side-effect fix): also reject when prev
+            # is a top-level ``# `` H1 title.  pdftotext routinely emits
+            # the title twice — once as the H1 + a running-header copy
+            # broken across wrap lines at the top of column 1.  The
+            # running-header first wrap line is a title-case candidate;
+            # without this reject it would promote to ``### `` and
+            # duplicate the title (e.g. ip_feldman_2025_pspb after
+            # Cluster E stripped the metadata block that previously
+            # separated them).
+            if prev.startswith("# ") and not prev.startswith("## "):
+                out.append(line)
+                continue
         # Promote.
         if out and out[-1] != "":
             out.append("")
