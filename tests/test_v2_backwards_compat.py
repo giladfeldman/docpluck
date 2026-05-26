@@ -64,15 +64,22 @@ def test_extract_pdf_byte_identical(entry):
 
 @pytest.mark.parametrize("entry", _entries(), ids=lambda e: e.get("id", "?"))
 def test_method_value_uses_known_strings(entry):
-    """method must be one of the documented values (or 'error' on malformed PDFs)."""
+    """method must be one of the documented values (or 'error' on malformed PDFs).
+
+    v2.4.76 (R4 column-aware re-extraction) extends the documented set with a
+    ``+column_corrected:N,M,...`` suffix when R4 fires on flagged interleave
+    pages. The base prefix still matches one of the v2.4.74 known strings.
+    """
     pdf_path = _resolve(entry)
     if not pdf_path.is_file():
         pytest.skip(f"Fixture not available: {entry['id']}")
     from docpluck import extract_pdf
     _, method = extract_pdf(pdf_path.read_bytes())
-    known = {
+    known_bases = {
         "pdftotext_default",
         "pdftotext_default+pdfplumber_recovery",
         "error",
     }
-    assert method in known, f"unexpected method: {method!r}"
+    # Strip the optional R4 suffix `+column_corrected:N,M,...` before checking.
+    base = method.split("+column_corrected:")[0]
+    assert base in known_bases, f"unexpected method base: {base!r} (full: {method!r})"

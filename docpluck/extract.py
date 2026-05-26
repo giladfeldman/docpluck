@@ -122,6 +122,37 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
                     text = patched
                     method = "pdftotext_default+pdfplumber_word_patch"
 
+        # §A R4 / B6 column-aware re-extraction (v2.4.76, 2026-05-25).
+        # Detector runs on form-feed-split pdftotext output (cheap, no
+        # pdfplumber call). If any page is flagged for column-interleave,
+        # extract the layout doc and rewrite those pages via pdftotext
+        # crop-mode (per-column pdftotext gives correct word spacing where
+        # pdfplumber `extract_text()` drops spaces on tight-kerned PDFs).
+        # The corrected text then flows through ALL downstream channels —
+        # sections, normalize, render, structured — because they all go
+        # through extract_pdf. Per CLAUDE.md hard rule 3, this is
+        # conditional fallback, NOT a default tool swap.
+        try:
+            from .normalize import _detect_column_interleave_pages
+            from .extract_columns import splice_column_corrected_pages
+            ff_offsets: list[int] = [0]
+            for idx, ch in enumerate(text):
+                if ch == "\f":
+                    ff_offsets.append(idx + 1)
+            flagged_pages = _detect_column_interleave_pages(text, tuple(ff_offsets))
+            if flagged_pages:
+                from .extract_layout import extract_pdf_layout
+                layout_doc = extract_pdf_layout(pdf_bytes)
+                corrected = splice_column_corrected_pages(
+                    text, layout_doc, ff_offsets, flagged_pages,
+                    pdf_bytes=pdf_bytes,
+                )
+                if corrected and corrected != text:
+                    text = corrected
+                    method = f"{method}+column_corrected:{','.join(map(str, flagged_pages))}"
+        except Exception:
+            pass
+
         if sections is not None:
             from .sections import extract_sections
             doc = extract_sections(pdf_bytes)

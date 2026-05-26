@@ -1,5 +1,74 @@
 # Changelog
 
+## [2.4.76] — 2026-05-25
+
+**§A R4 column-aware re-extraction LANDED — closes jama-open-1 D4 (Key Points sidebar missing).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25 (concurrent with EC-T1's bump). Closes the final defect of the 2026-05-25 Haiku-orchestration pretest jama-open-1 cluster (HANDOFF_2026-05-25_pretest-followups.md Issue 1 — 5 of 5 defects now closed).
+
+Two-pronged detector + per-page pdftotext-crop re-extraction:
+
+- **Detector (`docpluck/normalize.py::_detect_column_interleave_pages`):** added Signature B (bimodal-line-length): substantial-content page (≥30 body lines) where ≥30% of lines are short (<40 chars) AND ≥30% are long (>70 chars) is column-fragmented. The canonical fingerprint of JAMA Open's abstract+sidebar interleave that escaped the original Signature A (no-terminator+Title-Case flip count) because period-terminated structured-abstract labels masked the flips.
+- **Column extractor (`docpluck/extract_columns.py`):** new module. `extract_page_text_columns(layout, page_index, pdf_bytes)` detects column midline via word-center histogram (relaxed fallback to single deep gutter when no contiguous run exists — narrow-sidebar pages produce 1-bucket gutters), then `_crop_and_extract` runs pdftotext twice per flagged page with `-x -y -W -H` crop flags (preserves pdftotext's gap-aware word-spacing that pdfplumber's `extract_text()` loses on tight-kerned PDFs). Fall-through to pdfplumber word-join path if pdftotext-crop fails.
+- **Wiring (`docpluck/extract.py::extract_pdf`):** R4 runs at the text-channel layer (after pdftotext, before return) so sections / normalize / render / structured ALL see the corrected text via the single `extract_pdf` call. Method tag gains `+column_corrected:N,M,...` suffix when R4 fires.
+
+**jama-open-1 D4 outcome:** Key Points sidebar (`Question / Findings / Meaning`) now appears as a coherent block rather than line-interleaved through the abstract. Abstract content flows in proper paragraph order. Combined with the v2.4.74 fixes (D1 RUNNING_HEADER_LEAK, D2 HALLUC_HEAD, D3 ABSTRACT_LEVEL_MISMATCH, D5 TABLE_STRUCTURE_CORRUPT), the full jama-open-1 5-defect cluster is closed.
+
+**jama-open-1 D1/D2/D3/D5 follow-up (also this version) ported from v2.4.74:**
+
+- D1 RUNNING_HEADER_LEAK (`normalize.py`): JAMA-style `Downloaded from <bare-domain> ... user on MM/DD/YYYY` watermark + bare standalone date footer.
+- D2 HALLUC_HEAD (`render.py _demote_isolated_table_cell_headings`): demote `### {label}` stranded inside table-cell clusters via bidirectional cell-fragment / column-header-stranded / data-shape signatures.
+- D3 ABSTRACT_LEVEL_MISMATCH (`render.py _demote_abstract_zone_inline_labels`): zone-bounded demoter for JAMA structured-abstract inline labels + Key Points sidebar trio.
+- D5 TABLE_STRUCTURE_CORRUPT (`render.py _strip_phantom_camelot_tables`): strip Camelot tables with masthead `<th>` + section-name `<td>` leak.
+
+**R1-perf threading** (`extract_pdf_structured` + `render.py`): `_layout_doc` kwarg eliminates duplicate `extract_pdf_layout(pdf_bytes)` call.
+
+**R3b widening** (`render.py _suppress_inline_duplicate_figure_captions`): wider 250-char overhang form gated against body-prose starters + stat shapes.
+
+**Other R4-cascade regressions also fixed in this release** (4 separate downstream tests failed when R4 wiring landed; all addressed):
+
+- **`_demote_italic_label_with_comma_headings` allowlist** (`render.py`): the Stream A §B-new-4 demoter fired on generic `## Discussion` when the body started with `In this study, ...` (matches the comma-list shape) and wrecked the rendered output — preventing the orphan-multilevel-number fold from producing `### 5.4. Discussion` on jdm_m.2022.2.pdf. New `_METADATA_LABEL_HEADING_PREFIXES` allowlist restricts the demoter to the open-science / data-availability metadata family (`Data Availability`, `Open Science Disclosures`, `Preregistration`, `Author Contributions`, `Funding`, `CRediT`, etc.). Generic subsection words can no longer be flattened by the heuristic.
+- **`_demote_metadata_label_headings` heading-skipping lookahead** (`render.py`): the §B-new-2 demoter capped lookahead at 3 lines, so when R4 column-aware extraction reordered xiao_2021_crsp front-matter into `KEYWORDS / Introduction / metadata-list`, the bare `## KEYWORDS` heading survived because its keyword payload landed below the intervening `## Introduction`. Extended scan to 15 non-blank lines and explicitly skips intervening heading lines while searching for metadata-shape content.
+- **`_prior_paragraph_is_sentence_terminated` URL handling** (`sections/annotators/text.py`): Stream A's Cluster A canonical-heading guard rejected lines preceded by URL-terminated paragraphs (`...code: https://osf.io/bwmtr/`) because URLs don't end in `.!?`. Added two acceptors: prior line contains `://` (any URL) OR ends with `/` (URL trailing slash). Resolves the v161 text-annotator regression on the lowercase-body Keywords test.
+- **`_strip_recurring_running_headers` truncated-prefix case** (`normalize.py`): when R4 column-aware extraction crops a page footer mid-token (`PLOS Medicine | https://...1004323 Dec` instead of `... December 28, 2023`), the truncated form appeared once while the full form appeared ≥3 times, so P0r's repetition detector stripped the full but left the truncated single. Added a prefix-match arm: when a body line ≥30 chars is a strict prefix of an already-known repeating header, strip it.
+- **Method-tag allowlist + snapshot regen** (`tests/test_v2_backwards_compat.py`): the `+column_corrected:N,M,...` suffix is documented and allowlisted via base-prefix split before the known-strings check. `tests/snapshots/{jama_lattice,ieee_figure_heavy}.txt` snapshots deleted to recapture against the v2.4.76 R4-corrected output.
+
+**R4 false-positive gates** (`extract_columns.py`): three structural-signature gates discovered while reconciling R4 with the full corpus. Each blocks a distinct false-positive class without affecting JAMA Open detection:
+
+1. **Contiguous-run gate** (`_detect_2col_midline`): best_run must span ≥2 buckets before yielding a midline. A length-1 run inside an otherwise populated central region is an alternating-zeros artifact of periodic word x-positioning (justified text, monospaced layouts, synthetic fixtures), not a real gutter. Real 2-column pages produce sustained low-density valleys ≥2 buckets wide because both column peaks are wide enough to push down a stretch of central density.
+2. **Deep-fallback density gates** (`_detect_2col_midline`): the single-bucket trough fallback only fires when (a) ≥50% of surrounding buckets exceed the loose threshold (blocks sparse fixtures + figure-only pages) AND (b) the trough's immediate neighbors both exceed the loose threshold (flanked by genuine peaks).
+3. **Y-row bilateral gate** (`extract_page_text_columns`, NEW in `extract_columns.py:113`): even when midline detection succeeds, R4 is skipped for the page if ≥30% of y-rows have words on BOTH sides of the candidate midline. A real 2-column body-text page has text rows in ONE column at a time (independent baselines per column); a TABLE embedded in a single-column page has rows with cells on both sides at the SAME y. Empirically (2026-05-25): JAMA Open p1 abstract+sidebar = 12.5% bilateral (passes); amle_1 table-heavy pages 10/13/29 = 65.5%/53.0%/38.5% bilateral (rejected).
+
+Verified to preserve R4 firing on jama_open_1 (D4 Key Points sidebar closure unchanged — 3/3 R4 tests pass) while blocking R4 from misreading amle_1's 13 in-paper tables as page-level columns (resolving `test_amle_1_table_captions_not_cell_garbage`). Also updates `tests/test_extract_columns.py::FakePage` to mirror the new LayoutDoc schema (`height`, `words` fields the v2.4.76 R4 rewrite reads) and adds a new bilateral-gate unit test with a synthetic 30-row 2-cell-per-row table.
+
+**Known residuals (v2.4.77+ follow-ups):** column-boundary line truncation on wide titles; `CONCLUSIONS AND RELEVANCE` split across columns becomes two fragments; orphan `(contin` from `(continued)` page markers. Cosmetic — the structural defect (sidebar missing / abstract interleaved) is closed. Full fix needs column-element detection (figures/title/page-spanning banners get rendered FROM the original pdftotext output, not the crops).
+
+**EC-T1: table-row flattening for downstream stat-verification consumers.** `TABLE_EXTRACTION_VERSION` 2.1.5 → 2.2.0. Closes the largest cluster from the ESCIcheck handoffs ([2026-05-24](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-24.md), [2026-05-25](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md)) — ~78 effectcheck rows across 6 canary papers blocked on bare table cells.
+
+**New module: [`docpluck.tables.flatten`](docpluck/tables/flatten.py)**
+
+- `flatten_table(table) -> list[FlattenedRow]` — turns a structured `Table` into per-row records. Each record carries `raw_cells`, `header`, `row_label`, a flattened English `sentence` (e.g. `Importance: t(741) = 3.93, p < .001, d = 0.29`), and a structured `fields` dict (`t`, `df`, `df1`, `df2`, `F`, `r`, `chi2`, `p`, `p_op`, `d`, `eta2`, `M`, `SD`, `n`, `N`, `CI_lower`, `CI_upper`). Three nested fidelity levels so consumers pick what they trust.
+- `flatten_tables_for_paper(tables)` — convenience for paper-level JSONL emission.
+- `render_flattened_inline(records, ...)` — renders the same records as a markdown block bounded by HTML-comment sentinels (`<!-- docpluck:flattened-table id="…" start --> … end -->`).
+- Header→cell binding consolidations: `t + df → t(df)`; `F + (df1, df2)` from a `F(1, 998)` header → `F(df1, df2)`; `r + n → r(n-2)`; `M + SD → M = m, SD = sd`; CI from `[lo, hi]` cell OR separate `lower/upper` columns → `95% CI [lo, hi]`; `p_op + p → p < .001`.
+
+**Render integration**
+
+- `render_pdf_to_markdown` gains `flatten_tables_inline: bool = False`. When True, an `### {label} — rendered as text` block is emitted immediately after each `<table>`, with one bullet per body row. Bounded by HTML-comment sentinels — greppable, diff-tool-friendly, invisible in rendered markdown viewers.
+- Inline block is *generated from* the same `FlattenedRow` records that go into the JSONL sidecar — single source of truth, no drift risk between the two outputs.
+- Default `False` keeps the .md byte-identical to v2.4.75 for callers that don't opt in.
+
+**CLI**
+
+- `docpluck render --tables-jsonl PATH` writes one `FlattenedRow` JSON record per line to `PATH`. Canonical extraction contract for downstream stat-verification tools (effectcheck, escimate, scimeto).
+- `docpluck render --flatten-tables-inline` embeds the human-readable block in the .md output (debug/eyeball mode).
+
+**New top-level exports:** `FlattenedRow`, `flatten_table`, `flatten_tables_for_paper`, `render_flattened_inline`.
+
+**Tests:** 19 new tests in `tests/test_tables_flatten.py` covering the 6 canary table shapes from the handoffs (collabra_57785 T8 t-rows, collabra_90203 T8 F-with-df-header, T10 r+n correlations, collabra_90203 T9 bare-numeric, lee_feldman bare t+p+nodf, majumder effect-size-with-CI) plus inline-render sentinel boundaries and edge cases.
+
+Outstanding from the same handoffs:
+- **EC-T2** — RR/RD/MD per-arm trial-table flattening (`plosmed_1004323`). Specialization of EC-T1; queued.
+- **D-25-C** — gold-label mismatch on inter-rater r (not a docpluck defect); flagged for `article-finder` gold-quality pass.
+
 ## [2.4.75] — 2026-05-25
 
 **EC-T3: CI bracket middle-period → comma (ESCIcheck 2026-05-24 D2).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25. Closes one of the three defect clusters filed by escicheck-iterate against docpluck ([handoff](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md), [triage EC-T3](docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md)).

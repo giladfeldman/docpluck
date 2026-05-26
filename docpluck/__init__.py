@@ -67,11 +67,17 @@ from .sections import (
     SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
 )
 from .tables import Cell, Table
+from .tables.flatten import (
+    FlattenedRow,
+    flatten_table,
+    flatten_tables_for_paper,
+    render_flattened_inline,
+)
 from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
 from .render import render_pdf_to_markdown
 
-__version__ = "2.4.75"
+__version__ = "2.4.76"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
@@ -109,6 +115,12 @@ __all__ = [
     "TABLE_EXTRACTION_VERSION",
     "StructuredResult",
     "extract_pdf_structured",
+    # Table row flattening (v2.4.76, EC-T1) — canonical JSONL contract for
+    # downstream stat-verification tools (effectcheck, escimate, scimeto).
+    "FlattenedRow",
+    "flatten_table",
+    "flatten_tables_for_paper",
+    "render_flattened_inline",
     # Markdown rendering (v2.2)
     "render_pdf_to_markdown",
 ]

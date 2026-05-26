@@ -44,6 +44,11 @@ from .normalize import (
     recover_pua_glyphs,
 )
 from .sections import extract_sections
+from .tables.flatten import (
+    FlattenedRow,
+    flatten_table,
+    render_flattened_inline,
+)
 from .tables.render import cells_to_html
 
 
@@ -1150,16 +1155,31 @@ def _demote_metadata_label_headings(text: str) -> str:
         if m:
             label = m.group(2).strip()
             if label in _METADATA_LABEL_TOKENS:
-                # Find next non-blank line within 3.
-                lookahead = 0
-                j = i + 1
+                # Find first metadata-shape line within ~15 non-heading
+                # lines. Skip intervening headings (some papers — e.g.
+                # xiao_2021_crsp — render with KEYWORDS / Introduction /
+                # metadata-list, where the keywords list lands BELOW
+                # `## Introduction` because R4 column-aware extraction
+                # reorders the front-matter). Without the heading-skip,
+                # the bare `## KEYWORDS` survived as an h2 even though
+                # its metadata payload was clearly present, just offset
+                # by one heading.
                 next_line = ""
-                while j < n and lookahead < 4:
-                    if lines[j].strip():
-                        next_line = lines[j]
-                        break
-                    j += 1
-                    lookahead += 1
+                j = i + 1
+                scanned = 0
+                while j < n and scanned < 15:
+                    s = lines[j].strip()
+                    if not s:
+                        j += 1
+                        continue
+                    if re.match(r"^#{1,6}\s", s):
+                        # Intervening heading — keep scanning past it,
+                        # but cap the scan so we don't reach body prose.
+                        j += 1
+                        scanned += 1
+                        continue
+                    next_line = lines[j]
+                    break
                 if next_line and _looks_like_metadata_content(next_line):
                     # Emit as bold inline metadata label, not a heading. The
                     # metadata content line below stays as-is. We use bold
@@ -1193,20 +1213,59 @@ _LIST_CONTINUATION_LEAD_RE = re.compile(
 )
 
 
+_METADATA_LABEL_HEADING_PREFIXES = frozenset({
+    # Real metadata-label phrases that get comma-split across heading + body
+    # by pdftotext column-wraps. Restricted to the open-science / data-
+    # availability family — these are the only headings observed in the wild
+    # (2026-05-23 ip_feldman finding #3) where the body continuation is a
+    # genuine list-continuation of a metadata phrase, not a real subsection.
+    "Data Availability",
+    "Open Science Disclosures",
+    "Preregistration",
+    "Code Availability",
+    "Open Practices",
+    "Materials Availability",
+    "Open Materials",
+    "Open Data",
+    "Author Contributions",
+    "CRediT",
+    "Funding",
+    "Conflict of Interest",
+    "Competing Interests",
+})
+
+
 def _demote_italic_label_with_comma_headings(text: str) -> str:
     """§B-new-4: demote ``## <Heading>`` when the immediately following non-
-    blank line begins with a list-continuation phrase (``Word,`` or
-    ``and Word``), indicating the heading was wrongly split off a comma-
-    broken italic metadata label.
+    blank paragraph begins with a list-continuation phrase that completes
+    a metadata-label sentence (e.g. ``## Data Availability`` followed by
+    ``Preregistration, and Open-Science Disclosures. We provided...``).
 
     Conservative gates:
-      * Heading must be ≤3 words (real section headings are usually shorter
-        than that or longer — short multi-word phrases like ``Data
-        Availability`` are most at risk).
-      * Continuation line must start with ``Word,`` or ``and Word`` shape.
-      * Continuation line must end with ``.`` (a complete metadata phrase
-        ends with period; a body sentence opening with a comma'd word list
-        rarely does in academic prose).
+      * Heading must be in ``_METADATA_LABEL_HEADING_PREFIXES`` — restricted
+        to the open-science / data-availability metadata family. Without
+        this allowlist, the heuristic fired on generic subsection words like
+        ``## Discussion`` whose body legitimately starts with capital +
+        comma'd subject phrase (``In this study, participants...``) and
+        wrecked the rendered output.
+      * Continuation paragraph must start with ``Word,`` or ``and Word`` shape.
+      * Continuation paragraph must contain a sentence terminator (``.``)
+        within its first sentence — a real metadata-label phrase ends with
+        period, a body sentence opening with a comma'd word list rarely
+        does in academic prose.
+
+    2026-05-25 fix (Cluster A, finding #3 on ip_feldman_2025_pspb): scans
+    up to the next ``\\n\\n`` paragraph break for the first sentence
+    terminator, not just the single immediate next line — pdftotext
+    column-wraps may push the terminator several lines down.  Original
+    behaviour (`next_line.rstrip().endswith(".")`) silently failed on
+    multi-line continuations.
+
+    2026-05-25 wrapup: added ``_METADATA_LABEL_HEADING_PREFIXES`` allowlist
+    after this demoter wrecked ``## Discussion`` on jdm_m.2022.2.pdf —
+    flattening it to italic body that prevented the orphan-multilevel-
+    number fold from producing ``### 5.4. Discussion``. The 2026-05-23
+    pre-allowlist behaviour was too aggressive for the real corpus.
     """
     if not text:
         return text
@@ -1221,22 +1280,47 @@ def _demote_italic_label_with_comma_headings(text: str) -> str:
         if m:
             heading_text = m.group(2).strip()
             words = heading_text.split()
-            if 1 <= len(words) <= 3:
-                # Find next non-blank line within 3 lines.
+            if heading_text not in _METADATA_LABEL_HEADING_PREFIXES:
+                # Not a known metadata-label prefix — never demote, even when
+                # the body continuation looks list-shaped.
+                pass
+            elif 1 <= len(words) <= 3:
+                # Find start of next non-blank paragraph (within 3 lines).
                 j = i + 1
                 while j < n and j - i <= 3 and not lines[j].strip():
                     j += 1
-                if j < n and j - i <= 3:
-                    next_line = lines[j].rstrip()
-                    if (
-                        _LIST_CONTINUATION_LEAD_RE.match(next_line)
-                        and next_line.rstrip().endswith(".")
-                    ):
-                        # Rejoin: emit a single italic inline metadata label.
-                        combined = f"*{heading_text}, {next_line.strip()}*"
-                        # Replace heading + continuation with single italic line.
-                        out.append(combined)
-                        i = j + 1
+                if (
+                    j < n
+                    and j - i <= 3
+                    and _LIST_CONTINUATION_LEAD_RE.match(lines[j].rstrip())
+                ):
+                    # Collect the full continuation paragraph (until next blank).
+                    para_lines: list[str] = []
+                    k = j
+                    while k < n and lines[k].strip():
+                        para_lines.append(lines[k].rstrip())
+                        k += 1
+                    para_text = " ".join(para_lines).strip()
+                    # Find the first sentence (ending with `.` `!` or `?`,
+                    # optionally close-quote/paren, followed by space+Capital
+                    # or end-of-paragraph).  Without a terminator within the
+                    # paragraph, we cannot safely demote.
+                    sentence_match = re.match(
+                        r"^(.+?[.!?][\"”’\)\]]*)(?:\s+[A-Z]|\s*$)",
+                        para_text,
+                    )
+                    if sentence_match:
+                        first_sentence = sentence_match.group(1).strip()
+                        rest_offset = len(sentence_match.group(1))
+                        rest = para_text[rest_offset:].lstrip()
+                        # Emit demoted italic label + remaining paragraph as
+                        # a separate body paragraph.  Preserves all body
+                        # content; only the false heading is gone.
+                        out.append(f"*{heading_text}, {first_sentence}*")
+                        if rest:
+                            out.append("")
+                            out.append(rest)
+                        i = k  # consumed [i..k-1]
                         demoted = True
         if not demoted:
             out.append(line)
@@ -1408,6 +1492,257 @@ def _looks_like_titlecase_subsection_label(line: str) -> bool:
     return True
 
 
+# Sentence-terminator detection — used by promote/demote helpers to reject
+# candidates whose prior paragraph ended mid-sentence (a pdftotext column-wrap
+# artifact).  Terminators: `.` `!` `?` optionally followed by close-quote
+# (straight/curly) or close-paren/bracket.  Semicolons and colons do NOT
+# count: a line ending with ";" or ":" is mid-list / lead-in to a display,
+# not a sentence boundary.
+#
+# 2026-05-25 fix — Cluster A root cause: pdftotext routinely splits a body
+# sentence at a column boundary, putting a short label-shaped line from the
+# next column on a paragraph-isolated next line.  Every promotion helper
+# until now checked only `blank_before` / `blank_after`; with this guard
+# they also require the prior paragraph to be sentence-terminated.  Kills
+# `### Supplemental Materials` mid-Method on ip_feldman + parallel false
+# positives across the corpus.  Audit: tmp/iterate/canary-380647a7cb2a/.
+_SENTENCE_TERMINATOR_RE = re.compile(
+    r"[.!?][\"”’\)\]]*\s*$"
+)
+
+
+def _prev_paragraph_is_sentence_terminated(lines: list[str], i: int) -> bool:
+    """Return True if the paragraph immediately preceding ``lines[i]`` ends
+    with a sentence terminator (``.`` / ``!`` / ``?``, possibly followed by
+    a close-quote or close-paren).  Returns True at start-of-document (no
+    prior paragraph to corrupt).
+
+    Also returns True when the prior non-blank line is a STRUCTURAL boundary
+    (markdown heading ``#…``, italic-label ``*…*``, table fence ``<table>``,
+    blockquote ``>``, list marker, or `---`-divider) — these are equivalents
+    of "paragraph ended" for the purpose of admitting a subsequent heading
+    candidate.  Without this, `### Background` after `## Introduction`
+    gets rejected because `## Introduction` doesn't end with `.` `!` `?`.
+
+    Used by promotion guards to reject candidates whose paragraph-isolation
+    is a pdftotext column-wrap artifact rather than a real paragraph break.
+    """
+    k = i - 1
+    while k >= 0 and not lines[k].strip():
+        k -= 1
+    if k < 0:
+        return True  # start-of-document; nothing to mis-attribute to
+    prev = lines[k].rstrip()
+    if not prev:
+        return True  # defensive
+    # Structural-boundary equivalents — these are always "paragraph end"
+    # regardless of whether they end with `.` `!` `?`.
+    if prev.startswith(("#", "*", "<", ">", "|", "`", "---", "===")):
+        return True
+    if re.match(r"^\s*[\-+*]\s", prev) or re.match(r"^\s*\d+\.\s", prev):
+        return True  # list item
+    return bool(_SENTENCE_TERMINATOR_RE.search(prev))
+
+
+# 2026-05-26 (Cluster A-ter): parent ``## `` section labels where stacked
+# titlecase candidates are NOT subsection headings but list items:
+#   - CRediT roles ("Methodology", "Data curation", "Writing - original
+#     draft") under Author Contributions / CRediT.
+#   - Declaration items under Declaration of Conflicting Interests.
+#   - Funding agency names under Funding.
+#   - Disclosure items under Disclosure / Open-Science.
+# When the chain detection walks back to one of these parents, REJECT
+# the chain — the candidates are content of the section, not subsections
+# of it.
+_CHAIN_REJECT_PARENTS = frozenset({
+    "Author Contributions",
+    "Authorship Declaration",
+    "Authorship Statement",
+    "Author Information",
+    "Author Roles",
+    "Author Statement",
+    "Contributions",
+    "CRediT",
+    "CRediT Authorship Statement",
+    "Declaration of Conflicting Interests",
+    "Declaration of Interests",
+    "Declarations",
+    "Disclosure",
+    "Disclosures",
+    "Funding",
+    "Funding Statement",
+    "Conflict of Interest",
+    "Conflicts of Interest",
+    "Acknowledgments",
+    "Acknowledgements",
+    "ORCID iDs",
+    "ORCID",
+    "Notes",
+    "References",
+    "Bibliography",
+    "Data Availability",
+    "Data and Code Availability",
+    "Supplemental Material",
+    "Supplementary Materials",
+    "Supplementary Information",
+})
+
+
+def _is_subsection_chain_member(lines: list[str], i: int) -> bool:
+    """Return True when ``lines[i]`` is a paragraph-isolated short Title-
+    Case line that participates in a CHAIN of consecutive blank-separated
+    subsection-candidate lines, where the chain:
+
+    1. Opens after a parent ``## `` heading (walking backward through the
+       chain, the first non-candidate non-blank line MUST be a ``## `` —
+       not a deeper heading, not body prose, not structural markup).
+    2. Terminates in body prose (walking forward through the chain, the
+       first non-candidate non-blank paragraph MUST be a multi-line
+       paragraph OR a sentence-terminated long single-line ≥60 chars).
+
+    Designed to recognise the PSPB / Sage / APA layout where pdftotext
+    serialises a parent section with stacked subsection headings:
+
+        ## Method
+
+        Design and Procedure
+
+        Power Analysis and Sensitivity Test
+
+        We summarized the experimental design ... [multi-line body]
+
+    The intermediate ``Design and Procedure`` and ``Power Analysis ...``
+    labels should each promote to ``### {label}`` even though the
+    cell-region (next-para single-line short non-terminated) and
+    sibling-label (prev non-blank is a titlecase label) rejects in
+    ``_promote_isolated_titlecase_subsection_headings`` individually
+    block them.
+
+    The chain check is STRUCTURAL — no paper identity, no fixed label
+    vocabulary; position-agnostic (works in Methods, Results, Discussion,
+    anywhere with a ``## `` parent). Accepts both
+    ``_METHOD_SUBSECTION_LABELS`` members and general titlecase candidates
+    as chain members.
+
+    2026-05-26 (Cluster A-ter, ip_feldman finding cluster): closes the
+    Method-subsection promotion gap that survived Cluster A's PSPB-style
+    relaxation. Targets the 4-5 Method subsection findings on
+    ip_feldman_2025_pspb plus analogous findings on chan_feldman and
+    ar_apa where stacked subsections are demoted to plain text.
+    """
+    n = len(lines)
+    s = lines[i].strip()
+    if not s:
+        return False
+    if not (
+        _looks_like_titlecase_subsection_label(s)
+        or s in _METHOD_SUBSECTION_LABELS
+    ):
+        return False
+
+    # Walk BACKWARD through STRICTLY ADJACENT (blank, titlecase-candidate)
+    # pairs counting candidates until reaching the ``## `` parent.  Any
+    # body line, heading other than ``## ``, structural markup, or non-
+    # candidate content BETWEEN the candidate and its parent rejects the
+    # chain — the chain bypass is reserved for STACKED-adjacent
+    # subsection sets (where the only thing between candidate and ``## ``
+    # parent is other candidates + blank lines).  This conservatism keeps
+    # the bypass from over-promoting table-cell labels that happen to
+    # appear deeper in a ``## `` section (e.g. Table 4 row labels on
+    # ip_feldman, which look like a chain but aren't real subsections).
+    backward_count = 0
+    parent_found = False
+    parent_label = ""
+    k = i - 1
+    while k >= 0:
+        while k >= 0 and not lines[k].strip():
+            k -= 1
+        if k < 0:
+            return False  # walked off top without ## parent
+        prev = lines[k].strip()
+        if prev.startswith("## ") and not prev.startswith("### "):
+            parent_found = True
+            parent_label = prev[3:].strip()
+            break
+        # Any other heading (# / ### / #### / etc.) breaks adjacency
+        if prev.startswith("#"):
+            return False
+        if (
+            _looks_like_titlecase_subsection_label(prev)
+            or prev in _METHOD_SUBSECTION_LABELS
+        ):
+            backward_count += 1
+            k -= 1
+            continue
+        # Body / structural markup / non-candidate — chain broken
+        return False
+    if not parent_found:
+        return False
+
+    # 2026-05-26 (Cluster A-ter): reject when parent section is a known
+    # non-subsection-bearing section (Author Contributions, CRediT,
+    # Acknowledgments, Funding, etc.).  Candidates underneath those
+    # parents are list items (CRediT roles, ORCID names, funding agencies),
+    # not subsection headings.  Even when the stacked-adjacent shape
+    # matches, the parent identity tells us "this stack is content, not
+    # subsections."
+    if parent_label in _CHAIN_REJECT_PARENTS:
+        return False
+
+    # Walk FORWARD through ADJACENT (blank, titlecase-candidate) pairs
+    # counting candidates until reaching body prose or end-of-doc.
+    # ``### `` sibling subsections (already-promoted candidates from the
+    # SAME or a PRIOR iteration of this promoter) are transparent — they
+    # don't count toward the chain but don't break it either.
+    forward_count = 0
+    body_found = False
+    j = i + 1
+    while j < n:
+        while j < n and not lines[j].strip():
+            j += 1
+        if j >= n:
+            return False  # walked off bottom with no body
+        para_first = lines[j].strip()
+        para_count = 0
+        m = j
+        while m < n and lines[m].strip():
+            para_count += 1
+            m += 1
+        # ``### `` sibling subsection — transparent (advance j past it,
+        # don't count toward chain, don't break).
+        if para_first.startswith("### "):
+            j = m
+            continue
+        # Other heading depth (# / ## / #### / etc.) — chain broken
+        if para_first.startswith("#"):
+            return False
+        # Multi-line paragraph = body
+        if para_count >= 2:
+            body_found = True
+            break
+        # Single-line: body if long (≥60 chars) or sentence-terminated
+        if len(para_first) >= 60 or para_first[-1:] in ".!?":
+            body_found = True
+            break
+        if (
+            _looks_like_titlecase_subsection_label(para_first)
+            or para_first in _METHOD_SUBSECTION_LABELS
+        ):
+            forward_count += 1
+            j = m
+            continue
+        return False  # non-candidate non-body — chain broken
+    if not body_found:
+        return False
+
+    # Adjacent chain SIZE = 1 (current) + adjacent_backward + adjacent_forward.
+    # Require ≥ 2 — solo candidates (size 1) are handled by the standard
+    # gates with PSPB-style relaxation; the chain bypass exists only for
+    # the stacked-candidates case the standard gates can't see across.
+    adjacent_chain_size = 1 + backward_count + forward_count
+    return adjacent_chain_size >= 2
+
+
 def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
     """§B-new-1: promote paragraph-isolated Title-Case short lines (≤6 words,
     ≤60 chars) followed by prose to ``### {label}`` headings.
@@ -1416,6 +1751,20 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
     positives — see ``_looks_like_titlecase_subsection_label`` and the prev-
     line non-sibling guard below. Conservative: skips lines already wrapped
     in any markdown structural marker.
+
+    2026-05-25 guard added: prior paragraph MUST be sentence-terminated.
+    Pdftotext column-wraps that orphan a short title-case line in the
+    middle of a sentence are NOT real subsection labels and must not be
+    promoted (e.g. ``### Supplemental Materials`` mid-Method on
+    ip_feldman_2025_pspb).  See ``_prev_paragraph_is_sentence_terminated``.
+
+    2026-05-26 (Cluster A-ter): chain detection — when the candidate is
+    part of a verified ``## ``-rooted chain of consecutive titlecase
+    labels terminating in body prose, bypass the cell-region /
+    sibling-label / prev-paragraph-terminator rejects (they correctly
+    reject individual candidates that look like cell labels, but they
+    can't see across the chain to confirm the candidates are real
+    stacked subsections). See ``_is_subsection_chain_member``.
     """
     if not text:
         return text
@@ -1428,24 +1777,116 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
         if not stripped or stripped.startswith(("#", "*", "_", "<", ">", "|", "`", "-", "+")):
             out.append(line)
             continue
-        # Skip lines already covered by B2c (narrow method-subsection set —
-        # those promote with explicit list membership).
-        if stripped in _METHOD_SUBSECTION_LABELS:
-            out.append(line)
+        # 2026-05-26 (Cluster A-ter): chain promotion BEFORE the standard
+        # gate set.  When chain detection confirms ``## `` parent + body
+        # terminus, all the individual-candidate rejects are bypassed.
+        # Also covers _METHOD_SUBSECTION_LABELS members that B2c rejected
+        # (e.g. "Measures" with blank_after=False).
+        if _is_subsection_chain_member(lines, i):
+            if out and out[-1] != "":
+                out.append("")
+            out.append(f"### {stripped}")
+            out.append("")
             continue
+        # B2c (``_promote_isolated_method_subsection_headings``) handles
+        # ``_METHOD_SUBSECTION_LABELS`` members when they are FULLY blank-
+        # isolated (blank_before AND blank_after).  When they aren't
+        # — PSPB / Sage layouts that place the label directly above body
+        # prose with no blank between — B2c rejects them.  Let the
+        # general promoter step in via its PSPB-style relaxation
+        # (handles blank_after=False when next line is prose).
+        # 2026-05-26 (Cluster A-ter): previously this skipped unconditionally,
+        # which left ip_feldman_2025_pspb's solo ``Measures`` /
+        # ``Data Analysis Strategy`` etc. permanently as plain body text.
+        if stripped in _METHOD_SUBSECTION_LABELS:
+            _b2c_blank_before = i == 0 or not lines[i - 1].strip()
+            _b2c_blank_after = i == n - 1 or not lines[i + 1].strip()
+            if _b2c_blank_before and _b2c_blank_after:
+                # B2c's eligibility conditions met — it handled (or
+                # rejected) this line under its own gate set; don't
+                # double-process.
+                out.append(line)
+                continue
+            # else: B2c rejected because of blank_after=False — fall
+            # through so general PSPB-style relaxation can handle.
         if not _looks_like_titlecase_subsection_label(stripped):
             out.append(line)
             continue
         blank_before = i == 0 or not lines[i - 1].strip()
         blank_after = i == n - 1 or not lines[i + 1].strip()
-        if not (blank_before and blank_after):
+        # 2026-05-25 (PSPB-style heading: blank-before + immediate body):
+        # Sage / APA two-column layouts often place a subsection heading
+        # (single Title-Case line) immediately followed by the body text
+        # on the next line WITHOUT a blank line between them.  The original
+        # helper required blank_after, which rejected legitimate PSPB
+        # subsection headings ("Background", "Choice of Study", "The
+        # Misestimation of Others' Emotions" on ip_feldman_2025_pspb).
+        # New logic: blank_before required; blank_after is sufficient
+        # alone, but when missing, we also admit when the line passes
+        # the stricter title-case-label check AND the immediate next line
+        # is body prose (lowercase or sentence-starter Capital).  All the
+        # downstream gates (prior-paragraph-terminator, sibling-label,
+        # structural-markup-prev) still apply.
+        if not blank_before:
             out.append(line)
             continue
-        # Next non-blank line must be PROSE.
+        if not blank_after:
+            # Allow only when next line is immediate body prose AND the
+            # candidate line passes the strict title-case-label shape.
+            next_line_raw = lines[i + 1] if i + 1 < n else ""
+            next_line_stripped = next_line_raw.strip()
+            if not next_line_stripped:
+                out.append(line)
+                continue
+            # Next must be prose (a body sentence, not another label).
+            # _is_prose_line is the standard prose check.
+            if not _is_prose_line(next_line_raw):
+                out.append(line)
+                continue
+            # Don't admit if current line ends with a terminator (then it's
+            # a sentence, not a heading).
+            if stripped[-1] in ".!?":
+                out.append(line)
+                continue
+        # Next non-blank line must be PROSE (validated above for the
+        # no-blank-after path; here for the blank-after path).
         j = i + 1
         while j < n and not lines[j].strip():
             j += 1
         if j >= n or not _is_prose_line(lines[j]):
+            out.append(line)
+            continue
+        # 2026-05-25 guard (Cluster B residue, ip_feldman finding #4):
+        # Look at the NEXT paragraph after current.  A real subsection
+        # heading is followed by a multi-line body paragraph (≥3 wrapped
+        # lines forming a sentence-terminated body).  A cell-region label
+        # is followed by a SINGLE-LINE short paragraph (the next cell
+        # label).  Count consecutive non-blank lines starting at j —
+        # if it's just 1 line AND that line is short + non-terminated,
+        # we're in cell-region (reject).  This preserves PSPB-style
+        # subsection headings (whose body paragraphs wrap across 3-8 lines
+        # with no internal blanks) while rejecting cell labels (each on
+        # its own single-line paragraph).
+        next_para_line_count = 0
+        k = j
+        while k < n and lines[k].strip():
+            next_para_line_count += 1
+            k += 1
+        next_para_first = lines[j].strip()
+        if (
+            next_para_line_count == 1
+            and len(next_para_first) < 60
+            and next_para_first[-1:] not in ".!?"
+        ):
+            out.append(line)
+            continue
+        # 2026-05-25 guard (Cluster A): prior paragraph MUST be sentence-
+        # terminated.  Pdftotext column-wraps that orphan a short title-case
+        # line in the middle of a wrapped sentence are NOT real subsection
+        # labels.  Without this guard, "Supplemental Materials" appearing
+        # mid-paragraph (because pdftotext split "...summarized in the\n\n
+        # Supplemental Materials\n\nThere were...") gets falsely promoted.
+        if not _prev_paragraph_is_sentence_terminated(lines, i):
             out.append(line)
             continue
         # Previous non-blank line must NOT itself be a short isolated
@@ -1463,9 +1904,22 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
                 out.append(line)
                 continue
             # Also skip when prev is structural markup (figure / table /
-            # blockquote / fence / italic-label / heading) — those contexts
-            # are not real "end of prior subsection" boundaries.
-            if prev.startswith(("#", "*", "<", ">", "|", "`", "-", "+", "_")):
+            # blockquote / fence / italic-label / list / divider) — those
+            # contexts are not real "end of prior subsection" boundaries.
+            # 2026-05-25 carve-out: a parent HEADING ("## Introduction") IS
+            # a valid prior context for a subsection-heading promotion —
+            # we want "Background" promoted to "### Background" right
+            # after "## Introduction".  Without this carve-out, PSPB-style
+            # subsection headings remain plain text body across the whole
+            # Introduction / Method / Results / Discussion.
+            if prev.startswith(("*", "<", ">", "|", "`", "-", "+", "_")):
+                out.append(line)
+                continue
+            # Heading-prefix: only skip if the candidate would create a
+            # nonsensical level relationship (e.g. promoting a label right
+            # after another `###` heading — implies the prior section had
+            # zero body).  Allow promotion when prev is ## or higher.
+            if prev.startswith("###"):
                 out.append(line)
                 continue
         # Promote.
@@ -1570,11 +2024,71 @@ def _strip_phantom_camelot_tables(text: str) -> str:
         masthead_match = any(
             p.search(th_text) for p in _PHANTOM_TABLE_HEADER_PATTERNS
         )
+        # 2026-05-25 (Cluster D-partial, ip_feldman finding #9):
+        # ALSO treat tables whose <th> content is long-form body prose
+        # (not a column-header noun phrase) as phantom.  Sage two-column
+        # layouts where a body paragraph shares y-coordinates with the
+        # actual table header line cause Camelot to absorb body words
+        # into the <thead>.  Distinguishing signature: a <th> cell with
+        # MANY words (≥8), containing function words ("and", "we",
+        # "below", "those", "with", "against") AND verb-shape words
+        # (ending in -ed / -ing / -ly).  Legitimate column headers are
+        # short noun phrases ("β for negative", "Outcomes (Extension)")
+        # without function-word + verb co-occurrence.  Three-channel
+        # corroboration prevents legitimate-but-long headers from
+        # tripping (e.g. multi-clause caption-like headers).
+        _FUNCTION_WORDS_IN_PROSE = frozenset({
+            "and", "or", "but", "we", "us", "our", "you", "they", "them",
+            "their", "those", "these", "this", "that", "with", "without",
+            "for", "from", "to", "in", "on", "at", "by", "as", "of",
+            "below", "above", "before", "after", "against", "between",
+            "yet", "however", "although", "though", "while", "because",
+            "since", "if", "when", "where", "which", "who", "whom",
+            "what", "have", "has", "had", "should", "would", "could",
+            "may", "might", "must", "can", "will", "shall", "do", "does",
+            "did", "is", "are", "was", "were", "be", "been", "being",
+        })
+        th_section_leak = False
         if not masthead_match:
+            for th_cell in th_cells:
+                cleaned_th = re.sub(r"<[^>]+>", "", th_cell)
+                # Strip <br>-implied whitespace runs too.
+                cleaned_th = re.sub(r"\s+", " ", cleaned_th).strip()
+                # Drop trailing-hyphen artifacts from PDF line-wrap ("cau-tion")
+                cleaned_th = cleaned_th.replace("- ", "")
+                words = re.findall(r"\b[\w']+\b", cleaned_th.lower())
+                if len(words) < 8:
+                    continue
+                fn_count = sum(1 for w in words if w in _FUNCTION_WORDS_IN_PROSE)
+                verb_count = sum(
+                    1 for w in words
+                    if len(w) >= 4 and w[0].islower()
+                    and (w.endswith("ed") or w.endswith("ing") or w.endswith("ly"))
+                )
+                # Body-prose signature: ≥3 function words AND ≥2 verb-shape words.
+                # Backstop: the OLD heuristic (named section-token + verb-shape)
+                # still works for cases where the section name is present.
+                if fn_count >= 3 and verb_count >= 2:
+                    th_section_leak = True
+                    break
+                word_set = set(words)
+                if any(t.lower() in word_set for t in _PHANTOM_TABLE_BODY_LEAK_TOKENS):
+                    if verb_count >= 1:
+                        th_section_leak = True
+                        break
+        if not (masthead_match or th_section_leak):
             return False
         # Inspect tbody: count non-empty body cells, look for section-name leak.
         body_cells = re.findall(r"<td[^>]*>(.*?)</td>", block, re.DOTALL | re.IGNORECASE)
         non_empty = [c.strip() for c in body_cells if c.strip()]
+        # 2026-05-25 (Cluster D-partial): when the <th> already shows
+        # body-prose leak (th_section_leak=True), we have strong evidence
+        # the entire table region is corrupted by Camelot absorbing
+        # adjacent-column body text.  In that case, the `>3 body cells`
+        # early-return below would still keep the table even though its
+        # data is unreadable — drop unconditionally on th_section_leak.
+        if th_section_leak:
+            return True
         if len(non_empty) > 3:
             # Not a phantom — real table with content despite masthead-shaped header.
             return False
@@ -2409,6 +2923,123 @@ def _strip_running_header_lines_in_unstructured_table_fences(text: str) -> str:
 # the caption appears once inline in body prose and once as the spliced
 # ``### Figure N`` block — a double-emission.
 _INLINE_FIG_CAPTION_LABEL_RE = re.compile(r"^(?:Figure|FIGURE|Fig\.)\s+\d+\b")
+
+# 2026-05-25 (Cluster B, ip_feldman findings #4 + #5): parallel of the
+# figure caption-suppressor.  Pdftotext linearises a table caption into
+# the body text column the same way it linearises a figure caption; the
+# figure helper has existed since 2026-05-12, but the table form was
+# never written.  Result: italic `*Table N. <caption>.*` lines appear
+# duplicated in body prose AND as the in-block caption above the rendered
+# `<table>`.  This pass keeps the in-block caption and drops the
+# orphaned body-text duplicates.  Also suppresses body-text duplicates
+# of TABLE-CELL content that surfaces as paragraph-isolated short labels
+# in between the inline caption and the next prose paragraph (e.g.
+# "Exploratory open-ended" — finding #4 — which is a cell of Table 4
+# that pdftotext serialised in body order).
+_INLINE_TABLE_CAPTION_LABEL_RE = re.compile(r"^(?:Table|TABLE|Tab\.)\s+\d+\b")
+_ITALIC_TABLE_CAPTION_RE = re.compile(r"^\*(Table\s+(\d+)[\.\:].+?)\*\s*$")
+
+
+def _suppress_inline_duplicate_table_captions(text: str) -> str:
+    """Drop italic `*Table N. <caption>.*` lines that pdftotext also left
+    inline in body prose, when the table already has a dedicated
+    ``### Table N`` block with the same caption.
+
+    Parallel of ``_suppress_inline_duplicate_figure_captions``.  Same root
+    cause (pdftotext linearises captions into running text), same safe-
+    subset semantics (drop only when the inline duplicate is OUTSIDE the
+    `### Table N` block zone and its caption exactly matches the in-block
+    caption — case-insensitive, whitespace-normalised).
+
+    Also drops the trailing body-text block (up to next blank+structural
+    boundary) that pdftotext linearises after the inline caption — those
+    are duplicate table-cell content that no longer belong in body once
+    the HTML block is rendered (covers finding #4 "Exploratory open-ended"
+    which is a Table 4 cell label, not a real subsection).
+    """
+    if not text or "Table " not in text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    # 1. Collect "### Table N" block headings + their accompanying italic
+    # captions.  Heading-line index → (block caption text, heading line index).
+    block_info: dict[int, tuple[str, int]] = {}
+    for i, ln in enumerate(lines):
+        m = re.match(r"^#{2,4}\s+Table\s+(\d+)\s*$", ln)
+        if not m:
+            continue
+        num = int(m.group(1))
+        # Italic caption within next 5 lines.
+        for j in range(i + 1, min(i + 5, n)):
+            cm = _ITALIC_TABLE_CAPTION_RE.match(lines[j].strip())
+            if cm:
+                cap_norm = re.sub(r"\s+", " ", cm.group(1)).strip()
+                block_info[num] = (cap_norm, i)
+                break
+    if not block_info:
+        return text
+    # 2. Walk body lines; drop inline matches that aren't the in-block caption.
+    drop: set[int] = set()
+    for i, ln in enumerate(lines):
+        s = ln.strip()
+        if not s:
+            continue
+        cm = _ITALIC_TABLE_CAPTION_RE.match(s)
+        if not cm:
+            continue
+        num = int(cm.group(2))
+        info = block_info.get(num)
+        if not info:
+            continue
+        block_caption, heading_idx = info
+        # Skip if this IS the in-block caption (within 5 lines of the heading).
+        if abs(i - heading_idx) <= 5:
+            continue
+        candidate = re.sub(r"\s+", " ", cm.group(1)).strip()
+        if candidate.lower() != block_caption.lower():
+            continue
+        # Drop this inline caption + tighten surrounding blank lines.
+        drop.add(i)
+        if i > 0 and not lines[i - 1].strip():
+            drop.add(i - 1)
+        # Walk forward through any body-text run that is short, cell-shaped
+        # content (Table N body data that pdftotext linearised after the
+        # caption).  Stop at the first long prose sentence, structural
+        # marker, or second blank line.  This is what kills finding #4
+        # ("Exploratory open-ended") which sits as one of these cell
+        # fragments between the inline caption and the next real
+        # paragraph.  Conservative: cap at 12 lines, stop on `.`-terminated
+        # multi-word prose.
+        j = i + 1
+        blank_run = 0
+        cell_lines_consumed: list[int] = []
+        while j < n and j - i < 12:
+            sj = lines[j].strip()
+            if not sj:
+                blank_run += 1
+                if blank_run > 1:
+                    break
+                j += 1
+                continue
+            blank_run = 0
+            if sj.startswith(("#", "*", "<", "|", "`", ">")):
+                break
+            # Real prose: ≥ 80 chars and ends with sentence terminator → stop.
+            if len(sj) >= 80 and sj[-1] in ".!?":
+                break
+            # Otherwise treat as cell-shaped continuation.
+            cell_lines_consumed.append(j)
+            j += 1
+        # Only drop the cell run if it's clearly cell content (each line short
+        # AND none ends in a body-prose-sentence terminator with > 80 chars).
+        if cell_lines_consumed:
+            drop.update(cell_lines_consumed)
+        # Drop trailing blank line.
+        if j < n and not lines[j].strip():
+            drop.add(j)
+    if not drop:
+        return text
+    return "\n".join(ln for i, ln in enumerate(lines) if i not in drop)
 
 
 def _suppress_inline_duplicate_figure_captions(text: str) -> str:
@@ -3292,7 +3923,12 @@ def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
 
 
 def _render_sections_to_markdown(
-    sectioned, tables: list[dict], figures: list[dict]
+    sectioned,
+    tables: list[dict],
+    figures: list[dict],
+    *,
+    flatten_tables_inline: bool = False,
+    docpluck_version: Optional[str] = None,
 ) -> str:
     """Render a SectionedDocument as markdown, splicing tables and figures.
 
@@ -3418,6 +4054,21 @@ def _render_sections_to_markdown(
                     if cap:
                         body_chunks.append(f"*{cap}*\n")
                     body_chunks.append(html)
+                    # EC-T1: optional human-readable flattened block below the
+                    # <table>. Same records that go into the .tables.jsonl
+                    # sidecar — single source of truth, no drift risk.
+                    if flatten_tables_inline:
+                        records = flatten_table(item)
+                        if records:
+                            body_chunks.append(
+                                "\n"
+                                + render_flattened_inline(
+                                    records,
+                                    table_id=str(item.get("id") or label),
+                                    label=label,
+                                    version=docpluck_version,
+                                )
+                            )
                 elif raw_t:
                     # v2.4.14: Camelot returned no cells, but we extracted
                     # the linearized cell text following the caption
@@ -3502,6 +4153,18 @@ def _render_sections_to_markdown(
                     out_chunks.append(f"*{cap}*\n")
                 if html:
                     out_chunks.append(html + "\n")
+                    if flatten_tables_inline:
+                        records = flatten_table(t)
+                        if records:
+                            out_chunks.append(
+                                render_flattened_inline(
+                                    records,
+                                    table_id=str(t.get("id") or label),
+                                    label=label,
+                                    version=docpluck_version,
+                                )
+                                + "\n"
+                            )
                 elif raw_t:
                     # v2.4.14: surface raw_text fallback (same shape as
                     # the inline emission above).
@@ -3536,6 +4199,7 @@ def render_pdf_to_markdown(
     pdf_bytes: bytes,
     *,
     normalization_level: NormalizationLevel = NormalizationLevel.standard,
+    flatten_tables_inline: bool = False,
     _structured: Optional[dict] = None,
     _sectioned=None,
     _layout_doc: Optional[LayoutDoc] = None,
@@ -3561,6 +4225,18 @@ def render_pdf_to_markdown(
         normalization_level: Forwarded to ``extract_sections`` via the
             normalize step. Default is ``standard``; pass ``academic`` to
             also apply statistical-expression repairs.
+        flatten_tables_inline: When True, emit a human-readable
+            ``### {label} — rendered as text`` block immediately after each
+            ``<table>``, with one bullet per body row carrying the labelled
+            sentence (e.g. ``Importance: t(741) = 3.93, p < .001, d = 0.29``).
+            Bounded by HTML-comment sentinels
+            ``<!-- docpluck:flattened-table id="…" start --> … end -->``.
+            Default False keeps the .md output unchanged from prior versions.
+            Callers who want the structured records as a JSONL sidecar should
+            instead call :func:`docpluck.flatten_tables_for_paper` on
+            ``structured["tables"]`` from ``extract_pdf_structured`` — that
+            function is the canonical source, and the inline block here is
+            *derived from* the same records (so the two outputs cannot drift).
         _structured: Optional pre-computed ``extract_pdf_structured`` result
             (StructuredResult dict). Pass this when the caller has already
             run structured extraction — skips a duplicate Camelot pass that
@@ -3622,8 +4298,13 @@ def render_pdf_to_markdown(
         )
 
     # 3. Render sections + splice tables/figures.
+    from . import __version__ as _dp_ver
     md = _render_sections_to_markdown(
-        sectioned, structured["tables"], structured["figures"]
+        sectioned,
+        structured["tables"],
+        structured["figures"],
+        flatten_tables_inline=flatten_tables_inline,
+        docpluck_version=_dp_ver,
     )
 
     # 4. Post-process (spike pipeline order).
@@ -3741,6 +4422,12 @@ def render_pdf_to_markdown(
     # the block caption (``reﬂection`` vs body ``reflection``) would otherwise
     # defeat the equality check.
     md = _suppress_inline_duplicate_figure_captions(md)
+    # 2026-05-25 (Cluster B): parallel for tables — drop body-text duplicate
+    # of `*Table N. <caption>.*` when the `### Table N` block already carries
+    # it.  Same root cause as figure variant (pdftotext linearises captions
+    # into body text); without this pass, ip_feldman shows the Table 3
+    # caption twice in body prose plus a third time inside its real block.
+    md = _suppress_inline_duplicate_table_captions(md)
     # §C P0r-F (2026-05-23): strip P0r-shape running-header / page-footer
     # lines that survived inside ``unstructured-table`` fenced blocks
     # (third-channel completion of the body normalize-stage P0r).
