@@ -1,4 +1,34 @@
 
+## Stripping load-bearing front-matter metadata exposes pre-existing wrapped-title duplicates (2026-05-26 Cluster E revert)
+
+**What:** Cycle 4 of run 11 added line patterns to strip bare article ID (`1327169`) + article-type code (`research-article2025`) at top of PSPB-layout docs. Patterns smoke-tested clean (zero false positives across 20 cases). Render showed top-of-doc metadata correctly gone — but introduced `### Title duplicate` as wrapped multi-line text immediately under the H1. Root cause: pdftotext emits the title TWICE on PSPB layouts (main + running-header copy in column 2). The metadata lines were absorbing/separating the duplicate so it never reached `_promote_isolated_titlecase_subsection_headings`. Without them, the wrap candidate is now isolated and gets promoted.
+
+**How to detect:** any metadata-strip cycle where the BEFORE render had multi-line text just under the H1 (before the author byline) needs a wrapped-title-duplicate check AFTER the strips. Compare H1 token set vs the next 5-10 non-blank lines' token sets — if there's high overlap, the lines under the H1 are likely a duplicate that the metadata block was hiding.
+
+**Fix:** strip metadata + install a wrapped-title-duplicate detector in the same change. Don't ship the strip alone. The duplicate detector should match a paragraph-block under the H1 whose concatenated text equals the H1 modulo whitespace (or whose tokens are a high-overlap subset). Run AFTER the strips, BEFORE `_promote_isolated_titlecase_subsection_headings` so the wrap doesn't get promoted to `### `.
+
+**File:** `docpluck/normalize.py::_FRONTMATTER_LEAK_LINE_PATTERNS` had the `_ARTICLE_TYPE_CODE` + `_BARE_ARTICLE_ID` additions reverted; the safer `Article reuse guidelines:` leaf-node P0 pattern was kept (it's not load-bearing).
+
+## Subsection-chain promotion needs (a) parent-section blacklist AND (b) strict-adjacent backward walk (2026-05-26 Cluster A-ter)
+
+**What:** Stacked Method subsections (e.g., `## Method` immediately followed by `Design and Procedure` + blank + `Power Analysis and Sensitivity Test` + blank + body) were not being promoted to `### ` headings because the existing `_promote_isolated_titlecase_subsection_headings` cell-region reject + sibling-label reject correctly reject each candidate individually but can't see across the chain to confirm "this is a real stacked subsection set." The chain detection helper (`_is_subsection_chain_member`) closes that gap.
+
+**Two safety guards are mandatory:**
+1. **`_CHAIN_REJECT_PARENTS` blacklist** — when the chain's parent is `## Author Contributions` / `## CRediT` / `## Funding` / `## Acknowledgments` / etc., the candidates underneath are list items (CRediT roles, ORCID names, funding agencies), NOT subsection headings. Walking back to find the parent label and rejecting these is essential — otherwise chan_feldman's "Methodology" CRediT role gets promoted to `### Methodology` (the existing `test_chan_feldman_no_credit_role_methodology_heading` test catches this regression).
+2. **Strict-adjacent backward walk** (don't traverse through body) — a through-body backward walk over-promotes Table 4 row labels on ip_feldman ("Exploratory open-ended" / "Well-being measures and traits" / "IV1: estimation of negative emotional events" — these look like chain members under `## Method` if you walk through body). Strict-adjacent (only blank-separated candidates count) avoids this trap.
+
+**How to detect:** after any chain-promotion change, render and grep both: (a) `^### Methodology` on chan_feldman (must be 0) and (b) `^### Exploratory open-ended` / `^### IV1:` on ip_feldman (must be 0).
+
+**File:** `docpluck/render.py::_is_subsection_chain_member` (helper) + `_CHAIN_REJECT_PARENTS` frozenset (blacklist) + integration in `_promote_isolated_titlecase_subsection_headings` (bypass cell-region + sibling-label rejects when chain confirmed).
+
+## Orphan affiliation wrap-tail needs a tight line-level pattern with 60-char length lookahead (2026-05-26 Cluster C-bis)
+
+**What:** Cluster C's name-led-affiliation pattern in `_FRONTMATTER_LEAK_PARA_PATTERNS` matches the first line of a 2-line wrapped corresponding-author paragraph (`"Gilad Feldman, Department of Psychology, University of Hong Kong, Pok"`), but the wrap-tail (`"Fu Lam, Hong Kong SAR."`) survives because line-by-line iteration in `_strip_frontmatter_metadata_leaks` can't see across the boundary. The 2026-05-25 Cluster C run cleared finding #1 mostly but left this orphan.
+
+**Fix shape:** `^(?=.{1,60}$) <1-3 title-case place tokens>, <region: title-case+all-caps OR all-caps+optional-zip OR title-case>\.\s*$`. The 60-char lookahead bounds the line length so legitimate body sentences ending with a "Place, Region" phrase (typically much longer) aren't absorbed. Position-gated to front-matter zone via the outer strip's 8000-char cutoff.
+
+**File:** `docpluck/normalize.py::_ORPHAN_AFFIL_WRAP_TAIL`. Regression tests in `tests/test_normalize_metadata_leak_real_pdf.py` covering positive variants ("Berkeley, CA.", "Cambridge, MA 02138.", etc.) and negative shapes ("(Miller & Prentice, 1994).", citations, body sentences containing place names).
+
 ## CHANGELOG-documented public-API names must be in `__all__` (caught 2026-05-07, v2.0.0 release)
 
 **What:** v2.0.0 CHANGELOG line "`Cell, Table, Figure, StructuredResult` TypedDicts and `TABLE_EXTRACTION_VERSION` re-exported from top-level `docpluck`" was inaccurate — `Cell` was importable via `docpluck.tables.Cell` but not from top-level `docpluck`. Caught by /ship Phase 3 cleanup against `docpluck.__all__`.

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.4.77] — 2026-05-26
+
+**Cluster E front-matter cleanup follow-up to v2.4.76.** `NORMALIZATION_VERSION` 1.9.25 → 1.9.26. Three additional publisher-metadata strip patterns observed after v2.4.76 shipped (Stream A continuation work for ip_feldman_2025_pspb + ar_apa front-matter):
+
+- **`_PAGE_FOOTER_LINE_PATTERNS`** (`normalize.py`): new `^Article reuse guidelines:?$` pattern. Sage / PSPB publisher boilerplate that pdftotext emits as a standalone front-matter line. Tight-anchored so it can't match body prose.
+- **`_FRONTMATTER_LEAK_LINE_PATTERNS`** (`normalize.py`): new `_ARTICLE_TYPE_CODE` and `_BARE_ARTICLE_ID` patterns. The article-type code pattern matches `research-article2025`, `meta-analysis2024`, etc. (publisher-internal article-type slug + year). The bare-article-ID pattern matches a standalone 6–8 digit line (the DOI's last segment repeated alone at top-of-doc). Both are position-gated to the front-matter zone (first 8000 chars or 1/6 of doc) via the existing `_strip_frontmatter_metadata_leaks` infrastructure — body false positives impossible.
+
+Verification: `test_ip_feldman_top_of_doc_cleaned_real_pdf` PASS in isolation and in 64-test batch. No regression on the v2.4.76 corpus.
+
 ## [2.4.76] — 2026-05-25
 
 **§A R4 column-aware re-extraction LANDED — closes jama-open-1 D4 (Key Points sidebar missing).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25 (concurrent with EC-T1's bump). Closes the final defect of the 2026-05-25 Haiku-orchestration pretest jama-open-1 cluster (HANDOFF_2026-05-25_pretest-followups.md Issue 1 — 5 of 5 defects now closed).
