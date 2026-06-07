@@ -76,6 +76,51 @@ class TestContinuationDemotion:
         assert "### Below Table" in out
 
 
+class TestContinuationRejoin:
+    """v2.4.79 — the demoted continuation is rejoined to the prior line it
+    grammatically continues, not left as an orphan bare line (which reads as
+    a hallucinated fragment to the AI verifier). ip_feldman canary finding #2.
+    """
+
+    def test_rejoins_to_prior_line_no_orphan(self):
+        md = "\n".join([
+            "The calculated effect sizes are summarized in the",
+            "",
+            "## Supplemental Materials",
+            "",
+            "There were several issues with the target article's effects.",
+        ])
+        out = _demote_continuation_promoted_headings(md)
+        # The phrase is joined onto the prior line — no standalone bare line.
+        assert "summarized in the Supplemental Materials" in out
+        assert "\nSupplemental Materials\n" not in out, "orphan bare line remains"
+        # Body after the join is preserved on its own paragraph.
+        assert "There were several issues" in out
+
+    def test_restores_terminal_period_when_sentence_final(self):
+        # Next line starts a new sentence (capital) → restore the period the
+        # heading-promotion stripped.
+        md = "summarized in the\n\n## Supplemental Materials\n\nThere were issues."
+        out = _demote_continuation_promoted_headings(md)
+        assert "summarized in the Supplemental Materials." in out
+
+    def test_no_double_period(self):
+        # If the heading text already ends in punctuation, don't add another.
+        md = "we cite Smith et al. in\n\n## the Appendix.\n\nNext sentence."
+        out = _demote_continuation_promoted_headings(md)
+        assert "the Appendix.." not in out
+
+    def test_no_period_when_followed_by_lowercase_continuation(self):
+        # Next line continues lowercase → the phrase is NOT sentence-final,
+        # so no period is injected mid-sentence.
+        md = "we discuss this in the\n\n## Supplemental Materials\n\nsection below."
+        out = _demote_continuation_promoted_headings(md)
+        assert "in the Supplemental Materials section below." in out or (
+            "in the Supplemental Materials" in out
+            and "Supplemental Materials." not in out
+        )
+
+
 class TestContinuationGuardsAgainstFalsePositives:
     def test_does_not_demote_after_period(self):
         # Prior line ends in `.` — sentence terminator, NOT a continuation.
@@ -212,3 +257,14 @@ class TestG5d2RealPdfRegression:
         # the words entirely.
         md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
         assert "Supplemental Materials" in md or "Supplemental Material" in md
+
+    def test_ip_feldman_effect_sizes_sentence_rejoined(self):
+        # v2.4.79 finding #2: the demoted continuation must be rejoined into
+        # one continuous sentence matching the gold, not split across a blank
+        # line as an orphan fragment.
+        md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
+        assert "The calculated effect sizes are summarized in the Supplemental Materials." in md, (
+            "effect-sizes sentence should be rejoined into one continuous line"
+        )
+        # No orphan bare "Supplemental Materials" line surrounded by blanks.
+        assert "\n\nSupplemental Materials\n\n" not in md

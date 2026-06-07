@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.27"
+NORMALIZATION_VERSION = "1.9.28"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1084,6 +1084,20 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
         r"^Received[:]?\s+\d{1,2}\s+\w+\s+\d{4}\s*[;,]\s*"
         r"Accepted[:]?\s+\d{1,2}\s+\w+\s+\d{4}"
         r"(?:\s*[;,]\s*Published[:]?\s+\d{1,2}\s+\w+\s+\d{4})?\s*\.?\s*$",
+        re.IGNORECASE,
+    ),
+    # v2.4.79: US-format publication-history line "Received Month DD, YYYY;
+    # revision accepted Month DD, YYYY" (Sage / APA journals — PSPB,
+    # ip_feldman). Distinct from the European "Received DD Month YYYY;
+    # Accepted ..." forms above: this uses "Month DD, YYYY" order with a
+    # comma, and the phrase "revision accepted" (not bare "Accepted"). The
+    # date sub-pattern accepts either order (US "Month DD, YYYY" or European
+    # "DD Month YYYY"); the "revision accepted" token plus a trailing year
+    # makes this unmistakably journal boilerplate, never body prose.
+    re.compile(
+        r"^Received\s+(?:\w+\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+\w+\.?\s+\d{4})"
+        r"\s*;\s*revision\s+accepted\s+"
+        r"(?:\w+\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\s+\w+\.?\s+\d{4})\s*\.?\s*$",
         re.IGNORECASE,
     ),
     # B3 / D4 (2026-05-22): bare "N / M" or "N/M" page-furniture marker

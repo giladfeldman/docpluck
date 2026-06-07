@@ -1028,9 +1028,12 @@ def _demote_continuation_promoted_headings(text: str) -> str:
       "Box 2", etc. are structural labels — always legitimate even when the
       surrounding prose is technically continuation-shaped.
 
-    Returns the demoted text with the ``## `` marker stripped (leaving the
-    title as a bare line). A separate normalize pass can rejoin it to the
-    prior line if needed; for now we just stop the false-heading.
+    Returns the demoted text. As of v2.4.79 the demoted continuation is
+    rejoined to the prior line it grammatically continues (with the trailing
+    sentence terminator restored when the phrase completes the sentence),
+    rather than left as an orphan bare line — an orphaned fragment like
+    "Supplemental Materials" reads as a hallucination to the AI verifier
+    (ip_feldman canary finding #2).
     """
     if not text:
         return text
@@ -1072,7 +1075,44 @@ def _demote_continuation_promoted_headings(text: str) -> str:
                             if last_word_match:
                                 last_word = last_word_match.group(1).lower()
                                 if last_word in _CONTINUATION_TAIL_WORDS:
-                                    out.append(heading_text)
+                                    # v2.4.79: rejoin the demoted continuation to
+                                    # the prior line instead of leaving it as an
+                                    # orphan bare line. The promoted heading lost
+                                    # its trailing period and gained blank-line
+                                    # padding; an orphaned "Supplemental Materials"
+                                    # fragment reads as a hallucination to the AI
+                                    # verifier (ip_feldman canary finding #2). The
+                                    # prior line grammatically continues into this
+                                    # phrase, so join them and restore a sentence
+                                    # terminator when the phrase completes the
+                                    # sentence (next non-blank line starts a new
+                                    # sentence or markdown block).
+                                    k = len(out) - 1
+                                    while k >= 0 and not out[k].strip():
+                                        k -= 1
+                                    if k >= 0:
+                                        nxt = i + 1
+                                        while nxt < n and not lines[nxt].strip():
+                                            nxt += 1
+                                        starts_new = (
+                                            nxt >= n
+                                            or lines[nxt].lstrip()[:1].isupper()
+                                            or bool(re.match(
+                                                r"^\s*(?:#|[*+\-]\s|\d+\.\s|>|<|\||```)",
+                                                lines[nxt],
+                                            ))
+                                        )
+                                        joined = out[k].rstrip() + " " + heading_text
+                                        if starts_new and not joined.rstrip().endswith(
+                                            (".", "?", "!", ":", ";", ")", "]", "\"", "'")
+                                        ):
+                                            joined = joined.rstrip() + "."
+                                        # Drop the blank padding lines between the
+                                        # prior line and the demoted heading.
+                                        del out[k + 1:]
+                                        out[k] = joined
+                                    else:
+                                        out.append(heading_text)
                                     i += 1
                                     demoted = True
         if not demoted:

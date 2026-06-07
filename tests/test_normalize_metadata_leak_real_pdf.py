@@ -519,3 +519,71 @@ def test_ip_feldman_top_of_doc_cleaned_real_pdf():
         assert f"### {first_three}" not in md, (
             f"wrapped-title-duplicate heading detected: '### {first_three}...'"
         )
+
+
+# ── 2026-06-07 v2.4.79: US-format publication-history line strip ───────────
+
+
+def test_p0_strips_us_format_received_revision_accepted():
+    """Sage / APA "Received Month DD, YYYY; revision accepted Month DD, YYYY"
+    publication-history line (ip_feldman canary finding #1). The existing
+    European-order patterns ("Received DD Month YYYY; Accepted ...") miss it
+    because this uses US "Month DD, YYYY" order and the phrase "revision
+    accepted".
+    """
+    text = (
+        "emotional estimation error\n"
+        "Received August 22, 2023; revision accepted February 17, 2025\n"
+        "Body after."
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Received August 22, 2023" not in out
+    assert "revision accepted" not in out
+    assert "emotional estimation error" in out
+    assert "Body after." in out
+
+
+def test_p0_received_revision_accepted_variants():
+    """Structural signature — matches both date orders and abbreviated
+    months; never matches body prose containing the same words.
+    """
+    matches = [
+        "Received August 22, 2023; revision accepted February 17, 2025",
+        "Received August 22, 2023; revision accepted February 17, 2025.",
+        "Received 22 August 2023; revision accepted 17 February 2025",
+        "Received Aug. 22, 2023; revision accepted Feb. 17, 2025",
+        "received august 22, 2023; revision accepted february 17, 2025",
+    ]
+    for line in matches:
+        out = _strip_page_footer_lines(f"Before.\n{line}\nAfter.")
+        assert line not in out, f"history line {line!r} should be stripped"
+        assert "Before." in out and "After." in out
+
+    non_matches = [
+        # Prose that happens to contain the words — not start-anchored history.
+        "We received the data on August 22, 2023, after revision accepted "
+        "by the journal in 2025.",
+        "Received wisdom suggests that revision accepted norms vary by 2025.",
+        # Missing the "revision accepted" phrase entirely.
+        "Received August 22, 2023.",
+        # No trailing year on the second date.
+        "Received August 22, 2023; revision accepted soon",
+    ]
+    for line in non_matches:
+        out = _strip_page_footer_lines(f"Before.\n{line}\nAfter.")
+        assert line in out, f"non-history line {line!r} should be preserved"
+
+
+def test_ip_feldman_received_revision_accepted_stripped_real_pdf():
+    """Rule 0d real-PDF regression: ip_feldman canary finding #1. The
+    "Received August 22, 2023; revision accepted February 17, 2025" line
+    that leaked between ## Keywords and ## Introduction must be gone.
+    """
+    md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
+    import re as _re
+    assert not _re.search(
+        r"(?mi)^Received\s+.+;\s*revision\s+accepted\s+.+$", md
+    ), "publication-history 'Received ...; revision accepted ...' line still present"
+    # Body integrity — the keywords and Introduction must survive intact.
+    assert "## Keywords" in md
+    assert "## Introduction" in md
