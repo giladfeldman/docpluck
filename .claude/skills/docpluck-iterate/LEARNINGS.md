@@ -1013,3 +1013,22 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 - Cycle 11 — diagnose remaining individual non-idempotent cases (verify_out scan post-cycle-10 expected ~10-15 from initial 40). Many are likely whitespace-only or single-paper quirks.
 - Group B / B1 — plos-med-1 TABLE-builder cluster. ARCHITECTURAL — needs user direction before coding.
 - Phase 8 Tier-3 verify — confirm v2.4.62 on Railway after this cycle's auto-bump deploys.
+
+---
+
+## Cycle 5 (2026-06-07) — canary findings #1 + #2 cleared (v2.4.79) + canary-gate substrate hardening
+
+**Target (from 2026-06-07 handoff):** clear ip_feldman canary finding #1 (METADATA-LEAK, residual `Received …; revision accepted …` line) and #2 (HALLUCINATION, `Supplemental Materials` fragment). Both DONE + verified.
+
+**Finding #1** — US-format publication-history line. Root cause: every existing `Received…` strip pattern is European-order (`Received DD Month YYYY`); ip_feldman is US `Received Month DD, YYYY; revision accepted …`. Fix: one `_PAGE_FOOTER_LINE_PATTERNS` entry whose date sub-pattern accepts BOTH orders, anchored on the distinctive `revision accepted` + trailing year. The handoff suggested `^Received .*; revision accepted .*$` — I tightened it (verified it rejects body prose like "We received … revision accepted by reviewers in 2025").
+
+**Finding #2** — confirmed **audit FALSE-POSITIVE** (the sentence is real, gold line 86). The real defect was a demote-miss: `_demote_continuation_promoted_headings` stripped a `## Supplemental Materials` false-heading but left it as an orphan bare line (period stripped by the promotion, blank-line padding retained) → read as a hallucinated fragment. Fix: rejoin the demoted continuation to the prior line it grammatically continues + restore the terminal period. The function's own docstring had *deferred* this rejoin ("for now we just stop the false-heading") — a deferred half-fix that surfaced as a finding two sessions later. **Lesson: a docstring that says "a separate pass can do X later" is a latent finding; finish it.**
+
+**Substrate defects found + fixed while gating (LEAVE NOTHING BEHIND):**
+1. **`finding_key` was line-number-sensitive.** `_norm_location` folded a location to `"line N"` keeping the number. My fix shifted ip_feldman's line numbers (removed 1 line, rejoined 1) → deferred Table-10 finding moved `line 1351`→`line 1348` → the `--gate-new-only` ledger saw it as NEW and BLOCKED the commit. This defeats the entire regression-only gate: ANY render change trips it. Fixed `_norm_location` to drop the line number (identity = severity + verbatim excerpt). + invariance self-test. **This is the #1 reason the per-commit canary hook was unusable.**
+2. **Audit had no `allowed_omissions` concept.** The Sonnet canary auditor flagged docpluck's by-design front-matter masthead strip (authors/affiliations/journal/DOI) as TEXT-LOSS — a recurring false-positive that forces SKIP_CANARY. Added an optional `allowed_omissions` payload field (wired through canary-audit.sh + audit-subagent-prompt.md + canary.json) so by-design omissions aren't findings. Mirrors the in-session verifier's allowed-omissions list.
+3. **Single-audit non-determinism vs a large deferred surface.** ip_feldman has a big KNOWN-deferred defect set (Camelot tables + R4 reading-order). The `--quick` single audit samples a DIFFERENT ~7 of them each run, so `--gate-new-only` keeps finding "new" ones until the whole surface is baselined. The `--full` double-audit+union mitigates but can't eliminate. **Practical consequence: per-commit canary on a paper with a large open deferred surface will keep requiring SKIP_CANARY until the deferred work lands — surface this, don't pretend the gate is clean.**
+
+**Gate honesty:** iterate-gate --cycle 1 = FAIL (I2: only audited the litmus; I3: ip_feldman still FAIL on deferred findings). Correct per rule 0e-bis — the cycle made progress but the canary isn't clean. NOT marked PASS, NOT tagged. The 10 deferred findings (Camelot B4 + R4 reading-order) are each their own multi-session architecture effort — surfaced to the user, not bundled.
+
+**Verification:** full pytest 1870 passed; 26/26 corpus baseline; substrate self-tests 17/17; canary audit confirmed zero METADATA-LEAK/HALLUCINATION remain on ip_feldman.
