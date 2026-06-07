@@ -131,6 +131,31 @@ Add only when a real downstream consumer asks for one. YAGNI until then.
 - [ ] **Task #8**: `ai-gold.py resolve` should accept stem names + source-PDF paths (or docs redirect to `check`).
 - [ ] **Task #9**: `ai-gold.py onboard` needs `--skip-legacy` / `--ignore-unresolvable` flag (citationguard onboard halted on 3,018 legacy bare-stem keys).
 
+## 2026-06-07 — v2.4.78 landed (committed 73462e3, unpushed→pushed, NOT tagged)
+
+> **Source:** Cycle-4-redux session. See `docs/superpowers/handoffs/2026-06-07-v2.4.78-landed-canary-iterate.md` for the full state + next-session opener. v2.4.78 cleared canary findings #1/#3/#4 + 4 run-11 hallucinated-heading findings + citationguard soft-hyphen Defect 1. Corpus 26/26, full pytest 1861 passed, canary re-audit 8→5.
+
+### Remaining canary findings on ip_feldman_2025_pspb (from 2026-06-07 re-audit @ 73462e3)
+
+- [x] **METADATA-LEAK** — ✅ CLEARED in **v2.4.79** (cycle 5). New `_PAGE_FOOTER_LINE_PATTERNS` entry strips US-format `Received Month DD, YYYY; revision accepted Month DD, YYYY` (date sub-pattern accepts either order; gated on `revision accepted` + trailing year). The handoff-suggested `^Received .*; revision accepted .*$` was tightened to avoid matching body prose. Real-PDF + contract tests added.
+- [x] **HALLUCINATION** — ✅ CLEARED in **v2.4.79** (cycle 5). Confirmed **audit false-positive** (the sentence is real — gold line 86); the actual defect was a spurious mid-sentence split + dropped period left by `_demote_continuation_promoted_headings`. The demoter now rejoins the demoted continuation to the prior line it continues + restores the terminal period. Verifier allowed-omissions doc updated so publication-history dates can't churn METADATA-LEAK→TEXT-LOSS.
+- [ ] **TABLE (deferred, Camelot multi-session):** Table 2 hypothesis content serialized mid-Introduction (B4).
+- [ ] **TABLE (deferred, Camelot multi-session):** Table 10 caption serialized mid-External-Analysis body (B4).
+- [ ] **SECTION-BOUNDARY (deferred, R4 column-aware):** `## Discussion` opens with displaced Table-9 footnote + External-Analysis fragment (reading-order). Same root cause as the #5 Method-subsection-order finding.
+
+### Deferred from this session (surfaced, not hacked)
+
+- [ ] **`### Reasons for change`** (ip_feldman) — Table 5 column header promoted to heading; needs table-region awareness (the body-coherence guard doesn't catch it because its body starts capitalized). RCA: rank-3 in the 2026-06-06 run-11 RCA.
+- [ ] **`## Data Availability` end-matter absent** — RCA CORRECTED the run-11 "demoter over-strip" premise: the section never enters the text channel (pdftotext drops the title-page box). Needs cross-channel (pdfplumber) recovery, same architecture class as B7. NOT a demoter exception.
+- [ ] **Glyph `Västfjäll`→`Vastfall`** (ar_apa/collabra, citationguard Defect 2) — baked pdftotext CID-font mis-map; needs a same-document surname-consensus normalizer (new subsystem). **Product/architecture decision on scope.**
+- [ ] **org-author `Open Science Collaboration`→`Open, S. C.`** — baked into the PDF's embedded text by the publisher (identical in pdftotext AND pdfplumber); no safe general docpluck fix. **Routed to CitationGuard** (DOI/CrossRef author reconciliation).
+- [ ] **Tag v2.4.78** once the full canary set clears (currently 5 open). Then bump `PDFextractor/service/requirements.txt` pin + run `/docpluck-deploy`.
+
+### Substrate / infra follow-ups (2026-06-07)
+
+- [x] **Tune the canary git-hooks to be ledger-aware (regression-only gate).** ✅ DONE (2026-06-07 cycle 5). `canary-audit.sh --gate-new-only` mode had landed but the hooks weren't passing it. Now wired: `.git/hooks/pre-commit` runs `--quick … --gate-new-only` (routine commits block only on NEW/regressed findings, not the deferred baseline); `.git/hooks/pre-push` uses `--gate-new-only` for **main** pushes but keeps the **strict** no-exceptions gate for **tag** pushes (a release tag must ship a fully-clean canary). Substrate self-tests 16/16 pass.
+- [ ] **Modern Standby permanent disable** (optional, user/admin): `reg add HKLM\SYSTEM\CurrentControlSet\Control\Power /v PlatformAoAcOverride /t REG_DWORD /d 0 /f` + reboot. Current `powercfg /change standby-timeout-ac 0` works but can revert on power-plan change. See memory `feedback_long_runs_die_on_this_machine`.
+
 ### Replicate canary-audit pattern to other iterate skills (after docpluck proven)
 
 - [ ] **escicheck-iterate** — easiest pilot (46 successful phase_5d_runs already, well-defined stats-family defect taxonomy). Update `verification_protocol` in its `canary.json`.

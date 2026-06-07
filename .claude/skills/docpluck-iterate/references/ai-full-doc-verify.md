@@ -144,8 +144,11 @@ CHECKS (in order; each must pass):
    the library may apply: U+2212→hyphen, soft-hyphen rejoin, line-wrap reflow,
    NFKC composition, smart-quote→straight-quote. Allowed omissions ONLY:
    running headers, page numbers, copyright lines, Crossref boilerplate,
-   watermark strips, ORCID lines, DOI banner lines. Anything else missing is a
-   TEXT-LOSS finding.
+   watermark strips, ORCID lines, DOI banner lines, publication-history date
+   lines (e.g. "Received <date>; revision accepted <date>", "Received/Revised/
+   Accepted" mastheads — docpluck strips these as journal furniture by long-
+   established design; not sentence-shaped body prose). Anything else missing is
+   a TEXT-LOSS finding.
 
 2. HALLUCINATION check.
    For every substantive paragraph in the rendered .md (≥60 chars,
