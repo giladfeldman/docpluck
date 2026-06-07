@@ -402,3 +402,120 @@ def test_ip_feldman_article_reuse_guidelines_stripped_real_pdf():
     assert "Article reuse guidelines:" not in md, (
         "'Article reuse guidelines:' boilerplate line should be stripped"
     )
+
+
+# ── 2026-06-06 Cluster E re-land: front-matter article-ID + article-type-code strip ──
+
+
+def test_p1_strips_article_type_code_synthetic():
+    """Publisher article-type codes (`research-article2025`) appear at the
+    very top of doc as standalone lines. Cluster E pattern strips them.
+    Position-gated to front-matter zone, so body-prose mentions are safe.
+    """
+    text = (
+        "1327169\n\n"
+        "research-article2025\n\n"
+        "# The Title\n\n"
+        "Abstract body."
+    ) + "\n\nbody. " * 200
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert "research-article2025" not in out
+    assert "1327169" not in out  # bare article ID also stripped
+    assert "# The Title" in out
+    assert "Abstract body." in out
+
+
+def test_p1_article_type_code_variants():
+    """Several publisher article-type code shapes should match — and a
+    bare 'editorial2020' (no hyphenated suffix) should NOT match (could be
+    a body word)."""
+    body_tail = "\n\nbody. " * 200
+    for variant in (
+        "research-article2025",
+        "review-article2024",
+        "original-article2023",
+        "brief-report2022",
+        "case-report2021",
+    ):
+        text = f"# Title\n\n{variant}\n\nBody." + body_tail
+        out = _strip_frontmatter_metadata_leaks(text)
+        assert variant not in out, f"article-type code {variant!r} not stripped"
+
+    # Bare 'editorial2020' (no hyphen-suffix) — should NOT match.
+    text = "# Title\n\neditorial2020\n\nBody." + body_tail
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert "editorial2020" in out, "bare year-suffix word should NOT be stripped"
+
+
+def test_p1_bare_article_id_position_gated():
+    """Bare 6-8 digit lines in front-matter zone are publisher article IDs
+    and should be stripped. The same shape in body (past 8000-char position
+    cutoff) is preserved."""
+    # Front-matter: 7-digit standalone → stripped.
+    text = "1234567\n\n# Title\n\nBody." + "\n\nbody. " * 200
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert "1234567" not in out
+
+    # Body (past 8000-char cutoff): same shape preserved.
+    body = "Body sentence. " * 1200
+    text = f"# Title\n\n{body}\n\n9876543\n\nEnd."
+    assert text.index("9876543") > 8000
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert "9876543" in out
+
+
+def test_p1_bare_article_id_does_not_overmatch_pages():
+    """A 1-5 digit line (page numbers, short refs) MUST NOT match the
+    6-8 digit article-ID pattern. The DOI itself (10.1177/...) contains
+    digits that look like article IDs but are inside a longer line and
+    safe by anchoring."""
+    text = (
+        "# Title\n\n"
+        "12345\n\n"                       # 5-digit (page) — preserve
+        "10.1177/01461672251327169\n\n"   # full DOI inline — preserve (line ≠ bare digits)
+        "Body."
+    ) + "\n\nbody. " * 200
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert "12345" in out, "5-digit page line should NOT be stripped"
+    assert "10.1177/01461672251327169" in out, "DOI line should NOT be stripped"
+
+
+def test_ip_feldman_top_of_doc_cleaned_real_pdf():
+    """ip_feldman_2025_pspb canary finding #1 (METADATA-LEAK @ lines 1-17):
+    bare article ID '1327169' + 'research-article2025' must be gone from
+    the rendered doc, and the title H1 must be the first content line.
+
+    Per cycle 4 lesson: confirm no wrapped-title-duplicate `### The Complex
+    Misestimation...` heading appears after stripping (Cluster A-ter's
+    chain detector + `# ` H1 prev-reject should structurally prevent it
+    even though the metadata block separator is gone).
+    """
+    md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
+
+    # First non-blank line should be the title H1, not metadata noise.
+    first_nonblank = next((line for line in md.split("\n") if line.strip()), "")
+    assert first_nonblank.startswith("# "), (
+        f"first non-blank line should be title H1, got {first_nonblank!r}"
+    )
+
+    # Article-type code gone.
+    assert "research-article2025" not in md
+
+    # Bare article ID '1327169' line-anchored — DOI '10.1177/01461672251327169'
+    # contains '1327169' as substring so check anchored at line start.
+    import re as _re
+    assert not _re.search(r"(?m)^1327169\s*$", md), (
+        "bare article ID '1327169' still present on its own line"
+    )
+
+    # Cycle 4 lesson check: no wrapped-title duplicate promoted to `### `.
+    # The H1 title's first few significant words shouldn't appear as a
+    # `### ` heading anywhere in the doc.
+    h1_match = _re.search(r"(?m)^# (.+)$", md)
+    if h1_match:
+        title = h1_match.group(1)
+        # Take first 3 words of the H1 as a fingerprint
+        first_three = " ".join(title.split()[:3])
+        assert f"### {first_three}" not in md, (
+            f"wrapped-title-duplicate heading detected: '### {first_three}...'"
+        )

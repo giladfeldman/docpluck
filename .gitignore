@@ -47,3 +47,9 @@ tmp_*.py
 
 # Verification harness outputs (scripts/harness) — extraction artifacts, not committed.
 verify_out/
+
+# Canary-audit persistent open-finding ledger (per-machine cross-run audit
+# STATE written by ~/.claude/skills/_shared/iterate-loop/canary-audit.sh). It is
+# git-SHA-keyed but reflects local audit history, so it's machine-local state —
+# not committed (canary.json, the sibling CONFIG, IS tracked).
+.claude/skills/_project/canary-findings-ledger.json

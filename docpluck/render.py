@@ -1743,6 +1743,484 @@ def _is_subsection_chain_member(lines: list[str], i: int) -> bool:
     return adjacent_chain_size >= 2
 
 
+# ── Wrapped-title-duplicate demoter (2026-06-06, Cycle 4 redux) ────────────
+#
+# Pdftotext routinely emits the document title TWICE on PSPB / Sage / APA
+# two-column layouts: once as the main full-width title (becomes `# H1`),
+# and a second time as a running-header copy at the top of column 1
+# broken across column-wrapped lines. Until cycle 4, the publisher
+# metadata block (article ID, article-type code) absorbed/separated the
+# duplicate so it never became a `### ` promotion candidate.
+#
+# Cluster E re-land (2026-06-06) strips the metadata absorber, which
+# exposes the duplicate as a candidate. The candidate then passes
+# `_promote_isolated_titlecase_subsection_headings`'s gate set (the
+# prev-paragraph-terminator guard treats the `# H1` as a structural
+# boundary; no other reject catches it because the chain detector
+# correctly returns False for an H1 parent, and the immediate prev-non-
+# blank H1 reject doesn't see across multi-line continuation forms),
+# producing `### The Complex Misestimation of Others'` immediately under
+# the H1 with continuation lines as orphan body.
+#
+# This demoter runs AFTER all promotion passes and looks for the
+# STRUCTURAL signature — a `### ` heading immediately after `# H1`,
+# whose token concatenation (with subsequent continuation lines) is an
+# ordered prefix of the H1's tokens. When detected with ≥75% coverage
+# of the H1 tokens, strip the `### ` line + continuation lines.
+_TITLE_DUPLICATE_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+# ── Cohesive front-matter masthead-block strip (2026-06-06, Cycle 4 redux) ─
+#
+# pdftotext serialises the title-page publisher masthead (journal name,
+# volume/page range, society copyright, DOI, article-reuse URLs) inline
+# with the title + author block on column-heavy layouts (Sage / PSPB /
+# APA). Existing P0 / P0r / P1 strippers (normalize.py) catch the lines
+# that carry a recognisable publisher signature (©-copyright, sagepub
+# URLs, "Article reuse guidelines:", JAMA-style footers). What survives
+# to the rendered body on ip_feldman_2025_pspb (canary finding #1,
+# METADATA-LEAK @ lines 1-17) is the residue: author-name+superscript
+# lines, journal-name wrap fragments, a bare page-range, a copyright
+# tail, the "DOI:" label, and the bare DOI — all sitting between the H1
+# title and the `## Abstract` heading.
+#
+# This pass runs at render level (AFTER title rescue inserts the `# H1`)
+# and strips that residual masthead block with a cohesive-block gate:
+# the H1→first-`##` zone must contain >= 2 HARD masthead markers (bare
+# DOI / DOI: label / page-range / author-name+superscript / ©-copyright)
+# before any line is removed. The gate makes the pass self-limiting:
+# on a paper whose H1→`##` zone is real content (no masthead residue),
+# fewer than 2 hard markers are present and the pass is a no-op.
+#
+# General by construction — keyed on structural shapes (DOI grammar,
+# page-range grammar, name+trailing-affiliation-digit, ©), never on
+# paper identity or a hard-coded journal string. See Run-11 handoff
+# (2026-05-26-run-11-...) cycle-4-redux step 2.
+
+# Hard masthead markers (presence of >=2 in the zone confirms a masthead
+# block and licenses stripping the softer journal-name / society wraps).
+_MASTHEAD_BARE_DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$")
+_MASTHEAD_DOI_LABEL_RE = re.compile(
+    r"^(?:DOI:?|https?://(?:dx\.)?doi\.org/\S+)\s*$", re.IGNORECASE
+)
+# Page / volume range: optional leading BOM/soft-hyphen junk, NN-NN.
+_MASTHEAD_PAGE_RANGE_RE = re.compile(
+    r"^[﻿­\s]*\d{1,4}\s*[­\-‐-―]\s*\d{1,4}\s*$"
+)
+# Author name with a trailing affiliation superscript digit (1-2 digits),
+# optionally led by "and " (pdftotext splits multi-author lists).
+_MASTHEAD_AUTHOR_SUPERSCRIPT_RE = re.compile(
+    r"^(?:and\s+)?[A-Z][a-zA-Z.’']+(?:\s+[A-Z][a-zA-Z.’']+){1,3}\d{1,2}$"
+)
+# Copyright line / tail (© ... OR a "..., Inc"/"Society for ..." fragment).
+_MASTHEAD_COPYRIGHT_RE = re.compile(
+    r"(?:^\s*(?:©|\(c\)|copyright\b)"
+    r"|\bSociety\s+for\b"
+    r"|,\s*Inc\.?\s*$)",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_masthead_hard_marker(line: str) -> bool:
+    s = line.strip()
+    if not s:
+        return False
+    return bool(
+        _MASTHEAD_BARE_DOI_RE.match(s)
+        or _MASTHEAD_DOI_LABEL_RE.match(s)
+        or _MASTHEAD_PAGE_RANGE_RE.match(s)
+        or _MASTHEAD_AUTHOR_SUPERSCRIPT_RE.match(s)
+        or _MASTHEAD_COPYRIGHT_RE.search(s)
+    )
+
+
+def _is_frontmatter_prose_line(line: str) -> bool:
+    """A line that is clearly running prose (not masthead) — used to
+    terminate the masthead zone so an undetected abstract or any real
+    body text before the first `## ` heading is never stripped.
+
+    Conservative: only a long (>=80 char) line ending in a sentence
+    terminator counts as prose. Short masthead lines (author names,
+    journal wraps, DOI) never reach 80 chars + terminator.
+    """
+    s = line.strip()
+    if len(s) < 80:
+        return False
+    return bool(_SENTENCE_TERMINATOR_RE.search(s))
+
+
+def _strip_frontmatter_masthead_block(text: str) -> str:
+    """Strip the residual publisher masthead block between the document
+    H1 and the first `## ` body-section heading.
+
+    Fires only when the zone holds >= 2 hard masthead markers. Walks the
+    zone from H1+1, stopping at the first `## ` heading OR the first prose
+    line OR 30 lines (whichever comes first); every non-blank line in the
+    confirmed zone is masthead and is removed. Blank-line structure is
+    re-collapsed afterward.
+
+    No-op when: no H1 present; zone has < 2 hard markers; the very first
+    post-H1 content is prose (real body — nothing to strip).
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+
+    h1_idx = -1
+    for idx, line in enumerate(lines):
+        s = line.lstrip()
+        if s.startswith("# ") and not s.startswith("## "):
+            h1_idx = idx
+            break
+    if h1_idx < 0:
+        return text
+
+    zone_indices: list[int] = []
+    hard_markers = 0
+    j = h1_idx + 1
+    walked = 0
+    while j < n and walked <= 30:
+        raw = lines[j]
+        s = raw.strip()
+        if s.startswith("## "):
+            break  # body-section boundary — zone ends
+        if _is_frontmatter_prose_line(raw):
+            break  # real content — stop, preserve everything from here
+        if s:
+            zone_indices.append(j)
+            if _looks_like_masthead_hard_marker(raw):
+                hard_markers += 1
+        j += 1
+        walked += 1
+
+    if hard_markers < 2 or not zone_indices:
+        return text
+
+    strip = set(zone_indices)
+    out = [line for i, line in enumerate(lines) if i not in strip]
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+# ── Column-wrapped subsection-heading repair (2026-06-06, Cycle 4 redux) ───
+#
+# Dense two-column Sage / PSPB / APA layouts column-wrap a subsection
+# heading whose title carries a citation. pdftotext serialises the wrap
+# as two physical lines, producing two distinct defect shapes that the
+# section partitioner + the render-level promoters cannot catch (the
+# title trips the `et al.` sentence-internal-period gate, the 6-word cap,
+# and the trailing-colon gate in `_looks_like_titlecase_subsection_label`
+# — gates that exist to reject prose corpus-wide and must NOT be relaxed
+# globally; see LESSONS + RCA 2026-06-06).
+#
+# Two tightly-gated structural signatures (no paper identity, no hard-
+# coded strings — keyed purely on citation/wrap typography):
+#
+#   Rule A — citation-wrap promote (canary finding #3):
+#       Choice of Study for Replication: Jordan et al.   <- L0 (blank-before, Title-Case, ends "et al.")
+#       (2011)                                            <- L1 (bare year, alone on its line)
+#                                                         <- blank
+#       We aimed to revisit ...                           <- body prose
+#     -> ### Choice of Study for Replication: Jordan et al. (2011)
+#     A bare "(YYYY)" alone on its own line only happens when a citation
+#     in a SHORT heading overflows the wrap; in body the year stays glued
+#     to the following text. That is the disambiguating signal.
+#
+#   Rule B — orphan tail reattach (canary finding #4):
+#       ### Original Hypotheses and Findings in Target    <- H (h2/h3, no terminal .!?:)
+#                                                         <- blank
+#       Article: Jordan et al. (2011)                     <- T (short, colon-led completion)
+#       Jordan et al. (2011) empirical work ...           <- body prose
+#     -> ### Original Hypotheses and Findings in Target Article: Jordan et al. (2011)
+#     Generalises the proven `_merge_compound_heading_tails` off its
+#     hard-coded JAMA tail list to any short colon-led / paren-led tail.
+_CITATION_WRAP_L0_RE = re.compile(
+    r"^[A-Z][A-Za-z].{0,58}\bet al\.$"      # Title-Case start, <=60 chars, ends "et al."
+)
+_BARE_YEAR_LINE_RE = re.compile(
+    r"^\(\d{4}[a-z]?\)[.,;]?$"               # (2011) / (2011a) / (2011). alone
+)
+_ORPHAN_TAIL_RE = re.compile(
+    r"^(?:[A-Z][a-z]+:|\()"                  # colon-led word ("Article:") or paren-led
+)
+
+
+def _repair_column_wrapped_headings(text: str) -> str:
+    """Repair column-wrapped subsection-heading titles (Rules A + B above).
+
+    Conservative — both rules require the wrap-continuation to be followed
+    by body prose (never another heading), so two real sibling headings
+    are never merged, and a real heading is never extended with a real
+    body sentence (the tail is short + has a heading-completion shape).
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    i = 0
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+
+        # ── Rule B: orphan tail reattach to an existing heading ──────────
+        m_h = re.match(r"^(#{2,3})\s+(.*)$", stripped)
+        if m_h:
+            htext = m_h.group(2).rstrip()
+            if htext and htext[-1] not in ".!?:":
+                # next non-blank line
+                j = i + 1
+                while j < n and not lines[j].strip():
+                    j += 1
+                if j < n:
+                    tail = lines[j].strip()
+                    tail_words = tail.split()
+                    # line after the tail must be body prose (not heading/markup)
+                    k = j + 1
+                    while k < n and not lines[k].strip():
+                        k += 1
+                    after_is_prose = (
+                        k < n
+                        and not lines[k].lstrip().startswith(
+                            ("#", "*", "<", ">", "|", "`", "-", "+")
+                        )
+                        and len(lines[k].strip()) >= 40
+                    )
+                    if (
+                        len(tail) <= 55
+                        and 1 <= len(tail_words) <= 7
+                        and _ORPHAN_TAIL_RE.match(tail)
+                        and tail[-1] not in ".!?"  # tail isn't a full sentence
+                        and after_is_prose
+                    ):
+                        out.append(f"{m_h.group(1)} {htext} {tail}")
+                        # skip blanks + the tail line; continue from k
+                        out.append("")
+                        i = k
+                        continue
+
+        # ── Rule A: citation-wrap promote (body L0 + bare-year L1) ───────
+        blank_before = (not out) or out[-1].strip() == ""
+        if (
+            blank_before
+            and stripped
+            and _CITATION_WRAP_L0_RE.match(stripped)
+            and i + 1 < n
+            and _BARE_YEAR_LINE_RE.match(lines[i + 1].strip())
+        ):
+            # line after the bare-year must be body prose
+            k = i + 2
+            while k < n and not lines[k].strip():
+                k += 1
+            after_is_prose = (
+                k < n
+                and not lines[k].lstrip().startswith(
+                    ("#", "*", "<", ">", "|", "`", "-", "+")
+                )
+                and len(lines[k].strip()) >= 40
+            )
+            if after_is_prose:
+                joined = f"{stripped} {lines[i + 1].strip()}"
+                if out and out[-1] != "":
+                    out.append("")
+                out.append(f"### {joined}")
+                out.append("")
+                i += 2
+                # swallow the blank(s) between L1 and prose
+                while i < n and not lines[i].strip():
+                    i += 1
+                continue
+
+        out.append(line)
+        i += 1
+
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _demote_wrapped_title_duplicate(text: str) -> str:
+    """Strip a `### {prefix-of-H1}` + continuation block immediately
+    following the document H1, where the block's token sequence is an
+    ordered prefix of the H1's tokens (≥75% coverage).
+
+    Pattern (after the standard promote/demote passes):
+
+        # The Complex Misestimation of Others' Emotions: Underestimation
+        of Emotional Prevalence Versus Overestimation of Emotional
+        Intensity and Their Associations with Well-Being
+
+        ### The Complex Misestimation of Others'
+
+        Emotions: Underestimation of Emotional
+        Prevalence Versus Overestimation of Emotional Intensity and
+        Their Associations with Well-Being
+
+    The `### ` line + 3 continuation lines together reconstruct the H1's
+    token sequence as an ordered prefix. Strip them.
+
+    Conservative gates (no false-positive paths):
+    - Only fires when an H1 (`# `) is present in the doc.
+    - Only considers a `### ` candidate within 2 blank lines after the H1
+      (so a legitimate `### Background` after `## Introduction` body is
+      safe — it's not immediately after the H1).
+    - Requires the candidate + accumulated continuation tokens to form
+      an EXACT ordered prefix of the H1 tokens (modulo punctuation).
+    - Requires ≥75% H1-token coverage to fire (a short coincidental
+      prefix like `### The Complex` alone with 3 tokens against a 20-
+      token H1 has 15% coverage and is preserved).
+    - H1 must have ≥4 tokens (skip short titles where false-positive
+      risk is higher).
+
+    See Run-11 handoff line 93-100 + cycle 4 lesson for the structural
+    background.
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+
+    # Find the first H1 (`# ` not `## `).
+    h1_idx = -1
+    for idx, line in enumerate(lines):
+        s = line.lstrip()
+        if s.startswith("# ") and not s.startswith("## "):
+            h1_idx = idx
+            break
+    if h1_idx < 0:
+        return text
+
+    h1_text = lines[h1_idx].lstrip()[2:]  # strip `# `
+    h1_tokens = [
+        t.lower() for t in _TITLE_DUPLICATE_TOKEN_RE.findall(h1_text)
+    ]
+    if len(h1_tokens) < 4:
+        return text  # too-short title; false-positive risk too high
+
+    # Scan forward for the `### ` candidate within ≤2 blank lines.
+    j = h1_idx + 1
+    blanks_skipped = 0
+    while j < n and not lines[j].strip():
+        blanks_skipped += 1
+        if blanks_skipped > 2:
+            return text
+        j += 1
+    if j >= n:
+        return text
+
+    cand = lines[j].lstrip()
+    if not cand.startswith("### ") or cand.startswith("#### "):
+        return text
+
+    # Build accumulated tokens from `### ` candidate + continuation lines.
+    accum_tokens: list[str] = [
+        t.lower() for t in _TITLE_DUPLICATE_TOKEN_RE.findall(cand[4:])
+    ]
+    if not accum_tokens:
+        return text
+    # Must already be a prefix of H1 tokens.
+    if accum_tokens != h1_tokens[:len(accum_tokens)]:
+        return text
+
+    # Walk forward absorbing continuation lines as long as they extend
+    # the prefix match.  block_end is the FIRST line we keep
+    # (i.e. lines[j..block_end-1] are candidates for strip).
+    block_end = j + 1
+    k = j + 1
+    while k < n and len(accum_tokens) < len(h1_tokens):
+        s = lines[k].strip()
+        if not s:
+            k += 1
+            continue
+        if s.startswith(("#", "*", "<", ">", "|", "`")):
+            break  # structural marker terminates the duplicate block
+        new_tokens = [
+            t.lower() for t in _TITLE_DUPLICATE_TOKEN_RE.findall(s)
+        ]
+        trial = accum_tokens + new_tokens
+        if len(trial) > len(h1_tokens):
+            break  # would exceed H1 length — not a prefix
+        if trial != h1_tokens[:len(trial)]:
+            break  # divergence from H1 token sequence
+        accum_tokens = trial
+        block_end = k + 1
+        k += 1
+
+    # Require ≥75% H1-token coverage to be confident.
+    coverage = len(accum_tokens) / len(h1_tokens)
+    if coverage < 0.75:
+        return text
+
+    # Strip lines[j..block_end-1] (the `### ` line + continuation lines).
+    out = lines[:j] + lines[block_end:]
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _strip_pre_title_heading_noise(text: str) -> str:
+    """Strip heading markup that appears ABOVE the document H1 title.
+
+    A real section/subsection heading never precedes the title. A ``#``-
+    prefixed line in the pre-title masthead zone is a promoted journal-
+    section label (e.g. ``### FlashReport`` / ``### RESEARCH ARTICLE`` on
+    Elsevier front matter) — masthead noise the gold omits. Drop those
+    lines entirely.
+
+    Must run AFTER title rescue (the H1 is the anchor). No-op when there is
+    no H1 or no heading precedes it. General — keyed on "a heading line sits
+    above the document title", never on the label text.
+
+    2026-06-06 (run-11, ar_apa `### FlashReport`).
+    """
+    if not text:
+        return text
+    lines = text.split("\n")
+    h1_idx = -1
+    for ix, ln in enumerate(lines):
+        s = ln.lstrip()
+        if s.startswith("# ") and not s.startswith("## "):
+            h1_idx = ix
+            break
+    if h1_idx <= 0:
+        return text
+    out: list[str] = []
+    for ix, ln in enumerate(lines):
+        if ix < h1_idx and ln.lstrip().startswith("#"):
+            continue  # drop pre-title heading-noise line
+        out.append(ln)
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _nearest_h2_parent_label(lines: list[str], i: int) -> Optional[str]:
+    """Walk backward from ``lines[i]`` to the nearest ``## `` heading and
+    return its label, tolerating interleaved running-header / short non-
+    heading lines. Returns None if the document H1 (``# ``) is reached
+    first (no enclosing ``## `` section) or no parent is found within a
+    bounded scan.
+
+    2026-06-06 (run-11): used by the regular promotion path to consult
+    ``_CHAIN_REJECT_PARENTS`` the same way the chain path does, so a CRediT
+    role label (e.g. ``Methodology``) stranded under ``## Author
+    Contributions`` by an interleaved running-header line is not promoted.
+    """
+    k = i - 1
+    seen = 0
+    while k >= 0 and seen < 80:
+        s = lines[k].strip()
+        if s.startswith("## ") and not s.startswith("### "):
+            return s[3:].strip()
+        if s.startswith("# ") and not s.startswith("## "):
+            return None  # hit the H1 title; no enclosing ## section
+        k -= 1
+        seen += 1
+    return None
+
+
 def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
     """§B-new-1: promote paragraph-isolated Title-Case short lines (≤6 words,
     ≤60 chars) followed by prose to ``### {label}`` headings.
@@ -1934,6 +2412,30 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
             if prev.startswith("# ") and not prev.startswith("## "):
                 out.append(line)
                 continue
+        # 2026-06-06 (run-11 finding cluster): the following body must read
+        # as a real subsection body. A candidate whose body's FIRST
+        # alphabetic character is lowercase is a fragment torn from a running
+        # sentence — the candidate line was a table-cell value / mid-sentence
+        # wrap, not a title. E.g. `### Close replication` then "testing the
+        # proposed causal chain..." (chan_feldman); `### Proced` then
+        # "age >=18 years..." (plos_med, a truncation fragment). A genuine
+        # subsection body opens with a capital. (Chain-validated stacked
+        # subsections bypass this — they took the early chain path above.)
+        _body_first = lines[j].strip()
+        _body_first_alpha = next((c for c in _body_first if c.isalpha()), "")
+        if _body_first_alpha and _body_first_alpha.islower():
+            out.append(line)
+            continue
+        # 2026-06-06 (run-11, plos_med `### Methodology`): reject promotion
+        # when the nearest enclosing `## ` parent is a known non-subsection-
+        # bearing section (Author Contributions / CRediT / Funding / ...).
+        # Generalizes the chain-path `_CHAIN_REJECT_PARENTS` protection to the
+        # regular promotion path — a CRediT role label gets here when an
+        # interleaved running-header line breaks chain adjacency.
+        _parent_label = _nearest_h2_parent_label(lines, i)
+        if _parent_label is not None and _parent_label in _CHAIN_REJECT_PARENTS:
+            out.append(line)
+            continue
         # Promote.
         if out and out[-1] != "":
             out.append("")
@@ -4361,6 +4863,13 @@ def render_pdf_to_markdown(
     # Title-Case short line (≤6 words, ≤60 chars) followed by prose, gated
     # by strict shape checks. Runs AFTER B2c so the narrow set still wins.
     md = _promote_isolated_titlecase_subsection_headings(md)
+    # 2026-06-06 (Cycle 4 redux): repair column-wrapped subsection-heading
+    # titles carrying a citation — Rule A promotes a body `{Title} et al.`
+    # + bare `(YYYY)` wrap to `### {Title} et al. (YYYY)` (finding #3);
+    # Rule B reattaches a short colon-/paren-led orphan tail onto an
+    # existing heading that was split mid-title (finding #4). Runs AFTER
+    # the titlecase promoter so Rule B sees the partially-promoted `###`.
+    md = _repair_column_wrapped_headings(md)
     # v2.4.74 (jama-open-1 HALLUC_HEAD fix): demote ### headings that the
     # promoters just stranded inside table-cell-region clusters. Runs AFTER
     # all promoters so it sees the final ### state and can target promotions
@@ -4463,6 +4972,28 @@ def render_pdf_to_markdown(
 
     # 5. Title rescue — uses the layout_doc computed once at step 0 (v2.4.74).
     md = _rescue_title_from_layout(md, layout_doc)
+    # 2026-06-06 (Cycle 4 redux, Cluster E side-effect protection): strip
+    # the `### {prefix-of-H1}` + continuation block that pdftotext column-
+    # wraps emit on PSPB/Sage layouts. MUST run AFTER `_rescue_title_from_
+    # layout` because the H1 it inserts is the anchor for the token-prefix
+    # match. Requires ≥75% H1-token-coverage to fire — false-positives
+    # architecturally impossible because legitimate subsection headings
+    # under a `## ` parent (e.g. `### Background`) are not located ≤2 blank
+    # lines below the H1 and don't reproduce the H1's token sequence as an
+    # ordered prefix.
+    md = _demote_wrapped_title_duplicate(md)
+    # 2026-06-06 (Cycle 4 redux step 2): strip the residual publisher
+    # masthead block (author+superscript, journal-name wraps, page range,
+    # copyright tail, DOI: label, bare DOI) between the H1 and the first
+    # `## ` body-section heading. Runs AFTER the wrapped-title demoter so
+    # the zone no longer contains a `### `-duplicate that would otherwise
+    # terminate the zone early. Self-limiting >=2-hard-marker gate.
+    md = _strip_frontmatter_masthead_block(md)
+    # 2026-06-06 (run-11, ar_apa `### FlashReport`): strip heading markup
+    # that sits ABOVE the document H1 — a journal-section label promoted to
+    # a heading in the pre-title masthead zone. Runs after title rescue (H1
+    # is the anchor).
+    md = _strip_pre_title_heading_noise(md)
     md = _italicize_known_subtitle_badges(md)
 
     return md.rstrip() + "\n"

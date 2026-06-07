@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.26"
+NORMALIZATION_VERSION = "1.9.27"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -1666,20 +1666,40 @@ _ORPHAN_AFFIL_WRAP_TAIL = re.compile(
     r"\.\s*$"                                          # required period
 )
 
-# 2026-05-26 (Cluster E attempted in run 11, REVERTED): stripping bare
-# article ID + article-type code at top of doc successfully cleared the
-# masthead noise BUT exposed a previously-suppressed wrapped-title
-# duplicate immediately under the H1 (pdftotext serialises the title
-# twice on PSPB layouts; the metadata lines previously absorbed/separated
-# the duplicate). Net effect: 1 finding cleared (METADATA-LEAK),
-# 1 finding introduced (HALLUCINATION ### Title duplicate). Reverted.
+# 2026-06-06 (Cluster E re-land after cycle 4 revert): the article-ID +
+# article-type-code patterns were drafted in run 11 cycle 4 and reverted
+# because their landing exposed a wrapped-title-duplicate previously
+# absorbed by those very metadata lines (pdftotext serialises the title
+# twice on PSPB layouts). Re-landed here because: (a) Cluster A-ter
+# (render.py _is_subsection_chain_member + `# ` H1 reject prev-check)
+# now structurally rejects the wrapped-title-duplicate's promotion to
+# `### `, removing the side-effect that motivated the revert; and (b)
+# the canary smoke at HEAD 31fb646 confirms the leak is the #1 finding
+# on ip_feldman (METADATA-LEAK @ lines 1-17). Per LEAVE NOTHING BEHIND,
+# leaving a known-fix-shape reverted in code is itself a defect.
 #
-# Next session: do this together with a wrapped-title-duplicate detector
-# that runs AFTER metadata strips. See handoff for the structural
-# signature (consecutive lines starting with a title-token, all under
-# the H1, formerly absorbed by metadata).
+# Pattern safety:
+# - `_ARTICLE_TYPE_CODE` requires a hyphenated suffix-with-year
+#   (`research-article2025`); single-token body words like `editorial2020`
+#   are explicitly NOT matched (regression-tested).
+# - `_BARE_ARTICLE_ID` is position-gated to the front-matter zone by the
+#   existing _strip_frontmatter_metadata_leaks (first 8000 chars). A
+#   standalone 6–8 digit line in body prose is genuinely rare and is
+#   preserved by the position gate; in front-matter it is always a
+#   publisher article ID (last segment of DOI repeated alone).
+_ARTICLE_TYPE_CODE = re.compile(
+    r"^(?:research|review|opinion|original|brief|invited|short|case|"
+    r"editorial|letter|commentary|perspective|practice|empirical|"
+    r"systematic-review|meta-analysis)-(?:article|report|review|"
+    r"communication|note|paper|study)\d{4}\s*$",
+    re.IGNORECASE,
+)
+_BARE_ARTICLE_ID = re.compile(r"^\d{6,8}\s*$")
+
 _FRONTMATTER_LEAK_LINE_PATTERNS: list[re.Pattern[str]] = [
     _ORPHAN_AFFIL_WRAP_TAIL,
+    _ARTICLE_TYPE_CODE,
+    _BARE_ARTICLE_ID,
 ]
 
 
@@ -2811,6 +2831,20 @@ def normalize_text(
 
     # S6: Whitespace and invisible character normalization
     before = t
+    # 2026-06-06 (citationguard text-extraction handoff, Defect 1): a SOFT
+    # HYPHEN (U+00AD) immediately before a line break is ALWAYS a
+    # discretionary extraction hyphen splitting one word across the wrap
+    # (relation\u00AD\nship). Join the fragments (drop U+00AD AND the
+    # newline) BEFORE the bare strip below; otherwise the bare strip
+    # leaves relation\nship, which reflows to "relation ship" (a space-
+    # broken word) ~1/3 of the time. Gated on a following letter so a
+    # U+00AD before a blank line / punctuation never collapses a
+    # paragraph boundary. Unlike U+002D (real hyphen, ambiguous - handled
+    # by S7 with its own guard), U+00AD is unambiguous and always
+    # removable. Recovers com/mitment, pro/motion, altru/ism,
+    # relation/ship on chan_feldman_2025_cogemo (was: 6 space-broken
+    # words surviving to rendered output).
+    t = re.sub(r"\u00AD[ \t]*\r?\n[ \t]*(?=[A-Za-z])", "", t)
     t = t.replace("\u00AD", "")    # soft hyphen (invisible, breaks search — 14/50 test PDFs)
     t = t.replace("\u00A0", " ")   # NBSP
     t = t.replace("\u2002", " ")   # en space
