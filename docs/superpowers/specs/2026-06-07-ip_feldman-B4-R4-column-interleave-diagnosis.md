@@ -89,6 +89,140 @@ amle_1, JAMA, all PSPB/JESP). Gate hard on the 26-corpus baseline every iteratio
 
 ---
 
+## Implementation started (2026-06-07, cycle 5) — validated band-detector prototype
+
+User approved starting the region-aware architecture. Foundation built + **empirically
+validated against ip_feldman's real layout**, but **deliberately NOT wired into the live
+extraction pipeline** — a half-tuned reading-order change would risk silent corpus-wide
+corruption that the char-ratio corpus gate cannot catch (per the skill: char-ratio/Jaccard
+are blind to "right words, wrong order"). The live wiring + tuning + full corpus+AI gating
+is the next focused session.
+
+### Key insight discovered: a vertical empty-gutter strip beats the bilateral gate
+
+The current whole-page **bilateral gate** (`extract_columns.py:140-151`, reject if ≥30% of
+y-rows have words on both sides of the midline) **misclassifies genuine 2-column prose
+pages with aligned baselines**. ip_feldman page 14 reads 0.37 bilateral (would be REJECTED)
+yet has a clean full-height gutter at x=314 — it is real 2-col prose. A **gutter-strip
+detector** (is there a central x-interval that NO word crosses across the band's height?)
+gets page 14 right, and correctly finds NO full-page gutter on page 13 (Discussion) because
+that page is banded (table band + prose bands). **The gutter-strip check should replace or
+augment the bilateral gate.**
+
+### Validated prototype (page map + band detector)
+
+Page map (ip_feldman, 0-indexed) — current hist-path fires on only page 18; a line-start /
+gutter detector would newly handle the pure-prose 2-col pages; the table-bearing pages need
+banding:
+
+```
+pg words hist  ls_mid bilat  verdict
+ 0  540   -    319    0.27   prose (title/abstract page — handle with care)
+ 1  903   -    304    0.17   pure 2-col prose  ✅ single clean gutter band @299
+ 9  914   -    304    0.24   pure 2-col prose
+11  314   -    248    0.26   pure 2-col prose
+ 5  742   -    304    0.39   MIXED (table+prose)  → needs banding
+ 8  482   -    244    0.33   MIXED → banding
+10  472   -    290    0.42   MIXED → banding
+12  321   -    244    0.35   MIXED → banding
+13  595   -    304    0.44   MIXED (Discussion+Table 10) → banding
+14  799   -    319    0.37   pure 2-col prose ✅ single clean gutter band @314 (bilateral-gate FALSE reject)
+17  735   -    305    0.31   MIXED → banding
+18  826  321    -     -      hist-path already fires
+```
+
+Band-detector prototype (validated: page 1 → one prose band mid=299; page 14 → one prose
+band mid=314; page 13 → correctly splits into table/prose bands, though sparse-table bands
+produce spurious gutter midlines (397, 278) that the refinement below must reject):
+
+```python
+TOL = 5.0
+def _widest_empty_strip(words, lo, hi, min_w=8.0):
+    """Widest x-interval in [lo,hi] crossed by no word [x0,x1]; (center,width) or None."""
+    occ = sorted((max(w['x0'],lo), min(w['x1'],hi)) for w in words
+                 if min(w['x1'],hi) > max(w['x0'],lo))
+    best=None; cur=lo
+    for a,b in occ:
+        if a>cur and (a-cur) >= (best[1]-best[0] if best else 0): best=(cur,a)
+        cur=max(cur,b)
+    if cur<hi and (hi-cur) >= (best[1]-best[0] if best else 0): best=(cur,hi)
+    return ((best[0]+best[1])/2, best[1]-best[0]) if best and (best[1]-best[0])>=min_w else None
+
+def _column_bands(words, W, H):
+    """Segment page rows into bands sharing a central gutter (prose) vs none (table).
+    Greedy: extend a band while a central empty strip persists; close+reset when a row
+    crosses the center."""
+    from collections import defaultdict
+    rows=defaultdict(list)
+    for w in words: rows[int(round(w['top']/TOL)*TOL)].append(w)
+    ykeys=sorted(rows); lo,hi=0.30*W,0.70*W; out=[]; cur=[]
+    def flush():
+        if not cur: return
+        ws=[w for k in cur for w in rows[k]]; st=_widest_empty_strip(ws,lo,hi)
+        out.append((cur[0],cur[-1],'prose' if st else 'table', st[0] if st else None,len(cur)))
+    for k in ykeys:
+        if _widest_empty_strip([w for kk in cur+[k] for w in rows[kk]],lo,hi): cur=cur+[k]
+        else:
+            if cur:
+                flush(); cur=[k]
+                if not _widest_empty_strip(rows[k],lo,hi): out.append((k,k,'table',None,1)); cur=[]
+            else: out.append((k,k,'table',None,1)); cur=[]
+    flush(); return out
+```
+
+### Refinements required before live wiring (next session)
+1. **Center-constraint the gutter:** require the strip center within ~[0.42W, 0.58W]
+   (257–355pt for W=612) so sparse-table bands don't yield bogus midlines (397, 278).
+2. **Minimum band height:** a prose band must span ≥ N rows (e.g. ≥4) to be column-corrected;
+   1-row "prose" bands are noise.
+3. **Midline consistency:** within a page, real prose-band gutters cluster (~299–314);
+   reject outlier midlines.
+4. **Banded crop-extract:** extend `_crop_and_extract` to crop BOTH x (by band midline) and
+   y (by band y-range), per prose band; concatenate bands top-to-bottom; leave table bands
+   as original linear text (and suppress their body duplication once Camelot owns them — the
+   B4 half).
+5. **Replace/augment the whole-page bilateral gate** with the gutter-strip check (page 14
+   false-reject above).
+
+### Gating plan (mandatory, every iteration)
+- 26-corpus baseline (`scripts/verify_corpus.py`) — catches gross regressions.
+- **AI-audit of every 2-column paper** (ip_feldman, chandrashekar_2023_mp [B6 canary],
+  chan_feldman, the JESP/PSPB family) — the ONLY check that catches reading-order scrambles
+  (char-ratio is blind to word-order). Keep a change ONLY if all stay PASS.
+- Add real-PDF tests asserting ip_feldman's Discussion opens with Discussion prose (not the
+  Table-9 footnote) and Table 2/10 content no longer appears in body.
+
+## CRITICAL design constraint proven empirically (2026-06-07): NO whole-page shortcut — banding is mandatory
+
+A whole-page gutter-strip detector (`_detect_2col_midline_gutter`: widest empty x-interval in
+[0.42W,0.58W] across ALL page words; bypass the bilateral gate when found) was implemented and
+probed live, then **reverted** — it is UNSAFE. Result on ip_feldman (newly firing pages):
+
+```
+pg gutter newlen  note
+ 1   299   5860   genuine prose ✅
+ 4   314   5549   genuine prose ✅
+ 7   299   5375   genuine prose ✅
+ 9   299   5738   genuine prose ✅
+10   306   3112   ⚠ TABLE page mis-fire (short output — table has a coincidental center gap;
+                    whole-page column-crop splits the table wrongly)
+14   314   5299   genuine prose ✅ (this is the one the bilateral gate falsely rejects)
+15   299   5989   genuine prose ✅
+16   314   5719   genuine prose ✅
+17   299   5511   prose-ish
+13    —      —    correctly NOT fired (no full-page gutter — needs banding)
+```
+
+**The killer: a table page can have a coincidental empty center band** (cells straddle the
+centre with a gap), so a whole-page gutter fires and column-crops the table wrongly (page 10,
+3112 chars). And it CANNOT be filtered by re-adding the bilateral gate: genuine prose (page 14,
+0.37 bilateral) and the table page (page 10, 0.42 bilateral) are too close to separate with any
+threshold. **There is no whole-page classifier that admits page 14 and rejects page 10.** The
+discriminator must be applied PER Y-BAND (the prose bands have a gutter; the table band does
+not), i.e. the **banded** approach in the refinements above is not optional — it is the only
+safe design. The whole-page `_detect_2col_midline_gutter` shortcut is a dead end; do not
+re-attempt it.
+
 ## Status
 - ip_feldman canary findings #3/#4 (Table 2/Table 10 B4) and #5 (Discussion R4) remain
   OPEN/deferred in the ledger. They are NOT regressions; they are this known root cause.
