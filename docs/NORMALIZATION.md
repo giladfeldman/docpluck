@@ -237,7 +237,7 @@ documented here at summary level only.
 
 | Step | Purpose | Notes |
 |------|---------|-------|
-| F0 | Layout-aware running-header / footer / footnote strip | Requires `LayoutDoc` from `extract_pdf_layout`; populates `report.footnote_spans`. Optional. |
+| F0 | Layout-aware running-header / footer / footnote strip | Requires `LayoutDoc` from `extract_pdf_layout`; populates `report.footnote_spans` (raw char offsets) and `report.footnote_texts` (the captured footnote strings, parallel — v2.4.83). Stripped footnotes move to an appendix after a `\n\f\f\n` marker. Optional. |
 | H0 | Document-header banner-line strip | Runs only in the first 30 lines; curated `_HEADER_BANNER_PATTERNS`. v1.8.0. |
 | T0 | TOC dot-leader paragraph strip | Drops paragraphs containing `_{3,}` runs in the head zone (first ~100 lines). v1.8.0. |
 | P0 | Page-footer / running-header LINE strip | Curated `_PAGE_FOOTER_LINE_PATTERNS` matching single complete lines. Includes `^Q. XIAO ET AL.$`, `^RECKELL et al.$`, `^CONTACT …$`, `^Department of …, University of <Place>, <Region>$`, `^Supplemental data for this article …$`, truncated `^Department of …, University of$`, JAMA/AOM/PMC footers, etc. v1.8.0 + v2.4.6 + v2.4.8 + v2.4.16. |

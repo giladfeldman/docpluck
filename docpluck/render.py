@@ -4746,6 +4746,60 @@ def _render_sections_to_markdown(
     return md.strip() + "\n"
 
 
+# ── v2.4.83: de-dup the table/figure label between heading and caption ──────
+#
+# Every table/figure block is emitted as ``### Table N`` immediately followed
+# by an italic ``*Table N. <desc>*`` caption (see _render_sections_to_markdown
+# body + appendix paths). The label number is therefore printed twice — once
+# as the heading, once at the head of the caption ("### Table 1" then
+# "*Table 1. …*"). Strip the redundant ``Table N.`` / ``Figure N.`` prefix from
+# the caption line when an immediately-preceding ``### Table N`` / ``### Figure
+# N`` heading already carries the same number.
+#
+# Runs LAST in the pipeline, AFTER the caption-detecting passes that key on the
+# ``Table N.`` prefix (``_suppress_inline_duplicate_table_captions``,
+# ``_suppress_orphan_table_cell_text``) — so it never disturbs their matching.
+# The structured ``caption`` field from extract_pdf_structured is unchanged
+# (verbatim printed caption); only the rendered markdown is de-duplicated.
+_DEDUPE_HEADING_LABEL_RE = re.compile(r"^#{2,4}\s+(Table|Figure)\s+(\d+(?:\.\d+)?)\s*$")
+_DEDUPE_ITALIC_CAPTION_RE = re.compile(
+    r"^(?P<indent>\s*)\*(?P<kind>Table|Figure)\s+(?P<num>\d+(?:\.\d+)?)\.\s+(?P<desc>.+?)\*\s*$"
+)
+
+
+def _dedupe_label_in_table_figure_caption(text: str) -> str:
+    """Strip a redundant ``Table N.`` / ``Figure N.`` prefix from an italic
+    caption that immediately follows a matching ``### Table N`` / ``### Figure
+    N`` heading (the heading already shows the number).
+
+    Conservative: fires only when the heading and the caption carry the SAME
+    kind+number, the caption has a non-empty description after the label, and
+    the caption is the first non-blank, non-comment line under the heading.
+    Idempotent — a caption already stripped of its label no longer matches.
+    """
+    if not text or ("Table " not in text and "Figure " not in text):
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    for i, ln in enumerate(lines):
+        hm = _DEDUPE_HEADING_LABEL_RE.match(ln)
+        if not hm:
+            continue
+        kind, num = hm.group(1), hm.group(2)
+        # Inspect the first non-blank, non-comment line after the heading.
+        for j in range(i + 1, min(i + 5, n)):
+            s = lines[j].strip()
+            if not s or s.startswith("<!--"):
+                continue
+            cm = _DEDUPE_ITALIC_CAPTION_RE.match(lines[j])
+            if cm and cm.group("kind") == kind and cm.group("num") == num:
+                desc = cm.group("desc").strip()
+                if desc:
+                    lines[j] = f"{cm.group('indent')}*{desc}*"
+            break  # only the first content line under the heading is the caption
+    return "\n".join(lines)
+
+
 # ── Public entry point ─────────────────────────────────────────────────────
 
 
@@ -5035,5 +5089,9 @@ def render_pdf_to_markdown(
     # is the anchor).
     md = _strip_pre_title_heading_noise(md)
     md = _italicize_known_subtitle_badges(md)
+    # v2.4.83: runs LAST — strip the redundant ``Table N.`` / ``Figure N.``
+    # label from a caption that sits directly under its ``### Table N`` heading.
+    # Must follow the caption-detecting passes above that key on the prefix.
+    md = _dedupe_label_in_table_figure_caption(md)
 
     return md.rstrip() + "\n"

@@ -25,7 +25,54 @@ from docpluck.render import (
     _demote_false_single_word_headings,
     _apply_title_rescue,
     _strip_duplicate_title_occurrences,
+    _dedupe_label_in_table_figure_caption,
 )
+
+
+# ── v2.4.83: de-dup the table/figure label between heading and caption ──────
+# Render emits ``### Table 1`` then ``*Table 1. <desc>*`` — the label is shown
+# twice. The de-dup pass strips the redundant ``Table N.`` / ``Figure N.``
+# prefix from the italic caption when an immediately-preceding heading already
+# carries the number.
+
+
+def test_dedupe_label_strips_redundant_table_prefix():
+    md = "### Table 1\n\n*Table 1. Per-condition descriptive statistics.*\n\n<table></table>\n"
+    out = _dedupe_label_in_table_figure_caption(md)
+    assert "### Table 1" in out                                   # heading kept
+    assert "*Per-condition descriptive statistics.*" in out       # desc kept
+    assert "*Table 1. Per-condition" not in out                   # label de-duped
+
+
+def test_dedupe_label_strips_redundant_figure_prefix():
+    md = "### Figure 2\n\n*Figure 2. Mean response by condition.*\n"
+    out = _dedupe_label_in_table_figure_caption(md)
+    assert "*Mean response by condition.*" in out
+    assert "*Figure 2. Mean" not in out
+
+
+def test_dedupe_label_leaves_unlabeled_caption_alone():
+    md = "### Table 1\n\n*Per-condition descriptive statistics.*\n"
+    assert _dedupe_label_in_table_figure_caption(md) == md
+
+
+def test_dedupe_label_requires_matching_heading():
+    # An inline ``*Table 1. ...*`` with no ``### Table 1`` heading above must
+    # be left untouched (it is not a heading/caption duplication).
+    md = "Some body prose about results.\n\n*Table 1. A caption with no heading above.*\n"
+    assert _dedupe_label_in_table_figure_caption(md) == md
+
+
+def test_dedupe_label_mismatched_number_left_alone():
+    # Heading says Table 1, caption says Table 2 — not a duplication; leave it.
+    md = "### Table 1\n\n*Table 2. A different table's caption.*\n"
+    assert _dedupe_label_in_table_figure_caption(md) == md
+
+
+def test_dedupe_label_idempotent():
+    md = "### Table 1\n\n*Table 1. Per-condition descriptive statistics.*\n"
+    once = _dedupe_label_in_table_figure_caption(md)
+    assert _dedupe_label_in_table_figure_caption(once) == once
 
 
 # ── _dedupe_h2_sections ────────────────────────────────────────────────────
