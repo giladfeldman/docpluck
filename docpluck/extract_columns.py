@@ -362,10 +362,20 @@ def splice_column_corrected_pages(
     page_offsets: Iterable[int],
     pages_to_fix: Iterable[int],
     pdf_bytes: bytes | None = None,
-    word_preserve_pages: Iterable[int] | None = None,
+    gutter_fallback_pages: Iterable[int] | None = None,
     changed_out: list | None = None,
 ) -> str:
     """Splice column-aware re-extracted text into flagged pages of raw_text.
+
+    Word preservation is UNCONDITIONAL (v2.4.82): a page's re-extraction is
+    accepted ONLY when it is a pure reorder — identical substantial-word
+    multiset AND a materially different token order. A column re-extraction can
+    never legitimately drop, split, merge, or invent a word (rules 0a / 0b); the
+    previous "accept any non-empty re-extraction" path for non-guarded pages
+    shipped real corruptions (jama_open_1 ``adults`` → ``adu``, ieee_access_3
+    ``using`` → ``us`` — pdftotext column-crop cutting a word that straddles the
+    crop x). A rejected page keeps its ORIGINAL text (possibly still interleaved
+    but WORD-CORRECT) — never a corrupted reorder.
 
     Args:
         raw_text: Original pdftotext output (form-feed separated pages).
@@ -373,23 +383,23 @@ def splice_column_corrected_pages(
         page_offsets: Char offsets where each page starts in raw_text.
         pages_to_fix: 1-indexed list of page numbers to rewrite (matching
             NormalizationReport.column_interleave_pages).
-        word_preserve_pages: 1-indexed pages whose re-extraction is accepted
-            ONLY if it carries the SAME word-multiset as the original page text
-            (a pure reordering — no token dropped or invented). Safety gate for
-            the O5 reading-order-inversion path (v2.4.80): geometric reordering
-            must never lose or fabricate text (rule 0a / 0b). Pages NOT in this
-            set keep the legacy "accept any non-empty re-extraction" behaviour,
-            byte-for-byte.
+        gutter_fallback_pages: 1-indexed pages that may use the full-height
+            GUTTER-STRIP midline detector (``allow_gutter_fallback``) — the
+            stronger 2-column discriminator that bypasses the y-row bilateral
+            table gate. The O5 reading-order-inversion pages and (under
+            ``DOCPLUCK_COLUMN_CORRECT_GENERAL``) the general-interleave flagged
+            pages opt in. Pages NOT in this set use only the word-center
+            histogram midline. This set NO LONGER controls word-preservation —
+            that gate now applies to every page, always.
 
     Returns:
-        Rewritten raw_text with flagged pages' content replaced. Pages that
-        the rewriter couldn't confidently column-detect — or, when in
-        ``word_preserve_pages``, whose re-extraction would change the word
-        multiset — are left untouched.
+        Rewritten raw_text with flagged pages' content replaced. Pages whose
+        re-extraction the rewriter couldn't confidently column-detect, or whose
+        re-extraction would change the word multiset, are left untouched.
     """
     offsets = list(page_offsets)
     pages_set = set(pages_to_fix)
-    wp_pages = set(word_preserve_pages or ())
+    gf_pages = set(gutter_fallback_pages or ())
     if not pages_set or not offsets:
         return raw_text
 
@@ -406,20 +416,26 @@ def splice_column_corrected_pages(
         if page_number_1idx in pages_set:
             rewritten = extract_page_text_columns(
                 layout_doc, page_idx, column_count=2, pdf_bytes=pdf_bytes,
-                allow_gutter_fallback=(page_number_1idx in wp_pages),
+                allow_gutter_fallback=(page_number_1idx in gf_pages),
             )
             if rewritten:
-                accept = True
-                if page_number_1idx in wp_pages:
-                    original_page = raw_text[start:end]
-                    # Accept only a pure reorder: identical word multiset AND a
-                    # materially different line order (else it's a no-op the
-                    # original already had right — don't churn whitespace).
-                    same_words = _word_multiset(rewritten) == _word_multiset(original_page)
-                    reordered = rewritten.split() != original_page.split()
-                    accept = same_words and reordered
-                if accept:
-                    out_parts.append(rewritten)
+                original_page = raw_text[start:end]
+                # Accept ONLY a pure reorder: identical substantial-word multiset
+                # AND a materially different token order (else it's a no-op the
+                # original already had right — don't churn whitespace). This guard
+                # is unconditional now — it rejects column-crop word SPLITS
+                # (jama_open_1 'adults'→'adu') that the old accept-any path shipped.
+                same_words = _word_multiset(rewritten) == _word_multiset(original_page)
+                reordered = rewritten.split() != original_page.split()
+                if same_words and reordered:
+                    # Re-attach the original page's trailing separator (newlines
+                    # + form-feed) so the corrected page's last word can't glue
+                    # onto the next page's first word at the splice boundary
+                    # (bjps_1 'results'+'https'→'resultshttps'; chen running-header
+                    # 'J' gluing to the prior word) and the \f page structure is
+                    # preserved for downstream page-aware consumers.
+                    trailing = original_page[len(original_page.rstrip()):]
+                    out_parts.append(rewritten.rstrip() + trailing)
                     cursor = end
                     if changed_out is not None:
                         changed_out.append(page_number_1idx)

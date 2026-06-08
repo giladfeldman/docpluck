@@ -1621,7 +1621,7 @@ Brahma, et al. Scaling instruction-finetuned language models. arXiv
 preprint arXiv:2210.11416, 2022.
 [61] Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov, Soumya Batra, Prajjwal Bhar13
 
-Ghanadian et al.
+Ghanadian et al.: Preparation of Papers for IEEE TRANSACTIONS and JOURNALS
 
 gava, Shruti Bhosale, et al. Llama 2: Open foundation and fine-tuned chat
 models. arXiv preprint arXiv:2307.09288, 2023.
@@ -1644,6 +1644,20 @@ measures for classification tasks. Information processing & management,
 Bryan Wilie, Holy Lovenia, Ziwei Ji, Tiezheng Yu, Willy Chung, et al.
 A multitask, multilingual, multimodal evaluation of chatgpt on reasoning,
 hallucination, and interactivity. arXiv preprint arXiv:2302.04023, 2023.
+
+HUSSEIN AL OSMAN is an Associate Professor at the School of Electrical Engineering and
+Computer Science at the University of Ottawa. He
+completed his Ph.D. in Electrical and Computer
+Engineering at the University of Ottawa in 2014.
+He leads the Multimedia Processing and Interaction group and is a member of the Multimedia
+Computing and the Distributed and Collaborative
+Virtual Environments Research laboratories. His
+research focuses on the application of artificial
+intelligence in affective computing and biomedical engineering. In particular, he is interested in the development of multi-modal affect recognition
+methods using deep artificial neural networks to estimate facial expressions
+and speech sentiment. He studies remote physiological signal measurement
+using video signals and applies this technology to biomedical and HumanComputer Interaction (HCI) applications. He conducts research in HCI,
+especially the development of serious games intended for physical rehabilitation and education.
 
 HAMIDEH GHANADIAN is Ph.D. Candidate in
 Electrical Engineering and Computer Science at
@@ -1668,29 +1682,6 @@ also focuses on responsible AI, specifically on evaluating and improving the
 transparency and fairness of natural language processing systems.
 14
 
-intelligenc
-ular, he is
-methods us
-and speech
-using vide
-Computer
-especially
-tation and
-
-.: Preparation of Papers for IEEE TRANSACTIONS and JOURNALS
-
-HUSSEIN AL OSMAN is an Associate Professor at the School of Electrical Engineering and
-Computer Science at the University of Ottawa. He
-completed his Ph.D. in Electrical and Computer
-Engineering at the University of Ottawa in 2014.
-He leads the Multimedia Processing and Interaction group and is a member of the Multimedia
-Computing and the Distributed and Collaborative
-Virtual Environments Research laboratories. His
-research focuses on the application of artificial
-ce in affective computing and biomedical engineering. In particinterested in the development of multi-modal affect recognition
-sing deep artificial neural networks to estimate facial expressions
-h sentiment. He studies remote physiological signal measurement
-eo signals and applies this technology to biomedical and HumanInteraction (HCI) applications. He conducts research in HCI,
-the development of serious games intended for physical rehabilieducation.
-
 VOLUME 4, 2016
+
+

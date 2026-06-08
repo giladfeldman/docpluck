@@ -151,6 +151,37 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
             #    reorder can never lose or fabricate text (rule 0a / 0b).
             flagged_pages = _detect_column_interleave_pages(text, tuple(ff_offsets))
             inversion_pages = _detect_reference_inversion_pages(text, tuple(ff_offsets))
+            # RC-1 Step 1 (v2.4.82): GENERAL two-column interleave correction.
+            # The O5 inversion path has always run the column-aware re-extraction
+            # under TWO safeties: the full-height GUTTER-STRIP midline detector
+            # (allow_gutter_fallback — strong 2-column evidence that bypasses the
+            # bilateral table gate) AND the word-multiset preservation guard (a
+            # reorder accepted only when it neither drops nor invents a word, rules
+            # 0a/0b). The general-interleave flagged pages got NEITHER safety, so
+            # they fell to the histogram detector + bilateral gate and stayed
+            # interleaved on narrow-gutter (Elsevier / Collabra / JESP) and
+            # table-bearing pages — the dominant defect on two-column APA papers
+            # (TRIAGE 2026-06-08). When DOCPLUCK_COLUMN_CORRECT_GENERAL=1 the
+            # flagged pages join the inversion pages under BOTH safeties: a flagged
+            # page is corrected only when it has a clean full-height central gutter
+            # (genuinely two-column, no full-width row crossing center) AND the
+            # left-then-right re-extraction is a pure reorder of the same words.
+            # Pages without a clean gutter (embedded full-width table, single
+            # column) are left untouched — an honest partial; the per-band Step 2
+            # closes those. Default OFF ⇒ byte-identical legacy path (ship dark,
+            # validate against the AI golds, then flip the default).
+            general_correct = (
+                os.environ.get("DOCPLUCK_COLUMN_CORRECT_GENERAL", "0") == "1"
+            )
+            # gutter_fallback_pages opt into the full-height gutter-strip detector
+            # (bypasses the bilateral table gate). Word-preservation now gates
+            # EVERY corrected page unconditionally inside the splice, so this set
+            # only governs HOW aggressively the midline is detected, not whether
+            # the result is trusted. Inversion pages always opt in; general
+            # flagged pages opt in only under the flag.
+            gutter_fallback_pages = set(inversion_pages)
+            if general_correct:
+                gutter_fallback_pages |= set(flagged_pages)
             all_pages = sorted(set(flagged_pages) | set(inversion_pages))
             if all_pages:
                 from .extract_layout import extract_pdf_layout
@@ -159,7 +190,7 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
                 corrected = splice_column_corrected_pages(
                     text, layout_doc, ff_offsets, all_pages,
                     pdf_bytes=pdf_bytes,
-                    word_preserve_pages=inversion_pages,
+                    gutter_fallback_pages=sorted(gutter_fallback_pages),
                     changed_out=changed,
                 )
                 if corrected and corrected != text and changed:

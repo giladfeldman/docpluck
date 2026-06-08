@@ -1078,3 +1078,32 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 
 ### SPINE / deferrals (surfaced, not silent)
 - Cycle verification was DETERMINISTIC (real-PDF strip-gone + body-preserved assertions + 316-test regression) rather than per-cycle AI-subagent verify — appropriate for a furniture-strip whose effect is fully captured deterministically; AI-verify (sonnet) was run PRE-fix in the discovery sweep to FIND the defects. Full canary AI-verify + full-corpus baseline deferred (signature-gated fix is provably no-op on canary; machine suspension makes the 50-min runs impractical) — queued for follow-up.
+
+---
+
+## Run: 2026-06-08 (cont.) · RC-1 Step 1 → column-splice word-integrity · v2.4.81 → v2.4.82
+
+**Goal:** continue the untested-sweep run; implement RC-1 Step 1 (wire the general column-interleave correction). Reproducing the gap at HEAD turned a feature cycle into a **pre-existing-corruption fix**.
+
+### Outcome
+- **Two latent corruptions in `splice_column_corrected_pages` fixed** (shipping in the v2.4.81 DEFAULT): (A) accept-any word-SPLITS (pdftotext column-crop cuts a word straddling the crop-x — `jama_open_1` `adults`→`adu`, `ieee_access_3` `using`→`us`, +amc_1/amle_1/jama_open_2 = 5/26 baseline papers), (B) cross-page boundary GLUE (corrected page dropped its `\f` → last word glued to next page — `bjps_1` `results`+`https`→`resultshttps`, chen/jesp running-header `J` glue). Fix = unconditional word-preservation + trailing-separator preservation. **Decisive validation: all 26 baseline papers now preserve the raw pdftotext word-multiset under BOTH flag-off and flag-on (was 7 corrupted).**
+- **General de-interleave (RC-1 Step 1)** behind `DOCPLUCK_COLUMN_CORRECT_GENERAL`, **default OFF** (user choice). AI-verify: jesp_2021 section-inversions 12+ → 4; ip_feldman B3/B4 canary findings cleared. Partial (table-bearing/no-gutter pages → Step 2), so shipped dark.
+- **Run verdict: PARTIAL** — corruption fix committed; canary still FAILs on KNOWN-deferred Step-2 (table-region) + a separate RC-2-residual (bare `J. Chen et al.` leak) + a separate GLYPH (`M_age 59.3→39.3`), all queued.
+
+### Methodology wins (the high-signal lessons)
+- **Reproduce-at-HEAD before trusting the TRIAGE item — it can surface a BIGGER pre-existing defect than the item itself.** The TRIAGE said "wire the general-interleave splice." The reproduce showed the splice was *already partly wired* AND was shipping word corruptions. The 5-minute reproduce reframed the whole cycle. (Cross-confirms the loaded card `reproduce-triage-defect-at-head-before-trusting-cost-estimate`.)
+- **A corpus-wide "extract output vs RAW pdftotext word-multiset" check is a cheap, powerful, reorder-BLIND-PROOF safety gate.** char-ratio/Jaccard are blind to reordering; the word-MULTISET (`_word_multiset`, alphabetic tokens len≥2) is invariant under reorder, so `multiset(extract_pdf(b)) == multiset(raw_pdftotext(b))` cleanly separates "safe reorder" from "corruption (split/glue/loss)". This found 7 corrupted papers in ~8 min, extract-only (no Camelot). **Should become a permanent corpus test** (proposed amendment below).
+- **The per-page word-preservation guard is necessary but NOT sufficient — corruption can live at the CONCATENATION SEAM between pages.** Each page was word-correct in isolation (guard passed) yet the doc glued `from`+`J`→`fromj` because the splice dropped the page separator. When a guard checks units in isolation, also check the JOIN.
+- **A committed SNAPSHOT can STORE a corruption and mask it as the baseline.** `jama_lattice` + `ieee_figure_heavy` snapshots held `adu`/`us` and the byte-identical test was GREEN on them for weeks. Exactly the `ITERATION_VERIFICATION_LESSONS.md` "broken baseline" mode. Before regenerating any drifted snapshot, verify the NEW output against an INDEPENDENT truth (raw multiset) — and check whether the OLD snapshot was itself wrong (here, 2 of 3 were).
+
+### Edge cases / fix lessons
+- **AI-verify renders made with pre-fix code are partially invalidated by the fix — re-render before trusting verdicts.** The first jesp AI-verify flagged `scienceJ. Chen` mid-sentence glue as METADATA-LEAK; that WAS the boundary-glue bug. After the fix + re-render, the glue verdict cleared (running-header leak remained — a separate cause). Always re-render the affected papers on the FINAL code before recording phase_5d verdicts.
+- **`rule 0a/0b (no corruption) outranks reading-order de-interleave.** R4's jama_open_1 abstract de-interleave was built on the word-splitting crop; word-preservation correctly rejects it, reverting that page to word-correct-but-column-mixed. Proper de-interleave (full-width title band crossing 2 columns) needs Step 2 band-aware cropping. Don't ship a reading-order win that costs word integrity.
+- **Decouple "detector aggressiveness" from "result trust."** The old `word_preserve_pages` param conflated gutter-fallback opt-in with word-preservation; renamed to `gutter_fallback_pages` (detector only) and made word-preservation unconditional. One param = one concern.
+
+### PROPOSED AMENDMENT (await user approval)
+Add a permanent corpus test `tests/test_column_splice_preserves_raw_multiset.py`: for the 26-baseline (+canary) PDFs, assert `_word_multiset(extract_pdf(b)[0]) == _word_multiset(raw_pdftotext(b))` under both `DOCPLUCK_COLUMN_CORRECT_GENERAL` off and on. This is the regression gate that would have caught the R4 accept-any corruption at v2.4.76 and any future column-splice change that splits/glues/drops a word. Extract-only, ~8 min; could be a `@pytest.mark.slow` corpus gate run pre-tag.
+
+### SPINE / deferrals (surfaced, not silent)
+- Canary AI-verify this cycle covered ip_feldman (fixed-3) + jesp/collabra (targets); plos_med_1, chandrashekar, chan_feldman, ar_apa NOT full-AI-verified — but ALL 26 (incl. those) passed the corpus word-multiset gate (no corruption). The canary papers' residual FAILs are KNOWN-deferred Step-2 architecture (region-aware band) — not regressions. I2/I3 honestly not "PASS"; cycle = PARTIAL.
+- Queued THIS run (per user "continue"): bare `J. Chen et al.` running-header strip (RC-2 residual, normalize.py — separate root cause); `M_age 59.3→39.3` glyph diagnosis (collabra_77859). Multi-session: RC-1 Step 2 (per-y-band region-aware crop) — the only path to the remaining inversions + table-region interleave.

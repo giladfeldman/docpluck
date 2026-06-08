@@ -1,6 +1,18 @@
 # RC-1 — Region-aware two-column reading-order architecture (design + start)
 
-**Status:** STARTED 2026-06-08 (user greenlit "Both: strip-fixes + start columns"). Multi-session. This doc is the durable design + the precise gap analysis so the next session executes, not re-derives.
+**Status:** Step 1 IMPLEMENTED 2026-06-08 (v2.4.82, default OFF). Step 2 (per-band region-aware crop) remains the multi-session work. This doc is the durable design + the precise gap analysis so the next session executes, not re-derives.
+
+## Step 1 — IMPLEMENTED (v2.4.82, `DOCPLUCK_COLUMN_CORRECT_GENERAL`, default OFF)
+
+The general-interleave flagged pages now join the O5 inversion pages under the gutter-strip detector + word-preservation guard when the flag is set. **AI-verified:** `j.jesp.2021.104154` numbered-section inversions 12+ → 4; `ip_feldman` B3 affiliation-leak + B4 mid-text-caption cleared. Ships dark (default off) because it is partial — table-bearing / no-clean-gutter pages stay untouched (that is Step 2). Flip the default after Step 2 lands.
+
+**Reproducing the gap surfaced TWO pre-existing corruptions in `splice_column_corrected_pages` (fixed in v2.4.82, independent of the flag):**
+- **Accept-any word splits:** pages outside the word-preserve set were accepted on any non-empty re-extraction; pdftotext column-crop split words straddling the crop-x (`jama_open_1` `adults`→`adu`, `ieee_access_3` `using`→`us`) — shipping in the DEFAULT on 5/26 baseline papers.
+- **Cross-page boundary glue:** `extract_page_text_columns` returns page text without its trailing `\f`, so a corrected page's last word glued onto the next page's first word (`results`+`https`→`resultshttps`; running-header `J`→`fromj`).
+
+**Fix:** word-preservation is now UNCONDITIONAL in the splice (every corrected page must be a pure reorder) + the page's trailing `\f` separator is re-attached. Param `word_preserve_pages` → `gutter_fallback_pages` (gutter detector opt-in only). **Validated: all 26 baseline papers preserve the raw pdftotext word-multiset under both flag settings** (`tmp/rc1_corpus_v2.py`). This means Step 2 can build on a splice that is now *guaranteed* word-faithful — any band-level crop it adds is gated by the same unconditional guard.
+
+**Consequence for Step 2's scope:** the `jama_open_1` abstract (full-width title/byline band crossing the two abstract/sidebar columns) is exactly the case Step 1's whole-page crop CANNOT do without splitting words — so word-preservation now (correctly) rejects it and the page is word-correct-but-column-mixed. The per-band crop is the ONLY path to de-interleave it without corruption. Step 2 is therefore not optional polish; it is required to recover the reading order Step 1's safety guard had to give up.
 
 **Evidence (2026-06-08 untested-corpus sweep):** column-interleave is the **dominant** defect on two-column APA papers — not just the ip_feldman/chandrashekar canaries. Confirmed on 4/4 two-column papers verified against article-finder golds:
 - `j.jesp.2021.104154`: 12+ section-order inversions; Tables 3/7/9-10/12/14 broken (wrong-column data, merged, empty shells).
