@@ -35,6 +35,20 @@ def _maybe_render(rel: str) -> str:
     return render_pdf_to_markdown(pdf.read_bytes())
 
 
+# v2.4.81 untested-corpus-sweep fixtures (Elsevier JESP 2021, Nature Comms 2023)
+# live in the shared article-finder repository (the I9 locator's data store),
+# not in PDFextractor/test-pdfs/. Resolve from there; skip if the cache isn't on
+# this machine (manifest-with-skip pattern, per ``feedback_no_pdfs_in_repo``).
+_AF_FULLTEXT = Path(__file__).resolve().parents[3] / "ArticleRepository" / "fulltext"
+
+
+def _maybe_render_af_cache(doi_stem: str) -> str:
+    pdf = _AF_FULLTEXT / f"{doi_stem}.pdf"
+    if not pdf.is_file():
+        pytest.skip(f"article-finder cache fixture not available: {doi_stem}")
+    return render_pdf_to_markdown(pdf.read_bytes())
+
+
 def test_p0r_version_bumped():
     # P0r was added in NORMALIZATION_VERSION 1.9.22.
     parts = tuple(int(x) for x in NORMALIZATION_VERSION.split("."))
@@ -124,6 +138,43 @@ class TestLooksLikeRunningHeaderOrFooter:
         # — character alone (em-dash) is too short
         assert not _looks_like_running_header_or_footer("—")
 
+    # v2.4.81 — Elsevier + Nature running-footer shapes (untested-corpus sweep).
+    def test_elsevier_journal_vol_footer(self):
+        # "<Journal> <Vol> (<Year>) <ArticleNo>" — Elsevier / ScienceDirect.
+        assert _looks_like_running_header_or_footer(
+            "Journal of Experimental Social Psychology 96 (2021) 104154"
+        )
+        assert _looks_like_running_header_or_footer(
+            "Journal of Economic Psychology 81 (2020) 102349"
+        )
+
+    def test_elsevier_author_prefixed_footer(self):
+        assert _looks_like_running_header_or_footer(
+            "J. Chen et al. / Journal of Experimental Social Psychology 96 (2021) 104154"
+        )
+
+    def test_nature_pipe_issue_footer(self):
+        # "<Journal> | (<Year>)<Vol>:<ArtNo>" — Nature family.
+        assert _looks_like_running_header_or_footer("Nature Communications | (2023)14:8487")
+
+    def test_reference_entry_not_matched(self):
+        # APA reference entries (comma-separated, year-after-author) must NOT match.
+        assert not _looks_like_running_header_or_footer(
+            "Gilovich, T., & Medvec, V. H. (1994). Journal of Personality and Social Psychology, 67, 357"
+        )
+        assert not _looks_like_running_header_or_footer(
+            "Journal of Personality and Social Psychology, 67(3), 357"
+        )
+
+    def test_body_with_year_and_numbers_not_matched(self):
+        assert not _looks_like_running_header_or_footer(
+            "We tested whether participants in 2021 chose option 104 over 96."
+        )
+        # Has the year+vol+artno tokens but not the footer shape (no pipe-issue).
+        assert not _looks_like_running_header_or_footer(
+            "Nature Communications volume 14, article number 8487 (2023)"
+        )
+
 
 # ── Detection: requires ≥3 repetition AND shape match ───────────────────
 
@@ -168,6 +219,18 @@ class TestDetectRecurringRunningHeaders:
         text = "\n".join(["intro"] + ["PLOS MEDICINE\nbody"] * 5)
         headers = _detect_recurring_running_headers(text)
         assert "PLOS MEDICINE" in headers
+
+    def test_detects_elsevier_and_nature_footers(self):
+        # v2.4.81: both new shapes must be detected when repeated ≥3×.
+        elsevier = "Journal of Experimental Social Psychology 96 (2021) 104154"
+        nature = "Nature Communications | (2023)14:8487"
+        text = "\n".join(
+            [f"Body content paragraph number {i} here." for i in range(4)]
+            + [elsevier, nature] * 3
+        )
+        headers = _detect_recurring_running_headers(text)
+        assert elsevier in headers
+        assert nature in headers
 
 
 # ── Strip behavior ──────────────────────────────────────────────────────
@@ -337,3 +400,26 @@ class TestP0rRealPdfRegression:
         # At least some "Replication" should survive (it's a table column
         # label across multiple tables).
         assert "Replication" in md
+
+    # v2.4.81 untested-corpus-sweep regressions (Elsevier + Nature footers).
+    def test_jesp_2021_elsevier_journal_footer_stripped(self, monkeypatch):
+        monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+        md = _maybe_render_af_cache("10.1016__j.jesp.2021.104154")
+        footer = "Journal of Experimental Social Psychology 96 (2021) 104154"
+        standalone = [ln for ln in md.split("\n") if ln.strip() == footer]
+        assert len(standalone) == 0, (
+            f"expected 0 standalone Elsevier footers, got {len(standalone)}"
+        )
+        # Body prose must survive intact (this is a hindsight-bias paper).
+        assert "hindsight" in md.lower()
+
+    def test_s41467_nature_journal_footer_stripped(self, monkeypatch):
+        monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+        md = _maybe_render_af_cache("10.1038__s41467-023-42320-4")
+        footer = "Nature Communications | (2023)14:8487"
+        standalone = [ln for ln in md.split("\n") if ln.strip() == footer]
+        assert len(standalone) == 0, (
+            f"expected 0 standalone Nature footers, got {len(standalone)}"
+        )
+        # Body prose must survive intact.
+        assert "brain" in md.lower()
