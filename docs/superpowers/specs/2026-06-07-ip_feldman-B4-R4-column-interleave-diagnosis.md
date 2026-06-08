@@ -231,3 +231,40 @@ re-attempt it.
   over-optimistic on the bilateral-gate interaction (corrected above).
 - **Decision needed from user:** approve the region-aware column-detection architecture
   (multi-session) as the next track, or keep these deferred.
+
+## UPDATE 2026-06-07 (resume) — the SEPARABLE subcase shipped in v2.4.80 (O5), WITHOUT violating the "no whole-page shortcut" rule
+
+The citationguard O5 case (`chen_2021_jesp` p19, `jamison_2020_jesp` p9 — reference entries
+stranded above their own `References` heading) shipped a fix in v2.4.80. It **uses**
+`_detect_2col_midline_gutter` — the function the section above calls "a dead end; do not
+re-attempt." This is **not** a re-attempt of the unsafe design; read carefully:
+
+**Why the "dead end" verdict stands and is not contradicted.** That verdict is about applying
+the gutter shortcut **UNCONDITIONALLY to every page** — which mis-fires on table pages with a
+coincidental center gap (ip_feldman p10 → garbled 3112-char crop) and cannot be rescued by the
+bilateral gate (p10 0.42 vs p14 0.37 are inseparable whole-page). All true; still true.
+
+**What v2.4.80 does differently — three independent confinements, none present in the reverted
+probe:**
+1. **Inversion-only entry.** The gutter detector runs ONLY on pages flagged by
+   `_detect_reference_inversion_pages` (≥3 reference-entry lines above their own `References`
+   heading). ip_feldman's table pages (10, 13, …) are NOT reference-inversion pages, so the
+   gutter never runs on them. Empirically: the inversion detector fires on **exactly 2 of the
+   101-paper corpus** (chen p19, jamison p9); ip_feldman gets `(no reorder)`.
+2. **Center-constrained gutter** (spec refinement #1, now implemented): the strip center must
+   lie in [0.40W, 0.60W], rejecting the off-center sparse-table "gutters" the probe hit.
+3. **Word-preservation guard.** The re-extraction is accepted only if it preserves the page's
+   substantial-word multiset (alphabetic tokens len ≥2). The p10-style garbling crop (3112
+   chars, words lost) would be REJECTED and the page left untouched. A pure reorder can never
+   drop or fabricate text (rules 0a/0b).
+
+So the shortcut is safe **for the separable layout only** (table band above a 2-col reference
+band whose gutter survives full-height), reached only through the inversion gate, and
+backstopped by the word guard. The **interwoven** layout (ip_feldman B4/#3/#4, R4/#5) still has
+NO surviving full-height gutter and still needs the per-y-band `_column_bands` architecture
+prototyped above — that remains OPEN.
+
+**Gating done:** 26-corpus baseline 26/26 PASS; 32 existing column tests + 5 new real-PDF tests
+(`tests/test_o5_reference_inversion_real_pdf.py`); chen 0 stranded / 101 alphabetical-ordered
+refs; jamison 0 / 37; ip_feldman + 98 others unchanged. Shipped in `extract_columns.py` +
+`extract.py`. Version 2.4.79 → 2.4.80.

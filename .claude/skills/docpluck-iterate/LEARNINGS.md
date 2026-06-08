@@ -1032,3 +1032,21 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 **Gate honesty:** iterate-gate --cycle 1 = FAIL (I2: only audited the litmus; I3: ip_feldman still FAIL on deferred findings). Correct per rule 0e-bis — the cycle made progress but the canary isn't clean. NOT marked PASS, NOT tagged. The 10 deferred findings (Camelot B4 + R4 reading-order) are each their own multi-session architecture effort — surfaced to the user, not bundled.
 
 **Verification:** full pytest 1870 passed; 26/26 corpus baseline; substrate self-tests 17/17; canary audit confirmed zero METADATA-LEAK/HALLUCINATION remain on ip_feldman.
+
+---
+
+## Run: 2026-06-07 (resume) · O5 reference reading-order inversion · v2.4.79 → v2.4.80
+
+### Outcome
+- SHIPPED (uncommitted, user to review) — O5 from the citationguard-iterate handoff: chen + jamison reference lists were reading-order-inverted by pdftotext (a banded page stacks a CRediT table above a 2-column reference list; pdftotext emits the right reference column before the left column carrying the `References` heading → a block of entries stranded above the heading). Fixed via region-aware column re-extraction. chen: 0 stranded / 101 ordered (was 36+ stranded); jamison: 0 / 37; 99 other corpus papers unchanged.
+
+### What the handoff started as vs what it became
+- Began as "address the A–D text-extraction handoff" → user decided **won't-fix, alert scimeto** (A/B superscript flatten+glue, C semantic hyphen, D ref mangling are all pdftotext text-channel / source-PDF — verified at the raw level; Strömwall was already resolved, a pymupdf-fixture artifact). Then the user surfaced **O5** (in `TRIAGE_iterate_2026-06-07.md`, not the A–D handoff) and reversed to "review/verify/fix it all + build O5."
+- **Lesson: don't inherit a sibling item's disposition.** scimeto had tagged O5 "docpluck won't-fix" by association with A–D. Re-deriving layer-of-origin showed O5 is a *reading-order* bug docpluck owns — a different class entirely.
+
+### Blind spots / process
+- **A broad `except Exception: pass` hid a hard import error.** The working tree had a broken in-flight WIP of this exact feature (`extract_columns.py` IndentationError + undefined `_detect_2col_midline_gutter`); the `except: pass` in `extract.py`'s column-correction call meant the module silently failed to import on every flagged page → column-correction was OFF corpus-wide with no surfaced error. Restored to clean HEAD before building. When a feature is wrapped in `except: pass`, test that it actually runs.
+- **The corpus char-ratio/Jaccard gate is blind to reordering** (known: `feedback_ai_verification_mandatory`). The safe shipping pattern for a reading-order change: a **word-preservation guard** (accept the re-extraction only if it preserves the substantial-word multiset — a pure reorder, rules 0a/0b) + confine the new path behind an explicit flag (legacy byte-identical) + verify the trigger fires on a tiny hand-checked subset (2 of 101) before trusting it.
+
+### Tests
+- `tests/test_o5_reference_inversion_real_pdf.py` — real-PDF, parametrized over chen + jamison: detection fires, refs corrected (0 before / ≥20 after header), text preserved (anchor surnames present), detector selective (does NOT fire on a normally-ordered paper).

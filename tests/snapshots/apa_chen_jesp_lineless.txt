@@ -3651,102 +3651,11 @@ leyAnne) Choi, Ying Ching (Lita) Lo, Shin Yee (Sarah) Au, and Chi Ho
 
 J. Chen et al.
 
-Journal of Experimental Social Psychology 96 (2021) 104154
-
 (Toby) Tsang conducted the two replication studies as part of university
 coursework. They conducted an initial analysis of the paper, designed
 the replication, initiated the extensions, wrote the pre-registrations,
 conducted initial data analyses, and wrote initial replication reports.
 Bo Ley Cheng guided and assisted the replication effort.
-
-Bernstein, D., Aßfalg, A., Kumar, R., & Ackerman, R. (2016). Looking backward and
-forward on hindsight bias. Handbook of Metamemory (pp. 289–304). Oxford, UK:
-Oxford University Press.
-Bernstein, D. M., Erdfelder, E., Meltzoff, A. N., Peria, W., & Loftus, G. R. (2011).
-Hindsight bias from 3 to 95 years of age. Journal of Experimental Psychology: Learning,
-Memory, and Cognition, 37, 378–391.
-Bishop, D. (2019). Fixing the replication crisis: The need to understand human
-psychology. APS Observer, 32(10).
-Bishop, D. (2020a). How scientists can stop fooling themselves over statistics. Nature,
-584(7819), 9.
-Bishop, D. (2020b). The psychology of experimental psychologists: Overcoming
-cognitive constraints to improve research: The 47th sir Frederic Bartlett lecture.
-Quarterly Journal of Experimental Psychology, 73(1), 1–19.
-Blank, H., Musch, J., & Pohl, R. F. (2007). Hindsight bias: On being wise after the event.
-Social Cognition, 25, 1–9.
-Blank, H., & Nestler, S. (2007). Cognitive process models of hindsight bias. Social
-Cognition, 25, 132–146.
-Bosco, F. A., Aguinis, H., Field, J. G., Pierce, C. A., & Dalton, D. R. (2016). HARKing’s
-threat to organizational research: Evidence from primary and meta-analytic sources.
-Personnel Psychology, 69, 709–750.
-Brandt, M. J., IJzerman, H., Dijksterhuis, A., Farach, F. J., Geller, J., Giner-Sorolla, R., …
-Van’t Veer, A. (2014). The replication recipe: What makes for a convincing
-replication? Journal of Experimental Social Psychology, 50, 217–224.
-Bukszar, E., & Connolly, T. (1988). Hindsight bias and strategic choice: Some problems in
-learning from experience. Academy of Management Journal, 31, 628–641.
-Button, K. S., Bal, L., Clark, A., & Shipley, T. (2016). Preventing the ends from justifying
-the means: Withholding results to address publication bias in peer-review. BMC
-Psychology, 4(1), 1–7.
-Camerer, C. F., Dreber, A., Forsell, E., Ho, T.-H., Huber, J., Johannesson, M., … Wu, H.
-(2016). Evaluating replicability of laboratory experiments in economics. Science, 351
-(6280), 1433–1436.
-Camerer, C. F., Dreber, A., Holzmeister, F., Ho, T. H., Huber, J., Johannesson, M., …
-Altmejd, A. (2018). Evaluating the replicability of social science experiments in
-nature and science between 2010 and 2015. Nature Human Behaviour, 2, 637–644.
-Casper, J. D., Benedict, K., & Perry, J. L. (1989). Juror decision making, attitudes, and the
-hindsight bias. Law and Human Behavior, 13, 291–310.
-Chambers, C. D. (2018). Reproducibility meets accountability: Introducing the
-replications initiative at Royal Society Open Science. In Royal Society Open Science.
-Retrieved from https://royalsociety.org/blog/2018/10/reproducibility-meets-acc
-ountability/.
-Chambers, C. D., & Tzavella, L. (2020). Registered Reports: Past, Present and Future.
-https://doi.org/10.31222/osf.io/43298.
-Christensen-Szalanski, J. J., & Willham, C. F. (1991). The hindsight bias: A meta-analysis.
-Organizational Behavior and Human Decision Processes, 48, 147–168.
-Cohen, J. E. (1988). Statistical power analysis for the behavioral sciences. Hillsdale, NJ:
-Lawrence Erlbaum Associates, Inc.
-Colby, C. L. (2009). Spatial Cognition. Encyclopedia of Neuroscience, 165–171.
-Davis, A. L., & Fischhoff, B. (2014). Communicating uncertain experimental evidence.
-Journal of Experimental Psychology: Learning, Memory, and Cognition, 40, 261–274.
-Dawson, N. V., Connors, A. F., Jr., Speroff, T., Kemka, A., Shaw, P., & Arkes, H. R. (1993).
-Hemodynamic assessment in the critically ill: Is physician confidence warranted?
-Medical Decision Making, 13, 258–266.
-Ebersole, C. R., Mathur, M. B., Baranski, E., Bart-Plange, D. J., Buttrick, N. R.,
-Chartier, C. R., … Szecsi, P. (2020). Many labs 5: Testing pre-data-collection peer
-review as an intervention to increase replicability. Advances in Methods and Practices
-in Psychological Science, 3(3), 309–331.
-Edlund, J., Cuccolo, K., Irgens, M. S., Wagge, J. R., & Zlokovich, M. S. (2020). Saving
-Science Through Replication Studies. https://doi.org/10.31234/osf.io/efypc.
-Faul, F., Erdfelder, E., Buchner, A., & Lang, A. G. (2009). Statistical power analyses using
-G* power 3.1: Tests for correlation and regression analyses. Behavior Research
-Methods, 41, 1149–1160.
-Fay, M. P., & Malinovsky, Y. (2018). Confidence intervals of the Mann-Whitney
-parameter that are compatible with the Wilcoxon-Mann-Whitney test. Statistics in
-Medicine, 37, 3991–4006.
-Fischhoff, B. (1975). Hindsight ∕
-= foresight: The effect of outcome knowledge on
-judgment under uncertainty. Journal of Experimental Psychology: Human Perception
-and Performance, 104, 288–299.
-Fischhoff, B. (1977). Perceived informativeness of facts. Journal of Experimental
-Psychology: Human Perception and Performance, 3, 349–358.
-Fischhoff, B. (2007). An early history of hindsight research. Social Cognition, 25(1),
-10–13.
-Fischhoff, B., & Beyth, R. (1975). I knew it would happen: Remembered probabilities of
-once—Future things. Organizational Behavior and Human Performance, 13, 1–16.
-Forer, B. R. (1949). The fallacy of personal validation: A classroom demonstration of
-gullibility. Journal of Abnormal and Social Psychology, 44, 118–123.
-Fritz, C. O., Morris, P. E., & Richler, J. J. (2012). Effect size estimates: Current use,
-calculations, and interpretation. Journal of Experimental Psychology: General, 141,
-2–18.
-Gelman, A., & Loken, E. (2013). The garden of forking paths: Why multiple comparisons
-can be a problem even when there is no “fishing expectation” or “p-hacking” and the
-research hypothesis was posited ahead of time. Retrieved from https://osf.io/n3axs.
-Granhag, P. A., Strömwall, L. A., & Allwood, C. M. (2000). Effects of reiteration,
-hindsight bias, and memory on realism in eyewitness confidence. Applied Cognitive
-Psychology, 14, 397–420.
-Gregory, E., Landau, B., & McCloskey, M. (2011). Representation of object orientation in
-children: Evidence from mirror-image confusions. Visual Cognition, 19, 1035–1062.
-
 Contributor roles taxonomy
 In the table below, employ CRediT (Contributor Roles Taxonomy) to
 identify the contribution and roles played by the contributors in the
@@ -3868,9 +3777,98 @@ Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: A pr
 and powerful approach to multiple testing. Journal of the Royal Statistical Society
 Series B, 57, 289–300.
 
+1
+
 19
 
-J. Chen et al.
+Journal of Experimental Social Psychology 96 (2021) 104154
+Bernstein, D., Aßfalg, A., Kumar, R., & Ackerman, R. (2016). Looking backward and
+forward on hindsight bias. Handbook of Metamemory (pp. 289–304). Oxford, UK:
+Oxford University Press.
+Bernstein, D. M., Erdfelder, E., Meltzoff, A. N., Peria, W., & Loftus, G. R. (2011).
+Hindsight bias from 3 to 95 years of age. Journal of Experimental Psychology: Learning,
+Memory, and Cognition, 37, 378–391.
+Bishop, D. (2019). Fixing the replication crisis: The need to understand human
+psychology. APS Observer, 32(10).
+Bishop, D. (2020a). How scientists can stop fooling themselves over statistics. Nature,
+584(7819), 9.
+Bishop, D. (2020b). The psychology of experimental psychologists: Overcoming
+cognitive constraints to improve research: The 47th sir Frederic Bartlett lecture.
+Quarterly Journal of Experimental Psychology, 73(1), 1–19.
+Blank, H., Musch, J., & Pohl, R. F. (2007). Hindsight bias: On being wise after the event.
+Social Cognition, 25, 1–9.
+Blank, H., & Nestler, S. (2007). Cognitive process models of hindsight bias. Social
+Cognition, 25, 132–146.
+Bosco, F. A., Aguinis, H., Field, J. G., Pierce, C. A., & Dalton, D. R. (2016). HARKing’s
+threat to organizational research: Evidence from primary and meta-analytic sources.
+Personnel Psychology, 69, 709–750.
+Brandt, M. J., IJzerman, H., Dijksterhuis, A., Farach, F. J., Geller, J., Giner-Sorolla, R., …
+Van’t Veer, A. (2014). The replication recipe: What makes for a convincing
+replication? Journal of Experimental Social Psychology, 50, 217–224.
+Bukszar, E., & Connolly, T. (1988). Hindsight bias and strategic choice: Some problems in
+learning from experience. Academy of Management Journal, 31, 628–641.
+Button, K. S., Bal, L., Clark, A., & Shipley, T. (2016). Preventing the ends from justifying
+the means: Withholding results to address publication bias in peer-review. BMC
+Psychology, 4(1), 1–7.
+Camerer, C. F., Dreber, A., Forsell, E., Ho, T.-H., Huber, J., Johannesson, M., … Wu, H.
+(2016). Evaluating replicability of laboratory experiments in economics. Science, 351
+(6280), 1433–1436.
+Camerer, C. F., Dreber, A., Holzmeister, F., Ho, T. H., Huber, J., Johannesson, M., …
+Altmejd, A. (2018). Evaluating the replicability of social science experiments in
+nature and science between 2010 and 2015. Nature Human Behaviour, 2, 637–644.
+Casper, J. D., Benedict, K., & Perry, J. L. (1989). Juror decision making, attitudes, and the
+hindsight bias. Law and Human Behavior, 13, 291–310.
+Chambers, C. D. (2018). Reproducibility meets accountability: Introducing the
+replications initiative at Royal Society Open Science. In Royal Society Open Science.
+Retrieved from https://royalsociety.org/blog/2018/10/reproducibility-meets-acc
+ountability/.
+Chambers, C. D., & Tzavella, L. (2020). Registered Reports: Past, Present and Future.
+https://doi.org/10.31222/osf.io/43298.
+Christensen-Szalanski, J. J., & Willham, C. F. (1991). The hindsight bias: A meta-analysis.
+Organizational Behavior and Human Decision Processes, 48, 147–168.
+Cohen, J. E. (1988). Statistical power analysis for the behavioral sciences. Hillsdale, NJ:
+Lawrence Erlbaum Associates, Inc.
+Colby, C. L. (2009). Spatial Cognition. Encyclopedia of Neuroscience, 165–171.
+Davis, A. L., & Fischhoff, B. (2014). Communicating uncertain experimental evidence.
+Journal of Experimental Psychology: Learning, Memory, and Cognition, 40, 261–274.
+Dawson, N. V., Connors, A. F., Jr., Speroff, T., Kemka, A., Shaw, P., & Arkes, H. R. (1993).
+Hemodynamic assessment in the critically ill: Is physician confidence warranted?
+Medical Decision Making, 13, 258–266.
+Ebersole, C. R., Mathur, M. B., Baranski, E., Bart-Plange, D. J., Buttrick, N. R.,
+Chartier, C. R., … Szecsi, P. (2020). Many labs 5: Testing pre-data-collection peer
+review as an intervention to increase replicability. Advances in Methods and Practices
+in Psychological Science, 3(3), 309–331.
+Edlund, J., Cuccolo, K., Irgens, M. S., Wagge, J. R., & Zlokovich, M. S. (2020). Saving
+Science Through Replication Studies. https://doi.org/10.31234/osf.io/efypc.
+Faul, F., Erdfelder, E., Buchner, A., & Lang, A. G. (2009). Statistical power analyses using
+G* power 3.1: Tests for correlation and regression analyses. Behavior Research
+Methods, 41, 1149–1160.
+Fay, M. P., & Malinovsky, Y. (2018). Confidence intervals of the Mann-Whitney
+parameter that are compatible with the Wilcoxon-Mann-Whitney test. Statistics in
+Medicine, 37, 3991–4006.
+Fischhoff, B. (1975). Hindsight ∕
+= foresight: The effect of outcome knowledge on
+judgment under uncertainty. Journal of Experimental Psychology: Human Perception
+and Performance, 104, 288–299.
+Fischhoff, B. (1977). Perceived informativeness of facts. Journal of Experimental
+Psychology: Human Perception and Performance, 3, 349–358.
+Fischhoff, B. (2007). An early history of hindsight research. Social Cognition, 25(1),
+10–13.
+Fischhoff, B., & Beyth, R. (1975). I knew it would happen: Remembered probabilities of
+once—Future things. Organizational Behavior and Human Performance, 13, 1–16.
+Forer, B. R. (1949). The fallacy of personal validation: A classroom demonstration of
+gullibility. Journal of Abnormal and Social Psychology, 44, 118–123.
+Fritz, C. O., Morris, P. E., & Richler, J. J. (2012). Effect size estimates: Current use,
+calculations, and interpretation. Journal of Experimental Psychology: General, 141,
+2–18.
+Gelman, A., & Loken, E. (2013). The garden of forking paths: Why multiple comparisons
+can be a problem even when there is no “fishing expectation” or “p-hacking” and the
+research hypothesis was posited ahead of time. Retrieved from https://osf.io/n3axs.
+Granhag, P. A., Strömwall, L. A., & Allwood, C. M. (2000). Effects of reiteration,
+hindsight bias, and memory on realism in eyewitness confidence. Applied Cognitive
+Psychology, 14, 397–420.
+Gregory, E., Landau, B., & McCloskey, M. (2011). Representation of object orientation in
+children: Evidence from mirror-image confusions. Visual Cognition, 19, 1035–1062.J. Chen et al.
 
 Journal of Experimental Social Psychology 96 (2021) 104154
 Nosek, B. A., Spies, J. R., & Motyl, M. (2012). Scientific utopia: II Restructuring
