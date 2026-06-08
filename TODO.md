@@ -159,3 +159,9 @@ Add only when a real downstream consumer asks for one. YAGNI until then.
 - [ ] **escicheck-iterate** — easiest pilot (46 successful phase_5d_runs already, well-defined stats-family defect taxonomy). Update `verification_protocol` in its `canary.json`.
 - [ ] **2rmarkdown-iterate** — needs 3-tier verdict-vocabulary (GREEN/YELLOW/RED → PASS/FAIL/FAIL) integration in the orchestrator. Fixture-keyed corpus.
 - [ ] **citationguard-iterate** — needs corpus onboarding into article-finder FIRST (`corpus-query --source citationguard` returns 0 currently). Two-view-per-paper (`citations.v2` + `intext_citations.v1`).
+
+## 2026-06-08 — deferred from /ship v2.4.80 (O5 reference inversion)
+- [ ] **Canary finding-key case-normalization bug** (shared iterate-loop substrate): known-deferred ledger findings get re-flagged as NEW (case mismatch), forcing SKIP_CANARY overrides. Spawned as a background task this session. Fix the finding-key comparison to case-fold both sides + add a regression test.
+- [ ] **Authenticated prod functional smoke** on chen via Railway /extract (needs a dp_ API key) — confirm O5 ordered-refs end-to-end in prod. Version (2.4.80) + health verified; the authenticated extract was not run.
+- [ ] **CitationGuard follow-ups** (their repo, documented in docs/DOCPLUCK_HANDOFF_2026-06-07.md): regenerate chen+jamison fixtures from docpluck v2.4.80 academic + re-score; extend citelink's number-ending-host special-case to single COVID-1928. Superscript recovery: WON'T-FIX in docpluck (would regress citelink — tested).
+- [ ] **ip_feldman interwoven table+prose case** (B4/#3/#4, R4/#5): still open; needs the per-y-band region-aware architecture (tracked in docs/superpowers/specs/2026-06-07-ip_feldman-B4-R4-column-interleave-diagnosis.md). O5 only handled the separable banded case (chen/jamison).
