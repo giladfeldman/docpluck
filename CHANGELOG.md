@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.83] — 2026-06-08
+
+**P0r — bare "`<Initials> <Surname> et al.`" running-header strip.** `NORMALIZATION_VERSION` 1.9.29 → 1.9.30. Keyed on the `Initial. Surname et al.` line shape + the existing ≥3-standalone-repetition guard, never paper identity.
+
+Surfaced by the v2.4.82 RC-1 AI-verify: `J. Chen et al.` leaked as a standalone line **×20** on `chen_2021_jesp` / `j.jesp.2021.104154` (and `I. Ziano et al.` **×10** on `ziano_2021_joep`). Root cause: pdftotext splits the full Elsevier running header `J. Chen et al. / Journal of Experimental Social Psychology 96 (2021) 104154` across **two** lines; v2.4.81's `_ELSEVIER_JOURNAL_VOL_FOOTER` strips the journal half, but the bare author half (`J. Chen et al.`) was its own line and matched no shape filter, so it leaked. (The mid-sentence *glued* variant `scienceJ. Chen et al.` was a separate splice-boundary bug fixed in v2.4.82.)
+
+New `_AUTHOR_ETAL_INITIAL` shape in `_looks_like_running_header_or_footer`: 1–4 leading initials (`J.` / `J. K.` / hyphenated `M.-J.`), an optional surname particle (`van`, `de`, …), a Title-Case surname (Latin-Extended, hyphen/apostrophe), and a trailing `et al.` with nothing else on the line. It is gated by the ≥3-standalone-repetition requirement in `_detect_recurring_running_headers`, so it can only fire on the recurring page furniture — an in-text citation is never a standalone whole line, and an APA reference entry is `Surname, Initial.` (comma after the surname — the inverse order). Corpus-wide check: fires on exactly the two genuine running headers (`chen` ×20, `ziano` ×10) across the 26-paper baseline, **zero** false positives on body text or table cells.
+
+New regression tests: `tests/test_p0r_recurring_running_header_strip.py::TestBareAuthorEtalRunningHeader` (shape positives incl. hyphenated/particle forms + negatives for citation/reference/bare-author; ≥3× detection gate; standalone strip preserves body; real-PDF on `chen_2021_jesp` — references intact, the paper is also the O5 inversion fixture — and `ziano_2021_joep`).
+
 ## [2.4.82] — 2026-06-08
 
 **Column-splice word-integrity — two pre-existing corruptions fixed; general two-column de-interleave added behind a flag (default off).** No `NORMALIZATION_VERSION` change (text channel only — `extract.py` + `extract_columns.py`). Both fixes keyed on a STRUCTURAL INVARIANT — *a column re-extraction must preserve the page's substantial-word multiset* — never paper identity. Gated against the full 26-paper corpus (every paper now preserves the raw pdftotext word multiset under both settings) + the column-test suite.
