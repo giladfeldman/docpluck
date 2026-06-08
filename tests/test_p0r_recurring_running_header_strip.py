@@ -423,3 +423,75 @@ class TestP0rRealPdfRegression:
         )
         # Body prose must survive intact.
         assert "brain" in md.lower()
+
+
+class TestBareAuthorEtalRunningHeader:
+    """v2.4.83 — bare "<Initials> <Surname> et al." running header.
+
+    Elsevier splits the full "J. Chen et al. / <Journal> <Vol> (<Year>) <ArtNo>"
+    running header across two pdftotext lines; _ELSEVIER_JOURNAL_VOL_FOOTER strips
+    the journal half, but the bare author half ("J. Chen et al.") leaked standalone
+    ×20 on chen_2021_jesp / j.jesp.2021.104154 (and "I. Ziano et al." ×10 on
+    ziano_2021_joep) — surfaced by the 2026-06-08 RC-1-Step-1 AI-verify. Keyed on
+    the "Initial. Surname et al." shape + the ≥3-standalone-repetition guard,
+    never paper identity. The leading initial + trailing "et al." with nothing
+    else on the line distinguishes it from an in-text citation (mid-line, never a
+    standalone whole line) and an APA reference entry ("Surname, Initial." —
+    comma after the surname, the inverse order).
+    """
+
+    def test_shape_positives(self):
+        for s in ["J. Chen et al.", "I. Ziano et al.", "J. K. Smith et al",
+                  "A. van der Berg et al.", "M.-J. O’Brien et al."]:
+            assert _looks_like_running_header_or_footer(s), s
+
+    def test_shape_negatives(self):
+        # In-text citation (text follows) — and never a standalone whole line.
+        assert not _looks_like_running_header_or_footer(
+            "as J. Chen et al. (2021) showed that participants"
+        )
+        # APA reference entry — "Surname, Initial." (comma after surname).
+        assert not _looks_like_running_header_or_footer(
+            "Chen, J., & Smith, K. (2021). Title of the work. Journal."
+        )
+        # Bare author without "et al." — too citation-like to strip.
+        assert not _looks_like_running_header_or_footer("J. Chen")
+        # Lowercase sentence fragment ending in "et al" — not an author header.
+        assert not _looks_like_running_header_or_footer("The results et al")
+
+    def test_detection_requires_3x(self):
+        header = "J. Chen et al."
+        text2 = "\n".join(["Body.", header, "Body.", header])
+        assert header not in _detect_recurring_running_headers(text2)
+        text3 = "\n".join(["Body.", header, "Body.", header, "Body.", header])
+        assert header in _detect_recurring_running_headers(text3)
+
+    def test_strips_standalone_preserving_body(self):
+        header = "J. Chen et al."
+        text = "\n".join(
+            [f"Body paragraph {i} with real prose content here." for i in range(4)]
+            + [header] * 4
+        )
+        out = _strip_recurring_running_headers(text)
+        assert header not in out
+        assert "Body paragraph 0 with real prose content here." in out
+
+    def test_chen_jesp_2021_bare_author_header_stripped(self, monkeypatch):
+        monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+        md = _maybe_render("apa/chen_2021_jesp.pdf")
+        standalone = [ln for ln in md.split("\n") if ln.strip() == "J. Chen et al."]
+        assert len(standalone) == 0, (
+            f"expected 0 standalone 'J. Chen et al.' running headers, got {len(standalone)}"
+        )
+        # Body + references must survive (this is also the O5 inversion paper —
+        # the reference list must remain intact after the header strip).
+        assert "hindsight" in md.lower()
+        assert "References" in md
+
+    def test_ziano_joep_bare_author_header_stripped(self, monkeypatch):
+        monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+        md = _maybe_render("apa/ziano_2021_joep.pdf")
+        standalone = [ln for ln in md.split("\n") if ln.strip() == "I. Ziano et al."]
+        assert len(standalone) == 0, (
+            f"expected 0 standalone 'I. Ziano et al.' running headers, got {len(standalone)}"
+        )

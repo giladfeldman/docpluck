@@ -1107,3 +1107,19 @@ Add a permanent corpus test `tests/test_column_splice_preserves_raw_multiset.py`
 ### SPINE / deferrals (surfaced, not silent)
 - Canary AI-verify this cycle covered ip_feldman (fixed-3) + jesp/collabra (targets); plos_med_1, chandrashekar, chan_feldman, ar_apa NOT full-AI-verified — but ALL 26 (incl. those) passed the corpus word-multiset gate (no corruption). The canary papers' residual FAILs are KNOWN-deferred Step-2 architecture (region-aware band) — not regressions. I2/I3 honestly not "PASS"; cycle = PARTIAL.
 - Queued THIS run (per user "continue"): bare `J. Chen et al.` running-header strip (RC-2 residual, normalize.py — separate root cause); `M_age 59.3→39.3` glyph diagnosis (collabra_77859). Multi-session: RC-1 Step 2 (per-y-band region-aware crop) — the only path to the remaining inversions + table-region interleave.
+
+---
+
+## Run: 2026-06-08 (cont.) · bare author running-header strip + M_age baked-glyph diagnosis · v2.4.82 → v2.4.83
+
+### Outcome
+- **v2.4.83 (committed):** `_AUTHOR_ETAL_INITIAL` P0r shape — strips the bare `J. Chen et al.` standalone running header (leaked ×20 on chen_2021_jesp, ×10 `I. Ziano et al.` on ziano_2021_joep). NORMALIZATION_VERSION 1.9.29→1.9.30.
+- **M_age 59.3→39.3 DIAGNOSED (no code change, user decision = document):** baked CID-font DIGIT misread — PDF visually shows 59.3, embedded codepoint baked as 3, both pdftotext AND pdfplumber extract 39.3. Same class as Västfjäll; documented in todo.md + a consumer note routed to CitationGuard.
+
+### Methodology wins
+- **A "general" repetition-strip that misses is almost always a SHAPE-FILTER coverage gap, not a detection-mechanism gap** (re-confirms the v2.4.81 lesson). Here the *full* Elsevier header `J. Chen et al. / Journal … 96 (2021) 104154` was split by pdftotext across TWO lines; the v2.4.81 `_ELSEVIER_JOURNAL_VOL_FOOTER` stripped the journal half, leaving the bare author half (`J. Chen et al.`) matching NO shape. When a strip half-works, check whether pdftotext SPLIT the furniture line — each fragment needs its own shape, all gated by the shared ≥3× repetition guard.
+- **The corpus-wide false-positive sweep is the right no-regression gate for a new strip shape** (mirror of the word-multiset gate for splice changes): run `_detect_recurring_running_headers` over all 26 baseline papers and assert the NEW shape adds ONLY real running headers (here chen ×20 + ziano ×10, zero body/table false positives). Cheap, text-only, decisive. char-ratio/Jaccard is blind to a short repeated header line — chen had been leaking 20× through the 26-baseline undetected.
+- **Confirm a baked-glyph hypothesis with a DUAL-extractor diff + a visual read.** pdftotext==pdfplumber==39.3 while the AI gold (and the visual PDF read) ==59.3 → the codepoint is baked wrong; no text-channel fix is possible. This 3-way check (pdftotext / pdfplumber / visual) is the standard for separating a docpluck bug from a source-PDF artifact.
+
+### Edge cases
+- Hyphenated initials (`M.-J. O’Brien et al.`) need `[A-Z]\.[-\s]*` (not `[A-Z]\.\s*`) in the initial group, else they slip the shape. Curly apostrophe `’` must be in the surname char-class.

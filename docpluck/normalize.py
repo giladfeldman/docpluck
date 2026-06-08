@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.29"
+NORMALIZATION_VERSION = "1.9.30"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -324,15 +324,17 @@ def _detect_repeating_lines(layout, *, position: str) -> set[str]:
 
 def _f0_strip_running_and_footnotes(
     raw_text: str, layout, table_regions: list[dict] | None = None,
-) -> tuple[str, list[tuple[int, int]]]:
+) -> tuple[str, list[tuple[int, int]], list[str]]:
     """Strip running headers/footers and footnotes using layout info.
 
-    Returns (post_strip_text_with_appendix, footnote_spans_in_raw_text).
+    Returns ``(post_strip_text_with_appendix, footnote_spans_in_raw_text,
+    footnote_texts)``. ``footnote_texts`` is parallel to the spans list —
+    ``footnote_texts[i]`` is the raw_text slice for ``footnote_spans[i]``.
     """
     from .extract_layout import LayoutDoc
 
     if not isinstance(layout, LayoutDoc) or not layout.pages:
-        return raw_text, []
+        return raw_text, [], []
 
     body_size = _body_size(layout)
 
@@ -360,6 +362,7 @@ def _f0_strip_running_and_footnotes(
     page_text_chunks: list[str] = []
     footnote_chunks: list[str] = []
     footnote_raw_spans: list[tuple[int, int]] = []
+    footnote_raw_texts: list[str] = []  # parallel to footnote_raw_spans
 
     repeating_header_lines = _detect_repeating_lines(layout, position="top")
     repeating_footer_lines = _detect_repeating_lines(layout, position="bottom")
@@ -399,6 +402,7 @@ def _f0_strip_running_and_footnotes(
                 idx = raw_text.find(line_text, page_start)
                 if idx >= 0:
                     footnote_raw_spans.append((idx, idx + len(line_text)))
+                    footnote_raw_texts.append(line_text)
                 continue
 
             keep_lines.append(line_text)
@@ -412,7 +416,7 @@ def _f0_strip_running_and_footnotes(
         appendix = "\n\f\f\n" + "\n\n".join(footnote_chunks)
     else:
         appendix = ""
-    return body + appendix, footnote_raw_spans
+    return body + appendix, footnote_raw_spans, footnote_raw_texts
 
 
 def _detect_recurring_page_numbers(raw_text: str) -> set[int]:
@@ -1435,6 +1439,23 @@ _JOURNAL_PIPE_ISSUE_FOOTER = re.compile(
     r"(?:\s*\|\s*\S.*)?"                            # optional trailing " | <doi/extra>"
     r"\s*$"
 )
+# v2.4.83 (2026-06-08): bare author running-header — "<Initials> <Surname> et al.",
+# e.g. "J. Chen et al." (leaked ×13 standalone on j.jesp.2021.104154). Elsevier's
+# full running header "J. Chen et al. / <Journal> <Vol> (<Year>) <ArtNo>" is split
+# by pdftotext across two lines; _ELSEVIER_JOURNAL_VOL_FOOTER strips the journal
+# half, leaving the bare author half as its own line. This is unambiguously page
+# furniture, NOT body text, given the ≥3-standalone-repetition guard in
+# _detect_recurring_running_headers: an in-text citation is never a standalone
+# WHOLE line, and an APA reference entry is "Surname, Initial." (comma after the
+# surname) — the inverse of this "Initial. Surname" order. Requiring a LEADING
+# initial + a trailing "et al." with nothing else on the line keeps it tight.
+_AUTHOR_ETAL_INITIAL = re.compile(
+    r"^(?:[A-Z]\.[-\s]*){1,4}"                    # leading initials: "J. " / "J. K. " / "M.-J. "
+    r"(?:(?:van|von|de|der|den|di|del|della|du|la|le|el|bin|ben|da|dos)\s+){0,2}"  # optional surname particles
+    r"[A-ZÀ-Þ][\w'’\-]+"                          # Title-Case surname (Latin-Extended, hyphen/apostrophe)
+    r"\s+et\s+al\.?\s*$",                          # "et al." (optional period), end of line
+    re.UNICODE,
+)
 
 
 def _is_all_caps_journal_banner(line: str) -> bool:
@@ -1470,7 +1491,8 @@ def _is_all_caps_journal_banner(line: str) -> bool:
 
 
 def _looks_like_running_header_or_footer(line: str) -> bool:
-    """Return True if the line shape matches one of the 5 P0r signatures.
+    """Return True if the line shape matches one of the P0r running-header /
+    page-footer signatures.
 
     Used as a content guard on top of the ≥3-standalone-repetition guard.
     Together they keep the strip from touching table cells (which repeat
@@ -1492,6 +1514,8 @@ def _looks_like_running_header_or_footer(line: str) -> bool:
     if _ELSEVIER_JOURNAL_VOL_FOOTER.match(line):
         return True
     if _JOURNAL_PIPE_ISSUE_FOOTER.match(line):
+        return True
+    if _AUTHOR_ETAL_INITIAL.match(line):
         return True
     return False
 
@@ -2030,6 +2054,12 @@ class NormalizationReport:
     steps_changed: list[str] = field(default_factory=list)
     changes_made: dict[str, int] = field(default_factory=dict)
     footnote_spans: tuple[tuple[int, int], ...] = ()  # pre-strip char offsets
+    # v2.4.83: the captured footnote strings, parallel to footnote_spans
+    # (footnote_texts[i] == raw_text[footnote_spans[i][0]:footnote_spans[i][1]]).
+    # A first-class surface so consumers don't have to slice char offsets or
+    # parse the \n\f\f\n appendix out of the body. Empty when F0 doesn't run
+    # (no layout) or no footnotes were detected.
+    footnote_texts: tuple[str, ...] = ()
     page_offsets: tuple[int, ...] = ()                 # post-strip body page offsets
     # §A R4 / B6 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): 1-indexed page
     # numbers where pdftotext's two-column reading-order serialisation
@@ -2060,6 +2090,7 @@ class NormalizationReport:
             "steps_changed": self.steps_changed,
             "changes_made": self.changes_made,
             "footnote_spans": [list(s) for s in self.footnote_spans],
+            "footnote_texts": list(self.footnote_texts),
             "page_offsets": list(self.page_offsets),
         }
 
@@ -2679,10 +2710,14 @@ def normalize_text(
     # ── F0: Layout-aware running-header/footer + footnote strip ─────────
     # Requires a LayoutDoc from extract_pdf_layout. When present, strips
     # repeating running headers/footers and moves footnotes to an appendix
-    # section after "\n\f\f\n". Populates report.footnote_spans.
+    # section after "\n\f\f\n". Populates report.footnote_spans +
+    # report.footnote_texts (the captured footnote strings, parallel).
     if layout is not None:
-        t, footnote_spans = _f0_strip_running_and_footnotes(t, layout, table_regions=table_regions)
+        t, footnote_spans, footnote_texts = _f0_strip_running_and_footnotes(
+            t, layout, table_regions=table_regions
+        )
         report.footnote_spans = tuple(footnote_spans)
+        report.footnote_texts = tuple(footnote_texts)
         report.steps_applied.append("F0")
         if footnote_spans:
             report.steps_changed.append("F0")
