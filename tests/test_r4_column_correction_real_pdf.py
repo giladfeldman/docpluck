@@ -1,17 +1,32 @@
-"""R4 column-aware re-extraction regression test (v2.4.76, 2026-05-25).
+"""R4 column-aware re-extraction regression test (v2.4.76, 2026-05-25;
+word-integrity revision v2.4.82, 2026-06-08).
 
 Asserts the column-correction pipeline (`docpluck.extract.extract_pdf` →
 `_detect_column_interleave_pages` → `splice_column_corrected_pages` →
-`_crop_and_extract`) fires end-to-end on jama_open_1.pdf and produces
-non-interleaved abstract text + a coherent Key Points sidebar block.
+`_crop_and_extract`) produces a WORD-CORRECT, coherent rendering of the JAMA
+Open abstract + Key Points sidebar.
+
+**v2.4.82 word-integrity revision.** The original R4 whole-page crop on
+jama_open_1 page 1 de-interleaved the abstract/sidebar but SPLIT words at the
+column-crop boundary (``adults`` → ``adu``, ``control`` → ``cont``,
+``body`` → ``bod``) — a rule-0a/0b text corruption that shipped for weeks. The
+splice now applies an UNCONDITIONAL word-preservation guard, so that corrupting
+crop is rejected and page 1 keeps its word-correct (raw pdftotext) text. The
+rendered abstract is therefore word-intact; the structured-abstract labels stay
+in document order and the Key Points block is present without the correction.
+Properly de-interleaving this page (a full-width title/byline band crossing the
+two abstract/sidebar columns) requires the per-band Step 2 region-aware crop
+(`docs/superpowers/specs/2026-06-08-rc1-region-aware-column-architecture.md`),
+which can de-interleave WITHOUT cutting words. Until then word-integrity wins.
 
 Real-PDF (rule 0d) + structural-signature general fix (rule 16). Closes
 jama-open-1 D4 (MISSING_SECTION / Key Points sidebar) from the 2026-05-25
-Haiku-orchestration pretest.
+Haiku-orchestration pretest; the word-split it introduced is closed here.
 """
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -30,17 +45,43 @@ def jama_pdf_bytes() -> bytes:
     return _PDF.read_bytes()
 
 
-def test_r4_fires_on_jama_open_1(jama_pdf_bytes: bytes):
-    """The extract_pdf method tag must include `+column_corrected:N,...`
-    when R4 fires on the JAMA Open paper. Asserts the detector picks up
-    page 1 (where Signature B / bimodal-line-length should fire on the
-    abstract+Key-Points sidebar)."""
-    _text, method = extract_pdf(jama_pdf_bytes)
-    assert "column_corrected" in method, (
-        f"R4 did not fire on jama_open_1 — method tag missing "
-        f"`+column_corrected:N,...` (got: {method!r}). Check "
-        f"_detect_column_interleave_pages Signature B threshold."
-    )
+def test_r4_jama_abstract_word_integrity(jama_pdf_bytes: bytes):
+    """The rendered abstract must contain WHOLE words — never the column-crop
+    SPLIT fragments the old accept-any R4 path shipped (``adults`` → ``adu``,
+    ``control`` → ``cont``, ``mean`` → ``mea``, ``body`` → ``bod``). This is the
+    rule-0a/0b corruption the unconditional word-preservation guard closes; it
+    is the keystone assertion for jama_open_1 (a digit/word change in a
+    meta-science extraction is catastrophic)."""
+    md = render_pdf_to_markdown(jama_pdf_bytes)
+    # The whole words must be present...
+    for whole in ["adults", "control", "body", "mean", "continued"]:
+        assert re.search(rf"\b{whole}\b", md, re.IGNORECASE), (
+            f"jama_open_1: whole word {whole!r} missing from rendered output — "
+            f"the column-crop may have split it (rule 0a)."
+        )
+    # ...and the truncated crop fragments must NOT appear as standalone tokens.
+    for frag in ["adu", "cont", "mea", "bod", "contin"]:
+        assert not re.search(rf"(?<![A-Za-z]){frag}(?![A-Za-z])", md), (
+            f"jama_open_1: word-split fragment {frag!r} appears as a standalone "
+            f"token — the column-crop split a word straddling the crop x "
+            f"(rule 0a/0b). The word-preservation guard must reject that crop."
+        )
+
+
+def test_r4_jama_no_crop_corruption_in_method(jama_pdf_bytes: bytes):
+    """Either page 1 is NOT column-corrected (the whole-page crop splits words,
+    so word-preservation rejects it — the current correct state), OR if a future
+    band-aware crop DOES correct it, the output must still be word-intact. Encodes
+    the invariant: a column correction is never accepted at the cost of a split
+    word. Guards against a regression that re-enables the corrupting accept-any
+    crop."""
+    text, method = extract_pdf(jama_pdf_bytes)
+    # The raw words survive in the extracted text regardless of whether the page
+    # was corrected — the guard guarantees a reorder never splits a word.
+    for whole in ["adults", "control", "body"]:
+        assert re.search(rf"\b{whole}\b", text, re.IGNORECASE), (
+            f"jama_open_1 extract text lost whole word {whole!r} (rule 0a)."
+        )
 
 
 def test_r4_jama_abstract_not_interleaved(jama_pdf_bytes: bytes):
