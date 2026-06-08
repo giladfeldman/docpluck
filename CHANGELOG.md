@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.81] — 2026-06-08
+
+**Untested-corpus sweep — RC-2 metadata/running-header leak strips.** `NORMALIZATION_VERSION` 1.9.28 → 1.9.29. A discovery sweep over 15 previously-untested manuscripts (located + gold-sourced via article-finder) found the most universal defect: front-matter / per-page furniture leaking into the body stream on **5/5** verified papers. Two strip-coverage gaps closed this release (one root cause: non-body metadata appearing in body):
+
+**(1) Running header/footer shapes.** docpluck's P0r repetition-driven strip (`_strip_recurring_running_headers`) already detects ≥3×-repeated furniture and strips it (standalone + welded-prefix), but its shape filter `_looks_like_running_header_or_footer` knew only 5 publisher shapes and missed two common families:
+
+- **Elsevier / ScienceDirect footer** — `<Journal Name> <Vol> (<Year>) <ArticleNo>`, e.g. `Journal of Experimental Social Psychology 96 (2021) 104154` (leaked ×20 on `j.jesp.2021.104154`), plus the author-prefixed `<Author> et al. / <Journal> <Vol> (<Year>) <ArtNo>` variant. New `_ELSEVIER_JOURNAL_VOL_FOOTER`. Distinct from an APA reference entry: the journal-name span excludes commas/periods (so it cannot match a citation's comma-separated author list) and the `(YYYY)` parenthetical sits AFTER the volume (footer form), not after the authors (reference form).
+- **Nature-family footer** — `<Journal Name> | (<Year>)<Vol>:<ArtNo>`, e.g. `Nature Communications | (2023)14:8487` (leaked ×15 on `s41467-023-42320-4`). The existing `_JOURNAL_DOI_DATE_FOOTER` required `| https://doi.org/…`; this is the pipe-issue variant with no DOI URL. New `_JOURNAL_PIPE_ISSUE_FOOTER`.
+
+Both shapes are tight typographic signatures and are additionally gated by the existing ≥3-standalone-repetition requirement, so they only ever fire on the recurring page furniture — never on body prose or a once-occurring reference line. Keyed on STRUCTURAL signatures (publisher footer layout), never paper identity.
+
+**(2) Lowercase / shared-first-author corresponding-author footnote.** `normalize.py` `_PAGE_FOOTER_LINE_PATTERNS`: the v2.4.6 prefixed-footnote pattern matched `<a> Corresponding Author:` (capital A) only; Collabra emits the lowercase `a Corresponding author: <affiliation>; <email>` form and the combined `a Shared first author b Corresponding author: …` line, both of which leaked mid-body on `collabra.37122` / `collabra.77859`. The pattern now accepts case-insensitive `author` and the `Shared/Joint first author` openers. Still anchored on the `^[a-z]\s+<footnote-keyword>` shape, so a genuine body sentence starting with a lone "a " + noun is untouched.
+
+New regression tests: `tests/test_p0r_recurring_running_header_strip.py` (running-header shapes — contract positives + reference/body negatives, detection ≥3×, real-PDF on `j.jesp.2021.104154` Elsevier + `s41467-023-42320-4` Nature); `tests/test_normalize_metadata_leak_real_pdf.py` (corresponding-author — lowercase + shared-first-author contract, body-sentence negative, real-PDF on `collabra.37122`). New-paper fixtures resolve via the article-finder cache (I9-compliant, skip-if-missing). Gated against the 26-paper corpus baseline.
+
+Triage for the full sweep (incl. the dominant column-interleave architectural finding, RC-1) is in `docs/TRIAGE_2026-06-08_untested_corpus_sweep.md`.
+
 ## [2.4.80] — 2026-06-07
 
 **O5 — reference reading-order inversion fixed (citationguard-iterate handoff).** Region-aware column re-extraction (`extract.py` + `extract_columns.py`); no `NORMALIZATION_VERSION` change (text channel only). Keyed on a STRUCTURAL signature — reference-list entries serialized ABOVE their own `References` heading on a page — never paper identity. Gated against the 26-paper corpus baseline + the column-test suite (32 existing pass) + 5 new real-PDF tests.

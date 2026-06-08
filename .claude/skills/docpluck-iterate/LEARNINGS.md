@@ -1050,3 +1050,31 @@ Mid-run (between cycle 6 and cycle 7) the user re-stated the LEAVE NOTHING BEHIN
 
 ### Tests
 - `tests/test_o5_reference_inversion_real_pdf.py` — real-PDF, parametrized over chen + jamison: detection fires, refs corrected (0 before / ≥20 after header), text preserved (anchor surnames present), detector selective (does NOT fire on a normally-ordered paper).
+
+---
+
+## Run: 2026-06-08 · Untested-manuscript discovery sweep (APA-focus) · v2.4.80 → v2.4.81
+
+**Goal:** continue iterating on PREVIOUSLY-UNTESTED manuscripts (focus APA, some other formats), using article-finder for both more articles AND all ground truth. Mode = discovery sweep (not the canary-grind loop).
+
+### Outcome
+- **Discovery sweep:** 15 untested papers located via article-finder; AI-verified (sonnet subagents) the 5 with VALID gold↔PDF integrity → all 5 FAIL. Triage: `docs/TRIAGE_2026-06-08_untested_corpus_sweep.md`.
+- **Cycle 1+2 (bundled v2.4.81, RC-2 metadata-leak root cause):** running-header leak strip (Elsevier `<Journal> <Vol> (<Year>) <ArtNo>` + Nature `<Journal> | (<Year>)<Vol>:<ArtNo>`) + corresponding-author leak strip (lowercase `a Corresponding author:` / `Shared first author`). 316 relevant tests pass, 0 fail. SHIPPED to working tree (uncommitted, pending user).
+- **RC-1 (column-interleave) STARTED:** design doc `docs/superpowers/specs/2026-06-08-rc1-region-aware-column-architecture.md`. User greenlit "Both" (strip-fixes + start columns). Multi-session; not implemented this run.
+- **Run standing verdict: PARTIAL** — strip-fixes shipped+verified; RC-1 architectural findings remain open (rule 0e-bis: not "clean" while canary architectural findings open).
+
+### Blind spots / methodology wins
+- **Gold↔PDF integrity gating is MANDATORY when reusing sibling-skill golds.** 10/15 candidate papers had a cache-vs-gold SHA mismatch: `cache-check` by DOI returns docpluck's version-of-record PDF, but the existing gold was produced by escicheck-iterate/citationguard from a DIFFERENT copy (an ESCIcheck `…print-nosupp.pdf` preprint). Verifying rendered-VOR against a preprint-gold manufactures false findings. **Always compare `cache-check` PDF sha256 vs the gold's `reading.meta.json::source_pdf_sha256` before trusting a verdict.** Surfaced an article-finder provenance gap (one DOI → two PDF copies; cache serves one, gold linked to the other) — flag to the AF owner; not a docpluck bug.
+- **3 "untested" candidates were already-tested papers under alternate DOIs** (efendic_2022_affect=19485506211056761, ieee_access_2=access.2025.3645087, maier_2023_collabra=collabra.90203). Resolve sweep candidates against the existing coverage matrix + canary before counting them "new".
+- **The dominant defect on two-column APA papers is column-interleave (RC-1), not the small stuff.** 4/4 two-column papers showed section-order scrambling + wrong-column tables + paragraph splits. This is the KNOWN-deferred B4/R4/O5 class — but the sweep proved it's BROAD (every 2-col Collabra/JESP paper), not just the 2 canaries. Surfaced as an architecture decision (user greenlit starting). The detection (`_detect_column_interleave_pages`) and correction (`extract_columns.py`) BOTH already exist — the gap is that detection is SIGNAL-ONLY (normalize.py:3813 records `column_interleave_pages` but never wires it to `splice_column_corrected_pages`; only the O5 inversion path splices).
+
+### Edge cases / fix lessons
+- **A repetition-strip's shape-filter is only as good as its publisher-shape coverage.** P0r (`_strip_recurring_running_headers`) already does ≥3×-repeat detection + welded-prefix strip, but `_looks_like_running_header_or_footer` knew only 5 shapes; the Elsevier journal-vol-year-artno footer and the Nature journal-pipe-issue footer (no DOI URL) both slipped → leaked on 5/5 papers. When a "general" strip misses, check the SHAPE FILTER coverage first, not the detection mechanism. Each new shape is keyed structurally (journal-vol-year layout) + double-guarded by the ≥3× repetition requirement, so it can't fire on a one-off reference line.
+- **Case-sensitivity in a curated footnote pattern is a silent coverage hole.** The v2.4.6 `Corresponding\s+Author` (capital A) missed Collabra's lowercase `a Corresponding author:`. Curated metadata patterns should be case-tolerant on the label word, or enumerate the real-world casings.
+- **Separate genuine docpluck defects from gold-formatting-philosophy.** The PCI-RR rebuttal-letter gold used markdown blockquotes / `## Reply to Reviewer` headings / `*t*` markdown-italic stats — docpluck (a faithful paper extractor) doesn't reproduce these; flagging them as defects inflates the count. Only the running-header leak was a genuine docpluck defect on that paper.
+
+### Process miss (machine constraint, recurring)
+- **The full pytest suite + the 26-paper verify_corpus baseline both got SUSPENDED mid-run (~14 min / ~2 papers)** by Claude Desktop's in-session bg-task suspension (memory `feedback_long_runs_die_on_this_machine`) — even after a user message reset the window. Workaround that WORKED: a FOREGROUND focused subset (the change's blast-radius test files, Camelot-disabled) with a 10-min Bash timeout = 235 pass in 5:39, guaranteed to complete in-turn. **For a surgically-scoped change, run a foreground blast-radius subset rather than the full bg suite.** The full suite / harness Tier-D remains the deferred comprehensive gate.
+
+### SPINE / deferrals (surfaced, not silent)
+- Cycle verification was DETERMINISTIC (real-PDF strip-gone + body-preserved assertions + 316-test regression) rather than per-cycle AI-subagent verify — appropriate for a furniture-strip whose effect is fully captured deterministically; AI-verify (sonnet) was run PRE-fix in the discovery sweep to FIND the defects. Full canary AI-verify + full-corpus baseline deferred (signature-gated fix is provably no-op on canary; machine suspension makes the 50-min runs impractical) — queued for follow-up.
