@@ -36,6 +36,18 @@ def _maybe_render(rel: str) -> str:
     return render_pdf_to_markdown(pdf.read_bytes())
 
 
+# v2.4.81: untested-corpus-sweep fixtures (Collabra) live in the shared
+# article-finder repository (the I9 locator's data store), not in test-pdfs/.
+_AF_FULLTEXT = Path(__file__).resolve().parents[3] / "ArticleRepository" / "fulltext"
+
+
+def _maybe_render_af_cache(doi_stem: str) -> str:
+    pdf = _AF_FULLTEXT / f"{doi_stem}.pdf"
+    if not pdf.is_file():
+        pytest.skip(f"article-finder cache fixture not available: {doi_stem}")
+    return render_pdf_to_markdown(pdf.read_bytes())
+
+
 # ── Contract tests for the helper (synthetic strings — fast, exhaustive) ───
 
 
@@ -57,6 +69,56 @@ def test_p0_strips_supplemental_data_sidebar():
     assert "Supplemental data for this article" not in out
     assert "Intro paragraph one." in out
     assert "Intro paragraph two." in out
+
+
+# ── v2.4.81: lowercase / shared-first-author corresponding-author footnotes ──
+
+
+def test_p0_strips_lowercase_corresponding_author_footnote():
+    # Collabra emits "a Corresponding author: <affiliation>; <email>" with
+    # LOWERCASE "author" — the v2.4.6 pattern only matched capital-A
+    # "Corresponding Author". Leaked into body on collabra.37122.
+    text = (
+        "Body paragraph one is here and substantial enough.\n\n"
+        "a Corresponding author: Department of Psychology, University of Hong "
+        "Kong, Hong Kong SAR, China; gfeldman@hku.hk\n\n"
+        "Body paragraph two is here and substantial enough."
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Corresponding author:" not in out
+    assert "gfeldman@hku.hk" not in out
+    assert "Body paragraph one" in out and "Body paragraph two" in out
+
+
+def test_p0_strips_shared_first_author_combined_footnote():
+    # The combined "a Shared first author b Corresponding author: …" line
+    # (collabra.77859).
+    text = (
+        "Body paragraph here is substantial.\n\n"
+        "a Shared first author b Corresponding author: Gilad Feldman, "
+        "Department of Psychology, University of Hong Kong; gfeldman@hku.hk\n\n"
+        "Next body paragraph is substantial."
+    )
+    out = _strip_page_footer_lines(text)
+    assert "Shared first author" not in out
+    assert "Corresponding author:" not in out
+    assert "Body paragraph here" in out and "Next body paragraph" in out
+
+
+def test_p0_keeps_body_sentence_starting_with_a_noun():
+    # A genuine body sentence beginning "a Corresponding value …" must NOT be
+    # stripped — the opener keyword is "Corresponding author/Author", not any
+    # word starting with "Corresponding".
+    text = "a Corresponding value was computed for each participant here.\n"
+    assert "Corresponding value was computed" in _strip_page_footer_lines(text)
+
+
+def test_collabra_37122_corresponding_author_not_in_body():
+    md = _maybe_render_af_cache("10.1525__collabra.37122")
+    assert "Corresponding author: Department of Psychology" not in md
+    assert "gfeldman@hku.hk" not in md
+    # Body prose must survive (this is a regret/inaction replication paper).
+    assert "regret" in md.lower()
 
 
 def test_p0_strips_truncated_department_affiliation():

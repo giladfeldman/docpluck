@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.28"
+NORMALIZATION_VERSION = "1.9.29"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -984,8 +984,14 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     #   "a Contributed equally, joint first author"
     #   "b Contributed equally, joint first author"
     #   "c Corresponding Author: <name>, <affiliation>"
+    # v2.4.81 (untested-corpus sweep): Collabra emits the lowercase
+    # "a Corresponding author: <affiliation>; <email>" form (lowercase "author")
+    # and the combined "a Shared first author b Corresponding author: …" line —
+    # both leaked into the body on collabra.37122 / collabra.77859. Make "author"
+    # case-insensitive and add the shared/joint-first-author footnote openers.
     re.compile(
-        r"^[a-z]\s+(?:Contributed\s+equally|Corresponding\s+Author)\b.*$"
+        r"^[a-z]\s+(?:Contributed\s+equally|Corresponding\s+[Aa]uthor"
+        r"|Shared\s+first\s+author|Joint\s+first\s+author)\b.*$"
     ),
     # v2.4.6: standalone affiliation lines that recur on bottom of every
     # page in 2-column journals — "Department of <field>, University of
@@ -1400,6 +1406,35 @@ _JOURNAL_DATE_TAIL_ORPHAN = re.compile(
 _JOURNAL_PROOF_HEADER = re.compile(
     r"^[A-Z][A-Za-z][A-Za-z &\-]{4,60}\s+\d{1,3}\(\d{1,3}\)\s*$"
 )
+# v2.4.81 (2026-06-08 untested-corpus sweep): Elsevier / ScienceDirect running
+# footer — "<Journal Name> <Vol> (<Year>) <ArticleNo>", e.g.
+# "Journal of Experimental Social Psychology 96 (2021) 104154" (leaked ×20 on
+# j.jesp.2021.104154). Also the author-prefixed variant
+# "<Author> et al. / <Journal> <Vol> (<Year>) <ArtNo>". Distinct from a
+# reference-list entry: the journal name spans only [A-Za-z&-:' ] (no comma /
+# period), so it cannot match the comma-separated author list of a citation;
+# and the "(YYYY)" parenthetical sits AFTER the volume (footer form) rather than
+# after the authors (APA reference form). Paired with the ≥3-repetition guard in
+# _detect_recurring_running_headers, this only ever fires on the page footer.
+_ELSEVIER_JOURNAL_VOL_FOOTER = re.compile(
+    r"^(?:.{2,45}\s+/\s+)?"                       # optional "<author> et al. / " prefix
+    r"[A-Z][A-Za-z][A-Za-z&\-:' ]{5,70}"          # journal name (title-case words)
+    r"\s+\d{1,4}\s+\(\d{4}\)\s+"                   # volume + (year)
+    r"(?:\d{1,7}|\d{1,5}\s*[–-]\s*\d{1,5})"   # article number OR page range
+    r"\s*$"
+)
+# v2.4.81: Nature-family running footer — "<Journal Name> | (<Year>)<Vol>:<ArtNo>",
+# e.g. "Nature Communications | (2023)14:8487" (leaked ×15 on s41467). The
+# existing _JOURNAL_DOI_DATE_FOOTER requires "| https://doi.org/..."; this is the
+# pipe-issue variant with no DOI URL. Tight signature: journal + pipe + a
+# "(YYYY)NN:NNNN" issue token that body prose never produces.
+_JOURNAL_PIPE_ISSUE_FOOTER = re.compile(
+    r"^[A-Z][A-Za-z][A-Za-z&\-:' ]{1,50}"         # journal name
+    r"\s*\|\s*"                                    # pipe separator
+    r"\(\d{4}\)\d{1,4}:\d{1,7}"                    # (year)vol:artno
+    r"(?:\s*\|\s*\S.*)?"                            # optional trailing " | <doi/extra>"
+    r"\s*$"
+)
 
 
 def _is_all_caps_journal_banner(line: str) -> bool:
@@ -1453,6 +1488,10 @@ def _looks_like_running_header_or_footer(line: str) -> bool:
     if _JOURNAL_DOI_DATE_FOOTER.match(line):
         return True
     if _JOURNAL_PROOF_HEADER.match(line):
+        return True
+    if _ELSEVIER_JOURNAL_VOL_FOOTER.match(line):
+        return True
+    if _JOURNAL_PIPE_ISSUE_FOOTER.match(line):
         return True
     return False
 
