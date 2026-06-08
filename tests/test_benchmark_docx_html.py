@@ -11,6 +11,7 @@ programmatically so the suite runs anywhere without external test files.
 The passages match real patterns from the PDF ground-truth set.
 """
 import io
+import os
 import time
 
 import pytest
@@ -243,18 +244,36 @@ class TestQualityScores:
 # Performance
 # ---------------------------------------------------------------------------
 
+def _perf_limit_s(serial: float = 1.0, parallel: float = 5.0) -> float:
+    """Wall-clock perf budget for the current run mode.
+
+    Absolute elapsed-time assertions are unreliable under ``pytest-xdist``
+    parallel load — CPU contention from N concurrent workers inflates the
+    measured time (a small DOCX fixture clocked 1.94s under ``-n10`` but
+    ~0.0s serially). The project's standard baseline gate runs ``-n10``
+    (see the long-runs note), so a strict 1s bound makes that gate
+    non-deterministic. Keep the strict bound for serial runs (real perf
+    regression detection) and a load-tolerant bound under xdist (still
+    catches gross regressions) so the parallel gate stays green-when-correct.
+    """
+    return parallel if os.environ.get("PYTEST_XDIST_WORKER") else serial
+
+
 class TestPerformance:
     def test_docx_extraction_under_1s(self):
         docx = _build_docx_fixture(GROUND_TRUTH_PASSAGES)
         start = time.perf_counter()
         extract_docx(docx)
         elapsed = time.perf_counter() - start
-        # Should be well under 1 second for a small fixture
-        assert elapsed < 1.0, f"DOCX extraction took {elapsed:.2f}s"
+        # Should be well under 1 second for a small fixture (serial); tolerant
+        # of xdist CPU contention under the parallel baseline gate.
+        limit = _perf_limit_s()
+        assert elapsed < limit, f"DOCX extraction took {elapsed:.2f}s (limit {limit}s)"
 
     def test_html_extraction_under_1s(self):
         html = _build_html_fixture(GROUND_TRUTH_PASSAGES)
         start = time.perf_counter()
         extract_html(html)
         elapsed = time.perf_counter() - start
-        assert elapsed < 1.0, f"HTML extraction took {elapsed:.2f}s"
+        limit = _perf_limit_s()
+        assert elapsed < limit, f"HTML extraction took {elapsed:.2f}s (limit {limit}s)"

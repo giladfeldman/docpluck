@@ -56,6 +56,7 @@ See Also:
 """
 
 from .extract import extract_pdf, extract_pdf_file, count_pages
+from .extract_layout import extract_pdf_layout
 from .extract_docx import extract_docx
 from .extract_html import extract_html, html_to_text
 from .normalize import normalize_text, NormalizationLevel, NormalizationReport
@@ -85,6 +86,7 @@ __all__ = [
     # Extraction
     "extract_pdf",
     "extract_pdf_file",
+    "extract_pdf_layout",
     "extract_docx",
     "extract_html",
     "html_to_text",
