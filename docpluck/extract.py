@@ -134,22 +134,37 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
         # conditional fallback, NOT a default tool swap.
         try:
             from .normalize import _detect_column_interleave_pages
-            from .extract_columns import splice_column_corrected_pages
+            from .extract_columns import (
+                splice_column_corrected_pages,
+                _detect_reference_inversion_pages,
+            )
             ff_offsets: list[int] = [0]
             for idx, ch in enumerate(text):
                 if ch == "\f":
                     ff_offsets.append(idx + 1)
+            # Two cheap text-only detectors decide whether the (more expensive)
+            # layout extraction + geometric re-order is worth running:
+            #  - legacy column-INTERLEAVE (sentences woven between columns), and
+            #  - O5 reading-order INVERSION (a page's reference entries serialized
+            #    ABOVE their own References heading — chen page 19). The inversion
+            #    pages are corrected under the word-preservation guard so the
+            #    reorder can never lose or fabricate text (rule 0a / 0b).
             flagged_pages = _detect_column_interleave_pages(text, tuple(ff_offsets))
-            if flagged_pages:
+            inversion_pages = _detect_reference_inversion_pages(text, tuple(ff_offsets))
+            all_pages = sorted(set(flagged_pages) | set(inversion_pages))
+            if all_pages:
                 from .extract_layout import extract_pdf_layout
                 layout_doc = extract_pdf_layout(pdf_bytes)
+                changed: list[int] = []
                 corrected = splice_column_corrected_pages(
-                    text, layout_doc, ff_offsets, flagged_pages,
+                    text, layout_doc, ff_offsets, all_pages,
                     pdf_bytes=pdf_bytes,
+                    word_preserve_pages=inversion_pages,
+                    changed_out=changed,
                 )
-                if corrected and corrected != text:
+                if corrected and corrected != text and changed:
                     text = corrected
-                    method = f"{method}+column_corrected:{','.join(map(str, flagged_pages))}"
+                    method = f"{method}+column_corrected:{','.join(map(str, changed))}"
         except Exception:
             pass
 
