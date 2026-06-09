@@ -267,26 +267,43 @@ curl -s -o /dev/null -w "%{http_code}" https://docpluck.app/login
 ```
 Must return 200.
 
-### 3. Railway Service Health
-```bash
-curl -s https://extraction-service-production-d0e5.up.railway.app/health
-```
-Must return `{"status":"ok",...}`.
+### 3. Railway Service Health + deployed-version gate (AUTHORITATIVE)
 
-### 4. Smoke Test (if service is live)
+`/health` is public and reports the docpluck version the live service actually imported — this is the authoritative "the new library is deployed" gate (the auth-gated `/extract` smoke in check 4 cannot run without a `dp_` API key). A clean boot here also proves docpluck imports without error at the new version.
+
 ```bash
-# Test extraction endpoint directly
-curl -s -X POST https://extraction-service-production-d0e5.up.railway.app/extract \
-  -F "file=@test-pdfs/apa/chan_feldman_2025_cogemo.pdf" | python -c "
+LIB_VERSION=$(grep '^__version__' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck/docpluck/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+curl -s --max-time 25 https://extraction-service-production-d0e5.up.railway.app/health | python -c "
+import sys, json
+d = json.load(sys.stdin)
+print('health:', d.get('status'), '| docpluck:', d.get('docpluck_version'), '| db:', d.get('database'))
+assert d.get('status') == 'ok', 'service not ok'
+assert d.get('docpluck_version') == '$LIB_VERSION', f\"deployed docpluck {d.get('docpluck_version')} != released $LIB_VERSION\"
+print('Health + version gate: PASS')
+"
+```
+**Gate:** `status == ok` AND `docpluck_version == <released version>` AND `database == connected`. A version mismatch means Railway has not finished redeploying on the new pin — wait and re-check; do not declare the deploy done.
+
+### 4. Authenticated extraction smoke (OPTIONAL — requires a `dp_` API key)
+
+`/extract` is auth-gated: an unauthenticated POST returns `401 {"detail":"Missing or invalid API key. Use: Authorization: Bearer dp_..."}`. So this is a real end-to-end extraction check ONLY when a key is available (e.g. `DP_SMOKE_API_KEY` in the env). The check-3 health/version gate is the authoritative deployed-version proof; this is extra confidence on the extraction path. Skip (mark INCONCLUSIVE, not FAIL) when no key is present.
+
+```bash
+if [ -n "$DP_SMOKE_API_KEY" ]; then
+  curl -s --max-time 90 -X POST https://extraction-service-production-d0e5.up.railway.app/extract \
+    -H "Authorization: Bearer $DP_SMOKE_API_KEY" \
+    -F "file=@test-pdfs/apa/chan_feldman_2025_cogemo.pdf" | python -c "
 import sys, json
 data = json.load(sys.stdin)
-print(f'Engine: {data[\"metadata\"][\"engine\"]}')
-print(f'Chars: {data[\"metadata\"][\"chars\"]}')
-print(f'Quality: {data[\"quality\"][\"score\"]}')
-assert data['metadata']['chars'] > 10000, 'Too few chars'
-assert data['quality']['score'] >= 80, 'Quality too low'
-print('Smoke test: PASS')
+m, q = data.get('metadata', {}), data.get('quality', {})
+print('engine:', m.get('engine'), '| chars:', m.get('chars'), '| quality:', q.get('score'))
+assert (m.get('chars') or 0) > 10000, 'Too few chars'
+assert (q.get('score') or 0) >= 80, 'Quality too low'
+print('Authenticated smoke test: PASS')
 "
+else
+  echo 'DP_SMOKE_API_KEY not set — authenticated /extract smoke SKIPPED (INCONCLUSIVE). Health+version gate (check 3) is authoritative.'
+fi
 ```
 
 ### 5. Daily-Digest Dry-Run Smoke (post-deploy, CRITICAL)
