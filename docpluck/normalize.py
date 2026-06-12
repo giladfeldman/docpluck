@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.30"
+NORMALIZATION_VERSION = "1.9.31"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -469,23 +469,94 @@ _R2_BODY_NOUN_PATTERN = re.compile(
     r"people|persons?|adults?|children|students?|patients?|workers?|"
     r"employees?|managers?|leaders?|followers?|users?|members?|"
     r"votes?|comments?|ratings?|reviews?|posts?|tweets?|messages?|"
-    r"items?|conditions?|variables?|categories?|topics?|themes?)\b",
+    r"items?|conditions?|variables?|categories?|topics?|themes?|"
+    r"instruments?|measures?|scales?|factors?|dimensions?|domains?|"
+    r"experiments?|datasets?|samples?|tasks?|stimuli|questions?)\b",
     re.IGNORECASE,
 )
+
+# v2.4.84 (NORMALIZATION_VERSION 1.9.31): R2 quantifier-head pre-context guard.
+#
+# The body-noun allowlist above is necessarily incomplete — it can never
+# enumerate every countable noun a reference title might quantify ("3
+# instruments", "5 trajectories", "12 heuristics", …). The amle_1 fix
+# (v2.4.17) added nouns one at a time; the plos_med_1 "Clinimetric properties
+# of 3 instruments" → "… of instruments" drop (filed by citationguard-iterate
+# 2026-06-10, same class as the earlier Mayiwar case) is the same whack-a-mole
+# recurring.
+#
+# A genuine page-number leak and a legitimate quantifier are distinguished by
+# the word IMMEDIATELY PRECEDING the digit, not the noun after it:
+#   * quantifier — the digit heads a noun phrase, so it follows a CLOSED-CLASS
+#     function word (article / preposition / determiner): "of 3 instruments",
+#     "the 5 factors", "first 20 years", "only 3 studies".
+#   * page leak — the digit interrupts a content phrase, so it follows a
+#     CONTENT word (adjective / noun): "psychological 41 science",
+#     "recovery 12 in a population".
+# Function words are a finite closed class, so keying on them generalizes where
+# the open-ended noun list cannot. This guard is purely ADDITIVE — it only
+# ever PRESERVES a digit (returns True), never strips one — so it cannot make
+# R2 strip anything it did not already strip (no false-positive page numbers
+# newly retained beyond the safe direction). Per docpluck's correctness
+# asymmetry, silently deleting a digit from a scientific reference title (rule
+# 0a, NO TEXT MAY DISAPPEAR) is far worse than leaving a stray page number, so
+# biasing toward preserve at a quantifier head is the correct trade.
+_R2_QUANTIFIER_HEAD_WORDS = frozenset(
+    {
+        # articles
+        "a", "an", "the",
+        # prepositions
+        "of", "in", "on", "at", "to", "for", "with", "by", "from", "as",
+        "into", "than", "between", "among", "amongst", "through", "during",
+        "after", "before", "over", "under", "about", "across", "per",
+        "within", "upon", "against", "toward", "towards", "around",
+        # conjunctions
+        "and", "or", "nor", "but",
+        # determiners / quantifier-context heads
+        "all", "both", "these", "those", "some", "any", "each", "every",
+        "first", "last", "next", "only", "total", "following", "remaining",
+        "top", "approximately", "nearly", "least", "most", "up", "least",
+        "another", "additional", "further", "respective", "successive",
+    }
+)
+# Trailing-word extractor: the alphabetic word ending right before ``match_pos``
+# (the optional trailing hyphen lets "well-3" style hyphenations still resolve
+# to the final segment, which is what matters for the function-word lookup).
+_R2_PRECEDING_WORD = re.compile(r"([A-Za-z]+)[\s ]*$")
 
 
 def _r2_is_body_phrase(digit_str: str, refs_text: str, match_pos: int) -> bool:
     """Return True if the digit at ``match_pos`` is part of a body phrase
-    (e.g. "20 years", "1,675 participants") and should NOT be stripped by R2.
+    (e.g. "20 years", "1,675 participants", "of 3 instruments") and should
+    NOT be stripped by R2 (the page-number scrub).
 
-    Heuristic: check the 30-char window AFTER the matched digit for a
-    body-noun keyword (years, participants, etc.). If found, the digit is
-    almost certainly part of legitimate body prose, not a page-number leak.
+    Two complementary, both-conservative signals — either one preserves:
+
+    1. **Following body-noun** — the 60-char window AFTER the digit contains a
+       known body-noun keyword (years, participants, instruments, …). Handles
+       "20 years", "1,675 participants".
+    2. **Preceding quantifier head** — the word IMMEDIATELY BEFORE the digit is
+       a closed-class function word (article / preposition / determiner), so
+       the digit heads a quantified noun phrase ("of 3 instruments", "the 5
+       factors") rather than interrupting a content phrase. Generalizes beyond
+       the finite noun list. See ``_R2_QUANTIFIER_HEAD_WORDS``.
+
+    A genuine page-number leak ("psychological 41 science", "recovery 12 in a
+    population") fails BOTH checks — the noun after isn't in the list and the
+    word before is a content word — so it is still stripped.
     """
-    # Window starts after the digit + at least one space.
+    # (1) Following body-noun. Window starts after the digit + at least one space.
     window_start = match_pos + len(digit_str)
     window = refs_text[window_start:window_start + 60]
-    return bool(_R2_BODY_NOUN_PATTERN.search(window))
+    if _R2_BODY_NOUN_PATTERN.search(window):
+        return True
+
+    # (2) Preceding quantifier head (closed-class function word).
+    m = _R2_PRECEDING_WORD.search(refs_text[:match_pos])
+    if m and m.group(1).lower() in _R2_QUANTIFIER_HEAD_WORDS:
+        return True
+
+    return False
 
 
 def _looks_like_ref_start(line: str) -> bool:
