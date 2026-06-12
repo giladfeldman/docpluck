@@ -133,8 +133,37 @@ def test_r2_body_noun_pattern_covers_common_units():
         "years", "year", "days", "hours", "participants", "subjects",
         "followers", "sources", "authors", "articles", "people", "students",
         "patients", "managers", "items", "trials", "studies",
+        "instruments", "measures", "scales", "factors",
     ]:
         assert _R2_BODY_NOUN_PATTERN.search(noun), f"missing noun: {noun}"
+
+
+# ── v2.4.84 quantifier-head pre-context guard (general, closed-class) ────────
+
+
+def test_r2_quantifier_head_preserves_of_three_instruments():
+    # "of 3 instruments" — "of" is a function word heading a noun phrase, so
+    # the digit is a quantifier and must be preserved even though the prior
+    # noun list never enumerated "instruments". This is the plos_med_1
+    # Clinimetric defect (citationguard-iterate 2026-06-10) root signature.
+    refs_text = "Clinimetric properties of 3 instruments measuring recovery."
+    pos = refs_text.find("3")
+    assert _r2_is_body_phrase("3", refs_text, pos) is True
+
+
+def test_r2_quantifier_head_preserves_the_five_factors():
+    refs_text = "Validation of the 5 factors underlying the construct."
+    pos = refs_text.find("5")
+    assert _r2_is_body_phrase("5", refs_text, pos) is True
+
+
+def test_r2_quantifier_head_does_not_rescue_content_word_leak():
+    # The preceding word "psychological" is a CONTENT word, so the
+    # quantifier-head guard must NOT preserve — the page-number leak still
+    # strips (no false rescue). Mirrors the original strip-test.
+    refs_text = "Their study published in psychological 41 science."
+    pos = refs_text.find("41")
+    assert _r2_is_body_phrase("41", refs_text, pos) is False
 
 
 # ── Real-PDF regression tests (rule 0d) ────────────────────────────────────
@@ -164,3 +193,15 @@ def test_amle_1_sample_counts_not_corrupted_real_pdf():
     # A3 corruption would produce "7.445", "33.719", "32.981".
     for bad in ["7.445", "33.719", "32.981"]:
         assert bad not in md, f"A3 still corrupts {bad}"
+
+
+def test_plos_med_1_three_instruments_preserved_real_pdf():
+    # plos_med_1 reference: "Clinimetric properties of 3 instruments measuring
+    # postoperative recovery in a gynecologic surgical population." R2 saw "3"
+    # as a recurring standalone-line page number and stripped it from the
+    # title → "… properties of instruments measuring …", silently corrupting
+    # the citation citationguard consumed (filed 2026-06-10). The v2.4.84
+    # quantifier-head guard preserves it because "of" precedes the digit.
+    md = _maybe_render("vancouver/plos_med_1.pdf")
+    assert "of 3 instruments" in md, "R2 still strips the quantifier '3' from the title"
+    assert "of instruments measuring" not in md
