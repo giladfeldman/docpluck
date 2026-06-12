@@ -22,7 +22,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install poppler-utils (for pdftotext)
-        run: sudo apt-get install -y poppler-utils
+        # `apt-get update` first: the runner image ships a stale package list
+        # that pins a poppler point-release (e.g. 24.02.0-1ubuntu9.8) which the
+        # mirror has since superseded, so a bare `install` 404s on the old .deb.
+        # Refreshing the lists pulls the current version. See the v2.4.84 CI
+        # flake (2026-06-12): "Failed to fetch libpoppler134 … 404 Not Found".
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
 
       - name: Install dependencies
         run: pip install -e ".[dev]"
