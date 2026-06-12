@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.31"
+NORMALIZATION_VERSION = "1.9.32"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -238,7 +238,59 @@ _REFS_END = re.compile(
 )
 _REF_START_VANCOUVER = re.compile(r"^\d{1,3}\.\s+[A-Z]")
 _REF_START_IEEE = re.compile(r"^\[\d+\]\s+[A-Z]")
-_REF_START_APA = re.compile(r"^[A-Z][a-z]+(?:-[A-Z][a-z]+)?,\s+[A-Z]\.")
+# Harvard / Cambridge name-year reference entry start (D1, citationguard-iterate
+# 2026-06-12): "Surname A and Surname B (2020) …", "Surname A et al. (2020) …",
+# "Surname A, Surname B and Surname C (2019) …". Distinct from APA, which puts a
+# comma immediately after surname-1 ("Surname, A.") — the Harvard form has NO
+# comma between surname and initials, so _REF_START_APA never matched it and R3
+# collapsed the whole bibliography onto one line (British Journal of Political
+# Science bjps_1: 109 entries joined into a single paragraph). The structural
+# signature is an author block — Surname + 1–3 bare initials, optionally chained
+# with " and "/"&"/comma — terminated by a parenthesised 4-digit year. The
+# parenthesised year is the strong anchor that keeps mid-entry wrap lines
+# ("American Journal of\nPolitical Science 64, 904-20.") from matching.
+# Initials: 1-4 groups, each 1-3 capitals, optionally hyphenated ("H-G", "Z-C")
+# and optionally period-terminated; groups may be spaced ("R J") or glued ("DH").
+_HARVARD_INITIALS = r"(?:\s+[A-Z]{1,3}(?:-[A-Z]{1,3})?\.?){1,4}"
+# Surname: Title-case word (Latin-Extended so "Häusermann", "Öhman" qualify),
+# optionally hyphenated ("Huntington-Klein") and optionally a second word for
+# compound surnames ("Santos Silva", "El Soufi"), with leading lowercase
+# particles ("van der", "de la") permitted.
+# Letter ranges span ASCII + Latin-1 Supplement + Latin Extended-A/B (U+0100-
+# U+024F) so Eastern-European / Turkish surnames ("Häusermann", "Tuğal", "Öhman")
+# qualify. First letter is an uppercase-ish Latin letter; the rest may be any
+# Latin letter or apostrophe.
+_HARVARD_NAME_WORD = (
+    r"[A-ZÀ-ÞĀ-ɏ][A-Za-zÀ-ÿĀ-ɏ'’]+(?:-[A-ZÀ-ÞĀ-ɏ][A-Za-zÀ-ÿĀ-ɏ'’]+)?"
+)
+_HARVARD_SURNAME = (
+    # Leading particles, capitalised or not ("van der", "de la", "Van der Brug",
+    # "De Vries") — the first particle is often title-cased at an entry start.
+    r"(?:(?:[Vv]an|[Vv]on|[Dd]e|[Dd]er|[Dd]en|[Dd]i|[Dd]el|[Dd]ella|[Dd]u"
+    r"|[Ll]a|[Ll]e|[Ee]l|[Dd]os|[Dd]a)\s+){0,2}"
+    + _HARVARD_NAME_WORD
+    + r"(?:\s+" + _HARVARD_NAME_WORD + r")?"
+)
+_HARVARD_AUTHOR = _HARVARD_SURNAME + _HARVARD_INITIALS
+_REF_START_HARVARD = re.compile(
+    r"^" + _HARVARD_AUTHOR +
+    r"(?:"
+    r",?\s+et\s+al\.?"                          #   "et al." / "Surname K, et al."
+    r"|,?\s+(?:and|&)\s+" + _HARVARD_AUTHOR +   # " and Surname I"
+    r"|,\s+" + _HARVARD_AUTHOR +                # ", Surname I"
+    r")*"
+    r"(?:\s+\((?:eds?|editors?)\.?\))?"         # optional "(eds)" / "(ed.)" marker
+    r"\s+\((?:1[89]|20)\d{2}[a-z]?\)",         # (Year) optional letter suffix
+    re.UNICODE,
+)
+# APA reference entry start: "Surname, A.", "Surname, A. B.". Reuses the shared
+# surname block so accented ("Yücel, M."), particle ("de Kovel, C."), and
+# compound ("Karlsson Linnér, R.") surnames are recognised — the previous
+# ASCII-only `[A-Z][a-z]+` form silently merged those entries into the preceding
+# reference (surfaced on nat_comms_5 / nathumbeh_2 during the D1 broad-read;
+# same root-cause class as D1). The comma-then-initial is the APA discriminator
+# (Harvard has no comma after the surname).
+_REF_START_APA = re.compile(r"^" + _HARVARD_SURNAME + r",\s+[A-Z]\.", re.UNICODE)
 
 
 def _find_references_spans(text: str) -> list[tuple[int, int]]:
@@ -258,7 +310,17 @@ def _find_references_spans(text: str) -> list[tuple[int, int]]:
         ref_starts = (
             len(re.findall(r"\b\d{1,3}\.\s+[A-Z]", window))
             + len(re.findall(r"\n\[\d+\]\s+[A-Z]", window))
-            + len(re.findall(r"\n[A-Z][a-z]+(?:-[A-Z][a-z]+)?,\s+[A-Z]\.", window))
+            + len(re.findall(r"\n" + _HARVARD_SURNAME + r",\s+[A-Z]\.", window))
+            # Harvard name-year entries (D1): "\nSurname A(?: and …| et al.)? (YYYY)".
+            # Without this a pure-Harvard bibliography (no comma after surname,
+            # no numbered/IEEE entries) would score 0 ref-starts and the span
+            # would go undetected, so R3 would never run to keep entries split.
+            + len(re.findall(
+                r"\n" + _HARVARD_AUTHOR +
+                r"(?:\s+et\s+al\.?|,?\s+(?:and|&)\s+" + _HARVARD_AUTHOR +
+                r")*\s+\((?:1[89]|20)\d{2}[a-z]?\)",
+                window,
+            ))
         )
         if ref_starts >= 3:
             end_m = _REFS_END.search(text, start)
@@ -564,6 +626,7 @@ def _looks_like_ref_start(line: str) -> bool:
         _REF_START_VANCOUVER.match(line)
         or _REF_START_IEEE.match(line)
         or _REF_START_APA.match(line)
+        or _REF_START_HARVARD.match(line)
     )
 
 
@@ -1529,6 +1592,32 @@ _AUTHOR_ETAL_INITIAL = re.compile(
 )
 
 
+# D2 (citationguard-iterate 2026-06-12): single-word / short category-label
+# running headers. Nature-family and many journals print the article-type label
+# ("Article", "Review", "Letter", "Matters Arising", …) at the top of every page.
+# H0 already curates these in _HEADER_BANNER_PATTERNS, but H0 only fires in the
+# document-header zone (first 30 lines); when the label recurs mid-document — e.g.
+# inside the References section at a page break — it survives and gets welded into
+# an entry ("…EAE based on\n\n\x0cArticle histology…" orphaned ref 34's year on
+# nat_comms_2). Stripping it here is gated by the ≥3-standalone-repetition guard in
+# _detect_recurring_running_headers, so a one-off body occurrence is never touched.
+# Scoped to genuine publisher article-type furniture; bare common words ("Research",
+# "Comment") are excluded to avoid colliding with section-heading body lines.
+_CATEGORY_LABEL_HEADER = re.compile(
+    r"^(?:"
+    r"Article|ARTICLE|Articles"
+    r"|Review|Reviews|REVIEW"
+    r"|Letter|Letters|LETTER"
+    r"|Resource|Resources"
+    r"|Analysis|Perspective|Perspectives"
+    r"|Correspondence|Editorial"
+    r"|Brief\s+Communication|Matters\s+Arising"
+    r"|Original\s+(?:Investigation|Article|Research)"
+    r"|Research\s+(?:Article|Paper|Letter|Report)"
+    r")$"
+)
+
+
 def _is_all_caps_journal_banner(line: str) -> bool:
     """All-caps multi-word journal banner: e.g. ``PLOS MEDICINE``,
     ``COGNITION AND EMOTION``, ``JAMA NETWORK OPEN``.
@@ -1572,6 +1661,8 @@ def _looks_like_running_header_or_footer(line: str) -> bool:
     """
     if not line or len(line) > 100:
         return False
+    if _CATEGORY_LABEL_HEADER.match(line):
+        return True
     if _is_all_caps_journal_banner(line):
         return True
     if _AUTHOR_PAIR_ALL_CAPS_AND.match(line):
@@ -3626,6 +3717,22 @@ def normalize_text(
         for r_start, r_end in reversed(_refs_spans):
             refs_text = t[r_start:r_end]
 
+            # R3 page-break stitch (D2, citationguard-iterate 2026-06-12): inside
+            # a bibliography a form-feed (page break) NEVER coincides with a
+            # paragraph boundary — entries are delimited by ref-starts, not blank
+            # lines. When an entry straddles a page break, pdftotext emits
+            # "…based on\n\n\x0cArticle\nhistology…(2008)." — the blank line +
+            # form feed split the entry, so R3's normal continuation join (which
+            # resets on a blank line) leaves the tail (and its year) detached,
+            # orphaning nat_comms_2 ref 34's "(2008)". Collapse each form-feed
+            # junction (and the blank line(s) around it) to a single newline so
+            # the tail rejoins the head as an ordinary continuation. The running-
+            # header label on the new page ("Article") is stripped upstream by
+            # P0r (_CATEGORY_LABEL_HEADER); any that survives is handled by the
+            # continuation join, but the year is recovered regardless.
+            refs_text = re.sub(r"[ \t]*\n[ \t\n]*\f[ \t]*", "\n", refs_text)
+            refs_text = refs_text.replace("\f", "\n")
+
             # R3 pre-pass (Cycle 15 v2.4.67): two-column bibliography
             # pairing. pdftotext renders some 2-column bibliographies by
             # streaming the entire NUMBER column first, then the entire
@@ -3653,15 +3760,49 @@ def normalize_text(
             before_r3 = refs_text
             lines = refs_text.split("\n")
             joined: list[str] = []
+            # Index in ``joined`` of the entry currently being built. Unlike the
+            # previous ``joined[-1]`` check, this survives blank lines: within a
+            # bibliography a blank line is a page-break artifact (entries are
+            # single-newline separated), so a continuation line that follows a
+            # blank still belongs to the entry above it. This rejoins entries
+            # split across a page break — e.g. nat_comms_2 ref 34, whose
+            # "(2008)" year sat past the page-break blank after the running
+            # header was stripped (D2). Entry boundaries are still established
+            # solely by _looks_like_ref_start, so genuinely separate entries do
+            # not merge.
+            cur_entry = -1
+            saw_blank = False
             for line in lines:
                 stripped = line.strip()
                 if not stripped:
                     joined.append("")
+                    saw_blank = True
                     continue
-                if joined and joined[-1] and not _looks_like_ref_start(stripped):
-                    joined[-1] = joined[-1].rstrip() + " " + stripped
-                else:
+                is_start = _looks_like_ref_start(stripped)
+                bridged = False
+                if cur_entry >= 0 and not is_start:
+                    if saw_blank:
+                        # Crossing a blank line: only bridge when the current
+                        # entry is syntactically INCOMPLETE (does not end with
+                        # sentence-terminal punctuation). A page-break split
+                        # leaves the head mid-clause ("…EAE based on"), so the
+                        # tail rejoins; a COMPLETED entry ("…46, 215-39.")
+                        # followed by a blank is the end of the list, and the
+                        # next block ("Cite this article: …") is post-reference
+                        # trailer that must NOT be absorbed.
+                        prev = joined[cur_entry].rstrip()
+                        if prev and prev[-1] not in ".?!":
+                            joined[cur_entry] = prev + " " + stripped
+                            bridged = True
+                    else:
+                        joined[cur_entry] = (
+                            joined[cur_entry].rstrip() + " " + stripped
+                        )
+                        bridged = True
+                if not bridged:
                     joined.append(stripped)
+                    cur_entry = len(joined) - 1
+                saw_blank = False
             refs_text = "\n".join(joined)
             r3_joins_total += before_r3.count("\n") - refs_text.count("\n")
 
