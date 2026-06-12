@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.4.85] — 2026-06-12
+
+**Harvard name-year reference splitting (D1) + page-break reference stitch & category-label running-header strip (D2).** `NORMALIZATION_VERSION` 1.9.31 → 1.9.32.
+
+Surfaced by `CitationGuard/docs/DOCPLUCK_HANDOFF_2026-06-12.md`.
+
+**D1 — HIGH IMPACT — Harvard / Cambridge bibliographies collapsed into one paragraph.** R3 (the references-span continuation join) keeps each reference on its own logical line by breaking whenever a line *looks like a reference start*. That detection (`_looks_like_ref_start`) recognised Vancouver (`12. Surname`), IEEE (`[12] Surname`), and APA (`Surname, A.` — note the comma after the surname) — but **not** the Harvard / Cambridge name-year form `Surname A and Surname B (2020) …`, which has *no* comma between surname and initials. So on `bjps_1` (British Journal of Political Science, 109 entries) R3 treated every entry boundary as a mid-entry wrap and joined the **entire** reference section onto a single line. Downstream this made the consumer (citelink) parse 9 of 109 references (refs.f1 0.051).
+
+The fix adds `_REF_START_HARVARD`, keyed on the structural signature *author-block + parenthesised 4-digit year*: a Title-case surname (Latin-Extended, so `Häusermann` / `Tuğal` qualify; hyphenated and compound surnames and `van der` / `Van der` particles handled) + 1–4 initials (spaced `R J`, glued `DH`, hyphenated `H-G`, or period `R.`), optionally chained with ` and `/`&`/comma or `et al.` (incl. `Surname K, et al.`), an optional `(eds)` editor marker, terminated by `(YYYY)`. The parenthesised year is the strong anchor that keeps mid-entry wrap lines (`American Journal of\nPolitical Science 64, 904-20.`) from matching. The same signature is added to `_find_references_spans` so a *pure*-Harvard bibliography (no numbered/IEEE/APA entries at all) is still detected as a references span and R3 runs. Result on `bjps_1`: 109 entries split one-per-line, **zero** entries collapsed; across the 8-paper BJPS Harvard corpus + 9 Nature papers, ≥95% of entries split correctly (was: every Harvard bibliography fully collapsed).
+
+**Same-class fix surfaced by the D1 broad-read — APA ref-start missed accented / particle / compound surnames.** `_REF_START_APA` used an ASCII-only `[A-Z][a-z]+` surname, so `Yücel, M.`, `de Kovel, C.`, and `Karlsson Linnér, R.` were not recognised as entry starts and merged into the preceding reference (nat_comms_5: 10 collapsed pairs; nathumbeh_2: several). It now reuses the shared Latin-Extended surname block (with particles and an optional compound second word), keeping the comma-after-surname APA discriminator. Result: nat_comms_5 collapsed-pairs 10 → 1, nathumbeh_2 6 → 3 (the 3 remaining are supplementary-section prose, not reference merges). The change is a strict widening of a tight `Surname, Initial.` signature — journal-tail continuation lines (`Developmental psychology, 50(12), …`) still do not match.
+
+**D2 — running-header injected mid-reference + page-break-orphaned year.** On `nat_comms_2` (Nature Communications) ref 34 straddles a page break; pdftotext emits `…EAE based on␊␊␌Article␊histology, … (2008).`. The category label `Article` (Nature prints it atop every page) survived — `_looks_like_running_header_or_footer` recognised multi-word banners and author-pair headers but not a bare single-word category label — and welded into the entry, while the page-break blank line left the entry's `(2008)` year in a detached paragraph (citelink parsed ref 34 with an empty year). Two coordinated fixes:
+
+1. `_CATEGORY_LABEL_HEADER` (new shape in `_looks_like_running_header_or_footer`) recognises the publisher article-type labels H0 already curates (`Article`, `Review`, `Letter`, `Matters Arising`, `Original Investigation`, …). Combined with P0r's existing ≥3-standalone-repetition guard this strips the recurring label wherever it appears (including mid-references), so a one-off body occurrence is never touched. Bare common words (`Research`, `Comment`) are excluded to avoid colliding with section headings.
+2. R3 now **bridges a page-break blank line** when the current entry is syntactically *incomplete* (does not end in sentence-terminal punctuation) — a page-break split leaves the head mid-clause (`…EAE based on`), so the tail rejoins; a *completed* entry (`…46, 215-39.`) followed by a blank is the end of the list, so a post-reference trailer (`Cite this article: …`) is **not** absorbed. A form-feed stitch (`\f` → newline inside the span) handles the case where the page header survives upstream.
+
+Result on `nat_comms_2`: ref 34 is a single logical line carrying its `(2008)` year, with no `Article` injection.
+
+New regression tests in `tests/test_harvard_refs_pagebreak_stitch.py`: Harvard ref-start positives (glued/hyphenated/accented/compound/particle surnames) and continuation-line negatives; the bjps_1 one-per-line and nat_comms_2 year-recovery defects at the text level; the page-break stitch + header strip; the trailer-not-absorbed guard; and real-PDF manifest-with-skip assertions on both fixtures.
+
 ## [2.4.84] — 2026-06-12
 
 **R2 page-number scrub — general quantifier-head guard (stop deleting digits from reference titles).** `NORMALIZATION_VERSION` 1.9.30 → 1.9.31.
