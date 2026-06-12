@@ -2,6 +2,25 @@
 
 This file tracks future-aim items that are scoped out of the current milestone but should not be lost. See `docs/superpowers/specs/` for active specs.
 
+## Reference ref-start detection — rare Harvard variants (deferred from v2.4.85)
+
+v2.4.85 (D1) added `_REF_START_HARVARD` and broadened `_REF_START_APA` so Harvard/Cambridge
+name-year bibliographies split one-per-line (bjps_1: 109/109; ≥95% of entries across the 8-paper
+BJPS + 9 Nature validation corpus). Two **rare** entry-start variants remain unrecognised, so
+those entries still merge into the preceding reference (~14 residual lines total across 20 papers):
+
+- **Full first names instead of initials** — e.g. `Harteveld Eelco and van der Brug Wouter (2023)`.
+  Hard to distinguish a first name (`Eelco`) from a compound-surname second word (`Santos Silva`)
+  without a names gazetteer; forcing a split risks false-positives.
+- **Internal-particle compound surnames** — e.g. `Bueno de Mesquita B (2003)` (particle *between*
+  surname words, not leading).
+
+Both are low-frequency and carry higher false-split risk than the structural signatures already
+handled. Defer until a paper actually needs them; if tackled, gate hard on the full
+Harvard/Nature broad-read (see `tests/test_harvard_refs_pagebreak_stitch.py`) to confirm no
+regression on the entries that currently split correctly. citelink's defensive splitter covers the
+residual downstream in the meantime.
+
 ## Tables — formal evaluation corpus (deferred to v2.1)
 
 v2.0 ships with smoke tests only (`tests/fixtures/tables/`, ~10-15 hand-picked PDFs with per-PDF assertions on table count, row/col counts, specific cell values). No formal accuracy numbers.
