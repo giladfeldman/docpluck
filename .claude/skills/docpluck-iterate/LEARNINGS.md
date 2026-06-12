@@ -1123,3 +1123,54 @@ Add a permanent corpus test `tests/test_column_splice_preserves_raw_multiset.py`
 
 ### Edge cases
 - Hyphenated initials (`M.-J. O’Brien et al.`) need `[A-Z]\.[-\s]*` (not `[A-Z]\.\s*`) in the initial group, else they slip the shape. Curly apostrophe `’` must be in the surname char-class.
+
+---
+
+## 2026-06-12 — CitationGuard handoff 2026-06-10 (4 items): 1 fix + 3 won't-fix
+
+**Target:** verify+fix the 4 text-extraction defects filed in
+`CitationGuard/docs/DOCPLUCK_HANDOFF_2026-06-10.md`. Shipped v2.4.84
+(NORMALIZATION_VERSION 1.9.31).
+
+**Methodology lesson (the load-bearing one): VERIFY THE LAYER before
+dispositioning a consumer-filed "extraction defect".** A CitationGuard handoff
+calls everything a "docpluck text-extraction defect", but the layer differs and
+determines whether it's ours:
+- Reproduce each defect at HEAD against the *exact view the consumer reads*
+  (CitationGuard consumes `/extract?normalize=academic` → `normalize_text(raw,
+  academic)`), AND against *raw pdftotext*.
+- If the token is **present in raw pdftotext but absent in academic-normalized →
+  it's a DOCPLUCK normalize bug** (item 4: "of 3 instruments" → R2 deleted "3").
+- If the token is **already corrupted in raw pdftotext → check pdfplumber too**.
+  Corrupted identically in BOTH MIT extractors ⇒ PDF-embedded-text-layer loss,
+  no in-text signal, no general fix, tool-swap forbidden ⇒ won't-fix (items 1–3).
+Do NOT assume "filed by citationguard ⇒ pdftotext-layer won't-fix" — that
+generalization (memory `project_citationguard_extraction_defects_wontfix`) is
+true for SOME items, but item 4 was squarely ours. The 5-min reproduce-at-HEAD
+step (top preflight lesson) is what separated them.
+
+**The fix (general, not whack-a-mole):** R2 (references page-number scrub) was
+deleting any digit whose value appears as a standalone page-number line when it
+sat between two lowercase words — so the quantifier "3 instruments" (page 3 of
+the PDF) was stripped. The pre-existing guard was an *open-ended noun allowlist*
+(`years|participants|…`) that v2.4.17 had been extending one noun at a time.
+Replaced the strategy with a **closed-class signal**: a page leak follows a
+CONTENT word ("psychological 41 science"); a quantifier follows a FUNCTION word
+("of 3 instruments"). Closed classes generalize where open allowlists can't.
+Kept the guard **purely additive** (only preserves, never strips more) so it
+cannot regress the must-strip cases — the safe direction given rule 0a.
+
+**Verification without the harness:** camelot + `claude` CLI were both absent on
+this machine, so the full Phase-5H harness / canary-audit couldn't run. The
+substitute that actually proves a normalize-only, additive change is a
+**deterministic 101-PDF old-vs-new academic-normalized diff**: stash the change,
+regenerate all outputs, `diff` per paper, and READ every changed line. Result: 5
+papers changed, all correct restorations, 0 regressions — and it surfaced 4
+*pre-existing* silent digit-drops the fix also repaired (amp_1, bmc_med_3,
+ieee_access_5 ×2, maier_2023). This diff IS the canary evidence; recorded it as
+the `SKIP_CANARY=1` justification when the `claude`-less pre-commit hook hard-failed.
+
+**Process miss to fix next time:** no working docpluck venv on this machine
+(pdfplumber/camelot/pytest all had to be pip-installed mid-run into C:\Python314).
+Stand up a proper env before an iterate run so the harness + camelot table tests
+aren't skipped.
