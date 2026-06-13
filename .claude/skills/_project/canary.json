@@ -55,7 +55,7 @@
     "gold_view": "reading",
     "locator_via_article_finder": "python ~/.claude/skills/article-finder/cache-check.py <doi>",
     "gold_via_article_finder": "python ~/.claude/skills/article-finder/ai-gold.py get <key> --view reading",
-    "render_command": "python tools/render_for_audit.py --key {key} --out {out}",
+    "render_command": "py -3 tools/render_for_audit.py --key {key} --out {out}",
     "allowed_omissions": [
       "Front-matter masthead block between the title (H1) and the Abstract: author name line(s), affiliation line(s), corresponding-author contact line, journal-name banner, volume/issue/page range, 'Article type', publisher/copyright line, 'Article reuse guidelines', journal-home URL. docpluck strips this masthead by design (render.py _strip_frontmatter_masthead_block); consumers needing structured author metadata use CrossRef/DOI lookup. Its absence from the rendered .md is NOT TEXT-LOSS or METADATA-LEAK.",
       "Publication-history date lines such as 'Received <date>; revision accepted <date>' or 'Received/Revised/Accepted' mastheads — stripped as journal furniture (normalize.py _PAGE_FOOTER_LINE_PATTERNS).",
