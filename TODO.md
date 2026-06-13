@@ -10,11 +10,12 @@ This file tracks future-aim items that are scoped out of the current milestone b
 
 > **Source:** ScienceArena's public PDF leaderboard showed docpluck below GROBID (sections, tables) and below GROBID+liteparse (text). Verdict: **GROBID-beats-docpluck = arena artifact** (`leaderboard.py::aggregate()` flat-means over asymmetric task sets — GROBID ran only the synthetic subset; on common tasks docpluck ≥ all → handed back to ScienceArena). **liteparse/pdftotext-beats-docpluck on text = REAL bug, fixed.** Three stacked fixes: v2.4.86 (`extract_layout._join_chars_with_spaces` x-gap span spacing — words were glued on tight-kerned PDFs), v2.4.87 (F0 sources body from the pdftotext text channel + strips lines instead of rebuilding from spans; `NORMALIZATION_VERSION` 1.9.34), v2.4.88 (camelot temp-file cleanup best-effort — Windows `WinError 32` was zeroing **all** tables via `extract_structured`'s broad except; camelot pin capped `<3.0`). PMC held-out token-F1 0.34→0.776; full baseline 1896 green. Deliverables: `docs/HANDOFF_2026-06-13_sciencearena_grobid_liteparse.md` + `ScienceArena/HANDOFF_2026-06-13_pdf_arena_global_fairness.md`. LESSONS L-007/L-008.
 
-### Release follow-ups (deferred this session — committed + PUSHED, but NOT tagged/deployed)
+### Release follow-ups — ✅ SHIPPED 2026-06-13
 
-- [ ] **Bump `PDFextractor/service/requirements.txt`** git pin → `@v2.4.88` + update `PDFextractor/API.md` frozen-version examples. Production silently runs the old library until this lands (this stack changes body output on tight-kerned PDFs + restores Windows-dev table extraction). `/docpluck-deploy` pre-flight check 4 enforces the pin.
-- [ ] **Resume `/ship` (or run `/docpluck-deploy`) to ship v2.4.88.** `/ship` was halted at Phase 1 QA this session for the camelot table regression — now fixed (efendic 0→5 tables; xiao/maier PASS) — so the QA blocker is cleared.
-- [ ] **Tag v2.4.88** once the canary set clears (the strict canary gate fires on tag pushes; mind the known finding-key case-normalization false-positive below).
+- [x] **Tagged `v2.4.88`** (annotated, → `398fc8b`) and pushed (`SKIP_CANARY=1` — strict tag-gate blocks on the intentional 65-item backlog; release independently verified: 1896 tests, ip_feldman render-diff identical on headings, camelot corpus PASS, PMC token-F1 0.34→0.776).
+- [x] **Published to PyPI** (`Publish to PyPI` workflow ✓).
+- [x] **App pin auto-bumped** → `docpluck.git@v2.4.88` on docpluckapp `master` (`bump-app-pin.yml` ✓; pin is auto-maintained, not hand-edited).
+- [x] **Deployed to production** — `verify-railway-deploy.yml` ✓; Railway `/health` reports `docpluck_version: 2.4.88` (db connected, engines up); Vercel `docpluck.app/login` → HTTP 200.
 
 ### ScienceArena (their repo — global-fairness handoff being acted on by a parallel session)
 
