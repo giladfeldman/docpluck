@@ -94,12 +94,51 @@ def extract_pdf_layout(pdf_bytes: bytes) -> LayoutDoc:
     )
 
 
+def _join_chars_with_spaces(line: list[dict]) -> str:
+    """Concatenate per-char ``text``, inserting a space where the horizontal
+    gap between consecutive glyphs exceeds a font-relative threshold.
+
+    pdfplumber's ``chars`` stream often omits the inter-word space glyph on
+    tight-kerned PDFs (Cambridge journals, many two-column layouts), so a naive
+    ``"".join(...)`` glues a whole line into one token ("CNSSpectrums",
+    "Thebehavioralhealthcarecontinuum"). That silently destroys the text/body
+    channel whenever the F0 layout path rebuilds body text from spans — the
+    word boundaries are simply gone, even though the character count looks
+    right. We re-introduce word boundaries the way pdftotext does: from the
+    x-gap, keyed on a fraction of the glyph font size so the threshold scales
+    across point sizes. ``0.20·size`` reproduces pdftotext/JATS spacing to
+    within ~0.2% space-density on the Cambridge/PMC corpus.
+
+    See LESSONS.md / memory ``feedback_pdfplumber_extract_words_unreliable``
+    ("always carry a char-level absolute-x-gap fallback").
+    """
+    parts: list[str] = []
+    prev: dict | None = None
+    for c in line:
+        t = c.get("text", "")
+        if not t:
+            continue
+        if prev is not None and parts:
+            gap = float(c.get("x0") or 0.0) - float(prev.get("x1") or 0.0)
+            size = max(float(c.get("size") or 0.0),
+                       float(prev.get("size") or 0.0)) or 10.0
+            if gap > 0.20 * size and not t[0].isspace() \
+                    and not parts[-1].endswith(" "):
+                parts.append(" ")
+        parts.append(t)
+        prev = c
+    return "".join(parts)
+
+
 def _chars_to_spans(chars: Iterable[dict], *, page_index: int) -> Iterable[TextSpan]:
     """Cluster pdfplumber per-character dicts into per-line text spans.
 
-    Heuristic: chars with the same fontname + fontsize on close y-coords
-    (within 1pt) get joined into a span; gaps in x of >2× space-width
-    split into separate spans.
+    Heuristic: chars are grouped into lines by close y-coords (within 1pt);
+    within a line, ``_join_chars_with_spaces`` re-inserts inter-word spaces
+    from the x-gap (pdfplumber's char stream drops the space glyph on
+    tight-kerned PDFs — see that helper). One span == one line; columns are
+    NOT split here, so a line spanning two columns is merged (a known residual
+    handled downstream by the text channel's reading-order logic).
     """
     if not chars:
         return []
@@ -127,7 +166,7 @@ def _chars_to_spans(chars: Iterable[dict], *, page_index: int) -> Iterable[TextS
     spans: list[TextSpan] = []
     for line in lines:
         line.sort(key=lambda c: c.get("x0") or 0.0)
-        text = "".join(c.get("text", "") for c in line)
+        text = _join_chars_with_spaces(line)
         if not text.strip():
             continue
         font_sizes = [float(c.get("size") or 0.0) for c in line if c.get("size")]

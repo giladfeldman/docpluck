@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.4.88] — 2026-06-13
+
+**Camelot temp-file cleanup is best-effort — stop silently dropping every table on Windows.** (No `NORMALIZATION_VERSION` change — table channel only; output on POSIX/prod is unchanged.)
+
+Surfaced by `/docpluck-qa` (corpus render verifier, tag H) while validating v2.4.86/87: `efendic_2022_affect` rendered with **0** of its **4** in-body HTML tables. Reproduced on HEAD too (pre-existing, not from the layout fixes).
+
+**Root cause (Windows-only).** `tables/camelot_extract.py::extract_tables_camelot` writes the PDF to a `NamedTemporaryFile(delete=False)`, runs Camelot, then unlinks the temp file in a `finally` block. Under **camelot-py 2.0.0** on Windows, Camelot still holds the temp-file handle open at that point, so `Path(tmp_path).unlink()` raises `PermissionError [WinError 32]`. That exception propagated out of `extract_tables_camelot` and was swallowed by `extract_structured`'s broad `except Exception` (→ `method="…camelot_failed"`, `tables=[]`) — so **every** paper lost **all** Camelot tables on Windows, even though extraction itself succeeded. POSIX permits unlinking an open file, so prod/Linux/Railway never hit this; it was invisible outside Windows dev. (The drift to the camelot-py 2.0.0 major came via the unbounded `camelot-py[cv]>=0.11.0` pin.)
+
+**Fix.** The `finally` cleanup now swallows `OSError` (best-effort temp removal; the OS temp dir reclaims the file). Camelot table extraction is restored on Windows: `efendic_2022_affect` 0 → 5 tables (3 with HTML), corpus verifier PASS. New regression `tests/test_camelot_temp_cleanup.py` monkeypatches `Path.unlink` to raise and asserts `extract_tables_camelot` returns a list instead of propagating. Table/structured suite: 90 passed, 1 skipped.
+
+## [2.4.87] — 2026-06-13
+
+**F0 sources the body from the text channel — strip header/footer/footnote lines from pdftotext, never rebuild the body from spans.** `NORMALIZATION_VERSION` 1.9.33 → 1.9.34.
+
+Follow-up #1 from `docs/HANDOFF_2026-06-13_sciencearena_grobid_liteparse.md` — the deeper, L-001-preferred fix for the residual the v2.4.86 word-gluing patch left behind.
+
+**Root cause (architectural).** When `layout=` is supplied, the F0 step (`_f0_strip_running_and_footnotes`) was **rebuilding the entire body from `TextSpan.text`** and discarding the pdftotext `raw_text` the caller passed in (used only to locate footnote offsets). That rebuild-from-spans is what made *both* the v2.4.86 word-gluing (pdfplumber's char stream drops the inter-word space glyph) and the residual two-column interleaving (`_chars_to_spans` groups chars by y-coordinate only, so left+right columns at the same y merge into one span — e.g. `how www.cambridge.org/cns we can pay for it`) possible. It violates the documented text-channel/layout-channel split (CLAUDE.md, LESSONS L-001/L-007): the body must come from `extract_pdf` (pdftotext, which already infers spaces from the x-gap *and* serialises columns in reading order), and the layout channel should be used only to *identify* which lines are running headers/footers/footnotes.
+
+**Fix.** `_f0_strip_running_and_footnotes` now keeps the exact same span-based classification (repeating-header detection, body-y-band header/footnote position rules, font-size footnote test, table-region guard) but uses it only to build **strip-key sets**. It then walks the pdftotext `raw_text` line by line (splitting on both `\n` and the bare `\f` page separator, keeping separators so footnote byte-offsets stay exact), drops header/footer lines, moves footnote lines to the `\n\f\f\n` appendix, and keeps the rest **in pdftotext order with pdftotext spacing**. Keyed on the structural signature (content-key membership), so it generalises to any PDF; strip-keys that are pure-numeric or shorter than 4 chars are excluded (page numbers etc. are handled downstream by P0/P0r/R2 and are absent from the JATS body), removing the only realistic false-strip vector. The body is now provably a *line-subsequence* of the text channel — F0 only deletes, never reorders or merges.
+
+**Validation (ScienceArena pdf-text-fidelity-v1 held-out PMC corpus, 30 papers, token-F1 vs JATS gold).** Mean token-F1 **0.745 → 0.776** (above raw pdftotext 0.750; on par with normalized-pdftotext 0.767, and above the per-paper cases where F0's header/footnote stripping adds lift). Primary metric (`0.5·levenshtein + 0.5·token_f1`, the leaderboard rank key) **0.559 → 0.666** — the large jump comes from levenshtein (~0.30 → ~0.60) now that column reading-order is correct. Zero catastrophic-zero papers (unchanged). `_join_chars_with_spaces` (v2.4.86) is retained — it is now load-bearing for span-text key matching and for the sections/tables layout consumers.
+
+New regression tests in `tests/test_normalize_f0_footnote_strip.py`: the F0 body is a line-subsequence of the text channel (a span-rebuild regression reorders/merges and fails), and every kept body line is an exact substring of `raw_text` (spacing comes from the text channel, never a glued span). LESSONS L-007 updated: the architectural follow-up is now done.
+
+## [2.4.86] — 2026-06-13
+
+**F0 layout body channel — reinsert inter-word spaces from the x-gap (stop gluing words on tight-kerned PDFs).** `NORMALIZATION_VERSION` 1.9.32 → 1.9.33.
+
+Surfaced by `docs/HANDOFF_2026-06-13_sciencearena_grobid_liteparse.md` (ScienceArena pdf-text-fidelity-v1 held-out PMC corpus): on ~16 of 30 real biomedical PDFs docpluck's `normalize_text(..., layout=...)` body scored token-F1 **≈ 0.00** against the JATS gold while raw pdftotext scored 0.7–0.9 — *with a normal character count*. Same characters, zero token overlap: the words were glued (`CNSSpectrums`, `Thebehavioralhealthcarecontinuuminthe`, `UnitedStates`).
+
+**Root cause.** When `layout=` is supplied, the F0 step (`_f0_strip_running_and_footnotes`) rebuilds the body from `TextSpan.text`. Span text was built in `extract_layout._chars_to_spans` by `"".join(c["text"] for c in line)` — a naive character concatenation with **no x-gap handling** (the function's own docstring claimed x-gap splitting that was never implemented). pdfplumber's `chars` stream omits the inter-word space glyph on tight-kerned PDFs (Cambridge journals, many two-column layouts) — pdftotext infers those spaces from the horizontal gap, but the raw char stream does not carry them. So on those PDFs the entire layout body collapsed to space-ratio ~0.005 (vs ~0.13 for the same text via pdftotext), and any consumer using the layout body channel (the recommended body-fidelity path since v2.4.83) silently emitted unspaced text. This is the long-standing `feedback_pdfplumber_extract_words_unreliable` failure mode — "always carry a char-level absolute-x-gap fallback" — which had never been applied to span text.
+
+**Fix.** New `extract_layout._join_chars_with_spaces` reinserts a space between consecutive glyphs when the horizontal gap exceeds a font-relative threshold (`gap > 0.20·font_size`), keyed on the structural signature (x-gap) rather than any paper identity, so it generalizes to every tight-kerned PDF. `0.20·size` reproduces pdftotext/JATS spacing to within ~0.2% space-density on the Cambridge/PMC corpus (PMC13064744 token-F1 0.00 → 0.86; space-ratio 0.0053 → 0.1282; full 30-paper held-out PMC token-F1 mean ~0.34 → 0.747 with zero catastrophic-zero papers, was 16/30). The guard never doubles an existing space and never splits within a tightly-kerned word. One known residual remains (documented, not addressed here): `_chars_to_spans` still does not split a line at a column gutter, so a line spanning two columns is merged — a smaller reading-order issue handled by the text channel, tracked for a follow-up.
+
+New regression tests in `tests/test_extract_layout.py`: x-gap space insertion on a word gap, no-split within a tight word, no double-space across an explicit space glyph, and a real-render assertion that normal loosely-kerned text keeps its word spaces.
+
 ## [2.4.85] — 2026-06-12
 
 **Harvard name-year reference splitting (D1) + page-break reference stitch & category-label running-header strip (D2).** `NORMALIZATION_VERSION` 1.9.31 → 1.9.32.

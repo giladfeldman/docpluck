@@ -156,6 +156,102 @@ Demo showing the difference: `docs/superpowers/plans/spot-checks/splice-spike/ht
 
 ---
 
+## L-007 — Layout span text MUST reinsert inter-word spaces from the x-gap (never `"".join(chars)`)
+
+### The recurring mistake
+When a downstream step rebuilds text from the **layout channel** (`extract_pdf_layout`
+→ `TextSpan.text`), it is tempting to construct a line's text by concatenating
+pdfplumber's per-character `chars`: `"".join(c["text"] for c in line)`. This is wrong.
+pdfplumber's char stream **does not carry the inter-word space glyph** on tight-kerned
+PDFs (Cambridge journals, many two-column layouts) — pdftotext *infers* those spaces
+from the horizontal gap, but the raw chars do not. So the naive join glues whole lines
+into one token (`CNSSpectrums`, `Thebehavioralhealthcarecontinuuminthe`).
+
+### What it broke (2026-06-13, v2.4.86)
+`extract_layout._chars_to_spans` built span text with the naive join. Since v2.4.83 the
+F0 step (`normalize_text(..., layout=...)`) rebuilds the **body** from spans, so on
+~16 of 30 real biomedical PDFs the body collapsed to space-ratio ~0.005 (vs ~0.13 via
+pdftotext) — token-F1 ≈ 0.00 against the JATS gold *with a normal character count*.
+The defect was invisible to char-ratio/word-delta metrics (the chars are all there;
+only the spaces are gone) and was surfaced by ScienceArena's `pdf-text-fidelity-v1`
+held-out PMC set, where raw pdftotext beat docpluck. The function's own docstring even
+*claimed* x-gap handling that had never been implemented.
+
+### The rule
+- Any reconstruction of text from layout chars MUST reinsert a space when the
+  horizontal gap between consecutive glyphs exceeds a **font-relative** threshold
+  (`gap > 0.20·font_size` reproduces pdftotext/JATS spacing to ~0.2% space-density).
+  Use `extract_layout._join_chars_with_spaces`; never `"".join(chars)`.
+- This is the in-repo instance of memory `feedback_pdfplumber_extract_words_unreliable`
+  ("always carry a char-level absolute-x-gap fallback"). It applies to span text, and
+  to any future layout-channel text reconstruction (sections annotators, tables).
+- **A space-density collapse is the canary.** When a layout-derived body has space-ratio
+  far below the pdftotext text for the same PDF (e.g. < 0.05 vs ~0.13), suspect glued
+  word boundaries before anything else — it is not "dropped text."
+- Architecturally, the body is sourced from `extract_pdf` (pdftotext, which already has
+  correct spaces AND correct column reading-order) and the layout channel is used only
+  to *identify* lines to strip (running headers / footnotes), per L-001's
+  text-channel/layout-channel split. **Done in v2.4.87** (`NORMALIZATION_VERSION`
+  1.9.34): `_f0_strip_running_and_footnotes` no longer rebuilds the body from spans — it
+  builds strip-key sets from the span classification and deletes the matching lines from
+  the pdftotext `raw_text`, keeping the rest in pdftotext order/spacing. This closed the
+  residual two-column interleaving (`how www.cambridge.org/cns we can pay for it`) that
+  the v2.4.86 spacing patch left behind, and lifted the held-out PMC token-F1 mean
+  0.745 → 0.776 (primary 0.559 → 0.666). The F0 body is now provably a line-subsequence
+  of the text channel (guarded by
+  `tests/test_normalize_f0_footnote_strip.py::test_f0_body_is_a_line_subsequence_of_the_text_channel`).
+  Rebuilding the whole body from spans is the smell that made the gluing bug possible; do
+  not reintroduce it.
+
+Cite: `docpluck/normalize.py` (`_f0_strip_running_and_footnotes`),
+`docpluck/extract_layout.py` (`_join_chars_with_spaces`),
+`tests/test_normalize_f0_footnote_strip.py`, `tests/test_extract_layout.py`,
+CHANGELOG 2026-06-13 (v2.4.86 spacing, v2.4.87 body-source).
+
+---
+
+## L-008 — Temp-file cleanup must be best-effort; a broad `except` around extraction will swallow a cleanup error into total silent failure
+
+### The recurring mistake
+A function writes input to a `NamedTemporaryFile(delete=False)`, runs an external
+library, and unlinks the temp file in a `finally` block. The caller wraps the whole
+call in `except Exception: return []`. If the unlink raises, the exception escapes the
+`finally`, the caller's broad `except` swallows it, and the **successful** extraction
+result is discarded — a total, silent, output-zeroing failure that looks like "the
+tool found nothing."
+
+### What it broke (2026-06-13, v2.4.88)
+`tables/camelot_extract.py::extract_tables_camelot` unlinked its temp PDF in a
+`finally`. Under **camelot-py 2.0.0 on Windows**, Camelot still held the file handle
+open, so `Path(tmp_path).unlink()` raised `PermissionError [WinError 32]`. The
+exception propagated into `extract_structured`'s `except Exception` →
+`camelot_failed`, `tables=[]` — so **every** paper lost **all** tables on Windows even
+though Camelot had extracted them fine. POSIX allows unlinking an open file, so
+prod/Linux/Railway never saw it; it was invisible outside Windows dev and only caught
+by the corpus render verifier (tag H, 4 tables → 0).
+
+### The rules
+1. **Temp-file cleanup is always best-effort.** Wrap `unlink`/`rmtree` of a temp path
+   in `try/except OSError: pass` (or use a tempdir context that tolerates it). A
+   failure to delete scratch is never worth failing — or silently zeroing — the real
+   result. The OS temp dir reclaims it.
+2. **A platform-specific cleanup failure is invisible on the platform you test prod on.**
+   POSIX `unlink`-while-open succeeds; Windows refuses. If extraction works in CI/Linux
+   but returns empty locally on Windows (or vice-versa), suspect a `finally`-block
+   cleanup raising under a held file handle before suspecting the extractor.
+3. **A broad `except Exception` around a subprocess/library call hides this class.**
+   When such a wrapper exists, the inner function must not raise on cleanup — otherwise
+   "tool failed, 0 results" silently conflates real failure with a cosmetic cleanup error.
+4. **Pin breaking-major dependencies.** The drift to camelot-py 2.0.0 came through the
+   unbounded `camelot-py[cv]>=0.11.0` pin. Settled-on deps should carry a tested upper
+   bound (see memory `feedback_no_silent_optional_deps`); a major bump is opt-in + re-verified.
+
+Cite: `docpluck/tables/camelot_extract.py` (`extract_tables_camelot` `finally`),
+`docpluck/extract_structured.py` (the broad `except`), `tests/test_camelot_temp_cleanup.py`,
+CHANGELOG 2026-06-13 (v2.4.88).
+
+---
+
 ## When to add a new lesson here
 
 Add a lesson when:
