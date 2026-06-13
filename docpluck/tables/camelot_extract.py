@@ -405,7 +405,18 @@ def extract_tables_camelot(
             )
         return out
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        # Best-effort temp cleanup. On Windows, camelot (>=2.0) can still hold
+        # the temp-file handle open when we reach here, so ``unlink`` raises
+        # ``PermissionError [WinError 32]``. That exception used to propagate out
+        # of this function and be swallowed by ``extract_structured``'s broad
+        # ``except`` (→ ``camelot_failed``, zero tables) — silently dropping
+        # EVERY table on Windows even though extraction succeeded. POSIX allows
+        # unlinking an open file, so prod/Linux never saw it. Swallow the
+        # cleanup error; the OS temp dir reclaims the file later.
+        try:
+            Path(tmp_path).unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _bboxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
