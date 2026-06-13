@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.32"
+NORMALIZATION_VERSION = "1.9.34"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -387,7 +387,15 @@ def _detect_repeating_lines(layout, *, position: str) -> set[str]:
 def _f0_strip_running_and_footnotes(
     raw_text: str, layout, table_regions: list[dict] | None = None,
 ) -> tuple[str, list[tuple[int, int]], list[str]]:
-    """Strip running headers/footers and footnotes using layout info.
+    """Strip running headers/footers and footnotes from the text-channel body.
+
+    The body stays sourced from ``raw_text`` (the pdftotext text channel); the
+    layout channel is used only to *identify* which lines are running
+    headers/footers/footnotes, which are then removed from ``raw_text`` (headers
+    and footers dropped; footnotes moved to a ``\\n\\f\\f\\n`` appendix). This is
+    the L-001/L-007 text-channel/layout-channel split — the body is never
+    rebuilt from ``span.text``, which previously caused the v2.4.86 word-gluing
+    and two-column interleaving regressions.
 
     Returns ``(post_strip_text_with_appendix, footnote_spans_in_raw_text,
     footnote_texts)``. ``footnote_texts`` is parallel to the spans list —
@@ -421,19 +429,37 @@ def _f0_strip_running_and_footnotes(
             return True
         return False
 
-    page_text_chunks: list[str] = []
-    footnote_chunks: list[str] = []
-    footnote_raw_spans: list[tuple[int, int]] = []
-    footnote_raw_texts: list[str] = []  # parallel to footnote_raw_spans
+    # ── Classify spans → build strip-key SETS (do NOT rebuild body) ─────────
+    # L-001 / L-007: the body MUST stay sourced from the text channel
+    # (``raw_text`` = pdftotext), which already has correct column reading-order
+    # AND correct inter-word spacing. Earlier this step rebuilt the whole body
+    # from ``span.text``, which is what made both the v2.4.86 word-gluing
+    # (spaces dropped on tight-kerned PDFs) and the residual two-column
+    # interleaving (y-only span grouping merges left+right columns) possible.
+    # The layout channel is used here ONLY to *identify* which lines are running
+    # headers / footers / footnotes; those lines are then stripped from the
+    # pdftotext body. Sourcing the body from pdftotext lifts the held-out PMC
+    # token-F1 mean from ~0.745 (span rebuild) to ~0.77 (pdftotext + F0 strip),
+    # on par with raw pdftotext — see docs/HANDOFF_2026-06-13_*.md and L-007.
+    def _key(s: str) -> str:
+        return " ".join(s.split())
+
+    # A strip-key must be distinctive enough that a coincidental body line can't
+    # collide with it under content matching: skip pure-numeric and very short
+    # keys. Standalone page numbers / short banners are handled downstream by
+    # P0 / P0r / R2 and are absent from the JATS body anyway, so excluding them
+    # here costs nothing and removes the only realistic false-strip vector.
+    def _usable(k: str) -> bool:
+        return len(k) >= 4 and not k.isdigit()
 
     repeating_header_lines = _detect_repeating_lines(layout, position="top")
     repeating_footer_lines = _detect_repeating_lines(layout, position="bottom")
 
+    header_footer_keys: set[str] = set()
+    footnote_keys: set[str] = set()
+
     for page in layout.pages:
         body_y_min, body_y_max = _body_y_band(page, body_size)
-        keep_lines: list[str] = []
-        page_footnotes: list[str] = []
-
         for span in page.spans:
             line_text = span.text.strip()
             if not line_text:
@@ -456,24 +482,56 @@ def _f0_strip_running_and_footnotes(
                 )
             )
 
+            k = _key(line_text)
+            if not _usable(k):
+                continue
             if is_header or is_footer:
-                continue
-            if is_footnote:
-                page_footnotes.append(line_text)
-                page_start = layout.page_offsets[page.page_index]
-                idx = raw_text.find(line_text, page_start)
-                if idx >= 0:
-                    footnote_raw_spans.append((idx, idx + len(line_text)))
-                    footnote_raw_texts.append(line_text)
-                continue
+                header_footer_keys.add(k)
+            elif is_footnote:
+                footnote_keys.add(k)
 
-            keep_lines.append(line_text)
+    # A header key that is also classified as a footnote elsewhere is dropped as
+    # a header (never moved to the appendix, never kept as body).
+    footnote_keys -= header_footer_keys
 
-        page_text_chunks.append("\n".join(keep_lines))
-        if page_footnotes:
-            footnote_chunks.append("\n".join(page_footnotes))
+    # ── Strip identified lines FROM the pdftotext body, preserving its order ──
+    # Treat BOTH "\n" and "\f" (the pdftotext page separator, emitted bare with
+    # no surrounding newline) as line boundaries, so a page-boundary line is not
+    # glued to the next page's running header. We split keeping the separators so
+    # byte offsets into raw_text stay exact for the footnote spans — str.split()
+    # / str.splitlines() would lose that exactness and also over-split on Unicode
+    # separators.
+    out_parts: list[str] = []
+    footnote_chunks: list[str] = []
+    footnote_raw_spans: list[tuple[int, int]] = []
+    footnote_raw_texts: list[str] = []  # parallel to footnote_raw_spans
 
-    body = "\n\f".join(page_text_chunks)
+    segments = re.split(r"([\n\f])", raw_text)  # [content, sep, content, sep, ..., content]
+    offset = 0
+    for idx in range(0, len(segments), 2):
+        content = segments[idx]
+        sep = segments[idx + 1] if idx + 1 < len(segments) else ""
+        consumed = len(content) + len(sep)
+        stripped = content.strip()
+        k = _key(stripped)
+        if k and _usable(k) and k in header_footer_keys:
+            offset += consumed
+            continue
+        if k and _usable(k) and k in footnote_keys:
+            # Record exact (start, end) so report.footnote_texts[i] equals
+            # raw_text[start:end] (the spans/texts arrays stay parallel).
+            lead = len(content) - len(content.lstrip())
+            start = offset + lead
+            end = start + len(stripped)
+            footnote_raw_spans.append((start, end))
+            footnote_raw_texts.append(stripped)
+            footnote_chunks.append(stripped)
+            offset += consumed
+            continue
+        out_parts.append(content + sep)
+        offset += consumed
+
+    body = "".join(out_parts)
     if footnote_chunks:
         appendix = "\n\f\f\n" + "\n\n".join(footnote_chunks)
     else:

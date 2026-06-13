@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docpluck"
-version = "2.4.85"
+version = "2.4.88"
 description = "PDF, DOCX, and HTML text extraction and normalization for academic papers"
 readme = "docs/README.md"
 requires-python = ">=3.10"
@@ -37,7 +37,11 @@ dependencies = [
     # in tables/camelot_extract.py raises ImportError, the wrapper silently
     # returns [], and every detected table caption becomes kind='isolated'
     # with empty cells — exactly the v2.4.12 production regression.
-    "camelot-py[cv]>=0.11.0",
+    # Upper bound: 2.x is verified (v2.4.88 handles its Windows temp-handle
+    # behavior, see LESSONS L-008); cap below the next breaking major so a 3.0
+    # can't silently drift in and re-zero table extraction. Bump deliberately
+    # after re-verifying the corpus render.
+    "camelot-py[cv]>=0.11.0,<3.0",
     # Lattice flavor also needs Ghostscript at runtime — the system binary,
     # installed via Dockerfile (apt-get install ghostscript). Without it,
     # lattice silently fails and only the (often noisier) stream flavor
