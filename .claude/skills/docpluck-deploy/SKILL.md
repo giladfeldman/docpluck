@@ -108,7 +108,7 @@ fi
 echo "✅ Library version sync OK"
 ```
 
-### 4. Verify Vercel Environment Variables
+### 5. Verify Vercel Environment Variables
 ```bash
 cd frontend && vercel env ls
 ```
@@ -125,7 +125,7 @@ Required variables (all must show as "Encrypted"):
 
 If any are missing, refer to SETUP_GUIDE.md.
 
-### 5. SES Environment Variables Present in Vercel Production (CRITICAL)
+### 6. SES Environment Variables Present in Vercel Production (CRITICAL)
 
 Same pattern as check 4 (Vercel env vars) but for the SES + notification surface. Missing any of these means the app boots in production with a broken email path (queued notifications, no send; webhook signature checks fail; admin alerts silently dropped).
 
@@ -141,7 +141,7 @@ done
 
 **Gate:** all listed vars present (Encrypted). Any missing = FAIL the deploy.
 
-### 6. SES Identity SUCCESS
+### 7. SES Identity SUCCESS
 
 ```bash
 aws sesv2 get-email-identity --email-identity mail.docpluck.app --region eu-west-1 \
@@ -150,7 +150,7 @@ aws sesv2 get-email-identity --email-identity mail.docpluck.app --region eu-west
 
 **Gate:** must equal `SUCCESS`. Anything else = FAIL the deploy.
 
-### 7. DKIM + SPF + DMARC DNS Resolve
+### 8. DKIM + SPF + DMARC DNS Resolve
 
 ```bash
 # DKIM token list — read live from SES, do NOT hard-code:
@@ -322,8 +322,14 @@ curl -s -w '\nHTTP %{http_code}\n' \
 
 If deployment fails:
 ```bash
-# Vercel: rollback to previous deployment
-cd frontend && vercel rollback
+# Vercel: roll back to a SPECIFIC known-good deployment (don't rely on bare
+# `vercel rollback`, which targets whatever happens to be the previous deploy
+# and is ambiguous when several deploys landed close together).
+cd frontend
+vercel ls                          # find the last URL that showed Ready + healthy
+vercel rollback <deployment-url>   # e.g. https://pdfextractor-abc123.vercel.app
+# (bare `vercel rollback` = roll back to the immediately previous deployment;
+#  only use it when you are certain that is the known-good target.)
 
 # Railway: redeploy from last working commit
 railway service extraction-service

@@ -34,7 +34,7 @@ Reference handoff: `docs/superpowers/handoffs/2026-05-25-canary-audit-architectu
 1. Run: `bash ~/.claude/skills/_shared/bin/preflight-filter.sh docpluck-iterate` and print its `🔧 skill-optimize pre-check · ...` heartbeat as your first visible output line.
 2. Initialize `~/.claude/skills/_shared/run-meta/docpluck-iterate.json` per `~/.claude/skills/_shared/preflight.md` step 6 — including the **iterate-skill extension fields** (`project_root`, `current_cycle`, `cycle_status`, `cycle_targets`, `phase_5d_runs`, `corpus_sweeps`, `open_findings`, `iterate_skips`, `run_closeout`). Set `project_root` to the absolute path of the docpluck repo so `iterate-gate.sh` can find the canary file when running outside a git CWD.
 3. Load `~/.claude/skills/_shared/quality-loop/core.md` into working memory. Although `docpluck-iterate` is not a `-qa`/`-review`/`-cleanup`/`-deploy` skill itself, it ORCHESTRATES those skills cycle-by-cycle and the spine rules R1–R5 apply transitively. Treat any FAIL from those orchestrated skills as a phase failure for this skill.
-4. **Load the iterate-loop spine** — read `~/.claude/skills/_shared/iterate-loop/core.md` and hold rules I1–I7 in working memory. Confirm `<docpluck-repo>/.claude/skills/_project/canary.json` exists (it MUST; missing canary = immediate gate fail). This spine — not prose in this file — is what makes the cycle/run discipline foolproof. Rules I1 / I2 / I3 / I5 / I7 are checked after every cycle by `iterate-gate.sh --cycle N`; rules I4 / I6 are checked at run-close by `iterate-gate.sh --close`. A non-zero exit BLOCKS the corresponding write (cycle PASS, run closeout). See "Iterate-loop spine integration" below for the exact call sequence.
+4. **Load the iterate-loop spine** — read `~/.claude/skills/_shared/iterate-loop/core.md` and hold rules **I1–I12** in working memory (the spine grew past I7 — I8 gate-was-called, I9 locator-via-article-finder, I10 artifact-existence, I11 gold-sha-matches-cache, I12 lesson-readback; see the table below for the authoritative `--cycle`/`--close` split, mirrored from `core.md`). Confirm `<docpluck-repo>/.claude/skills/_project/canary.json` exists (it MUST; missing canary = immediate gate fail). This spine — not prose in this file — is what makes the cycle/run discipline foolproof. The **per-cycle** rules (I1, I2, I3, I4, I5, I7, I9, I10, I11, I12-present) are checked after every cycle by `iterate-gate.sh --cycle N`; the **run-close** rules (I6, I8, I12-relevance) are checked by `iterate-gate.sh --close`. A non-zero exit BLOCKS the corresponding write (cycle PASS, run closeout). See "Iterate-loop spine integration" below for the exact call sequence.
 
 If you skip these steps, the postflight heartbeat will be missing and the run will produce no learning signal — defeating the whole point of a self-improving loop.
 
@@ -46,15 +46,20 @@ This skill — like every `<prefix>-iterate` and `<prefix>-fix` skill across the
 
 **What the spine enforces (full text in `~/.claude/skills/_shared/iterate-loop/core.md`):**
 
-| Rule | Hard check |
-|---|---|
-| **I1** phase-5d-actually-ran | Cycle must record ≥1 `phase_5d_runs` entry |
-| **I2** canary-coverage | Cycle must AI-verify every (target ∪ canary) paper |
-| **I3** verdict-on-truth-not-proxy | Cycle PASS requires every `phase_5d_runs` verdict == PASS |
-| **I4** blocked-gold-is-a-cycle-status | BLOCKED-NEEDS-GOLD is a legal cycle status; blocks run-close (not cycle) |
-| **I5** corpus-sweep-not-stale | Sweep must have run within last 3 cycles |
-| **I6** no-open-canary-findings-at-close | Run-close requires zero open canary findings + zero BLOCKED canary papers |
-| **I7** deterministic-metric-is-not-a-verdict | Idempotency / char-ratio / snapshot diff are INPUTS to I3, not substitutes for it |
+| Rule | When | Hard check |
+|---|---|---|
+| **I1** phase-5d-actually-ran | `--cycle` | Cycle must record ≥1 `phase_5d_runs` entry |
+| **I2** canary-coverage | `--cycle` | Cycle must AI-verify every (target ∪ canary) paper |
+| **I3** verdict-on-truth-not-proxy | `--cycle` | Fires on ANY `phase_5d_runs` verdict ∈ {FAIL, STALE_GOLD} — does not wait for a claimed PASS |
+| **I4** blocked-gold-is-a-cycle-status | `--cycle` | BLOCKED-NEEDS-GOLD is a legal cycle status (listed as a warning); blocks run-close (not cycle) |
+| **I5** corpus-sweep-not-stale | `--cycle` | Sweep must have run within last 3 cycles |
+| **I6** no-open-canary-findings-at-close | `--close` | Run-close requires zero open canary findings + zero BLOCKED canary papers (MUST-with-override) |
+| **I7** deterministic-metric-is-not-a-verdict | `--cycle` | Idempotency / char-ratio / snapshot diff are INPUTS to I3, not substitutes for it |
+| **I8** gate-was-actually-called | `--close` | Every cycle 1..current must have invoked `iterate-gate.sh --cycle N` (no skipped gate) |
+| **I9** locator-via-article-finder | `--cycle` | All paper/gold location + retrieval goes through article-finder (`locator_via`/`gt_via` ∈ cache-check/corpus-query/ai-gold.get/ai-gold.check/generate-gold) — never direct `find`/`glob`/path reads of `test-pdfs/` or `ai_gold/` |
+| **I10** artifact-existence | `--cycle` | Each `phase_5d_runs` entry's rendered file must exist and its sha match `rendered_sha` |
+| **I11** gold-sha-matches-cache | `--cycle` | Each entry's `gold_sha` must match the sha of the cached gold it was verified against |
+| **I12** lesson-readback | `--cycle` / `--close` | `--cycle`: a this-run `lesson_readback` trail must exist (MUST). `--close`: each surfaced card colliding with `files_touched`/`commands_run` must be in `lessons_applied` (MUST-with-override) |
 
 **The two mandatory gate calls (cannot be skipped):**
 
@@ -182,94 +187,7 @@ Before any iteration, establish:
 
 **Per-cycle self-check (Phase 9 / Verification Checklist):** every cycle must be able to answer "what did I parallelize via subagents this cycle, and what did I do inline that could have been parallel?" If the honest answer is "I did N independent things serially," that is a logged process miss — fix it next cycle.
 
-Iteration is dominated by I/O + AI work that is naturally parallel across papers. The orchestrator (this skill) MUST aggressively fan out to `Agent` subagents whenever there are 2+ independent units of work, when the work passes the safety checklist below.
-
-### Safety checklist — must pass ALL 4 before parallelizing
-
-1. **No shared file state.** Each parallel unit must write to a distinct output path (e.g., `tmp/<paper>_gold.md` for paper A vs `tmp/<paper>_gold.md` for paper B — different paths). Never have two agents writing the same file.
-2. **No shared git state.** Never run two parallel agents that modify git (commits, tags, branches, pushes). Git operations are sequential.
-3. **No sequential dependency.** Agent B does not consume an artifact agent A produces in the same fan-out batch. If A→B, run sequentially.
-4. **Self-contained briefs.** Each subagent prompt is a complete, standalone instruction set — absolute paths, no references to "the prior conversation", no implicit context.
-
-If ANY checklist item fails, run sequentially.
-
-### Where to parallelize (and where to use `run_in_background: true`)
-
-| Phase / step | Parallel? | How | Background? |
-|---|---|---|---|
-| **Phase 2 broad-read** — render 8-10 sample papers from publishers | YES | One `Bash` subprocess per paper OR one `Agent` per paper-cluster | Foreground for ≤4; background for more |
-| **Phase 5d gold-extraction** — DELEGATED to `article-finder generate-gold`; docpluck-iterate does NOT generate golds | N/A | `article-finder` owns extraction + its own parallelization | N/A |
-| **Phase 5d verification** — compare rendered.md ↔ gold for each affected paper | YES | One `Agent` per paper (independent inputs) | **Background** (1-2 min each) |
-| **Phase 5d cross-paper sweep** — corpus-level pattern detection on 5 papers | YES, but only ONE agent for the whole sweep | Single agent reading 5 paper pairs and emitting a corpus-level findings list | Foreground (one call, ~3-4 min) |
-| **Diagnostic artifact capture** — `pdftotext` + `extract_pdf_structured` per paper | YES | One `Bash` per paper | Foreground (each <5s) |
-| **Phase 5b broad pytest** — independent of Phase 5d verification | YES | `Bash` with `run_in_background: true` | Background; check via `Monitor` |
-| **Phase 5c 26-paper baseline** — independent of Phase 5d | YES | `Bash` with `run_in_background: true` | Background; ~10 min |
-| **Phase 6c rendered ↔ tables-tab parity** — across affected papers | YES | One `Bash` per paper | Foreground; each <5s |
-| **Phase 8 Tier-3 prod parity** — across affected papers (POST-deploy) | YES | One `Bash` curl per paper | Foreground; each <10s |
-| **Phase 7 release** — version bump + commit + tag + push + auto-bump merge | **NO** | Sequential git operations | N/A |
-| **Phase 4 library fix** — code edits | **NO** | Orchestrator holds architectural context | N/A |
-| **/docpluck-cleanup, /docpluck-review, /docpluck-deploy** — meta-skill chain | **NO** to running 2 at once | Each is sequential per its own internal logic | Foreground; chain them |
-
-### Concrete fan-out patterns to use
-
-**Pattern A — obtain golds, then fan-out VERIFICATION for affected papers (typical Phase 5d):**
-
-```
-1. Identify N affected papers for this cycle.
-2. For each paper: resolve the canonical key and `ai-gold.py check` the shared cache.
-   On a miss, gold generation is DELEGATED to `article-finder generate-gold` — docpluck
-   NEVER dispatches its own gold-extraction subagent (see Phase 5d Step 1; 2026-05-16
-   directive). Copy each `reading` view to `tmp/<paper>_gold.md`.
-3. While golds are obtained, render the affected papers at the working-tree version
-   via a single `Bash` script that renders them in sequence (Camelot is not thread-safe;
-   keep render serial).
-4. As each gold is ready, optionally dispatch its verifier Agent immediately (background).
-   Or wait for all golds, then dispatch all verifiers in a single multi-tool-call message.
-5. Aggregate verdicts as they return; queue defects per rule 0e.
-```
-
-**Pattern B — background long-running tasks during planning:**
-
-```
-1. Kick off the 26-paper baseline (`Bash` with run_in_background=true).
-2. Kick off the broad pytest (`Bash` with run_in_background=true).
-3. While both run, do Phase 3 TRIAGE re-read + Phase 4 code edit planning.
-4. By the time you need 5b/5c results, they're already done.
-```
-
-**Pattern C — corpus sweep with a single agent:**
-
-```
-For the every-3rd-cycle corpus sweep, do NOT fan out 5 separate agents.
-Use ONE agent given paths to 5 paper pairs and ask for a corpus-level
-findings list. This produces a coherent ranking; 5 independent agents
-would each produce a local list and the orchestrator would have to
-merge them by hand.
-```
-
-### Anti-patterns to avoid
-
-| Anti-pattern | Why it's wrong |
-|---|---|
-| "Dispatch 10 agents to each fix a different defect" | Multiple agents editing the same library code → merge conflicts, lost work. Orchestrator does fixes. |
-| "Dispatch parallel agents to bump version" | Two agents racing on `pyproject.toml` / `__init__.py` / git → broken commits. |
-| "Dispatch parallel agents to render the same paper" | Same `tmp/<paper>_v<version>.md` written twice → race condition. |
-| "Skip the Pattern-A wait and do verify before gold exists" | Verifier needs gold as input; sequential dependency. |
-| "Dispatch a subagent to read the PDF and produce a gold" | docpluck-iterate does NOT generate ground truth — generation is delegated to `article-finder generate-gold` (one producer, one protocol; 2026-05-16 directive). A local extraction subagent re-forks the gold. |
-| "Use multiple agents for a single small task" | Subagent dispatch has fixed overhead (~30s). For tasks <60s, do it inline. |
-| "Subagents share my conversation context" | They DON'T. Each subagent prompt must be self-contained — give absolute paths, restate the goal, restate the discipline. |
-
-### When in doubt
-
-Default to **sequential** when:
-- You're not sure if outputs collide.
-- The task takes <1 minute (overhead > benefit).
-- The task modifies global state (git, env, settings).
-
-Default to **parallel** when:
-- 3+ independent items with the same pattern (papers, sections, checks).
-- Each item takes ≥2 minutes.
-- Each item has a distinct output path.
+**Operational detail — load on demand before fanning out:** [references/subagent-parallelization.md](references/subagent-parallelization.md) holds the 4-item safety checklist (all must pass or run sequentially), the per-phase where-to-parallelize + `run_in_background` table, the concrete fan-out patterns (A: golds-then-verify, B: background-during-planning, C: single-agent corpus sweep), the anti-patterns table, and the when-in-doubt sequential/parallel defaults. Read it whenever you are about to dispatch parallel work.
 
 ---
 
