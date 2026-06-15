@@ -1174,3 +1174,27 @@ the `SKIP_CANARY=1` justification when the `claude`-less pre-commit hook hard-fa
 (pdfplumber/camelot/pytest all had to be pip-installed mid-run into C:\Python314).
 Stand up a proper env before an iterate run so the harness + camelot table tests
 aren't skipped.
+
+---
+
+## Run: 2026-06-15 · cycle 1 · B7 layout-channel dropped-minus recovery · v2.4.88 → v2.4.89
+
+### Outcome
+- **B7 (the dropped-minus-with-no-CI residual) FIXED** for the layout-visible subset. `normalize.recover_dropped_minus_via_layout` (W0h) recovers `ar_apa` `β = -.022 / -.88 / -.428`; leaves `.48` positive. Shipped v2.4.89. Surgical blast radius (only ar_apa flips across the 5 onboarded canary papers).
+- User-approved scope decision (surfaced mid-cycle): ship the layout-visible subset + document the OCR-only residual; do NOT build an OCR tier this run.
+
+### Blind Spots
+- **"The layout channel can recover what pdftotext drops" has a HARD FLOOR: pixel-only glyphs.** `ar_apa` `β = -.245` is drawn as painted pixels — its minus is absent from pdftotext AND pdfplumber chars/lines/rects/curves AND pdfminer's raw LTChar/LTImage layer. Before designing ANY layout-recovery, probe the SPECIFIC glyph instances (not just "does the layout see a minus somewhere") — feasibility can be 3/4, not 4/4, and a recovery that silently fixes 3 of 4 sign-flips is a product decision (false-confidence risk), not an automatic win. Confirm per-instance with a geometry probe.
+- **The section/render path calls `normalize_text` WITHOUT `layout=`** (`sections/__init__.py:75`), so F0 — and any layout-gated pass — is OFF in the main render path by design (the section pipeline is deliberately text-channel-only). A layout-aware fix CANNOT just be added behind the existing `layout` gate; it must thread a DEDICATED param (`dropped_minus_layout`) so it doesn't also switch F0 on (which would risk broad regressions). Non-obvious; cost a detour to discover.
+- **A TRIAGE data-gap claim can be STALE.** `TRIAGE_2026-06-15` said `plos_med_1` has "no reading gold / BLOCKED". `ai-gold.py get` returned a 42KB gold (28d old). Always re-check `ai-gold.py get <key>` before recording BLOCKED-NEEDS-GOLD — the gold may exist. (Also: the gate's I11 then flagged a key-form mismatch warning for plos — the gold may be under a non-canonical key dir; worth a rekey check.)
+
+### Edge Cases
+- **Group layout chars into lines by y-OVERLAP, never `round(top)`.** A minus glyph sits ~0.4pt off its digits' baseline; `round(top)` put `.88`'s `(cid:2)` in top-bucket 353 while its digits were in 352, orphaning it (the first impl recovered `.022` but missed `.88`). Cluster by `bottom > top+ε and top < bottom-ε` (y-overlap) like `extract_layout._chars_to_spans` does.
+- **pdfplumber reports the glyph EM-box, not ink-box**, so bbox HEIGHT is identical for minus/hyphen/period (≈ font ascent-descent) — you cannot shape-discriminate a minus by vertical ink position. Width does differ (minus 6.3 vs hyphen 3.3 vs period 2.0 at size 8). So the safe detector keys on CONTEXT (unmapped `(cid:N)` in the `= <coef>` operator slot + text-lacks-minus), not glyph shape.
+
+### Verification Gaps
+- **Camelot non-determinism on Windows changes the rendered byte count run-to-run** (ar_apa 27038B vs 27507B across two identical renders — a table present in one, absent in the other). This makes `rendered_sha` unstable for I10 and can flip a paper's table findings. The body-prose betas are stable, but table-bearing verification needs a deterministic Camelot or a retry/normalize step before sha-pinning.
+- **The full `pytest -n auto` (xdist) background run died silently on Windows** (0 output, no python process, no completion notification) — the exact "backgrounded long task dies" failure the portfolio rule warns about. Serial `pytest -q` with an explicit `PYTEST_DONE_EXIT_$?` marker is the reliable pattern here; verify liveness (process + output growth), never infer it.
+
+### Process notes
+- One AI-verify cycle surfaced THREE pre-existing defect classes beyond the target: RC-1 two-column interleave (ip_feldman/chandrashekar/chan_feldman/ar_apa-table), B1 table-completeness (plos Tables 2/3/4/5 lose rows/cols/bodies), and metadata-leak (plos affiliations/abbrev/running-headers — an RC-2 residual). Per 0e-bis the run's standing verdict stays FAIL; cycle 1 is an incremental ship, not a clean PASS. Surfaced to user as the run punch-list.
