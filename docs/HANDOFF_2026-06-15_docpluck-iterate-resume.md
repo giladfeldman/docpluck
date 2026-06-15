@@ -1,4 +1,4 @@
-# HANDOFF — docpluck-iterate resume (2026-06-15, updated post-B7)
+# HANDOFF — docpluck-iterate resume (2026-06-15, updated post-B7 + RC-1 Step 2)
 
 > **Supersedes** the earlier citationguard-iterate-written stub of the same name (that one flagged
 > B7 as "triage first" — now DONE). Its findings table is preserved below under "Open queue".
@@ -8,12 +8,29 @@
 - **B7 (dropped-minus sign-flip) FIXED and shipped as v2.4.89** (committed `44f4ccd`, tagged
   `v2.4.89` **locally — NOT pushed**). Full suite 1968 passed; AI-verify confirms all 5 ar_apa beta
   signs correct; canary pre-commit gate PASS (0 new findings).
-- The run is **OPEN / PARTIAL** — standing verdict **FAIL** (rule 0e-bis). Two more architectural
-  classes remain: **RC-1** (two-column interleave, user-approved) and **B1** (table-completeness,
-  *beyond* the originally-approved B7+RC-1 scope — needs a scope nod). Plus a metadata-leak residual
-  + heading-demotion.
-- **User decisions 2026-06-15:** (1) "ship B7, then full handoff" → this doc. (2) "commit+tag now,
-  batch prod deploy with RC-1" → **deploy is HELD** (see Deploy state).
+- **RC-1 Step 2 (two-column interleave — THE dominant defect) FIRST CUT shipped as v2.4.90**
+  (committed `1325d14`, tagged `v2.4.90` **locally — NOT pushed**). `extract_page_text_banded`
+  (`docpluck/extract_columns.py`) segments flagged pages into prose / full-width y-bands,
+  column-corrects the prose bands, keeps table bands intact — applied as a fallback inside
+  `splice_column_corrected_pages` under the unconditional word-preservation guard. **Ship-dark behind
+  `DOCPLUCK_COLUMN_CORRECT_BANDED` (default OFF; flag-OFF is byte-identical — 26/26 baseline
+  unchanged).** AI-verified vs article-finder reading golds (Sonnet) on the 2 heaviest papers:
+  **chan_feldman ON_BETTER** (Procedure/Manipulations order + Power-analysis split fixed),
+  **chandrashekar ON_BETTER** (`## Results` heading restored, column-token orphans suppressed) —
+  **0 text-loss / 0 hallucination / 0 regression**. Touched-path suite 302 passed; new
+  `tests/test_rc1_banded_column_real_pdf.py`. cycle-2 iterate-gate = FAIL (honest: tables + refinements open).
+- The run is **OPEN / PARTIAL** — standing verdict **FAIL** (rule 0e-bis). Remaining:
+  **(a) RC-1 Step-2 refinements** before the default can flip — band-cut word clips (~6/71 flagged
+  pages, guard-rejected so no corruption, just stay interleaved), per-row both-sides under-detection,
+  hard title+sidebar pages (PSPB p1); see the spec's "Step 2 — remaining work".
+  **(b) full canary AI-verify coverage** for cycle 2 (ip_feldman, plos_med, collabra, jesp, ar_apa —
+  I2 gap). **(c) table-structuring** (empty-shell/swapped/unstructured-fallback — separate root cause).
+  **(d) B1 table-completeness** (plos_med_1 — *beyond* the approved B7+RC-1 scope; needs a scope nod).
+  Plus metadata-leak residual + heading-demotion + B7 `.245` OCR-only residual.
+- **User decisions 2026-06-15:** (1) "ship B7, then full handoff". (2) "commit+tag now, batch prod
+  deploy with RC-1" → **deploy is HELD**. (3) "Start RC-1 Step 2 now" → first cut DONE (this update).
+  Both v2.4.89 + v2.4.90 are committed + tagged **locally only**; **the bundled deploy (push tags +
+  main → app-pin bump → Railway/Vercel) is still HELD** for the next session / user go-ahead.
 
 ## What shipped this session — cycle 1, B7 (v2.4.88 → v2.4.89)
 
