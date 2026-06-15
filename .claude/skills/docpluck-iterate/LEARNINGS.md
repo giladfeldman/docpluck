@@ -1198,3 +1198,17 @@ aren't skipped.
 
 ### Process notes
 - One AI-verify cycle surfaced THREE pre-existing defect classes beyond the target: RC-1 two-column interleave (ip_feldman/chandrashekar/chan_feldman/ar_apa-table), B1 table-completeness (plos Tables 2/3/4/5 lose rows/cols/bodies), and metadata-leak (plos affiliations/abbrev/running-headers — an RC-2 residual). Per 0e-bis the run's standing verdict stays FAIL; cycle 1 is an incremental ship, not a clean PASS. Surfaced to user as the run punch-list.
+
+---
+
+## Run: 2026-06-15 · cycle 2 (resume) · RC-1 Step 2 shipped v2.4.90 (ship-dark)
+
+### Outcome
+- Resumed the open run (B7 v2.4.89 already committed by a concurrent session-instance; independently re-verified it: test 5/5, suite 547 passed, baseline 26/26 — no work lost). Implemented **RC-1 Step 2** (`extract_page_text_banded`): per-band region-aware two-column re-extraction, the architectural fix for THE dominant defect. Ship-dark behind `DOCPLUCK_COLUMN_CORRECT_BANDED` (default OFF; flag-OFF byte-identical, 26/26 baseline unchanged). AI-verified ON_BETTER on chan_feldman + chandrashekar vs article-finder golds (0 text-loss/halluc/regression). Committed `1325d14` + local tag v2.4.90, deploy HELD.
+
+### Blind spots / learnings
+- **The word-preservation guard is the load-bearing safety, not the heuristic.** It rejects any non-pure-reorder, so band segmentation can be optimized for COVERAGE not correctness. Corpus word-multiset scan (flag-OFF vs flag-ON identical) is the fast pre-AI-verify gate. Three hazards it caught: full-width-title column-split (fix: gutter-strip-clear row test, not "no word spans gx"), band-cut glyph bisection (fix: merge overlapping bands to full-width), per-row-both-sides vs gutter-clear coverage/rejection trade. Durable: shared card `band-reextraction-lean-on-word-preservation-guard` + project lessons.md.
+- **Concurrency hazard observed:** a second session-instance committed B7 to the SAME working tree mid-run (foreign pytest procs + a commit at 14:59 UTC during my session). Reconciled via git log + run-meta (it had run its postflight + paused PARTIAL-PAUSED). Lesson: on resume, `git log origin/main..HEAD` + run-meta `completed_at`/`run_closeout` BEFORE assuming the working tree is yours; a clean `git add` that stages nothing means someone already committed it.
+
+### Process notes
+- cycle-2 iterate-gate = FAIL (I2 partial canary coverage: only chan+chandra AI-verified of the canary/target set; I3 tables remain; I10 rendered_sha is the flag-ON render not the gate's flag-OFF canary artifact). Honest incremental-cycle FAIL per 0e-bis — run stays OPEN/PARTIAL, NOT closed. Remaining punch-list in the handoff + spec "Step 2 — remaining work".
