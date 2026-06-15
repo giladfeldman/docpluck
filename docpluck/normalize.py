@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.34"
+NORMALIZATION_VERSION = "1.9.35"
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2678,6 +2678,135 @@ def recover_dropped_minus_via_ci_pairing(text: str) -> str:
     return "\n".join(out)
 
 
+# §A R5 / B7 (NORMALIZATION_VERSION 1.9.35, 2026-06-15): recover the DROPPED
+# minus class that W0g's CI-pairing CANNOT reach -- a coefficient reported with
+# only a t/p value and NO confidence interval (`b = -.022, t(87) = .17`).
+# pdftotext drops the U+2212 glyph entirely on tight-kerned PDFs that draw the
+# minus in a dedicated symbol font; W0g needs a CI bracket to prove the sign, so
+# a bare `b = .022` with no CI is left silently sign-flipped (the sign-flip
+# inverts the statistical conclusion -- a catastrophic class for a meta-science
+# tool). This pass reads the minus directly from the LAYOUT channel
+# (pdfplumber), where the dropped glyph survives as an unmapped `(cid:N)`
+# symbol-font character touching the coefficient.
+#
+# Structural signature (general -- NOT keyed on any paper/font identity):
+#   In the layout, an UNMAPPED `(cid:N)` glyph that (a) immediately precedes a
+#   coefficient token `.NNN` / `D.NNN` with a near-zero x-gap, AND (b) whose
+#   nearest non-space neighbour to the LEFT is `=` (the operator slot of a
+#   `<stat> = <minus><coef>` assignment). The same coefficient appears in the
+#   pdftotext TEXT without a leading minus. We then flip exactly the text
+#   coefficients the layout proves negative -- never one the layout did not flag.
+#
+# The `=`-anchor pins the glyph to the point-estimate operator slot: a `(cid:N)`
+# between two numbers (`5.2 ± 0.3`) or after a digit is never matched, so a
+# dropped `±` / `≈` / footnote-dagger can never be mistaken for a sign.
+#
+# LIMITATION (documented; see ar_apa_j_jesp_2009_12_011 beta -.245): a minus
+# drawn as painted pixels -- absent from pdftotext AND pdfplumber
+# chars/lines/rects/curves AND pdfminer's raw layer -- cannot be recovered from
+# text or layout. That is an OCR-tier problem, outside docpluck's MIT
+# text+layout architecture. W0h recovers the layout-visible subset and leaves a
+# pixel-only minus untouched rather than guessing. See TODO.md R5 Path 1.
+_CID_GLYPH_RE = re.compile(r"^\(cid:\d+\)$")
+_LAYOUT_COEF_SHAPE_RE = re.compile(r"^\d?\.\d+$")  # .NNN or D.NNN
+
+
+def _layout_negative_coefficients(layout) -> dict[str, int]:
+    """Scan the layout channel for coefficients whose dropped U+2212 minus
+    survives as an unmapped ``(cid:N)`` glyph in the ``<stat> = <minus><coef>``
+    operator slot. Returns ``{coef_string: count}`` (e.g. ``{".022": 1}``) for
+    the coefficients the layout proves negative. Empty when no layout / no hit.
+    """
+    from .extract_layout import LayoutDoc  # local import (layout is optional)
+
+    counts: dict[str, int] = {}
+    if not isinstance(layout, LayoutDoc):
+        return counts
+    for page in layout.pages:
+        chars = page.chars
+        if not chars:
+            continue
+        for c in chars:
+            if not _CID_GLYPH_RE.match(str(c.get("text") or "")):
+                continue
+            size = float(c.get("size") or 0.0) or 10.0
+            ctop = float(c.get("top") or 0.0)
+            cbot = float(c.get("bottom") or 0.0)
+            # Visual line = chars whose y-range overlaps this glyph's. A minus
+            # glyph sits ~0.4pt off its digits' baseline, so exact-`top`
+            # bucketing orphans it (.88's cid at 352.7 vs digits at 352.3) —
+            # y-overlap is robust to that vertical offset.
+            line = [
+                d for d in chars
+                if float(d.get("bottom") or 0.0) > ctop + 0.5
+                and float(d.get("top") or 0.0) < cbot - 0.5
+            ]
+            line.sort(key=lambda d: float(d.get("x0") or 0.0))
+            try:
+                i = next(k for k, d in enumerate(line) if d is c)
+            except StopIteration:
+                continue
+            if i + 1 >= len(line):
+                continue
+            # (a) immediately followed by a coefficient (near-zero x-gap).
+            nxt = line[i + 1]
+            gap = float(nxt.get("x0") or 0.0) - float(c.get("x1") or 0.0)
+            if gap > 0.30 * size:
+                continue
+            num = ""
+            j = i + 1
+            while j < len(line):
+                t = str(line[j].get("text") or "")
+                if len(t) == 1 and t in "0123456789.":
+                    num += t
+                    j += 1
+                else:
+                    break
+            if not _LAYOUT_COEF_SHAPE_RE.match(num):
+                continue
+            # (b) nearest non-space neighbour to the LEFT is `=`.
+            left = None
+            k = i - 1
+            while k >= 0:
+                lt = str(line[k].get("text") or "").strip()
+                if lt:
+                    left = lt
+                    break
+                k -= 1
+            if left != "=":
+                continue
+            counts[num] = counts.get(num, 0) + 1
+    return counts
+
+
+def recover_dropped_minus_via_layout(text: str, layout) -> str:
+    """W0h (R5 / B7): recover dropped-minus coefficients that carry NO CI, using
+    the layout channel's surviving ``(cid:N)`` minus glyph. Conservative: only
+    flips coefficients the layout proves negative, only in the ``= <coef>``
+    assignment slot, and only as many times as the layout found them. See the
+    module comment above for the structural signature + the OCR-only limitation.
+    """
+    if not text or layout is None:
+        return text
+    counts = _layout_negative_coefficients(layout)
+    if not counts:
+        return text
+    for num, count in counts.items():
+        # `(?<=[\w\s])` ties the `=` to a label/space (excludes `<=` `>=` `==`);
+        # `(?![\d.])` stops a partial match of a longer number.
+        pat = re.compile(r"(?<=[\w\s])(=\s{0,3})(" + re.escape(num) + r")(?![\d.])")
+        remaining = [count]
+
+        def _sub(m: "re.Match[str]", _r=remaining) -> str:
+            if _r[0] <= 0:
+                return m.group(0)
+            _r[0] -= 1
+            return m.group(1) + "-" + m.group(2)
+
+        text = pat.sub(_sub, text)
+    return text
+
+
 # v2.4.44 (NORMALIZATION_VERSION 1.9.8): decompose Latin typographic
 # ligatures (ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ, U+FB00-FB06). pdftotext preserves these
 # presentation-form glyphs verbatim, so words render as "conﬁdent" /
@@ -2873,6 +3002,7 @@ def normalize_text(
     layout=None,
     table_regions: list[dict] | None = None,
     preserve_math_glyphs: bool = False,
+    dropped_minus_layout=None,
 ) -> tuple[str, NormalizationReport]:
     """Apply normalization pipeline at the specified level.
 
@@ -2895,6 +3025,13 @@ def normalize_text(
     behavior for callers that depend on ASCII-form stat tokens (D5 audit
     suite, statistical pattern matching). Established 2026-05-14 from the
     Phase-5d AI-gold audit (TRIAGE_2026-05-14_phase_5d_gold_audit.md G2/G7/G12/G21).
+
+    When `dropped_minus_layout` is provided (a LayoutDoc), the W0h step recovers
+    dropped-minus coefficients that have NO confidence interval (so W0g cannot
+    reach them) by reading the surviving `(cid:N)` minus glyph from the layout
+    channel. It is a SEPARATE param from `layout` on purpose: the section
+    pipeline runs the text channel only (F0 stays off), so we thread just this
+    one targeted layout signal through without enabling the full F0 strip.
     """
     if level == NormalizationLevel.none:
         report = NormalizationReport(level="none")
@@ -3024,6 +3161,16 @@ def normalize_text(
     before = t
     t = recover_dropped_minus_via_ci_pairing(t)
     report._track("W0g_dropped_minus_ci_pairing", before, t, "dropped_minus_signs_recovered")
+
+    # ── W0h (§A R5 / B7, 2026-06-15): recover DROPPED minus via LAYOUT ──
+    # The residual W0g cannot reach: a coefficient with only a t/p value and NO
+    # CI (`b = -.022, t(87) = .17`). Reads the surviving `(cid:N)` minus glyph
+    # from the layout channel in the `<stat> = <minus><coef>` slot. Gated on the
+    # dedicated `dropped_minus_layout` param so F0 stays off in the section path.
+    if dropped_minus_layout is not None:
+        before = t
+        t = recover_dropped_minus_via_layout(t, dropped_minus_layout)
+        report._track("W0h_dropped_minus_layout", before, t, "dropped_minus_signs_recovered")
 
     # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
     # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a

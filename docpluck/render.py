@@ -4903,6 +4903,10 @@ def render_pdf_to_markdown(
             pdf_bytes,
             source_format="pdf",
             preserve_math_glyphs=True,
+            # W0h dropped-minus layout recovery (R5/B7): reuse the layout_doc
+            # already computed above so the section/normalize path can read the
+            # surviving `(cid:N)` minus glyph without a 3rd pdfplumber pass.
+            _dropped_minus_layout=layout_doc,
         )
 
     # 3. Render sections + splice tables/figures.

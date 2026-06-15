@@ -162,7 +162,8 @@ Add only when a real downstream consumer asks for one. YAGNI until then.
 - [ ] **R4 title truncation** — `Effect of Time-Restricted Eating on Weight Loss in Adu` cut at column midline.
 - [ ] **R4 multi-word-label splits** — `CONCLUSIONS AND RELEVANCE` becomes `**CONCLUSIONS**` heading + `AND RELEVANCE` orphan.
 - [ ] **R4 (continued) fragment** — `(continued)` page marker splits as `(contin` / `ued)`.
-- [ ] **R5 Path 1** — layout-channel per-char glyph identity recovery (bare table-cell betas, ar_apa_j_jesp_2009_12_011). Architectural multi-day work.
+- [x] **R5 Path 1 — layout-visible subset DONE (v2.4.89, W0h).** `normalize.recover_dropped_minus_via_layout` recovers dropped-minus coefficients that carry NO CI (so W0g can't reach them) by reading the surviving `(cid:N)` minus glyph from the layout channel, in the `<stat> = <minus><coef>` slot. On `ar_apa_j_jesp_2009_12_011` (body-prose betas) it recovers `β = -.022 / -.88 / -.428`; leaves the genuinely-positive `.48` untouched. Gated on a dedicated `dropped_minus_layout` param (F0 stays off in the section path). Blast radius: only ar_apa flips across the 5 onboarded canary papers (the other 4 are byte-identical no-ops).
+- [ ] **R5 Path 1 residual — OCR-only, NOT fixable in text+layout.** `ar_apa` `β = -.245` is drawn as **painted pixels**: its minus is absent from pdftotext AND pdfplumber chars/lines/rects/curves AND pdfminer's raw LTChar/LTImage layer (proven 2026-06-15). docpluck's MIT text+layout architecture cannot recover it; only OCR could. W0h deliberately leaves it rather than guessing. Decision needed before any work here: add an OCR fallback tier (Tesseract, Apache-2.0) vs. permanent documented limitation. **Surfaced + user-approved 2026-06-15: ship the layout-visible subset, document this residual.**
 
 ### Article-finder skill issues (separate skill, separate session)
 
