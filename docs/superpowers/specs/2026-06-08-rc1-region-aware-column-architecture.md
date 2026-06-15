@@ -1,6 +1,6 @@
 # RC-1 — Region-aware two-column reading-order architecture (design + start)
 
-**Status:** Step 1 IMPLEMENTED 2026-06-08 (v2.4.82, default OFF). Step 2 (per-band region-aware crop) remains the multi-session work. This doc is the durable design + the precise gap analysis so the next session executes, not re-derives.
+**Status:** Step 1 IMPLEMENTED 2026-06-08 (v2.4.82, default OFF). **Step 2 (per-band region-aware crop) FIRST CUT IMPLEMENTED 2026-06-15 (v2.4.90, `DOCPLUCK_COLUMN_CORRECT_BANDED`, default OFF)** — `extract_page_text_banded` in `docpluck/extract_columns.py`, applied as a fallback inside `splice_column_corrected_pages` when the whole-page path returns "", under the same word-preservation guard. AI-verified ON_BETTER on `chan_feldman_2025_cogemo` + `chandrashekar_2023_mp` (section order + paragraph continuity restored; 0 text-loss/hallucination/regression). **Remaining before default-flip:** ~6/71 flagged pages clip one word at a band cut (guard-rejected, stay interleaved); hard title+sidebar pages (PSPB p1) degrade to full-width. See "Step 2 — remaining work" at the end. This doc is the durable design + the precise gap analysis so the next session executes, not re-derives.
 
 ## Step 1 — IMPLEMENTED (v2.4.82, `DOCPLUCK_COLUMN_CORRECT_GENERAL`, default OFF)
 
@@ -70,3 +70,12 @@ This corrects the prose bands of a page that ALSO carries a table, without garbl
 1. Reproduce: run `_detect_column_interleave_pages` on collabra.77859 + j.jesp.2021 raw text; confirm the interleaved pages are flagged (signal present) and currently uncorrected.
 2. Implement Step 1 behind the flag; re-render + AI-verify the 4 papers; 26-baseline.
 3. If Step 1 clean, scope Step 2 (band segmentation) as its own cycle.
+
+## Step 2 — remaining work (after the v2.4.90 first cut)
+
+The first cut (`extract_page_text_banded`) is safe (word-preservation guard) and AI-verified ON_BETTER, but is intentionally conservative. To reach a default-ON state:
+
+1. **Band-cut word clips (~6/71 flagged pages).** A single word is still bisected at a band boundary on a handful of pages (`donation`→`dona`+`tion`), so the page is guard-rejected and stays interleaved. Root cause: the inter-band midpoint cut, though glyph-free by the `_segment_bands` overlap-merge invariant, can still land where pdftotext's crop assigns a boundary glyph to both/neither crop. Fix direction: snap each cut to a y that is provably glyph-free in BOTH the upper and lower crop (scan a small window for an empty scanline), or detect+repair the boundary-glued/clipped token post-crop. Convert these from guard-rejected to fixed.
+2. **Per-row both-sides under-detection.** `_row_is_2col` requires both columns in the same y-bucket; baseline-offset columns bucket separately, so some genuinely two-column rows read full-width and the band degrades to a (safe) full-width crop. A gutter-clear-only row test recovered more rows but raised guard-rejections 6→12 on the hard pages (corpus scan 2026-06-15) — needs a smarter band-level both-sides reconciliation rather than a blanket per-row relaxation.
+3. **Hard title+sidebar pages (PSPB p1 etc.).** The large-title / metadata-sidebar block overlaps adjacent rows, so the overlap-merge collapses it to full-width (no de-interleave). Needs size-aware band handling (treat a large-font title as its own full-width band without swallowing the adjacent 2-col sidebar).
+4. **Then flip the default** (`DOCPLUCK_COLUMN_CORRECT_BANDED` + `DOCPLUCK_COLUMN_CORRECT_GENERAL`) once 1–3 land and a full-corpus AI-verify + 26-baseline are clean with the flags ON.

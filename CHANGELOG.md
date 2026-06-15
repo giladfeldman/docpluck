@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.90] — 2026-06-15
+
+**RC-1 Step 2 — per-band region-aware two-column re-extraction (ship-dark behind `DOCPLUCK_COLUMN_CORRECT_BANDED`, default OFF).** No `NORMALIZATION_VERSION` change — the default path is byte-identical; the flag only adds reading-order corrections upstream of normalize.
+
+The dominant defect on two-column APA papers: pdftotext serializes a page's columns interleaved, so Method/Results/Discussion order scrambles and paragraphs split with their continuations displaced. The Step-1 whole-page corrector (`extract_page_text_columns`, v2.4.82) **cannot reach** these pages — its bilateral y-row gate and full-height gutter strip both reject any page that carries a full-width band (a table row, banner, or wide title) crossing the column centre, which is exactly the failing pages (TRIAGE 2026-06-15: re-rendering with `DOCPLUCK_COLUMN_CORRECT_GENERAL=1` produced byte-near-identical output).
+
+**Step 2** (`extract_page_text_banded`, `docpluck/extract_columns.py`) segments a flagged page into horizontal y-BANDS: a band whose central gutter strip is glyph-free across its rows is two-column prose → re-extracted left-then-right; a band with full-width content (table/banner/title) is kept as-is. Bands are reassembled top-to-bottom at glyph-free cut lines (vertically-overlapping bands are merged to full-width so a tall title glyph is never bisected). Applied **only as a fallback** inside `splice_column_corrected_pages` when the whole-page path returns "", and under the **same unconditional word-preservation guard** — a band crop that drops/fabricates a word is rejected and the page kept as-is, so the flag can only ADD a pure reorder, never ship corruption.
+
+**Validation (2026-06-15).** Corpus word-preservation scan across 4 two-column papers (71 flagged pages): every accepted page is a pure reorder; the 6 residual band-cut clips are all guard-rejected (no corruption). Production smoke (flag ON) corrects ~44 pages across 5 papers, all word-safe; flag OFF is byte-identical. **AI-verify vs article-finder reading golds** (Sonnet subagents) on the two heaviest papers (`chan_feldman_2025_cogemo`, `chandrashekar_2023_mp`): both **ON_BETTER** — Procedure/Manipulations ordering and the Power-analysis paragraph split fixed (chan); `## Results` heading restored and column-token orphans suppressed (chandrashekar); **zero text-loss, zero hallucination, zero regression** vs flag OFF. New regression `tests/test_rc1_banded_column_real_pdf.py` (synthetic-layout geometry units + real-PDF word-preservation + ship-dark-default). Touched-path suite 302 passed; 26-paper baseline 26/26 (flag OFF).
+
+**Known residual (documented, not regressions):** ~6/71 flagged pages still clip a single word at a band cut and are guard-rejected (stay interleaved — no worse than today); hard title+sidebar pages (e.g. PSPB p1) degrade to full-width (no de-interleave). These are the remaining Step-2 refinement targets before the default can be flipped.
+
 ## [2.4.89] — 2026-06-15
 
 **W0h — recover dropped-minus statistical coefficients from the LAYOUT channel (the no-CI residual W0g cannot reach).** `NORMALIZATION_VERSION` 1.9.34 → 1.9.35.
