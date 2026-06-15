@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.89] — 2026-06-15
+
+**W0h — recover dropped-minus statistical coefficients from the LAYOUT channel (the no-CI residual W0g cannot reach).** `NORMALIZATION_VERSION` 1.9.34 → 1.9.35.
+
+Surfaced by `/docpluck-iterate` Phase-5d (B7 canary `ar_apa_j_jesp_2009_12_011`). On tight-kerned PDFs that draw the U+2212 minus in a dedicated symbol font, pdftotext **drops the glyph entirely**, so a body-prose coefficient `β = −.022, t(87) = .17, ns` reaches the text channel as `b = .022` — a **silent sign flip that inverts the statistical conclusion**. The existing W0g recovery needs a confidence interval to prove the sign; these betas report only a t-value, so W0g cannot reach them.
+
+**Root cause + recovery.** The dropped minus survives in the **layout channel** (pdfplumber) as an unmapped `(cid:N)` glyph in a symbol font (here `AdvP4C4E74`), immediately touching the coefficient. `normalize.recover_dropped_minus_via_layout` (W0h) detects this in the `<stat> = <minus><coef>` operator slot — an unmapped glyph whose left neighbour is `=` and whose right neighbour is a coefficient — and re-inserts the minus into the pdftotext text. Keyed on the **structural signature** (not paper/font identity): the `=`-anchor excludes `5.2 ± 0.3` (glyph between two numbers) so a dropped `±`/`≈`/dagger can never be mistaken for a sign; it flips only coefficients the layout proves negative, only as many times as found. Threaded through a dedicated `dropped_minus_layout` param (`render → extract_sections → normalize_text`) so the section pipeline's text-channel-only contract is preserved (F0 stays off). On `ar_apa` it recovers `β = −.022 / −.88 / −.428` and leaves the genuinely-positive `.48` untouched. Blast radius: of the 5 onboarded canary papers only `ar_apa` flips (exactly its 3 layout-visible negatives); the other 4 are byte-identical no-ops.
+
+**Documented limitation (NOT fixable in text+layout).** `ar_apa` `β = −.245` is drawn as **painted pixels** — its minus is absent from pdftotext AND pdfplumber chars/lines/rects/curves AND pdfminer's raw layer (proven). Only OCR could recover it; W0h deliberately leaves it rather than guessing. See `TODO.md` R5 Path 1.
+
+New regression `tests/test_dropped_minus_layout_recovery_real_pdf.py` (4 synthetic-layout unit tests pinning the `=`-slot guard + the no-flip-after-a-number guard, and 1 real-PDF render test). Minus/normalize/render/sections suite: 148 passed.
+
 ## [2.4.88] — 2026-06-13
 
 **Camelot temp-file cleanup is best-effort — stop silently dropping every table on Windows.** (No `NORMALIZATION_VERSION` change — table channel only; output on POSIX/prod is unchanged.)
