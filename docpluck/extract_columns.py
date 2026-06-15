@@ -356,6 +356,296 @@ def _word_multiset(text: str) -> "Counter":
     return Counter(toks)
 
 
+# ── RC-1 Step 2: per-band region-aware column de-interleave ──
+#
+# `extract_page_text_columns` corrects a WHOLE page and is (correctly) refused
+# by the bilateral / full-height-gutter gate whenever the page carries an
+# embedded full-width table or banner — a whole-page left-then-right crop would
+# slice straight through the table. That leaves the two-column PROSE bands
+# above/below the table interleaved — the dominant residual on two-column APA
+# papers (Collabra / JESP / chandrashekar / ip_feldman).
+#
+# Step 2 segments the page into horizontal y-bands and column-corrects only the
+# bands that are genuinely two-column across THEIR OWN y-range, leaving
+# full-width bands (table rows, banners, spanning headings) untouched. The
+# gutter is located by the MIN-CROSSING central x — it tolerates table/banner
+# rows that cross it (those rows simply classify as full-width) — rather than
+# the whole-page full-height clean strip a table would destroy.
+#
+# Safety is layered so no corruption can ship (rules 0a / 0b):
+#   1. a band is column-cropped only when both sides carry substantial text AND
+#      no word straddles the cut x;
+#   2. per-band word-preservation — the two-column crop is accepted only when
+#      its substantial-word multiset equals the band's full-width crop (a pure
+#      reorder). A straddle-split (`donation` → `dona` + `tion`) or a
+#      cross-column glue difference (`betweenoriginal` → `between` + `subject`)
+#      makes them differ → that band alone falls back to the word-correct
+#      full-width crop, preserving the page's other good bands;
+#   3. the caller's UNCONDITIONAL page-level word-preservation guard in
+#      `splice_column_corrected_pages` is the final backstop — any page whose
+#      reassembly changes the page word multiset is rejected wholesale and the
+#      original (interleaved but word-correct) text kept. Worst case is an
+#      unimproved page, never a corrupted one.
+#
+# Keyed on a structural signature (gutter geometry + per-row column occupancy),
+# never on paper identity (CLAUDE.md general-fix rule). Algorithm validated as a
+# tmp/ prototype on 71 flagged pages across 5 two-column papers before promotion
+# (65/71 word-safe before per-band fallback; the 6 straddle/glue violations are
+# what safety #2 localizes). pdftotext crop-mode is used for spacing fidelity,
+# consistent with `extract_page_text_columns` (CLAUDE.md hard rule 3: conditional
+# per-page re-extraction, not a default tool swap).
+
+# Half-width (PDF points) of the central strip that must be glyph-free for a row
+# to read as two-column. A full-width line's inter-word space (~3-4pt) is
+# narrower than 2*_GUTTER_STRIP_HALF, so a justified title/abstract line is
+# correctly classed full-width; a real column gutter (10-30pt) clears it.
+_GUTTER_STRIP_HALF = 4.0
+
+
+def _min_crossing_gutter(words: list[dict], page_width: float) -> float | None:
+    """Find the central-band x crossed by the FEWEST distinct text rows.
+
+    Unlike `_detect_2col_midline_gutter` (which REQUIRES a near-zero-crossing
+    full-height strip and so returns None on any page with an embedded
+    full-width table row), this returns the *least-crossed* central x even when
+    table/banner rows cross it — those rows become full-width bands downstream.
+    Confined to [0.35W, 0.65W] and tie-broken toward page center. Returns None
+    when the page has too few text rows to trust a gutter.
+    """
+    if not words or page_width <= 0:
+        return None
+    lo_i, hi_i = int(page_width * 0.35), int(page_width * 0.65)
+    if hi_i - lo_i < _MIN_GUTTER_STRIP_WIDTH:
+        return None
+    all_rows = {int(round(w["top"] / _LINE_Y_TOLERANCE)) for w in words}
+    if len(all_rows) < 10:
+        return None
+    crossings: dict[int, set] = defaultdict(set)
+    for w in words:
+        x0 = max(lo_i, int(w["x0"]))
+        x1 = min(hi_i, int(w["x1"]))
+        if x1 < x0:
+            continue
+        rk = int(round(w["top"] / _LINE_Y_TOLERANCE))
+        for x in range(x0, x1 + 1):
+            crossings[x].add(rk)
+    center = page_width / 2.0
+    best_x: int | None = None
+    best_n: int | None = None
+    for x in range(lo_i, hi_i + 1):
+        n = len(crossings.get(x, ()))
+        if (best_n is None or n < best_n
+                or (n == best_n and abs(x - center) < abs(best_x - center))):
+            best_x, best_n = x, n
+    return float(best_x) if best_x is not None else None
+
+
+def _row_is_two_column(row_words: list[dict], gutter_x: float) -> bool:
+    """A row is column-compatible (NOT full-width) iff NO word's horizontal
+    extent enters the central strip [gx-Δ, gx+Δ] — i.e. nothing crosses the
+    column gutter / crop line.
+
+    Crucially this does NOT require text on both sides: in real staggered
+    two-column prose most rows carry text in only ONE column at a given y
+    (paragraph ends, ragged column bottoms), and those one-sided rows belong in
+    the two-column band — they crop cleanly to their own side and the empty
+    side contributes nothing. Requiring both sides per-row (an earlier
+    prototype's rule) fragments a genuine two-column region into noise and
+    misses it entirely (collabra_77859). The "is this band actually
+    two-column" judgement is made once at the BAND level (both sides ≥ 25% of
+    the band's words) in `extract_page_text_bands`, which is the correct scale
+    for it. A full-width line (table row, banner, spanning heading, or any line
+    with a word straddling the cut) has a word in the strip and so is False."""
+    return not any(
+        w["x0"] <= gutter_x + _GUTTER_STRIP_HALF
+        and w["x1"] >= gutter_x - _GUTTER_STRIP_HALF
+        for w in row_words
+    )
+
+
+def _segment_into_bands(words: list[dict], gutter_x: float, page_height: float):
+    """Group a page's text rows into contiguous full-width / two-column y-bands.
+
+    Returns a list of ``(is_full_width, y_top, y_bottom, band_words)`` in
+    y-order. Up to one isolated opposite-class row is tolerated inside a run (a
+    stray descender crossing the gutter, a one-line full-width subhead).
+    Adjacent bands whose y-extents OVERLAP are merged and forced full-width —
+    overlapping mixed-size content (a tall title line abutting the next row)
+    can't be cleanly column-separated, and a full-width crop is the safe,
+    word-preserving fallback there.
+    """
+    rows: dict[int, list[dict]] = defaultdict(list)
+    for w in words:
+        rows[int(round(w["top"] / _LINE_Y_TOLERANCE))].append(w)
+    classified = []  # (y_top, y_bottom, is_full_width, words)
+    for rk in sorted(rows):
+        ws = rows[rk]
+        classified.append((
+            min(w["top"] for w in ws),
+            max(w["bottom"] for w in ws),
+            not _row_is_two_column(ws, gutter_x),
+            ws,
+        ))
+    if not classified:
+        return []
+
+    # Group contiguous same-class rows (tol = 1 isolated opposite row).
+    grouped: list[tuple[bool, list]] = []
+    cur_class = classified[0][2]
+    run = [classified[0]]
+    opp = 0
+    for row in classified[1:]:
+        if row[2] == cur_class:
+            run.append(row)
+            opp = 0
+        else:
+            opp += 1
+            run.append(row)
+            if opp > 1:
+                keep = run[:-opp]
+                if keep:
+                    grouped.append((cur_class, keep))
+                run = run[-opp:]
+                cur_class = row[2]
+                opp = 0
+    if run:
+        grouped.append((cur_class, run))
+
+    bands = []
+    for fw, rws in grouped:
+        bands.append([
+            fw,
+            min(r[0] for r in rws),
+            max(r[1] for r in rws),
+            [w for r in rws for w in r[3]],
+        ])
+
+    # Overlap-merge adjacent bands (force full-width on merge).
+    merged: list[list] = [list(bands[0])]
+    for b in bands[1:]:
+        prev = merged[-1]
+        if b[1] <= prev[2]:  # b.y_top <= prev.y_bottom → overlap
+            prev[0] = True
+            prev[2] = max(prev[2], b[2])
+            prev[3] = prev[3] + b[3]
+        else:
+            merged.append(list(b))
+    return [(b[0], b[1], b[2], b[3]) for b in merged]
+
+
+def extract_page_text_bands(layout_doc, page_index: int,
+                            pdf_bytes: bytes | None = None) -> str:
+    """Per-band region-aware column de-interleave for a single page.
+
+    The Step-2 complement to `extract_page_text_columns`: when a page carries an
+    embedded full-width table/banner (so the whole-page corrector's bilateral /
+    full-height-gutter gate skips it), segment the page into y-bands and reorder
+    only the genuinely-two-column bands left-then-right, leaving full-width bands
+    as-is, then reassemble in y-order at glyph-free cut lines.
+
+    Args:
+        layout_doc: LayoutDoc from `docpluck.extract_layout.extract_pdf_layout`.
+        page_index: 0-based page index.
+        pdf_bytes: raw PDF bytes (required — pdftotext crop-mode gives the
+            word spacing pdfplumber drops on tight-kerned PDFs).
+
+    Returns:
+        The reassembled page text, or "" when the page has no clean gutter or no
+        confidently-correctable two-column band (caller keeps the original
+        text). Every two-column band emitted is a per-band word-preserving
+        reorder; the caller's page-level guard is the final backstop.
+    """
+    if pdf_bytes is None:
+        return ""
+    if page_index < 0 or page_index >= len(layout_doc.pages):
+        return ""
+    page = layout_doc.pages[page_index]
+    page_width = float(page.width or 0.0)
+    page_height = float(page.height or 0.0)
+    if page_width <= 0 or page_height <= 0:
+        return ""
+    words = list(page.words or ())
+    if len(words) < _MIN_WORDS_FOR_COLUMN_MODE:
+        return ""
+
+    gutter_x = _min_crossing_gutter(words, page_width)
+    if gutter_x is None:
+        return ""
+    bands = _segment_into_bands(words, gutter_x, page_height)
+    if not bands:
+        return ""
+
+    # Clean cut lines: after overlap-merge the bands are non-overlapping, so each
+    # inter-band midpoint sits in a glyph-free gap. Crop [cut[i], cut[i+1]] so the
+    # page is covered top-to-bottom with no gaps/overlaps and no horizontal cut
+    # bisects a glyph.
+    cuts = [0.0]
+    for i in range(len(bands) - 1):
+        cuts.append((bands[i][2] + bands[i + 1][1]) / 2.0)
+    cuts.append(page_height)
+
+    import os
+    import subprocess
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(pdf_bytes)
+        tmp_path = tmp.name
+
+    def _crop(x: float, y: float, w: float, h: float) -> str:
+        if w <= 1 or h <= 1:
+            return ""
+        proc = subprocess.run(
+            ["pdftotext", "-enc", "UTF-8",
+             "-f", str(page_index + 1), "-l", str(page_index + 1),
+             "-x", str(int(x)), "-y", str(int(y)),
+             "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
+            capture_output=True, timeout=30, encoding="utf-8", errors="replace",
+        )
+        if proc.returncode != 0:
+            return ""
+        return (proc.stdout or "").rstrip("\f").strip()
+
+    try:
+        parts: list[str] = []
+        n_two_col = 0
+        for i, (is_full_width, _y_top, _y_bottom, band_words) in enumerate(bands):
+            top, bot = cuts[i], cuts[i + 1]
+            height = bot - top
+            did_two_col = False
+            if not is_full_width and band_words:
+                left = [w for w in band_words if (w["x0"] + w["x1"]) / 2 < gutter_x]
+                right = [w for w in band_words if (w["x0"] + w["x1"]) / 2 >= gutter_x]
+                straddles = any(w["x0"] < gutter_x < w["x1"] for w in band_words)
+                if (len(left) >= 0.25 * len(band_words)
+                        and len(right) >= 0.25 * len(band_words)
+                        and not straddles):
+                    lt = _crop(0, top, gutter_x, height)
+                    rt = _crop(gutter_x, top, page_width - gutter_x, height)
+                    # Per-band word-preservation (safety #2): accept the
+                    # two-column reorder only when it neither splits nor re-glues
+                    # a word vs the band's own full-width crop. Otherwise that
+                    # band falls back to full-width — word-correct, still
+                    # interleaved — without sacrificing the page's other bands.
+                    if lt.strip() and rt.strip():
+                        fw = _crop(0, top, page_width, height)
+                        if _word_multiset(lt + "\n" + rt) == _word_multiset(fw):
+                            parts.append((lt + "\n" + rt).strip())
+                            n_two_col += 1
+                            did_two_col = True
+            if not did_two_col:
+                parts.append(_crop(0, top, page_width, height))
+        if n_two_col == 0:
+            # No band was confidently column-corrected → no improvement over the
+            # original; signal the caller to keep the original page text.
+            return ""
+        return "\n".join(p for p in parts if p.strip())
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+
 def splice_column_corrected_pages(
     raw_text: str,
     layout_doc,
@@ -363,6 +653,7 @@ def splice_column_corrected_pages(
     pages_to_fix: Iterable[int],
     pdf_bytes: bytes | None = None,
     gutter_fallback_pages: Iterable[int] | None = None,
+    banded_pages: Iterable[int] | None = None,
     changed_out: list | None = None,
 ) -> str:
     """Splice column-aware re-extracted text into flagged pages of raw_text.
@@ -391,6 +682,12 @@ def splice_column_corrected_pages(
             pages opt in. Pages NOT in this set use only the word-center
             histogram midline. This set NO LONGER controls word-preservation —
             that gate now applies to every page, always.
+        banded_pages: 1-indexed pages that may use the RC-1 Step 2 per-band
+            region-aware re-extraction (``extract_page_text_banded``) as a
+            FALLBACK when the whole-page corrector returns "" (table-bearing /
+            mixed-layout pages it cannot reach). Same unconditional word-
+            preservation guard applies, so a band crop that drops/fabricates a
+            word is rejected and the page kept as-is.
 
     Returns:
         Rewritten raw_text with flagged pages' content replaced. Pages whose
@@ -400,6 +697,7 @@ def splice_column_corrected_pages(
     offsets = list(page_offsets)
     pages_set = set(pages_to_fix)
     gf_pages = set(gutter_fallback_pages or ())
+    b_pages = set(banded_pages or ())
     if not pages_set or not offsets:
         return raw_text
 
@@ -418,6 +716,14 @@ def splice_column_corrected_pages(
                 layout_doc, page_idx, column_count=2, pdf_bytes=pdf_bytes,
                 allow_gutter_fallback=(page_number_1idx in gf_pages),
             )
+            # RC-1 Step 2 (v2.4.90): when the whole-page corrector can't reach a
+            # page (a table/banner row crosses the gutter, or a few stray rows
+            # defeat the full-height gutter strip), fall back to per-band
+            # region-aware re-extraction. The SAME unconditional word-
+            # preservation guard below validates the result, so a band split
+            # that drops/fabricates a word is rejected (page kept as-is).
+            if not rewritten and page_number_1idx in b_pages and pdf_bytes is not None:
+                rewritten = extract_page_text_banded(layout_doc, page_idx, pdf_bytes)
             if rewritten:
                 original_page = raw_text[start:end]
                 # Accept ONLY a pure reorder: identical substantial-word multiset
@@ -686,3 +992,248 @@ def _words_to_column_text(words: list[dict]) -> str:
         if line.strip():
             out_lines.append(line)
     return "\n".join(out_lines)
+
+
+# ── RC-1 Step 2: per-band region-aware re-extraction (v2.4.90) ──────────────
+#
+# The whole-page corrector (extract_page_text_columns) corrects a page only when
+# a SINGLE column geometry holds across the WHOLE page: the bilateral y-row gate
+# and the full-height gutter strip both REJECT a page that carries an embedded
+# full-width band (a table row, a banner, a wide title) crossing the column
+# centre — so 2-column prose ABOVE/BELOW such a band stays interleaved (the
+# dominant RC-1 defect on two-column APA papers — TRIAGE 2026-06-15).
+#
+# Step 2 segments a flagged page into horizontal y-BANDS and corrects each band
+# in isolation: a band whose central gutter strip is clean (2-column prose) is
+# re-extracted left-then-right; a band with full-width content (table/banner) is
+# kept as-is (full-width crop). Bands are reassembled top-to-bottom. The same
+# unconditional word-preservation guard in splice_column_corrected_pages then
+# accepts the page ONLY if the result is a pure reorder (rules 0a/0b) — a band
+# cut that clips a word is rejected and the page kept as-is, so this can only
+# ADD correct reorders, never ship corruption.
+
+# Half-width (pt) of the central gutter strip that must be glyph-free for a row
+# to count as two-column. A justified full-width line's inter-word space (~3-4pt)
+# is narrower than 2*_BAND_GUTTER_HALF, so a title / abstract line stays
+# full-width; a real column gutter (10-30pt) clears it. This is what keeps a
+# full-width title from being column-split into fragments.
+_BAND_GUTTER_HALF = 4.0
+
+# A band must hold at least this many text rows to be worth column-correcting.
+_MIN_BAND_ROWS_FOR_2COL = 2
+
+
+def _band_gutter_x(words: list[dict], page_width: float) -> float | None:
+    """Central-band x crossed by the FEWEST text rows.
+
+    Unlike `_detect_2col_midline_gutter` (which REQUIRES the strip clear across
+    ~97% of the page height), this tolerates table/banner rows crossing the
+    centre — those become the full-width bands — so it finds the column midline
+    on the table-bearing pages the whole-page detector rejects. Returns None
+    when there is no page / too few text rows to trust a gutter.
+    """
+    if not words or page_width <= 0:
+        return None
+    lo_i, hi_i = int(page_width * 0.35), int(page_width * 0.65)
+    if hi_i - lo_i < _MIN_GUTTER_STRIP_WIDTH:
+        return None
+    all_rows = {int(round(w["top"] / _LINE_Y_TOLERANCE)) for w in words}
+    if len(all_rows) < 10:
+        return None
+    crossings: dict[int, set] = defaultdict(set)
+    for w in words:
+        x0 = max(lo_i, int(w["x0"]))
+        x1 = min(hi_i, int(w["x1"]))
+        if x1 < x0:
+            continue
+        rk = int(round(w["top"] / _LINE_Y_TOLERANCE))
+        for x in range(x0, x1 + 1):
+            crossings[x].add(rk)
+    center = page_width / 2.0
+    best_x: int | None = None
+    best_n: int | None = None
+    for x in range(lo_i, hi_i + 1):
+        n = len(crossings.get(x, ()))
+        if (best_n is None or n < best_n
+                or (n == best_n and abs(x - center) < abs(best_x - center))):
+            best_x, best_n = x, n
+    return float(best_x) if best_x is not None else None
+
+
+def _row_is_2col(row_words: list[dict], gx: float) -> bool:
+    """A text row is two-column iff the central strip [gx ± Δ] is glyph-free AND
+    there is text on BOTH sides of gx. Distinguishes a real column gutter from a
+    full-width justified line that merely has a word-space near the centre (a
+    title, a spanning table row), which must NOT be column-split.
+
+    Requiring both sides *per row* is deliberately conservative: it under-detects
+    two-column rows whose left/right baselines bucket separately, but the pages
+    that need this fallback are exactly the table-bearing / mixed ones the
+    whole-page corrector already rejects, and on those the conservative test
+    yielded materially fewer word-preservation-guard rejections than a
+    gutter-clear-only test (corpus scan 2026-06-15: 6 vs 12 rejected of 71).
+    Clean two-column pages are handled upstream by the whole-page gutter path.
+    """
+    if any(w["x0"] <= gx + _BAND_GUTTER_HALF and w["x1"] >= gx - _BAND_GUTTER_HALF
+           for w in row_words):
+        return False
+    left = any((w["x0"] + w["x1"]) / 2 < gx for w in row_words)
+    right = any((w["x0"] + w["x1"]) / 2 >= gx for w in row_words)
+    return left and right
+
+
+def _segment_bands(words: list[dict], gx: float) -> list[tuple[bool, float, float, list]]:
+    """Group page rows into contiguous y-bands of one class. Returns a list of
+    ``(is_full_width, y_top, y_bottom, band_words)`` in top-to-bottom order.
+
+    A single isolated opposite-class row is absorbed (tol=1) so a stray
+    gutter-crossing descender or a one-line subhead does not shatter a band.
+    Adjacent bands whose y-extents OVERLAP (a tall title glyph reaching into the
+    next row) are merged and forced full-width — there is no clean horizontal
+    scanline to cut between them, so a column crop would bisect a glyph.
+    """
+    rows: dict[int, list[dict]] = defaultdict(list)
+    for w in words:
+        rows[int(round(w["top"] / _LINE_Y_TOLERANCE))].append(w)
+    classified: list[tuple[float, float, bool, list]] = []
+    for rk in sorted(rows):
+        ws = rows[rk]
+        y_top = min(w["top"] for w in ws)
+        y_bot = max(w["bottom"] for w in ws)
+        classified.append((y_top, y_bot, not _row_is_2col(ws, gx), ws))
+    if not classified:
+        return []
+    # Contiguous same-class grouping with single-row tolerance.
+    grouped: list[tuple[bool, list]] = []
+    cur_fw = classified[0][2]
+    run = [classified[0]]
+    opp = 0
+    for row in classified[1:]:
+        if row[2] == cur_fw:
+            run.append(row)
+            opp = 0
+        else:
+            opp += 1
+            run.append(row)
+            if opp > 1:
+                keep = run[:-opp]
+                if keep:
+                    grouped.append((cur_fw, keep))
+                run = run[-opp:]
+                cur_fw = row[2]
+                opp = 0
+    if run:
+        grouped.append((cur_fw, run))
+    bands: list[list] = []
+    for fw, rws in grouped:
+        y_top = min(r[0] for r in rws)
+        y_bot = max(r[1] for r in rws)
+        bwords = [w for r in rws for w in r[3]]
+        bands.append([fw, y_top, y_bot, bwords])
+    # Merge vertically-overlapping adjacent bands (no clean cut) -> full-width.
+    merged: list[list] = [bands[0]]
+    for b in bands[1:]:
+        prev = merged[-1]
+        if b[1] <= prev[2]:
+            prev[0] = True
+            prev[2] = max(prev[2], b[2])
+            prev[3] = prev[3] + b[3]
+        else:
+            merged.append(b)
+    return [tuple(b) for b in merged]
+
+
+def extract_page_text_banded(layout_doc, page_index: int,
+                             pdf_bytes: bytes) -> str:
+    """RC-1 Step 2: re-extract a flagged page band-by-band (see module comment).
+
+    Returns the reassembled page text, or "" when the page has no usable column
+    gutter / too little text (caller keeps the original page). The result is
+    ALWAYS subject to the splice's word-preservation guard, so a banded crop
+    that is not a pure reorder is rejected upstream.
+    """
+    if pdf_bytes is None:
+        return ""
+    if page_index < 0 or page_index >= len(layout_doc.pages):
+        return ""
+    page = layout_doc.pages[page_index]
+    page_width = float(page.width or 0.0)
+    page_height = float(page.height or 0.0)
+    if page_width <= 0 or page_height <= 0:
+        return ""
+    words = list(page.words or ())
+    if len(words) < _MIN_WORDS_FOR_COLUMN_MODE:
+        return ""
+    gx = _band_gutter_x(words, page_width)
+    if gx is None:
+        return ""
+    bands = _segment_bands(words, gx)
+    if not bands:
+        return ""
+
+    # Cut lines: bands are non-overlapping after the merge, so the midpoint of
+    # each inter-band gap is a glyph-free scanline. First band starts at the page
+    # top, last band runs to the page bottom — every glyph lands in exactly one
+    # crop, the precondition for word-preservation.
+    cuts = [0.0]
+    for i in range(len(bands) - 1):
+        cuts.append((bands[i][2] + bands[i + 1][1]) / 2.0)
+    cuts.append(page_height)
+
+    import os
+    import subprocess
+    import tempfile
+
+    def _crop(tmp_path: str, x: float, y: float, w: float, h: float) -> str:
+        if w <= 1 or h <= 1:
+            return ""
+        pa = str(page_index + 1)  # pdftotext is 1-indexed
+        try:
+            proc = subprocess.run(
+                ["pdftotext", "-enc", "UTF-8", "-f", pa, "-l", pa,
+                 "-x", str(int(x)), "-y", str(int(y)),
+                 "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
+                capture_output=True, timeout=30, encoding="utf-8", errors="replace",
+            )
+        except Exception:
+            return ""
+        if proc.returncode != 0:
+            return ""
+        return (proc.stdout or "").rstrip("\f").strip()
+
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        parts: list[str] = []
+        for i, (fw, _yt, _yb, bwords) in enumerate(bands):
+            top, bot = cuts[i], cuts[i + 1]
+            h = bot - top
+            did_2col = False
+            if not fw and bwords:
+                left = [w for w in bwords if (w["x0"] + w["x1"]) / 2 < gx]
+                right = [w for w in bwords if (w["x0"] + w["x1"]) / 2 >= gx]
+                # Both columns substantial AND no word straddles the gutter strip
+                # (else the column crop would split that word).
+                straddles = any(
+                    w["x0"] <= gx + _BAND_GUTTER_HALF and w["x1"] >= gx - _BAND_GUTTER_HALF
+                    for w in bwords
+                )
+                if (len(left) >= 0.25 * len(bwords)
+                        and len(right) >= 0.25 * len(bwords)
+                        and not straddles):
+                    lt = _crop(tmp_path, 0, top, gx, h)
+                    rt = _crop(tmp_path, gx, top, page_width - gx, h)
+                    if lt.strip() and rt.strip():
+                        parts.append((lt + "\n" + rt).strip())
+                        did_2col = True
+            if not did_2col:
+                parts.append(_crop(tmp_path, 0, top, page_width, h))
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    return "\n".join(p for p in parts if p.strip())

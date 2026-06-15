@@ -173,6 +173,16 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
             general_correct = (
                 os.environ.get("DOCPLUCK_COLUMN_CORRECT_GENERAL", "0") == "1"
             )
+            # RC-1 Step 2 (v2.4.90): per-band region-aware re-extraction for the
+            # table-bearing / mixed-layout pages the whole-page corrector (Step 1)
+            # cannot reach. Applied as a FALLBACK inside the splice only when the
+            # whole-page path returns "" for a flagged page, and only under the
+            # SAME unconditional word-preservation guard. Default OFF ⇒ the
+            # legacy path is byte-identical (ship dark; validate vs AI golds, then
+            # flip the default once Step 1 + Step 2 are jointly verified).
+            banded_correct = (
+                os.environ.get("DOCPLUCK_COLUMN_CORRECT_BANDED", "0") == "1"
+            )
             # gutter_fallback_pages opt into the full-height gutter-strip detector
             # (bypasses the bilateral table gate). Word-preservation now gates
             # EVERY corrected page unconditionally inside the splice, so this set
@@ -180,17 +190,23 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
             # the result is trusted. Inversion pages always opt in; general
             # flagged pages opt in only under the flag.
             gutter_fallback_pages = set(inversion_pages)
-            if general_correct:
+            if general_correct or banded_correct:
+                # Under BANDED too: a flagged page that IS a clean 2-column page
+                # should be corrected by the proven whole-page gutter path; the
+                # per-band fallback only fires when that path returns "" (the
+                # table-bearing / mixed-layout pages it cannot reach).
                 gutter_fallback_pages |= set(flagged_pages)
             all_pages = sorted(set(flagged_pages) | set(inversion_pages))
             if all_pages:
                 from .extract_layout import extract_pdf_layout
                 layout_doc = extract_pdf_layout(pdf_bytes)
                 changed: list[int] = []
+                banded_pages = sorted(all_pages) if banded_correct else []
                 corrected = splice_column_corrected_pages(
                     text, layout_doc, ff_offsets, all_pages,
                     pdf_bytes=pdf_bytes,
                     gutter_fallback_pages=sorted(gutter_fallback_pages),
+                    banded_pages=banded_pages,
                     changed_out=changed,
                 )
                 if corrected and corrected != text and changed:
