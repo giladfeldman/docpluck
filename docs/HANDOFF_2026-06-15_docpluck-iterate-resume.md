@@ -35,9 +35,9 @@ off in the text-channel-only section path. `NORMALIZATION_VERSION` 1.9.34 → 1.
 
 | Step | State |
 |---|---|
-| commit | ✅ `44f4ccd` on `main` (LOCAL) |
+| commit | ✅ `44f4ccd` (release) + `dca0e32` (docs) on `main` — **LOCAL, not pushed** |
 | tag `v2.4.89` | ✅ created LOCAL, **NOT pushed** |
-| push `main` | ✅ pushed (source only — does NOT deploy; prod uses the pinned tag) |
+| push `main` | ⏸ HELD (deploy-safe — docpluck main push doesn't deploy — but held for the batch; user asked commit+tag only) |
 | push tag → auto-bump PR | ⏸ HELD (pushing the tag opens the docpluckapp pin-bump PR) |
 | PyPI publish | ⏸ HELD |
 | `PDFextractor/service/requirements.txt` pin bump | ⏸ HELD (still `@v2.4.88`) |
