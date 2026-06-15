@@ -19,6 +19,7 @@ Exit codes:
     1  - article-finder cache-check failed (PDF not in repository)
     2  - docpluck render raised an exception
     3  - usage error
+    4  - input-feed provenance mismatch (rec R-0003: located PDF sha != pinned/expected)
 """
 from __future__ import annotations
 
@@ -47,6 +48,17 @@ parser.add_argument(
     "--quiet",
     action="store_true",
     help="Suppress per-step stdout (errors still go to stderr)",
+)
+parser.add_argument(
+    "--expected-sha",
+    default=None,
+    help=(
+        "Expected sha256 of the input PDF (input-feed provenance gate, rec "
+        "R-0003). If omitted, falls back to canary.json's expected_pdf_sha for "
+        "--key. On mismatch the render aborts with exit 4 BEFORE scoring, so a "
+        "drifted input PDF can never be silently scored against a gold made "
+        "from the original."
+    ),
 )
 args = parser.parse_args()
 
@@ -132,6 +144,27 @@ pdf_bytes = pdf_path.read_bytes()
 pdf_sha = sha256_bytes(pdf_bytes)
 _log(f"PDF sha256: {pdf_sha}")
 
+# --- input-feed provenance gate (rec R-0003) ------------------------------
+# The verification substrate (the PDF we are about to render + score) must be
+# byte-equal to the canonical production input feed. The expected sha comes
+# from --expected-sha, or failing that from canary.json's expected_pdf_sha for
+# this key. Un-pinned keys are a no-op (additive guard). On mismatch we abort
+# with exit 4 BEFORE rendering, so a drifted PDF is never silently scored
+# against a gold generated from the original input.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from canary_provenance import check_provenance, load_expected_sha  # noqa: E402
+
+_canary_json = (
+    Path(__file__).resolve().parents[1] / ".claude" / "skills" / "_project" / "canary.json"
+)
+expected_sha = args.expected_sha or load_expected_sha(str(_canary_json), args.key)
+_prov_ok, _prov_msg = check_provenance(args.key, pdf_sha, expected_sha)
+if not _prov_ok:
+    print(_prov_msg, file=sys.stderr)
+    sys.exit(4)
+if expected_sha:
+    _log(f"provenance OK: input PDF matches pinned sha for {args.key}")
+
 try:
     md = render_pdf_to_markdown(pdf_bytes)
 except Exception as e:  # noqa: BLE001 - we want to surface everything the library raises
@@ -154,6 +187,8 @@ manifest = {
     "library_version": docpluck.__version__,
     "pdf_path": str(pdf_path),
     "pdf_sha": pdf_sha,
+    "expected_pdf_sha": expected_sha or "",
+    "provenance_ok": True,
     "rendered_path": str(out_path),
     "rendered_sha": rendered_sha,
     "rendered_bytes": len(md.encode("utf-8")),
