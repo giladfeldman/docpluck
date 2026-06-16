@@ -2,6 +2,11 @@
 
 This file tracks future-aim items that are scoped out of the current milestone but should not be lost. See `docs/superpowers/specs/` for active specs.
 
+## 2026-06-16 — deferred for investigation before code changes
+
+- [ ] **Investigate `sections=` extraction de-dup (no behavior change yet).** `extract_pdf(..., sections=...)`, `extract_docx(..., sections=...)`, and `extract_html(..., sections=...)` currently do one extraction pass and then call `extract_sections(...)`, which can re-run extraction/annotation internally by design. Before optimizing, document invariants proving parity with direct `extract_sections(...)` outputs, then run corpus/harness verification to confirm zero regressions. No implementation change until those proofs are in place.
+- [ ] **Investigate adding first-class diagnostics to structured outputs.** Current fallback visibility is via `method` suffixes and telemetry counters. Evaluate a stable `diagnostics` field on structured/text outputs (schema, backwards-compat guarantees, and consumer impact) before landing any API contract change.
+
 ## 2026-06-13 — v2.4.86/87/88 landed (ScienceArena GROBID/liteparse re-audit; PUSHED to origin/main e8b275d, NOT tagged)
 
 > ✅ **Push status:** committed AND pushed to `origin/main` as `e8b275d` (`8bfcdba..e8b275d`). The earlier "push hangs" were NOT a network issue — they were the **pre-push canary hook** running the slow full 5-paper audit, which kept getting killed by short timeouts. Pushed with `SKIP_CANARY=1` (justified: the canary's render subprocess was broken by the Python-env issue below, so its verdict was invalid; the changes were independently verified — 1896-test baseline green, deterministic ip_feldman render-diff identical on headings, camelot table fix confirmed on efendic/xiao/maier). NOT tagged.
