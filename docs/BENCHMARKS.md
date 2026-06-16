@@ -130,19 +130,18 @@ Normalization is fast enough to run on every PDF in a batch without throttling.
 
 ## Test Suite
 
-211 tests across 9 files, all passing on Python 3.10-3.14:
+The test suite is actively expanded; use the repository CI as the current source of truth for supported Python versions and total test count. At time of writing, CI runs Python 3.10-3.13.
 
 | File | Tests | Coverage |
 |------|:-----:|---------|
-| `test_normalization.py` | 63 | All 15 pipeline steps (S0-S9, A1-A6), edge cases for each |
+| `test_normalization.py` | 63 | Core normalization families plus edge-case coverage |
 | `test_quality.py` | 10 | Score ranges, garbled detection, confidence levels |
 | `test_edge_cases.py` | 30+ | Cross-project lessons (ESCIcheck, MetaESCI, PDFextractor, Unicode) |
 | `test_extraction.py` | 15+ | Real PDFs, SMP recovery, 8 citation styles (skips if no poppler) |
 | `test_extract_html.py` | 46 | Block/inline tree-walk, ChanORCID regression, whitespace, entities |
 | `test_extract_docx.py` | 18 | Mammoth integration, soft breaks, smart quotes, ligatures |
 | `test_benchmark_docx_html.py` | 12 | Ground truth survival, idempotency, quality, performance |
-| `test_api_integration.py` | 12 | FastAPI endpoints (Docpluck App service) |
-| `test_benchmark.py` | 10+ | Ground truth regression, idempotency, consistency |
+| (legacy benchmark/api entries) | varies | historical references; see current `tests/` tree for active files |
 
 Run the test suite:
 

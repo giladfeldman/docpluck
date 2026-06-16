@@ -2,8 +2,10 @@
 
 The normalization pipeline transforms raw PDF-extracted text into clean text suitable for academic statistical pattern matching. It is applied after extraction via `normalize_text(text, level)`.
 
-**Version:** 1.1.0  
-**Three levels:** `none` | `standard` (F0 + H0 + T0 + P0 + P1 + W0 + S0-S9) | `academic` (everything in `standard` + A1-A6)
+**Version:** see `docpluck.normalize.NORMALIZATION_VERSION` (current code is the source of truth).  
+**Three levels:** `none` | `standard` (document-shape cleanup + core cleanup + ref/reflow repair) | `academic` (everything in `standard` + statistical repairs).
+
+> This document explains the core step families. The live pipeline has grown beyond the original v1.1 shape (for example `W0*`, `R2`, `R3`, `A7`, and additional recovery stages). For the exact execution order and current step list, inspect `docpluck/normalize.py`.
 
 ---
 
