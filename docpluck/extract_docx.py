@@ -29,7 +29,12 @@ import io
 from .extract_html import html_to_text
 
 
-def extract_docx(docx_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
+def extract_docx(
+    docx_bytes: bytes,
+    *,
+    sections: list[str] | None = None,
+    max_input_bytes: int | None = None,
+) -> tuple[str, str]:
     """Extract text from DOCX file bytes.
 
     Converts the DOCX to HTML via mammoth (preserving soft breaks and block
@@ -42,6 +47,8 @@ def extract_docx(docx_bytes: bytes, *, sections: list[str] | None = None) -> tup
             "methods"]``) to filter the output. When provided, ``extract_sections``
             is called and only the requested sections are returned concatenated
             in document order. Pass ``None`` (default) to return the full text.
+        max_input_bytes: Optional hard cap for input size. When set and
+            ``len(docx_bytes)`` exceeds it, a ValueError is raised.
 
     Returns:
         A tuple of (text, method) where:
@@ -67,6 +74,11 @@ def extract_docx(docx_bytes: bytes, *, sections: list[str] | None = None) -> tup
     """
     # Lazy import so the core library works without mammoth installed
     import mammoth
+
+    if max_input_bytes is not None and len(docx_bytes) > max_input_bytes:
+        raise ValueError(
+            f"DOCX input exceeds max_input_bytes: {len(docx_bytes)} > {max_input_bytes}"
+        )
 
     result = mammoth.convert_to_html(io.BytesIO(docx_bytes))
     html = result.value

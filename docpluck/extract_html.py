@@ -123,7 +123,12 @@ def _walk(element: Any, parts: list[str], NavigableString: type, Tag: type) -> N
                     parts.append(' ')
 
 
-def extract_html(html_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
+def extract_html(
+    html_bytes: bytes,
+    *,
+    sections: list[str] | None = None,
+    max_input_bytes: int | None = None,
+) -> tuple[str, str]:
     """Extract text from HTML file bytes.
 
     Decodes as UTF-8 with error replacement (handles malformed encoding
@@ -135,6 +140,8 @@ def extract_html(html_bytes: bytes, *, sections: list[str] | None = None) -> tup
             "methods"]``) to filter the output. When provided, ``extract_sections``
             is called and only the requested sections are returned concatenated
             in document order. Pass ``None`` (default) to return the full text.
+        max_input_bytes: Optional hard cap for input size. When set and
+            ``len(html_bytes)`` exceeds it, a ValueError is raised.
 
     Returns:
         A tuple of (text, method) where:
@@ -154,6 +161,11 @@ def extract_html(html_bytes: bytes, *, sections: list[str] | None = None) -> tup
         with open("article.html", "rb") as f:
             text, method = extract_html(f.read(), sections=["abstract"])
     """
+    if max_input_bytes is not None and len(html_bytes) > max_input_bytes:
+        raise ValueError(
+            f"HTML input exceeds max_input_bytes: {len(html_bytes)} > {max_input_bytes}"
+        )
+
     html = html_bytes.decode('utf-8', errors='replace')
     text = html_to_text(html)
 
