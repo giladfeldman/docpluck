@@ -9,7 +9,7 @@ Supports three input formats:
 - **DOCX** via `mammoth` (DOCX → HTML → text, preserving Shift+Enter soft breaks)
 - **HTML** via `beautifulsoup4` + `lxml` (block/inline-aware tree-walk)
 
-All three formats feed into the same 15-step normalization pipeline and quality scoring.
+All three formats feed into the same normalization pipeline and quality scoring.
 
 ---
 
@@ -250,8 +250,8 @@ Apply the normalization pipeline at the specified level.
 | Level | Steps | Use when |
 |-------|-------|----------|
 | `none` | — | You want raw text, no modifications |
-| `standard` | S0-S9 | General text processing (NLP, search indexing) |
-| `academic` | S0-S9 + A1-A6 | Statistical pattern matching, meta-analysis |
+| `standard` | Core cleanup (`S*`) + document-shape cleanup (`F0/H0/T0/P0/P1/W0`) + recovery/ref joins (`R2/R3/A7`) | General text processing (NLP, search indexing) |
+| `academic` | `standard` + statistical repairs (`A*` and `W0*`) | Statistical pattern matching, meta-analysis |
 
 ```python
 from docpluck import normalize_text, NormalizationLevel
@@ -265,7 +265,7 @@ text, report = normalize_text(raw, NormalizationLevel.standard)
 # Full statistical repair (recommended for academic PDFs)
 text, report = normalize_text(raw, NormalizationLevel.academic)
 
-print(report.version)          # "1.1.0"
+print(report.version)          # e.g., "1.9.35"
 print(report.steps_applied)    # ["S0_smp_to_ascii", "S1_encoding_validation", ...]
 print(report.changes_made)     # {"ligatures_expanded": 27, "dashes_normalized": 3, ...}
 ```
@@ -275,7 +275,7 @@ print(report.changes_made)     # {"ligatures_expanded": 27, "dashes_normalized":
 | Field | Type | Description |
 |-------|------|-------------|
 | `level` | `str` | Level used: `"none"`, `"standard"`, or `"academic"` |
-| `version` | `str` | Pipeline version (e.g. `"1.1.0"`) |
+| `version` | `str` | Pipeline version (e.g. `"1.9.35"`) |
 | `steps_applied` | `list[str]` | Step codes in order (e.g. `["S1_encoding_validation", "S3_ligature_expansion"]`) |
 | `changes_made` | `dict[str, int]` | Character-level change counts per step |
 
