@@ -56,6 +56,8 @@ def extract_pdf_structured(
     *,
     thorough: bool = False,
     table_text_mode: TableTextMode = "raw",
+    max_input_bytes: int | None = None,
+    extract_timeout_seconds: int = 120,
     _layout_doc=None,
 ) -> StructuredResult:
     """Extract text + structured tables + figures from a PDF.
@@ -67,6 +69,10 @@ def extract_pdf_structured(
         table_text_mode: ``"raw"`` (default; text identical to ``extract_pdf``)
             or ``"placeholder"`` (caption lines for tables/figures are replaced
             with ``[Label: caption]`` markers).
+        max_input_bytes: Optional hard cap for input size. When set and
+            ``len(pdf_bytes)`` exceeds it, a ValueError is raised.
+        extract_timeout_seconds: Timeout passed to ``extract_pdf`` for the
+            pdftotext subprocess. Default 120 seconds preserves prior behavior.
         _layout_doc: Optional pre-computed ``extract_pdf_layout(pdf_bytes)``
             result. When provided, the §A R1 whitespace_cells fallback path
             reuses it instead of re-extracting (saves one pdfplumber pass
@@ -78,7 +84,11 @@ def extract_pdf_structured(
     Returns:
         StructuredResult dict.
     """
-    raw_text, base_method = extract_pdf(pdf_bytes)
+    raw_text, base_method = extract_pdf(
+        pdf_bytes,
+        max_input_bytes=max_input_bytes,
+        pdftotext_timeout_seconds=extract_timeout_seconds,
+    )
     page_count = count_pages(pdf_bytes)
 
     if raw_text.startswith("ERROR:"):
