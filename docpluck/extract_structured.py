@@ -161,8 +161,9 @@ def extract_pdf_structured(
             if camelot_tables:
                 method_pieces.append("camelot_stream")
         except Exception as exc:
-            method_pieces.append("camelot_failed")
-            record_fallback("camelot_extract_exception", detail=type(exc).__name__)
+            exc_name = type(exc).__name__
+            method_pieces.append(f"camelot_failed:{exc_name}")
+            record_fallback("camelot_extract_exception", detail=exc_name)
             camelot_tables = []
 
     # Match Camelot tables to "Table N" caption lines on the same page.
@@ -215,7 +216,9 @@ def extract_pdf_structured(
             _whitespace_cells = _wc
             _region_for_caption_fn = _rfc
         except Exception as exc:
-            record_fallback("whitespace_cells_setup_exception", detail=type(exc).__name__)
+            exc_name = type(exc).__name__
+            record_fallback("whitespace_cells_setup_exception", detail=exc_name)
+            method_pieces.append(f"whitespace_setup_failed:{exc_name}")
             layout_doc = None
 
     for cap in unmatched_caps:
@@ -226,7 +229,9 @@ def extract_pdf_structured(
                 if region is not None:
                     cells = _whitespace_cells(layout_doc, region=region)
             except Exception as exc:
-                record_fallback("whitespace_cells_region_exception", detail=type(exc).__name__)
+                exc_name = type(exc).__name__
+                record_fallback("whitespace_cells_region_exception", detail=exc_name)
+                method_pieces.append(f"whitespace_region_failed:{exc_name}")
                 cells = []
         if cells:
             n_rows = max((c["r"] for c in cells), default=-1) + 1
