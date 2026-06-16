@@ -214,7 +214,9 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
                     text = corrected
                     method = f"{method}+column_corrected:{','.join(map(str, changed))}"
         except Exception as exc:
-            record_fallback("column_correction_exception", detail=type(exc).__name__)
+            exc_name = type(exc).__name__
+            record_fallback("column_correction_exception", detail=exc_name)
+            method = f"{method}+column_correction_failed:{exc_name}"
 
         if sections is not None:
             from .sections import extract_sections
