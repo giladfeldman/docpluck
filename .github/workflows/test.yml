@@ -36,3 +36,6 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+      - name: Check docs and metadata consistency
+        run: python scripts/check_docs_consistency.py
