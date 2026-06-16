@@ -24,7 +24,13 @@ from typing import Optional, Union
 
 from .telemetry import record_fallback
 
-def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
+def extract_pdf(
+    pdf_bytes: bytes,
+    *,
+    sections: list[str] | None = None,
+    max_input_bytes: int | None = None,
+    pdftotext_timeout_seconds: int = 120,
+) -> tuple[str, str]:
     """Extract text from PDF bytes.
 
     Uses pdftotext as the primary engine. Automatically falls back to
@@ -49,6 +55,12 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
               "pdftotext_default"                   — normal extraction
               "pdftotext_default+pdfplumber_recovery" — SMP fallback triggered
 
+    Guardrails:
+        max_input_bytes: Optional hard cap for input size. When set and
+            ``len(pdf_bytes)`` exceeds it, a ValueError is raised.
+        pdftotext_timeout_seconds: Timeout for the pdftotext subprocess.
+            Default 120 seconds preserves current behavior.
+
     Requires:
         pdftotext binary (from poppler-utils) on PATH.
 
@@ -61,6 +73,13 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
         with open("paper.pdf", "rb") as f:
             text, method = extract_pdf(f.read(), sections=["abstract", "methods"])
     """
+    if max_input_bytes is not None and len(pdf_bytes) > max_input_bytes:
+        raise ValueError(
+            f"PDF input exceeds max_input_bytes: {len(pdf_bytes)} > {max_input_bytes}"
+        )
+    if pdftotext_timeout_seconds <= 0:
+        raise ValueError("pdftotext_timeout_seconds must be > 0")
+
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
@@ -70,7 +89,7 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
         result = subprocess.run(
             ["pdftotext", "-enc", "UTF-8", tmp_path, "-"],
             capture_output=True,
-            timeout=120,
+            timeout=pdftotext_timeout_seconds,
             encoding="utf-8",
             errors="replace",
         )
