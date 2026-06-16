@@ -34,6 +34,7 @@ from .tables.captions import (
     find_caption_matches,
 )
 from .tables.render import cells_to_html
+from .telemetry import record_fallback
 
 
 TABLE_EXTRACTION_VERSION = "2.2.0"  # v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
@@ -159,8 +160,9 @@ def extract_pdf_structured(
             camelot_tables = extract_tables_camelot(pdf_bytes)
             if camelot_tables:
                 method_pieces.append("camelot_stream")
-        except Exception:
+        except Exception as exc:
             method_pieces.append("camelot_failed")
+            record_fallback("camelot_extract_exception", detail=type(exc).__name__)
             camelot_tables = []
 
     # Match Camelot tables to "Table N" caption lines on the same page.
@@ -212,7 +214,8 @@ def extract_pdf_structured(
                 layout_doc = extract_pdf_layout(pdf_bytes)
             _whitespace_cells = _wc
             _region_for_caption_fn = _rfc
-        except Exception:
+        except Exception as exc:
+            record_fallback("whitespace_cells_setup_exception", detail=type(exc).__name__)
             layout_doc = None
 
     for cap in unmatched_caps:
@@ -222,7 +225,8 @@ def extract_pdf_structured(
                 region = _region_for_caption_fn(layout_doc, cap)
                 if region is not None:
                     cells = _whitespace_cells(layout_doc, region=region)
-            except Exception:
+            except Exception as exc:
+                record_fallback("whitespace_cells_region_exception", detail=type(exc).__name__)
                 cells = []
         if cells:
             n_rows = max((c["r"] for c in cells), default=-1) + 1
