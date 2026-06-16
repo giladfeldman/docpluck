@@ -22,6 +22,7 @@ import re
 
 from docpluck.tables import Cell, Table
 from docpluck.tables.render import cells_to_html
+from docpluck.telemetry import record_fallback
 
 
 # Patterns used to detect rows that look like running headers / page footers.
@@ -240,7 +241,8 @@ def _pick_best_per_page(stream_tables: list, lattice_tables: list) -> list:
         try:
             n_rows = len(ct.df)
             n_cols = len(ct.df.columns)
-        except Exception:
+        except Exception as exc:
+            record_fallback("camelot_table_shape_exception", detail=type(exc).__name__)
             continue
         if n_rows < 2 or n_cols < 2:
             continue
@@ -289,7 +291,8 @@ def extract_tables_camelot(
             stream_tables = list(
                 camelot.read_pdf(tmp_path, pages="all", flavor="stream", strip_text="\n")
             )
-        except Exception:
+        except Exception as exc:
+            record_fallback("camelot_stream_exception", detail=type(exc).__name__)
             stream_tables = []
         try:
             lattice_tables = list(
@@ -302,7 +305,8 @@ def extract_tables_camelot(
                     process_background=True,
                 )
             )
-        except Exception:
+        except Exception as exc:
+            record_fallback("camelot_lattice_exception", detail=type(exc).__name__)
             lattice_tables = []
         tables_obj = _pick_best_per_page(stream_tables, lattice_tables)
 
@@ -318,7 +322,8 @@ def extract_tables_camelot(
             try:
                 n_rows = len(df)
                 n_cols = len(df.columns)
-            except Exception:
+            except Exception as exc:
+                record_fallback("camelot_table_frame_exception", detail=type(exc).__name__)
                 continue
             if n_rows < 2 or n_cols < 2:
                 continue
@@ -377,7 +382,8 @@ def extract_tables_camelot(
 
             try:
                 html = cells_to_html(cells)
-            except Exception:
+            except Exception as exc:
+                record_fallback("camelot_html_render_exception", detail=type(exc).__name__)
                 html = None
 
             out.append(

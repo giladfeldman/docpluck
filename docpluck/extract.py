@@ -22,6 +22,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Union
 
+from .telemetry import record_fallback
 
 def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple[str, str]:
     """Extract text from PDF bytes.
@@ -212,8 +213,8 @@ def extract_pdf(pdf_bytes: bytes, *, sections: list[str] | None = None) -> tuple
                 if corrected and corrected != text and changed:
                     text = corrected
                     method = f"{method}+column_corrected:{','.join(map(str, changed))}"
-        except Exception:
-            pass
+        except Exception as exc:
+            record_fallback("column_correction_exception", detail=type(exc).__name__)
 
         if sections is not None:
             from .sections import extract_sections
@@ -293,11 +294,13 @@ def count_pages(pdf_bytes: bytes) -> int:
             import pdfplumber  # type: ignore[import-not-found]
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
                 return max(len(pdf.pages), 1)
-        except Exception:
+        except Exception as exc:
+            record_fallback("count_pages_pdfplumber_fallback_failed", detail=type(exc).__name__)
             # pdfplumber failed (corrupt PDF, password-protected, etc.) —
             # fall back to the heuristic's value.
             return max(count, 1)
-    except Exception:
+    except Exception as exc:
+        record_fallback("count_pages_exception", detail=type(exc).__name__)
         return 0
 
 
@@ -458,5 +461,6 @@ def _recover_with_pdfplumber(pdf_path: str) -> Optional[str]:
 
         return full_text
 
-    except Exception:
+    except Exception as exc:
+        record_fallback("pdfplumber_recovery_exception", detail=type(exc).__name__)
         return None
