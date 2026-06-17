@@ -2261,7 +2261,46 @@ def _nearest_h2_parent_label(lines: list[str], i: int) -> Optional[str]:
     return None
 
 
-def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
+def _raw_text_is_single_column(raw_text: str) -> bool:
+    """Heuristic single-column-layout detector for the heading-promotion
+    relaxation below.
+
+    MUST be computed from the RAW pdftotext output (``extract_pdf`` /
+    ``structured["text"]`` in ``"raw"`` mode) — NOT from the in-render-pipeline
+    text, where earlier steps have already JOINED column-wrapped lines into
+    long paragraphs and destroyed the line-width signal (a 36-char raw
+    column-cell becomes a 112-char joined line). See ``_project/lessons.md``
+    2026-06-17 ("Text-channel heading promotion can't use line-WIDTH to gate").
+
+    Signal: the fraction of non-blank lines wider than 65 chars. A two-column
+    layout physically cannot emit many wide lines — each column wraps at
+    ~30-48 chars — so this fraction stays low (measured 0.06-0.24 across the
+    two-column corpus members: chan_feldman 0.06, ip_feldman 0.13,
+    chandrashekar 0.15, ieee_access_3/4 0.17-0.24). Single-column body prose
+    wraps at the full page width, so the fraction is high (0.28-0.58:
+    ar_apa 0.38, chen_jesp 0.39, plos_med 0.44, nat_comms 0.58). The 0.25
+    threshold sits in the natural corpus gap (0.235 -> 0.280).
+
+    Conservative by construction: a single-column doc misclassified as
+    two-column merely FORGOES the relaxation (no regression — the headings
+    stay demoted exactly as before this change); the only harmful direction
+    (a two-column doc classed single-column) is additionally bounded by every
+    downstream promotion guard still applying. Keyed on a structural typographic
+    invariant (column width), never on paper identity.
+    """
+    if not raw_text:
+        return False
+    widths = [len(line) for line in raw_text.split("\n") if line.strip()]
+    if len(widths) < 20:
+        # Too little body text to judge layout reliably — stay conservative.
+        return False
+    frac_wide = sum(1 for w in widths if w > 65) / len(widths)
+    return frac_wide >= 0.25
+
+
+def _promote_isolated_titlecase_subsection_headings(
+    text: str, *, is_single_column: bool = False
+) -> str:
     """§B-new-1: promote paragraph-isolated Title-Case short lines (≤6 words,
     ≤60 chars) followed by prose to ``### {label}`` headings.
 
@@ -2346,8 +2385,50 @@ def _promote_isolated_titlecase_subsection_headings(text: str) -> str:
         # downstream gates (prior-paragraph-terminator, sibling-label,
         # structural-markup-prev) still apply.
         if not blank_before:
-            out.append(line)
-            continue
+            # 2026-06-17 single-column relaxation. JESP / Elsevier single-column
+            # papers glue a subsection heading ("Overview", "Practice
+            # instructions", "Self-control assessment") DIRECTLY between the
+            # prior subsection's body and its own body, with NO blank padding on
+            # either side — so blank_before is False and every existing promoter
+            # rejects them, leaving them demoted to body text. Admit a no-blank-
+            # before candidate ONLY when (a) the document is single-column AND
+            # (b) the immediately-preceding line is a sentence-terminated prose
+            # line (a clean paragraph boundary, not a mid-sentence column-wrap).
+            # Two-column layouts keep the hard reject: there the identical shape
+            # is a narrow table-cell / measures-list label and admitting it
+            # re-opens the G5d hallucinated-heading trap (5 false promotions on
+            # ip_feldman). The width-derived ``is_single_column`` flag is the
+            # only thing that separates the two cases — the line-wrap signal is
+            # gone by the time the render pipeline reaches this promoter, so it
+            # is precomputed from the raw pdftotext text and threaded in.
+            # See _project/lessons.md 2026-06-17. All downstream guards
+            # (prev-paragraph-terminator, sibling-label, cell-region,
+            # body-first-alpha, CRediT-parent) still apply below.
+            # The preceding line must be a GENUINE clean paragraph boundary:
+            # end in a real sentence terminator (._SENTENCE_TERMINATOR_RE) OR be
+            # a markdown heading (the candidate's parent ``## `` section). This
+            # is deliberately STRICTER than _prev_paragraph_is_sentence_terminated,
+            # which ALSO treats a numbered list-item line as a boundary — but a
+            # numbered questionnaire scale item ("6. How confident ... 0 =
+            # Extremely not confident … 6 =") ending mid-anchor wraps its tail
+            # ("Extremely confident") onto the next line, and that wrapped tail
+            # is NOT a subsection heading (chen_2021_jesp G5d false positive).
+            _pk = i - 1
+            while _pk >= 0 and not lines[_pk].strip():
+                _pk -= 1
+            _prev_clean = lines[_pk].rstrip() if _pk >= 0 else ""
+            _prev_is_clean_boundary = (
+                _pk < 0
+                or _prev_clean.startswith("#")
+                or bool(_SENTENCE_TERMINATOR_RE.search(_prev_clean))
+            )
+            if not (
+                is_single_column
+                and _prev_is_clean_boundary
+                and not _is_single_col_relaxation_fragment(stripped)
+            ):
+                out.append(line)
+                continue
         if not blank_after:
             # Allow only when next line is immediate body prose AND the
             # candidate line passes the strict title-case-label shape.
@@ -4339,6 +4420,49 @@ _TITLE_CONNECTOR_TAIL_WORDS = frozenset({
 })
 
 
+# Prepositions that, when they LEAD a promotion candidate, mark it as the head
+# of a column-wrapped sentence rather than a subsection title (e.g. korbmacher's
+# "From Cornell University undergraduates to American" + "MTurk workers as
+# participants."). Deliberately EXCLUDES articles ("the"/"a"/"an") and
+# conjunctions ("and"/"or"/"but"): real headings routinely lead with an article
+# ("The current study", "The present studies"). Subset of the tail set above.
+_LEADING_FRAGMENT_PREPS = frozenset({
+    "of", "from", "for", "to", "with", "on", "at",
+    "by", "in", "as", "into", "onto", "upon",
+})
+
+
+def _is_single_col_relaxation_fragment(stripped: str) -> bool:
+    """Reject shapes the single-column no-blank-before relaxation must NOT
+    promote — the false-positive shapes the hard ``blank_before`` reject used
+    to filter, which re-surface only via the relaxation (so this guard is
+    scoped to it; existing blank-isolated promotion is untouched):
+
+    * open-bracket furniture — ``(Continued )`` table-continuation markers;
+    * a candidate LEADING with a bare preposition — the head of a column-wrapped
+      sentence (``From Cornell University undergraduates to American``);
+    * a candidate ENDING on a dangling connector — a structured-abstract label
+      glued to its body (``Meaning These findings suggest that``);
+    * a candidate containing an internal SEMICOLON or ending on a COMMA — an
+      abbreviation glossary / clause list, never a heading (plos_med_1's
+      ``Anesthesiologists; CI, confidence interval; DSMB,`` abbreviation block).
+    """
+    if stripped.startswith(("(", "[", "{")):
+        return True
+    if ";" in stripped or stripped.endswith(","):
+        return True
+    words = stripped.split()
+    if not words:
+        return True
+    first = re.sub(r"[^A-Za-z]", "", words[0]).lower()
+    if first in _LEADING_FRAGMENT_PREPS:
+        return True
+    last = re.sub(r"[^A-Za-z]", "", words[-1]).lower()
+    if last in _TITLE_CONNECTOR_TAIL_WORDS:
+        return True
+    return False
+
+
 def _title_looks_truncated(title_text: str) -> bool:
     """True if ``title_text`` ends with a connector word.
 
@@ -4960,7 +5084,15 @@ def render_pdf_to_markdown(
     # §B-new-1 (2026-05-23): wider analogue — promote any paragraph-isolated
     # Title-Case short line (≤6 words, ≤60 chars) followed by prose, gated
     # by strict shape checks. Runs AFTER B2c so the narrow set still wins.
-    md = _promote_isolated_titlecase_subsection_headings(md)
+    # 2026-06-17: single-column layout signal, computed from the RAW pdftotext
+    # text (structured["text"] is mode="raw") BEFORE the render pipeline joined
+    # column-wrapped lines — see _raw_text_is_single_column. Gates the
+    # no-blank-before subsection-heading relaxation so JESP/Elsevier glued
+    # headings promote without re-opening the two-column G5d over-promotion trap.
+    _is_single_column = _raw_text_is_single_column(structured["text"])
+    md = _promote_isolated_titlecase_subsection_headings(
+        md, is_single_column=_is_single_column
+    )
     # 2026-06-06 (Cycle 4 redux): repair column-wrapped subsection-heading
     # titles carrying a citation — Rule A promotes a body `{Title} et al.`
     # + bare `(YYYY)` wrap to `### {Title} et al. (YYYY)` (finding #3);
