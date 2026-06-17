@@ -43,11 +43,35 @@
         "key": "10.1016/j.jesp.2009.12.011",
         "doi": "10.1016/j.jesp.2009.12.011",
         "expected_pdf_sha": "69b2795c04ef1491b5cfc295be28197cc83b9579830f6fdd1ab8f1549314ce31",
-        "exercises": "B2 hallucinated headings (Participants/Overview); B7 deleted-minus glyph (b = .022 → should be -0.022)"
+        "exercises": "B2 hallucinated headings (Participants/Overview); single-column glued-heading promotion (Overview/Practice instructions/Self-control assessment, v2.4.91); B7 deleted-minus glyph (b = .022 → should be -0.022)"
+      },
+      {
+        "stem": "efendic_2022_affect",
+        "key": "10.1177/19485506211056761",
+        "doi": "10.1177/19485506211056761",
+        "expected_pdf_sha": "3c19f397fece9068010c7f0166ccc968c7897435a14f8ad266e0c4dc815c6dc2",
+        "exercises": "glyph family (< -as-backslash v2.4.39, 2-for-minus CI-pairing v2.4.40); single-column layout (frac>65~0.14 — two-column profile, gate stays OFF)",
+        "onboarded": "2026-06-17 (gold pre-existed in article-finder cache; fulltext PDF aligned to test-pdfs/apa; gold title verified present in test-pdf text)"
+      },
+      {
+        "stem": "maier_2023_collabra",
+        "key": "10.1525/collabra.90203",
+        "doi": "10.1525/collabra.90203",
+        "expected_pdf_sha": "723099e15a1d1e4e6a31fb9b7d70b3f9f8925a1cb6c63ec7d3b9d618885c4553",
+        "exercises": "Collabra single-column layout; identifiable-victim replication tables",
+        "onboarded": "2026-06-17 (gold pre-existed in article-finder cache; fulltext PDF aligned to test-pdfs/apa; gold title verified present in test-pdf text)"
+      },
+      {
+        "stem": "xiao_2021_crsp",
+        "key": "10.1080/23743603.2021.1878340",
+        "doi": "10.1080/23743603.2021.1878340",
+        "expected_pdf_sha": "a5b349c8b5808c601dc46277d8b034e70df22dc7c54ac2ac8748a67cdb1d003c",
+        "exercises": "Camelot section-row labels (decoy-effect condition groups, v2.4.27); single-column tables",
+        "onboarded": "2026-06-17 (gold pre-existed in article-finder cache; fulltext PDF copied from test-pdfs/apa; gold title verified present in test-pdf text)"
       }
     ],
     "rotation_size": 2,
-    "_pool_size_note": "Pool currently has 2 entries == rotation_size, so every cycle covers both (no rotation effect). Expand to 5+ once efendic_2022_affect, maier_2023_collabra, xiao_2021_crsp are onboarded into article-finder per the locator-via-AF directive. See `onboarding_status.still_to_onboard_before_use`."
+    "_pool_size_note": "Pool has 5 entries > rotation_size 2 — rotation is active (each cycle samples 2). efendic/maier/xiao onboarded 2026-06-17 (their reading golds pre-existed in the article-finder cache; fulltext PDFs aligned to the canonical test-pdfs/apa copies and each gold's title was verified present in the test-pdf text). The fixed-3 (ip_feldman/plos_med/chandrashekar) run EVERY cycle regardless of rotation."
   },
   "limits": {
     "max_cycles_without_corpus_sweep": 3,
@@ -114,9 +138,9 @@
     "_note": "The audit subagent (Sonnet) is dispatched per-paper. For each canary paper: render via render_command, fetch gold via gold_via_article_finder, dispatch Sonnet with this taxonomy + paper-specific signals from canary.fixed[].rationale. Sonnet emits STRICT JSON verdict. The orchestrator (canary-audit.sh) aggregates per-paper verdicts and exits 0/1. Per feedback_no_apis_only_claude_max, Sonnet is ONLY invoked via Claude Max (headless `claude -p --model sonnet` or in-session Agent tool) — NEVER via the Anthropic API."
   },
   "onboarding_status": {
-    "onboarded_to_article_finder": ["ip_feldman_2025_pspb", "plos_med_1", "chandrashekar_2023_mp", "chan_feldman_2025_cogemo", "ar_apa_j_jesp_2009_12_011"],
-    "still_to_onboard_before_use": ["efendic_2022_affect", "maier_2023_collabra", "xiao_2021_crsp"],
-    "onboarding_date": "2026-05-23",
-    "onboarding_record": "tmp/onboard_canary.py — run again to onboard the remaining 3 (DOIs need to be extracted first)"
+    "onboarded_to_article_finder": ["ip_feldman_2025_pspb", "plos_med_1", "chandrashekar_2023_mp", "chan_feldman_2025_cogemo", "ar_apa_j_jesp_2009_12_011", "efendic_2022_affect", "maier_2023_collabra", "xiao_2021_crsp"],
+    "still_to_onboard_before_use": [],
+    "onboarding_date": "2026-06-17 (efendic/maier/xiao added; 2026-05-23 for the original 5)",
+    "onboarding_record": "tmp/onboard_canary.py — all 8 canary papers now registered with reading golds; rotating_pool size 5 > rotation_size 2"
   }
 }
