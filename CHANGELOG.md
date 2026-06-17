@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.91] — 2026-06-17
+
+**Single-column subsection-heading promotion — recover glued JESP/Elsevier subsection headings without re-opening the two-column G5d trap.** Render-layer only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
+
+Surfaced by `/docpluck-iterate` Phase-5d (canary `ar_apa_j_jesp_2009_12_011`). Single-column Elsevier/JESP papers emit subsection headings ("Overview", "Practice instructions", "Self-control assessment") on their own line with **no blank padding on either side** — glued directly between the prior subsection's sentence-terminated body and their own body. Every existing promoter requires `blank_before AND blank_after` (or the PSPB no-blank-after relaxation, which still requires `blank_before`), so these stayed demoted to body text.
+
+`_promote_isolated_titlecase_subsection_headings` now admits a no-blank-before candidate **only when the document is single-column** AND the immediately-preceding line is a sentence-terminated prose line. The single-column signal (`_raw_text_is_single_column`) is the fraction of raw-pdftotext non-blank lines wider than 65 chars (≥ 0.25) — a structural typographic invariant computed from the **raw** text *before* the render pipeline joins column-wrapped lines and destroys the line-width signal (corpus separation: two-column 0.06–0.24, single-column 0.28–0.58; threshold sits in the natural gap). Two-column layouts keep the hard `blank_before` reject, where the identical shape is a narrow table-cell / measures-list label (the G5d hallucinated-heading trap). A fragment guard (`_is_single_col_relaxation_fragment`) additionally rejects bracket furniture, leading-preposition sentence-wraps, dangling-connector tails, and **abbreviation-glossary / clause lists** (internal `;` or trailing `,`).
+
+**Validation (2026-06-17).** Deterministic heading-delta across the corpus: `ar_apa_j_jesp_2009_12_011` **+3** genuine headings (AI-verified vs the article-finder reading gold: `new_headings_are_real=true`, zero hallucination), `ar_apa_…_010` +9, `jmf_1` +11, `demography_1` +4, `bjps_1` +3, `chen_2021_jesp` +3; two-column papers (`ip_feldman_2025_pspb` byte-identical, `chan_feldman`, `chandrashekar`) **+0**; `plos_med_1` net +0 (one abbreviation-glossary false promotion caught by the fragment guard). 26-paper baseline 26/26 (one transient pdftotext timeout, PASS in isolation); full suite 1733 passed. New regression `tests/test_single_column_subsection_promote_real_pdf.py` (23 cases). The canary corpus still FAILs on **pre-existing** table row/column loss and RC-1 column-interleave (separate root causes, queued) — this release is an incremental heading-fidelity improvement, not a corpus-clean claim.
+
 ## [2.4.90] — 2026-06-15
 
 **RC-1 Step 2 — per-band region-aware two-column re-extraction (ship-dark behind `DOCPLUCK_COLUMN_CORRECT_BANDED`, default OFF).** No `NORMALIZATION_VERSION` change — the default path is byte-identical; the flag only adds reading-order corrections upstream of normalize.
