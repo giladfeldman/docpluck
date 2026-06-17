@@ -1212,3 +1212,24 @@ aren't skipped.
 
 ### Process notes
 - cycle-2 iterate-gate = FAIL (I2 partial canary coverage: only chan+chandra AI-verified of the canary/target set; I3 tables remain; I10 rendered_sha is the flag-ON render not the gate's flag-OFF canary artifact). Honest incremental-cycle FAIL per 0e-bis — run stays OPEN/PARTIAL, NOT closed. Remaining punch-list in the handoff + spec "Step 2 — remaining work".
+
+---
+
+## 2026-06-17 · Resume run · v2.4.91 single-column heading fix shipped; canary expanded; RC-1/tables remain OPEN
+
+**Stop condition:** resume the 2026-06-17 handoff queue ("implement, resume, finish the whole thing"). **Verdict: PARTIAL — run remains OPEN/FAIL** (iterate-gate `--cycle 1` = FAIL on I3; canary corpus genuinely broken on pre-existing table/column defects).
+
+**Shipped (v2.4.91, tag + PyPI + docpluckapp pin @v2.4.91 auto-merged + prod /_diag=2.4.91):**
+- Single-column subsection-heading promotion. `_raw_text_is_single_column` (frac of raw-pdftotext lines >65 chars ≥ 0.25 — a structural column-width invariant measured across all 26 baseline papers; clean gap 0.235→0.280) gates a no-blank-before relaxation in `_promote_isolated_titlecase_subsection_headings`. ar_apa_011 +3 genuine headings (AI-verified `new_headings_are_real=true`), jmf_1 +11, ar_apa_010 +9, demography +4, bjps +3, chen +3; two-column +0 (ip_feldman byte-identical). 26/26 baseline, full suite 1748 passed, 23 new tests.
+- **Concurrent-stream merge:** render.py combined a parallel session's work (chen_2021_jesp `_prev_is_clean_boundary` scale-item guard + `_LEADING_FRAGMENT_PREPS`) with this session's single-column gate + abbreviation-glossary fragment guard. One coherent feature; verified together; provenance noted in the commit (user-approved).
+- Canary rotating pool expanded 2→5 (efendic/maier/xiao onboarded; golds pre-existed; warning cleared).
+
+**Process lessons this run:**
+1. **AI-verify is the only thing that catches a hallucinated promotion that a heading-COUNT delta passes.** The deterministic 15-paper single-column heading-delta scan showed plos_med +1 — but only the Sonnet AI-verify vs the gold identified that +1 as `### Anesthesiologists; CI, confidence interval; DSMB,`, an abbreviation glossary (a HALLUCINATION), not a real subsection. Fix: fragment guard rejects internal `;` / trailing `,`. **A heading-count delta is necessary-not-sufficient; AI-verify every single-column paper whose heading count changes.**
+2. **Layout heuristics: measure the discriminator across the WHOLE baseline before fixing a threshold.** Median line-width misclassifies single-column-but-table-heavy papers (plos_med median 48); the column-interleave page count is useless (the genuine single-column ar_apa has 4/5 pages flagged). `frac>65` is the physical invariant that actually separates the classes.
+3. **Concurrent co-editing of the same source file is now a recurring hazard (3rd occurrence in 3 days).** `git status` at resume showed render.py modified; the live file contained work I didn't author. Re-confirm provenance (`git show HEAD:` diff) before committing; surface to the user; stage by explicit path.
+
+**Open queue (run stays OPEN — standing verdict FAIL):**
+- **Tables (highest user impact, item 3):** fresh AI-verify of all 5 canary papers re-confirmed pervasive table TEXT-LOSS — plos_med Tables 2-5 (Table 5's 13 SAE rows empty body, Table 4 shows wrong table's content), ip_feldman Tables 3/4/5/10, chandrashekar Tables 7-10 collapse to header shells, chan_feldman PCIRR + Tables 1/3/4/7 row-loss + Table 8/9 swap, ar_apa Table 1 raw-dump duplicated. Camelot/extraction-layer, multi-cycle.
+- **RC-1 band path (item 2, user-approved multi-cycle):** ar_apa flag-ON regression reconfirmed at v2.4.91 — section-order scramble (Introduction before Abstract) + "M. Muraven / Journal of Experimental" running-header leak. Flags stay OFF. Fix band-cut/reorder under the word-preservation guard before any flip.
+- **Pre-existing G5d two-column heading hallucinations (NOT addressed by v2.4.91, gate-off path):** ip_feldman `### Reasons for change` (Table 5 col label), chandrashekar `### Department of Philosophy, Lake Forest College` (affiliation in Abstract via column-interleave). Separate root cause from the single-column path.
