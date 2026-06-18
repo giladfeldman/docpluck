@@ -1860,6 +1860,42 @@ _MASTHEAD_COPYRIGHT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 2026-06-18 (G5d affiliation-heading): an academic affiliation / institution
+# line is masthead furniture (author address), never a section heading. When
+# column-interleave scatters such a line past the H1→first-`##` masthead zone
+# (e.g. chandrashekar_2023_mp's "Department of Philosophy, Lake Forest College"
+# landing just after `## Abstract`), _strip_frontmatter_masthead_block can no
+# longer reach it, and its short Title-Case shape then matches the subsection-
+# heading promoter and becomes a hallucinated `### ` heading. This signature is
+# consulted by the promoter to REJECT promotion (the line stays body text — a
+# strict improvement over a fake heading). Keyed on affiliation grammar, never
+# on paper identity:
+#   (a) a unit phrase head — "Department/School/Faculty/Division/Institute/
+#       Centre/Center/Laboratory/College/University of <Capitalized>"; or
+#   (b) a proper-noun institution phrase ENDING in University/College/Institute/
+#       Hospital/Polytechnic (optionally with a trailing "(ACRONYM)").
+# Candidates are already gated to <=6 words / <=60 chars by the promoter, so the
+# false-positive surface is limited to short Title-Case lines, among which an
+# institution-terminated phrase is overwhelmingly an affiliation.
+_AFFILIATION_LINE_RE = re.compile(
+    r"^\s*(?:Department|School|Faculty|Division|Institute|Centre|Center"
+    r"|Laboratory|College|University)\s+of\s+[A-Z]"
+    r"|\b[A-Z][\w’'.\-]+(?:\s+[A-Z][\w’'.\-]+)*\s+"
+    r"(?:University|College|Institute|Hospital|Polytechnic)\b"
+    r"(?:\s*\([A-Z]{2,}\))?\s*$",
+    re.UNICODE,
+)
+
+
+def _looks_like_affiliation_line(line: str) -> bool:
+    """True when ``line`` matches academic-affiliation grammar (see
+    ``_AFFILIATION_LINE_RE``). Used to veto subsection-heading promotion of a
+    stray affiliation line that interleave dropped past the masthead zone."""
+    s = line.strip()
+    if not s:
+        return False
+    return bool(_AFFILIATION_LINE_RE.search(s))
+
 
 def _looks_like_masthead_hard_marker(line: str) -> bool:
     s = line.strip()
@@ -2332,6 +2368,16 @@ def _promote_isolated_titlecase_subsection_headings(
         stripped = line.strip()
         # Skip lines that already carry structural markup.
         if not stripped or stripped.startswith(("#", "*", "_", "<", ">", "|", "`", "-", "+")):
+            out.append(line)
+            continue
+        # 2026-06-18 (G5d affiliation-heading): never promote an affiliation /
+        # institution line to a subsection heading — it is masthead furniture
+        # (author address), not a section. Interleave can scatter it past the
+        # masthead-strip zone (e.g. chandrashekar's "Department of Philosophy,
+        # Lake Forest College" landing just after `## Abstract`); left here it
+        # would match the Title-Case promoter and become a fake `### ` heading.
+        # Placed BEFORE the chain-member bypass so it holds on every path.
+        if _looks_like_affiliation_line(stripped):
             out.append(line)
             continue
         # 2026-05-26 (Cluster A-ter): chain promotion BEFORE the standard
