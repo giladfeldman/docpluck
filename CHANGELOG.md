@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.4.92] — 2026-06-18
+
+**Affiliation-heading guard — never promote an affiliation/institution line to a subsection heading (G5d).** Render-layer only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
+
+Surfaced by `/docpluck-iterate` Phase-5d (canary `chandrashekar_2023_mp`). When column-interleave serialises a two-column title block out of order, an affiliation line can land **past** the H1 → first-`##` masthead zone that `_strip_frontmatter_masthead_block` cleans — on chandrashekar, `Department of Philosophy, Lake Forest College` is dropped immediately after `## Abstract`. The masthead strip can no longer reach it, and its short Title-Case shape then matched `_promote_isolated_titlecase_subsection_headings` and became a hallucinated `### Department of Philosophy, Lake Forest College` heading, corrupting the Abstract's section structure.
+
+Fix (general, keyed on a STRUCTURAL SIGNATURE — affiliation grammar, never paper identity): `_promote_isolated_titlecase_subsection_headings` consults a new `_looks_like_affiliation_line` and refuses to promote any line matching academic-affiliation grammar — a unit-phrase head (`Department/School/Faculty/Division/Institute/Centre/Center/Laboratory/College/University of <Capitalized>`) or a proper-noun institution phrase ending in `University`/`College`/`Institute`/`Hospital`/`Polytechnic`. The line stays body text (a strict improvement over a fake heading; the affiliation text is preserved, never dropped). The guard runs before the chain-promotion bypass so it holds on every path.
+
+Verification: a 47-gold / 2226-real-heading false-positive scan found **zero** legitimate headings the guard would reject; a deterministic corpus render-diff (guard-live vs guard-bypassed) over the canary set + a 12-paper cross-publisher sample changed **only** chandrashekar (the single target heading), all other papers byte-identical; full suite **2027 passed** + 227 render/heading-cluster + 23 new affiliation-guard tests; AI-verify vs the article-finder reading gold returned `FIX-CORRECT` (no new text-loss / hallucination). chandrashekar remains FAIL overall on **pre-existing** Table 7-10 header-shell collapse and two pre-existing table-cell-label heading promotions (`IV2: No-default`, `Participation rate`) — both queued as separate cycles; this release does not touch them.
+
 ## [2.4.91] — 2026-06-17
 
 **Single-column subsection-heading promotion — recover glued JESP/Elsevier subsection headings without re-opening the two-column G5d trap.** Render-layer only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
