@@ -178,6 +178,8 @@ echo "✅ DKIM + SPF + DMARC resolve"
 
 If the library version changed since the last deploy, the library must be tagged + pushed FIRST so `service/requirements.txt` (now pointing at the new version) can resolve.
 
+> **The push will appear to hang for several minutes — that is the pre-push canary hook, NOT auth.** Pushing `main` or a tag runs the FULL 5-paper canary render audit (`[pre-push] running FULL canary audit`, ~5–10 min; tag pushes use the strict no-exceptions gate). **Never wrap the push in `timeout` or kill the process** — that aborts the hook mid-run so git never reaches the remote (and `git push | tail` then masks it as a misleading exit 0). Run it patiently (background + long window) and **verify success against the real remote** (`git ls-remote origin refs/heads/main` == local HEAD; `git ls-remote --tags origin v$LIB_VERSION`), not the exit code. If the *credential* step itself stalls, the repo's `credential.helper=store` lacks a token — run `gh auth setup-git` once (wires git to the authenticated `gh`). Tagging fires `bump-app-pin.yml` → bumps `docpluckapp` `service/requirements.txt` → Railway redeploy; confirm via Railway `/health` `docpluck_version`. (Memory `feedback_docpluck_push_canary_hook`.)
+
 ```bash
 cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck
 LIB_VERSION=$(grep '^__version__' docpluck/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
