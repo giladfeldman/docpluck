@@ -251,12 +251,95 @@ def _pick_best_per_page(stream_tables: list, lattice_tables: list) -> list:
     out: list = []
     for page in sorted(set(list(by_page.keys()) + list(pages_with_lattice.keys()))):
         if page in pages_with_lattice:
+            stream_cts = [ct for _, ct in by_page.get(page, [])]
             for _, ct in pages_with_lattice[page]:
-                out.append(ct)
+                out.append(_augment_lattice_with_stream_rows(ct, stream_cts))
         else:
             for _, ct in by_page.get(page, []):
                 out.append(ct)
     return out
+
+
+def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
+    """Tier-2 (v2.4.94): recover rows a lattice table vertically TRUNCATED.
+
+    Lattice flavor extracts clean headers + merged cells, but only inside the
+    table's *ruled* region — when a table's lower rows sit below the ruling
+    lines (PROSECCO Table 2: the "adjusted" / "remnant" rows), lattice stops at
+    the box bottom while STREAM captured the whole table. The page-level
+    winner-take-all then discards the fuller stream table.
+
+    Fix: when a same-page stream table has the SAME column count, OVERLAPS the
+    lattice bbox, and extends BELOW it, append the stream rows whose vertical
+    centre falls below the lattice bbox (the rows lattice missed) onto the
+    lattice frame — so the merged table keeps lattice's clean headers AND gains
+    every data row. Stream's split value/parenthetical cells are rejoined later
+    by ``_merge_continuation_rows``.
+
+    Gated hard (equal n_cols + bbox overlap + extends-below) so a table lattice
+    captured in full, or an unrelated stream table, is never touched. Returns
+    ``lattice_ct`` unchanged (possibly mutated in place) — any failure is a
+    transparent no-op.
+    """
+    try:
+        import pandas as pd
+
+        l_df = lattice_ct.df
+        l_cols = len(l_df.columns)
+        l_bbox = tuple(getattr(lattice_ct, "_bbox", ()) or ())
+        if len(l_bbox) < 4:
+            return lattice_ct
+        l_ymin = l_bbox[1]
+    except Exception as exc:
+        record_fallback("lattice_augment_setup_exception", detail=type(exc).__name__)
+        return lattice_ct
+
+    best: tuple[int, list[list[str]], tuple] | None = None
+    for s in stream_cts:
+        try:
+            s_df = s.df
+            if len(s_df.columns) != l_cols:
+                continue
+            s_bbox = tuple(getattr(s, "_bbox", ()) or ())
+            if len(s_bbox) < 4 or not _bboxes_overlap(s_bbox, l_bbox):
+                continue
+            if s_bbox[1] >= l_ymin:  # stream does not extend below the lattice box
+                continue
+            s_rows = getattr(s, "rows", None)
+            if not s_rows or len(s_rows) != len(s_df):
+                continue
+            extra: list[list[str]] = []
+            for r in range(len(s_df)):
+                top, bottom = s_rows[r][0], s_rows[r][1]
+                if (top + bottom) / 2.0 < l_ymin:
+                    extra.append([str(s_df.iloc[r, c]) for c in range(l_cols)])
+            if extra and (best is None or len(extra) > best[0]):
+                best = (len(extra), extra, s_bbox)
+        except Exception as exc:
+            record_fallback("lattice_augment_scan_exception", detail=type(exc).__name__)
+            continue
+
+    if best is None:
+        return lattice_ct
+    try:
+        import pandas as pd
+
+        _, extra, s_bbox = best
+        lattice_ct.df = pd.concat(
+            [lattice_ct.df, pd.DataFrame(extra, columns=lattice_ct.df.columns)],
+            ignore_index=True,
+        )
+        # Widen the bbox downward so caption/figure overlap logic sees the full
+        # table extent; keep the lattice top edge.
+        lattice_ct._bbox = (
+            min(l_bbox[0], s_bbox[0]),
+            min(l_bbox[1], s_bbox[1]),
+            max(l_bbox[2], s_bbox[2]),
+            l_bbox[3],
+        )
+    except Exception as exc:
+        record_fallback("lattice_augment_merge_exception", detail=type(exc).__name__)
+    return lattice_ct
 
 
 def extract_tables_camelot(

@@ -252,6 +252,28 @@ CHANGELOG 2026-06-13 (v2.4.88).
 
 ---
 
+## L-009 — A library feature is not "delivered" to a consumer until it is reachable over the surface they actually call; and table-FLATTEN quality is bounded by table-CAPTURE
+
+### The recurring mistake
+
+Two mistakes, both surfaced 2026-06-18 by ESCImate `REQUEST_10`:
+
+1. **"Built ≠ reachable."** docpluck shipped `flatten_tables_for_paper` / `extract_pdf_structured` / `extract_sections` in v2.2.0 *for* the stat-verification consumers (the `flatten.py` docstring names effectcheck/escimate/scimeto) — but the hosted `/api/extract` endpoint those consumers call only ever returned `{text, metadata, normalization, quality}`. The capability sat unreachable for months. A feature added for a consumer must be exposed over the consumer's actual call surface (and documented in `API.md`) in the same effort, or it is invisible.
+
+2. **Flatten quality is downstream of capture.** When asked to "make PROSECCO Table 2's 5 missing rows appear," the tempting read is "fix the flattener." Grounding first (dumping `extract_pdf_structured(pdf)["tables"]`) showed only **1 of 3** data rows reached `flatten` — so the fix belonged in the capture layer, not flatten. No amount of flatten work can surface a row Camelot never emitted.
+
+3. **Re-ground even WITHIN the layer you've localized to — the first capture-layer hypothesis was also wrong.** The Tier-2 spec (written from the captured docpluck `Table`) asserted "Camelot's stream parser drops the rows / they're orphaned labels needing layout-channel synthesis." Dumping the **raw per-flavor Camelot output** (`camelot.read_pdf(pages="9", flavor=...)`) disproved it: **stream captured every row** (but lost the header text and vertically split each value from its parenthetical), **lattice had clean headers but only the ruled-box rows**, and `_pick_best_per_page` discarded the fuller stream table. The real fix (v2.4.94) was a cross-flavor merge + numeric-continuation merge — NOT orphaned-label synthesis. Lesson: localizing to "the capture layer" is not the root cause; inspect the *rawest* artifact (each flavor's df + bbox + row y-bands) before designing the fix.
+
+### The rules
+
+1. **Expose-where-called.** Surfacing an already-built library capability is HTTP-layer + serializer work in the app repo; do it behind an opt-in, default-OFF param so existing callers are byte-identical, and document the param + response fields + default in `API.md`. (REQUEST_10 modes A/B; `REPLY_FROM_DOCPLUCK_v2.4.93.md`.)
+2. **Ground table fixes in the rawest artifact.** Dump `extract_pdf_structured(pdf)["tables"]` first; if the target rows are absent, drop one level further and dump each Camelot flavor's raw `df` / `_bbox` / `rows`. The fix locus (flatten vs. flavor-selection vs. continuation-merge vs. region detection) is only knowable from that rawest view — a plausible mid-layer hypothesis (here, "orphaned labels") can be flatly wrong.
+3. **v2.4.93 flatten fixes** (combined `est_ci` columns, dash-sign CI, parallel ITT/PP groups) flatten every row Camelot captures. **v2.4.94 Tier-2** (cross-flavor lattice-augmentation + numeric-continuation merge) makes capture deliver the rows: PROSECCO R1–R6 now flatten sign-correct. Gated hard (equal-col-count + bbox overlap + extends-below; fragment-cell + column-aligned) so the 100-PDF / 2000-test corpus is regression-free.
+
+Cite: `docpluck/tables/camelot_extract.py::_augment_lattice_with_stream_rows` + `docpluck/tables/cell_cleaning.py::_merge_continuation_rows` (v2.4.94), `docpluck/tables/flatten.py` (v2.4.93), `tests/test_camelot_lattice_augment.py`, `tests/test_tables_cell_cleaning.py`, `tests/test_tables_flatten.py`, `REQUEST_10_TIER2_ORPHANED_LABEL_ROW_RECOVERY.md` (root cause corrected), CHANGELOG v2.4.93–v2.4.94.
+
+---
+
 ## When to add a new lesson here
 
 Add a lesson when:
