@@ -12,7 +12,10 @@ Triage: `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` → cluster EC-T1.
 
 from __future__ import annotations
 
+import pytest
+
 from docpluck.tables.flatten import (
+    _parse_ci_cell,
     flatten_table,
     flatten_tables_for_paper,
     render_flattened_inline,
@@ -357,3 +360,137 @@ class TestEdgeCases:
         assert len(all_rows) == 2
         assert all_rows[0]["table_id"] == "T1"
         assert all_rows[1]["table_id"] == "T2"
+
+
+# ── v2.4.93 — dash-sign CI parsing + combined est_ci column + parallel groups ─
+# Source: REQUEST_10_TABLE_FLATTEN_HTTP_EXPOSURE.md (PROSECCO trial Table 2,
+# 10.1371/journal.pmed.1004323). Confidence-interval cells in clinical tables
+# use a dash as the lo–hi separator that collides with a negative sign, e.g.
+# "(-11.2-7.5)" = (lo -11.2, hi +7.5). docpluck resolves the sign with two
+# general invariants: interval monotonicity (lo < hi) and, when a point
+# estimate is known, the estimate-in-interval invariant (lo <= est <= hi).
+
+
+class TestParseCiCell:
+    """Dash-sign CI disambiguation — the one genuinely new parsing logic."""
+
+    @pytest.mark.parametrize(
+        "cell, estimate, expected",
+        [
+            # Distinct range glyph (en-dash) — sign-unambiguous on its own.
+            ("−10.36–8.34", None, (-10.36, 8.34)),
+            ("−9.53–9.65", None, (-9.53, 9.65)),
+            # Comma form (unchanged, back-compat).
+            ("[0.20, 0.38]", None, (0.20, 0.38)),
+            ("0.20, 0.38", None, (0.20, 0.38)),
+            # Spelled-out range.
+            ("0.20 to 0.38", None, (0.20, 0.38)),
+            # ASCII-hyphen collision — resolved by the estimate-in-interval rule.
+            ("(-11.2-7.5)", -1.83, (-11.2, 7.5)),
+            ("(-8.63-10.28)", 0.82, (-8.63, 10.28)),
+            ("(-3.2-18.5)", 7.7, (-3.2, 18.5)),
+            # ASCII-hyphen collision with no estimate — monotonicity still picks
+            # the sign-correct split (the only one with lo < hi).
+            ("(-11.2-7.5)", None, (-11.2, 7.5)),
+            # Combined estimate cell: the parenthesised interval is parsed.
+            ("-1.83% (-11.2-7.5)", None, (-11.2, 7.5)),
+        ],
+    )
+    def test_parse(self, cell, estimate, expected):
+        lo, hi = _parse_ci_cell(cell, estimate=estimate)
+        assert lo == pytest.approx(expected[0])
+        assert hi == pytest.approx(expected[1])
+        assert lo < hi  # monotonicity always holds
+
+    def test_unparseable_returns_none(self):
+        assert _parse_ci_cell("n/a") == (None, None)
+        assert _parse_ci_cell("") == (None, None)
+
+
+class TestEstCiCombinedColumn:
+    """A "Risk diff. (95% CI)" column carries an estimate AND its interval in
+    one cell — previously unclassified (dropped). Now parsed to est + CI."""
+
+    def _table(self):
+        cells = [
+            mk_cell(0, 0, "", True),
+            mk_cell(0, 1, "Risk diff. (95% CI)", True),
+            mk_cell(0, 2, "P value", True),
+            mk_cell(1, 0, "Resection complete"),
+            mk_cell(1, 1, "−1.01% (−10.36–8.34)"),
+            mk_cell(1, 2, "0.09"),
+        ]
+        return mk_table(cells)
+
+    def test_fields(self):
+        rows = flatten_table(self._table())
+        assert len(rows) == 1
+        f = rows[0]["fields"]
+        assert f["est"] == pytest.approx(-1.01)
+        assert f["CI_lower"] == pytest.approx(-10.36)
+        assert f["CI_upper"] == pytest.approx(8.34)
+        assert f["p"] == pytest.approx(0.09)
+
+    def test_sentence(self):
+        rows = flatten_table(self._table())
+        s = rows[0]["sentence"]
+        assert "Risk diff" in s
+        assert "95% CI [-10.36, 8.34]" in s
+        assert "p = 0.09" in s
+
+
+class TestParallelColumnGroups:
+    """ITT/PP super-header → one FlattenedRow per (row × arm), so duplicate
+    roles across arms don't collide. Mirrors PROSECCO Table 2's captured row."""
+
+    def _table(self):
+        # Super-header row 0 marks the two arms; sub-header row 1 names columns.
+        cells = [
+            mk_cell(0, 0, "", True),
+            mk_cell(0, 1, "ITT", True),
+            mk_cell(0, 2, "", True),
+            mk_cell(0, 3, "", True),
+            mk_cell(0, 4, "PP", True),
+            mk_cell(0, 5, "", True),
+            mk_cell(0, 6, "", True),
+            mk_cell(1, 0, "", True),
+            mk_cell(1, 1, "PSA N = 98", True),
+            mk_cell(1, 2, "Risk diff. (95% CI)", True),
+            mk_cell(1, 3, "P value", True),
+            mk_cell(1, 4, "PSA N = 94", True),
+            mk_cell(1, 5, "Risk diff. (95% CI)", True),
+            mk_cell(1, 6, "P value", True),
+            mk_cell(2, 0, "Resection complete"),
+            mk_cell(2, 1, "86 (87.8%)"),
+            mk_cell(2, 2, "−1.01% (−10.36–8.34)"),
+            mk_cell(2, 3, "0.09"),
+            mk_cell(2, 4, "83 (88.3%)"),
+            mk_cell(2, 5, "0.06% (−9.53–9.65)"),
+            mk_cell(2, 6, "0.06"),
+        ]
+        return mk_table(cells)
+
+    def test_emits_one_row_per_arm(self):
+        rows = flatten_table(self._table())
+        assert len(rows) == 2
+        groups = {r["fields"].get("group") for r in rows}
+        assert groups == {"ITT", "PP"}
+
+    def test_arms_carry_distinct_stats(self):
+        rows = {r["fields"]["group"]: r for r in flatten_table(self._table())}
+        itt, pp = rows["ITT"], rows["PP"]
+        # ITT arm
+        assert itt["fields"]["est"] == pytest.approx(-1.01)
+        assert itt["fields"]["p"] == pytest.approx(0.09)
+        assert (itt["fields"]["CI_lower"], itt["fields"]["CI_upper"]) == pytest.approx((-10.36, 8.34))
+        # PP arm — its own p (0.06), not ITT's (0.09): no duplicate-role collision
+        assert pp["fields"]["est"] == pytest.approx(0.06)
+        assert pp["fields"]["p"] == pytest.approx(0.06)
+        assert (pp["fields"]["CI_lower"], pp["fields"]["CI_upper"]) == pytest.approx((-9.53, 9.65))
+
+    def test_group_appears_in_sentence_and_no_fold_sentinels(self):
+        rows = flatten_table(self._table())
+        for r in rows:
+            assert "(ITT)" in r["sentence"] or "(PP)" in r["sentence"]
+            assert "\x00" not in r["sentence"]
+            assert all("\x00" not in h for h in r["header"])

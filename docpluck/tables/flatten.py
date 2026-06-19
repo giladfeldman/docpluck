@@ -44,6 +44,9 @@ from typing import Optional, TypedDict
 
 from . import Cell, Table
 from .cell_cleaning import (
+    _MERGE_SEPARATOR,
+    _SUP_OPEN,
+    _SUP_CLOSE,
     _drop_running_header_rows,
     _is_group_separator,
     _is_header_like_row,
@@ -54,6 +57,20 @@ from .cell_cleaning import (
     _strip_leader_dots,
     _split_mashed_cell,
 )
+
+
+def _strip_fold_sentinels(s: str) -> str:
+    """Remove the internal fold/super-script sentinels (`\\x00BR\\x00`,
+    `\\x00SUP\\x00`, `\\x00/SUP\\x00`) the HTML emitter uses, so the plain
+    `header`/`raw_cells` strings we emit in a `FlattenedRow` are clean."""
+    if not s:
+        return s
+    return (
+        s.replace(_MERGE_SEPARATOR, " ")
+        .replace(_SUP_OPEN, "")
+        .replace(_SUP_CLOSE, "")
+        .strip()
+    )
 
 
 # ── Public types ─────────────────────────────────────────────────────────────
@@ -174,6 +191,13 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("SD",    re.compile(r"^\s*(?:SD|std\.?\s*dev\.?|standard\s+deviation)\s*$", re.I)),
     ("n",     re.compile(r"^\s*n\s*$", re.I)),
     ("N",     re.compile(r"^\s*N\s*$")),
+    # est_ci: a *combined* effect-and-interval column whose header carries an
+    # effect word (or any leading text) followed by a parenthesised CI marker,
+    # e.g. "Risk diff. (95% CI)", "Mean diff (95%CI)", "OR (95% CI)",
+    # "Cohen's d (95% CI)". The cell then holds an estimate AND its interval
+    # (e.g. "-1.01% (-10.36-8.34)"). Must precede the bare-"CI" pattern so a
+    # combined column is not mis-read as an interval-only column.
+    ("est_ci", re.compile(r"[A-Za-z].*\(\s*95\s*%?\s*C\.?\s*I", re.I)),
     ("CI",    re.compile(r"^\s*(?:95\s*%?\s*)?CI(?:\s*\[?\s*lower\s*,?\s*upper\s*\]?)?\s*$", re.I)),
     ("CI_lo", re.compile(r"^\s*(?:lower|LL|lo|95\s*%?\s*lower)\s*$", re.I)),
     ("CI_hi", re.compile(r"^\s*(?:upper|UL|hi|95\s*%?\s*upper)\s*$", re.I)),
@@ -234,15 +258,117 @@ def _parse_p_cell(s: str) -> tuple[Optional[str], Optional[float]]:
     return (op or "="), f
 
 
-def _parse_ci_cell(s: str) -> tuple[Optional[float], Optional[float]]:
-    """Parse a ``[0.20, 0.38]`` or ``0.20, 0.38`` CI cell into (lo, hi)."""
-    m = _CI_INLINE_RE.search(s or "")
+# Range separators that are typographically DISTINCT from a minus sign, so a
+# split on them is sign-unambiguous: en-dash, em-dash, horizontal bar, or the
+# spelled-out " to ". (Camelot cells are NOT run through normalize.py, so the
+# source glyphs survive — a minus is usually U+2212/U+002D while the range
+# separator is U+2013, and they disambiguate themselves.)
+_RANGE_SEP_RE = re.compile(r"\s*(?:–|—|―|\bto\b)\s*")
+_PAREN_RE = re.compile(r"\(([^()]*)\)")
+# Two signed decimals joined by a single ASCII hyphen — the AMBIGUOUS case the
+# distinct-glyph split above could not resolve (e.g. "-11.2-7.5").
+_HYPHEN_CI_RE = re.compile(r"^\s*(-?)\s*(\d*\.?\d+)\s*-\s*(-?)\s*(\d*\.?\d+)\s*$")
+
+
+def _to_signed_float(s: str) -> Optional[float]:
+    """First signed decimal in `s`, with U+2212 minus folded to ASCII."""
+    if not s:
+        return None
+    m = re.search(r"[-+]?\d*\.?\d+", s.replace("−", "-").replace("%", ""))
+    if not m:
+        return None
+    try:
+        return float(m.group(0))
+    except ValueError:
+        return None
+
+
+def _parse_leading_number(s: str) -> Optional[float]:
+    """Leading numeric token of a combined estimate cell, e.g.
+    ``-1.01% (-10.36-8.34)`` → ``-1.01``. Stops at the first ``(``."""
+    head = (s or "").split("(", 1)[0]
+    return _to_signed_float(head)
+
+
+def _resolve_hyphen_ci(
+    body: str, estimate: Optional[float]
+) -> tuple[Optional[float], Optional[float]]:
+    """Resolve a hyphen-joined CI like ``-11.2-7.5`` where the separator dash
+    collides with a negative sign. docpluck enforces two general invariants —
+    interval monotonicity (``lo < hi``) and, when the row's point estimate is
+    known, the estimate-in-interval invariant (``lo <= estimate <= hi``) — to
+    pick the one sign assignment that can be correct. Keyed purely on the
+    structural shape, never on paper identity."""
+    t = body.replace("−", "-").replace("%", "").strip().strip("[]()")
+    m = _HYPHEN_CI_RE.match(t)
     if not m:
         return None, None
-    try:
-        return float(m.group(1)), float(m.group(2))
-    except ValueError:
+    mag1, mag2 = float(m.group(2)), float(m.group(4))
+    sign1 = -1.0 if m.group(1) == "-" else 1.0
+    sign2 = -1.0 if m.group(3) == "-" else 1.0
+    primary = (sign1 * mag1, sign2 * mag2)
+
+    # Candidate sign assignments, primary interpretation first.
+    seen: set[tuple[float, float]] = set()
+    valid: list[tuple[float, float]] = []
+    for a in (sign1, 1.0, -1.0):
+        for c in (sign2, 1.0, -1.0):
+            cand = (a * mag1, c * mag2)
+            if cand in seen:
+                continue
+            seen.add(cand)
+            lo, hi = cand
+            if lo < hi and (estimate is None or lo <= estimate <= hi):
+                valid.append(cand)
+    if primary in valid:
+        return primary
+    if valid:
+        return valid[0]
+    # No assignment satisfies the invariants — fall back to the literal parse
+    # only if it is at least monotonic, else give up (don't emit a bad CI).
+    if primary[0] < primary[1]:
+        return primary
+    return None, None
+
+
+def _parse_ci_cell(
+    s: str, estimate: Optional[float] = None
+) -> tuple[Optional[float], Optional[float]]:
+    """Parse a confidence-interval cell into ``(lo, hi)``.
+
+    Handles, in order of decreasing certainty:
+      1. comma-separated ``[0.20, 0.38]`` / ``0.20, 0.38`` (unambiguous);
+      2. a distinct range glyph (en/em-dash or " to "), e.g. ``-10.36–8.34``
+         (sign-unambiguous because the separator is not a minus);
+      3. a hyphen-collision ``-11.2-7.5`` resolved via the monotonicity and
+         estimate-in-interval invariants (see ``_resolve_hyphen_ci``).
+
+    When the cell wraps the interval in parentheses (a combined
+    ``-1.01% (-10.36-8.34)`` estimate cell), the parenthesised content is tried
+    first. `estimate` (the row's point estimate) disambiguates case 3."""
+    if not s:
         return None, None
+    parens = _PAREN_RE.findall(s)
+    for body in ([parens[-1]] if parens else []) + [s]:
+        b = (body or "").strip().strip("[]")
+        # 1. comma-separated
+        m = _CI_INLINE_RE.search(b)
+        if m:
+            try:
+                return float(m.group(1)), float(m.group(2))
+            except ValueError:
+                pass
+        # 2. distinct range glyph (en/em-dash, " to ")
+        parts = _RANGE_SEP_RE.split(b, maxsplit=1)
+        if len(parts) == 2:
+            lo, hi = _to_signed_float(parts[0]), _to_signed_float(parts[1])
+            if lo is not None and hi is not None:
+                return lo, hi
+        # 3. hyphen collision — resolve by invariant
+        lo, hi = _resolve_hyphen_ci(b, estimate)
+        if lo is not None and hi is not None:
+            return lo, hi
+    return None, None
 
 
 # ── Row flattening ──────────────────────────────────────────────────────────
@@ -260,6 +386,15 @@ def _pick_row_label(row: list[str]) -> tuple[str, int]:
     return (row[0].strip() if row else ""), 0
 
 
+def _est_label_from_header(h: str) -> str:
+    """Effect label of a combined ``est_ci`` column — the header with its
+    parenthesised CI marker stripped, e.g. ``Risk diff. (95% CI)`` →
+    ``Risk diff.``."""
+    cleaned = _strip_fold_sentinels(h or "")
+    cleaned = re.sub(r"\(?\s*95\s*%?\s*C\.?\s*I[^)]*\)?", "", cleaned, flags=re.I)
+    return cleaned.strip(" .,:") or ""
+
+
 def _flatten_one_row(
     table_id: str,
     page: int,
@@ -267,6 +402,7 @@ def _flatten_one_row(
     row_idx: int,
     header: list[str],
     row: list[str],
+    group: Optional[str] = None,
 ) -> FlattenedRow:
     row_label, label_col = _pick_row_label(row)
 
@@ -310,6 +446,18 @@ def _flatten_one_row(
             if lo is not None and hi is not None:
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
+        elif role == "est_ci":
+            # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)".
+            est = _parse_leading_number(raw)
+            if est is not None:
+                role_nums["est"] = est
+                role_vals["est"] = raw.split("(", 1)[0].strip() or _fmt_num(est)
+                role_vals["est_label"] = _est_label_from_header(header[ci])
+            # The estimate anchors the CI sign when the bounds are hyphen-glued.
+            lo, hi = _parse_ci_cell(raw, estimate=est)
+            if lo is not None and hi is not None:
+                role_nums["CI_lower"] = lo
+                role_nums["CI_upper"] = hi
         else:
             n = _parse_number(raw)
             if n is not None:
@@ -330,7 +478,9 @@ def _flatten_one_row(
             df1_val, df2_val = float(a), float(b)
 
     fields: dict[str, object] = {}
-    for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD"):
+    if group:
+        fields["group"] = group
+    for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est"):
         if k in role_nums:
             fields[k] = role_nums[k]
     for k in ("n", "N"):
@@ -348,16 +498,18 @@ def _flatten_one_row(
         fields["CI_lower"] = role_nums["CI_lower"]
         fields["CI_upper"] = role_nums["CI_upper"]
 
-    sentence = _assemble_sentence(row_label, role_vals, role_nums, df_val, df1_val, df2_val)
+    sentence = _assemble_sentence(
+        row_label, role_vals, role_nums, df_val, df1_val, df2_val, group
+    )
 
     return FlattenedRow(
         table_id=table_id,
         page=page,
         label=label,
         row_idx=row_idx,
-        row_label=row_label,
-        header=list(header),
-        raw_cells=list(row),
+        row_label=_strip_fold_sentinels(row_label),
+        header=[_strip_fold_sentinels(h) for h in header],
+        raw_cells=[_strip_fold_sentinels(c) for c in row],
         sentence=sentence,
         fields=fields,
     )
@@ -379,10 +531,12 @@ def _assemble_sentence(
     df: Optional[float],
     df1: Optional[float],
     df2: Optional[float],
+    group: Optional[str] = None,
 ) -> str:
     """Produce a flattened APA-style sentence from the parsed cells.
 
     Consolidations applied:
+      * ``est`` (+ ``CI``)        → ``{effect} = {value}`` (combined column)
       * ``t`` + ``df``           → ``t(df) = value``
       * ``F`` + ``df1, df2``     → ``F(df1, df2) = value``
       * ``r`` + ``n``            → ``r(n - 2) = value``
@@ -391,10 +545,18 @@ def _assemble_sentence(
       * ``p_op`` + ``p``          → ``p {op} {value}``
       * ``CI_lower`` + ``CI_upper`` → ``95% CI [lo, hi]``
 
+    `group` (a super-header arm such as ``ITT`` / ``PP``) is appended to the
+    row label so parallel-group rows stay distinguishable.
+
     Unmatched columns fall through to ``header: value`` form, dropped from
     the sentence to keep it readable.
     """
     parts: list[str] = []
+
+    if "est" in role_nums:
+        est_label = role_vals.get("est_label", "")
+        est_txt = role_vals.get("est", _fmt_num(role_nums["est"]))
+        parts.append(f"{est_label} = {est_txt}" if est_label else est_txt)
 
     if "t" in role_nums:
         if df is not None:
@@ -454,18 +616,48 @@ def _assemble_sentence(
             hi = _fmt_num(role_nums["CI_upper"])
             parts.append(f"95% CI [{lo}, {hi}]")
 
+    eff_label = _strip_fold_sentinels(row_label)
+    if group:
+        eff_label = f"{eff_label} ({group})" if eff_label else f"({group})"
+
     if not parts:
         # No stat shapes recognized — fall back to a labelled cell dump so the
         # row is still visible. Skip empty/label cells.
-        return row_label
+        return eff_label
 
     body = ", ".join(parts)
-    if row_label:
-        return f"{row_label}: {body}"
+    if eff_label:
+        return f"{eff_label}: {body}"
     return body
 
 
 # ── Public entry points ─────────────────────────────────────────────────────
+
+
+def _detect_column_groups(
+    header: list[str],
+) -> Optional[tuple[list[int], list[tuple[str, list[int]]]]]:
+    """Detect parallel column groups from a folded super-header.
+
+    `_fold_super_header_rows` joins a super-header label into the first column
+    of each span it covers using the `_MERGE_SEPARATOR` sentinel (e.g.
+    ``ITT\\x00BR\\x00PSA N = 98``). Two or more such sentinel columns therefore
+    mark the start of two or more parallel arms (ITT / PP, Study 1 / Study 2).
+
+    Returns ``(label_cols, [(group_label, col_indices), ...])`` when ≥2 groups
+    are found, else ``None`` (so non-grouped tables are byte-identical to the
+    pre-existing single-row path). Keyed on the structural fold signature, not
+    on any column text — general across publishers."""
+    starts = [i for i, h in enumerate(header) if _MERGE_SEPARATOR in (h or "")]
+    if len(starts) < 2:
+        return None
+    label_cols = list(range(0, starts[0]))
+    groups: list[tuple[str, list[int]]] = []
+    for gi, start in enumerate(starts):
+        end = starts[gi + 1] if gi + 1 < len(starts) else len(header)
+        glabel = (header[start].split(_MERGE_SEPARATOR, 1)[0]).strip()
+        groups.append((glabel, list(range(start, end))))
+    return label_cols, groups
 
 
 def flatten_table(table: Table) -> list[FlattenedRow]:
@@ -492,6 +684,8 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
     page = int(table.get("page") or 0)
     label = table.get("label")
 
+    grouped = _detect_column_groups(header)
+
     out: list[FlattenedRow] = []
     n_cols = len(header)
     for row_idx, row in enumerate(body):
@@ -502,8 +696,25 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
             row = list(row) + [""] * (n_cols - len(row))
         elif len(row) > n_cols:
             row = list(row[:n_cols])
-        rec = _flatten_one_row(table_id, page, label, row_idx, header, row)
-        out.append(rec)
+
+        if grouped is None:
+            out.append(_flatten_one_row(table_id, page, label, row_idx, header, row))
+            continue
+
+        # Parallel-group table: emit one record per (row × arm). Shared label
+        # columns are prepended to each arm's own columns so role lookup and
+        # the row label both work on the sliced sub-row.
+        label_cols, groups = grouped
+        for glabel, gcols in groups:
+            if not any((row[i] or "").strip() for i in gcols):
+                continue  # this arm is empty on this row — don't emit a stub
+            sub_header = [header[i] for i in label_cols] + [header[i] for i in gcols]
+            sub_row = [row[i] for i in label_cols] + [row[i] for i in gcols]
+            out.append(
+                _flatten_one_row(
+                    table_id, page, label, row_idx, sub_header, sub_row, group=glabel
+                )
+            )
 
     return out
 

@@ -193,6 +193,41 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             return False
         return bool(_SECTION_ROW_LABEL_RE.match(content))
 
+    # v2.4.94 (Tier-2): numeric / parenthetical continuation rows. Camelot
+    # STREAM splits a stacked data cell across two physical rows — the value on
+    # one row ("86", "-1.01% (-10.36-") and its parenthetical / CI-upper-bound
+    # tail on the next ("(87.8%)", "8.34)", "(mean SD)†"). The prose-merge
+    # branch above only fires for multi-WORD wraps, so these short numeric
+    # fragments fell through as junk rows. Detect a row whose every non-empty
+    # cell is a *fragment* (opens with "(" or is a bare close-paren tail) AND
+    # whose every non-empty column is also populated in the parent row, then
+    # fold each fragment back into the parent's same-column cell. Gated on the
+    # column-alignment so an independent parenthetical row can't be absorbed
+    # into an unrelated parent.
+    def _is_fragment_cell(s: str) -> bool:
+        s = (s or "").strip()
+        if not s:
+            return True  # empty cells don't disqualify the row
+        if s.startswith("("):
+            return True
+        if ")" in s and "(" not in s:  # close-paren tail: "8.34)", "10.28)"
+            return True
+        return False
+
+    def _is_fragment_continuation(row: list[str], parent: list[str]) -> bool:
+        nz = [(i, (c or "").strip()) for i, c in enumerate(row)]
+        nz = [(i, s) for i, s in nz if s]
+        if not nz:
+            return False
+        if not all(_is_fragment_cell(s) for _, s in nz):
+            return False
+        # Every non-empty column must already be populated in the parent so we
+        # only ever CONTINUE an existing cell, never invent a new column.
+        for i, _ in nz:
+            if i >= len(parent) or not (parent[i] or "").strip():
+                return False
+        return True
+
     out: list[list[str]] = []
     for row in rows:
         first = row[0].strip() if row else ""
@@ -246,6 +281,25 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                     parent[i] = parent[i] + _MERGE_SEPARATOR + v
                 else:
                     parent[i] = v
+            continue
+
+        # v2.4.94 (Tier-2): numeric/parenthetical continuation — fold a
+        # fragment row back into the parent's same-column cells. Unlike the
+        # prose/label-modifier merges above, these fragments join INLINE (a
+        # space, or nothing when the parent ends mid-token at a dash/open
+        # paren) so "86" + "(87.8%)" → "86 (87.8%)" and
+        # "-1.01% (-10.36-" + "8.34)" → "-1.01% (-10.36-8.34)".
+        if out and _is_fragment_continuation(row, out[-1]):
+            parent = out[-1]
+            for i, cell in enumerate(row):
+                v = (cell or "").strip()
+                if not v or i >= len(parent):
+                    continue
+                base = parent[i].rstrip()
+                if base.endswith(("-", "–", "—", "(", "−")):
+                    parent[i] = base + v
+                else:
+                    parent[i] = base + " " + v
             continue
 
         out.append([(c or "").strip() for c in row])

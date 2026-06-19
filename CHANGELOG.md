@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.4.94] — 2026-06-19
+
+**Cross-flavor lattice-augmentation — recover table rows a lattice extraction vertically truncated (REQUEST_10 Tier-2).** `TABLE_EXTRACTION_VERSION` → `2.3.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
+
+Grounded in PROSECCO Table 2 (`10.1371/journal.pmed.1004323`). **Root cause (corrected after investigation):** the rows were not dropped by Camelot or by orphaned labels (the original Tier-2 hypothesis). Camelot **stream** captures the whole table but loses the column-header text and vertically splits each value from its `(percentage)`/CI-tail; Camelot **lattice** has clean headers but only the rows inside the ruled box (1 of 3 data rows); and `_pick_best_per_page` let lattice win the page, discarding the fuller stream table. So `flatten` (fixed in v2.4.93) never saw R2/R3/R5/R6.
+
+Two general fixes, each gated on a structural signature:
+
+1. **Cross-flavor row augmentation** (`docpluck/tables/camelot_extract.py::_augment_lattice_with_stream_rows`): when a page is lattice-owned but a same-page **stream** table has the **same column count**, **overlaps** the lattice bbox, and **extends below** it, the stream rows whose vertical centre falls below the lattice bbox (the rows lattice missed) are appended onto the lattice frame. Result: lattice's clean headers + every data row. Gated hard so a table lattice captured in full — or an unrelated stream table — is never touched (the `jama_open_1` lattice-preference path is unaffected: it only runs for lattice-owned pages, and there lattice had only sub-2×2 artifacts).
+2. **Numeric/parenthetical continuation merge** (`docpluck/tables/cell_cleaning.py::_merge_continuation_rows`): rejoin a row whose every non-empty cell is a *fragment* (opens with `(` like `(87.8%)`, or a bare close-paren tail like `8.34)`) into the parent's same-column cells, when every fragment column is already populated in the parent. Joins inline (no space when the parent ends mid-token at a dash/open-paren) so `86` + `(87.8%)` → `86 (87.8%)` and `-1.01% (-10.36-` + `8.34)` → `-1.01% (-10.36-8.34)`. General improvement for any stacked value/parenthetical table; previously only multi-word prose wraps merged.
+
+Outcome: PROSECCO Table 2 now flattens to all six gold arm-records, sign-correct — R1 ITT −1.01% 95% CI [−10.36, 8.34] p=.09; R4 PP 0.06% [−9.53, 9.65] p=.06; R2 ITT adj. −1.83% [−11.2, 7.5]; R5 PP adj. 0.82% [−8.63, 10.28]; R3 ITT remnant 7.7 [−3.2, 18.5] p=.15; R6 PP remnant 8.4 [−3.1, 19.9] p=.14 — plus the table's size-distribution sub-rows as label-only rows. Closes REQUEST_10 acceptance #1.
+
+Verification: 9 new unit tests (5 augmentation + 4 continuation) + full library suite green, **zero regressions**; table-focused suites (flatten/cell-cleaning/table-detect) unchanged. (A residual `≤`-glyph corruption in PROSECCO's size-bin labels is a pre-existing pdftotext cell-glyph issue in non-statistical count rows, unrelated to this fix.)
+
+## [2.4.93] — 2026-06-18
+
+**Table-flatten quality: combined estimate-and-CI columns, dash-sign CI disambiguation, and parallel-group (ITT/PP) rows.** Library `docpluck/tables/flatten.py` only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` / `TABLE_EXTRACTION_VERSION` change. Enables the HTTP exposure of the flattener over the hosted `/api/extract` (ESCImate `REQUEST_10_TABLE_FLATTEN_HTTP_EXPOSURE.md`, closing `REQUESTS_FROM_ESCIMATE.md` Request 4 — see `REPLY_FROM_DOCPLUCK_v2.4.93.md`).
+
+Grounded in the PROSECCO trial Table 2 (`10.1371/journal.pmed.1004323`). Three general fixes, each keyed on a STRUCTURAL SIGNATURE, never paper identity:
+
+1. **Combined `est_ci` column.** A header carrying an effect word followed by a parenthesised CI marker — `Risk diff. (95% CI)`, `Mean diff (95%CI)`, `OR (95% CI)`, `Cohen's d (95% CI)` — was previously unclassified and dropped. It now parses the cell's leading estimate **and** its interval (e.g. `-1.01% (-10.36-8.34)` → `est = -1.01`, `CI_lower = -10.36`, `CI_upper = 8.34`).
+2. **Dash-sign CI disambiguation.** CI cells use a dash as the lo–hi separator that collides with a negative sign (`(-11.2-7.5)` = lo -11.2, hi +7.5). The parser resolves sign with two general invariants — interval **monotonicity** (`lo < hi`) and, when the row's point estimate is known, the **estimate-in-interval** invariant (`lo ≤ est ≤ hi`). A typographically distinct range glyph (en/em-dash or " to ") is treated as sign-unambiguous and used directly. Comma CIs unchanged.
+3. **Parallel column groups.** A folded super-header (`ITT` / `PP`, `Study 1` / `Study 2`) now emits **one `FlattenedRow` per (row × arm)** with a `fields.group` tag, so duplicate roles across arms (two `P value`, two `Risk diff.`) no longer collide and overwrite each other. Detected from the `_MERGE_SEPARATOR` fold signature; tables without it are byte-identical to before. Emitted `header`/`raw_cells`/`row_label` strings are also stripped of the internal `\x00BR\x00`/`\x00SUP\x00` fold sentinels.
+
+New (additive, non-breaking) `FlattenedRow.fields` keys: `est` and `group`.
+
+Verification: 35 flatten unit tests (16 new) pass; existing 19 unchanged; cell-cleaning + table-detect suites green. On PROSECCO Table 2 the captured "Resection complete" row now flattens into two sign-correct arm records (ITT risk diff -1.01% 95% CI [-10.36, 8.34] p = 0.09; PP risk diff 0.06% 95% CI [-9.53, 9.65] p = 0.06). **Known limitation (queued, not fixed here):** Camelot captures only the first of Table 2's three conceptual data rows — the "adjusted" / "remnant" rows have orphaned labels and are dropped at the table-*extraction* layer, so gold rows R2/R3/R5/R6 remain unreachable until a separate orphaned-label row-recovery lands. Tracked in `LESSONS.md` (Tier-2) and `REPLY_FROM_DOCPLUCK_v2.4.93.md`.
+
 ## [2.4.92] — 2026-06-18
 
 **Affiliation-heading guard — never promote an affiliation/institution line to a subsection heading (G5d).** Render-layer only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
