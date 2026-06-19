@@ -142,6 +142,59 @@ def test_case_c_does_not_fire_on_complete_data_rows():
     assert merged[1][0] == "IQ"
 
 
+# v2.4.94 (Tier-2): numeric/parenthetical continuation merge — Camelot stream
+# splits a stacked value/parenthetical cell across two physical rows.
+
+
+def test_numeric_continuation_merges_percentage_below_count():
+    # "86" with "(87.8%)" stacked beneath it (PROSECCO Table 2 shape).
+    rows = [
+        ["Resection complete", "86", "79", "-1.01% (-10.36-", "0.09"],
+        ["", "(87.8%)", "(88.8%)", "8.34)", ""],
+    ]
+    merged = _merge_continuation_rows(rows)
+    assert len(merged) == 1
+    parent = merged[0]
+    assert parent[1] == "86 (87.8%)"
+    assert parent[2] == "79 (88.8%)"
+    # parent ended mid-token at the en-dash → join WITHOUT a space.
+    assert parent[3] == "-1.01% (-10.36-8.34)"
+
+
+def test_ci_tail_only_continuation_merges_into_aligned_parent():
+    rows = [
+        ["adjusted", "", "", "-1.83% (-11.2-7.5)", "-", "", "", "0.82% (-8.63-", "-"],
+        ["", "", "", "", "", "", "", "10.28)", ""],
+    ]
+    merged = _merge_continuation_rows(rows)
+    assert len(merged) == 1
+    assert merged[0][7] == "0.82% (-8.63-10.28)"
+
+
+def test_fragment_continuation_does_not_merge_when_column_unaligned():
+    # The fragment sits in a column the parent leaves EMPTY → it's a new row,
+    # not a continuation. Must NOT be absorbed.
+    rows = [
+        ["Group A", "12.3", "", ""],
+        ["", "", "(4.5)", ""],
+    ]
+    merged = _merge_continuation_rows(rows)
+    assert len(merged) == 2  # not merged — col 2 is empty in the parent
+
+
+def test_fragment_continuation_label_modifier_with_dagger():
+    # Mixed continuation: a parenthetical label-modifier in col0 plus value
+    # parentheticals — all fragments, all column-aligned with the parent.
+    rows = [
+        ["When incomplete; remnant", "23.9", "16.2 (6.9)"],
+        ["(mean SD)†", "(13.7)", ""],
+    ]
+    merged = _merge_continuation_rows(rows)
+    assert len(merged) == 1
+    assert merged[0][0] == "When incomplete; remnant (mean SD)†"
+    assert merged[0][1] == "23.9 (13.7)"
+
+
 # ---------------------------------------------------------------------------
 # _is_header_like_row + multi-row header detection
 # ---------------------------------------------------------------------------
