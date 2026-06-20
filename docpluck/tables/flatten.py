@@ -22,8 +22,9 @@ What we emit: per body row, a `FlattenedRow` dict with
     Built by `_assemble_sentence` from the parsed `fields`. Three nested
     fidelity levels so consumers pick what they trust.
   * `fields`   — structured dict of recognized statistical quantities
-    (`t`, `df`, `F`, `df1`, `df2`, `r`, `n`, `p_op`, `p`, `d`, `eta2`, `M`,
-    `SD`, `CI_lower`, `CI_upper`). Empty dict when nothing is recognized.
+    (`t`, `df`, `F`, `df1`, `df2`, `r`, `n`, `p_op`, `p`, `d`, `eta2`, `BF01`,
+    `est`, `M`, `SD`, `CI_lower`, `CI_upper`, and `group` for a parallel-arm
+    row's arm label). Empty dict when nothing is recognized.
 
 Canonical contract: docpluck always emits these records as a sidecar
 `<paper>.tables.jsonl` next to the rendered `.md`. The `render_pdf_to_markdown`
@@ -181,10 +182,15 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("F",     re.compile(r"^\s*F(?:[\s\-]?value|[\s\-]?stat(?:istic)?)?\s*$")),
     ("chi2",  re.compile(r"^\s*(?:χ\s*²?|χ2|chi[\s\-]?(?:square|sq|2))\s*$", re.I)),
     ("r",     re.compile(r"^\s*r\s*$")),
+    # BF01 (Bayes factor in favour of the null). Must precede bare patterns so
+    # it isn't swallowed; accepts the subscript glyph, "BF01", "BF 01", "BF₀₁".
+    ("BF01",  re.compile(r"^\s*BF\s*[._]?\s*(?:0?1|₀₁)\s*$", re.I)),
     ("df",    re.compile(r"^\s*df\s*$", re.I)),
     ("df1",   re.compile(r"^\s*df\s*1\s*$", re.I)),
     ("df2",   re.compile(r"^\s*df\s*2\s*$", re.I)),
     ("p",     re.compile(r"^\s*p(?:[\s\-]?value)?\s*$", re.I)),
+    # "d", "Cohen's d", and "d or dz [95% CI]" combined effect+interval headers.
+    # The combined bracket form is handled as est_ci below; the bare form here.
     ("d",     re.compile(r"^\s*(?:d|cohen[’']?s?\s*d)\s*$", re.I)),
     ("eta2",  re.compile(r"^\s*(?:η\s*²?|η2|eta[\s\-]?(?:square|sq|2)?(?:_?p)?)\s*$", re.I)),
     ("M",     re.compile(r"^\s*(?:M|mean)\s*$", re.I)),
@@ -192,16 +198,58 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("n",     re.compile(r"^\s*n\s*$", re.I)),
     ("N",     re.compile(r"^\s*N\s*$")),
     # est_ci: a *combined* effect-and-interval column whose header carries an
-    # effect word (or any leading text) followed by a parenthesised CI marker,
-    # e.g. "Risk diff. (95% CI)", "Mean diff (95%CI)", "OR (95% CI)",
-    # "Cohen's d (95% CI)". The cell then holds an estimate AND its interval
-    # (e.g. "-1.01% (-10.36-8.34)"). Must precede the bare-"CI" pattern so a
-    # combined column is not mis-read as an interval-only column.
-    ("est_ci", re.compile(r"[A-Za-z].*\(\s*95\s*%?\s*C\.?\s*I", re.I)),
+    # effect word (or any leading text) followed by a CI marker — either
+    # parenthesised "Risk diff. (95% CI)" / "OR (95% CI)" OR square-bracketed
+    # "d or dz [95%CI]" / "d [95% CI]". The cell then holds an estimate AND its
+    # interval (e.g. "-1.01% (-10.36-8.34)" or "0.76 [.50, 1.02]"). Must precede
+    # the bare-"CI" pattern so a combined column is not mis-read as interval-only.
+    ("est_ci", re.compile(r"[A-Za-z].*[\(\[]\s*95\s*%?\s*C\.?\s*I", re.I)),
     ("CI",    re.compile(r"^\s*(?:95\s*%?\s*)?CI(?:\s*\[?\s*lower\s*,?\s*upper\s*\]?)?\s*$", re.I)),
     ("CI_lo", re.compile(r"^\s*(?:lower|LL|lo|95\s*%?\s*lower)\s*$", re.I)),
     ("CI_hi", re.compile(r"^\s*(?:upper|UL|hi|95\s*%?\s*upper)\s*$", re.I)),
 ]
+
+# Effect-type hint for an est_ci / est column, keyed on the effect word in the
+# header (or the recovered vocab). Lets a downstream consumer route a parsed
+# estimate semantically (Request 11 §2.4). Unmatched ⇒ no hint emitted.
+_EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("cohens_d",            re.compile(r"\b(?:d\s*z|d|cohen)\b", re.I)),
+    ("hedges_g",            re.compile(r"\b(?:g|hedges)\b", re.I)),
+    ("pearson_r",           re.compile(r"^\s*r\b", re.I)),
+    ("eta_squared_partial", re.compile(r"η\s*²?\s*_?\s*p|η²p|eta.*p\b", re.I)),
+    ("eta_squared",         re.compile(r"η\s*²?|η2|eta", re.I)),
+    ("odds_ratio",          re.compile(r"\bOR\b|odds\s*ratio", re.I)),
+    ("risk_difference",     re.compile(r"risk\s*diff", re.I)),
+    ("mean_difference",     re.compile(r"mean\s*diff|\bMD\b|difference\s+in\s+means", re.I)),
+]
+
+
+def _effect_type_for(label: str) -> Optional[str]:
+    """Best-effort semantic effect-type for an estimate column header/label."""
+    s = (label or "").strip()
+    if not s:
+        return None
+    for et, pat in _EFFECT_TYPE_PATTERNS:
+        if pat.search(s):
+            return et
+    return None
+
+
+# Effect-type → canonical field key. Only the unambiguous effect sizes are
+# promoted to a typed key; everything else stays the generic `est` (paired with
+# its CI), which the consumer routes by est+CI+p (Request 11 §2.4, §4).
+_EFFECT_TYPE_KEY = {
+    "cohens_d": "d",
+    "eta_squared_partial": "eta2",
+    "eta_squared": "eta2",
+}
+
+
+def _effect_key(header_cell: str, hint: Optional[str]) -> str:
+    """Field key for an estimate column: a typed effect key (`d` / `eta2`) when
+    the header or table vocabulary names the effect, else generic `est`."""
+    et = _effect_type_for(header_cell) or hint
+    return _EFFECT_TYPE_KEY.get(et or "", "est")
 
 
 def _classify_column(header: str) -> Optional[str]:
@@ -226,13 +274,19 @@ def _classify_column(header: str) -> Optional[str]:
 
 _NUM_RE = re.compile(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
 _P_OP_RE = re.compile(r"^\s*([<>=]+)?\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
+# Comma-separated CI bounds. Allow a leading-dot decimal (APA omits the leading
+# zero: ".50", ".003") as well as the full "0.50" form — `\d*\.\d+`.
 _CI_INLINE_RE = re.compile(
-    r"\[?\s*([-+]?\d+\.\d+)\s*,\s*([-+]?\d+\.\d+)\s*\]?"
+    r"\[?\s*([-+]?\d*\.\d+)\s*,\s*([-+]?\d*\.\d+)\s*\]?"
 )
 
 
 def _parse_number(s: str) -> Optional[float]:
-    m = _NUM_RE.match(s or "")
+    # Fold U+2212 MINUS SIGN → ASCII hyphen first (Camelot cells are NOT run
+    # through normalize.py, so a negative test statistic / mean often arrives as
+    # U+2212 and would otherwise fail the ASCII-only number regex — dropping a
+    # valid negative value). Same fold the CI / signed-float parsers already do.
+    m = _NUM_RE.match((s or "").replace("−", "-"))
     if not m:
         return None
     try:
@@ -348,6 +402,11 @@ def _parse_ci_cell(
     first. `estimate` (the row's point estimate) disambiguates case 3."""
     if not s:
         return None, None
+    # Fold U+2212 MINUS → ASCII hyphen up front so the comma-separated branch
+    # (`_CI_INLINE_RE` + `float()`, ASCII-sign only) doesn't silently skip a
+    # negative lower bound ("[−0.48, 0.15]" → must be (-0.48, 0.15), not
+    # (0.48, 0.15)). The dash/hyphen branches already fold internally.
+    s = s.replace("−", "-")
     parens = _PAREN_RE.findall(s)
     for body in ([parens[-1]] if parens else []) + [s]:
         b = (body or "").strip().strip("[]")
@@ -369,6 +428,405 @@ def _parse_ci_cell(
         if lo is not None and hi is not None:
             return lo, hi
     return None, None
+
+
+# ── Blank-header column-role recovery ───────────────────────────────────────
+#
+# Some result tables (Collabra t-/F-/Bayes tables) capture the data grid but
+# emit BLANK stat-column headers: the header row was absorbed into the caption
+# region, or the sub-header sits a row above the data and got dropped. A
+# downstream text parser cannot bind the values; docpluck can, because the
+# information survives in two recoverable places — (1) the *shape* of each
+# column's data tokens, and (2) the statistic vocabulary that leaked into the
+# table caption / footnote. We assign a role to a blank column ONLY when backed
+# by a positive signal (unambiguous data shape OR a recovered caption token),
+# never by bare column position — that would fabricate labels for garbage, the
+# exact failure mode the consumer forbids (Request 11). Anything we cannot
+# ground stays unrecognized, and its row keeps the safe today-behaviour of an
+# empty `fields` dict.
+
+# A cell holding ONLY a confidence interval: "[.50, 1.02]", "[0.53, 0.72]",
+# "(-10.36–8.34)", "0.20, 0.38". Anchored end-to-end so a combined estimate
+# cell ("0.76 [.50, 1.02]") does NOT match (the leading estimate breaks it).
+# Requires either a bracket OR a decimal point so a bare integer pair ("1, 114")
+# is left to the df-pair detector instead.
+_CI_ONLY_RE = re.compile(
+    r"^\s*[\[(]\s*[-+]?\d*\.?\d+\s*[,–—\-]\s*[-+]?\d*\.?\d+\s*[\])]\s*$"
+    r"|^\s*[-+]?\d*\.\d+\s*[,–—]\s*[-+]?\d*\.?\d+\s*$"
+)
+# A bare integer df pair in ONE cell: "1, 114", "2, 998".
+_DF_PAIR_RE = re.compile(r"^\s*(\d+)\s*,\s*(\d+)\s*$")
+# A p-value-shaped cell: optional comparison op + a decimal in [0, 1] range
+# (one leading digit at most), or an "N/A" filler.
+_P_SHAPE_RE = re.compile(r"^\s*[<>=]?\s*[01]?\.\d+\s*$")
+_NA_RE = re.compile(r"^\s*n\s*/?\s*a\s*$", re.I)
+# A single bare number (a candidate test statistic / effect / BF cell).
+_BARE_NUM_RE = re.compile(r"^\s*[-+]?\d*\.?\d+\s*$")
+_BARE_INT_RE = re.compile(r"^\s*\d+\s*$")
+
+
+def _looks_like_ci_only(v: str) -> bool:
+    return bool(_CI_ONLY_RE.match(v or ""))
+
+
+def _looks_like_df_pair(v: str) -> bool:
+    return bool(_DF_PAIR_RE.match(v or ""))
+
+
+def _looks_like_p(v: str) -> bool:
+    return bool(_P_SHAPE_RE.match(v or "") or _NA_RE.match(v or ""))
+
+
+def _has_comparison_op(v: str) -> bool:
+    return "<" in (v or "") or ">" in (v or "")
+
+
+def _is_num_or_na(v: str) -> bool:
+    """A bare number or an N/A filler — the shape of a statistic-bearing cell
+    once intervals/df-pairs are excluded."""
+    return bool(_BARE_NUM_RE.match(v or "") or _NA_RE.match(v or ""))
+
+
+# A combined estimate-and-interval cell: a leading number, then a bracketed or
+# parenthesised interval — "0.76 [.50, 1.02]", "-1.01% (-10.36-8.34)". The
+# leading number outside the bracket is what distinguishes it from a pure CI.
+_EST_CI_CELL_RE = re.compile(
+    r"^\s*[-+]?\d*\.?\d+\s*%?\s*[\[(].*[\])]\s*$"
+)
+
+
+def _looks_like_est_ci(v: str) -> bool:
+    return bool(_EST_CI_CELL_RE.match(v or ""))
+
+
+def _column_values(body: list[list[str]], ci: int) -> list[str]:
+    """Non-empty data values of column `ci` across body rows."""
+    out: list[str] = []
+    for row in body:
+        if ci < len(row):
+            v = (row[ci] or "").strip()
+            if v:
+                out.append(v)
+    return out
+
+
+def _is_numeric_ish(v: str) -> bool:
+    """A cell that carries a number, interval, p-value or N/A filler — i.e. a
+    statistic value rather than a label or a leaked heading."""
+    v = (v or "").strip()
+    return bool(
+        _BARE_NUM_RE.match(v)
+        or _looks_like_ci_only(v)
+        or _looks_like_df_pair(v)
+        or _looks_like_p(v)
+    )
+
+
+def _is_data_row(row: list[str]) -> bool:
+    """A body row carrying ≥2 statistic values — distinguishes real data rows
+    from hypothesis sub-headers / section labels that leak into the body (e.g.
+    ``['H1: Identifiability', '', ...]`` or a long ``H2a: ...`` label cell)."""
+    return sum(1 for c in row if _is_numeric_ish(c)) >= 2
+
+
+def _table_label_col(data_rows: list[list[str]], n_cols: int) -> int:
+    """The row-identifier column: the one most consistently non-numeric across
+    data rows (ties → left-most). Almost always column 0 in academic tables."""
+    best_ci, best_score = 0, -1
+    for ci in range(n_cols):
+        score = sum(
+            1
+            for row in data_rows
+            if ci < len(row) and (row[ci] or "").strip() and not _is_numeric_ish(row[ci])
+        )
+        if score > best_score:
+            best_ci, best_score = ci, score
+    return best_ci
+
+
+def _frac_match(values: list[str], pred) -> bool:
+    """True when ≥2 values and ≥60% of them satisfy `pred` — tolerant of the
+    occasional capture artifact (a leaked heading glued onto one cell) without
+    letting a single bad cell veto a whole column's recovered role."""
+    if not values:
+        return False
+    if len(values) < 2:
+        return all(pred(v) for v in values)
+    hits = sum(1 for v in values if pred(v))
+    return hits >= 2 and hits / len(values) >= 0.6
+
+
+# Caption-leaked header tokens → canonical role. A table's header row sometimes
+# lands in the caption text (e.g. "...Explicit Learning df F p BF01 95% CI ...").
+# We recover the longest run of consecutive statistic tokens as an ordered role
+# sequence, used to TYPE blank columns left-to-right where data shape alone is
+# ambiguous (p vs BF01 vs effect when none carry an operator).
+_CAPTION_TOKEN_ROLE: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^BF\s*[._]?\s*(?:0?1|₀₁)$", re.I), "BF01"),
+    (re.compile(r"^(?:η\s*²?\s*_?p?|η2p?|etap?2?|eta)$", re.I), "eta2"),
+    (re.compile(r"^df$", re.I), "df"),
+    (re.compile(r"^(?:95\s*%?|95)$"), "CI"),
+    (re.compile(r"^C\.?I\.?$", re.I), "CI"),
+    (re.compile(r"^t$"), "t"),
+    (re.compile(r"^F$"), "F"),
+    (re.compile(r"^r$"), "r"),
+    (re.compile(r"^p$"), "p"),
+    (re.compile(r"^d(?:\s*z)?$", re.I), "d"),
+    (re.compile(r"^M$"), "M"),
+    (re.compile(r"^SD$"), "SD"),
+    (re.compile(r"^n$"), "n"),
+    (re.compile(r"^N$"), "N"),
+    (re.compile(r"^BF$", re.I), "BF01"),
+]
+
+
+def _caption_token_role(tok: str) -> Optional[str]:
+    t = (tok or "").strip().strip(",:;.")
+    if not t:
+        return None
+    for pat, role in _CAPTION_TOKEN_ROLE:
+        if pat.match(t):
+            return role
+    return None
+
+
+def _recover_caption_header_run(text: str) -> list[str]:
+    """The longest run of *consecutive* statistic tokens in `text`, as an
+    ordered list of canonical roles. Empty when no run of ≥2 stat tokens exists.
+
+    A "%" attached to "95% CI" collapses to a single CI role. Keyed on the
+    structural signature "a header row leaked into the caption", general across
+    publishers — never on caption wording for a specific paper."""
+    if not text:
+        return []
+    toks = re.split(r"\s+", text.strip())
+    best: list[str] = []
+    cur: list[str] = []
+    for tok in toks:
+        role = _caption_token_role(tok)
+        if role is None:
+            if len(cur) > len(best):
+                best = cur
+            cur = []
+            continue
+        # Collapse a duplicate trailing CI ("95%" then "CI") into one role.
+        if role == "CI" and cur and cur[-1] == "CI":
+            continue
+        cur.append(role)
+    if len(cur) > len(best):
+        best = cur
+    return best if len(best) >= 2 else []
+
+
+def _recover_blank_roles(
+    header: list[str],
+    body: list[list[str]],
+    label_col: int,
+    caption: Optional[str],
+    footnote: Optional[str],
+    extra_vocab: str = "",
+) -> dict[int, str]:
+    """Infer roles for columns whose grid header is blank/unrecognized.
+
+    Returns ``{col_idx: role}`` for recovered columns only (recognized-header
+    columns are left to the normal `_classify_column` path). Roles use the same
+    canonical names plus ``df_pair`` (a "df1, df2" cell) and ``stat`` (a typed
+    or generic test statistic). Every assignment is backed by a positive
+    signal — unambiguous data shape or a recovered caption/header token."""
+    n = len(header)
+    cols = [ci for ci in range(n) if ci != label_col]
+    grid_role = {ci: _classify_column(header[ci]) for ci in cols}
+
+    # GATE — only recover on the "header-stripped result table" signature: the
+    # stat-column header row was absorbed into the caption / dropped, so most
+    # data columns are unlabeled. When the table already classifies most of its
+    # columns (a normal labeled table with maybe one blank spacer column), we do
+    # NOT second-guess it — recovering the stragglers there mis-binds values and
+    # collides with recognized roles (the chen/korbmacher over-reach). Requires
+    # ≥2 blank data columns AND blanks to outnumber recognized columns.
+    data_cols = [ci for ci in cols if _column_values(body, ci)]
+    recognized = [ci for ci in data_cols if grid_role[ci]]
+    blank = [ci for ci in data_cols if not grid_role[ci]]
+    if len(blank) < 2 or len(recognized) >= len(blank):
+        return {}
+    # If the grid already names a core test statistic (t / F / r / χ²), the
+    # header row is intact enough — recovering blank stragglers there mis-binds
+    # values. The header-stripped tables we target have NO recognized statistic.
+    if {grid_role[ci] for ci in recognized} & {"t", "F", "F_with_df", "r", "chi2"}:
+        return {}
+
+    # Statistic vocabulary present anywhere we can read it: the grid headers
+    # (all rows, via `extra_vocab`), the caption, the footnote. Used to TYPE the
+    # leading statistic column and to confirm a token is plausible before
+    # assigning it.
+    vocab_text = " ".join(
+        [header[ci] for ci in cols] + [caption or "", footnote or "", extra_vocab]
+    )
+    run = _recover_caption_header_run(caption or "") or _recover_caption_header_run(
+        vocab_text
+    )
+
+    # GROUNDING GATE — fire ONLY on the Request-11 signature, so we never
+    # second-guess an ordinary table that merely has a blank spacer column:
+    #   (a) the stat header row leaked into the caption (a recovered run), OR
+    #   (b) the table names a typed effect size (Cohen's d / η²p) AND carries a
+    #       combined estimate+interval column (the t-/F-with-effect shape).
+    # Tables that are neither (regression OR tables, bare correlation matrices)
+    # are left exactly as the grid-header path produced them.
+    has_typed_effect = bool(
+        re.search(
+            r"\bd\s*z?\b|\bd\s+or\s+d\b|cohen|η|\beta[\s_\-]?(?:squared|sq|p|2)\b",
+            vocab_text,
+            re.I,
+        )
+    )
+    has_est_ci_col = any(
+        _frac_match(_column_values(body, ci), _looks_like_est_ci)
+        for ci in cols
+        if not grid_role[ci]
+    )
+    if not run and not (has_typed_effect and has_est_ci_col):
+        return {}
+
+    override: dict[int, str] = {}
+
+    # Pass 1 — unambiguous data-shape anchors on blank columns.
+    for ci in cols:
+        if grid_role[ci]:
+            continue
+        vals = _column_values(body, ci)
+        if not vals:
+            continue
+        if _frac_match(vals, _looks_like_df_pair):
+            override[ci] = "df_pair"
+        elif _frac_match(vals, _looks_like_est_ci):
+            # A leading number + its own bracketed interval, e.g.
+            # "0.76 [.50, 1.02]" — a combined effect-and-CI column.
+            override[ci] = "est_ci"
+        elif _frac_match(vals, _looks_like_ci_only):
+            override[ci] = "CI"
+        elif _frac_match(vals, _looks_like_p) and any(
+            _has_comparison_op(v) for v in vals
+        ):
+            # A p column is unambiguous only when it carries a comparison op
+            # somewhere; an operator-less small-decimal column is deferred to
+            # caption-token alignment below (it could be p, BF, or an effect).
+            override[ci] = "p"
+
+    # Test family — drives df-vs-n and the typing of the leading statistic
+    # column. Determined from data shape + the recovered vocabulary, never from
+    # bare position. df-pair ⇒ F; an effect "d/dz" column or a "t" token ⇒ t;
+    # an "r" token ⇒ correlation.
+    has_df_pair = "df_pair" in override.values()
+    has_effect_ci = "est_ci" in override.values()
+    has_d = bool(re.search(r"\bd\s*z?\b|\bd\s+or\s+d\b|cohen", vocab_text, re.I))
+    has_F = bool(re.search(r"(?<![A-Za-z])F(?![A-Za-z])", vocab_text))
+    has_t = bool(re.search(r"(?<![A-Za-z])t(?![A-Za-z])", vocab_text))
+    has_r = bool(re.search(r"(?<![A-Za-z])r(?![A-Za-z])", vocab_text))
+    if has_df_pair or (has_F and not has_t):
+        family = "F"
+    elif has_t or has_d or (has_effect_ci and not has_F):
+        family = "t"
+    elif has_r:
+        family = "r"
+    elif has_F:
+        family = "F"
+    else:
+        family = None
+
+    # Pass 2 — a lone all-integer column is df (t/F family) or n (r family).
+    if family in ("t", "F", "r"):
+        for ci in cols:
+            if grid_role[ci] or ci in override:
+                continue
+            vals = _column_values(body, ci)
+            if not _frac_match(vals, lambda v: bool(_BARE_INT_RE.match(v))):
+                continue
+            override[ci] = "n" if family == "r" else "df"
+
+    # Pass 3 — the left-most still-blank bare-numeric column is the test
+    # statistic, typed by family. Only fires when a family was established, so
+    # an arbitrary number column is never labelled a statistic.
+    if family in ("t", "F", "r"):
+        for ci in cols:
+            if grid_role[ci] or ci in override:
+                continue
+            vals = _column_values(body, ci)
+            if _frac_match(vals, _is_num_or_na):
+                override[ci] = family
+                break
+
+    # Set of column indices that carry (or will carry) a CI, for est-adjacency.
+    ci_cols = {
+        ci
+        for ci in cols
+        if grid_role[ci] in ("CI", "CI_lo", "CI_hi", "est_ci")
+        or override.get(ci) in ("CI", "est_ci")
+    }
+
+    # Pass 4 — greedy left-to-right alignment of the recovered caption run to
+    # the still-blank columns. Shape/family-anchored columns CONSUME their
+    # matching token so the sequence stays aligned; a "CI"/"df" token is
+    # consumed by the column that already owns that role rather than mis-assigned.
+    if run:
+        seq = list(run)
+
+        def _consume(role_group: tuple[str, ...]) -> None:
+            if seq and seq[0] in role_group:
+                seq.pop(0)
+
+        for ci in cols:
+            assigned = grid_role[ci] or override.get(ci)
+            if assigned:
+                if assigned in ("CI", "est_ci", "CI_lo", "CI_hi"):
+                    _consume(("CI",))
+                elif assigned in ("df", "df1", "df2", "df_pair"):
+                    _consume(("df",))
+                elif assigned == "n":
+                    _consume(("n",))
+                elif seq and seq[0] == assigned:
+                    seq.pop(0)
+                continue
+            # Blank, not yet anchored — take the next caption token if it names
+            # a stat role we trust binding by position.
+            if seq:
+                tok = seq.pop(0)
+                if tok in ("t", "F", "r", "p", "BF01", "eta2", "d", "M", "SD", "n", "N"):
+                    override[ci] = tok
+                    continue
+            # No token left: a bare-number column immediately left of a CI
+            # column is that interval's point estimate.
+            vals = _column_values(body, ci)
+            if _frac_match(vals, _is_num_or_na) and (ci + 1) in ci_cols:
+                override[ci] = "est"
+
+    # Pass 5 — final est-adjacency sweep for tables with no caption run: a
+    # still-blank bare-number column immediately left of a CI column is the
+    # interval's point estimate.
+    for ci in cols:
+        if grid_role[ci] or ci in override:
+            continue
+        vals = _column_values(body, ci)
+        if _frac_match(vals, _is_num_or_na) and (ci + 1) in ci_cols:
+            override[ci] = "est"
+
+    # De-duplicate against the grid — a recovered role must never duplicate a
+    # role the grid already recognized. A second "t"/"F"/"p"/… column collides
+    # with the recognized one at value-extraction (last-write-wins) and silently
+    # corrupts the real value (the chen Table 12 regression: a blank column got
+    # typed "t" and overwrote the correctly-headed t). df1/df2/CI bounds legitly
+    # come in pairs, so they are exempt.
+    grid_roles_present = {r for r in grid_role.values() if r}
+    single_roles = {
+        "t", "F", "r", "chi2", "p", "df", "df_pair", "BF01", "M", "SD", "n", "N", "est",
+    }
+    override = {
+        ci: role
+        for ci, role in override.items()
+        if not (role in single_roles and role in grid_roles_present)
+    }
+
+    return override
 
 
 # ── Row flattening ──────────────────────────────────────────────────────────
@@ -403,6 +861,8 @@ def _flatten_one_row(
     header: list[str],
     row: list[str],
     group: Optional[str] = None,
+    roles_override: Optional[dict[int, str]] = None,
+    effect_hint: Optional[str] = None,
 ) -> FlattenedRow:
     row_label, label_col = _pick_row_label(row)
 
@@ -410,11 +870,15 @@ def _flatten_one_row(
     # without breaking the lookup.
     f_with_df_re = next(p for r, p in _ROLE_PATTERNS if r == "F_with_df")
 
-    # Classify each non-label column.
+    # Classify each non-label column. A `roles_override` entry (from blank-header
+    # recovery) wins over the grid-header classification for that column.
     roles: dict[int, str] = {}
     df_from_header: dict[int, tuple[int, int]] = {}
     for ci, h in enumerate(header):
         if ci == label_col:
+            continue
+        if roles_override and ci in roles_override:
+            roles[ci] = roles_override[ci]
             continue
         role = _classify_column(h)
         if role == "F_with_df":
@@ -441,18 +905,38 @@ def _flatten_one_row(
                 role_nums["p"] = p
                 if op:
                     role_vals["p_op"] = op
+        elif role == "df_pair":
+            m = _DF_PAIR_RE.match(raw)
+            if m:
+                role_nums["df1"] = float(m.group(1))
+                role_nums["df2"] = float(m.group(2))
         elif role == "CI":
             lo, hi = _parse_ci_cell(raw)
             if lo is not None and hi is not None:
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
+        elif role == "est":
+            # A recovered point-estimate column (its interval is a sibling CI
+            # column). Bare value, no inline interval.
+            est = _parse_number(raw)
+            if est is None:
+                est = _to_signed_float(raw)
+            if est is not None:
+                eff_key = _effect_key(header[ci], effect_hint)
+                role_nums[eff_key] = est
+                role_vals[eff_key] = raw
         elif role == "est_ci":
-            # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)".
+            # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)"
+            # or "0.76 [.50, 1.02]".
             est = _parse_leading_number(raw)
             if est is not None:
-                role_nums["est"] = est
-                role_vals["est"] = raw.split("(", 1)[0].strip() or _fmt_num(est)
-                role_vals["est_label"] = _est_label_from_header(header[ci])
+                eff_key = _effect_key(header[ci], effect_hint)
+                role_nums[eff_key] = est
+                role_vals[eff_key] = (
+                    re.split(r"[\[(]", raw, maxsplit=1)[0].strip() or _fmt_num(est)
+                )
+                if eff_key == "est":
+                    role_vals["est_label"] = _est_label_from_header(header[ci])
             # The estimate anchors the CI sign when the bounds are hyphen-glued.
             lo, hi = _parse_ci_cell(raw, estimate=est)
             if lo is not None and hi is not None:
@@ -477,10 +961,34 @@ def _flatten_one_row(
         if df1_val is None and df2_val is None:
             df1_val, df2_val = float(a), float(b)
 
+    # Validity guards — a parsed value that violates a statistic's domain is
+    # garbage, not data. Drop it (and its sentence part) rather than emit an
+    # impossible field. Universal: an invalid statistic is wrong wherever it
+    # comes from, recovered or grid-classified ("never display garbage").
+    if "r" in role_nums and not (-1.0 <= role_nums["r"] <= 1.0):
+        role_nums.pop("r")
+        role_vals.pop("r", None)
+    if "p" in role_nums and not (0.0 <= role_nums["p"] <= 1.0):
+        role_nums.pop("p")
+        role_vals.pop("p", None)
+        role_vals.pop("p_op", None)
+    for k in ("n", "N"):
+        if k in role_nums and (role_nums[k] <= 0 or role_nums[k] != int(role_nums[k])):
+            role_nums.pop(k)
+            role_vals.pop(k, None)
+    if (
+        "CI_lower" in role_nums
+        and "CI_upper" in role_nums
+        and role_nums["CI_lower"] > role_nums["CI_upper"]
+    ):
+        role_nums.pop("CI_lower")
+        role_nums.pop("CI_upper")
+        role_vals.pop("CI", None)
+
     fields: dict[str, object] = {}
     if group:
         fields["group"] = group
-    for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est"):
+    for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est", "BF01"):
         if k in role_nums:
             fields[k] = role_nums[k]
     for k in ("n", "N"):
@@ -554,9 +1062,9 @@ def _assemble_sentence(
     parts: list[str] = []
 
     if "est" in role_nums:
-        est_label = role_vals.get("est_label", "")
+        est_label = role_vals.get("est_label", "") or "estimate"
         est_txt = role_vals.get("est", _fmt_num(role_nums["est"]))
-        parts.append(f"{est_label} = {est_txt}" if est_label else est_txt)
+        parts.append(f"{est_label} = {est_txt}")
 
     if "t" in role_nums:
         if df is not None:
@@ -607,10 +1115,15 @@ def _assemble_sentence(
         parts.append(f"d = {role_vals['d']}")
     if "eta2" in role_nums:
         parts.append(f"η² = {role_vals['eta2']}")
+    if "BF01" in role_nums:
+        parts.append(f"BF01 = {role_vals['BF01']}")
 
     if "CI_lower" in role_nums and "CI_upper" in role_nums:
         if "CI" in role_vals:
-            parts.append(f"95% CI [{role_vals['CI']}]")
+            # The raw CI cell may already carry its own brackets/parens —
+            # strip them so the sentence renders one set, not "[[...]]".
+            ci_txt = role_vals["CI"].strip().strip("[]()").strip()
+            parts.append(f"95% CI [{ci_txt}]")
         else:
             lo = _fmt_num(role_nums["CI_lower"])
             hi = _fmt_num(role_nums["CI_upper"])
@@ -660,6 +1173,169 @@ def _detect_column_groups(
     return label_cols, groups
 
 
+# A single statistic value-group: either a signed number with an optional
+# ``(SD)`` and/or bracketed ``[CI]`` suffix, OR a standalone bracketed interval
+# (a packed CI column whose cells are ``"[−0.48, 0.15] [−0.20, 0.34]"`` — no
+# leading point estimate). Used to split a packed parallel-arm cell into one
+# value per arm. The number branch is tried first so ``".07 [-.17,.31]"`` stays
+# a single group rather than splitting the estimate from its interval.
+_VALUE_GROUP_RE = re.compile(
+    r"(?:"
+    r"[+\-−]?(?:\d+\.?\d*|\.\d+)"  # signed number
+    r"(?:\s*\([^)]*\))?"  # optional (SD)
+    r"(?:\s*\[[^\]]*\])?"  # optional [CI]
+    r"|"
+    r"\[[^\]]*\]"  # OR a standalone bracketed interval
+    r")"
+)
+
+
+def _split_value_groups(cell: str, k: int) -> Optional[list[str]]:
+    """Split a packed multi-arm cell into EXACTLY ``k`` value-groups.
+
+    A value-group is a number with an optional ``(SD)`` and/or ``[CI]`` suffix
+    (``"4.76 (1.14)"``, ``".07 [-.17,.31]"``, ``"260.54"``). Returns the ``k``
+    groups when the cell yields exactly ``k`` of them AND they cover the bulk of
+    the cell's non-space characters; otherwise ``None`` so a cell that does not
+    hold one value per arm is left intact rather than mis-split."""
+    s = (cell or "").strip()
+    if not s:
+        return None
+    groups = [
+        m.group(0).strip() for m in _VALUE_GROUP_RE.finditer(s) if m.group(0).strip()
+    ]
+    if len(groups) != k:
+        return None
+    nospace = lambda x: re.sub(r"\s", "", x)  # noqa: E731
+    if len("".join(nospace(g) for g in groups)) < 0.8 * len(nospace(s)):
+        return None
+    return groups
+
+
+def _detect_packed_arms(
+    header: list[str], body: list[list[str]]
+) -> Optional[tuple[int, list[str]]]:
+    """Detect a table whose parallel arms are packed into single cells.
+
+    The Request-11 "Separate/Joint" shape: one arm-label column repeats the SAME
+    ``k≥2`` arm names on every data row (``"Separate Joint"``) and the other data
+    cells each pack ``k`` space-joined values, one per arm. This is distinct from
+    `_detect_column_groups` (arms in *separate* columns via a folded super-header)
+    — here every column holds all arms at once.
+
+    Returns ``(arm_label_col, [arm_labels...])`` or ``None``. Keyed purely on the
+    structural signature (a constant multi-token alpha label column + ≥2 cleanly
+    ``k``-splittable data columns), so ordinary single-arm tables are untouched
+    and stay byte-identical to the pre-existing path."""
+    # Fold the super-header sentinel down to spaces first: a packed arm-label
+    # column reads ``"Separate\x00BR\x00Joint"`` raw, and packed data cells are
+    # likewise sentinel-joined. `_is_data_row` can't see numbers inside a packed
+    # cell, so identify data rows by "≥2 cells containing a digit" instead.
+    rows = [[_strip_fold_sentinels(c or "") for c in r] for r in body]
+    data = [r for r in rows if sum(1 for c in r if re.search(r"\d", c)) >= 2]
+    if len(data) < 2:
+        return None
+    n = max(len(r) for r in data)
+    for a in range(n):
+        vals = [(r[a].strip() if a < len(r) else "") for r in data]
+        if any(not v for v in vals) or len(set(vals)) != 1:
+            continue  # not a column that repeats one constant arm-label string
+        toks = vals[0].split()
+        k = len(toks)
+        if not (2 <= k <= 4):
+            continue
+        if not all(re.fullmatch(r"[A-Za-z][A-Za-z.\-]*", t) for t in toks):
+            continue  # arm labels are alphabetic words ("Separate", "Joint")
+        splittable = sum(
+            1
+            for ci in range(n)
+            if ci != a
+            and (cv := _column_values(data, ci))
+            and all(_split_value_groups(v, k) is not None for v in cv)
+        )
+        if splittable >= 2:
+            return a, toks
+    return None
+
+
+def _flatten_packed_arms(
+    table_id: str,
+    page: int,
+    label: Optional[str],
+    header: list[str],
+    body: list[list[str]],
+    packed: tuple[int, list[str]],
+    *,
+    caption: Optional[str],
+    footnote: Optional[str],
+    vocab_all: str,
+    effect_hint: Optional[str],
+    n_cols: int,
+) -> list[FlattenedRow]:
+    """Emit one `FlattenedRow` per (body row × arm) for a packed-arm table.
+
+    Each kept (non-arm-label) cell is split into its ``k`` per-arm values via
+    `_split_value_groups`; cells that do not split (the DV label, blanks) are
+    replicated across arms. Roles for blank stat columns are recovered on the
+    SPLIT (single-value) shape, then the existing `_flatten_one_row` machinery
+    types and assembles each arm exactly as for a normal row, tagging the arm
+    via ``group=`` so Separate/Joint stay distinguishable."""
+    arm_col, arm_labels = packed
+    k = len(arm_labels)
+    keep_cols = [ci for ci in range(n_cols) if ci != arm_col]
+    sub_header = [
+        _strip_fold_sentinels(header[ci]) if ci < len(header) else "" for ci in keep_cols
+    ]
+
+    emit: list[tuple[int, str, list[str]]] = []
+    all_sub_rows: list[list[str]] = []
+    for row_idx, row in enumerate(body):
+        if _is_group_separator(row, n_cols):
+            continue
+        row = (list(row) + [""] * (n_cols - len(row)))[:n_cols]
+        per_arm: list[list[str]] = [[] for _ in range(k)]
+        for ci in keep_cols:
+            cell = _strip_fold_sentinels(row[ci] or "").strip()
+            groups = _split_value_groups(cell, k)
+            for j in range(k):
+                per_arm[j].append(groups[j] if groups is not None else cell)
+        for j in range(k):
+            all_sub_rows.append(per_arm[j])
+            emit.append((row_idx, arm_labels[j], per_arm[j]))
+
+    recovered: Optional[dict[int, str]] = None
+    if all_sub_rows:
+        lbl_col = _table_label_col(all_sub_rows, len(sub_header))
+        recovered = (
+            _recover_blank_roles(
+                sub_header,
+                all_sub_rows,
+                lbl_col,
+                caption,
+                footnote,
+                extra_vocab=vocab_all,
+            )
+            or None
+        )
+
+    out: list[FlattenedRow] = []
+    for row_idx, glabel, sub_row in emit:
+        out.append(
+            _flatten_one_row(
+                table_id,
+                page,
+                label,
+                row_idx,
+                sub_header,
+                sub_row,
+                group=glabel,
+                roles_override=recovered,
+                effect_hint=effect_hint,
+            )
+        )
+    return out
+
+
 def flatten_table(table: Table) -> list[FlattenedRow]:
     """Flatten a structured `Table` into per-row `FlattenedRow` records.
 
@@ -686,6 +1362,56 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
 
     grouped = _detect_column_groups(header)
 
+    # Blank-header column-role recovery (non-grouped tables only — grouped
+    # tables already resolve roles per arm). When the grid header leaves stat
+    # columns unlabeled, recover their roles from data shape + caption/footnote
+    # vocabulary so `fields` get populated instead of dropped.
+    # Effect-type hint from the whole-table vocabulary (all header rows +
+    # caption + footnote) — used to type a recovered estimate column (e.g.
+    # a blank "d or dz [95% CI]" column ⇒ key `d`). Header text on the column
+    # itself still wins; this only fills in when the column header is blank.
+    vocab_all = " ".join(
+        [" ".join(hr) for hr in header_rows]
+        + [table.get("caption") or "", table.get("footnote") or ""]
+    )
+    effect_hint = _effect_type_for(vocab_all)
+
+    # Packed parallel-arm table (Separate/Joint values space-joined inside each
+    # cell). Detected only when there are no column-groups; handled by its own
+    # split-then-flatten path so each arm becomes its own typed record.
+    packed = _detect_packed_arms(header, body) if grouped is None else None
+    if packed is not None:
+        return _flatten_packed_arms(
+            table_id,
+            page,
+            label,
+            header,
+            body,
+            packed,
+            caption=table.get("caption"),
+            footnote=table.get("footnote"),
+            vocab_all=vocab_all,
+            effect_hint=effect_hint,
+            n_cols=len(header),
+        )
+
+    roles_override: Optional[dict[int, str]] = None
+    if grouped is None:
+        n_cols0 = len(header)
+        data_rows = [
+            (list(r) + [""] * (n_cols0 - len(r)))[:n_cols0]
+            for r in body
+            if _is_data_row(r)
+        ]
+        if data_rows:
+            lbl_col = _table_label_col(data_rows, n_cols0)
+            recovered = _recover_blank_roles(
+                header, data_rows, lbl_col,
+                table.get("caption"), table.get("footnote"),
+                extra_vocab=vocab_all,
+            )
+            roles_override = recovered or None
+
     out: list[FlattenedRow] = []
     n_cols = len(header)
     for row_idx, row in enumerate(body):
@@ -698,7 +1424,13 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
             row = list(row[:n_cols])
 
         if grouped is None:
-            out.append(_flatten_one_row(table_id, page, label, row_idx, header, row))
+            out.append(
+                _flatten_one_row(
+                    table_id, page, label, row_idx, header, row,
+                    roles_override=roles_override,
+                    effect_hint=effect_hint,
+                )
+            )
             continue
 
         # Parallel-group table: emit one record per (row × arm). Shared label
@@ -712,7 +1444,8 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
             sub_row = [row[i] for i in label_cols] + [row[i] for i in gcols]
             out.append(
                 _flatten_one_row(
-                    table_id, page, label, row_idx, sub_header, sub_row, group=glabel
+                    table_id, page, label, row_idx, sub_header, sub_row,
+                    group=glabel, effect_hint=effect_hint,
                 )
             )
 
