@@ -38,6 +38,10 @@ _VIBE = os.path.join(os.path.expanduser("~"), "Dropbox", "Vibe")
 PDF_PATHS = {
     # docpluck's test corpus = sibling PDFextractor repo's test-pdfs/.
     "docpluck": os.path.join(_SIBLINGS, "PDFextractor", "test-pdfs"),
+    # The shared article repository (article-finder cache). Closed-access PDFs
+    # named by canonical DOI key (e.g. "10.1525__collabra.90203.pdf"). Tests
+    # that key on a specific paper skip gracefully when the repo isn't present.
+    "articlerepo": os.path.join(_VIBE, "ArticleRepository", "fulltext"),
     # Other-project corpora — if not under `_SIBLINGS`, dependent tests skip
     # gracefully (pdf_available returns False). Update to repo-relative once
     # the locations of these sibling repos are confirmed.

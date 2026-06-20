@@ -5,6 +5,15 @@
 > is **PARTIAL**: R1 + R4 surface sign-correct; **R2/R3/R5/R6 are blocked at the
 > Camelot capture layer** (orphaned row-labels), queued as a Tier-2 table-extraction
 > fix (docpluck `LESSONS.md` L-009). #2/#3 met; #4 is ESCImate's to run.
+>
+> **UPDATE 2026-06-19 — v2.4.94 CLOSES acceptance #1.** ESCImate verified against the
+> live service: PROSECCO Table 2 now returns all 6 gold rows (R1–R6) via `?structured=true`,
+> sign-correct (R2's `(-11.2--7.5)` resolved to `[-11.2, 7.5]`), exactly 6/88 flattened_rows
+> carry stat fields → zero false positives. ESCImate will consume `flattened_rows[].fields`.
+> **Remaining table-row work moved to `REQUEST_11_FLATTEN_FIELDS_NONCLINICAL_TABLES.md`:**
+> the flattener still emits empty `fields` for *non-clinical* result tables
+> (`10.1525/collabra.77859`, `10.1525/collabra.90203`) — grid captured but headers blank
+> and stats packed per cell. That is the only open table-flatten item.
 
 # Docpluck Request 10 — Expose the EC-T1 table flattener / structured tables / sections over the hosted `/api/extract` HTTP API
 
