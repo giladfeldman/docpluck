@@ -2,6 +2,15 @@
 
 This file tracks future-aim items that are scoped out of the current milestone but should not be lost. See `docs/superpowers/specs/` for active specs.
 
+## 2026-06-20 — v2.4.95 SHIPPED (REQUEST_11: flatten fields for non-clinical result tables) — deferred follow-ups
+
+> ✅ **Shipped + verified in prod.** main `370b89c` + tag `v2.4.95` (canary PASS), PyPI published, app pin auto-bumped to `@v2.4.95`, Railway `/health` reports `docpluck_version: 2.4.95`. Closes ESCImate REQUEST_11 (blank-header column-role recovery + packed parallel-arm split + general U+2212/bracket-CI fixes). All 4 acceptance criteria met, both target papers AI-gold-verified. Details: `REPLY_FROM_DOCPLUCK_v2.4.95.md`, `docs/HANDOFF_2026-06-20_request11_flatten_nonclinical_tables.md`, `CHANGELOG.md`.
+
+- [ ] **`fields.effect_type` — opt-in, only if ESCImate requests it.** REQUEST_11 §2.4 asked for `effect_type` (cohens_d / pearson_r / partial_eta_squared / mean_difference) but called it "not a blocker." Deferred because emitting it would add a key to PROSECCO's 6 rows, conflicting with acceptance #4 (PROSECCO byte-identical). Offered as an opt-in in the reply; implement (grounded in key-present + effect vocab) only if the consumer accepts the PROSECCO field-set change.
+- [ ] **(LOW) `collabra.77859` caption-number binding — "Table 3" vs gold "Table 2".** docpluck labels the Attractive/Affect Separate/Joint results table "Table 3" (its PDF caption "Study 4: Dish sets"; the consumer's request agrees), but the AI gold numbers the same data "Table 2". Values/arms all correct — only the table-number attribution differs. Needs a PDF-page inspection to adjudicate whether docpluck's caption-to-table binding or the gold's numbering is right. Logged in iterate run-meta `open_findings`.
+- [x] **(no action) `collabra.90203` Table 10 "Joint/No-explicit" r=.59 vs gold .63** — the PDF *text layer* encodes `.59` (pdftotext AND Camelot agree); only the AI-visual gold sees `.63`. Source text-layer corruption, undetectable without OCR (not allowed). Documented for the consumer; nothing docpluck can fix.
+- [x] **(handled) Value-exact real-PDF flatten tests flake under `-n10`** — Camelot extraction is non-deterministic under parallel load; the 4 `*_real_pdf` tests now skip under `PYTEST_XDIST_WORKER` (run serially in canonical QA), matching the `test_benchmark_docx_html.py` convention. Synthetic-grid contract tests cover the logic under `-n10`.
+
 ## 2026-06-16 — deferred for investigation before code changes
 
 - [ ] **Investigate `sections=` extraction de-dup (no behavior change yet).** `extract_pdf(..., sections=...)`, `extract_docx(..., sections=...)`, and `extract_html(..., sections=...)` currently do one extraction pass and then call `extract_sections(...)`, which can re-run extraction/annotation internally by design. Before optimizing, document invariants proving parity with direct `extract_sections(...)` outputs, then run corpus/harness verification to confirm zero regressions. No implementation change until those proofs are in place.
