@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.4.95] — 2026-06-20
+
+**Flatten now populates `fields` for non-clinical result tables (REQUEST_11).** `TABLE_EXTRACTION_VERSION` → `2.4.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change. v2.4.94 solved the clinical PROSECCO table (labelled headers); this closes the two reproducers whose `fields` still came back `{}` — header-stripped result tables and tables packing parallel arms into single cells.
+
+Grounded in `10.1525/collabra.77859` (Tables 3, 5) and `10.1525/collabra.90203` (Tables 8, 9, 10), both AI-gold-verified. Two cycles, each gated on a structural signature so ordinary tables stay byte-identical:
+
+**Cycle A — blank-header column-role recovery** (`docpluck/tables/flatten.py::_recover_blank_roles`). Some result tables capture the data grid but emit BLANK stat-column headers (the header row was absorbed into the caption region or sits a row above the data and got dropped), so the flattener returned `fields:{}`. The fix assigns a role to a blank column ONLY from two grounded signals — the **shape** of its data tokens (CI brackets, a `df1, df2` pair, an estimate adjacent to a CI, a p-value with a comparison operator) and the statistic **vocabulary** recovered from the caption / footnote / all header rows — never from bare column position (that would fabricate labels for garbage, the exact failure the consumer forbids). Recovers `collabra.77859` Table 5 (`t/df/d/CI`) and `collabra.90203` Tables 8/9 (`F/df1,df2/p/BF01/eta²p-as-est/CI`) and Table 10 (`r/n/CI/p`). Adds a **`BF01`** role (Bayes factor for the null) per request, and validity guards that drop a recovered value that can't be real (`r ∉ [-1, 1]`, non-monotone CI, non-integer `n`, `p ∉ [0, 1]`) — which also removed pre-existing non-monotone-CI garbage on unrelated papers (korbmacher, xiao).
+
+**Cycle B — packed parallel-arm split** (`_detect_packed_arms` / `_flatten_packed_arms`). Tables that pack `k ≥ 2` arms into single cells (an arm-label column repeating `"Separate Joint"` on every row, with each data cell holding `k` space-joined values like `".07 [-.17,.31] .08 [-.09, .25]"`) now emit **one typed record per arm**, tagged `group=<arm>`. Splits `collabra.77859` Table 3 (Separate/Joint, `d` + CI + `t` per arm) and — as a general dividend — `xiao_2021_crsp` Table 7 (Regret/Justifiability, all 12 rows AI-verified exact). Detection is keyed purely on the signature (a constant multi-token alpha label column + ≥2 cleanly `k`-splittable data columns); a normal single-arm table never triggers it.
+
+Two **general L-004 fixes** landed with Cycle B (Camelot cells are not run through `normalize.py`, so a negative statistic often arrives as U+2212):
+- `_parse_number` and `_parse_ci_cell` now fold U+2212 MINUS → ASCII hyphen, so a negative `t`/`d`/CI lower-bound is no longer dropped (number regex) or sign-flipped (`.search` skipping the non-ASCII sign). This surfaced real negative t-statistics that were previously dropped (e.g. `ip_feldman` Table 6 one-sample t-tests) — verbatim, header-typed, no fabrication.
+- `_VALUE_GROUP_RE` splits bracket-led CI groups (`"[−0.48, 0.15] [−0.20, 0.34]"`) so a packed CI column maps one interval per arm.
+
+Acceptance (consumer REQUEST_11 §3): #1 Table 5 + Table 3 arms ✓; #2 Tables 8/9/10 `F/p/eta²p/CI/BF01` + `r/n/CI/p` ✓; #3 sign-correct CIs + packed cells split ✓; #4 default call byte-identical + PROSECCO unchanged ✓ (verified by full before/after corpus diff: canary structural renders byte-identical, PROSECCO 6 stat rows untouched). `fields.effect_type` (§2.4, explicitly "not a blocker") is deferred — adding it would change PROSECCO's fields, conflicting with #4; available as an opt-in if wanted.
+
+Two honest caveats surfaced (neither a flatten defect): (1) `collabra.90203` Table 10 "Joint/No-explicit" `r` reads `.59` in the PDF **text layer** (pdftotext and Camelot agree) vs `.63` in the AI-visual gold — a text-layer corruption, undetectable without OCR. (2) the `collabra.77859` Attractive/Affect table is labelled "Table 3" by docpluck (its caption) and the consumer, but "Table 2" by the AI gold — a pre-existing caption-number binding question, values all correct.
+
+Verification: 16 new flatten tests (packed-arm split, value-group splitter, single-arm non-firing guard, real-PDF Table 3) + full flatten/render/structured suites green, zero regressions; both target papers AI-gold-verified PASS across both cycles.
+
 ## [2.4.94] — 2026-06-19
 
 **Cross-flavor lattice-augmentation — recover table rows a lattice extraction vertically truncated (REQUEST_10 Tier-2).** `TABLE_EXTRACTION_VERSION` → `2.3.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
