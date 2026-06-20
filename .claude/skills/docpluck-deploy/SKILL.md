@@ -318,7 +318,13 @@ curl -s -w '\nHTTP %{http_code}\n' \
   "https://docpluck.app/api/cron/daily-digest?dryRun=1"
 ```
 
-**Gate:** HTTP 200 AND JSON body shaped like `{ "dryRun": true, "wouldSend": <number>, ... }`. Anything else (401, 500, missing `wouldSend`, `dryRun: false`) = FAIL the deploy verdict; investigate before declaring the deploy done.
+**Gate:** HTTP 200 AND a JSON `DispatchResult` with `"dryRun": true` plus the expected fields (`adminDigest`, `userDigests`, `pruned`, `cap`). Anything else (401, 500, `dryRun: false`, or a non-JSON body) = FAIL the deploy verdict; investigate before declaring the deploy done. A quiet window legitimately returns `adminDigest.sent: false, reason: "no_issues"` — that is PASS, not a failure. (The route returns `runDailyDispatch`'s result; there is no `wouldSend` field.)
+
+> **Sourcing `CRON_SECRET`:** it is a Vercel-only (often _Sensitive_) var and is NOT in `frontend/.env.local`, so the curl above has no secret to use unless you pull it just-in-time, then delete it:
+> ```bash
+> TMP=$(mktemp); (cd frontend && vercel env pull "$TMP" --environment=production --yes >/dev/null 2>&1)
+> CRON_SECRET=$(grep -E '^CRON_SECRET=' "$TMP" | sed -E 's/^CRON_SECRET=//; s/^"//; s/"$//'); rm -f "$TMP"
+> ```
 
 ## Rollback
 
