@@ -84,28 +84,29 @@ print(f'All imports OK; docpluck=={info[\"version\"]} normalize={info[\"normaliz
 "
 ```
 
-### 4. Cross-Repo Library Version Sync (CRITICAL)
+### 4. Cross-Repo Library Version Sync (CRITICAL — "when we bump the package, we bump the app")
 
-Verify the app's `service/requirements.txt` git pin matches the library's latest tag. Mismatches mean the deploy will silently ship the OLD library to prod.
+Verify the app's `service/requirements.txt` git pin matches the library's latest released tag. A mismatch means the deploy silently ships the OLD library to prod. **The pin is read from docpluckapp `origin/master` (what Railway deploys), NOT the local clone — a stale local checkout shows an old pin even when prod is correctly synced, which almost causes a phantom "fix".** The shared gate (also run by `/docpluck-qa` check 11b and `/docpluck-review` rule 22) is the single source of truth:
 
 ```bash
-LIB_VERSION=$(grep '^__version__' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck/docpluck/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-APP_PIN=$(grep -oE 'docpluck.*@v[0-9]+\.[0-9]+\.[0-9]+' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/service/requirements.txt | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-echo "Library __version__: $LIB_VERSION"
-echo "App requirements.txt pin: v$APP_PIN"
-if [ "$LIB_VERSION" != "$APP_PIN" ]; then
-  echo "❌ MISMATCH — bump PDFextractor/service/requirements.txt to docpluck @ git+https://github.com/giladfeldman/docpluck.git@v$LIB_VERSION before deploying"
+cd C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck && python scripts/check_app_pin_sync.py || {
+  echo "Cross-repo pin sync FAILED — recover before deploying:"
+  echo "  - re-push the tag: git push origin v<VERSION>  (re-fires bump-app-pin.yml), OR"
+  echo "  - hand-bump PDFextractor/service/requirements.txt to @v<VERSION> and push to docpluckapp master."
   exit 1
-fi
+}
+# Note: a working-tree __version__ ahead of the latest tag is reported UNRELEASED (not a failure) —
+# that is the normal pre-flight state; the "Library Release Step" below tags+pushes it, which
+# fires the auto-bump, and post-deploy check 3 confirms Railway /health reports the new version.
 
 # Also verify the API.md examples are not stale beyond a major version
+LIB_VERSION=$(grep '^__version__' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/docpluck/docpluck/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 API_DOC_VERSION=$(grep -oE 'docpluck_version["\s:]+[0-9]+\.[0-9]+\.[0-9]+' C:/Users/filin/Dropbox/Vibe/MetaScienceTools/PDFextractor/API.md | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 LIB_MAJOR_MINOR=$(echo "$LIB_VERSION" | cut -d. -f1,2)
 DOC_MAJOR_MINOR=$(echo "$API_DOC_VERSION" | cut -d. -f1,2)
 if [ "$LIB_MAJOR_MINOR" != "$DOC_MAJOR_MINOR" ]; then
-  echo "⚠️ API.md examples reference docpluck_version $API_DOC_VERSION; library is at $LIB_VERSION. Update PDFextractor/API.md."
+  echo "WARN: API.md examples reference docpluck_version $API_DOC_VERSION; library is at $LIB_VERSION. Update PDFextractor/API.md."
 fi
-echo "✅ Library version sync OK"
 ```
 
 ### 5. Verify Vercel Environment Variables

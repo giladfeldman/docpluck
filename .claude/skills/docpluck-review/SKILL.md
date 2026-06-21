@@ -213,6 +213,12 @@ The product principle is "one nightly server-resource-bounded cron per concern."
 - **Check:** parse `frontend/vercel.json`; assert exactly two cron entries, namely `/api/admin/blob-cleanup` at `0 3 * * *` AND `/api/cron/daily-digest` at `0 9 * * *`.
 - **Severity:** BLOCKER on any third cron — REQUEST CHANGES with the question "why isn't daily-digest enough?"
 
+### 22. Library ↔ app version pin sync (cross-repo, 2026-06-20 — "when we bump the package, we bump the app")
+The app imports the library via a git pin in `PDFextractor/service/requirements.txt` (`docpluck[all] @ git+...@v<VERSION>`). This pin — on docpluckapp **origin/master**, the production-authoritative source Railway deploys — MUST always equal the library's latest released `v*` tag. A lagging pin silently runs the OLD library in production. The `bump-app-pin.yml` workflow auto-bumps it on tag push, but it is best-effort and has missed silently, so review VERIFIES rather than assumes.
+- **Check:** run `python scripts/check_app_pin_sync.py` (from the docpluck repo). Exit 0 = synced. It fetches docpluckapp `origin/master` and compares the pin to the latest library tag — a stale local clone is NOT trusted (it shows an old pin even when prod is correctly synced).
+- **Check:** whenever the diff bumps `docpluck/__init__.py:__version__` / `pyproject.toml:version`, confirm a matching `v<VERSION>` tag will be / has been pushed so the auto-bump can fire — an untagged version bump leaves the app pinned behind. The script reports this as UNRELEASED.
+- **Severity:** BLOCKER if the app pin lags the latest released library tag (production runs the old library). WARN if a working-tree version bump is not yet tagged (release step pending).
+
 ## Review Checklist
 
 ### Python Service (`service/`)
@@ -266,6 +272,7 @@ The product principle is "one nightly server-resource-bounded cron per concern."
 - [ ] Changes reflected in CLAUDE.md if architectural
 - [ ] LESSONS.md updated if a new pitfall was discovered
 - [ ] TODO.md updated if features were added/completed
+- [ ] App pin in sync with library (hard rule 22): `python scripts/check_app_pin_sync.py` exits 0 (app pin on docpluckapp `origin/master` == latest library tag). BLOCKER if it lags.
 
 ## Output Format
 

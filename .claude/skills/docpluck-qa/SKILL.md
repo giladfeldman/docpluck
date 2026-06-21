@@ -25,7 +25,7 @@ If QA surfaces an issue — any issue, however small, whether pre-existing, alre
 ## Project Context
 
 - **App repo (private):** `C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor` (GitHub: giladfeldman/docpluckapp)
-- **Library repo (public):** `C:\Users\filin\Dropbox\Vibe\docpluck` (GitHub: giladfeldman/docpluck, PyPI: docpluck)
+- **Library repo (public):** `C:\Users\filin\Dropbox\Vibe\MetaScienceTools\docpluck` (GitHub: giladfeldman/docpluck, PyPI: docpluck)
 - **Frontend:** Next.js 16 + Auth.js + Drizzle (in `frontend/`), port 6116
 - **Service:** Python FastAPI importing `docpluck` library (in `service/`), port 6117
 - **Database:** Neon Postgres (docpluck project)
@@ -607,6 +607,18 @@ print('F0 sentinel (preserved): PASS')
 "
 ```
 
+### 11b. Cross-Repo Library ↔ App Version Sync (CRITICAL — "when we bump the package, we bump the app")
+
+Asserts the app's docpluck git pin equals the library's latest released tag, so production never silently runs an old library. Reads the pin from docpluckapp **origin/master** (production-authoritative — a stale local clone shows an old pin even when prod is synced), so it fetches first.
+
+```bash
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\docpluck && python scripts/check_app_pin_sync.py
+```
+
+**Gate:** exit 0 (`PASS: in sync ...`). Exit 1 = the app pin lags the latest library tag — the `bump-app-pin.yml` auto-bump missed; recover NOW (re-push the tag to re-fire the workflow, or hand-bump `PDFextractor/service/requirements.txt` to `@v<latest>` and push to docpluckapp `master`), then re-run until PASS — never report the run clean while it lags. Exit 2 = could not reach docpluckapp `origin/master` (treat as FAIL, not PASS; offline dev only may pass `--allow-local-fallback`, which reads the local clone and prints a stale-clone warning). A working-tree `__version__` ahead of the latest tag is reported as UNRELEASED (not a failure) — tag + push it so the app auto-bumps.
+
+See CLAUDE.md "Two-Repo Architecture → Library ↔ app version sync".
+
 ### 12. Production Deployment (Vercel + Railway)
 ```bash
 # Vercel frontend
@@ -658,10 +670,11 @@ Opt-in cross-format benchmark suite --- DOCX corpus integrity, DOCX↔PDF parity
 | 9 | Database connectivity | PASS/FAIL | 7/7 tables |
 | 10 | Admin API | PASS/FAIL | health + stats |
 | 11 | Hard rules (4+2 checks) | PASS/FAIL | no -layout, no AGPL, U+2212, version, new modules, F0 sentinel |
+| 11b | Cross-repo lib↔app version sync | PASS/FAIL | app pin (origin/master) == latest library tag |
 | 12 | Production health | PASS/FAIL | HTTP codes |
 | 13 | ESCIcheck 10-PDF (production) | PASS/FAIL/SKIP | X/10 passed |
 
-**Overall: X/15 checks passed**
+**Overall: X/16 checks passed**
 
 ### Issues Found
 - [list any failures with exact error messages and file:line]

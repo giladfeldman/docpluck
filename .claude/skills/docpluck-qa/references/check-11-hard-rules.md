@@ -3,7 +3,7 @@
 _Extracted from [../SKILL.md](../SKILL.md). Full procedure lives here._
 
 ```bash
-cd C:\Users\filin\Dropbox\Vibe\PDFextractor\service && python -c "
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor\service && python -c "
 import re
 
 # Rule 1: No -layout flag in pdftotext calls (check library)
@@ -30,15 +30,22 @@ print('Rule 2 (no AGPL): PASS')
 import docpluck.normalize as _nm_mod
 with open(_nm_mod.__file__, 'rb') as _f:
     _norm_bytes = _f.read()
-assert b'\\u2212' in _norm_bytes or b'\xe2\x88\x92' in _norm_bytes, 'U+2212 normalization missing'
+assert b'\xe2\x88\x92' in _norm_bytes, 'U+2212 normalization missing'  # U+2212 as UTF-8 bytes
 print('Rule 3 (U+2212 norm): PASS')
 
-# Rule 4: Library version is consistent
-import docpluck
-assert docpluck.__version__ == '1.4.5', f'Version mismatch: {docpluck.__version__}'
-print(f'Rule 4 (version=1.4.5): PASS')
+# Rule 4: Library version is internally consistent (__init__.py == pyproject.toml).
+# (Do NOT freeze a literal version here — it rots. This checks the two in-repo
+#  sources agree; the cross-repo app-pin sync is qa check 11b, see note below.)
+import docpluck, re, pathlib
+init_ver = docpluck.__version__
+pyproject = (pathlib.Path(docpluck.__file__).resolve().parent.parent / 'pyproject.toml').read_text(encoding='utf-8')
+proj_ver = re.search(r'(?m)^version\s*=\s*.(\d+\.\d+\.\d+)', pyproject).group(1)
+assert init_ver == proj_ver, f'Version mismatch: __init__={init_ver} pyproject={proj_ver}'
+print(f'Rule 4 (version consistency, __init__==pyproject=={init_ver}): PASS')
 "
 ```
+
+> **Cross-repo pin sync** (the app's `@v<VERSION>` pin == the library's latest released tag) is a *separate* gate — qa check **11b** and the review hard rule, both via `python scripts/check_app_pin_sync.py` (reads docpluckapp `origin/master`). Rule 4 above only checks the library's *internal* version consistency (`__init__.py` == `pyproject.toml`).
 
 ---
 
