@@ -393,13 +393,32 @@ _NUMERIC_CELL_RE = re.compile(
     r"^[-−–]?\d+(?:[.,]\d+)*(?:[%∗*]+)?(?:\s*\([^)]*\))?$"
 )
 
+# A cell carrying a statistic VALUE (vs a header label). Broader than
+# _NUMERIC_CELL_RE: also matches APA leading-dot decimals (".34"), operator-
+# prefixed p-values ("< .001"), bracketed numeric intervals ("[0.53, 0.72]"),
+# and the "N/A" filler — all DATA, not header text. The interval branch requires
+# a digit and NO letters inside the brackets so a genuine header cell like
+# "[95% CI]" (letters present) is NOT counted as data and stays a header. Used by
+# `_is_header_like_row` so a real data row whose APA-formatted values the bare
+# numeric pattern under-counted is not mistaken for an extra header row — the
+# bug that silently dropped the FIRST data row of two-header-row correlation
+# tables (collabra.90203 Table 10, DP-5).
+_DATA_VALUE_CELL_RE = re.compile(
+    r"^(?:"
+    r"[<>=]?\s*[-−–]?\d*[.,]?\d+(?:[.,]\d+)*(?:[%∗*]+)?(?:\s*\([^)]*\))?"
+    r"|\[[^\]A-Za-z]*\d[^\]A-Za-z]*\]"
+    r"|n\s*/?\s*a"
+    r")$",
+    re.I,
+)
+
 
 def _is_header_like_row(row: list[str]) -> bool:
     """Heuristic: a row that looks like part of a header rather than data."""
     nonempty = [c.strip() for c in row if (c or "").strip()]
     if not nonempty:
         return False
-    numeric = sum(1 for c in nonempty if _NUMERIC_CELL_RE.match(c))
+    numeric = sum(1 for c in nonempty if _DATA_VALUE_CELL_RE.match(c))
     if numeric / len(nonempty) > 0.3:
         return False
     avg_len = sum(len(c) for c in nonempty) / len(nonempty)
