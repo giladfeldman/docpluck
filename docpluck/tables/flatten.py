@@ -261,6 +261,17 @@ def _classify_column(header: str) -> Optional[str]:
     h = (header or "").strip()
     if not h:
         return None
+    # A folded super-header cell ("Replication\x00BR\x0095% CI") carries the GROUP
+    # label in the super-part and the column's OWN role in the sub-part. Classify
+    # on the sub-part first (then the super-part) so a folded CI / p / stat column
+    # is still recognized — otherwise the whole "Replication…95% CI" string never
+    # matches and the column's role is lost (collabra.90203 T10 CI, DP-5).
+    if _MERGE_SEPARATOR in h:
+        for part in reversed([p.strip() for p in h.split(_MERGE_SEPARATOR) if p.strip()]):
+            role = _classify_column(part)
+            if role:
+                return role
+        return None
     # Strip a single trailing punct (`,`, `:`, `.`) that some PDFs include.
     h = h.rstrip(",:.")
     for role, pat in _ROLE_PATTERNS:
@@ -475,6 +486,18 @@ def _looks_like_df_pair(v: str) -> bool:
 
 def _looks_like_p(v: str) -> bool:
     return bool(_P_SHAPE_RE.match(v or "") or _NA_RE.match(v or ""))
+
+
+# A sub-one decimal: a value in [0, 1) written APA-style (".551", "0.03") with an
+# optional comparison op ("<.001"). Unlike `_P_SHAPE_RE` it rejects an integer
+# part ≥ 1 (so a test statistic like "1.31" is NOT mistaken for a p-value). Used
+# to separate a still-blank p column (sub-one) from a still-blank df / n column
+# (values ≥ 1) when both are unlabeled and adjacent. (Pass 3.5, DP-2.)
+_SUB_ONE_DEC_RE = re.compile(r"^\s*[<>=]?\s*0?\.\d+\s*$")
+
+
+def _looks_like_sub_one(v: str) -> bool:
+    return bool(_SUB_ONE_DEC_RE.match(v or ""))
 
 
 def _has_comparison_op(v: str) -> bool:
@@ -799,6 +822,54 @@ def _recover_blank_roles(
             vals = _column_values(body, ci)
             if _frac_match(vals, _is_num_or_na) and (ci + 1) in ci_cols:
                 override[ci] = "est"
+
+    # Pass 4.5 — p / df (or n) recovery for an established t/F/r results table.
+    # Once the statistic column is typed (Pass 3 / grid) and the table carries a
+    # recognized effect/CI column, the still-blank bare-numeric columns BETWEEN
+    # the statistic and that interval are the p-value and the df/n: p is a sub-one
+    # decimal (".551", "0.03", "<.001") with no integer part; df/n is a bare
+    # number ≥ 1 (Welch "260.54", integer "131"). This types the operator-less p
+    # that Pass 1 defers and the mixed-integer/decimal df that Pass 2 (all-integer
+    # only) skips — both unambiguous HERE because position (after the statistic,
+    # before the interval) pins them. Runs AFTER the caption-run pass so a leaked
+    # header always wins, and BEFORE Pass 5 so a real df is not stolen as an
+    # est-adjacent point estimate. Keyed on structure, never paper identity.
+    # (DP-2: collabra.77859 Separate/Joint t-tests dropped p + Welch df.)
+    if family in ("t", "F", "r"):
+        stat_col = next(
+            (ci for ci in cols if (override.get(ci) or grid_role[ci]) == family),
+            None,
+        )
+        if stat_col is not None:
+            right_bound = min(
+                (
+                    ci
+                    for ci in cols
+                    if ci > stat_col
+                    and grid_role[ci] in ("est_ci", "CI", "CI_lo", "CI_hi", "est")
+                ),
+                default=n,
+            )
+            present_roles = {grid_role[ci] for ci in cols if grid_role[ci]} | set(
+                override.values()
+            )
+            has_p = "p" in present_roles
+            for ci in cols:
+                if grid_role[ci] or ci in override:
+                    continue
+                if not (stat_col < ci < right_bound):
+                    continue
+                vals = _column_values(body, ci)
+                if not _frac_match(vals, _is_num_or_na):
+                    continue
+                if not has_p and _frac_match(vals, _looks_like_sub_one):
+                    override[ci] = "p"
+                    has_p = True
+                elif _frac_match(
+                    vals,
+                    lambda v: bool(_BARE_NUM_RE.match(v)) and (_parse_number(v) or 0) >= 1,
+                ):
+                    override[ci] = "n" if family == "r" else "df"
 
     # Pass 5 — final est-adjacency sweep for tables with no caption run: a
     # still-blank bare-number column immediately left of a CI column is the
@@ -1164,10 +1235,55 @@ def _detect_column_groups(
     starts = [i for i, h in enumerate(header) if _MERGE_SEPARATOR in (h or "")]
     if len(starts) < 2:
         return None
+    n = len(header)
+
+    # The sentinel marks where camelot PLACED each super-label — but a *centered*
+    # spanning label (colspan is lost in stream extraction) lands mid-span, not at
+    # its arm's first column, so trusting the sentinel as the arm boundary
+    # mis-bins columns: collabra.90203 T10 puts the Target-article "r" into the
+    # label region, and xiao_2021 T4 splits Original/Replication with the F values
+    # swapped. Re-derive arm boundaries from EQUAL-WIDTH blocks of the data region
+    # (the columns between the leading + trailing non-stat label columns), each of
+    # which must contain exactly one super-label. Falls back to the literal
+    # sentinel boundaries when the region does not divide evenly — so every
+    # previously-grouped table stays byte-identical unless this strictly corrects
+    # its alignment (a left-aligned super-header already at the block start yields
+    # the identical grouping). General, keyed on structure, not paper id. (DP-5.)
+    def _is_label_col(i: int) -> bool:
+        return i not in starts and not _classify_column(header[i])
+
+    lead = 0
+    while lead < n and _is_label_col(lead):
+        lead += 1
+    trail = n - 1
+    while trail >= 0 and _is_label_col(trail):
+        trail -= 1
+    width = trail - lead + 1
+    k = len(starts)
+    if (
+        width >= k
+        and width % k == 0
+        and lead <= starts[0]
+        and starts[-1] <= trail
+    ):
+        block = width // k
+        blocks = [(lead + j * block, lead + (j + 1) * block - 1) for j in range(k)]
+        if all(b_lo <= s <= b_hi for (b_lo, b_hi), s in zip(blocks, starts)):
+            label_cols = [i for i in range(n) if i < blocks[0][0] or i > blocks[-1][1]]
+            groups = [
+                (
+                    (header[s].split(_MERGE_SEPARATOR, 1)[0]).strip(),
+                    list(range(b_lo, b_hi + 1)),
+                )
+                for (b_lo, b_hi), s in zip(blocks, starts)
+            ]
+            return label_cols, groups
+
+    # Fallback: literal sentinel-boundary grouping (pre-existing behavior).
     label_cols = list(range(0, starts[0]))
-    groups: list[tuple[str, list[int]]] = []
+    groups = []
     for gi, start in enumerate(starts):
-        end = starts[gi + 1] if gi + 1 < len(starts) else len(header)
+        end = starts[gi + 1] if gi + 1 < len(starts) else n
         glabel = (header[start].split(_MERGE_SEPARATOR, 1)[0]).strip()
         groups.append((glabel, list(range(start, end))))
     return label_cols, groups

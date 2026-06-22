@@ -37,7 +37,7 @@ from .tables.render import cells_to_html
 from .telemetry import record_fallback
 
 
-TABLE_EXTRACTION_VERSION = "2.4.0"  # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
+TABLE_EXTRACTION_VERSION = "2.4.2"  # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 
@@ -1306,6 +1306,74 @@ def _line_is_body_prose(line: str) -> bool:
     return stopwords_hit >= 4
 
 
+def _join_wrapped_lines(lines: list[str]) -> list[str]:
+    """Merge pdftotext-wrapped lines into logical paragraphs.
+
+    pdftotext linearizes a flowing prose paragraph into several short
+    (~45-60 char) lines; the per-line ``_line_is_body_prose`` gate
+    (len >= 80) cannot see prose in that wrapped form. Joining a line with
+    the next whenever it does not end on sentence-terminal punctuation
+    reconstructs the paragraph so prose can be measured at paragraph scale.
+    """
+    paras: list[str] = []
+    cur = ""
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        cur = (cur + " " + s).strip() if cur else s
+        if s.endswith((".", "!", "?", ":")):
+            paras.append(cur)
+            cur = ""
+    if cur:
+        paras.append(cur)
+    return paras
+
+
+def _raw_text_is_degenerate_prose(text: str) -> bool:
+    """True if a table raw_text fallback is dominated by flowing body prose.
+
+    RC-T Layer-2 (v2.4.97). When Camelot recovers no cells AND the
+    caption-anchored region has no extractable table text near the caption,
+    the body_start walk lands INSIDE a prose paragraph and the fallback
+    swallows Results/Discussion prose (which is then duplicated under its
+    real section heading). Such a block must be suppressed (render then
+    emits a clean caption-only table) rather than dumped verbatim.
+
+    FP-safe by construction — fires only when BOTH hold:
+      (a) the block STARTS mid-sentence: its first line begins with a
+          lowercase multi-letter continuation word. A real table's
+          linearized cells start with a column header, label, number, or a
+          single-letter item marker (``a``/``b``/``c``) — never a wrapped
+          mid-paragraph continuation like "than empathy. We provided ...".
+      (b) the joined block is majority (>= 60% of chars) sentence-shaped
+          body prose.
+
+    Legitimate degraded tables are preserved: hypotheses ("a There is a
+    positive association ..."), descriptive rows ("Median age (years)"),
+    instrument items ("h et al., 1997)") all fail (a). Keyed purely on the
+    structural overshoot signature, never on paper identity.
+    """
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    if len(lines) < 4:
+        return False
+    first_tokens = lines[0].split()
+    first_word = first_tokens[0] if first_tokens else ""
+    starts_midsentence = (
+        len(first_word) >= 2
+        and first_word[0].islower()
+        and first_word[0].isalpha()
+    )
+    if not starts_midsentence:
+        return False
+    paragraphs = _join_wrapped_lines(lines)
+    total = sum(len(p) for p in paragraphs)
+    if total == 0:
+        return False
+    prose = sum(len(p) for p in paragraphs if _line_is_body_prose(p))
+    return prose >= 0.6 * total
+
+
 def _extract_table_body_text(
     raw_text: str,
     cap: CaptionMatch,
@@ -1379,6 +1447,31 @@ def _extract_table_body_text(
             break
         kept.append(ln)
 
+    # Note-anchor table-end (RC-T Layer-2, v2.4.97). A table's "Note:" /
+    # "Notes:" footnote is, by academic-table convention, its LAST element.
+    # Any text after the note paragraph is body prose that bled past the
+    # table boundary — the caption-anchored region overshot the table end
+    # and the per-line `_line_is_body_prose` gate (len >= 80) misses prose
+    # that pdftotext WRAPPED into short (~48-char) lines, so it accumulates
+    # here. Trim everything after the note's (possibly wrapped) paragraph.
+    # This is FP-safe: legitimate table cells (hypotheses a/b/c, instrument
+    # items) appear BEFORE the note; nothing legitimate follows it. Keyed on
+    # the structural "Note: ... <sentence end>" signature, never paper
+    # identity. `^Notes?[.:]` requires punctuation so body prose that merely
+    # starts with the word "Note that ..." does not false-trigger.
+    note_idx = next(
+        (i for i, ln in enumerate(kept)
+         if re.match(r"^\s*Notes?[.:]", ln.strip())),
+        None,
+    )
+    if note_idx is not None and not os.environ.get("DOCPLUCK_RCT_L2_BYPASS"):
+        note_end = note_idx
+        for k in range(note_idx, len(kept)):
+            note_end = k
+            if kept[k].strip().endswith((".", "!", "?")):
+                break
+        kept = kept[: note_end + 1]
+
     # Trim trailing heading-like short lines that don't belong to this table
     # (the start of the next section). Two patterns are trimmed:
     #   * Title-Case headings without a sentence terminator
@@ -1414,7 +1507,17 @@ def _extract_table_body_text(
         s = re.sub(r"[ \t]+", " ", ln).strip()
         if s:
             cleaned_lines.append(s)
-    return "\n".join(cleaned_lines).strip()
+    result = "\n".join(cleaned_lines).strip()
+    # Degenerate-prose guard (RC-T Layer-2, v2.4.97): drop a raw_text
+    # fallback that is really body prose the region overshot into, so the
+    # renderer emits a clean caption-only table instead of an
+    # ``unstructured-table`` dump that duplicates Results/Discussion prose.
+    # ``DOCPLUCK_RCT_L2_BYPASS`` reverts both Layer-2 additions (Note-anchor
+    # + this guard) to HEAD behavior — used only by the FP-scan harness to
+    # diff guard-live vs guard-bypassed over the full corpus.
+    if not os.environ.get("DOCPLUCK_RCT_L2_BYPASS") and _raw_text_is_degenerate_prose(result):
+        return ""
+    return result
 
 
 def _figure_from_caption(

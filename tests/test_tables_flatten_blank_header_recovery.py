@@ -247,6 +247,29 @@ class TestT77859Table3PackedArms:
         assert f["d"] == 0.08
         assert (f["CI_lower"], f["CI_upper"]) == pytest.approx((-0.09, 0.25))
 
+    def test_separate_arm_p_and_df(self):  # DP-2: p + Welch df must be recovered
+        sep = next(
+            r for r in self._rows()
+            if r["row_label"].startswith("Attractive")
+            and r["fields"].get("group") == "Separate"
+        )
+        f = sep["fields"]
+        # p (".551", no comparison op) and a Welch-corrected df ("260.54", a
+        # decimal) sat in blank-header columns; both previously dropped (DP-2).
+        assert f["p"] == pytest.approx(0.551)
+        assert f["df"] == pytest.approx(260.54)
+
+    def test_joint_arm_p_and_integer_df(self):  # DP-2: integer df recovered too
+        joint = next(
+            r for r in self._rows()
+            if r["row_label"].startswith("Attractive")
+            and r["fields"].get("group") == "Joint"
+        )
+        f = joint["fields"]
+        assert f["p"] == pytest.approx(0.344)
+        # Whole-number df stays an int (not 131.0).
+        assert f["df"] == 131 and isinstance(f["df"], int)
+
     def test_packed_values_split_not_concatenated(self):  # acceptance #3
         sep = next(
             r for r in self._rows()
@@ -389,7 +412,8 @@ def test_collabra_77859_table5_real_pdf():
 )
 def test_collabra_77859_table3_packed_arms_real_pdf():
     """Acceptance #1 (Table 3): the packed Separate/Joint arms split into one
-    record per arm, each carrying d + sign-correct CI."""
+    record per arm, each carrying d + sign-correct CI. DP-2 extends this: the
+    blank-header p and (Welch) df columns must also be typed into `fields`."""
     b = Path(pdf_path(_AR, "10.1525__collabra.77859.pdf")).read_bytes()
     r = extract_pdf_structured(b)
     t3 = next((t for t in r["tables"] if t.get("label") == "Table 3"), None)
@@ -403,6 +427,12 @@ def test_collabra_77859_table3_packed_arms_real_pdf():
     assert (by_arm["Separate"]["CI_lower"], by_arm["Separate"]["CI_upper"]) == pytest.approx((-0.17, 0.31))
     assert by_arm["Joint"]["d"] == 0.08
     assert (by_arm["Joint"]["CI_lower"], by_arm["Joint"]["CI_upper"]) == pytest.approx((-0.09, 0.25))
+    # DP-2: p (operator-less ".551"/".344") and df (Welch "260.54" / integer
+    # "131") were dropped before the Pass 4.5 positional recovery.
+    assert by_arm["Separate"]["p"] == pytest.approx(0.551)
+    assert by_arm["Separate"]["df"] == pytest.approx(260.54)
+    assert by_arm["Joint"]["p"] == pytest.approx(0.344)
+    assert by_arm["Joint"]["df"] == 131
     # Every CI is monotone (sign-correct).
     for f in by_arm.values():
         assert f["CI_lower"] <= f["CI_upper"]
