@@ -2696,6 +2696,20 @@ def _strip_phantom_camelot_tables(text: str) -> str:
     # Process each <table>...</table> block independently.
     pattern = re.compile(r"<table\b[^>]*>.*?</table>\s*", re.DOTALL | re.IGNORECASE)
 
+    # RC-T (v2.4.96): token sets of the document's italic caption lines (``*…*``).
+    # Used by the scoped "the" body-prose path below to EXCLUDE a <th> that is
+    # the table's own TITLE leaked into the header (a title-leak on a REAL table,
+    # e.g. amp_1 Table 5) rather than absorbed body prose — high caption-token
+    # overlap == title-leak == keep. Built once per render; empty when a paper
+    # has no captions (then the scoped path simply never excludes).
+    _caption_tok_sets = [
+        toks for toks in (
+            set(re.findall(r"[a-z]{2,}", c.lower()))
+            for c in re.findall(r"\*([^*\n]{12,}?)\*", text)
+        )
+        if len(toks) >= 4
+    ]
+
     def is_phantom(block: str) -> bool:
         # Extract <th> contents.
         th_cells = re.findall(r"<th[^>]*>(.*?)</th>", block, re.DOTALL | re.IGNORECASE)
@@ -2752,6 +2766,31 @@ def _strip_phantom_camelot_tables(text: str) -> str:
                 if fn_count >= 3 and verb_count >= 2:
                     th_section_leak = True
                     break
+                # RC-T (v2.4.96, 2026-06-21): "the" — the single most common
+                # English function word — is absent from _FUNCTION_WORDS_IN_PROSE,
+                # so a body-prose <th> with exactly fn_count==2 + "the" slipped
+                # under the bar: maier_2023 Table 7 "Following the analyses
+                # conducted in Study 1 of Small" (fn=in,of; verb=following,
+                # conducted) and chan_feldman Table 6 "associations between the
+                # six measures of interest: …". This NEW path counts "the" to push
+                # such ths over — but is SCOPED to the marginal case (fn_count<3
+                # without "the", >=3 with it) so every table already stripped at
+                # HEAD via the fn>=3 path stays byte-identical, AND gated on NOT
+                # being a title-leak: amp_1 Table 5 leaks its own caption
+                # ("Improving Scholarly Impact … Practice") into the <th> over a
+                # REAL grid — stripping it would destroy a real table. A title
+                # leak shares most of its tokens with a caption; body prose
+                # shares ~none.
+                the_count = sum(1 for w in words if w == "the")
+                if fn_count < 3 and (fn_count + the_count) >= 3 and verb_count >= 2:
+                    th_toks = set(re.findall(r"[a-z]{2,}", cleaned_th.lower()))
+                    is_title_leak = bool(th_toks) and any(
+                        len(th_toks & cap) / len(th_toks) >= 0.6
+                        for cap in _caption_tok_sets
+                    )
+                    if not is_title_leak:
+                        th_section_leak = True
+                        break
                 word_set = set(words)
                 if any(t.lower() in word_set for t in _PHANTOM_TABLE_BODY_LEAK_TOKENS):
                     if verb_count >= 1:
