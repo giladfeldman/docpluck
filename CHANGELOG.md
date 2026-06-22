@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.96] — 2026-06-21
+
+**RC-T (Option A): strip Camelot "tables" that are absorbed body prose, not data.** Render-only — `render.py::_strip_phantom_camelot_tables`; no `TABLE_EXTRACTION_VERSION` / `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
+
+Camelot runs free-form (`flavor="stream"`, no `table_areas`), so on a text-heavy page it returns a whole-page bbox and folds body prose into the `<thead>`. `_strip_phantom_camelot_tables` already drops such a table when a `<th>` is sentence-shaped prose (≥8 words, ≥3 function words, ≥2 verb-shape words) — but its function-word set was **missing `"the"`**, the single most common English function word, so a body-prose `<th>` with `fn=2 + "the"` slipped under the `fn≥3` bar and a garbage prose `<table>` survived. Two corpus cases: `10.1525/collabra.90203` (maier) Table 7 (`<th>` "Following the analyses conducted in Study 1 of Small") and `10.1080/02699931.2024.2434156` (chan_feldman) Table 6 ("associations between the six measures of interest: …").
+
+The fix counts `"the"`, but is **scoped to the marginal case** (a `<th>` that crosses fn 2→3 only because of "the") so every table already stripped at HEAD via the `fn≥3` path stays byte-identical, and is **gated on NOT being a title-leak**: `aom/amp_1` Table 5 leaks its own caption ("Improving Scholarly Impact … Practice") into the `<th>` over a REAL grid (Domains / Policymaking / Practice + data) — a caption-token-overlap test (≥60%) keeps such title-leak tables. **Net corpus impact: exactly 2 tables stripped, all others byte-identical** (verified by a full-corpus th-level scan over all 152 corpus PDFs + render diffs). Fail-clean: the `### Table N` heading + caption remain (table_parity preserved); the stripped prose is a Camelot duplicate, so the clean original survives in the body (no TEXT-LOSS). ip_feldman Table 10 — the RC-T canonical "orphan" — was already fail-clean at HEAD and is unchanged.
+
+Verification: 8 new real-PDF regression tests (`tests/test_rc_t_degenerate_table_real_pdf.py`): maier T7 + chan_feldman T6 stripped (each FAILS at HEAD, PASSES after), amp_1 T5 + chan_feldman T2/T5 (real tables) preserved, maier prose survives in body (no TEXT-LOSS), ip_feldman T10 prose stays out of `<table>`. Broad pytest green; 7-canary AI-verify shows the touched tables fail-clean with no new TEXT-LOSS / HALLUCINATION.
+
+**Deferred (separate cycles, surfaced not dropped):** (1) RC-T **Layer-1 recovery** — actually RECOVERING lost table data via tight `table_areas` (plos_med Table 5's 13 SAE rows; chan_feldman Table 2 column-squish) — out of Option-A scope. (2) **Audit of the ~37 corpus tables** stripped by the existing `_strip_phantom_camelot_tables` th-prose / section-token paths — some title-shaped `<th>` strips may be wrongly-stripped REAL tables (pre-existing; predates this change), needs its own verify-each-render cycle. (3) RC-1 two-column / sidebar interleave.
+
 ## [2.4.95] — 2026-06-20
 
 **Flatten now populates `fields` for non-clinical result tables (REQUEST_11).** `TABLE_EXTRACTION_VERSION` → `2.4.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change. v2.4.94 solved the clinical PROSECCO table (labelled headers); this closes the two reproducers whose `fields` still came back `{}` — header-stripped result tables and tables packing parallel arms into single cells.
