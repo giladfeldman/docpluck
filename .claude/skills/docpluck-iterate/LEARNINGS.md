@@ -1327,3 +1327,22 @@ aren't skipped.
 ### Verification Gaps / Deferred (queued, not dropped)
 - **RC-T Layer-1 recovery** — actually RECOVERING lost table data via tight `table_areas` (plos_med T5's 13 SAE rows; chan_feldman T2 column-squish) — out of Option-A scope, deferred by the user.
 - **Audit of the ~37 `_strip_phantom` th-stripped tables** — some title-shaped `<th>` strips may be wrongly-stripped REAL tables (pre-existing, predates this cycle). Needs its own verification cycle (render each, judge real-vs-phantom). Surfaced explicitly; NOT silently shipped around.
+
+---
+
+## Run: 2026-06-22 · cycle 2 (RC-T Layer-2) · v2.4.97 (combined ship)
+
+### Outcome
+- **RC-T Layer-2 shipped** (raw_text fallback prose contamination) — a SECOND, distinct prose-contamination path from cycle-1's structured-`<table>` strip. Combined with a concurrent session's DP-2/DP-5 flatten fixes into ONE v2.4.97 release per user direction. 7/7 canaries AI-verified: every touched fix confirmed correct, ZERO regression; run standing = PARTIAL (corpus retains pre-existing user-deferred backlog: RC-T Layer-1, RC-1).
+
+### Blind spots / root cause
+- **`_extract_table_body_text`'s per-line prose gate (`_line_is_body_prose`, len≥80) is blind to WRAPPED prose.** pdftotext wraps body prose into ~48-char lines; each line is under the 80-char bar, so the line-walk accumulates a whole swallowed paragraph. Two fixes: (a) **Note-anchor** — a table's `Note:` footnote is its last element, trim everything after the note paragraph (chan T1/T3, efendic T5); (b) **degenerate-prose guard** — suppress a fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose (chan T9 was a verbatim `## Discussion` duplicate → caption-only). Render's existing `elif cap:` branch already clean-fails to caption-only when raw_text is empty, so NO render.py change needed.
+- **FP discriminator that survives the hypotheses trap:** legit degraded tables ALSO wrap sentences (hypotheses "a There is a positive association…"), so "is it a wrapped sentence?" is NOT a usable signal. The usable signal is the LEADING token: real cells start with a header/label/number/single-letter marker; only a region-overshoot-into-prose block starts with a lowercase multi-letter continuation word. Keyed there → FP-safe by construction.
+
+### Edge cases
+- **Concurrent sessions on ONE working tree.** Two Claude sessions edited the same checkout; the working-tree version bump to 2.4.97 + CHANGELOG entry + handoff were the OTHER session's. Detected via `git diff` on `__init__.py` (the bump was uncommitted, not mine). Combined cleanly because the streams touch DISJOINT files (theirs: flatten.py/cell_cleaning.py; mine: extract_structured.py raw_text path). Staged 10 EXPLICIT paths, never `git add -A` (release-version-collision lesson applied). My table-extraction change shares extract_structured.py with their TABLE_EXTRACTION_VERSION bump → composed (2.4.1→2.4.2).
+- **AI-verify on a PARTIAL corpus reads 7/7 FAIL but that is NOT a ship blocker** when every FAIL is pre-existing/user-deferred and the touched fixes are confirmed + a full-corpus diff proves zero regression. The discipline: classify each finding introduced-vs-pre-existing; confirm each intended fix landed; prove no regression deterministically. Don't let a scary headline FAIL count veto a clean incremental ship.
+
+### Improvements / process
+- **Full-corpus FP gate via env-bypass + 2-pass diff, chunked + idempotent.** `DOCPLUCK_RCT_L2_BYPASS` reverts both additions to HEAD; a JSON-manifest harness diffs mine-vs-HEAD raw_text over all 101 PDFs. `grew=0 changed=0` (only trims+suppresses) is the clean signal. Chunked into <10-min foreground calls (the Bash foreground cap) writing to a merge-on-append JSON so a death loses no work.
+- **Windows reminders that bit again:** foreground Bash caps at 10 min → chunk long corpus scans; backgrounded `pytest -n10` buffers ALL output (0-byte file ≠ dead — it flushed 2085-passed at the very end); inline `json.load(open(...))` dies on cp1252 — always `encoding='utf-8'`.
