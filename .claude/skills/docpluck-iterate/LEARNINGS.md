@@ -1348,3 +1348,23 @@ aren't skipped.
 ### Open (queued, NOT dropped — rule 0e-bis)
 - 4 canary FAILs remain (ip_feldman T10, chan_feldman T6/T9, chandrashekar T2 table-data loss; plos_med sidebar interleave) → the RC-1 banded layout-channel + sidebar-interleave architectural cycle (spec `2026-06-08-rc1-region-aware-column-architecture.md`, sharpened this run).
 - Run verdict: **PARTIAL** — 2 clean fixes shipped; the canary corpus is NOT clean (honest punch-list above), so the standing corpus verdict is FAIL and the iterate-gate `--close` correctly cannot green-close.
+
+---
+
+## Run: 2026-06-25 (cont.) · RC-T char-level column recovery — FOUNDATION landed (v2.4.98), T10 wiring deferred
+
+### Outcome
+- **char_whitespace_cells (the char-level absolute-x-gap column detector) IMPLEMENTED + tested** in `docpluck/tables/whitespace.py`, wired as an automatic fallback inside `whitespace_cells` when the word path finds < 2 columns. This is the layout-channel piece that finally makes the "RC-T table-data recovery" tractable.
+
+### Blind spot closed (the key technical finding)
+- **Earlier this session I assessed T10 recovery as "architectural / multi-session, char detection too hard."** That was WRONG — disproven by probing char-level x-positions: ip_feldman Table 10's 3 stat columns are cleanly separable at the CHAR level (gaps 23-78pt) even though pdfplumber's WORD grouper glues the whole numeric row (`.29***−.21***.07`) into one token so the word-gap detector finds nothing. This is exactly the `pdfplumber_extract_words_unreliable` lesson ("always carry a char-level absolute-x-gap fallback") — I should have reached for it before declaring the wall.
+- **Right-aligned numeric tables need column-START-edge voting, not gap-MIDPOINT voting.** The label column is variable-width (`Loneliness` vs `Social orientation scale`), so gap midpoints scatter and never reach the stability threshold; but the DATA columns are left-aligned to fixed x, so their left edges are stable. `_find_stable_column_boundaries(bucket_pt>0)` votes on column starts + buckets within 8pt. With this, char_whitespace_cells recovers all 7 T10 data rows matching the gold exactly.
+
+### Edge case
+- **The word path MUST stay byte-identical when adding a char path.** First cut refactored `_find_stable_column_boundaries` to count only multi-column rows in the denominator — that silently changed the WORD path's stability threshold and broke 2 existing table tests (caught at ~65% of the broad run). Fix: branch the function — `bucket_pt<=0` runs the verbatim original word logic, `bucket_pt>0` runs the new char logic. Lesson: when extending a shared helper, keep the existing caller's path provably unchanged (literal copy), don't "improve" it in the same edit.
+
+### Deferred (queued, NOT dropped — rule 0e-bis)
+- **char_whitespace_cells alone does NOT close the T10 canary in production.** T10's caption is *matched* by the garbage full-page Camelot table, so it's added directly to `tables` and the whitespace fallback (where the char path lives) is never reached for it. Closing T10 needs the **degenerate-Camelot-table replacement** in `extract_structured.py`: when a Camelot-matched table has a full-page-ish bbox + furniture/prose cells, discard it and re-extract via `whitespace_cells` on the gutter-band-clipped caption region, PLUS a region prose-trim (the `(extension)` wrapped-caption + Discussion-prose tail still contaminate the region). That change touches the core extraction path for ALL papers → requires the full ~48-paper guard-live-vs-bypassed diff + 7-canary AI-verify before it ships (cycle-3 caption-follows revert is the precedent). Foundation is in place; this is the next focused cycle.
+
+### Verification
+- `tests/test_whitespace_char_fallback.py` (5 cases incl. real-PDF ip_feldman T10 = all 7 gold rows recovered; synthetic tight-kerned recovery; word-space reinsertion; delegation wiring; single-column-no-fabrication guard). 15/15 pass on the whitespace/char/caption-table suite; 0 failures across the broad table/render run; word path proven byte-identical (restored verbatim).
