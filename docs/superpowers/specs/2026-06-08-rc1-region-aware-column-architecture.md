@@ -79,3 +79,25 @@ The first cut (`extract_page_text_banded`) is safe (word-preservation guard) and
 2. **Per-row both-sides under-detection.** `_row_is_2col` requires both columns in the same y-bucket; baseline-offset columns bucket separately, so some genuinely two-column rows read full-width and the band degrades to a (safe) full-width crop. A gutter-clear-only row test recovered more rows but raised guard-rejections 6→12 on the hard pages (corpus scan 2026-06-15) — needs a smarter band-level both-sides reconciliation rather than a blanket per-row relaxation.
 3. **Hard title+sidebar pages (PSPB p1 etc.).** The large-title / metadata-sidebar block overlaps adjacent rows, so the overlap-merge collapses it to full-width (no de-interleave). Needs size-aware band handling (treat a large-font title as its own full-width band without swallowing the adjacent 2-col sidebar).
 4. **Then flip the default** (`DOCPLUCK_COLUMN_CORRECT_BANDED` + `DOCPLUCK_COLUMN_CORRECT_GENERAL`) once 1–3 land and a full-corpus AI-verify + 26-baseline are clean with the flags ON.
+
+## UPDATE 2026-06-25 — flip ATTEMPTED, REJECTED by 8-canary AI-verify. The flag is NOT safe to flip yet. Concrete regressions below.
+
+A flip attempt was gated on two checks at HEAD v2.4.97 (both flags ON):
+- **Word-preservation corpus scan: 26/26 baseline papers PRESERVED, 0 multiset violations, 23/26 corrected, 99 pages** (`tmp/rc1_banded_corpus_scan.py` / `tmp/rc1_banded_scan.log`). This PASSED — and is exactly why a word-multiset gate alone is dangerous.
+- **8-canary AI-verify (flagON vs flagOFF vs gold, 8 in-session Sonnet verifiers): REJECTED.** 3 ON_REGRESSION, 4 ON_NEUTRAL, 1 ON_BETTER. The word-preservation scan was BLIND to all 3 regressions (reordering + furniture-injection preserve the word multiset). **AI-verify is mandatory; the word-multiset gate is necessary-not-sufficient — do not flip on word-preservation alone.**
+
+**The 3 confirmed regressions (deterministically re-checked, NOT verifier FP) — these are the precise gap-4-blockers:**
+
+| Paper | Layout | Regression (flagON vs flagOFF) | Likely gap |
+|---|---|---|---|
+| `ar_apa_j_jesp_2009_12_011` | 2-col | flagON **injects running-header furniture** `M. Muraven / Journal …` ×2 into prose (flagOFF ×0) **and inverts section order** (`## Abstract`→`## Introduction` in OFF becomes `## Introduction`→`## Abstract` in ON) | banded crop pulls a margin running-header into a column band; band assembly reorders the page-top abstract/intro |
+| `chan_feldman_2025_cogemo` | 2-col | flagON **injects Power-Analysis sentences into the Extension paragraph** (cross-column bleed absent in OFF) | a band straddling two logical sections crops left/right but reassembles across a section boundary |
+| `maier_2023_collabra` | **single-col** | flagON **displaces Risk/Benefit prose into the Figure 4 caption + mid-General-Discussion**, fragmenting a paragraph — on a SINGLE-COLUMN paper the flag should be a NO-OP | `_band_gutter_x` / `_detect_column_interleave_pages` FALSE-POSITIVE on a single-column page (a coincidental vertical whitespace river read as a gutter) |
+
+**Highest-priority new gap (gap 5): the single-column false-positive (maier).** The flag must be a strict no-op on genuinely single-column pages. A coincidental whitespace river is being read as a column gutter and the page is band-cropped, fragmenting prose. Before any further band-detection work, add a single-column guard: a page is eligible for banded correction ONLY if `_detect_column_interleave_pages` independently flags it AND the gutter is full-height with substantial both-side word mass across the page's text rows (not a local river). maier must verify ON_NEUTRAL before the flip is reconsidered.
+
+**Gap 6: running-header/footer furniture must be stripped BEFORE/AFTER a band crop, not pulled into a column band** (ar_apa). The per-column pdftotext crop re-captures margin furniture that the whole-page F0 strip would have removed; the banded path needs to re-apply the running-header/footer strip to each crop, or exclude the top/bottom furniture y-bands from the crop region.
+
+**Gap 7: band boundaries must respect logical section boundaries** (chan_feldman) — a band that spans a section transition reassembles left-then-right across the boundary, interleaving two sections. Likely needs the band segmentation to cut at detected `##`/`###` heading rows too.
+
+**Re-verification gate for the next flip attempt (stricter than gap-4 said):** all 8 canaries (ip_feldman, plos_med, chandrashekar, chan_feldman, ar_apa, efendic, maier, xiao) must be ON_BETTER or ON_NEUTRAL — **zero ON_REGRESSION** — under AI-verify, in addition to the word-preservation scan + 26-baseline. Renders + per-paper verdicts from this run: `tmp/iterate/cycle-1/<stem>.flag{OFF,ON}.md`; verdicts in run-meta `corpus_sweeps` (2026-06-25). The flag REMAINS DEFAULT-OFF.

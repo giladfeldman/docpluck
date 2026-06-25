@@ -83,3 +83,50 @@ the failure is clean (no fabricated structure, no orphan heading) instead of mes
 - Actually **recovering** the lost table data via tight `table_areas` (passing detect.py regions to
   Camelot) is a larger Layer-1 change — a follow-on cycle once the prose-trim + clean-fallback land.
 - RC-1 two-column / sidebar interleave (separate spec, 2026-06-08).
+
+## UPDATE 2026-06-25 — Layer-1 recovery is the RC-1 BANDED-COLUMN work (probed, evidence below)
+
+v2.4.96 (phantom-strip refinement) + v2.4.97 (Layer-2 raw_text prose-trim/suppress) shipped option (A)
+clean-fail. At HEAD **v2.4.97** the residual is **4 data-losing caption-only stubs** across 3 canaries:
+`ip_feldman` T10, `chan_feldman` T6 + T9, `chandrashekar` T2 (`### Table N` heading + caption, NO
+`<table>`, data gone). Confirmed against the article-finder `reading` gold (e.g. ip_feldman T10 gold =
+a real 7-row regression table; render drops all 7 rows).
+
+**Probed two recovery angles; BOTH disproven as in-run wins (reproduce-before-trusting):**
+1. **`whitespace_cells` on the tight `_region_for_caption` region** → still garbage. The region is
+   `caption_only` + the 250pt below-window, and `_detect_geometry` finds no clean geometry, so the
+   region overshoots into prose; the clusterer mashes prose into cells (3 rows × 8 cols of junk).
+2. **Root cause is deeper than full-page-bbox: it is RC-1 interleave INSIDE the table region.** On
+   ip_feldman p.15 the table rows and the Discussion prose share y-positions line-by-line (table in
+   the LEFT x-band, Discussion in the RIGHT) — so ANY y-row clustering mixes them. Same shape on
+   `chan_feldman` T6 (`r1c3`/`r2c3` = Discussion prose) and `chandrashekar` T2 (near-full-page bbox +
+   survey-instructions prose). `chan_feldman` T9 is genuinely empty (`bbox 0,0,0,0`, 0 cells, 0 raw).
+
+**KEY EVIDENCE — the table IS cleanly x-separable.** An x0 histogram of ip_feldman p.15's table y-band
+(top 130–260) shows a clear column gutter at **x≈300–320** (table x≈60–300; Discussion densely
+x≈320–560). Filtering chars to the left band recovers the clean grid:
+```
+Negative well-being
+ Loneliness               .29***  −.21***  .07
+ Rumination/brooding       .22***  −.10*    .04
+ Depressive symptoms       .29***  −.20***  .07
+Positive well-being
+ Satisfaction with life   −.18***   .24***  .05
+ Subjective happiness     −.28***   .34***  .10
+ Number of confidants     −.07      .15**   .02
+ Social orientation scale  .13**     .01    .02  (extension)
+```
+**Therefore Layer-1 recovery == the RC-1 region-aware BANDED-column architecture**
+(`docs/superpowers/specs/2026-06-08-rc1-region-aware-column-architecture.md`, ship-dark behind
+`DOCPLUCK_COLUMN_CORRECT_BANDED`): detect the dominant gutter on the table's page-region, take the band
+the caption x-sits in, re-run column detection on that band. NOT a safe drop-in — landscape Tables
+6/7/8, genuinely single-column tables, and mid-table-gutter tables must NOT be split (the cycle-3
+caption-follows revert proved this class is FP-prone on the long tail). Needs its own session with the
+full ~48-paper guard-live-vs-bypassed diff + 7-canary AI-verify gate.
+
+**Safe non-architectural increment available now (not yet taken):** when a Camelot table is
+stripped-to-nothing as degenerate (`_strip_phantom_camelot_tables` removed the `<table>` and no cells/
+raw_text remain), emit a machine-greppable `<!-- table-data-lost: degenerate region, no grid recovered -->`
+completeness marker so the loss is HONEST to the harness + AI-verify (today it reads as clean because the
+caption-only stub satisfies `table_parity`). Zero output-fidelity risk; keyed on the structural signature,
+not paper identity.

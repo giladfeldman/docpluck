@@ -45,6 +45,21 @@ _VERSION_RE = re.compile(r"""^__version__\s*=\s*["'](\d+\.\d+\.\d+)["']""", re.M
 _TAG_RE = re.compile(r"^v(\d+\.\d+\.\d+)$")
 
 
+def _vtuple(v: str) -> tuple[int, ...]:
+    """Parse a dotted version string into an int tuple for ordered comparison.
+
+    Non-numeric / malformed components sort as ``-1`` so a garbage version never
+    silently compares *higher* than a real one.
+    """
+    parts: list[int] = []
+    for p in (v or "").split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            parts.append(-1)
+    return tuple(parts)
+
+
 def compare(latest_tag: str | None, app_pin: str | None, lib_version: str | None) -> tuple[bool, str]:
     """Pure decision core (kept import-friendly so both branches are unit-testable).
 
@@ -52,6 +67,15 @@ def compare(latest_tag: str | None, app_pin: str | None, lib_version: str | None
     latest released library tag. An unreleased working-tree ``__version__``
     (ahead of the latest tag) is reported but does NOT fail the gate — the pin
     legitimately tracks the latest *release* until that version is tagged.
+
+    The working-tree note is DIRECTION-AWARE (fixed 2026-06-25): it must compare
+    versions as ordered tuples, not merely ``!=``. The pre-fix code said
+    "working-tree X is ahead of latest tag Y -- UNRELEASED. Tag + push X" for
+    *any* inequality, so a tree that is BEHIND its own latest tag (e.g. a stale
+    2.4.95 working copy while v2.4.97 is the latest release — a real state hit
+    during a branch-reconciliation) got told it was "ahead" and advised to tag an
+    OLDER version. That advice is actively harmful. Now: ahead → UNRELEASED-tag
+    hint; behind → loud stale-working-tree warning; equal → no note.
     """
     if not latest_tag:
         return False, "could not determine the library's latest v* tag"
@@ -68,11 +92,19 @@ def compare(latest_tag: str | None, app_pin: str | None, lib_version: str | None
 
     msg = f"in sync: app pin v{app_pin} == latest library tag v{latest_tag}"
     if lib_version and lib_version != latest_tag:
-        msg += (
-            f"  [note: working-tree __version__ {lib_version} is ahead of the latest "
-            f"tag v{latest_tag} -- UNRELEASED. Tag + push v{lib_version} so the app "
-            f"auto-bumps to it.]"
-        )
+        if _vtuple(lib_version) > _vtuple(latest_tag):
+            msg += (
+                f"  [note: working-tree __version__ {lib_version} is ahead of the latest "
+                f"tag v{latest_tag} -- UNRELEASED. Tag + push v{lib_version} so the app "
+                f"auto-bumps to it.]"
+            )
+        else:
+            msg += (
+                f"  [WARNING: working-tree __version__ {lib_version} is BEHIND the latest "
+                f"tag v{latest_tag} -- the checkout is stale relative to the release. The "
+                f"app pin (v{app_pin}) correctly tracks the release; fast-forward / checkout "
+                f"v{latest_tag} before iterating so you don't re-do or collide with shipped work.]"
+            )
     return True, msg
 
 
