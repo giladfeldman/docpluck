@@ -87,8 +87,22 @@ class TestT90203Table8BlankHeaders:
         assert f["F"] == 0.01
         assert f["p"] == 0.923
         assert f["BF01"] == 11.57
-        assert f["est"] == 0.0  # eta²p value — generic est (no eta token in vocab)
+        # The η²p header glyph is dropped by the font (no ToUnicode), so the
+        # effect column is blank and no "eta" token survives in the vocab. The
+        # estimate is nonetheless typed `eta2` by STRUCTURAL inference: an F-test
+        # results table that reports a Bayes factor + CI and names no competing
+        # effect reports η²p by APA convention (ESCIcheck DP-2026-06-25-3). The
+        # value is range-guarded to η²'s domain [0, 1].
+        assert "est" not in f
+        assert f["eta2"] == 0.0
         assert (f["CI_lower"], f["CI_upper"]) == pytest.approx((0.0, 0.003))
+
+    def test_eta2_typed_for_all_f_rows(self):
+        # Every Replication/Target F-row's effect column types as η²p, not est.
+        for r in self._rows():
+            f = r["fields"]
+            if "F" in f or "BF01" in f:
+                assert "est" not in f, f"row {r['row_label']!r} left a generic est"
 
     def test_na_bf01_not_emitted(self):
         tgt = next(r for r in self._rows() if r["row_label"] == "Target article")

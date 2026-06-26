@@ -494,3 +494,88 @@ class TestParallelColumnGroups:
             assert "(ITT)" in r["sentence"] or "(PP)" in r["sentence"]
             assert "\x00" not in r["sentence"]
             assert all("\x00" not in h for h in r["header"])
+
+
+# ── DP-2026-06-25-5 / cog_emo Table 8 — inline self-labeled "r = .67" cells ──
+
+
+class TestInlineSelfLabeledStat:
+    """A cell that states its own statistic ("r = .67") types by that token even
+    when the COLUMN header is generic ("Effect size") and unrecognized — the
+    correlation case ESCIcheck filed (cog_emo Table 8)."""
+
+    def _table(self):
+        cells = [
+            mk_cell(0, 0, "Hypothesis", True),
+            mk_cell(0, 1, "p", True),
+            mk_cell(0, 2, "Effect size", True),   # generic header, NOT "r"
+            mk_cell(0, 3, "CI", True),
+            mk_cell(1, 0, "1a"),
+            mk_cell(1, 1, "<.001"),
+            mk_cell(1, 2, "r = .63"),
+            mk_cell(1, 3, "[0.56, 0.70]"),
+            mk_cell(2, 0, "2bi"),
+            mk_cell(2, 1, "<.001"),
+            mk_cell(2, 2, "r = -.73"),
+            mk_cell(2, 3, "[-0.78, -0.66]"),
+        ]
+        return mk_table(cells, id_="T8", label="Table 8", page=13)
+
+    def test_r_typed_from_cell_token(self):
+        rows = flatten_table(self._table())
+        f0 = rows[0]["fields"]
+        assert f0["r"] == pytest.approx(0.63)
+        assert (f0["CI_lower"], f0["CI_upper"]) == pytest.approx((0.56, 0.70))
+        assert rows[1]["fields"]["r"] == pytest.approx(-0.73)
+
+    def test_sentence_not_double_prefixed(self):
+        # The display value is the number only, so the assembler renders
+        # "r = 0.63", never "r = r = .63".
+        s = flatten_table(self._table())[0]["sentence"]
+        assert "r = 0.63" in s
+        assert "r = r" not in s
+
+    def test_out_of_domain_r_dropped(self):
+        # An inline "r = 1.4" violates r∈[-1,1] and must be dropped by the
+        # universal validity guard, not emitted as a bogus correlation.
+        cells = [
+            mk_cell(0, 0, "H", True), mk_cell(0, 1, "Effect size", True),
+            mk_cell(1, 0, "x"), mk_cell(1, 1, "r = 1.4"),
+            mk_cell(2, 0, "y"), mk_cell(2, 1, "r = .5"),
+        ]
+        rows = flatten_table(mk_table(cells, label="Table 1"))
+        assert "r" not in rows[0]["fields"]
+        assert rows[1]["fields"]["r"] == pytest.approx(0.5)
+
+
+# ── DP-2026-06-25-5 / cog_emo Table 8 — CI split across rows with "]" tail ──
+
+
+class TestBracketTailCIContinuation:
+    """A CI that wraps ("[0.59," on one row, "0.73]" on the next) folds back into
+    the parent CI cell, so no bare-fragment junk row survives and the bound is
+    complete. Mirrors the paren-tail merge but for the bracketed CI form."""
+
+    def _table(self):
+        cells = [
+            mk_cell(0, 0, "H", True),
+            mk_cell(0, 1, "p", True),
+            mk_cell(0, 2, "Effect size", True),
+            mk_cell(0, 3, "CI", True),
+            mk_cell(1, 0, "1a"),
+            mk_cell(1, 1, "<.001"),
+            mk_cell(1, 2, "r = .67"),
+            mk_cell(1, 3, "[0.59,"),     # CI opens, upper bound wraps
+            mk_cell(2, 0, ""),
+            mk_cell(2, 1, ""),
+            mk_cell(2, 2, ""),
+            mk_cell(2, 3, "0.73]"),      # close-bracket tail on its own row
+        ]
+        return mk_table(cells, id_="T8", label="Table 8", page=13)
+
+    def test_ci_merged_and_no_junk_row(self):
+        rows = flatten_table(self._table())
+        assert len(rows) == 1  # the fragment row was folded, not emitted
+        f = rows[0]["fields"]
+        assert (f["CI_lower"], f["CI_upper"]) == pytest.approx((0.59, 0.73))
+        assert f["r"] == pytest.approx(0.67)
