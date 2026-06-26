@@ -274,6 +274,74 @@ Cite: `docpluck/tables/camelot_extract.py::_augment_lattice_with_stream_rows` + 
 
 ---
 
+## L-010 — A caption that starts a page is mis-paged by the `^\s*` form-feed; and a font with no ToUnicode makes its glyph unrecoverable (recover the column ROLE, not the glyph)
+
+### Two findings, both surfaced 2026-06-25 by the ESCIcheck handoff
+
+1. **The `^\s*` caption regex eats the `\f` and mis-pages a page-starting table.**
+   `TABLE_CAPTION_RE` / `FIGURE_CAPTION_RE` begin `^\s*`. When a table starts a new
+   page, pdftotext emits `…results\n\fTable 4. …`, and `\s*` consumes the `\f`, so
+   `m.start()` lands *before* the form-feed. `_page_for_offset` then counts the
+   caption on the page BEFORE the break (off-by-one), and `_line_at` returns the
+   empty pre-`\f` segment (so `line_text == ''`). With the wrong page,
+   `_bbox_of_caption_line` can't find the caption in the layout channel → the whole
+   layout-region lookup returns None → the whitespace/char fallback never fires and
+   the table degrades to a caption-only stub. On `collabra.77859` this hit **all 5
+   tables**. The seemingly-obvious fix — advance `char_start` past the leading `\f`
+   to the actual "Table"/"Figure" token (`captions.find_caption_matches`) — DOES
+   correct the page AND unblock `collabra.77859` Table 4's replication stats (DP-1) in
+   isolation. **It was tried 2026-06-25 and REVERTED.** Populating the
+   previously-empty `line_text` re-scores `_find_caption_for_table`'s same-page
+   token-overlap and surfaces low-quality whitespace tables, so the mandatory AI-gold
+   canary verify caught it mis-pairing tables whose captions share a page (efendic
+   T4/T5, cog_emo T8/T9 swapped) and only half-fixing plos_med. **The lesson is the
+   process, not the patch:** a capture-path change that helps one paper in isolation
+   can silently mis-pair others — only a corpus-wide AI-gold verify (NOT the unit
+   suite, which stayed green) reveals it. The real fix needs same-page-caption
+   disambiguation in `_find_caption_for_table` + whitespace-region quality gating
+   FIRST; queued as its own gated cycle. Symptom to watch: `line_text == ''` on a
+   caption, or a caption whose `page` is one less than where the table visibly is.
+
+2. **A glyph with no ToUnicode mapping is gone from BOTH channels — recover its
+   ROLE, not the glyph.** `collabra.90203` reports `η²p`, but `pdffonts` shows the
+   symbol font as `uni: no` (no ToUnicode CMap), so pdftotext AND pdfplumber both
+   decode the glyph as U+0020 — the text reads `( = .000, …)` and the table's
+   effect-column header is blank. This is the same class as the residual deleted-minus
+   (memory `project_docpluck_rc_b7_done_w0h`): the *character identity* is absent from
+   the PDF, so text-channel recovery is **OCR-tier won't-fix**. But in a TABLE the
+   column's *role* is recoverable from structure — an F-test/ANOVA results table that
+   reports a Bayes factor + CI and names no competing effect reports η²p by APA
+   convention — so type the value `eta2` from the structural signature (range-guarded
+   to η²'s `[0,1]` domain) even though the glyph is unrecoverable
+   (`flatten._infer_anova_eta2_hint`). Don't chase the glyph; recover the meaning.
+
+### The rules
+
+1. **A caption-page / capture-path change MUST be AI-gold-verified across the corpus
+   before shipping — the unit suite will not catch a mis-pairing.** The page-fix kept
+   all 1852 unit tests green yet swapped table↔caption pairings on 3 papers. Per the
+   project ground-truth rule, render the canary set and compare TABLES against the AI
+   `reading` golds; revert if any paper regresses. (`^\s*`-anchored scans that skip
+   `\f` ARE the right idea for page attribution, but the downstream `line_text` /
+   same-page-caption scoring must be made robust in the same change, not after.)
+2. **Before "the symbol got stripped", run `pdffonts`.** If the glyph's font is
+   `uni:no`, nothing in the byte stream carries its identity — stop trying to recover
+   the glyph; recover the column's role/meaning from structure, or mark it OCR-tier.
+   (Shipped: `flatten._infer_anova_eta2_hint` types the value `eta2` from the F-test
+   table structure even though the η²p glyph is gone.)
+3. **A self-labeled cell beats its column header.** `r = .67` / `d = 0.32` states its
+   own type; type by the cell token even under a generic "Effect size" header
+   (`flatten._inline_stat_field`, shipped) — store only the numeric part so the
+   sentence assembler doesn't double the prefix (`r = r = .67`).
+
+Cite (SHIPPED v2.4.4): `docpluck/tables/flatten.py::_infer_anova_eta2_hint` +
+`_inline_stat_field`, `docpluck/tables/cell_cleaning.py::_is_fragment_cell` (bracket-CI
+tail). REVERTED (queued): the `captions.find_caption_matches` char_start advance +
+`whitespace._whitespace_grid_is_clean` / `_trim_trailing_prose_rows` gates.
+See `docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md`, CHANGELOG v2.4.98.
+
+---
+
 ## When to add a new lesson here
 
 Add a lesson when:

@@ -252,6 +252,96 @@ def _effect_key(header_cell: str, hint: Optional[str]) -> str:
     return _EFFECT_TYPE_KEY.get(et or "", "est")
 
 
+# Header tokens that name a *competing* effect size — if any of these is present
+# in a table, an unlabeled estimate column is NOT safe to assume is partial-η².
+_COMPETING_EFFECT_RE = re.compile(
+    r"\bd\s*z?\b|\bd\s+or\s+d\b|cohen|hedges|\bg\b|"
+    r"(?<![A-Za-z])r(?![A-Za-z])|\bOR\b|odds\s*ratio|risk\s*diff|\bMD\b",
+    re.I,
+)
+
+# A cell that SELF-LABELS its statistic inline, e.g. "r = .67", "r = -.73",
+# "d = 0.32", "dz = 0.40", "η² = .008". The token names the field; the number is
+# the value. This is the strongest possible signal (the cell states its own
+# type), so it types a value even when the COLUMN header is generic ("Effect
+# size") or unrecognized — ESCIcheck DP-2026-06-25-5, cog_emo Table 8, where the
+# correlation column is headed "Effect size" not "r". Group 1 = token, group 2 =
+# signed value (APA leading-dot allowed). Anchored at cell start.
+_INLINE_STAT_CELL_RE = re.compile(
+    r"^\s*(r|d\s*z|dz|d|g|η\s*²?\s*p?|η2p?|eta\s*p?2?)\s*=\s*"
+    r"([-+]?\d*\.?\d+)\s*$",
+    re.I,
+)
+# Inline token → canonical field key. (Mirrors `_EFFECT_TYPE_KEY`, but keyed on
+# the raw token a cell uses rather than an `_effect_type_for` name.)
+_INLINE_STAT_KEY: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^η|^eta", re.I), "eta2"),
+    (re.compile(r"^d\s*z$|^dz$|^d$", re.I), "d"),
+    (re.compile(r"^g$", re.I), "d"),  # Hedges g shares the d-family field
+    (re.compile(r"^r$", re.I), "r"),
+]
+
+
+def _inline_stat_field(cell: str) -> Optional[tuple[str, float]]:
+    """If a cell self-labels its statistic (``"r = .67"``), return
+    ``(field_key, value)``; else ``None``. Value-domain guards (r∈[-1,1],
+    η²∈[0,1]) are applied by the caller's universal validity pass."""
+    m = _INLINE_STAT_CELL_RE.match((cell or "").replace("−", "-"))
+    if not m:
+        return None
+    tok = m.group(1)
+    try:
+        val = float(m.group(2))
+    except ValueError:
+        return None
+    for pat, key in _INLINE_STAT_KEY:
+        if pat.match(tok.replace(" ", "")):
+            return key, val
+    return None
+
+
+def _infer_anova_eta2_hint(
+    roles: dict[int, str],
+    header: list[str],
+    explicit_hint: Optional[str],
+) -> bool:
+    """Structural signal that an UNLABELED estimate column in this row is a
+    partial eta-squared (η²p).
+
+    Why this exists: on PDFs whose η²p header glyph has no ToUnicode mapping
+    (e.g. NotoSerif-Regular `uni:no`), pdftotext AND pdfplumber both decode the
+    glyph as a space, so the effect-size column header is blank *and* the table
+    vocabulary contains no "eta"/"η" token — `_effect_type_for` returns None and
+    the value falls back to the generic `est` key, leaving the consumer with a
+    nameless number (ESCIcheck DP-2026-06-25-3). The glyph itself is
+    unrecoverable, but the column's *role* is recoverable from structure: an
+    F-test / ANOVA results table that reports a Bayes factor and/or a CI and
+    names no competing effect size reports its effect as η²p by APA convention.
+
+    Fires ONLY when (keyed on a structural signature, never paper identity):
+      * no explicit effect type was named anywhere (header text + table vocab),
+      * the row carries an ``F`` statistic (it is an F-test / ANOVA row),
+      * the row carries a ``BF01`` and/or a CI column (the results-table shape),
+      * NO column header names a competing effect (d / dz / r / OR / g / …).
+
+    The caller additionally range-guards the value to η²'s domain [0, 1] before
+    applying the inferred key, so a stray non-proportion estimate is never
+    mistyped. Returns True ⇒ treat unlabeled `est` columns as η²p.
+    """
+    if explicit_hint:
+        return False
+    present = set(roles.values())
+    if "F" not in present:
+        return False
+    if not ({"BF01", "CI", "est_ci", "CI_lo", "CI_hi"} & present):
+        return False
+    if {"d", "r"} & present:
+        return False
+    if any(_COMPETING_EFFECT_RE.search(h or "") for h in header):
+        return False
+    return True
+
+
 def _classify_column(header: str) -> Optional[str]:
     """Return the canonical role for a column header, or None if unrecognized.
 
@@ -960,6 +1050,14 @@ def _flatten_one_row(
         elif role is not None:
             roles[ci] = role
 
+    # Structural η²p inference for an unlabeled estimate column in an F-test
+    # results table whose effect-size header glyph was dropped by the font
+    # (see `_infer_anova_eta2_hint`). Computed once per row from the resolved
+    # role set; only used below to type an `est`/`est_ci` column when no explicit
+    # effect was named, and only after the value passes η²'s [0, 1] range guard.
+    eta2_inferred = _infer_anova_eta2_hint(roles, header, effect_hint)
+    effect_hint_eff = effect_hint or ("eta_squared_partial" if eta2_inferred else None)
+
     # Pull per-role values out of the body row.
     role_vals: dict[str, str] = {}
     role_nums: dict[str, float] = {}
@@ -993,7 +1091,17 @@ def _flatten_one_row(
             if est is None:
                 est = _to_signed_float(raw)
             if est is not None:
-                eff_key = _effect_key(header[ci], effect_hint)
+                eff_key = _effect_key(header[ci], effect_hint_eff)
+                # When the η²p key was INFERRED (not named in the header), guard
+                # it to η²'s domain [0, 1] — a non-proportion estimate falls back
+                # to the generic `est` so a stray value is never mistyped as η²p.
+                if (
+                    eff_key == "eta2"
+                    and not _effect_type_for(header[ci])
+                    and eta2_inferred
+                    and not (0.0 <= est <= 1.0)
+                ):
+                    eff_key = "est"
                 role_nums[eff_key] = est
                 role_vals[eff_key] = raw
         elif role == "est_ci":
@@ -1001,7 +1109,14 @@ def _flatten_one_row(
             # or "0.76 [.50, 1.02]".
             est = _parse_leading_number(raw)
             if est is not None:
-                eff_key = _effect_key(header[ci], effect_hint)
+                eff_key = _effect_key(header[ci], effect_hint_eff)
+                if (
+                    eff_key == "eta2"
+                    and not _effect_type_for(header[ci])
+                    and eta2_inferred
+                    and not (0.0 <= est <= 1.0)
+                ):
+                    eff_key = "est"
                 role_nums[eff_key] = est
                 role_vals[eff_key] = (
                     re.split(r"[\[(]", raw, maxsplit=1)[0].strip() or _fmt_num(est)
@@ -1017,6 +1132,26 @@ def _flatten_one_row(
             n = _parse_number(raw)
             if n is not None:
                 role_nums[role] = n
+
+    # Inline self-labeled statistic recovery: a cell like "r = .67" / "d = 0.32"
+    # states its own type, so type it even when the COLUMN header is generic
+    # ("Effect size") and the role loop above produced no estimate for it
+    # (ESCIcheck DP-2026-06-25-5). Scans every non-label cell; a role-loop value
+    # already present for that field wins (we never overwrite a typed value).
+    for ci in range(len(row)):
+        if ci == label_col:
+            continue
+        hit = _inline_stat_field(row[ci])
+        if hit is None:
+            continue
+        key, val = hit
+        if key in role_nums:
+            continue
+        role_nums[key] = val
+        # Store only the numeric part as the display value — the sentence
+        # assembler re-prefixes the field name ("r = …"), so keeping the inline
+        # "r = " here would double it ("r = r = .67").
+        role_vals[key] = _fmt_num(val)
 
     # Consolidate separate CI_lo / CI_hi columns into CI_lower / CI_upper so
     # the assembler sees a single CI primitive.

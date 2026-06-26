@@ -87,11 +87,19 @@ def test_table_kinds_are_valid():
     data = _read("apa_chan_feldman_lineless")
     result = extract_pdf_structured(data)
     for t in result["tables"]:
-        assert t["kind"] in {"structured", "isolated"}
-        assert t["rendering"] in {"lattice", "whitespace", "isolated"}
-        if t["kind"] == "structured":
-            assert t["confidence"] is not None
-            assert 0.0 <= t["confidence"] <= 1.0
+        # "whitespace" = the layout-channel column-gap fallback (fires when
+        # Camelot can't recover a caption-anchored lineless table, including a
+        # Camelot "no tables" under cumulative load); a real grid gated by the
+        # foundation's char-fallback. A valid kind alongside structured/isolated.
+        assert t["kind"] in {"structured", "whitespace", "isolated"}
+        assert t["rendering"] in {"lattice", "whitespace", "isolated", "structured"}
+        if t["kind"] in {"structured", "whitespace"}:
+            # whitespace grids carry no Camelot confidence; structured do.
+            if t["kind"] == "structured":
+                assert t["confidence"] is not None
+                assert 0.0 <= t["confidence"] <= 1.0
+            else:
+                assert t["confidence"] is None
             assert t["html"] is not None
             assert "<table>" in t["html"]
             assert isinstance(t["cells"], list)

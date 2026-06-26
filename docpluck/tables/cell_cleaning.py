@@ -212,6 +212,12 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             return True
         if ")" in s and "(" not in s:  # close-paren tail: "8.34)", "10.28)"
             return True
+        # Close-bracket tail of a CI split across two rows: "[0.59," wraps and
+        # its upper bound "0.73]" lands on the next row (cog_emo Table 8 — the
+        # bracketed CI form, not the parenthetical one above). The parent cell
+        # ends with "," so the fragment joins after a space → "[0.59, 0.73]".
+        if "]" in s and "[" not in s:  # close-bracket tail: "0.73]", "−0.66]"
+            return True
         return False
 
     def _is_fragment_continuation(row: list[str], parent: list[str]) -> bool:

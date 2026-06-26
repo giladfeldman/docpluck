@@ -94,6 +94,18 @@ def test_table_html_renders_when_structured(entry):
             assert 0.0 <= t["confidence"] <= 1.0
             assert isinstance(t["cells"], list)
             assert len(t["cells"]) > 0
+        elif t["kind"] == "whitespace":
+            # The layout-channel column-gap fallback (fires when Camelot can't
+            # recover a caption-anchored lineless table — including when Camelot
+            # returns "no tables" under cumulative test-suite load). Emits a real
+            # grid (cells + HTML) but no Camelot confidence. This branch existed
+            # before but the test never accounted for the kind, so a Camelot
+            # load-flake on jama/ieee/chen fixtures mis-failed the `else`.
+            assert t["html"] is not None
+            assert "<table>" in t["html"]
+            assert t["confidence"] is None
+            assert isinstance(t["cells"], list)
+            assert len(t["cells"]) > 0
         else:
             assert t["kind"] == "isolated"
             assert t["html"] is None
