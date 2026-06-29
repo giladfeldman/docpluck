@@ -97,7 +97,8 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
                 "is_header": is_header,
                 "bbox": (x_left, row_top, x_right, row_bot),
             })
-    return cells
+    cells = _trim_trailing_prose_rows(cells)
+    return cells if _whitespace_grid_is_clean(cells) else []
 
 
 def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
@@ -156,7 +157,8 @@ def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list
                 "is_header": is_header,
                 "bbox": (x_left, row_top, x_right, row_bot),
             })
-    return cells
+    cells = _trim_trailing_prose_rows(cells)
+    return cells if _whitespace_grid_is_clean(cells) else []
 
 
 # --- helpers ---
@@ -355,6 +357,247 @@ def _normalize_cell_text(text: str) -> str:
     text = text.replace("­", "")    # soft hyphen
     text = text.replace("−", "-")   # unicode minus → ASCII hyphen
     return _WHITESPACE_RE.sub(" ", text).strip()
+
+
+# --- prose-contamination guard + data-table quality gate (RC-T) -----------
+#
+# A caption-anchored whitespace/char region extends a fixed distance below the
+# caption (detect.SEARCH_BELOW_PT), so on a SHORT table it absorbs the body
+# paragraphs that follow — and on a PROSE table (a "Summary of hypotheses" grid)
+# the whole region is sentence text. Before the v2.4.98 caption page-fix these
+# regions never resolved (empty line_text → _bbox_of_caption_line None), so the
+# fallback silently emitted nothing; now that captions carry real line_text the
+# fallback fires on them and would emit garbage grids (cog_emo T1/T3/T4/T9 mashed
+# prose; rows lifted from an adjacent matrix). These two guards keep the fallback
+# to its purpose — the genuinely-lineless DATA table — and otherwise return [] so
+# the caller emits a clean caption-only stub.
+
+# A "statistical token" — any of these in a cell means the row carries data, not
+# prose. Numbers (incl. APA leading-dot + signed), comparison/equality ops, CI
+# brackets, and the bare single-letter stat/df markers academic tables use.
+_STAT_TOKEN_RE = re.compile(
+    r"[-+−]?\d*\.?\d+|[<>=≤≥]|\[[^\]]*\]|\bp\b|\bt\b|\bF\b|\bd\b|\br\b|\bM\b|\bSD\b|\bdf\b|\bn\b|\bN\b",
+    re.IGNORECASE,
+)
+
+# A prose block must be at least this many consecutive rows before we trim it —
+# one or two wordy rows could be a legitimate multi-line note, but a sustained
+# run is unambiguously absorbed body text.
+_PROSE_RUN_MIN: int = 3
+
+
+def _row_is_prose(cells_text: list[str]) -> bool:
+    """True when a whitespace-grid row looks like wrapped body PROSE rather than
+    a table data/label/header row.
+
+    A prose row has several word-like tokens and NO statistical token in ANY
+    cell. Word-wrap fragments the text mid-word (``"We predicted, b" | "ased on
+    the"``), so we count whitespace TOKENS (length ≥2, incl. fragments) rather
+    than only whole dictionary words — otherwise a wrapped prose line scores too
+    few words. A real data row always carries a number / op / CI / stat marker
+    (excluded first); a real section/label row has few tokens (kept). The
+    trailing-RUN requirement in ``_trim_trailing_prose_rows`` is what makes this
+    safe — one wordy row never trims; only a sustained block of them does.
+    """
+    joined = " ".join(t for t in cells_text if t).strip()
+    if not joined:
+        return False
+    if _STAT_TOKEN_RE.search(joined):
+        return False  # carries a number / op / CI / stat marker → data row
+    tokens = [tok for tok in re.split(r"\s+", joined) if len(tok) >= 2]
+    return len(tokens) >= 3
+
+
+# A single CELL that is a body-prose sentence fragment: ≥ this many whitespace
+# word-tokens of running text. A real data cell is a number / short label / stat;
+# a table never carries a 6-word sentence fragment in one cell, but an
+# over-captured body-paragraph line does ("264) were asked to recall a hurting
+# experience that"). Used by ``_whitespace_grid_is_clean`` to reject region grids
+# that absorbed 2-column body prose.
+_PROSE_CELL_MIN_WORDS: int = 6
+
+
+def _cell_is_prose(text: str) -> bool:
+    """True when one cell is a running-prose sentence fragment (≥6 word tokens,
+    mostly alphabetic words, not a stat/number list). Robust to wrapped fragments
+    and to embedded ``n = ``/``p = `` (which fool the stat-token guard) because it
+    keys on word COUNT, not on the absence of an operator."""
+    s = (text or "").strip()
+    if not s:
+        return False
+    words = [w for w in re.split(r"\s+", s) if w]
+    if len(words) < _PROSE_CELL_MIN_WORDS:
+        return False
+    # Count tokens that are predominantly alphabetic (letters ≥ half the token) —
+    # a numeric/stat row ("239 | 794 | 0.07 | [.01, .12]") has few such tokens
+    # even when it is long.
+    alpha_words = sum(
+        1 for w in words
+        if sum(ch.isalpha() for ch in w) * 2 >= len(w) and any(ch.isalpha() for ch in w)
+    )
+    return alpha_words >= _PROSE_CELL_MIN_WORDS
+
+
+def _trim_trailing_prose_rows(cells: list[Cell]) -> list[Cell]:
+    """Drop the body-prose block a whitespace region over-captured below a table.
+
+    Finds the EARLIEST row that begins a sustained run (``≥ _PROSE_RUN_MIN``) of
+    consecutive prose rows and cuts from there to the end. Cutting at the first
+    sustained prose block (rather than only a strictly-trailing run) is what makes
+    this robust to a stray section heading that interrupts the absorbed prose
+    (collabra.77859 Table 1: data rows, then a prose block with a lone heading — a
+    trailing-only walk would stop at that heading and keep all the prose above
+    it). A real table's data rows always carry a number / stat marker, so they
+    never form a prose run; requiring a RUN of ``_PROSE_RUN_MIN`` is the
+    false-positive guard against a single wordy note or label row. If the
+    surviving grid has < 2 rows the whole grid is dropped (``[]``) so the caller
+    emits a clean caption-only stub.
+    """
+    if not cells:
+        return cells
+    by_row: dict[int, list[Cell]] = defaultdict(list)
+    for c in cells:
+        by_row[c["r"]].append(c)
+    row_indices = sorted(by_row)
+    prose_flags = [
+        _row_is_prose([(c.get("text") or "").strip() for c in by_row[r]])
+        for r in row_indices
+    ]
+    # Find the first index that starts a run of >= _PROSE_RUN_MIN prose rows.
+    cut_pos: int | None = None
+    run = 0
+    run_start = 0
+    for i, is_prose in enumerate(prose_flags):
+        if is_prose:
+            if run == 0:
+                run_start = i
+            run += 1
+            if run >= _PROSE_RUN_MIN:
+                cut_pos = run_start
+                break
+        else:
+            run = 0
+    if cut_pos is None:
+        return cells  # no sustained prose block — leave the grid intact
+    cut_row = row_indices[cut_pos]
+    kept = [c for c in cells if c["r"] < cut_row]
+    kept_rows = {c["r"] for c in kept}
+    if len(kept_rows) < 2:
+        return []
+    return kept
+
+
+# A "clean" standalone data cell: a number (incl. APA leading-dot / signed / CI
+# bracket / parenthesised), a comparison-op'd p, or a short stat marker. Used to
+# confirm a whitespace grid is a real DATA table, not absorbed prose.
+_CLEAN_DATA_CELL_RE = re.compile(
+    r"^\s*(?:[<>=≤≥]\s*)?[-+−(\[]?\s*\d*\.?\d+"
+    r"(?:\s*[,\-–—−]\s*[-+−]?\d*\.?\d+)?\s*[)\]%]?\s*$"
+)
+# A severely GARBLED cell — a long run of one repeated letter (vertical-text
+# merge: ``caaaaaaaaaDott…``), a very long unbroken alpha token (columns the
+# char-fallback fused), or an unmapped-glyph marker. ``(cid:N)`` / U+FFFD mean
+# pdfminer/pdfplumber could not decode a glyph; the Camelot HTML path recovers a
+# (cid:0)-before-digit minus, but in a fused whitespace cell the marker sits
+# mid-token (``[(cid:0)ra00m..er’s,V``) where no recovery applies — its presence
+# is itself proof the char extraction for this region is corrupted, not tabular.
+_REPEAT_CHAR_RUN_RE = re.compile(r"([A-Za-z])\1{4,}")
+_LONG_ALPHA_TOKEN_RE = re.compile(r"[A-Za-z]{24,}")
+_UNMAPPED_GLYPH_RE = re.compile(r"\(cid:\d+\)|�")
+
+# A cell that contains a CAPTION label ("Table 9.", "Figure 2:") — structural
+# furniture that introduces a table, and so belongs BETWEEN tables, never inside
+# a data cell. Its presence proves the region absorbed an adjacent table's (or its
+# own) caption line (cog_emo Table 9's region reached up into Table 8's bottom
+# rows and pulled in the "Table 9. Summary…" caption). One occurrence condemns
+# the grid — the region is mis-bounded. (A trailing ``Note:`` / ``** p < .01``
+# footnote is deliberately NOT included: it is a legitimate part of many real
+# tables — e.g. cog_emo Table 2's intercorrelation matrix — and rejecting on it
+# would discard good grids.)
+_CAPTION_LABEL_RE = re.compile(r"\b(?:Table|Figure|TABLE|FIGURE)\s+\d+\s*[.:]")
+
+# A real data table the whitespace fallback should surface has at least this many
+# rows bearing a clean standalone numeric/stat cell. Below this it is almost
+# certainly absorbed prose or a misdetected region — discard.
+_MIN_CLEAN_DATA_ROWS: int = 2
+
+
+def _cell_is_garbled(text: str) -> bool:
+    s = (text or "").strip()
+    if not s:
+        return False
+    if _UNMAPPED_GLYPH_RE.search(s):
+        return True
+    if _REPEAT_CHAR_RUN_RE.search(s):
+        return True
+    for tok in s.split():
+        if _LONG_ALPHA_TOKEN_RE.match(tok):
+            return True
+    return False
+
+
+def _whitespace_grid_is_clean(cells: list[Cell]) -> bool:
+    """Accept a whitespace/char grid ONLY when it looks like a real DATA table.
+
+    The whitespace fallback is geometry-driven and, on regions it shouldn't have
+    fired on (absorbed body prose; multi-column text; vertical-label IEEE tables),
+    it emits prose rows or glyph-fused garbage. Camelot already handles the clean
+    tables; the fallback exists for the genuinely-lineless data table. So gate it:
+
+      * NO cell may carry an unmapped-glyph marker ((cid:N) / U+FFFD) — a clean
+        academic table never contains one and the whitespace path cannot recover
+        a mid-token marker; one occurrence condemns the grid.
+      * a grid is clean when its rows bearing a clean STANDALONE numeric/stat cell
+        are at least ``_MIN_CLEAN_DATA_ROWS`` AND OUTNUMBER its garbled rows.
+
+    A single garbled HEADER row over a block of clean data rows (ip_feldman Table
+    10 — the header glyphs interleave but every coefficient row is clean) is kept;
+    a grid that is mostly garble with no clean data (ieee_access_3 Table 3
+    vertical-label fusion) or mostly prose with no clean standalone numbers
+    (cog_emo Table 1 "Summary of hypotheses") is rejected.
+
+    Returns False ⇒ caller discards the grid and falls back to the caption-only
+    stub (clean, no false structure) instead of emitting garbage.
+    """
+    if not cells:
+        return False
+    for c in cells:
+        txt = c.get("text") or ""
+        if _UNMAPPED_GLYPH_RE.search(txt):
+            return False
+        # A caption label inside a cell ⇒ the region absorbed an adjacent table's
+        # caption (cog_emo Table 9's region reached up into Table 8's tail and
+        # pulled in the "Table 9." caption line). Mis-bounded → reject.
+        if _CAPTION_LABEL_RE.search(txt):
+            return False
+    by_row: dict[int, list[Cell]] = defaultdict(list)
+    for c in cells:
+        by_row[c["r"]].append(c)
+    clean_data_rows = 0
+    garbled_rows = 0
+    prose_cell_rows = 0
+    for row_cells in by_row.values():
+        texts = [(c.get("text") or "").strip() for c in row_cells]
+        if any(_cell_is_garbled(t) for t in texts):
+            garbled_rows += 1
+        if any(_CLEAN_DATA_CELL_RE.match(t) for t in texts if t):
+            clean_data_rows += 1
+        if any(_cell_is_prose(t) for t in texts):
+            prose_cell_rows += 1
+    total_rows = len(by_row)
+    # Prose-contamination reject (region-driven false-positive guard, 2026-06-29):
+    # a caption-anchored region can over-capture the surrounding 2-column body
+    # text, and a wrapped prose line that happens to contain a year or sample size
+    # ("…participants (n = 264) were asked…") satisfies _CLEAN_DATA_CELL_RE, so
+    # prose masquerades as data (cog_emo Table 3: a 27×4 grid that is entirely the
+    # High/Low-Empathy procedure paragraph). Detect rows carrying a CELL that is a
+    # genuine sentence fragment (``_cell_is_prose`` — many words, lowercase, spaces;
+    # NOT a stat/label cell), and reject when such rows are a large share of the
+    # grid. A real data/label table has almost none (its cells are numbers and
+    # short labels), so this never trips a clean table.
+    if total_rows and prose_cell_rows * 3 >= total_rows:
+        return False
+    return clean_data_rows >= _MIN_CLEAN_DATA_ROWS and clean_data_rows > garbled_rows
 
 
 __all__ = ["whitespace_cells", "char_whitespace_cells"]
