@@ -69,7 +69,27 @@ def find_caption_matches(
             num = int(m.group("num"))
             label_word = "Table" if kind == "table" else "Figure"
             label = f"{label_word} {num}"
+            # The caption regex begins ``^\s*`` so ``m.start()`` can land on the
+            # leading whitespace the ``\s*`` consumed — a blank paragraph-break
+            # line (``…\n\nTable 4. …`` on local Xpdf, whose default mode emits
+            # ``\n\n`` between paragraphs; see the ``pdftotext_version_skew``
+            # lesson) or a ``\f`` page break (a caption at a page top). Anchoring
+            # char_start at that whitespace breaks two things the layout-channel
+            # table pipeline depends on:
+            #   (a) ``_line_at`` returns the EMPTY pre-token segment, so
+            #       ``line_text == ''`` — which makes ``_bbox_of_caption_line``
+            #       (the layout caption locator) return None, so the
+            #       caption-anchored table REGION can't be built; and
+            #   (b) for a ``\f`` the page is mis-attributed to the page BEFORE the
+            #       form-feed (``_page_for_offset`` counts the ``\f`` as not yet
+            #       crossed).
+            # Advance to the first non-whitespace char (the real "Table"/"Figure"
+            # token) so the line, page, and char_end are read at the caption's
+            # true position. General — fixes every caption that follows a blank
+            # line or starts a page.
             char_start = m.start()
+            while char_start < len(raw_text) and raw_text[char_start].isspace():
+                char_start += 1
             line_text = _line_at(raw_text, char_start)
             char_end = char_start + len(line_text)
             page = _page_for_offset(char_start, page_offsets)
