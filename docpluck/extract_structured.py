@@ -180,12 +180,34 @@ def extract_pdf_structured(
     used_caption_ids: set[int] = set()
     table_captions = [c for c in captions if c.kind == "table"]
 
-    # Filter Camelot's output to tables that have a same-page caption.
-    # This anchors detection to caption signal (matching the pre-pdfplumber-removal
-    # behavior of docpluck) and drops false-positive Camelot detections like
-    # bibliographies or address blocks. Tables without captions are rare in APA
-    # corpus and the existing tests are calibrated against caption-anchored counts.
+    # ---- Region-driven capture (candidate generator) ----
+    # For each caption, hand Camelot the caption-anchored region as table_areas so
+    # it extracts exactly that caption's table — sidestepping the header-absorption,
+    # two-tables-merged-into-one, and caption-pairing failures of blind
+    # auto-detection. CRUCIAL: region-driven tables are CANDIDATES, not winners.
+    # ``_region_for_caption``'s bbox is reliable for VERTICAL anchoring but often
+    # too NARROW horizontally for a wide table (its width tracks the caption /
+    # partial content, not the full grid), so a naive "region wins" would collapse
+    # a 7-column demographics table to 2 columns. We therefore pick, per caption,
+    # the BETTER of the region-driven candidate and the auto-detected candidate
+    # (``_pick_better_table``: more columns wins; tie-break on cell count) — so
+    # region-driving can only ADD coverage (0×0 stub → real table) or replace an
+    # auto-detect table it strictly beats, never degrade one.
+    layout_doc = _layout_doc
+    region_tables: dict[int, Table] = {}
+    if not camelot_disabled and table_captions:
+        region_tables, layout_doc = _region_driven_capture(
+            pdf_bytes, rejoined, table_captions, layout_doc,
+            next_boundary_by_id, method_pieces,
+        )
+
+    # Auto-detect candidate per caption (legacy pairing). Filter Camelot's output
+    # to tables that have a same-page caption — this anchors detection to caption
+    # signal (matching the pre-pdfplumber-removal behavior) and drops false
+    # positives like bibliographies. Uncaptioned auto-detect tables are dropped as
+    # before (rare in the APA corpus; existing tests are caption-anchored).
     pages_with_table_caption = {c.page for c in table_captions}
+    auto_by_cap: dict[int, Table] = {}
     for ct in camelot_tables:
         if (ct.get("page") or 0) not in pages_with_table_caption:
             continue
@@ -196,7 +218,37 @@ def extract_pdf_structured(
             ct["caption"] = _extract_caption_text(
                 rejoined, match, next_boundary_by_id.get(id(match))
             )
-            tables.append(ct)
+            auto_by_cap[id(match)] = ct
+
+    # Pick the candidate per caption. ``used_caption_ids`` already holds the
+    # auto-detect-matched caps; add any caption the region pass alone satisfied.
+    #
+    # ``_pick_better_table`` is the single arbiter: region-driving's value is that
+    # it gives a STARVED caption its own table — and a starved caption has NO
+    # auto-detect candidate (auto-detect captured the page as one table and
+    # token-paired it to the OTHER caption), so ``auto_td is None`` and region
+    # wins automatically. Where auto-detect DID give this caption a real grid, the
+    # column-collapse guard keeps the richer one. This handles both stacked-table
+    # separation (cog_emo Table 9: auto=None → region 5×3 vs baseline 0×0) and
+    # wide single tables (jama_open_1 Table 1: region too narrow → keep auto 43×7)
+    # without a page-multiplicity special case (which over-forced region on
+    # multi-caption pages whose tables auto-detect already separated cleanly —
+    # bmc_med_3, ieee_access_8 — collapsing their columns).
+    region_win = region_only = 0
+    for cap in table_captions:
+        auto_td = auto_by_cap.get(id(cap))
+        region_td = region_tables.get(id(cap))
+        if auto_td is None and region_td is None:
+            continue
+        best = _pick_better_table(region_td, auto_td)
+        if best is region_td and auto_td is not None:
+            region_win += 1
+        elif best is region_td:
+            region_only += 1
+        tables.append(best)
+        used_caption_ids.add(id(cap))
+    if region_win or region_only:
+        method_pieces.append(f"region_pick:{region_win}+{region_only}")
 
     # §A R1 / B1 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): whitespace_cells
     # fallback for caption-detected tables that Camelot could not recover.
@@ -209,8 +261,8 @@ def extract_pdf_structured(
     #
     # Lazy-import the layout extraction + whitespace helper so the rest of
     # the pipeline works in environments without pdfplumber-layout deps; any
-    # failure here falls back transparently to the isolated path.
-    layout_doc = _layout_doc  # reuse caller-supplied doc when available
+    # failure here falls back transparently to the isolated path. `layout_doc`
+    # may already be materialized by the region-driven pass above; reuse it.
     _whitespace_cells = None
     _region_for_caption_fn = None
     unmatched_caps = [
@@ -344,6 +396,176 @@ def _join_split_captions(text: str) -> str:
     text = _T_PREFIX_RE.sub(r"Table \1\2", text)
     text = _FIG_PREFIX_RE.sub(r"Figure \1\2", text)
     return text
+
+
+# A region's bottom is clipped this many points ABOVE the next same-page
+# caption's top, so a short table's region does not extend down into the NEXT
+# table (cog_emo p13: Table 8's matrix region would otherwise absorb Table 9).
+_REGION_NEXT_CAPTION_GAP_PT: float = 2.0
+
+# A region's top is clamped to the caption's top minus this margin (enough to
+# include the caption line's own glyph ascent, but not the content above it), so
+# a region whose SEARCH_ABOVE fallback reached up into a preceding table is
+# pulled back to start at its own caption.
+_REGION_TOP_MARGIN_PT: float = 4.0
+
+
+def _table_cell_count(td: Optional[Table]) -> int:
+    if not td:
+        return 0
+    return sum(1 for c in (td.get("cells") or []) if (c.get("text") or "").strip())
+
+
+def _pick_better_table(
+    region_td: Optional[Table], auto_td: Optional[Table]
+) -> Optional[Table]:
+    """Choose between a caption's region-driven candidate and its auto-detected
+    candidate. Region-driving anchors the RIGHT table to the caption but its
+    bbox can be too narrow (collapsing columns), so it only wins when it is at
+    least as wide as the auto-detect table AND carries comparable content.
+
+    Rules (auto-detect is the incumbent; region must clearly not regress it):
+      - exactly one present → that one.
+      - region has FEWER columns than auto → auto (guards the column-collapse
+        regression: a 7-col demographics table must not become 2-col).
+      - region has MORE columns than auto → region, UNLESS it lost a large share
+        of cells (a wider-but-emptier grid is a mis-detection, keep auto).
+      - equal columns → whichever has more populated cells (ties → auto, the
+        stable incumbent).
+    """
+    if region_td is None:
+        return auto_td
+    if auto_td is None:
+        return region_td
+    rc = int(region_td.get("n_cols") or 0)
+    ac = int(auto_td.get("n_cols") or 0)
+    r_cells = _table_cell_count(region_td)
+    a_cells = _table_cell_count(auto_td)
+    if rc < ac:
+        return auto_td
+    if rc > ac:
+        # Wider grid must still retain most of the content to be believed.
+        if a_cells > 0 and r_cells < 0.6 * a_cells:
+            return auto_td
+        return region_td
+    # Equal column count: prefer the fuller grid; tie goes to the incumbent.
+    return region_td if r_cells > a_cells else auto_td
+
+
+def _region_driven_capture(
+    pdf_bytes: bytes,
+    rejoined: str,
+    table_captions: list[CaptionMatch],
+    layout_doc,
+    next_boundary_by_id: dict[int, Optional[int]],
+    method_pieces: list[str],
+) -> tuple[dict[int, Table], object]:
+    """Drive Camelot once per caption with the caption-anchored region as
+    ``table_areas`` and return ``{id(cap): Table}`` for every caption that
+    yielded a usable table, plus the (possibly newly-materialized) layout doc.
+
+    For each caption we (1) locate its layout region via ``_region_for_caption``,
+    (2) clip the region bottom at the next same-page caption so it can't reach
+    into the following table, (3) convert the pdfplumber TOP-DOWN bbox to the
+    Camelot PDF BOTTOM-UP ``table_areas`` string, and (4) attach the extracted
+    caption text. Any failure degrades gracefully to ``{}`` so the legacy
+    auto-detect + whitespace path still runs.
+    """
+    empty: dict[int, Table] = {}
+    try:
+        from .tables.detect import _region_for_caption, _bbox_of_caption_line
+        from .tables.camelot_extract import extract_tables_camelot_by_region
+        if layout_doc is None:
+            from .extract_layout import extract_pdf_layout
+            layout_doc = extract_pdf_layout(pdf_bytes)
+    except Exception as exc:
+        record_fallback("region_driven_setup_exception", detail=type(exc).__name__)
+        return empty, layout_doc
+
+    pages = getattr(layout_doc, "pages", None) or ()
+
+    # Group captions per page (top-to-bottom) so the next-caption bottom-clip can
+    # look at the following caption on the same page.
+    by_page: dict[int, list[CaptionMatch]] = {}
+    for c in table_captions:
+        by_page.setdefault(c.page, []).append(c)
+
+    specs: list[dict] = []
+    cap_by_key: dict[str, CaptionMatch] = {}
+    for page, caps in by_page.items():
+        if not (1 <= page <= len(pages)):
+            continue
+        page_obj = pages[page - 1]
+        page_height = float(getattr(page_obj, "height", 0.0) or 0.0)
+        if page_height <= 0.0:
+            continue
+        caps_sorted = sorted(caps, key=lambda c: c.char_start)
+        cap_top_td: dict[int, Optional[float]] = {}
+        for c in caps_sorted:
+            cb = _bbox_of_caption_line(page_obj, c)
+            cap_top_td[id(c)] = cb[1] if cb else None
+        for i, c in enumerate(caps_sorted):
+            try:
+                region = _region_for_caption(layout_doc, c)
+            except Exception as exc:
+                record_fallback("region_driven_region_exception", detail=type(exc).__name__)
+                region = None
+            if region is None:
+                continue
+            x0, top, x1, bottom = region.bbox
+            # Clip the region TOP at the caption's own top. A table never extends
+            # ABOVE its caption line; ``_region_for_caption``'s SEARCH_ABOVE
+            # fallback can pull the region up into a PRECEDING table when no
+            # geometry is found below (cog_emo Table 9, whose caption sits below
+            # Table 8's matrix, otherwise captures Table 8's rows). Clamp so the
+            # region starts at the caption line (minus a small margin for the
+            # caption glyphs' own ascent), never higher.
+            this_cap_top = cap_top_td.get(id(c))
+            if this_cap_top is not None and top < this_cap_top - _REGION_TOP_MARGIN_PT:
+                top = this_cap_top - _REGION_TOP_MARGIN_PT
+            # Clip bottom at the next same-page caption that sits below this one.
+            for j in range(i + 1, len(caps_sorted)):
+                nxt_top = cap_top_td.get(id(caps_sorted[j]))
+                if nxt_top is not None and nxt_top > top + 5.0:
+                    bottom = min(bottom, nxt_top - _REGION_NEXT_CAPTION_GAP_PT)
+                    break
+            if bottom <= top:
+                continue
+            key = f"{id(c)}"
+            specs.append({
+                "key": key,
+                "page": page,
+                "area": f"{x0:.2f},{page_height - top:.2f},{x1:.2f},{page_height - bottom:.2f}",
+                "area_bu": (x0, page_height - top, x1, page_height - bottom),
+                "label": c.label,
+            })
+            cap_by_key[key] = c
+
+    if not specs:
+        return empty, layout_doc
+
+    try:
+        by_key = extract_tables_camelot_by_region(pdf_bytes, specs)
+    except Exception as exc:
+        record_fallback("region_driven_extract_exception", detail=type(exc).__name__)
+        return empty, layout_doc
+
+    result: dict[int, Table] = {}
+    for key, td in by_key.items():
+        cap = cap_by_key.get(key)
+        if cap is None:
+            continue
+        # Use the caption-number id scheme (``t{number}``) — the same the
+        # isolated/whitespace path uses — so ids stay deterministic and match the
+        # recognized-prefix invariant (test_table_ids_unique_and_sequential).
+        td["id"] = f"t{cap.number}"
+        td["caption"] = _extract_caption_text(
+            rejoined, cap, next_boundary_by_id.get(id(cap))
+        )
+        result[id(cap)] = td
+    if result:
+        method_pieces.append("region_driven")
+    return result, layout_doc
 
 
 def _find_caption_for_table(

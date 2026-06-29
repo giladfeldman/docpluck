@@ -342,6 +342,148 @@ def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
     return lattice_ct
 
 
+def _camelot_table_to_dict(
+    ct,
+    idx: int,
+    *,
+    accuracy_threshold: float = 50.0,
+    id_prefix: str = "camelot_t",
+    label: str | None = None,
+) -> Table | None:
+    """Convert one Camelot table object into a docpluck Table dict, applying the
+    shared row-cleaning pipeline (running-header strip, caption-row drop, prose
+    trim, table-likeness gate) and cell emission.
+
+    Returns ``None`` when the table is below ``accuracy_threshold``, too small,
+    or doesn't survive the cleaning gate. ``label`` (when given — the
+    region-driven path knows the caption by construction) is carried onto the
+    dict; the legacy auto-detect path passes ``None`` and lets the caller pair.
+    """
+    try:
+        accuracy = float(ct.accuracy)
+    except (AttributeError, ValueError, TypeError):
+        accuracy = 0.0
+    if accuracy < accuracy_threshold:
+        return None
+    df = ct.df
+    try:
+        n_rows = len(df)
+        n_cols = len(df.columns)
+    except Exception as exc:
+        record_fallback("camelot_table_frame_exception", detail=type(exc).__name__)
+        return None
+    if n_rows < 2 or n_cols < 2:
+        return None
+
+    # Build the row matrix first; trim noisy rows; then emit cells.
+    row_matrix: list[list[str]] = []
+    for r in range(n_rows):
+        row_cells: list[str] = [
+            str(df.iloc[r, c]).replace("\n", " ").strip()
+            for c in range(n_cols)
+        ]
+        row_matrix.append(row_cells)
+
+    row_matrix = _strip_running_header_rows(row_matrix)
+    row_matrix = _drop_caption_first_row(row_matrix)
+    # Trim trailing prose rows (Camelot sometimes bundles a small real table at
+    # the top of a 2-column page with body prose below).
+    row_matrix = _trim_prose_tail(row_matrix)
+    if not _is_table_like(row_matrix):
+        return None
+
+    n_rows = len(row_matrix)
+    n_cols = max((len(r) for r in row_matrix), default=0)
+
+    cells: list[Cell] = []
+    raw_row_texts: list[str] = []
+    for r, row_cells in enumerate(row_matrix):
+        for c, text in enumerate(row_cells):
+            if not text:
+                continue
+            cells.append(
+                {
+                    "r": r,
+                    "c": c,
+                    "rowspan": 1,
+                    "colspan": 1,
+                    "text": text,
+                    "is_header": (r == 0),
+                    "bbox": (0.0, 0.0, 0.0, 0.0),
+                }
+            )
+        row_text = " ".join(s for s in row_cells if s).strip()
+        if row_text:
+            raw_row_texts.append(row_text)
+
+    # Region-driven path only: apply the prose-contamination + caption-absorption
+    # guard. A caption-anchored region extends a fixed distance from the caption,
+    # so on a SHORT / PROSE table it absorbs surrounding 2-column body text
+    # (cog_emo Table 3 "study procedure paragraph") or reaches into a neighbouring
+    # table's caption (cog_emo Table 9). The legacy auto-detect path is left
+    # untouched here: applying this strict data-table gate to it wholesale rejects
+    # legitimate-but-imperfect auto-detected tables (cog_emo Tables 5/6/7 — the
+    # right tables with some header/prose bleed), a net regression. Auto-detect
+    # keeps its own _trim_prose_tail / _is_table_like gate.
+    if id_prefix.startswith("region"):
+        from .whitespace import _trim_trailing_prose_rows, _whitespace_grid_is_clean
+        cells = _trim_trailing_prose_rows(cells)
+        if not _whitespace_grid_is_clean(cells):
+            return None
+        if not cells:
+            return None
+        # Recompute shape + raw_text from the trimmed cell set.
+        n_rows = max((c["r"] for c in cells), default=-1) + 1
+        n_cols = max((c["c"] for c in cells), default=-1) + 1
+        kept_rows = sorted({c["r"] for c in cells})
+        by_row: dict[int, list[Cell]] = {}
+        for c in cells:
+            by_row.setdefault(c["r"], []).append(c)
+        raw_row_texts = []
+        for r in kept_rows:
+            row_text = " ".join(
+                (c.get("text") or "") for c in sorted(by_row[r], key=lambda c: c["c"])
+            ).strip()
+            if row_text:
+                raw_row_texts.append(row_text)
+
+    try:
+        page = int(ct.page)
+    except (AttributeError, ValueError, TypeError):
+        page = 1
+    try:
+        cam_bbox = tuple(ct._bbox)
+    except (AttributeError, TypeError):
+        cam_bbox = (0.0, 0.0, 0.0, 0.0)
+
+    try:
+        html = cells_to_html(cells)
+    except Exception as exc:
+        record_fallback("camelot_html_render_exception", detail=type(exc).__name__)
+        html = None
+
+    return {
+        "id": f"{id_prefix}{idx}",
+        "label": label,
+        "page": page,
+        "bbox": cam_bbox,
+        "caption": None,
+        "footnote": None,
+        "kind": "structured",
+        "rendering": "whitespace",
+        # Clip to [0, 1] — Camelot's `accuracy` is occasionally ≥ 100 due to
+        # floating-point arithmetic; without this clip, ``confidence > 1.0``
+        # fails the ``test_table_html_renders_when_structured`` invariant.
+        "confidence": max(0.0, min(1.0, accuracy / 100.0)),
+        "n_rows": n_rows,
+        "n_cols": n_cols,
+        "header_rows": 1,
+        "cells": cells,
+        "html": html,
+        "raw_text": "\n".join(raw_row_texts),
+    }
+
+
 def extract_tables_camelot(
     pdf_bytes: bytes,
     *,
@@ -395,103 +537,9 @@ def extract_tables_camelot(
 
         out: list[Table] = []
         for idx, ct in enumerate(tables_obj):
-            try:
-                accuracy = float(ct.accuracy)
-            except (AttributeError, ValueError, TypeError):
-                accuracy = 0.0
-            if accuracy < accuracy_threshold:
-                continue
-            df = ct.df
-            try:
-                n_rows = len(df)
-                n_cols = len(df.columns)
-            except Exception as exc:
-                record_fallback("camelot_table_frame_exception", detail=type(exc).__name__)
-                continue
-            if n_rows < 2 or n_cols < 2:
-                continue
-
-            # Build the row matrix first; trim noisy rows; then emit cells.
-            row_matrix: list[list[str]] = []
-            for r in range(n_rows):
-                row_cells: list[str] = [
-                    str(df.iloc[r, c]).replace("\n", " ").strip()
-                    for c in range(n_cols)
-                ]
-                row_matrix.append(row_cells)
-
-            row_matrix = _strip_running_header_rows(row_matrix)
-            row_matrix = _drop_caption_first_row(row_matrix)
-            # Trim trailing prose rows (Camelot sometimes bundles a small real
-            # table at the top of a 2-column page with body prose below).
-            row_matrix = _trim_prose_tail(row_matrix)
-            if not _is_table_like(row_matrix):
-                # Even after trimming, the remaining content doesn't look like
-                # a real table. Skip.
-                continue
-
-            n_rows = len(row_matrix)
-            n_cols = max((len(r) for r in row_matrix), default=0)
-
-            cells: list[Cell] = []
-            raw_row_texts: list[str] = []
-            for r, row_cells in enumerate(row_matrix):
-                for c, text in enumerate(row_cells):
-                    if not text:
-                        continue
-                    cells.append(
-                        {
-                            "r": r,
-                            "c": c,
-                            "rowspan": 1,
-                            "colspan": 1,
-                            "text": text,
-                            "is_header": (r == 0),
-                            "bbox": (0.0, 0.0, 0.0, 0.0),
-                        }
-                    )
-                row_text = " ".join(s for s in row_cells if s).strip()
-                if row_text:
-                    raw_row_texts.append(row_text)
-
-            try:
-                page = int(ct.page)
-            except (AttributeError, ValueError, TypeError):
-                page = 1
-            try:
-                cam_bbox = tuple(ct._bbox)
-            except (AttributeError, TypeError):
-                cam_bbox = (0.0, 0.0, 0.0, 0.0)
-
-            try:
-                html = cells_to_html(cells)
-            except Exception as exc:
-                record_fallback("camelot_html_render_exception", detail=type(exc).__name__)
-                html = None
-
-            out.append(
-                {
-                    "id": f"camelot_t{idx}",
-                    "label": None,
-                    "page": page,
-                    "bbox": cam_bbox,
-                    "caption": None,
-                    "footnote": None,
-                    "kind": "structured",
-                    "rendering": "whitespace",
-                    # Clip to [0, 1] — Camelot's `accuracy` is occasionally
-                    # ≥ 100 due to floating-point arithmetic (e.g. 100.0000000003);
-                    # without this clip, ``confidence > 1.0`` fails the
-                    # ``test_table_html_renders_when_structured`` invariant.
-                    "confidence": max(0.0, min(1.0, accuracy / 100.0)),
-                    "n_rows": n_rows,
-                    "n_cols": n_cols,
-                    "header_rows": 1,
-                    "cells": cells,
-                    "html": html,
-                    "raw_text": "\n".join(raw_row_texts),
-                }
-            )
+            td = _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold)
+            if td is not None:
+                out.append(td)
         return out
     finally:
         # Best-effort temp cleanup. On Windows, camelot (>=2.0) can still hold
@@ -502,6 +550,122 @@ def extract_tables_camelot(
         # EVERY table on Windows even though extraction succeeded. POSIX allows
         # unlinking an open file, so prod/Linux never saw it. Swallow the
         # cleanup error; the OS temp dir reclaims the file later.
+        try:
+            Path(tmp_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _area_overlap_frac(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    """Fraction of box ``a`` covered by its intersection with ``b``. Both boxes
+    are ``(x0, y_a, x1, y_b)`` in the SAME frame; y order is normalized so this
+    works whether the tuples are top-down or bottom-up."""
+    if len(a) < 4 or len(b) < 4:
+        return 0.0
+    ax0, ay0, ax1, ay1 = a[0], min(a[1], a[3]), a[2], max(a[1], a[3])
+    bx0, by0, bx1, by1 = b[0], min(b[1], b[3]), b[2], max(b[1], b[3])
+    ix0, iy0 = max(ax0, bx0), max(ay0, by0)
+    ix1, iy1 = min(ax1, bx1), min(ay1, by1)
+    if ix1 <= ix0 or iy1 <= iy0:
+        return 0.0
+    inter = (ix1 - ix0) * (iy1 - iy0)
+    area_a = max((ax1 - ax0) * (ay1 - ay0), 1e-6)
+    return inter / area_a
+
+
+def extract_tables_camelot_by_region(
+    pdf_bytes: bytes,
+    region_specs: list[dict],
+    *,
+    accuracy_threshold: float = 50.0,
+) -> dict[str, Table]:
+    """Region-driven Camelot capture: extract exactly one table per caption by
+    handing Camelot the caption-anchored region as ``table_areas``.
+
+    This is the reliable alternative to blind ``pages="all"`` auto-detection +
+    post-hoc caption pairing. Because each Camelot extraction is constrained to a
+    known caption's region, the result IS that caption's table by construction —
+    no header absorption, no two-tables-merged-into-one bbox, no pairing
+    ambiguity. docpluck already computes the region (``_region_for_caption``); we
+    feed it back to Camelot instead of discarding it.
+
+    Args:
+        pdf_bytes: the PDF.
+        region_specs: one dict per caption, each with keys:
+            ``key`` (a stable id used in the returned mapping),
+            ``page`` (1-indexed),
+            ``area`` (Camelot ``"x1,y1,x2,y2"`` PDF bottom-up string; top-left
+                larger-y, bottom-right smaller-y),
+            ``area_bu`` (the same box as a 4-tuple ``(x0, y_top, x1, y_bottom)``
+                in bottom-up coords, for matching returned tables back).
+        accuracy_threshold: passed through to ``_camelot_table_to_dict``.
+
+    Returns:
+        ``{key: Table}`` for each caption that yielded a usable table. Captions
+        with no region/extraction are simply absent (the caller falls back to its
+        existing whitespace/isolated path for those).
+    """
+    try:
+        import camelot
+    except ImportError:
+        return {}
+    if not region_specs:
+        return {}
+
+    by_page: dict[int, list[dict]] = {}
+    for spec in region_specs:
+        by_page.setdefault(int(spec["page"]), []).append(spec)
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(pdf_bytes)
+        tmp_path = tmp.name
+
+    out: dict[str, Table] = {}
+    try:
+        for page, specs in by_page.items():
+            areas = [s["area"] for s in specs]
+            try:
+                tables = list(
+                    camelot.read_pdf(
+                        tmp_path, pages=str(page), flavor="stream",
+                        table_areas=areas, strip_text="\n", suppress_stdout=True,
+                    )
+                )
+            except Exception as exc:
+                record_fallback("camelot_region_exception", detail=type(exc).__name__)
+                continue
+            # One-to-one greedy match: each returned table claimed by the spec it
+            # best overlaps. Camelot returns tables sorted by POSITION, not in
+            # table_areas order, and two caption regions can overlap (a lower
+            # caption inside an upper table's region) — so match by bbox, not by
+            # index, and let each Camelot table back at most one spec.
+            cand: list[tuple[float, int, int]] = []  # (overlap, spec_i, table_i)
+            for si, spec in enumerate(specs):
+                for ti, t in enumerate(tables):
+                    tb = tuple(getattr(t, "_bbox", ()) or ())
+                    frac = _area_overlap_frac(spec["area_bu"], tb)
+                    if frac > 0.0:
+                        cand.append((frac, si, ti))
+            cand.sort(reverse=True)
+            used_s: set[int] = set()
+            used_t: set[int] = set()
+            for frac, si, ti in cand:
+                if si in used_s or ti in used_t:
+                    continue
+                used_s.add(si)
+                used_t.add(ti)
+                spec = specs[si]
+                td = _camelot_table_to_dict(
+                    tables[ti], 0,
+                    accuracy_threshold=accuracy_threshold,
+                    id_prefix="region_t",
+                    label=spec.get("label"),
+                )
+                if td is not None:
+                    td["id"] = f"region_{spec['key']}"
+                    out[spec["key"]] = td
+        return out
+    finally:
         try:
             Path(tmp_path).unlink(missing_ok=True)
         except OSError:
