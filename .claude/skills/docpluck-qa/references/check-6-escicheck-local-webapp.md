@@ -7,7 +7,7 @@ Requires local service running on port 6117 AND frontend on port 6116. Test via 
 
 First start the service (if not running):
 ```bash
-cd C:\Users\filin\Dropbox\Vibe\PDFextractor\service && uvicorn app.main:app --port 6117 --reload &
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor\service && uvicorn app.main:app --port 6117 --reload &
 ```
 
 Then run:

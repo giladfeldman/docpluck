@@ -3,7 +3,7 @@
 _Extracted from [../SKILL.md](../SKILL.md). Full procedure lives here._
 
 ```bash
-cd C:\Users\filin\Dropbox\Vibe\PDFextractor\service && python -c "
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor\service && python -c "
 import os
 from docpluck import extract_pdf
 base = '../test-pdfs'

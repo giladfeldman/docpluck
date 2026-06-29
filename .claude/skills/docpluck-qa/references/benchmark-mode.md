@@ -12,23 +12,23 @@ Opt-in cross-format benchmark suite (DOCX corpus, DOCX↔PDF parity via Word COM
 - Microsoft Word installed (for `docx2pdf`, accessed via COM)
 - Python packages: `mammoth`, `beautifulsoup4`, `lxml`, `rapidfuzz`, `pdf2docx`, `docx2pdf`
 - CitationGuard corpus present at `C:\Users\filin\Dropbox\Vibe\CitationGuard\apps\worker\testpdfs\validation\docx\`
-- PDF test corpus at `C:\Users\filin\Dropbox\Vibe\PDFextractor\test-pdfs\`
+- PDF test corpus at `C:\Users\filin\Dropbox\Vibe\MetaScienceTools\PDFextractor\test-pdfs\`
 
 ### Running
 
 Full benchmark (5–15 minutes, launches Word):
 ```bash
-cd C:\Users\filin\Dropbox\Vibe\docpluck && python benchmarks/run_all.py
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\docpluck && python benchmarks/run_all.py
 ```
 
 Quick mode (3 files per benchmark, 2–4 minutes):
 ```bash
-cd C:\Users\filin\Dropbox\Vibe\docpluck && python benchmarks/run_all.py --quick
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\docpluck && python benchmarks/run_all.py --quick
 ```
 
 Skip Word-based conversion (if Word unavailable):
 ```bash
-cd C:\Users\filin\Dropbox\Vibe\docpluck && python benchmarks/run_all.py --skip docx2pdf
+cd C:\Users\filin\Dropbox\Vibe\MetaScienceTools\docpluck && python benchmarks/run_all.py --skip docx2pdf
 ```
 
 Individual benchmarks:
