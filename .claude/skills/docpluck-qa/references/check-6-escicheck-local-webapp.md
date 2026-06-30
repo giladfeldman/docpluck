@@ -15,7 +15,7 @@ Then run:
 python -c "
 import os, re, json, requests
 
-ESCI_DIR = r'C:\Users\filin\Dropbox\Vibe\ESCIcheck\testpdfs\Coded already'
+ESCI_DIR = r'C:\Users\filin\Dropbox\Vibe\MetaScienceProjects\COREteamToolsTemplates\COREcoding\testpdfs\Coded already'
 pdfs = sorted(os.listdir(ESCI_DIR))[:10]
 
 # Test via the Python service directly (bypasses auth)

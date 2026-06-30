@@ -14,7 +14,7 @@ if not API_KEY:
     print('SKIP: set DOCPLUCK_API_KEY env var to run production check')
     exit(0)
 
-ESCI_DIR = r'C:\Users\filin\Dropbox\Vibe\ESCIcheck\testpdfs\Coded already'
+ESCI_DIR = r'C:\Users\filin\Dropbox\Vibe\MetaScienceProjects\COREteamToolsTemplates\COREcoding\testpdfs\Coded already'
 pdfs = sorted(os.listdir(ESCI_DIR))[:10]
 
 results = []

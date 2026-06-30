@@ -10,7 +10,7 @@ python -c "
 import os, re, sys
 from docpluck import extract_pdf, normalize_text, NormalizationLevel, compute_quality_score
 
-ESCI_DIR = r'C:\Users\filin\Dropbox\Vibe\ESCIcheck\testpdfs\Coded already'
+ESCI_DIR = r'C:\Users\filin\Dropbox\Vibe\MetaScienceProjects\COREteamToolsTemplates\COREcoding\testpdfs\Coded already'
 pdfs = sorted(os.listdir(ESCI_DIR))[:10]  # First 10 alphabetically
 
 results = []

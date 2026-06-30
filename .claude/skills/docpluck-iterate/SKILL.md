@@ -1,6 +1,6 @@
 ---
 name: docpluck-iterate
-description: Use when the user wants to run an autonomous library→local→deploy iteration loop on docpluck — fix-verify-release-deploy cycles working through a backlog of corpus defects until a stop condition is met (time budget, iteration count, corpus pass-rate threshold, or explicit "until X"). Self-improving: appends LEARNINGS each cycle and proposes SKILL.md amendments after recurring patterns. Triggers on phrases like "iterate on docpluck", "run the docpluck loop", "self-improve docpluck", "fix-and-deploy until X", "keep working on the corpus", or after a v2.x.y release when the user asks to continue iterating.
+description: 'Use when the user wants to run an autonomous library→local→deploy iteration loop on docpluck — fix-verify-release-deploy cycles working through a backlog of corpus defects until a stop condition is met (time budget, iteration count, corpus pass-rate threshold, or explicit "until X"). Self-improving: appends LEARNINGS each cycle and proposes SKILL.md amendments after recurring patterns. Triggers on phrases like "iterate on docpluck", "run the docpluck loop", "self-improve docpluck", "fix-and-deploy until X", "keep working on the corpus", or after a v2.x.y release when the user asks to continue iterating.'
 tags: [docpluck, python, fastapi, nextjs, vercel, railway, neon, iterate, orchestration, self-improving, qa, deploy]
 user-invocable: true
 argument-hint: "[--goal time:60m | iters:5 | baseline:26/26+full:95/101 | until:\"description\"] [--no-broad-read] [--dry-run]"

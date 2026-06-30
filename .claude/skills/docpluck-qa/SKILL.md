@@ -29,7 +29,7 @@ If QA surfaces an issue — any issue, however small, whether pre-existing, alre
 - **Frontend:** Next.js 16 + Auth.js + Drizzle (in `frontend/`), port 6116
 - **Service:** Python FastAPI importing `docpluck` library (in `service/`), port 6117
 - **Database:** Neon Postgres (docpluck project)
-- **ESCIcheck PDFs:** `C:\Users\filin\Dropbox\Vibe\ESCIcheck\testpdfs\Coded already\` (56 PDFs, APA psychology papers)
+- **ESCIcheck PDFs:** `C:\Users\filin\Dropbox\Vibe\MetaScienceProjects\COREteamToolsTemplates\COREcoding\testpdfs\Coded already\` (50 PDFs, APA psychology papers)
 - **Test PDFs:** `test-pdfs/` (47 PDFs, 8 citation styles)
 - **Test suite:** `service/tests/` (151 tests across 6 files)
 
