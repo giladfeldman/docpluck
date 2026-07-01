@@ -37,7 +37,7 @@ from .tables.render import cells_to_html
 from .telemetry import record_fallback
 
 
-TABLE_EXTRACTION_VERSION = "2.4.5"  # v2.4.5 (region-driven capture, 2026-06-29 — AI-gold-verified, CAPTURE-PATH change): each table caption now drives Camelot stream with its OWN caption-anchored region as table_areas (extract_tables_camelot_by_region + _region_driven_capture), so a caption gets exactly its table by construction — recovers stacked / side-by-side multi-table-per-page cases blind pages="all" + token-overlap pairing could not separate (efendic Table 4+5 split, 12 papers' 0×0 stubs → real). Region tables are CANDIDATES: _pick_better_table keeps the structurally-richer of {region, auto-detect} per caption (region too-narrow bbox can't collapse a wide table; jama_open_1 stays 43×7). Content-plausibility guards on the region path (_cell_is_prose dominance + _CAPTION_LABEL_RE absorption) reject prose-as-grid / caption-absorbed fragments → honest 0×0 stubs (cog_emo Table 3/9). Caption page-fix (char_start past leading \n\n/\f) is the foundation. Full 101-PDF structured diff (27 changed/0 err) + 6-paper AI-gold canary (all FIX/PASS/NET-BETTER, no new regressions). Known documented hard cases (not regressions vs prior): cog_emo T8 Camelot under-segmentation, chandrashekar 2-col caption interleave, efendic T2 Camelot-invisible, bmc_med_3 duplicate-fragment pairing (dedupe + bbox-proximity pairing both tried + reverted — net-harmful, see LEARNINGS). # v2.4.4 (ESCIcheck handoff 2026-06-25 — flatten-only, AI-gold-verified): (DP-3) flatten._infer_anova_eta2_hint types a font-dropped η²p effect column by STRUCTURE — an unlabeled estimate column in an F-test/ANOVA results table (F + BF01/CI, no competing d/r/OR) is keyed `eta2`, range-guarded to [0,1]; the η²p glyph itself is unrecoverable (NotoSerif uni:no, OCR-tier). (DP-5b) flatten._inline_stat_field types a self-labeled cell (`r = .67`, `d = 0.32`) by its token even under a generic "Effect size" header. (DP-5a) cell_cleaning._is_fragment_cell recognizes a bracketed-CI close tail (`0.73]`) so a CI split across rows rejoins (`[0.59, 0.73]`) and the junk fragment row is dropped (cog_emo T8 14→10 rows). These three are flatten/cell-cleaning ONLY — no capture-path change, so caption→table pairing is byte-identical to v2.4.3. (DP-1/DP-2 capture recovery — the caption page-attribution fix — was prototyped but REVERTED: AI-gold canary verify showed it mis-pairs same-page-caption tables (efendic T4/T5, cog_emo T8/T9) and only half-fixes plos_med; it is queued as its own gated cycle with same-page disambiguation + region-quality gating. See docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md.) # v2.4.3 (RC-T foundation): tables.whitespace gains a CHAR-LEVEL column-detection fallback (char_whitespace_cells) — when pdfplumber's word grouper glues a tight-kerned numeric row into one token so the word-gap detector finds < 2 columns, recover the grid from char x-gaps, voting on column-START edges (right-aligned data columns are left-edge-stable even when the label column is variable-width) and reinserting intra-cell word spacing from geometry. Fires ONLY as a fallback when the word path returns < 2 columns, so currently-correct tables are byte-unchanged (word path restored verbatim). Recovers ip_feldman Table 10's 7 regression rows in isolation. NOT yet wired to replace a degenerate MATCHED Camelot table (that extract_structured change + region prose-trim is the next gated cycle — see LEARNINGS 2026-06-25). # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
+TABLE_EXTRACTION_VERSION = "2.4.6"  # v2.4.6 (duplicate-starvation rescue, 2026-07-01 — AI-gold-verified, PAIRING change): _rescue_duplicate_starved_captions repairs the greedy mis-pairing where, on a page with ≥2 captions, Camelot emits a near-identical DUPLICATE fragment of one table and the greedy first-come loop hands that duplicate to a SECOND caption — starving (dropping) that caption's own real table. When ≥2 captions were assigned identical-raw_text tables, the best-overlap caption keeps it and each other caption is reassigned to the best UNASSIGNED same-page table that fits it at least as well as the duplicate. Fires ONLY on that signature — a whole-corpus dup_rescue-firing scan confirms it activates on bmc_med_3 alone; every other page keeps its greedy assignment byte-identical (so the corpus-wide token-overlap fixes verified in prior cycles are untouched). bmc_med_3 Table 3 recovers its real 11×6 "Comparisons of SCE" grid (AI-gold-verified vs the source page; was a second copy of Table 2's 29×5). A full order-independent GLOBAL matching also fixed it but reshuffled ~24 papers + regressed chan_feldman T6 (prose fragment promoted to a caption) — rejected; see LEARNINGS / memory project_docpluck_region_driven_camelot. Camelot run-to-run non-determinism (feedback_camelot_flake_cumulative_load) defeats naive before/after fingerprint diffing, so surgicality is proven at the CODE-PATH level (no dup_rescue → identical HEAD path), not by comparing flaky shapes. # v2.4.5 (region-driven capture, 2026-06-29 — AI-gold-verified, CAPTURE-PATH change): each table caption now drives Camelot stream with its OWN caption-anchored region as table_areas (extract_tables_camelot_by_region + _region_driven_capture), so a caption gets exactly its table by construction — recovers stacked / side-by-side multi-table-per-page cases blind pages="all" + token-overlap pairing could not separate (efendic Table 4+5 split, 12 papers' 0×0 stubs → real). Region tables are CANDIDATES: _pick_better_table keeps the structurally-richer of {region, auto-detect} per caption (region too-narrow bbox can't collapse a wide table; jama_open_1 stays 43×7). Content-plausibility guards on the region path (_cell_is_prose dominance + _CAPTION_LABEL_RE absorption) reject prose-as-grid / caption-absorbed fragments → honest 0×0 stubs (cog_emo Table 3/9). Caption page-fix (char_start past leading \n\n/\f) is the foundation. Full 101-PDF structured diff (27 changed/0 err) + 6-paper AI-gold canary (all FIX/PASS/NET-BETTER, no new regressions). Known documented hard cases (not regressions vs prior): cog_emo T8 Camelot under-segmentation, chandrashekar 2-col caption interleave, efendic T2 Camelot-invisible, bmc_med_3 duplicate-fragment pairing (FIXED in v2.4.6 by _rescue_duplicate_starved_captions; the dedupe + bbox-proximity + global-matching approaches were net-harmful and rejected — see LEARNINGS). # v2.4.4 (ESCIcheck handoff 2026-06-25 — flatten-only, AI-gold-verified): (DP-3) flatten._infer_anova_eta2_hint types a font-dropped η²p effect column by STRUCTURE — an unlabeled estimate column in an F-test/ANOVA results table (F + BF01/CI, no competing d/r/OR) is keyed `eta2`, range-guarded to [0,1]; the η²p glyph itself is unrecoverable (NotoSerif uni:no, OCR-tier). (DP-5b) flatten._inline_stat_field types a self-labeled cell (`r = .67`, `d = 0.32`) by its token even under a generic "Effect size" header. (DP-5a) cell_cleaning._is_fragment_cell recognizes a bracketed-CI close tail (`0.73]`) so a CI split across rows rejoins (`[0.59, 0.73]`) and the junk fragment row is dropped (cog_emo T8 14→10 rows). These three are flatten/cell-cleaning ONLY — no capture-path change, so caption→table pairing is byte-identical to v2.4.3. (DP-1/DP-2 capture recovery — the caption page-attribution fix — was prototyped but REVERTED: AI-gold canary verify showed it mis-pairs same-page-caption tables (efendic T4/T5, cog_emo T8/T9) and only half-fixes plos_med; it is queued as its own gated cycle with same-page disambiguation + region-quality gating. See docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md.) # v2.4.3 (RC-T foundation): tables.whitespace gains a CHAR-LEVEL column-detection fallback (char_whitespace_cells) — when pdfplumber's word grouper glues a tight-kerned numeric row into one token so the word-gap detector finds < 2 columns, recover the grid from char x-gaps, voting on column-START edges (right-aligned data columns are left-edge-stable even when the label column is variable-width) and reinserting intra-cell word spacing from geometry. Fires ONLY as a fallback when the word path returns < 2 columns, so currently-correct tables are byte-unchanged (word path restored verbatim). Recovers ip_feldman Table 10's 7 regression rows in isolation. NOT yet wired to replace a degenerate MATCHED Camelot table (that extract_structured change + region prose-trim is the next gated cycle — see LEARNINGS 2026-06-25). # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 
@@ -219,6 +219,23 @@ def extract_pdf_structured(
                 rejoined, match, next_boundary_by_id.get(id(match))
             )
             auto_by_cap[id(match)] = ct
+
+    # Duplicate-starvation rescue (bmc_med_3 p8): when the greedy loop above handed
+    # a caption a near-identical DUPLICATE of another caption's table and that
+    # caption's own real table went unassigned, reassign the real table. Narrow by
+    # construction — only fires on the duplicate signature, so every other page's
+    # greedy assignment is unchanged. Re-attach the moved table's caption text.
+    n_rescued = _rescue_duplicate_starved_captions(
+        auto_by_cap, camelot_tables, table_captions
+    )
+    if n_rescued:
+        for cap in table_captions:
+            td = auto_by_cap.get(id(cap))
+            if td is not None and td.get("label") == cap.label:
+                td["caption"] = _extract_caption_text(
+                    rejoined, cap, next_boundary_by_id.get(id(cap))
+                )
+        method_pieces.append(f"dup_rescue:{n_rescued}")
 
     # Pick the candidate per caption. ``used_caption_ids`` already holds the
     # auto-detect-matched caps; add any caption the region pass alone satisfied.
@@ -587,11 +604,10 @@ def _find_caption_for_table(
     if len(same_page) == 1:
         return same_page[0]
     # Score each caption by token overlap with the camelot table content
-    table_text = (camelot_table.get("raw_text") or "").lower()
-    table_tokens = set(re.findall(r"[a-z]{3,}|\d+(?:\.\d+)?", table_text))
+    table_tokens = _caption_overlap_tokens(camelot_table.get("raw_text"))
     best: Optional[tuple[int, int, CaptionMatch]] = None
     for c in same_page:
-        cap_tokens = set(re.findall(r"[a-z]{3,}|\d+(?:\.\d+)?", c.line_text.lower()))
+        cap_tokens = _caption_overlap_tokens(c.line_text)
         score = len(cap_tokens & table_tokens)
         candidate = (-score, c.char_start, c)
         if best is None or candidate < best:
@@ -599,6 +615,122 @@ def _find_caption_for_table(
     if best is None:
         return None
     return best[2]
+
+
+_CAPTION_TOKEN_RE = re.compile(r"[a-z]{3,}|\d+(?:\.\d+)?")
+
+
+def _caption_overlap_tokens(text: Optional[str]) -> set[str]:
+    """Token set used to score a caption line against a table's text: lowercase
+    words of 3+ letters and numbers. Shared by the greedy pairing
+    (``_find_caption_for_table``) and the duplicate-starvation rescue so both use
+    one identical scheme."""
+    return set(_CAPTION_TOKEN_RE.findall((text or "").lower()))
+
+
+def _rescue_duplicate_starved_captions(
+    auto_by_cap: dict[int, Table],
+    camelot_tables: list[Table],
+    table_captions: list[CaptionMatch],
+) -> int:
+    """Repair the specific greedy mis-pairing where a caption is handed a DUPLICATE
+    of another caption's table while its own real table goes unassigned.
+
+    The greedy ``_find_caption_for_table`` loop walks Camelot's tables in emission
+    order and lets each claim the best still-free caption. When Camelot emits two
+    near-identical fragments of one table on a page (stream + lattice both fire),
+    the first caption legitimately takes one copy, then the SECOND caption — now
+    the only free one — is handed the duplicate SECOND copy, even though that copy
+    is not its table. The caption's real, distinct table (emitted later, or with a
+    lower greedy priority) then finds no free caption and is dropped
+    (bmc_med_3 p8: Table 3's real 11×6 lost to a second copy of Table 2's 29×5).
+
+    This pass is deliberately NARROW — it only acts on a page that exhibits that
+    exact signature (≥2 captions assigned tables with IDENTICAL ``raw_text``, plus
+    an unassigned same-page table that fits a starved caption better than the
+    duplicate it holds). Every other page is left byte-identical to the greedy
+    result, so the corpus-wide token-overlap assignments verified across prior
+    cycles are untouched (a global re-optimization instead reshuffled ~24 papers
+    and un-did verified fixes — chen / chandrashekar / ieee_access_4 / cmaj_2 — so
+    it was rejected; see LEARNINGS / memory ``project_docpluck_region_driven_camelot``).
+
+    Mutates ``auto_by_cap`` in place; returns the number of captions reassigned.
+    """
+    if len(auto_by_cap) < 2:
+        return 0
+
+    # Index captions and the set of currently-assigned table object ids.
+    cap_by_id = {id(c): c for c in table_captions}
+    assigned_table_ids = {id(td) for td in auto_by_cap.values()}
+
+    # Same-page Camelot tables, grouped by page (candidates for reassignment).
+    tables_by_page: dict[int, list[Table]] = {}
+    pages_with_caption = {c.page for c in table_captions}
+    for ct in camelot_tables:
+        page = ct.get("page") or 0
+        if page in pages_with_caption:
+            tables_by_page.setdefault(page, []).append(ct)
+
+    reassigned = 0
+    # Walk the captions that currently hold a table, grouped by page.
+    caps_with_table = [
+        cap_by_id[cid] for cid in auto_by_cap if cid in cap_by_id
+    ]
+    by_page_caps: dict[int, list[CaptionMatch]] = {}
+    for cap in caps_with_table:
+        by_page_caps.setdefault(cap.page, []).append(cap)
+
+    for page, caps in by_page_caps.items():
+        if len(caps) < 2:
+            continue
+        # Find groups of captions whose assigned tables have identical raw_text.
+        by_rawtext: dict[str, list[CaptionMatch]] = {}
+        for cap in caps:
+            rt = (auto_by_cap[id(cap)].get("raw_text") or "").strip()
+            if rt:
+                by_rawtext.setdefault(rt, []).append(cap)
+
+        for rt, dup_caps in by_rawtext.items():
+            if len(dup_caps) < 2:
+                continue  # no duplicate → greedy was fine for this group
+            shared_td = auto_by_cap[id(dup_caps[0])]
+            shared_tokens = _caption_overlap_tokens(rt)
+            # The caption that overlaps the shared table best legitimately keeps
+            # it; the rest are "starved" and eligible for a real table.
+            ranked = sorted(
+                dup_caps,
+                key=lambda c: (
+                    -len(_caption_overlap_tokens(c.line_text) & shared_tokens),
+                    c.char_start,
+                ),
+            )
+            keeper = ranked[0]
+            starved = ranked[1:]
+            for cap in starved:
+                cap_tokens = _caption_overlap_tokens(cap.line_text)
+                dup_score = len(cap_tokens & shared_tokens)
+                # Find the best unassigned same-page table for this caption.
+                best_td: Optional[Table] = None
+                best_score = 0
+                for ct in tables_by_page.get(page, []):
+                    if id(ct) in assigned_table_ids:
+                        continue
+                    score = len(cap_tokens & _caption_overlap_tokens(ct.get("raw_text")))
+                    if score > best_score:
+                        best_score = score
+                        best_td = ct
+                # Only reassign when a DISTINCT real table fits this caption at
+                # least as well as the duplicate it currently holds (and at all).
+                if best_td is not None and best_score > 0 and best_score >= dup_score:
+                    assigned_table_ids.discard(id(auto_by_cap[id(cap)]))
+                    best_td["label"] = cap.label
+                    auto_by_cap[id(cap)] = best_td
+                    assigned_table_ids.add(id(best_td))
+                    reassigned += 1
+                # else: leave greedy's assignment untouched (no better table).
+            _ = keeper  # documented: the keeper is intentionally left as-is.
+
+    return reassigned
 
 
 def _extract_caption_text(
