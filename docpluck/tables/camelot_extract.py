@@ -37,7 +37,13 @@ _RUNNING_HEADER_PATTERNS = [
     re.compile(r"\bNo\.\s*\d+\b", re.IGNORECASE),                      # contains "No. N"
     re.compile(r"^\s*\d{1,4}\s*$"),                                    # page number only
     re.compile(r"^\s*[A-Z][\w'-]+(?:\s+(?:and|&|et\s+al\.?))\s+[A-Z][\w'-]+\s*$"),  # "Ip and Feldman"
-    re.compile(r"^\s*[A-Z][\w'-]+\s+et\s+al\.?\s*$"),                  # "Korbmacher et al."
+    re.compile(r"^\s*[A-Z][\w'´́-]+\s+et\s+al\.?\s*$"),      # "Korbmacher et al." (allow accent)
+    # "Efendic et al. 1179" / "Ip and Feldman 42" — an author running header with a
+    # trailing PAGE NUMBER (the two-cell running-header row a region-driven grid
+    # sometimes captures as row 0). Same author-running-header signature as
+    # normalize._f0_strip_running_and_footnotes; anchored end-to-end and requiring
+    # the page number so it can't match a real "Author et al. (2019) …" data cell.
+    re.compile(r"^\s*[A-Z][\w'´́-]+(?:\s+(?:and|&)\s+[A-Z][\w'´́-]+|\s+et\s+al\.?)\s+\d{1,4}\s*$"),
     re.compile(r"\bJournal\s+of\s+\w+", re.IGNORECASE),                # "...Journal of X..."
     re.compile(r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b"),
     re.compile(r"https?://", re.IGNORECASE),                           # DOI/URL footer
@@ -67,6 +73,19 @@ _TABLE_CAPTION_NUMBER_PATTERN = re.compile(
 # row. Dropped only when it is the SOLE populated cell of a leading row (a real
 # header/data row never consists of just a parenthetical year).
 _CAPTION_TAIL_FRAGMENT_RE = re.compile(r"^\(\s*\d{4}[a-z]?\s*\)$")
+
+# A caption-continuation PROSE tail fragment: the last wrapped line of a caption
+# ("DV.", "as the DV.", "in Non-Manipulated Attribute as DV.") that a region whose
+# top edge includes the caption's final line leaves as the grid's leading
+# single-cell row, ABOVE the real header. It carries NO digit / statistic /
+# bracket and ENDS a sentence (final ``.``). Because a bare "DV." or "Note." is
+# ambiguous in isolation, this is only trusted when the row DIRECTLY ABOVE the
+# real (multi-cell) header — see ``_drop_caption_first_row``'s next-row context
+# check — so a genuine sole-cell data row (which is not followed by a fresh header)
+# is never removed. Keyed on the caption-is-continuous-prose vs
+# grid-header-is-short-multi-cell layout invariant (efendic Tables 2–5, whose
+# captions wrap onto a second line the region absorbs).
+_CAPTION_TAIL_PROSE_RE = re.compile(r"^(?=.*[A-Za-z])[^\d\[\]()=<>±]{1,40}\.$")
 
 
 def _row_joined(row: list[str]) -> str:
@@ -149,7 +168,20 @@ def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
         if not started:
             nonempty = [c for c in row if c and c.strip()]
             if len(nonempty) == 1 and _CAPTION_TAIL_FRAGMENT_RE.match(nonempty[0].strip()):
-                continue  # leading caption-tail fragment row → drop
+                continue  # leading caption-tail fragment row (bare "(YYYY)") → drop
+            if len(nonempty) == 1 and _CAPTION_TAIL_PROSE_RE.match(nonempty[0].strip()):
+                # Leading caption-tail PROSE fragment ("DV.", "as the DV."). Only
+                # drop it when the NEXT row is a genuine MULTI-CELL header — i.e.
+                # this single-cell prose row really does sit ABOVE the table
+                # header, not act as a legitimate sole-cell data/label row. This
+                # context guard is what makes an ambiguous bare "DV."/"Note."
+                # safe to strip only in the caption-bleed position.
+                nxt = next(
+                    (r for r in rows[i + 1:] if any(c and c.strip() for c in r)),
+                    None,
+                )
+                if nxt is not None and len([c for c in nxt if c and c.strip()]) >= 2:
+                    continue
         started = True
         out.append(row)
     return out
