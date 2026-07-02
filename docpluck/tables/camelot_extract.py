@@ -87,6 +87,45 @@ _CAPTION_TAIL_FRAGMENT_RE = re.compile(r"^\(\s*\d{4}[a-z]?\s*\)$")
 # captions wrap onto a second line the region absorbs).
 _CAPTION_TAIL_PROSE_RE = re.compile(r"^(?=.*[A-Za-z])[^\d\[\]()=<>±]{1,40}\.$")
 
+# Function words used to recognise a LONG caption-tail prose fragment (one that a
+# short-length regex would miss). Mirrors the set ``render._strip_phantom_camelot_
+# tables`` uses to detect body-prose leaked into a <th>: keeping the two in sync
+# means a long caption tail is stripped HERE (upstream) rather than tripping the
+# render phantom-strip, which drops the ENTIRE table (jdm_.2023.16 Table 7).
+_TAIL_PROSE_FUNCTION_WORDS = frozenset({
+    "the", "and", "or", "but", "we", "us", "our", "their", "those", "these",
+    "this", "that", "with", "for", "from", "to", "in", "on", "at", "by", "as",
+    "of", "below", "above", "their", "amount",
+})
+
+
+def _is_caption_tail_prose(cell: str) -> bool:
+    """True if ``cell`` is a caption-continuation PROSE fragment — either the
+    short sentence-ending form (``DV.``, ``as the DV.``) or a LONG one (≥8 words
+    with ≥2 function words and a sentence-ending period, e.g. "performance and
+    their amount of planning in the subsequent trials.").
+
+    Distinguishing prose from a real column header/label: a header is a short
+    noun phrase (``Outcome variable``, ``β for negative``) with few function
+    words and rarely a terminal period; a caption tail is flowing prose. This is
+    used only for a LEADING SINGLE-CELL row that sits above real table
+    structure (see :func:`_drop_caption_first_row`)."""
+    s = (cell or "").strip()
+    if not s:
+        return False
+    if _CAPTION_TAIL_PROSE_RE.match(s):
+        return True
+    # Long form: many words, sentence-ending, function-word-dense, no stat tokens.
+    if not s.endswith("."):
+        return False
+    if re.search(r"[\[\]()=<>±]|\d", s):
+        return False  # a real data/label cell carries a number or bracket
+    words = re.findall(r"[A-Za-z']+", s.lower())
+    if len(words) < 8:
+        return False
+    fn = sum(1 for w in words if w in _TAIL_PROSE_FUNCTION_WORDS)
+    return fn >= 2
+
 
 def _row_joined(row: list[str]) -> str:
     return " ".join(c for c in row if c).strip()
@@ -169,18 +208,28 @@ def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
             nonempty = [c for c in row if c and c.strip()]
             if len(nonempty) == 1 and _CAPTION_TAIL_FRAGMENT_RE.match(nonempty[0].strip()):
                 continue  # leading caption-tail fragment row (bare "(YYYY)") → drop
-            if len(nonempty) == 1 and _CAPTION_TAIL_PROSE_RE.match(nonempty[0].strip()):
-                # Leading caption-tail PROSE fragment ("DV.", "as the DV."). Only
-                # drop it when the NEXT row is a genuine MULTI-CELL header — i.e.
-                # this single-cell prose row really does sit ABOVE the table
-                # header, not act as a legitimate sole-cell data/label row. This
-                # context guard is what makes an ambiguous bare "DV."/"Note."
-                # safe to strip only in the caption-bleed position.
-                nxt = next(
-                    (r for r in rows[i + 1:] if any(c and c.strip() for c in r)),
-                    None,
+            if len(nonempty) == 1 and _is_caption_tail_prose(nonempty[0]):
+                # Leading caption-tail PROSE fragment ("DV.", "as the DV.",
+                # "performance and their amount of planning in the subsequent
+                # trials."). Only drop it when a genuine MULTI-CELL header/data
+                # row appears among the next few rows — i.e. this single-cell
+                # prose row really does sit ABOVE a structured table, not act as a
+                # legitimate sole-cell data/label row. This context guard is what
+                # makes an ambiguous bare "DV."/"Note." safe to strip only in the
+                # caption-bleed position. We scan a small window (not just the
+                # immediately-following row) because Camelot sometimes emits one or
+                # more OTHER single-cell fragment rows between the caption tail and
+                # the real header (jdm_.2023.16 Table 7: the tail row is followed
+                # by a lone "Outcome variable" super-header before the 10-col
+                # header proper). If left in a <th>, this prose trips
+                # render._strip_phantom_camelot_tables, which drops the ENTIRE
+                # (otherwise real) table — so stripping it here is what preserves
+                # the table.
+                has_multicell_below = any(
+                    len([c for c in r if c and c.strip()]) >= 2
+                    for r in rows[i + 1:i + 6]
                 )
-                if nxt is not None and len([c for c in nxt if c and c.strip()]) >= 2:
+                if has_multicell_below:
                     continue
         started = True
         out.append(row)
