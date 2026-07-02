@@ -2807,6 +2807,128 @@ def recover_dropped_minus_via_layout(text: str, layout) -> str:
     return text
 
 
+# §A R5 / B7 (NORMALIZATION_VERSION 1.9.36, 2026-06-30): recover a CI UPPER
+# bound whose leading minus pdftotext/Camelot DROPPED (or detached into a stray
+# en-dash). W0g (CI-pairing) and W0h (layout) repair a *coefficient* proven
+# negative by its CI bracket — but they TRUST the bracket, so a minus dropped
+# from the bracket's OWN upper bound is invisible to them. On tight-kerned PDFs
+# that draw U+2212 in a symbol font, the upper bound's minus can be dropped while
+# the lower bound keeps its minus, so a negative interval [-0.78, -0.66] is
+# extracted as [-0.78, 0.67] — a sign flip that inverts the interval
+# (chan_feldman_2025_cogemo Table 8, rows 2bi/2bii). This reaches the rendered
+# .md through the table channels (the structured-table flatten sidecar AND the
+# `<table>` HTML cell), so the recovery is a SHARED helper keyed on the numeric
+# structural signature, applied in flatten (separate estimate/CI columns) and in
+# cell_cleaning._html_escape (same-cell estimate+CI).
+#
+# Structural signature (general — NOT keyed on any paper/font identity): the
+# row's point estimate is negative, the parsed CI straddles zero with a negative
+# lower bound and a positive upper bound (lo < 0 < hi), AND negating the upper
+# bound yields an interval that is valid for this estimate — monotonic
+# (lo < -hi) and containing the estimate (lo <= est <= -hi) — AND that brackets
+# the estimate far more plausibly than the as-parsed interval (the estimate sits
+# in the OUTER half of the as-parsed interval but the INNER half of the flipped
+# one, measured by distance from each interval's mid-point). This is the same
+# estimate-containment invariant docpluck already uses for hyphen-glued CIs
+# (flatten._resolve_hyphen_ci), promoted to the dropped-upper-bound case.
+#
+# Self-guarding against a LEGITIMATE zero-straddling null CI (e.g.
+# d = -0.02, 95% CI [-0.19, 0.15] — a real null result in this same paper): a
+# genuine zero-straddling interval has its estimate close enough to zero that
+# negating the positive bound would EXCLUDE the estimate (-0.02 not in
+# [-0.19, -0.15]), so the post-flip containment test fails and the bound is left
+# untouched. Only an estimate far enough negative that the negated bound still
+# contains it — the hallmark of a dropped minus on a one-sided negative
+# interval — is corrected.
+def recover_dropped_minus_ci_upper(
+    estimate: float, lo: float, hi: float
+) -> "float | None":
+    """Return the corrected (negative) CI upper bound when ``hi`` lost its minus,
+    else ``None``. See the module comment above for the structural signature and
+    the self-guard against a legitimate zero-straddling CI."""
+    if not (estimate < 0 and lo < 0 < hi):
+        return None
+    flipped_hi = -hi
+    if not (lo < flipped_hi and lo <= estimate <= flipped_hi):
+        return None
+    parsed_half = (hi - lo) / 2.0
+    flipped_half = (flipped_hi - lo) / 2.0
+    if parsed_half <= 0 or flipped_half <= 0:
+        return None
+    parsed_offcentre = abs(estimate - (lo + hi) / 2.0) / parsed_half
+    flipped_offcentre = abs(estimate - (lo + flipped_hi) / 2.0) / flipped_half
+    if parsed_offcentre > 0.5 and flipped_offcentre < 0.5:
+        return flipped_hi
+    return None
+
+
+# A self-contained "<signed estimate> … [<lo>, <hi>]" cell/clause: a leading
+# signed point estimate (optionally `r = .73` / `−.32`, the bare APA decimal
+# form), then — after any decoration (`***`, `<br>`, spaces) — the FIRST
+# bracketed CI. The upper bound is split into a DETACHED dash run (en/em/hyphen
+# separated from the digit by space — the `[−0.78,  –  0.67]` corruption), an
+# ATTACHED sign glued to the digit (a genuine `−0.67`), and the magnitude. A
+# bare magnitude with no attached sign (`[−0.52,  0.33]`) is the fully-dropped
+# case. Sign chars accept ASCII hyphen AND U+2212. Groups: (1) est sign,
+# (2) est magnitude, (3) whole bracket, (4) lo text, (5) detached dash run,
+# (6) attached hi sign, (7) hi magnitude.
+_CI_SIGN = r"[-−]"
+_CI_DASH = r"[-−–—]"
+_CI_UPPER_DROPPED_RE = re.compile(
+    r"(?:[A-Za-z]+\s*=\s*)?(" + _CI_SIGN + r"?)\s*(\d*\.\d+)"   # signed estimate
+    r"[^\[\]\n]*?"                                              # decoration
+    r"(\[\s*(" + _CI_SIGN + r"?\s*\d*\.\d+)\s*,"                # [ lo ,
+    r"\s*(" + _CI_DASH + r"\s+)?"                               # detached dash?
+    r"(" + _CI_SIGN + r"?)(\d*\.\d+)\s*\])"                     # attached-sign hi ]
+)
+
+
+def recover_dropped_minus_ci_upper_in_text(text: str) -> str:
+    """Recover a dropped/detached minus on a CI UPPER bound inside a self-
+    contained ``<estimate> … [lo, hi]`` cell or clause (the table-cell and
+    raw-text surfaces). For each estimate-anchored bracket, the estimate-
+    containment invariant (``recover_dropped_minus_ci_upper``) decides whether
+    the positive upper bound is a dropped-minus victim; on a flip the bracket is
+    re-emitted with a single ASCII-hyphen minus on the upper bound (and any
+    stray detached dash collapsed), leaving the lower bound and all surrounding
+    text untouched. A bound that ALREADY carries an attached minus is parsed as
+    negative, so the invariant's ``lo < 0 < hi`` gate leaves it alone (no churn
+    on correct rows). No-op when no estimate-anchored bracket is present."""
+    if not text or "[" not in text:
+        return text
+
+    def _fold(s: str) -> str:
+        return (s or "").replace("−", "-").replace(" ", "")
+
+    def _sub(m: "re.Match[str]") -> str:
+        attached_sign = m.group(6) or ""
+        # An attached minus (no intervening space) is a genuine sign → parse the
+        # upper bound as negative so the invariant skips it. A DETACHED dash
+        # (group 5) is treated as a dropped/garbled minus, NOT a present sign:
+        # the magnitude is parsed positive and the invariant adjudicates.
+        hi_signed = ("-" if attached_sign in ("-", "−") else "") + m.group(7)
+        try:
+            est = float(_fold(m.group(1) + m.group(2)))
+            lo = float(_fold(m.group(4)))
+            hi = float(hi_signed)
+        except ValueError:
+            return m.group(0)
+        fixed_hi = recover_dropped_minus_ci_upper(est, lo, hi)
+        if fixed_hi is None:
+            return m.group(0)
+        # Preserve the lower bound's original glyph (e.g. U+2212) verbatim,
+        # stripping only interior spaces, so a corrected row's lo still matches
+        # the sibling rows' display; emit the upper bound with a single minus
+        # using the SAME minus glyph the lower bound uses (U+2212 if the lo is
+        # U+2212-signed, else ASCII hyphen — keeps the bracket visually uniform).
+        lo_txt = re.sub(r"\s+", "", m.group(4))
+        minus = "−" if lo_txt.startswith("−") else "-"
+        new_bracket = f"[{lo_txt}, {minus}{m.group(7)}]"
+        return m.group(0).replace(m.group(3), new_bracket, 1)
+
+    return _CI_UPPER_DROPPED_RE.sub(_sub, text)
+
+
 # v2.4.44 (NORMALIZATION_VERSION 1.9.8): decompose Latin typographic
 # ligatures (ﬀ ﬁ ﬂ ﬃ ﬄ ﬅ ﬆ, U+FB00-FB06). pdftotext preserves these
 # presentation-form glyphs verbatim, so words render as "conﬁdent" /

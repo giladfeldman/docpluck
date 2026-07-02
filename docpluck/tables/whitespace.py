@@ -438,7 +438,73 @@ def _cell_is_prose(text: str) -> bool:
     return alpha_words >= _PROSE_CELL_MIN_WORDS
 
 
-def _trim_trailing_prose_rows(cells: list[Cell]) -> list[Cell]:
+# A categorical/design table (predictions, 2×2 conditions, factor summaries) is a
+# real table that carries NO numeric cells — every cell is a short label
+# ("Risk is high", "Negative affect"). The numeric-data gates
+# (``_CLEAN_DATA_CELL_RE`` / ``_row_is_prose``) therefore read each of its rows as
+# prose and discard the whole grid (efendic Table 1: a 5×3 predictions table whose
+# region-driven Camelot grid is perfect, then deleted by the prose guards). A cell
+# is "categorical-short" when it has at most this many word tokens AND characters —
+# tight enough that an over-captured body-prose line (which always carries a
+# ``_cell_is_prose`` sentence fragment of ≥6 alpha words) can never satisfy it.
+_CATEGORICAL_CELL_MAX_WORDS: int = 5
+_CATEGORICAL_CELL_MAX_CHARS: int = 40
+
+
+def _is_categorical_grid(cells: list[Cell]) -> bool:
+    """True when ``cells`` form a RECTANGULAR grid (≥2 rows × ≥2 cols, every row at
+    the modal column count, no empty cell) of short, non-prose, non-garbled labels.
+
+    This is the structural signature of a categorical/design table that carries no
+    numeric data — a real table the numeric-data gate would otherwise reject. It is
+    deliberately strict so it can NEVER accept absorbed two-column body prose:
+
+      * every cell must be ``_CATEGORICAL_CELL_MAX_WORDS``/``_CHARS``-short — a
+        wrapped body-paragraph line has a long sentence fragment in a cell;
+      * no cell may be a ``_cell_is_prose`` fragment (≥6 alpha words) or
+        ``_cell_is_garbled`` (glyph fusion);
+      * the grid must be rectangular with no holes — absorbed prose is ragged
+        (variable word/column counts per wrapped line).
+
+    Keyed on a layout-structural signature (short uniform aligned labels), never on
+    paper identity, so it generalizes to any all-categorical academic table.
+
+    Applied UNCONDITIONALLY (not gated on ``allow_categorical``) inside the
+    prose-trim and clean-grid gates, so it serves the generic region path
+    (efendic Table 1) as well as the side-by-side isolated-region path. The
+    ``allow_categorical`` flag is a looser, opt-in relaxation for grids this
+    strict predicate rejects (e.g. a gutter-clipped side-by-side column with a
+    hole or a ragged tail).
+    """
+    if not cells:
+        return False
+    by_row: dict[int, list[Cell]] = defaultdict(list)
+    for c in cells:
+        by_row[c["r"]].append(c)
+    row_indices = sorted(by_row)
+    if len(row_indices) < 2:
+        return False
+    counts = [len(by_row[r]) for r in row_indices]
+    modal = max(set(counts), key=counts.count)
+    if modal < 2:
+        return False
+    if any(n != modal for n in counts):
+        return False  # not rectangular — ragged like wrapped prose
+    for c in cells:
+        text = (c.get("text") or "").strip()
+        if not text:
+            return False  # a hole in a "rectangular" grid — suspicious
+        if _cell_is_prose(text) or _cell_is_garbled(text):
+            return False
+        words = [w for w in re.split(r"\s+", text) if w]
+        if len(words) > _CATEGORICAL_CELL_MAX_WORDS or len(text) > _CATEGORICAL_CELL_MAX_CHARS:
+            return False
+    return True
+
+
+def _trim_trailing_prose_rows(
+    cells: list[Cell], *, allow_categorical: bool = False
+) -> list[Cell]:
     """Drop the body-prose block a whitespace region over-captured below a table.
 
     Finds the EARLIEST row that begins a sustained run (``≥ _PROSE_RUN_MIN``) of
@@ -452,17 +518,41 @@ def _trim_trailing_prose_rows(cells: list[Cell]) -> list[Cell]:
     false-positive guard against a single wordy note or label row. If the
     surviving grid has < 2 rows the whole grid is dropped (``[]``) so the caller
     emits a clean caption-only stub.
+
+    ``allow_categorical`` uses the stricter per-CELL prose test (``_cell_is_prose``
+    — a genuine ≥6-word sentence fragment) instead of the row-token heuristic, so
+    a purely categorical table (``Design facet | Replication study`` / ``IV
+    operationalization | Same``) is not mistaken for a prose run. Those rows have
+    3+ short tokens with no stat marker, which ``_row_is_prose`` flags as prose;
+    but each cell is a short label, never a sentence, so the per-cell test keeps
+    them. Used only by the side-by-side region path, which has already bounded the
+    table by geometry.
     """
     if not cells:
+        return cells
+    # A purely-categorical table (all short labels, no numbers) reads as an
+    # all-prose run to ``_row_is_prose`` and would be cut to nothing. Its tight
+    # rectangular short-label signature can't be absorbed prose, so leave it whole.
+    # Unconditional (serves the generic region path — efendic Table 1) and cheap;
+    # the ``allow_categorical`` flag below further relaxes the per-row prose test
+    # for the geometry-bounded side-by-side path (which may be ragged/holey and so
+    # fail the strict rectangular predicate).
+    if _is_categorical_grid(cells):
         return cells
     by_row: dict[int, list[Cell]] = defaultdict(list)
     for c in cells:
         by_row[c["r"]].append(c)
     row_indices = sorted(by_row)
-    prose_flags = [
-        _row_is_prose([(c.get("text") or "").strip() for c in by_row[r]])
-        for r in row_indices
-    ]
+    if allow_categorical:
+        prose_flags = [
+            any(_cell_is_prose((c.get("text") or "").strip()) for c in by_row[r])
+            for r in row_indices
+        ]
+    else:
+        prose_flags = [
+            _row_is_prose([(c.get("text") or "").strip() for c in by_row[r]])
+            for r in row_indices
+        ]
     # Find the first index that starts a run of >= _PROSE_RUN_MIN prose rows.
     cut_pos: int | None = None
     run = 0
@@ -536,7 +626,9 @@ def _cell_is_garbled(text: str) -> bool:
     return False
 
 
-def _whitespace_grid_is_clean(cells: list[Cell]) -> bool:
+def _whitespace_grid_is_clean(
+    cells: list[Cell], *, allow_categorical: bool = False
+) -> bool:
     """Accept a whitespace/char grid ONLY when it looks like a real DATA table.
 
     The whitespace fallback is geometry-driven and, on regions it shouldn't have
@@ -556,6 +648,15 @@ def _whitespace_grid_is_clean(cells: list[Cell]) -> bool:
     vertical-label fusion) or mostly prose with no clean standalone numbers
     (cog_emo Table 1 "Summary of hypotheses") is rejected.
 
+    ``allow_categorical`` accepts a grid with NO numeric data cells when it is a
+    clean CATEGORICAL table (text labels + text values — a replication-
+    classification "Design facet | Same/Different" grid). The numeric-row
+    requirement is the correct guard for the generic geometry-driven fallback, but
+    the side-by-side region path that sets this flag has already bounded the table
+    to one gutter-clipped column ending at the blank band above the next prose, so
+    a categorical grid there is trustworthy. The unmapped-glyph, caption-label, and
+    prose-fragment guards below STILL apply, so absorbed prose is still rejected.
+
     Returns False ⇒ caller discards the grid and falls back to the caption-only
     stub (clean, no false structure) instead of emitting garbage.
     """
@@ -570,14 +671,26 @@ def _whitespace_grid_is_clean(cells: list[Cell]) -> bool:
         # pulled in the "Table 9." caption line). Mis-bounded → reject.
         if _CAPTION_LABEL_RE.search(txt):
             return False
+    # A purely-categorical table (predictions / design summary) carries no numeric
+    # cells, so the clean-data-row count below is 0 and it would be rejected — yet
+    # it is a real table. Accept it on its rectangular short-non-prose-label
+    # signature (only AFTER the glyph / caption-absorption rejections above, so a
+    # mis-bounded or corrupted grid is still discarded). Unconditional — serves the
+    # generic region path (efendic Table 1); the ``allow_categorical`` branch below
+    # is a further, looser relaxation for the geometry-bounded side-by-side path.
+    if _is_categorical_grid(cells):
+        return True
     by_row: dict[int, list[Cell]] = defaultdict(list)
     for c in cells:
         by_row[c["r"]].append(c)
     clean_data_rows = 0
     garbled_rows = 0
     prose_cell_rows = 0
+    nonempty_rows = 0
     for row_cells in by_row.values():
         texts = [(c.get("text") or "").strip() for c in row_cells]
+        if any(t for t in texts):
+            nonempty_rows += 1
         if any(_cell_is_garbled(t) for t in texts):
             garbled_rows += 1
         if any(_CLEAN_DATA_CELL_RE.match(t) for t in texts if t):
@@ -597,6 +710,10 @@ def _whitespace_grid_is_clean(cells: list[Cell]) -> bool:
     # short labels), so this never trips a clean table.
     if total_rows and prose_cell_rows * 3 >= total_rows:
         return False
+    if allow_categorical:
+        # Categorical table: no numeric requirement. The grid must still be
+        # mostly non-garbled and carry ≥ _MIN_CLEAN_DATA_ROWS substantive rows.
+        return nonempty_rows >= _MIN_CLEAN_DATA_ROWS and garbled_rows * 2 < nonempty_rows
     return clean_data_rows >= _MIN_CLEAN_DATA_ROWS and clean_data_rows > garbled_rows
 
 

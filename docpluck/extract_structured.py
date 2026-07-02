@@ -195,8 +195,14 @@ def extract_pdf_structured(
     # auto-detect table it strictly beats, never degrade one.
     layout_doc = _layout_doc
     region_tables: dict[int, Table] = {}
+    # ``sbs_column_by_id`` maps a side-by-side caption to its own column
+    # ``(page, col_x0, col_x1)`` so the whitespace / isolated fallback can rebuild
+    # that caption's text + body from its column (chandrashekar Table 3, whose
+    # left-column stimulus list falls to the isolated path). Empty off a
+    # side-by-side page.
+    sbs_column_by_id: dict[int, tuple[int, float, float]] = {}
     if not camelot_disabled and table_captions:
-        region_tables, layout_doc = _region_driven_capture(
+        region_tables, sbs_column_by_id, layout_doc = _region_driven_capture(
             pdf_bytes, rejoined, table_captions, layout_doc,
             next_boundary_by_id, method_pieces,
         )
@@ -312,10 +318,26 @@ def extract_pdf_structured(
                 record_fallback("whitespace_cells_region_exception", detail=exc_name)
                 method_pieces.append(f"whitespace_region_failed:{exc_name}")
                 cells = []
+        # Side-by-side caption: rebuild from the caption's own column so it can't
+        # absorb the sibling caption across the gutter (chandrashekar Table 3,
+        # which falls to this fallback because its left column is a 1-column
+        # stimulus list Camelot can't structure as a ≥2-col grid).
+        sbs_col = sbs_column_by_id.get(id(cap))
+        sbs_caption = None
+        sbs_body = None
+        if sbs_col is not None and layout_doc is not None:
+            sbs_caption = _caption_text_from_column(
+                layout_doc, cap, page=sbs_col[0],
+                col_x0=sbs_col[1], col_x1=sbs_col[2],
+            )
+            sbs_body = _column_body_text(
+                layout_doc, cap, page=sbs_col[0],
+                col_x0=sbs_col[1], col_x1=sbs_col[2],
+            )
         if cells:
             n_rows = max((c["r"] for c in cells), default=-1) + 1
             n_cols = max((c["c"] for c in cells), default=-1) + 1
-            cap_text = _extract_caption_text(
+            cap_text = sbs_caption or _extract_caption_text(
                 rejoined, cap, next_boundary_by_id.get(id(cap))
             )
             tables.append({
@@ -339,7 +361,9 @@ def extract_pdf_structured(
         else:
             tables.append(
                 _isolated_table_from_caption(
-                    cap, rejoined, next_boundary_by_id.get(id(cap))
+                    cap, rejoined, next_boundary_by_id.get(id(cap)),
+                    caption_override=sbs_caption,
+                    body_override=sbs_body,
                 )
             )
 
@@ -361,6 +385,13 @@ def extract_pdf_structured(
     # Sort tables/figures by page for stable output.
     tables.sort(key=lambda t: (t.get("page") or 0, t.get("label") or ""))
     figures.sort(key=lambda f: (f.get("page") or 0, f.get("label") or ""))
+
+    # Strip the internal caption-pairing hint from every selected table (it is
+    # attached by ``_camelot_table_to_dict`` on BOTH the auto-detect and the
+    # region-driven paths). Done once here so no public Table — regardless of
+    # which path produced it — carries the private ``_caption_hint_number`` key.
+    for t in tables:
+        t.pop("_caption_hint_number", None)
 
     return {
         "text": text_out,
@@ -427,6 +458,222 @@ _REGION_NEXT_CAPTION_GAP_PT: float = 2.0
 _REGION_TOP_MARGIN_PT: float = 4.0
 
 
+
+_GUTTER_MIN_WIDTH_PT: float = 10.0
+# Each side of a gutter must hold at least this fraction of the scanned band's
+# total ink width to be a real column (rejects a stray right-margin annotation
+# or a hanging-indent notch from masquerading as a 2-column split).
+_GUTTER_MIN_COLUMN_FRACTION: float = 0.18
+# x-bin width (pt) for the gutter occupancy histogram.
+_GUTTER_BIN_PT: float = 2.0
+# How far below the topmost caption to scan for the gutter (pt). The gutter is
+# consistent down a 2-column page, so a generous column-height band is safe.
+_GUTTER_SCAN_HEIGHT_PT: float = 260.0
+# A column-internal vertical gap larger than this multiple of the column's modal
+# line-height marks the END of a table — the blank band before the next prose
+# paragraph (chandrashekar Table 4: a 39pt gap below the LeBel grid vs ~12pt
+# line spacing). Clipping the region there keeps flowing body prose out of the
+# region, which otherwise collapses Camelot's stream column detection to 1 col.
+_COLUMN_TABLE_GAP_FACTOR: float = 1.7
+
+
+def _detect_column_gutters(
+    page_obj,
+    band: tuple[float, float, float, float],
+) -> list[float]:
+    """Find vertical whitespace gutters within ``band`` on ``page_obj``.
+
+    ``band`` is an ``(x0, top, x1, bottom)`` pdfplumber-coordinate box (the
+    vertical extent spanning the side-by-side captions). Returns the x-positions
+    (midpoints) of every contiguous empty vertical whitespace run at least
+    :data:`_GUTTER_MIN_WIDTH_PT` wide that splits the band's ink into two
+    non-trivial columns. Empty list when the band is single-column.
+
+    Algorithm — a column-occupancy histogram (the same whitespace-column idea
+    ``tables.detect._whitespace_columns_stable`` uses, but returning the gap
+    POSITION): bin the band's x-range, mark every bin any glyph's x-span covers,
+    and report empty runs wide enough to be a gutter with real ink on both sides.
+    """
+    bx0, btop, bx1, bbottom = band
+    chars = [
+        c for c in (page_obj.chars or ())
+        if btop - 1.0 <= (float(c.get("top", 0.0)) + float(c.get("bottom", 0.0))) / 2.0 <= bbottom + 1.0
+        and bx0 - 1.0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 <= bx1 + 1.0
+    ]
+    if len(chars) < 6:
+        return []
+    xlo = min(float(c["x0"]) for c in chars)
+    xhi = max(float(c["x1"]) for c in chars)
+    span = xhi - xlo
+    if span <= _GUTTER_MIN_WIDTH_PT:
+        return []
+    nbins = int(span / _GUTTER_BIN_PT) + 1
+    occ = [False] * nbins
+    for c in chars:
+        b0 = int((float(c["x0"]) - xlo) / _GUTTER_BIN_PT)
+        b1 = int((float(c["x1"]) - xlo) / _GUTTER_BIN_PT)
+        for b in range(max(0, b0), min(nbins, b1 + 1)):
+            occ[b] = True
+    gutters: list[float] = []
+    i = 0
+    while i < nbins:
+        if occ[i]:
+            i += 1
+            continue
+        j = i
+        while j < nbins and not occ[j]:
+            j += 1
+        run_w = (j - i) * _GUTTER_BIN_PT
+        if run_w >= _GUTTER_MIN_WIDTH_PT:
+            gx = xlo + (i + j) / 2.0 * _GUTTER_BIN_PT
+            if (gx - xlo) >= _GUTTER_MIN_COLUMN_FRACTION * span and (
+                xhi - gx
+            ) >= _GUTTER_MIN_COLUMN_FRACTION * span:
+                gutters.append(gx)
+        i = j
+    return gutters
+
+
+def _label_x_midpoint(page_obj, cap: CaptionMatch) -> Optional[float]:
+    """x-midpoint of this caption's OWN label glyphs (``Table 3`` / ``Figure 4``).
+
+    The whole-row bbox from ``_bbox_of_caption_line`` is unusable for column
+    assignment in a side-by-side layout, because pdfplumber clusters BOTH labels
+    into one y-row (``Table3Table4`` spanning x0=54..346 — its midpoint lands in
+    the gutter, mis-assigning both captions to the same column). Here we locate
+    the specific ``Table N``/``Figure N`` token's char run by its number, so the
+    two same-row labels get their distinct x-positions (Table 3 ≈ x70, Table 4 ≈
+    x329). Returns ``None`` if the label can't be located.
+    """
+    chars = page_obj.chars or ()
+    if not chars:
+        return None
+    from .tables.detect import _bbox_of_caption_line
+    cb = _bbox_of_caption_line(page_obj, cap)
+    if cb is None:
+        return None
+    ctop = cb[1]
+    row = sorted(
+        (c for c in chars if abs(float(c.get("top", 0.0)) - ctop) <= 3.0),
+        key=lambda c: float(c.get("x0", 0.0)),
+    )
+    if not row:
+        return None
+    label_norm = re.sub(r"\s+", "", cap.label).lower()  # e.g. "table3"
+    joined = "".join(str(c.get("text", "")) for c in row)
+    spans: list[tuple[int, int, dict]] = []  # (start_in_joined, end, char)
+    pos = 0
+    for c in row:
+        t = str(c.get("text", ""))
+        spans.append((pos, pos + len(t), c))
+        pos += len(t)
+    joined_norm = joined.lower()
+    # Search every occurrence of the label; pick the one whose number EXACTLY
+    # matches (so "Table 3" doesn't match inside "Table 39").
+    search_from = 0
+    while True:
+        idx = joined_norm.find(label_norm, search_from)
+        if idx == -1:
+            break
+        end = idx + len(label_norm)
+        if end < len(joined_norm) and joined_norm[end].isdigit():
+            search_from = idx + 1
+            continue
+        lbl_chars = [c for (s, e, c) in spans if s < end and e > idx]
+        if lbl_chars:
+            lx0 = min(float(c.get("x0", 0.0)) for c in lbl_chars)
+            lx1 = max(float(c.get("x1", 0.0)) for c in lbl_chars)
+            return (lx0 + lx1) / 2.0
+        search_from = idx + 1
+    return None
+
+
+def _assign_caption_columns(
+    caps_sorted: list[CaptionMatch],
+    page_obj,
+    gutters: list[float],
+    page_width: float,
+) -> dict[int, tuple[float, float]]:
+    """Assign each caption to its column x-range, but ONLY when the captions
+    genuinely straddle a gutter (a true side-by-side layout).
+
+    Returns ``{id(cap): (col_x0, col_x1)}`` for captions that share a page in
+    side-by-side columns. Empty when all captions sit in the SAME column
+    (stacked tables that merely happen to share a 2-column page) — there is no
+    interleaving to undo and the region must stay full-width.
+
+    A caption's column is the maximal ``(left_gutter, right_gutter)`` interval
+    containing its label's x-midpoint (the label TOKEN's own position, not the
+    whole-row bbox — see :func:`_label_x_midpoint`), with the page edges as the
+    outer bounds.
+    """
+    bounds = [0.0] + sorted(gutters) + [page_width if page_width > 0 else 1e9]
+    col_of: dict[int, int] = {}
+    interval_of: dict[int, tuple[float, float]] = {}
+    for c in caps_sorted:
+        xmid = _label_x_midpoint(page_obj, c)
+        if xmid is None:
+            continue
+        k = 0
+        for k in range(len(bounds) - 1):
+            if bounds[k] <= xmid < bounds[k + 1]:
+                break
+        col_of[id(c)] = k
+        interval_of[id(c)] = (bounds[k], bounds[k + 1])
+    if len(set(col_of.values())) < 2:
+        # Every caption in the same column → not side-by-side; leave full-width.
+        return {}
+    return interval_of
+
+
+def _column_table_bottom(
+    page_obj,
+    *,
+    col_x0: float,
+    col_x1: float,
+    top: float,
+    bottom: float,
+) -> Optional[float]:
+    """Find the bottom of the tabular block in a column band, from ``top`` down.
+
+    Within the column's x-range, cluster chars into rows and walk top-to-bottom;
+    stop at the first inter-row gap exceeding :data:`_COLUMN_TABLE_GAP_FACTOR` ×
+    the modal line-height (the blank band separating the table from following
+    body prose). Returns the clip y (just below the last in-table row), or
+    ``None`` when no such gap is found (keep the full region).
+    """
+    rows: dict[float, dict] = {}
+    for c in page_obj.chars or ():
+        xm = (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0
+        if not (col_x0 <= xm < col_x1):
+            continue
+        ct = float(c.get("top", 0.0))
+        if not (top - 1.0 <= ct <= bottom + 1.0):
+            continue
+        key = round(ct)
+        rec = rows.setdefault(key, {"top": ct, "bottom": float(c.get("bottom", ct))})
+        rec["bottom"] = max(rec["bottom"], float(c.get("bottom", ct)))
+    if len(rows) < 3:
+        return None
+    ordered = [rows[k] for k in sorted(rows.keys())]
+    deltas = [
+        ordered[i + 1]["top"] - ordered[i]["top"]
+        for i in range(len(ordered) - 1)
+        if ordered[i + 1]["top"] - ordered[i]["top"] > 0
+    ]
+    if not deltas:
+        return None
+    deltas_sorted = sorted(deltas)
+    modal = deltas_sorted[len(deltas_sorted) // 2]  # median ≈ modal line height
+    if modal <= 0:
+        return None
+    threshold = modal * _COLUMN_TABLE_GAP_FACTOR
+    for i in range(len(ordered) - 1):
+        gap = ordered[i + 1]["top"] - ordered[i]["top"]
+        if gap > threshold:
+            return ordered[i]["bottom"] + 1.0
+    return None
+
 def _table_cell_count(td: Optional[Table]) -> int:
     if not td:
         return 0
@@ -454,6 +701,13 @@ def _pick_better_table(
         return auto_td
     if auto_td is None:
         return region_td
+    # A de-interleaved SIDE-BY-SIDE region table wins unconditionally: the
+    # competing auto-detect table is column-straddling by construction (it merged
+    # the two side-by-side tables into one grid), so its larger cell count is
+    # contamination, not richness — the column-collapse / cell-count heuristics
+    # below would wrongly pick it.
+    if region_td.get("_side_by_side"):
+        return region_td
     rc = int(region_td.get("n_cols") or 0)
     ac = int(auto_td.get("n_cols") or 0)
     r_cells = _table_cell_count(region_td)
@@ -469,6 +723,7 @@ def _pick_better_table(
     return region_td if r_cells > a_cells else auto_td
 
 
+
 def _region_driven_capture(
     pdf_bytes: bytes,
     rejoined: str,
@@ -476,10 +731,13 @@ def _region_driven_capture(
     layout_doc,
     next_boundary_by_id: dict[int, Optional[int]],
     method_pieces: list[str],
-) -> tuple[dict[int, Table], object]:
+) -> tuple[dict[int, Table], dict[int, tuple[int, float, float]], object]:
     """Drive Camelot once per caption with the caption-anchored region as
     ``table_areas`` and return ``{id(cap): Table}`` for every caption that
-    yielded a usable table, plus the (possibly newly-materialized) layout doc.
+    yielded a usable table, the side-by-side column map ``{id(cap): (page,
+    col_x0, col_x1)}`` (so the caller's isolated/whitespace fallback paths can
+    rebuild a side-by-side caption from its own column too), plus the (possibly
+    newly-materialized) layout doc.
 
     For each caption we (1) locate its layout region via ``_region_for_caption``,
     (2) clip the region bottom at the next same-page caption so it can't reach
@@ -489,6 +747,7 @@ def _region_driven_capture(
     auto-detect + whitespace path still runs.
     """
     empty: dict[int, Table] = {}
+    cap_column_by_id: dict[int, tuple[int, float, float]] = {}
     try:
         from .tables.detect import _region_for_caption, _bbox_of_caption_line
         from .tables.camelot_extract import extract_tables_camelot_by_region
@@ -497,7 +756,7 @@ def _region_driven_capture(
             layout_doc = extract_pdf_layout(pdf_bytes)
     except Exception as exc:
         record_fallback("region_driven_setup_exception", detail=type(exc).__name__)
-        return empty, layout_doc
+        return empty, cap_column_by_id, layout_doc
 
     pages = getattr(layout_doc, "pages", None) or ()
 
@@ -521,6 +780,24 @@ def _region_driven_capture(
         for c in caps_sorted:
             cb = _bbox_of_caption_line(page_obj, c)
             cap_top_td[id(c)] = cb[1] if cb else None
+        # Side-by-side detection: when ≥2 captions share this page, look for a
+        # vertical whitespace gutter separating them into columns. If a gutter
+        # puts the captions in DIFFERENT columns, the page is 2-column
+        # side-by-side; clip each caption's region to its own column so Camelot
+        # can't merge the two tables, and rebuild each caption's text from its
+        # column. ``cap_column_x`` is empty for single-column / stacked pages.
+        cap_column_x: dict[int, tuple[float, float]] = {}
+        if len(caps_sorted) >= 2:
+            tops = [t for t in (cap_top_td.get(id(c)) for c in caps_sorted) if t is not None]
+            if tops:
+                page_w = float(getattr(page_obj, "width", 0.0) or 0.0)
+                band_top = min(tops) - _REGION_TOP_MARGIN_PT
+                band = (0.0, band_top, page_w, band_top + _GUTTER_SCAN_HEIGHT_PT)
+                gutters = _detect_column_gutters(page_obj, band)
+                if gutters:
+                    cap_column_x = _assign_caption_columns(
+                        caps_sorted, page_obj, gutters, page_w
+                    )
         for i, c in enumerate(caps_sorted):
             try:
                 region = _region_for_caption(layout_doc, c)
@@ -530,6 +807,17 @@ def _region_driven_capture(
             if region is None:
                 continue
             x0, top, x1, bottom = region.bbox
+            # Side-by-side column clip: bound this caption's region to its own
+            # column's x-range so Camelot extracts exactly that column's table
+            # (chandrashekar Table 3 = left column, Table 4 = right column).
+            col = cap_column_x.get(id(c))
+            if col is not None:
+                clipped_x0 = max(x0, col[0])
+                clipped_x1 = min(x1, col[1])
+                if clipped_x1 - clipped_x0 >= 1.0:
+                    x0, x1 = clipped_x0, clipped_x1
+                else:
+                    col = None  # degenerate clip → fall back to full-width
             # Clip the region TOP at the caption's own top. A table never extends
             # ABOVE its caption line; ``_region_for_caption``'s SEARCH_ABOVE
             # fallback can pull the region up into a PRECEDING table when no
@@ -540,8 +828,30 @@ def _region_driven_capture(
             this_cap_top = cap_top_td.get(id(c))
             if this_cap_top is not None and top < this_cap_top - _REGION_TOP_MARGIN_PT:
                 top = this_cap_top - _REGION_TOP_MARGIN_PT
+            # Side-by-side bottom clip: a column's region extends a fixed distance
+            # below the caption and overshoots into the body prose that flows
+            # below the table. Flowing single-column prose collapses Camelot's
+            # stream column detection to 1 column (chandrashekar Table 4 → 19×1
+            # instead of the 10×2 LeBel grid). Clip the bottom at the blank band
+            # between the table and that prose so Camelot sees only the grid.
+            if col is not None:
+                col_bottom = _column_table_bottom(
+                    page_obj, col_x0=x0, col_x1=x1, top=top, bottom=bottom
+                )
+                if col_bottom is not None and top < col_bottom < bottom:
+                    bottom = col_bottom
             # Clip bottom at the next same-page caption that sits below this one.
+            # A SIDE-BY-SIDE sibling (a caption assigned to a DIFFERENT column)
+            # must be skipped — it is beside, not below, so clipping at its top
+            # would crush this region to the caption-line band (chandrashekar
+            # Table 4's label is mis-located one row down, which without this
+            # would clip Table 3's region to ~22pt). Column membership, not
+            # vertical order, decides whether a "next" caption bounds this one.
             for j in range(i + 1, len(caps_sorted)):
+                if col is not None:
+                    nxt_col = cap_column_x.get(id(caps_sorted[j]))
+                    if nxt_col is not None and nxt_col != col:
+                        continue  # different column → side-by-side, not below
                 nxt_top = cap_top_td.get(id(caps_sorted[j]))
                 if nxt_top is not None and nxt_top > top + 5.0:
                     bottom = min(bottom, nxt_top - _REGION_NEXT_CAPTION_GAP_PT)
@@ -555,17 +865,23 @@ def _region_driven_capture(
                 "area": f"{x0:.2f},{page_height - top:.2f},{x1:.2f},{page_height - bottom:.2f}",
                 "area_bu": (x0, page_height - top, x1, page_height - bottom),
                 "label": c.label,
+                # Side-by-side columns must extract in an isolated Camelot call so
+                # stream column detection isn't computed across both narrow
+                # columns at once (which collapses each to 1 column).
+                "isolate": col is not None,
             })
             cap_by_key[key] = c
+            if col is not None:
+                cap_column_by_id[id(c)] = (page, col[0], col[1])
 
     if not specs:
-        return empty, layout_doc
+        return empty, cap_column_by_id, layout_doc
 
     try:
         by_key = extract_tables_camelot_by_region(pdf_bytes, specs)
     except Exception as exc:
         record_fallback("region_driven_extract_exception", detail=type(exc).__name__)
-        return empty, layout_doc
+        return empty, cap_column_by_id, layout_doc
 
     result: dict[int, Table] = {}
     for key, td in by_key.items():
@@ -576,13 +892,209 @@ def _region_driven_capture(
         # isolated/whitespace path uses — so ids stay deterministic and match the
         # recognized-prefix invariant (test_table_ids_unique_and_sequential).
         td["id"] = f"t{cap.number}"
-        td["caption"] = _extract_caption_text(
-            rejoined, cap, next_boundary_by_id.get(id(cap))
-        )
+        col_info = cap_column_by_id.get(id(cap))
+        cap_text = None
+        if col_info is not None:
+            # Mark this as a de-interleaved side-by-side column table so the
+            # candidate picker prefers it over a column-straddling auto-detect
+            # table (which merges both side-by-side tables into one grid).
+            td["_side_by_side"] = True
+            # Rebuild the caption from its own column's chars so it can't absorb
+            # the sibling caption's label / description across the gutter (the
+            # text-channel snippet interleaves them).
+            cap_text = _caption_text_from_column(
+                layout_doc, cap, page=col_info[0],
+                col_x0=col_info[1], col_x1=col_info[2],
+            )
+        if not cap_text:
+            cap_text = _extract_caption_text(
+                rejoined, cap, next_boundary_by_id.get(id(cap))
+            )
+        td["caption"] = cap_text
         result[id(cap)] = td
     if result:
         method_pieces.append("region_driven")
-    return result, layout_doc
+    return result, cap_column_by_id, layout_doc
+
+
+# A layout-channel caption-column line that signals the caption text has ENDED
+# and table/body content has begun: an APA condition/stimulus block opener
+# (``[Introduction]:``), a "Note"/"Source" footnote label, a bullet/dash list
+# marker, or a line that is just a number/short data token. The caption is the
+# label line + its (wrapped) title; everything at/after such a line is cells.
+_COLUMN_CAPTION_STOP_RE = re.compile(
+    r"^\s*(?:\[|•|·|●|○|–|—|-\s|Note[s.:]|Source[s.:]|\d+\s*$)",
+    re.IGNORECASE,
+)
+
+# Internal x-gap (pt) within a single column's row that signals two side-by-side
+# CELLS (a grid row: ``Design facet`` … ``Replication study``) rather than one
+# continuous caption-title line. A flowing title's inter-word gaps are a few pt;
+# an intra-column cell gap is much wider.
+_COLUMN_CELL_GAP_PT: float = 18.0
+
+
+def _row_has_wide_internal_gap(col_chars: list[dict]) -> bool:
+    """True if this column-restricted row splits into ≥2 cells — a grid row, not
+    a continuous caption-title line. Detects a single inter-glyph gap wider than
+    :data:`_COLUMN_CELL_GAP_PT` between consecutive chars (sorted by x)."""
+    prev_x1 = None
+    for c in col_chars:
+        x0 = float(c.get("x0", 0.0))
+        if prev_x1 is not None and x0 - prev_x1 > _COLUMN_CELL_GAP_PT:
+            return True
+        prev_x1 = max(prev_x1, float(c.get("x1", 0.0))) if prev_x1 is not None else float(c.get("x1", 0.0))
+    return False
+
+
+def _caption_text_from_column(
+    layout_doc,
+    cap: CaptionMatch,
+    *,
+    page: int,
+    col_x0: float,
+    col_x1: float,
+    max_lines: int = 6,
+) -> Optional[str]:
+    """Rebuild a side-by-side caption's text from its OWN column's layout chars.
+
+    The text channel interleaves side-by-side captions across the gutter; this
+    reads the caption directly from the layout channel, taking only the chars
+    whose x-midpoint falls inside ``[col_x0, col_x1)`` on rows from the caption's
+    label line downward, so the result is exactly the caption's own column. Walk
+    stops at the first blank band or :data:`_COLUMN_CAPTION_STOP_RE` body/cell
+    line, or after ``max_lines`` rows. Returns ``None`` on any failure so the
+    caller falls back to :func:`_extract_caption_text`.
+    """
+    try:
+        from .tables.detect import _bbox_of_caption_line
+        from .extract_layout import _join_chars_with_spaces
+        pages = getattr(layout_doc, "pages", None) or ()
+        if not (1 <= page <= len(pages)):
+            return None
+        page_obj = pages[page - 1]
+        cb = _bbox_of_caption_line(page_obj, cap)
+        if cb is None:
+            return None
+        ctop = cb[1]
+        rows: dict[int, list[dict]] = {}
+        for c in page_obj.chars or ():
+            rows.setdefault(round(float(c.get("top", 0.0))), []).append(c)
+        out_lines: list[str] = []
+        for top_key in sorted(rows.keys()):
+            if top_key < ctop - 1.0:
+                continue
+            col_chars = [
+                c for c in rows[top_key]
+                if col_x0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 < col_x1
+            ]
+            col_chars.sort(key=lambda c: float(c.get("x0", 0.0)))
+            line = _join_chars_with_spaces(col_chars).strip()
+            if not line:
+                if out_lines:
+                    break  # blank band after caption content → caption ends
+                continue
+            if out_lines and _COLUMN_CAPTION_STOP_RE.match(line):
+                break  # body / cell content begins
+            # A caption title line is continuous text; a GRID row splits the
+            # column into ≥2 cells with a wide internal gap (``Design facet`` …
+            # ``Replication study``). Stop before the first such row so the
+            # caption doesn't absorb the table header (this caption's label was
+            # located one row above the grid, so its real title sits between).
+            if out_lines and _row_has_wide_internal_gap(col_chars):
+                break
+            out_lines.append(line)
+            if len(out_lines) >= max_lines:
+                break
+        if not out_lines:
+            return None
+        snippet = re.sub(r"\s+", " ", " ".join(out_lines)).strip()
+        # Same caption cleanup as _extract_caption_text: drop soft-hyphen wrap
+        # artifacts, strip leading orphan punctuation, ensure the label prefix.
+        snippet = re.sub("­\\s+", "", snippet)
+        snippet = snippet.replace("­", "")
+        snippet = re.sub(r"^[\s.:\-—–]+", "", snippet)
+        if cap.label and not snippet.startswith(cap.label):
+            snippet = f"{cap.label}. {snippet}".strip()
+        # Guard: a real reconstruction carries description text beyond the bare
+        # label. If only the label survived (column clip too aggressive), signal
+        # failure so the text-channel fallback runs.
+        if len(snippet) <= len(cap.label) + 2:
+            return None
+        return snippet
+    except Exception as exc:
+        record_fallback("caption_column_rebuild_exception", detail=type(exc).__name__)
+        return None
+
+
+# A column body never extends past this many points below the caption — a single
+# table's content on one page. Bounds the walk so it can't run to the page foot.
+_COLUMN_BODY_MAX_HEIGHT_PT: float = 640.0
+
+
+def _column_body_text(
+    layout_doc,
+    cap: CaptionMatch,
+    *,
+    page: int,
+    col_x0: float,
+    col_x1: float,
+) -> Optional[str]:
+    """Rebuild a side-by-side ISOLATED table's body from its OWN column's chars.
+
+    The text-channel ``_extract_table_body_text`` walk crosses the gutter and
+    interleaves the two side-by-side tables' content (chandrashekar Table 3's body
+    came out as Table 4's entire LeBel grid followed by Table 3's stimuli). This
+    reads the body straight from the layout channel, taking only chars within
+    ``[col_x0, col_x1)`` on rows BELOW the caption line, so the body is exactly
+    this column's content. Line structure is preserved (the isolated ``raw_text``
+    is line-based). Returns ``None`` on failure so the caller keeps the text-
+    channel body.
+    """
+    try:
+        from .tables.detect import _bbox_of_caption_line
+        from .extract_layout import _join_chars_with_spaces
+        pages = getattr(layout_doc, "pages", None) or ()
+        if not (1 <= page <= len(pages)):
+            return None
+        page_obj = pages[page - 1]
+        cb = _bbox_of_caption_line(page_obj, cap)
+        if cb is None:
+            return None
+        # Body starts below the caption line. ``cb`` is the (mis-located, possibly
+        # one-row-down) caption row; start a little below its bottom so the
+        # caption's own wrapped lines are not re-included as body.
+        cap_bottom = cb[3]
+        rows: dict[int, list[dict]] = {}
+        for c in page_obj.chars or ():
+            rows.setdefault(round(float(c.get("top", 0.0))), []).append(c)
+        out_lines: list[str] = []
+        for top_key in sorted(rows.keys()):
+            if top_key <= cap_bottom + 1.0:
+                continue
+            if top_key > cap_bottom + _COLUMN_BODY_MAX_HEIGHT_PT:
+                break
+            col_chars = [
+                c for c in rows[top_key]
+                if col_x0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 < col_x1
+            ]
+            if not col_chars:
+                continue
+            col_chars.sort(key=lambda c: float(c.get("x0", 0.0)))
+            line = _join_chars_with_spaces(col_chars).strip()
+            if line:
+                out_lines.append(line)
+        if not out_lines:
+            return None
+        # Same soft-hyphen rejoin the text-channel body applies.
+        body = "\n".join(out_lines)
+        body = re.sub("­\\s+", "", body)
+        body = body.replace("­", "")
+        body = re.sub(r"[ \t]+", " ", body)
+        return body.strip() or None
+    except Exception as exc:
+        record_fallback("column_body_rebuild_exception", detail=type(exc).__name__)
+        return None
 
 
 def _find_caption_for_table(
@@ -601,6 +1113,20 @@ def _find_caption_for_table(
     same_page = [c for c in captions if c.page == page and id(c) not in used_caption_ids]
     if not same_page:
         return None
+    # Caption-marker hint (authoritative): Camelot routinely absorbs a table's own
+    # caption line ("Table 9. Summary …") as the grid's first row, which
+    # ``_camelot_table_to_dict`` strips but records as ``_caption_hint_number``.
+    # That number IS the table's identity — far more reliable than caption-line
+    # token overlap, which ties when two same-page captions share a stray word
+    # (cog_emo p13: the Table 9 grid carries "Replication" as a column header,
+    # tying Table 8's caption and stealing it on the char_start tie-break, leaving
+    # the real Table 8 intercorrelation matrix unpaired). When the hint names an
+    # unused same-page caption, pair to it directly.
+    hint = camelot_table.get("_caption_hint_number")
+    if hint is not None:
+        for c in same_page:
+            if c.number == hint:
+                return c
     if len(same_page) == 1:
         return same_page[0]
     # Score each caption by token overlap with the camelot table content
@@ -617,12 +1143,30 @@ def _find_caption_for_table(
     return best[2]
 
 
-_CAPTION_TOKEN_RE = re.compile(r"[a-z]{3,}|\d+(?:\.\d+)?")
+# collabra_77859 Tables 2↔3 same-page mispairing fix: exclude BARE integers from
+# the caption-overlap tokenizer. A standalone digit — a table number ("Table 2" /
+# "Study 2"), a page number, a stray count in a categorical grid — matches
+# indiscriminately and manufactures a false +1 that mis-paired the page-7 stat /
+# categorical grids (whose real content shares no descriptive words with the
+# caption): "Table 2. Study 2 results" scored +1 against the Dish-sets grid purely
+# on a stray "2", beating the geometrically-correct pairing at 0. A DECIMAL
+# (``4.76``) is a genuine statistic and is kept. Was ``\d+(?:\.\d+)?``.
+#
+# NOTE: the region-driven capture already pins each collabra caption to its own
+# table by construction, so with this false token removed Tables 2/3/4/5 label
+# correctly AND deterministically across runs — no reading-order tie-break is
+# needed. (A reading-order visit-order sort was tried to make the zero-overlap
+# tie deterministic but it perturbed the greedy visit order corpus-wide and
+# regressed chan_feldman Table 6 — a degenerate prose grid got promoted into a
+# table — so it was rejected; the same blast-radius class as the global-assignment
+# refactor. See project memory / CHANGELOG.)
+_CAPTION_TOKEN_RE = re.compile(r"[a-z]{3,}|\d+\.\d+")
 
 
 def _caption_overlap_tokens(text: Optional[str]) -> set[str]:
     """Token set used to score a caption line against a table's text: lowercase
-    words of 3+ letters and numbers. Shared by the greedy pairing
+    words of 3+ letters and DECIMAL numbers (bare integers are excluded — see
+    :data:`_CAPTION_TOKEN_RE`). Shared by the greedy pairing
     (``_find_caption_for_table``) and the duplicate-starvation rescue so both use
     one identical scheme."""
     return set(_CAPTION_TOKEN_RE.findall((text or "").lower()))
@@ -1566,6 +2110,9 @@ def _isolated_table_from_caption(
     cap: CaptionMatch,
     raw_text: str,
     next_boundary: Optional[int] = None,
+    *,
+    caption_override: Optional[str] = None,
+    body_override: Optional[str] = None,
 ) -> Table:
     """Build an isolated (cellless) Table dict for a caption with no Camelot match.
 
@@ -1577,9 +2124,16 @@ def _isolated_table_from_caption(
     caption is much better than the previous "no cells or raw text
     extracted" banner — the user sees the table's information, just as
     a flat list rather than a structured grid.
+
+    ``caption_override`` / ``body_override`` supply a pre-built caption / body
+    (the layout-channel column-bounded rebuild for a side-by-side caption) so an
+    isolated table on a 2-column page does not fall back to the gutter-crossing
+    text-channel caption/body (which interleaves the two side-by-side tables).
     """
-    cap_text = _extract_caption_text(raw_text, cap, next_boundary)
-    body_text = _extract_table_body_text(raw_text, cap, next_boundary)
+    cap_text = caption_override or _extract_caption_text(raw_text, cap, next_boundary)
+    body_text = body_override if body_override is not None else _extract_table_body_text(
+        raw_text, cap, next_boundary
+    )
     return {
         "id": f"t{cap.number}",
         "label": cap.label,

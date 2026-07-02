@@ -486,6 +486,15 @@ def _resolve_hyphen_ci(
     return None, None
 
 
+# The CI-upper-bound dropped-minus recovery (B7 / GLYPH) lives in normalize.py
+# as the single shared home for all `recover_*` glyph helpers — it is applied in
+# three table surfaces: this structured-table flatten path (separate estimate/CI
+# columns), cell_cleaning._html_escape (same-cell estimate+CI in the `<table>`
+# HTML), and the render post-process over the assembled .md. Imported here so
+# there is exactly one definition of the estimate-containment invariant.
+from docpluck.normalize import recover_dropped_minus_ci_upper  # noqa: E402
+
+
 def _parse_ci_cell(
     s: str, estimate: Optional[float] = None
 ) -> tuple[Optional[float], Optional[float]]:
@@ -1182,6 +1191,28 @@ def _flatten_one_row(
         if k in role_nums and (role_nums[k] <= 0 or role_nums[k] != int(role_nums[k])):
             role_nums.pop(k)
             role_vals.pop(k, None)
+    # Dropped-minus on a CI UPPER bound (B7 / GLYPH, table channel). pdftotext
+    # can drop or detach the leading U+2212 of a CI's upper bound while keeping
+    # the lower bound's minus, so a negative interval [-0.78, -0.66] is parsed
+    # as [-0.78, 0.67]. W0g/W0h (normalize.py) trust the bracket, so this minus
+    # — dropped from the bracket itself — is invisible to them. Recover it from
+    # the row's own point estimate via the estimate-containment invariant. Runs
+    # BEFORE the monotonicity guard so the corrected (now-monotonic) interval is
+    # kept, not dropped. On a correction, drop the raw `CI` display string so
+    # the sentence re-renders from the fixed numerics instead of the corrupt
+    # cell text (which still shows the dropped/stray-dash upper bound).
+    if "CI_lower" in role_nums and "CI_upper" in role_nums:
+        _est_for_ci = next(
+            (role_nums[k] for k in ("r", "d", "est") if k in role_nums), None
+        )
+        if _est_for_ci is not None:
+            _fixed_hi = recover_dropped_minus_ci_upper(
+                _est_for_ci, role_nums["CI_lower"], role_nums["CI_upper"]
+            )
+            if _fixed_hi is not None:
+                role_nums["CI_upper"] = _fixed_hi
+                role_vals.pop("CI", None)
+
     if (
         "CI_lower" in role_nums
         and "CI_upper" in role_nums
