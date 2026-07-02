@@ -54,6 +54,20 @@ _CAPTION_ROW_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Same anchor as ``_CAPTION_ROW_PATTERN`` but capturing the integer table number,
+# for the caption-marker pairing hint (see ``_leading_table_caption_number``).
+_TABLE_CAPTION_NUMBER_PATTERN = re.compile(
+    r"^\s*Table\s+(\d+)(?:\.\d+)?\s*[.:]",
+    re.IGNORECASE,
+)
+
+# A caption-continuation TAIL fragment that pdftotext/Camelot leaves as the first
+# grid row when the region top includes the caption's last wrapped line — a bare
+# parenthetical year ("(2019)") or a lone "(citation)" with nothing else in the
+# row. Dropped only when it is the SOLE populated cell of a leading row (a real
+# header/data row never consists of just a parenthetical year).
+_CAPTION_TAIL_FRAGMENT_RE = re.compile(r"^\(\s*\d{4}[a-z]?\s*\)$")
+
 
 def _row_joined(row: list[str]) -> str:
     return " ".join(c for c in row if c).strip()
@@ -83,6 +97,33 @@ def _strip_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
     return out
 
 
+def _leading_table_caption_number(rows: list[list[str]]) -> int | None:
+    """Return the integer ``N`` if one of the first 3 rows IS a ``Table N.``
+    caption line — i.e. Camelot absorbed the table's own caption into the grid.
+
+    This is a strong, deterministic table-identity signal (cf. PDFFigures 2.0's
+    caption-start consistency check): a grid that literally starts with
+    ``Table 9. Summary …`` is Table 9's, regardless of how a downstream
+    token-overlap pairing would score it. Used by ``extract_structured`` to
+    pin the grid to its true caption, sidestepping the same-page-caption
+    mispairing where two captions tie on caption-line token overlap.
+
+    Scans the SAME 3-row window ``_drop_caption_first_row`` uses (the caption is
+    always at the top); the anchored ``^\\s*Table\\s+\\d+\\s*[.:]`` shape (start of
+    row, terminated by ``.``/``:``) is the same one already trusted to DROP these
+    rows, so an inline back-reference like ``see Table 2`` mid-row does not match.
+    Returns the FIRST such number found.
+    """
+    for row in rows[:3]:
+        m = _TABLE_CAPTION_NUMBER_PATTERN.match(_row_joined(row))
+        if m:
+            try:
+                return int(m.group(1))
+            except (ValueError, TypeError):
+                return None
+    return None
+
+
 def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
     """Drop "Table N. Caption text" rows from among the first 3 rows.
 
@@ -90,13 +131,26 @@ def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
     already extracted the caption from the surrounding text, so this row is
     duplicate noise. Scan the first 3 rows to catch cases where the running
     header occupies row 0 and the caption is at row 1 or 2.
+
+    Also drops a LEADING caption-continuation tail fragment — a row whose sole
+    populated cell is a bare parenthetical year (``(2019)``) — which a region
+    whose top edge includes the caption's last wrapped line leaves above the real
+    header row (chandrashekar Table 4: the caption's ``…LeBel et al. (2019)`` tail
+    became grid row 0). Only a leading single-cell ``(YYYY)`` row qualifies, so a
+    real header/data row is never removed.
     """
     out: list[list[str]] = []
     seen_caption = False
+    started = False
     for i, row in enumerate(rows):
         if i < 3 and not seen_caption and _CAPTION_ROW_PATTERN.search(_row_joined(row)):
             seen_caption = True
             continue
+        if not started:
+            nonempty = [c for c in row if c and c.strip()]
+            if len(nonempty) == 1 and _CAPTION_TAIL_FRAGMENT_RE.match(nonempty[0].strip()):
+                continue  # leading caption-tail fragment row → drop
+        started = True
         out.append(row)
     return out
 
@@ -349,6 +403,7 @@ def _camelot_table_to_dict(
     accuracy_threshold: float = 50.0,
     id_prefix: str = "camelot_t",
     label: str | None = None,
+    allow_categorical: bool = False,
 ) -> Table | None:
     """Convert one Camelot table object into a docpluck Table dict, applying the
     shared row-cleaning pipeline (running-header strip, caption-row drop, prose
@@ -358,6 +413,15 @@ def _camelot_table_to_dict(
     or doesn't survive the cleaning gate. ``label`` (when given — the
     region-driven path knows the caption by construction) is carried onto the
     dict; the legacy auto-detect path passes ``None`` and lets the caller pair.
+
+    ``allow_categorical`` relaxes the region-path clean-grid gate to accept a
+    purely CATEGORICAL table (text labels + text values, no numeric data cells —
+    e.g. a replication-classification "Design facet | Same/Different" grid). The
+    default numeric-data-row requirement is the right guard for the generic
+    whitespace fallback, but the SIDE-BY-SIDE region path bounds the table by
+    construction (gutter-clipped column + table-bottom clip + high Camelot
+    accuracy), so a categorical grid there is trustworthy. The prose-fragment and
+    caption-absorption guards still apply.
     """
     try:
         accuracy = float(ct.accuracy)
@@ -385,6 +449,10 @@ def _camelot_table_to_dict(
         row_matrix.append(row_cells)
 
     row_matrix = _strip_running_header_rows(row_matrix)
+    # Capture the table's own absorbed caption number BEFORE the caption row is
+    # dropped — it is the most reliable identity signal for caption pairing
+    # (see ``_leading_table_caption_number``).
+    caption_hint = _leading_table_caption_number(row_matrix)
     row_matrix = _drop_caption_first_row(row_matrix)
     # Trim trailing prose rows (Camelot sometimes bundles a small real table at
     # the top of a 2-column page with body prose below).
@@ -427,8 +495,8 @@ def _camelot_table_to_dict(
     # keeps its own _trim_prose_tail / _is_table_like gate.
     if id_prefix.startswith("region"):
         from .whitespace import _trim_trailing_prose_rows, _whitespace_grid_is_clean
-        cells = _trim_trailing_prose_rows(cells)
-        if not _whitespace_grid_is_clean(cells):
+        cells = _trim_trailing_prose_rows(cells, allow_categorical=allow_categorical)
+        if not _whitespace_grid_is_clean(cells, allow_categorical=allow_categorical):
             return None
         if not cells:
             return None
@@ -481,6 +549,10 @@ def _camelot_table_to_dict(
         "cells": cells,
         "html": html,
         "raw_text": "\n".join(raw_row_texts),
+        # Internal-only pairing hint: the table's own absorbed caption number, if
+        # any. Consumed + popped by ``extract_structured._find_caption_for_table``;
+        # never surfaces in the public Table output.
+        "_caption_hint_number": caption_hint,
     }
 
 
@@ -620,50 +692,76 @@ def extract_tables_camelot_by_region(
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
 
+    def _match_and_emit(specs: list[dict], tables: list) -> None:
+        # One-to-one greedy match: each returned table claimed by the spec it
+        # best overlaps. Camelot returns tables sorted by POSITION, not in
+        # table_areas order, and two caption regions can overlap (a lower
+        # caption inside an upper table's region) — so match by bbox, not by
+        # index, and let each Camelot table back at most one spec.
+        cand: list[tuple[float, int, int]] = []  # (overlap, spec_i, table_i)
+        for si, spec in enumerate(specs):
+            for ti, t in enumerate(tables):
+                tb = tuple(getattr(t, "_bbox", ()) or ())
+                frac = _area_overlap_frac(spec["area_bu"], tb)
+                if frac > 0.0:
+                    cand.append((frac, si, ti))
+        cand.sort(reverse=True)
+        used_s: set[int] = set()
+        used_t: set[int] = set()
+        for frac, si, ti in cand:
+            if si in used_s or ti in used_t:
+                continue
+            used_s.add(si)
+            used_t.add(ti)
+            spec = specs[si]
+            td = _camelot_table_to_dict(
+                tables[ti], 0,
+                accuracy_threshold=accuracy_threshold,
+                id_prefix="region_t",
+                label=spec.get("label"),
+                allow_categorical=bool(spec.get("isolate")),
+            )
+            if td is not None:
+                td["id"] = f"region_{spec['key']}"
+                out[spec["key"]] = td
+
     out: dict[str, Table] = {}
     try:
         for page, specs in by_page.items():
-            areas = [s["area"] for s in specs]
-            try:
-                tables = list(
-                    camelot.read_pdf(
-                        tmp_path, pages=str(page), flavor="stream",
-                        table_areas=areas, strip_text="\n", suppress_stdout=True,
+            # Side-by-side column specs (``isolate=True``) MUST run in their own
+            # single-area Camelot call: ``stream`` column detection is computed
+            # across ALL table_areas in a call, so batching a narrow left column
+            # and a narrow right column together makes Camelot collapse each to a
+            # single column (chandrashekar Table 4 → 19×1 instead of the 10×2
+            # LeBel grid). Isolating each restores correct per-column structure.
+            isolated = [s for s in specs if s.get("isolate")]
+            batched = [s for s in specs if not s.get("isolate")]
+            for spec in isolated:
+                try:
+                    tables = list(
+                        camelot.read_pdf(
+                            tmp_path, pages=str(page), flavor="stream",
+                            table_areas=[spec["area"]], strip_text="\n",
+                            suppress_stdout=True,
+                        )
                     )
-                )
-            except Exception as exc:
-                record_fallback("camelot_region_exception", detail=type(exc).__name__)
-                continue
-            # One-to-one greedy match: each returned table claimed by the spec it
-            # best overlaps. Camelot returns tables sorted by POSITION, not in
-            # table_areas order, and two caption regions can overlap (a lower
-            # caption inside an upper table's region) — so match by bbox, not by
-            # index, and let each Camelot table back at most one spec.
-            cand: list[tuple[float, int, int]] = []  # (overlap, spec_i, table_i)
-            for si, spec in enumerate(specs):
-                for ti, t in enumerate(tables):
-                    tb = tuple(getattr(t, "_bbox", ()) or ())
-                    frac = _area_overlap_frac(spec["area_bu"], tb)
-                    if frac > 0.0:
-                        cand.append((frac, si, ti))
-            cand.sort(reverse=True)
-            used_s: set[int] = set()
-            used_t: set[int] = set()
-            for frac, si, ti in cand:
-                if si in used_s or ti in used_t:
+                except Exception as exc:
+                    record_fallback("camelot_region_exception", detail=type(exc).__name__)
                     continue
-                used_s.add(si)
-                used_t.add(ti)
-                spec = specs[si]
-                td = _camelot_table_to_dict(
-                    tables[ti], 0,
-                    accuracy_threshold=accuracy_threshold,
-                    id_prefix="region_t",
-                    label=spec.get("label"),
-                )
-                if td is not None:
-                    td["id"] = f"region_{spec['key']}"
-                    out[spec["key"]] = td
+                _match_and_emit([spec], tables)
+            if batched:
+                areas = [s["area"] for s in batched]
+                try:
+                    tables = list(
+                        camelot.read_pdf(
+                            tmp_path, pages=str(page), flavor="stream",
+                            table_areas=areas, strip_text="\n", suppress_stdout=True,
+                        )
+                    )
+                except Exception as exc:
+                    record_fallback("camelot_region_exception", detail=type(exc).__name__)
+                    continue
+                _match_and_emit(batched, tables)
         return out
     finally:
         try:

@@ -12,9 +12,11 @@ p-value with a comparison operator) and the statistic *vocabulary* recovered
 from the caption / footnote / all header rows — never from bare column position.
 
 Contract tests use synthetic grids that mirror the real cleaned grids of
-``10.1525/collabra.77859`` Table 5 and ``10.1525/collabra.90203`` Tables 8/9;
-``test_*_real_pdf`` exercise the public library on the actual PDFs (rule 0d),
-skipping when the closed-access fixtures aren't present.
+``10.1525/collabra.77859`` (its Replication-analyses / Study-2-results tables —
+Tables 4 and 2 per the physical captions + reading gold) and
+``10.1525/collabra.90203`` Tables 8/9; ``test_*_real_pdf`` exercise the public
+library on the actual PDFs (rule 0d), skipping when the closed-access fixtures
+aren't present.
 
 Request: ``REQUEST_11_FLATTEN_FIELDS_NONCLINICAL_TABLES.md``.
 """
@@ -148,7 +150,12 @@ class TestT90203Table9DfPair:
         assert "BF01 = 11.56" in repl["sentence"]
 
 
-# ── Collabra 77859 Table 5 — blank t/p/df cols + "d or dz [95% CI]" header ───
+# ── Collabra 77859 Table 4 — blank t/p/df cols + "d or dz [95% CI]" header ───
+# (Synthetic grid mirroring the "Study 4: Replication analyses" table. That
+# table is **Table 4** per the physical caption + reading gold; the class name
+# keeps the legacy "Table5" spelling only to avoid churn — the grid it mirrors is
+# the same Separate/Joint-Evaluation table whose real-PDF row the
+# ``test_collabra_77859_table4_separate_eval_real_pdf`` test now verifies.)
 
 
 class TestT77859Table5DorDz:
@@ -196,17 +203,22 @@ class TestT77859Table5DorDz:
         assert "[[" not in sep["sentence"]  # no doubled brackets
 
 
-# ── Collabra 77859 Table 3 — parallel arms PACKED into single cells ──────────
+# ── Collabra 77859 Table 2 — parallel arms PACKED into single cells ──────────
+# (Synthetic grid mirroring the "Study 2 results" table — **Table 2** per the
+# physical caption + reading gold. The class name keeps the legacy "Table3"
+# spelling only to avoid churn; the real-PDF row is now verified by
+# ``test_collabra_77859_table2_packed_arms_real_pdf``.)
 
 _MS = "\x00BR\x00"  # the _MERGE_SEPARATOR sentinel, as it appears in a folded cell
 
 
 class TestT77859Table3PackedArms:
-    """Table 3 packs both evaluation arms (Separate, Joint) into single cells:
-    the arm-label column reads ``"Separate<sep>Joint"`` and every data cell holds
-    two space-joined values (``".07 [-.17,.31] .08 [-.09, .25]"``). Request 11
-    acceptance #1 requires these split into one record per arm carrying d + CI.
-    Grid mirrors the real cleaned grid (fold sentinels included)."""
+    """This "Study 2 results" grid packs both evaluation arms (Separate, Joint)
+    into single cells: the arm-label column reads ``"Separate<sep>Joint"`` and
+    every data cell holds two space-joined values
+    (``".07 [-.17,.31] .08 [-.09, .25]"``). Request 11 acceptance #1 requires
+    these split into one record per arm carrying d + CI. Grid mirrors the real
+    cleaned grid (fold sentinels included)."""
 
     HEADER = ["", "", "M (SD)", "M (SD)", "", "", "", "d or dz [95%CI]"]
     BODY = [
@@ -402,12 +414,25 @@ _skip_under_xdist = pytest.mark.skipif(
     not pdf_available(_AR, "10.1525__collabra.77859.pdf"),
     reason="closed-access fixture not present in the article repository",
 )
-def test_collabra_77859_table5_real_pdf():
+def test_collabra_77859_table4_separate_eval_real_pdf():
+    """The Separate-Evaluation t/df/d row of collabra.77859's "Study 4:
+    Replication analyses" table flattens with every blank-header stat field.
+
+    This row lives in **Table 4** ("Table 4. Study 4: Replication analyses" —
+    confirmed by the physical PDF caption AND the article-finder `reading` gold,
+    where it is gold Table 4 line "Separate Evaluation … 6.23 <.001 257 0.76
+    [.50, 1.02]"). An earlier revision of this test asserted it against "Table 5"
+    because the pre-v2.4.99 caption pairing mislabeled the page-7/8 grids; the
+    region-driven capture (v2.4.99) + the reading-order pairing tie-break now
+    label it correctly, so the assertion targets Table 4 (gold-correct). Table 5
+    is the "Comparison of original and replication effects" grid (Less is better /
+    More is better), a different table.
+    """
     b = Path(pdf_path(_AR, "10.1525__collabra.77859.pdf")).read_bytes()
     r = extract_pdf_structured(b)
-    t5 = next((t for t in r["tables"] if t.get("label") == "Table 5"), None)
-    assert t5 is not None, "Table 5 not extracted from collabra.77859"
-    rows = flatten_table(t5)
+    t4 = next((t for t in r["tables"] if t.get("label") == "Table 4"), None)
+    assert t4 is not None, "Table 4 not extracted from collabra.77859"
+    rows = flatten_table(t4)
     sep = next((x for x in rows if x["row_label"].startswith("Separate")), None)
     assert sep is not None, "Separate-evaluation row missing"
     f = sep["fields"]
@@ -424,15 +449,25 @@ def test_collabra_77859_table5_real_pdf():
     not pdf_available(_AR, "10.1525__collabra.77859.pdf"),
     reason="closed-access fixture not present in the article repository",
 )
-def test_collabra_77859_table3_packed_arms_real_pdf():
-    """Acceptance #1 (Table 3): the packed Separate/Joint arms split into one
-    record per arm, each carrying d + sign-correct CI. DP-2 extends this: the
-    blank-header p and (Welch) df columns must also be typed into `fields`."""
+def test_collabra_77859_table2_packed_arms_real_pdf():
+    """Acceptance #1: the packed Separate/Joint arms of the "Study 2 results"
+    table split into one record per arm, each carrying d + sign-correct CI. DP-2
+    extends this: the blank-header p and (Welch) df columns must also be typed
+    into `fields`.
+
+    These Attractive/Affect rows live in **Table 2** ("Table 2. Study 2 results"
+    — confirmed by the physical PDF caption AND the article-finder `reading` gold,
+    where they are gold Table 2). An earlier revision asserted them against
+    "Table 3" because the pre-v2.4.99 same-page caption pairing swapped the two
+    page-7 grids (Study-2-results ↔ Dish-sets); the reading-order pairing
+    tie-break now labels them correctly, so the assertion targets Table 2
+    (gold-correct). Table 3 is the "Study 4: Dish sets" categorical grid.
+    """
     b = Path(pdf_path(_AR, "10.1525__collabra.77859.pdf")).read_bytes()
     r = extract_pdf_structured(b)
-    t3 = next((t for t in r["tables"] if t.get("label") == "Table 3"), None)
-    assert t3 is not None, "Table 3 not extracted from collabra.77859"
-    rows = flatten_table(t3)
+    t2 = next((t for t in r["tables"] if t.get("label") == "Table 2"), None)
+    assert t2 is not None, "Table 2 not extracted from collabra.77859"
+    rows = flatten_table(t2)
     attr = [x for x in rows if x["row_label"].startswith("Attractive")]
     assert len(attr) == 2, "Attractive row should split into Separate + Joint arms"
     by_arm = {x["fields"].get("group"): x["fields"] for x in attr}

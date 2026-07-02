@@ -41,6 +41,8 @@ from docpluck.normalize import (
     destyle_math_alphanumeric,
     recover_corrupted_lt_operator,
     recover_corrupted_minus_signs,
+    recover_dropped_minus_ci_upper,
+    recover_dropped_minus_ci_upper_in_text,
     recover_pua_glyphs,
 )
 
@@ -87,6 +89,16 @@ def _html_escape(s: str | None) -> str:
     # recovered operator is HTML-escaped like any other "<". Same shared
     # helper as normalize.py's W0c step (table cells bypass W0c).
     s = recover_corrupted_lt_operator(s)
+    # Recover a CI UPPER bound whose leading minus pdftotext/Camelot dropped or
+    # detached into a stray en-dash — a same-cell "<estimate> ... [lo, hi]"
+    # correlation cell ("−.73***\x00BR\x00[−0.78,  –  0.67] (−0.72)") where the
+    # upper bound's minus is lost so a negative interval reads positive. Keyed on
+    # the estimate-containment invariant; self-guards a legitimate zero-straddling
+    # CI. W0g/W0h (normalize body) trust the bracket, so this minus dropped from
+    # the bracket ITSELF is recovered here for the table channel (B7 / GLYPH,
+    # v2.4.100). The merge-separator placeholders are still present, so the
+    # decoration span matches across a "\x00BR\x00" wrap.
+    s = recover_dropped_minus_ci_upper_in_text(s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -95,6 +107,73 @@ def _html_escape(s: str | None) -> str:
         .replace(_SUP_OPEN, "<sup>")
         .replace(_SUP_CLOSE, "</sup>")
     )
+
+
+# A cell holding ONLY a CI bracket: "[−0.78, −0.67]", "[−0.52,  0.33]",
+# "[−0.78,  –  0.67]" (detached en-dash on the upper bound). Groups: (1) lo
+# sign+magnitude, (2) detached dash run before hi, (3) hi attached sign, (4) hi
+# magnitude. Sign chars accept ASCII hyphen AND U+2212; the detached separator
+# also accepts en/em dash. Anchored end-to-end so a combined estimate+CI cell
+# does not match (that path is handled by recover_dropped_minus_ci_upper_in_text).
+_CI_BRACKET_CELL_RE = re.compile(
+    r"^\s*\[\s*([-−]?\s*\d*\.\d+)\s*,"
+    r"\s*([-−–—]\s+)?([-−]?)(\d*\.\d+)\s*\]\s*$"
+)
+# A cell stating a signed point estimate: "r = -.73", "−.32", "d = -0.43",
+# "-.43". The leading label (r/d/β/…) is optional; what matters is a signed
+# decimal that is the cell's principal value.
+_EST_CELL_RE = re.compile(
+    r"^\s*(?:[A-Za-zβΒ]+\s*=\s*)?([-−])\s*(\d*\.\d+)\s*$"
+)
+
+
+def _recover_ci_upper_in_grid_row(row: list[str]) -> list[str]:
+    """Recover a dropped/detached minus on a CI UPPER bound when the estimate
+    and the CI live in SEPARATE cells of the same row (the region-driven grid
+    shape: ``… <td>r = -.73</td> <td>[−0.78,  –  0.67]</td> …``). For each
+    CI-bracket cell, the nearest signed-estimate cell to its LEFT in the same
+    row anchors the estimate-containment invariant
+    (``recover_dropped_minus_ci_upper``); on a flip the bracket cell is
+    rewritten with a single minus on the upper bound. The same-cell shape
+    (estimate+CI mashed in one cell) is handled separately by
+    ``recover_dropped_minus_ci_upper_in_text`` in ``_html_escape``. No-op when a
+    row has no estimate-anchored bracket cell."""
+    # Pre-scan the row for signed point estimates (cell index -> value).
+    est_at: dict[int, float] = {}
+    for i, cell in enumerate(row):
+        m = _EST_CELL_RE.match(cell or "")
+        if m:
+            try:
+                est_at[i] = float(("-" if m.group(1) in ("-", "−") else "") + m.group(2))
+            except ValueError:
+                pass
+    if not est_at:
+        return row
+    out = list(row)
+    for j, cell in enumerate(row):
+        m = _CI_BRACKET_CELL_RE.match(cell or "")
+        if not m:
+            continue
+        # Nearest estimate cell to the LEFT (correlation grids place the
+        # estimate immediately before its CI within the same arm).
+        left_est_idx = [k for k in est_at if k < j]
+        if not left_est_idx:
+            continue
+        est = est_at[max(left_est_idx)]
+        try:
+            lo = float(m.group(1).replace("−", "-").replace(" ", ""))
+            attached = m.group(3) or ""
+            hi_signed = ("-" if attached in ("-", "−") else "") + m.group(4)
+            hi = float(hi_signed)
+        except ValueError:
+            continue
+        fixed_hi = recover_dropped_minus_ci_upper(est, lo, hi)
+        if fixed_hi is None:
+            continue
+        lo_txt = re.sub(r"\s+", "", m.group(1))
+        minus = "−" if lo_txt.startswith("−") else "-"
+        out[j] = f"[{lo_txt}, {minus}{m.group(4)}]"
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -800,6 +879,10 @@ def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
                 f"{_html_escape(row[0])}</strong></td></tr>"
             )
             continue
+        # Recover a dropped/detached minus on a CI upper bound when the row's
+        # estimate and CI are in separate cells (region-driven grid). The
+        # same-cell shape is handled inside _html_escape.
+        row = _recover_ci_upper_in_grid_row(row)
         lines.append("    <tr>")
         for c in row:
             lines.append(f"      <td>{_html_escape(c)}</td>")
