@@ -41,7 +41,11 @@ def test_cli_sections_json_output():
         assert code == 0, err
         payload = json.loads(out)
         assert "sections" in payload
-        assert payload["sectioning_version"] == "1.2.2"
+        # Assert the CLI reports the CURRENT sectioning version (not a hard-coded
+        # literal that goes stale on every SECTIONING_VERSION bump — the 1.2.2→
+        # 1.2.3 v2.4.105 bump left this red until it was next run).
+        from docpluck.sections import SECTIONING_VERSION
+        assert payload["sectioning_version"] == SECTIONING_VERSION
         assert any(s["canonical_label"] == "abstract" for s in payload["sections"])
 
 

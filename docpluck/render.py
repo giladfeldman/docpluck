@@ -2126,6 +2126,239 @@ def _strip_body_affiliation_block(text: str) -> str:
     return cleaned
 
 
+# ── Wrapped subsection-heading REJOIN (2026-07-03, C1) ────────────────────
+#
+# A LONG Results-subsection heading (RR / replication papers write these as
+# multi-word Sentence/Title-Case phrases, often carrying a "(Extension)" /
+# "(Replication)" / "(Exploratory Extension)" qualifier) is column-wrapped by
+# pdftotext across 2-3 PHYSICAL lines with NO blank between the head, the
+# wrapped tail, and the following body paragraph, e.g. (ip_feldman_2025_pspb):
+#
+#     <blank>
+#     Complementary Analysis: Interaction Between      <- HEAD (heading candidate)
+#     Self and Others in Predicting Well-Being         <- TAIL 1 (wrapped title)
+#     (Exploratory Extension)                          <- TAIL 2 (paren qualifier)
+#     We also explored interactions between one's own…  <- BODY prose
+#
+# Left un-rejoined, the downstream promoters mangle it THREE different ways on
+# the same paper: the ≤6-word ``### `` promoter fires on the HEAD alone and
+# strands the tail in body; the 5-12-word ``## `` major-section promoter grabs
+# a stranded tail line as its OWN over-promoted heading; or the whole thing
+# falls to body. The gold has each as ONE ``### `` heading. This pass rejoins
+# the wrap BEFORE any promoter runs, so the promoters classify the full title.
+#
+# Structural signature (no paper identity, no hard-coded strings) — ALL hold:
+#   1. HEAD is a Title-Case subsection-label shape (≤6 words,
+#      _looks_like_titlecase_subsection_label) at a CLEAN paragraph boundary
+#      (_prev_paragraph_is_sentence_terminated — the same guard that kills the
+#      "Supplemental Materials" mid-Method false promotion).
+#   2. The line IMMEDIATELY after the HEAD is a heading-ish TAIL (glued — no
+#      blank between). The glue is what marks a WRAP vs a complete short heading
+#      that is legitimately followed (after a blank) by prose.
+#   3. 1-2 tail lines, each heading-ish (short, Title-Case-dominant or a bare
+#      "(qualifier)", never a full sentence / lowercase prose).
+#   4. After the tail, GENUINE body prose (or blank then prose) follows.
+#   5. Disambiguators against merging non-headings:
+#      - HEAD "hangs" (ends in a continuation/function word — "Between", "and",
+#        "Using Target's" possessive — a title that grammatically continues) OR
+#        the joined tail ends in a balanced "(qualifier)".
+#      - HEAD is SUBSTANTIAL: carries a colon-led title OR is >=3 words. A bare
+#        2-word head wrapping onto one word ("Support for" + "Leader") is a
+#        scattered figure-DIAGRAM node-label pair, not a heading (jesp.2014).
+#      - NOT figure-adjacent: no "Fig. N." / "Figure N." caption immediately
+#        before the head or after the tail (figure node-labels live next to
+#        their caption).
+#      - Joined title <=115 chars / <=14 words (a runaway prose-merge is longer).
+#   FP-validated 2026-07-03 across a 16-paper broad-read + canary set: the only
+#   joins were the ip_feldman targets and two gold/context-confirmed real
+#   headings (collabra.90203 "Associations between Aggregated Feelings and
+#   Hypothetical Donations"; psych-sci "Contextual Confidence and Postdecision
+#   Processing"); ZERO prose-merges. See _project/lessons.md 2026-07-03.
+
+# Words that, ending a heading HEAD line (or a tail), indicate the title
+# continues onto the next physical line. Superset of the mid-title function
+# words that legitimately appear inside academic section titles.
+_HEADING_HANGS_WORDS = frozenset({
+    "and", "or", "the", "a", "an", "of", "in", "on", "to", "for", "with",
+    "within", "between", "among", "across", "through", "via", "by", "from",
+    "into", "as", "at", "using", "under", "over", "about", "after", "before",
+    "against", "during", "than",
+})
+_HEADING_FIG_CAPTION_RE = re.compile(r"^\*?\s*(?:Fig\.?|Figure)\s+\d+[.:]", re.IGNORECASE)
+
+
+def _line_is_headingish_tail(line: str) -> bool:
+    """True when ``line`` is the wrapped TAIL of a section heading: short,
+    Title-Case-dominant (or a bare parenthetical qualifier), NOT a full
+    sentence, NOT lowercase-led body prose."""
+    s = line.strip()
+    if not s or len(s) > 55:
+        return False
+    if s.startswith(("#", "*", "_", "<", ">", "|", "`", "-", "+", "=")):
+        return False
+    # Not a full sentence: no internal ". " and no terminal .!?;: (a trailing
+    # ``)`` closing a qualifier is fine).
+    if re.search(r"[.?!]\s", s):
+        return False
+    if s.endswith((".", "!", "?", ";", ":")):
+        return False
+    words = s.split()
+    if len(words) > 7:
+        return False
+    for w in words:
+        bare = re.sub(r"^[\(\[\{]+|[\)\]\},]+$", "", w)
+        if not bare:
+            continue
+        if not bare[0].isalpha():
+            # A pure-numeric token (table-cell "0.92") is NOT heading-ish; a
+            # compound with any alpha letter ("5-HT") passes.
+            if not any(c.isalpha() for c in bare):
+                return False
+            continue
+        if bare[0].isupper():
+            continue
+        # A lowercase-led word is allowed only as a title function/continuation
+        # word; otherwise the line is body prose, not a heading tail.
+        if bare.lower() in _HEADING_HANGS_WORDS:
+            continue
+        return False
+    return True
+
+
+def _line_is_heading_body_prose(line: str) -> bool:
+    """True when ``line`` is genuine body prose that ENDS the wrapped-heading
+    region (a real sentence, not another heading fragment)."""
+    s = line.strip()
+    if not s or s.startswith(("#", "*", "_", "<", ">", "|", "`")):
+        return False
+    return (
+        len(s) >= 60
+        or bool(_SENTENCE_TERMINATOR_RE.search(s))
+        or bool(re.search(r"[.!?]\s+\S", s))
+    )
+
+
+def _is_wrapped_heading_head(line: str) -> bool:
+    """True when ``line`` can be the HEAD of a column-wrapped subsection
+    heading. Two admissible shapes:
+
+    - The standard ≤6-word Title-Case subsection label
+      (``_looks_like_titlecase_subsection_label``); OR
+    - A COLON-terminated Title-Case ``titled`` head (``Challenging and
+      Reframing Misestimation:``). ``_looks_like_titlecase_subsection_label``
+      deliberately rejects a trailing ``:`` (a colon ends a *complete* label,
+      which the ≤6-word promoter should NOT then extend) — but when the colon
+      is IMMEDIATELY followed (no blank) by a heading-ish continuation line,
+      the colon is a title-internal separator and the title WRAPS. That case
+      is exactly this rejoin's job, so admit it here (the downstream
+      hang/qualifier + body-prose + substantiality gates still apply)."""
+    s = line.strip()
+    if _looks_like_titlecase_subsection_label(s):
+        return True
+    # Colon-titled head: "Word Word …:" — strip the colon and re-check the
+    # label shape on the remainder, then require it to genuinely end in ":".
+    if s.endswith(":") and _looks_like_titlecase_subsection_label(s[:-1].rstrip()):
+        return True
+    return False
+
+
+def _rejoin_wrapped_subsection_heading(text: str) -> str:
+    """Rejoin a Results-subsection heading pdftotext column-wrapped across
+    2-3 physical lines into ONE line, BEFORE the promoters classify it.
+    See the block comment above for the full structural signature + the
+    2026-07-03 16-paper FP validation (zero prose-merges)."""
+    if not text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    out: list[str] = []
+    i = 0
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+        if (
+            stripped
+            and not stripped.startswith(
+                ("#", "*", "_", "<", ">", "|", "`", "-", "+", "=")
+            )
+            and _is_wrapped_heading_head(stripped)
+            and _prev_paragraph_is_sentence_terminated(lines, i)
+            and i + 1 < n
+            and lines[i + 1].strip()
+            and _line_is_headingish_tail(lines[i + 1])
+        ):
+            # Collect up to 2 glued heading-ish tail lines.
+            tail_lines: list[str] = []
+            j = i + 1
+            while (
+                j < n
+                and len(tail_lines) < 2
+                and lines[j].strip()
+                and _line_is_headingish_tail(lines[j])
+            ):
+                tail_lines.append(lines[j].strip())
+                j += 1
+            # After the tail, a body-prose line (possibly after blanks) must
+            # follow — confirms head+continuation+body, not a heading stack.
+            k = j
+            while k < n and not lines[k].strip():
+                k += 1
+            body_ok = k < n and _line_is_heading_body_prose(lines[k])
+            head_words = stripped.split()
+            _last = re.sub(r"[^\w']+$", "", head_words[-1]).lower() if head_words else ""
+            head_hangs = (
+                _last in _HEADING_HANGS_WORDS
+                or stripped.endswith("'s")
+                or _last.endswith("'s")
+                # A colon-titled head ("Challenging and Reframing Misestimation:")
+                # inherently continues onto its wrapped tail — the colon is the
+                # hang signal (a "titled" subsection whose subtitle wraps).
+                or stripped.endswith(":")
+            )
+            tail_joined = " ".join(tail_lines)
+            tail_ends_qualifier = bool(re.search(r"\([^)]{1,40}\)$", tail_joined))
+            joined_all = stripped + " " + tail_joined
+            shape_ok = len(joined_all) <= 115 and len(joined_all.split()) <= 14
+            head_substantial = (":" in stripped) or (len(head_words) >= 3)
+            _pk = i - 1
+            while _pk >= 0 and not lines[_pk].strip():
+                _pk -= 1
+            fig_adjacent = (
+                (_pk >= 0 and _HEADING_FIG_CAPTION_RE.match(lines[_pk].strip()))
+                or (k < n and _HEADING_FIG_CAPTION_RE.match(lines[k].strip()))
+            )
+            if (
+                body_ok
+                and shape_ok
+                and head_substantial
+                and not fig_adjacent
+                and (head_hangs or tail_ends_qualifier)
+            ):
+                # Emit the reconstructed heading ALREADY promoted to ``### ``.
+                # The join signature (a paragraph-isolated Title-Case head that
+                # grammatically continues into a wrapped tail, over genuine body
+                # prose) IS a Results-SUBSECTION heading — so this pass owns the
+                # level decision rather than leaving the joined line for the
+                # downstream ≤6-word / 5-12-word promoters, which would either
+                # miss it (joined title now exceeds the ≤6-word window) or assign
+                # the wrong ``## `` major-section level. Gold-confirmed ``### ``
+                # for every ip_feldman / collabra case.
+                if out and out[-1] != "":
+                    out.append("")
+                out.append(f"### {joined_all}")
+                # Preserve the paragraph break before the following body.
+                out.append("")
+                while j < n and not lines[j].strip():
+                    j += 1
+                i = j
+                continue
+        out.append(line)
+        i += 1
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
 # ── Column-wrapped subsection-heading repair (2026-06-06, Cycle 4 redux) ───
 #
 # Dense two-column Sage / PSPB / APA layouts column-wrap a subsection
@@ -5756,6 +5989,16 @@ def render_pdf_to_markdown(
     # their own line with paragraph isolation, after the demote passes
     # have settled the major heading layout.
     md = _promote_isolated_method_subsection_headings(md)
+    # C1 (2026-07-03): rejoin a Results-subsection heading that pdftotext
+    # column-wrapped across 2-3 physical lines into ONE line, BEFORE the
+    # promoters below classify it. Runs FIRST among the isolated-heading
+    # promoters so the ≤6-word and 5-12-word promoters see the FULL title and
+    # assign one level, instead of promoting the head alone and stranding /
+    # over-promoting the wrapped tail (ip_feldman_2025_pspb: Complementary
+    # Analysis / External Analysis / Intensity Estimates headings). Strict
+    # structural signature (hang-word or paren-qualifier tail + substantial
+    # head + no figure-adjacency), FP-validated across a 16-paper set.
+    md = _rejoin_wrapped_subsection_heading(md)
     # §B-new-1 (2026-05-23): wider analogue — promote any paragraph-isolated
     # Title-Case short line (≤6 words, ≤60 chars) followed by prose, gated
     # by strict shape checks. Runs AFTER B2c so the narrow set still wins.
