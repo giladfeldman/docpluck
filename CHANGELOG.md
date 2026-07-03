@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.114] — 2026-07-04
+
+**The `Efendić et al.` Sage running header no longer leaks into the body.** `NORMALIZATION_VERSION` → `1.9.42`. The independent Sonnet canary audit found efendic_2022_affect leaking its running header `Efendić et al.` at 5 page breaks (the line arrives as `\fEfendić et al.`, splitting a sentence at one). The existing P0r running-header pattern only stripped an ALL-CAPS `SMITH et al.` header; a Title-Case surname was deliberately excluded because `Smith et al.` can be an inline citation.
+
+**The fix.** A P0r pattern that strips a Title-Case (mixed-case, accented) surname + `et al.` ONLY when it is the COMPLETE line (`^…$`, after `.strip()` removes the leading form-feed) with NOTHING after `et al.`. That is the disambiguator: an inline citation always carries a `(YEAR)` or continues the sentence (`…by Efendić et al., 2022, this holds`; `Efendić et al. (2022) found…`), never a bare `Surname et al.` alone on its own line. Surname characters include Latin-1 Supplement + Latin Extended-A (`ć`/`ń`/`ø`/`š`/`ž`…); up to 3 tokens with nobiliary particles (`van`/`der`/`de`/…), so `van der Wal et al.` and `García Márquez et al.` are covered.
+
+**Verification** (running headers are an `allowed_omissions` category, stripped by design). efendic: all 5 `Efendić et al.` running-header lines are gone; the sentence they split reconnects. A 12-case FP battery — 6 running-header shapes stripped, 6 inline-citation shapes preserved (`as shown by Efendić et al., 2022, …`, `Efendić et al. (2022) found…`, `This finding (Efendić et al., 2021) is robust`, `Finucane et al. (2000) proposed…`) — plus a corpus scan that confirms the pattern only matches standalone running-header lines, never a reference entry or inline citation. 3 new tests (13 parametrized cases). This resolves efendic's running-header METADATA-LEAK; its remaining findings (two demoted subsection headings, two ×-as-3 residuals) are queued.
+
 ## [2.4.113] — 2026-07-04
 
 **The Sage `Social Psychological and Personality Science` masthead no longer leaks into the body.** The independent Sonnet canary audit found efendic_2022_affect rendering its full Sage masthead between the H1 title and `## Abstract` — `Social Psychological and` / `Personality Science` / `2022, Vol. 13(7) 1173-1184` / `Ó The Author(s) 2021` / the author byline. `_strip_frontmatter_masthead_block` fires only when the H1→first-`##` zone holds ≥2 hard masthead markers, but three Sage-specific shapes were missing from `_looks_like_masthead_hard_marker`:
