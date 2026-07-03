@@ -3428,6 +3428,93 @@ def _promote_isolated_major_section_headings(text: str) -> str:
     return cleaned
 
 
+# ── C3: demote a '## ' over-promoted from a Results SUBSECTION ──────────────
+# (2026-07-04). A long (7-12 word) Sentence-case Results-subsection heading that
+# falls above the ≤6-word `### ` promoter's window is picked up by the 5-12-word
+# `## ` major-section promoter and rendered `## ` — one level too high, breaking
+# the section hierarchy. ip_feldman: `## Prevalence Estimates Associations with
+# WellBeing (Replication)` should be `### ` (a Results subsection, SIBLING to
+# `### Prevalence Estimate Errors` / `### Intensity Estimate Errors`).
+#
+# The reliable discriminator is PARALLEL PREFIX STRUCTURE, NOT "nearest `##`
+# parent is Results" (which would wrongly demote the `## Discussion` that also
+# has Results as its nearest `##` above). A `## ` heading is demoted to `### `
+# ONLY when a `### ` heading earlier IN THE SAME SECTION (scanning back, not
+# crossing a different `## ` body-section boundary) shares a ≥2-word stemmed
+# prefix with it AND then DIVERGES — the two are a genuine parallel pair
+# (`Prevalence Estimate Errors` vs `Prevalence Estimates Associations…`). A
+# `### ` sibling that is IDENTICAL to / a pure prefix of the `## ` title is a
+# duplicate-heading artifact, NOT a parallel pair — demoting the `## ` there
+# would compound the duplicate (collabra.90203 renders both the gold-correct
+# `## Extension: Perceived Impact of Donation` AND a spurious `### Extension:…`),
+# so the divergence requirement leaves such a `## ` alone. `## Discussion`,
+# `## Method`, etc. share no prefix with any `### ` sibling → never touched.
+# FP-validated 2026-07-04: a 20-paper rendered-corpus scan demotes ONLY the
+# ip_feldman target; collabra's duplicate `## Extension` is correctly left `##`.
+_C3_MIN_SHARED_PREFIX = 2
+
+
+def _c3_stem(word: str) -> str:
+    """Strip a single trailing plural 's' (Estimates→estimate, Estimate→estimate;
+    NOT 'es', which would give estimat ≠ estimate)."""
+    w = word.lower()
+    return w[:-1] if w.endswith("s") and len(w) > 3 else w
+
+
+def _c3_prefix_words(title: str) -> list[str]:
+    """The heading's content words with any trailing ``(qualifier)`` removed."""
+    title = re.sub(r"\([^)]*\)", "", title).strip()
+    return re.findall(r"[A-Za-z][A-Za-z'\-]*", title)
+
+
+def _c3_is_parallel_sibling(h2_title: str, sib_title: str) -> bool:
+    """True when ``sib_title`` (a ``### ``) is a genuine PARALLEL subsection of
+    the ``## `` candidate: ≥2-word shared stemmed prefix AND divergent tails
+    (neither title identical to / a pure ordered prefix of the other)."""
+    a = [_c3_stem(w) for w in _c3_prefix_words(h2_title)]
+    b = [_c3_stem(w) for w in _c3_prefix_words(sib_title)]
+    shared = 0
+    for x, y in zip(a, b):
+        if x == y:
+            shared += 1
+        else:
+            break
+    if shared < _C3_MIN_SHARED_PREFIX:
+        return False
+    if a == b:
+        return False
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    if longer[: len(shorter)] == shorter:
+        return False  # nested duplicate, not a parallel pair
+    return True
+
+
+def _demote_parallel_prefix_subsection_headings(text: str) -> str:
+    """C3: demote a ``## `` heading to ``### `` when a parallel-prefix ``### ``
+    sibling earlier in the same section proves it is a Results subsection that
+    the major-section promoter over-promoted. See the block comment above."""
+    if not text or "## " not in text:
+        return text
+    lines = text.split("\n")
+    out = list(lines)
+    for i, line in enumerate(lines):
+        m = re.match(r"^## (?!#)(.+)$", line.strip())
+        if not m:
+            continue
+        h2_title = m.group(1).strip()
+        for j in range(i - 1, -1, -1):
+            s = lines[j].strip()
+            if s.startswith("# ") and not s.startswith("## "):
+                break  # document title — stop
+            if s.startswith("## ") and not s.startswith("### "):
+                break  # a different major section — do not cross the boundary
+            hm = re.match(r"^### (.+)$", s)
+            if hm and _c3_is_parallel_sibling(h2_title, hm.group(1).strip()):
+                out[i] = out[i].replace("## ", "### ", 1)
+                break
+    return "\n".join(out)
+
+
 _CELL_FRAGMENT_NO_TERMINATOR_RE = re.compile(
     r"^[^.!?]{0,60}$"  # no sentence terminator anywhere in the line
 )
@@ -6024,6 +6111,14 @@ def render_pdf_to_markdown(
     # Sentence-case + word/char window + no sentence terminator except a colon
     # + genuine following prose) keeps it from touching the ≤6-word guarded set.
     md = _promote_isolated_major_section_headings(md)
+    # C3 (2026-07-04): demote a `## ` heading the major-section promoter
+    # over-promoted from a Results SUBSECTION back to `### `, keyed on a
+    # parallel-prefix `### ` sibling in the same section (ip_feldman
+    # `## Prevalence Estimates Associations…` → `### `, sibling of
+    # `### Prevalence Estimate Errors`). Divergence-guarded so a duplicate `###`
+    # of the same title never demotes the gold-correct `## `. Runs immediately
+    # after the promoter so it sees the final `## `/`### ` levels.
+    md = _demote_parallel_prefix_subsection_headings(md)
     # 2026-06-06 (Cycle 4 redux): repair column-wrapped subsection-heading
     # titles carrying a citation — Rule A promotes a body `{Title} et al.`
     # + bare `(YYYY)` wrap to `### {Title} et al. (YYYY)` (finding #3);
