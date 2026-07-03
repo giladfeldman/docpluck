@@ -28,6 +28,7 @@ os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
 
 from docpluck.normalize import (
     recover_corrupted_minus_signs,
+    recover_dropped_minus_via_ci_pairing,
     recover_minus_via_ci_pairing,
 )
 from docpluck.render import render_pdf_to_markdown
@@ -261,3 +262,59 @@ def test_efendic_table_estimates_recovered_with_camelot_on():
         f"{len(surviving)} corrupt '2X.XX' B-estimate cells survived in Camelot "
         f"HTML tables despite a CI in the same row: {surviving[:8]}"
     )
+
+
+# ── A3: dropped-minus SE-over-recovery guard (v2.4.104) ─────────────────────
+# recover_dropped_minus_via_ci_pairing flips a bare positive to negative when the
+# paired CI proves the minus was dropped. But in a "B | SE | CI" table row the CI
+# describes the B estimate, and the SE (standard error) legitimately falls OUTSIDE
+# B's CI — so the recovery wrongly flipped the SE to negative (SE cannot be
+# negative). The guard: don't flip a bare-positive token in a <td> row when a
+# signed-negative number (the already-recovered estimate) precedes it.
+
+
+def test_dropped_minus_leaves_se_column_positive_in_table_row():
+    # efendic Table 2 Intercept: B recovered to -0.09 (by W0d, upstream), SE=0.06,
+    # CI=[-0.21, 0.04]. -0.06 is inside the CI but 0.06 is not — yet 0.06 is the
+    # SE and must stay positive.
+    row = (
+        "<tr>\n<td>Intercept</td>\n<td>-0.09</td>\n<td>0.06</td>\n"
+        "<td>[-0.21, 0.04]</td>\n<td>.185</td>\n</tr>"
+    )
+    out = recover_dropped_minus_via_ci_pairing(row)
+    assert "<td>0.06</td>" in out, out
+    assert "<td>-0.06</td>" not in out
+
+
+def test_dropped_minus_still_recovers_first_estimate_in_table_row():
+    # A genuinely dropped-minus B (the FIRST numeric column, no preceding negative)
+    # must still flip: X=.09 with CI=[-0.21, -0.04] → -.09.
+    row = "<tr>\n<td>X</td>\n<td>.09</td>\n<td>[-0.21, -0.04]</td>\n</tr>"
+    out = recover_dropped_minus_via_ci_pairing(row)
+    assert "<td>-.09</td>" in out, out
+
+
+def test_dropped_minus_body_prose_unaffected_by_se_guard():
+    # The SE guard is scoped to <td> table rows; a body-prose dropped-minus
+    # estimate must still recover (the guard's "<td" check leaves prose alone).
+    line = "the simple slope was b = .022 [-0.05, -0.01]"
+    assert recover_dropped_minus_via_ci_pairing(line) == "the simple slope was b = -.022 [-0.05, -0.01]"
+
+
+def test_efendic_se_columns_all_positive_with_camelot_on():
+    """Every SE (standard-error) column value in efendic's regression tables must
+    render positive — a standard error is non-negative. Before the A3 guard the
+    dropped-minus recovery flipped SE cells that fell inside the B estimate's CI
+    (e.g. Intercept SE 0.06 → -0.06)."""
+    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
+    if not pdf.exists():
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
+    # In each 5-column regression row (pred | B | SE | CI | p), the SE (3rd cell,
+    # 2nd numeric) must not be a bare negative decimal.
+    row_re = re.compile(
+        r"<tr>\s*<td>[^<]*</td>\s*<td>[^<]*</td>\s*<td>(-0?\.\d+)</td>\s*<td>\[",
+        re.DOTALL,
+    )
+    negative_se = row_re.findall(md)
+    assert not negative_se, f"SE column rendered negative (SE cannot be < 0): {negative_se[:6]}"
