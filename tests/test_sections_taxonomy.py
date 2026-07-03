@@ -71,3 +71,37 @@ def test_lookup_returns_none_for_unrecognized():
     assert lookup_canonical_label("Frobnicator") is None
     assert lookup_canonical_label("Some Random Heading") is None
     assert lookup_canonical_label("") is None
+
+
+# ── v2.4.105: Sage / APA back-matter heading variants (ip_feldman cluster C2) ─
+# These render as body text (not `##`) because they were missing from the
+# taxonomy — in Sage replication reports they immediately precede their
+# paragraph with no blank line, so only canonical-heading recognition (not the
+# line-isolated fallback) can promote them.
+
+
+def test_declaration_of_conflicting_interests_recognized():
+    assert (
+        lookup_canonical_label("Declaration of Conflicting Interests")
+        == SectionLabel.conflict_of_interest
+    )
+    assert (
+        lookup_canonical_label("Declaration of Conflicting Interest")
+        == SectionLabel.conflict_of_interest
+    )
+
+
+def test_authorship_declaration_recognized():
+    assert (
+        lookup_canonical_label("Authorship Declaration")
+        == SectionLabel.author_contributions
+    )
+
+
+def test_orcid_ids_heading_recognized_but_not_inline_orcid():
+    # The plural heading form is canonical.
+    assert lookup_canonical_label("ORCID iDs") == SectionLabel.author_note
+    # A bare / singular / inline ORCID must NOT be canonical — it would
+    # false-match a line-leading identifier ("ORCID: 0000-…").
+    assert lookup_canonical_label("ORCID iD") is None
+    assert lookup_canonical_label("ORCID: 0000-0002-1305-0547") is None
