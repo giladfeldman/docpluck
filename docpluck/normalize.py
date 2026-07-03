@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.37"  # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
+NORMALIZATION_VERSION = "1.9.38"  # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2381,6 +2381,95 @@ def recover_corrupted_lt_operator(text: str) -> str:
     if not text or "\\" not in text:
         return text
     return _CORRUPT_LT_RE.sub(r"<\1", text)
+
+
+# v2.4.103 (NORMALIZATION_VERSION 1.9.38): recover the '×' MULTIPLICATION SIGN
+# that pdftotext/pdfminer map to the digit '3' on certain fonts (e.g.
+# efendic_2022 — every interaction-term predictor name reads "Direction 3
+# manipulated attribute" for "Direction × manipulated attribute", "PMA 3
+# direction" for "PMA × direction", across all four regression tables). Same
+# broken-ToUnicode font family as the '2'-for-minus (W0b/W0d) and '<'-as-
+# backslash (W0c) corruptions on this PDF (AdvPS… subset fonts, `pdffonts`
+# uni:no).
+#
+# UNLIKE the minus/'<' recoveries, a bare '3' between two words is AMBIGUOUS in
+# free prose — "Table 3 summarizes", "see Figure 3 and", "osf.io/pg3ae" all
+# contain a genuine '3' flanked by letters. So this recovery is SCOPED TO TABLE
+# CELLS ONLY (wired into cell_cleaning._html_escape, never normalize_text or the
+# whole-markdown render post-process). A Camelot table PREDICTOR cell that reads
+# "Direction 3 manipulated attribute" is unambiguously the interaction term
+# "Direction × manipulated attribute" — a table predictor cell never contains a
+# sentence-boundary or a URL. The signature: a '3' (with optional single spaces)
+# flanked on BOTH sides by an alphabetic character, inside a cell that is
+# predominantly a label/predictor name (carries a ≥3-letter word), AND not
+# immediately preceded by a reference/enumeration word (Study/Model/Wave/Phase/
+# Item/Table/Figure/Panel/Step/Level/Sample/Experiment) which would make "… 3 …"
+# a genuine ordinal. A corpus scan of 12 non-efendic papers found ZERO table
+# cells matching this signature that were not corrupted interaction terms.
+# A line-break separator that a wrapped interaction term may carry between its
+# operands: the cell-merge placeholder (``\x00…\x00``, e.g. ``\x00BR\x00``), a
+# literal ``<br>``, or a newline. A 3-way interaction "A × B × C" can wrap as
+# "A 3 B<br>3 C", so the '3' after the break is still a corrupted '×'.
+_TIMES_BREAK = r"(?:\x00[^\x00]*\x00|<br\s*/?>|\n)"
+# The corrupted '×': a '3' flanked on each side by an alphabetic char, with
+# whitespace OR a wrap-break on AT LEAST ONE immediate side. The whitespace/break
+# requirement is what separates an interaction operator ("Direction 3 manipulated",
+# "PMA 3direction") from a GLUED alphanumeric label that legitimately contains a 3
+# — hypothesis labels "H3a"/"H3b", model codes "M3", "x3y" — which are fully glued
+# with no separating space and must never be touched. Two alternatives: break/space
+# BEFORE the 3, or break/space AFTER it.
+_TIMES_GLYPH_RE = re.compile(
+    r"(?<=[A-Za-z])(" + _TIMES_BREAK + r"?[ \t]+|" + _TIMES_BREAK + r")3([ \t]*)(?=[A-Za-z])"
+    r"|"
+    r"(?<=[A-Za-z])([ \t]*)3(" + _TIMES_BREAK + r"?[ \t]+)(?=[A-Za-z])"
+)
+# Words that make a following "3" a genuine ordinal/reference, not a corrupted ×.
+_TIMES_REFERENCE_WORD_RE = re.compile(
+    r"\b(?:Study|Studies|Model|Models|Wave|Phase|Item|Items|Table|Tables|Figure|"
+    r"Figures|Fig|Panel|Step|Steps|Level|Sample|Samples|Experiment|Experiments|"
+    r"Section|Appendix|Chapter|Part|Day|Time|Trial|Trials|Version|Group|Grade|"
+    r"Cluster|Factor|Class|Type|Site|Cohort|Session|Block|Set|Round|Question|"
+    r"Condition|Column|Row|Line|Page|Wave)\s*$",
+    re.IGNORECASE,
+)
+
+
+def recover_times_interaction_glyph(cell: str) -> str:
+    """W0i: recover pdftotext '×'-as-'3' glyph corruption in a TABLE CELL.
+
+    Operates on a single Camelot table-cell string. A '3' flanked by letters on
+    both sides — inside a predictor/label cell, not preceded by a reference word
+    — is a corrupted interaction '×'. NOT safe for free prose; call only from the
+    table-cell pipeline (cell_cleaning._html_escape). See the module comment at
+    ``_TIMES_GLYPH_RE`` for the full signature and why this is table-scoped.
+    """
+    if not cell or "3" not in cell:
+        return cell
+    # Only fire in a cell that carries a variable/predictor name (a ≥3-letter
+    # alphabetic word). A purely-numeric stat cell ("0.34", "1.23") never has a
+    # letter on both sides of a 3, but this also skips a short-code cell early.
+    if not re.search(r"[A-Za-z]{3,}", cell):
+        return cell
+
+    def _sub(m: "re.Match[str]") -> str:
+        # Guard: a reference/enumeration word immediately before the 3 makes it a
+        # genuine ordinal ("Model 3 predictor" stays; the ordinal is not an ×).
+        before = cell[: m.start()]
+        if _TIMES_REFERENCE_WORD_RE.search(before):
+            return m.group(0)
+        # Two regex alternatives (break/space before the 3, or after it); each
+        # captures its own (left, right) whitespace groups. Preserve whatever the
+        # source had, defaulting the empty side to a single space so an
+        # interaction term reads "A × B" regardless of how it wrapped/glued.
+        if m.group(1) is not None:  # first alternative (separator before)
+            left, right = m.group(1), m.group(2)
+        else:  # second alternative (separator after)
+            left, right = m.group(3), m.group(4)
+        left = left if left else " "
+        right = right if right else " "
+        return f"{left}×{right}"
+
+    return _TIMES_GLYPH_RE.sub(_sub, cell)
 
 
 # v2.4.40 (NORMALIZATION_VERSION 1.9.6): recover standalone '2'-for-U+2212
