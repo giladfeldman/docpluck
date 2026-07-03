@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.106] — 2026-07-03
+
+**The Elsevier CrossMark "T" widget no longer leaks into the article title.** A cycle-5 broad-read found multiple Elsevier / ScienceDirect (JESP) papers rendering a stray uppercase `T` **inside** the H1 title — "Choosing persuasion targets: How expectations of qualitative change **T** increase advocacy intentions" and "…the criminal justice **T** system". Diagnosis: the CrossMark "Check for updates" widget renders as a lone `T`-shaped glyph positioned in the title y-band (at the right edge, in a slightly smaller font — height 10.0 vs the title's 13.4), so the layout-title assembler (`_compute_layout_title`) picks it up as a title word and merges it mid-run between the two wrapped title lines.
+
+**The fix.** `_compute_layout_title` drops a bare single-character `T` title word. A real title never contains a standalone uppercase `T` as its own word, so this is safe and general — it corrects every Elsevier / ScienceDirect paper carrying the CrossMark widget, not just the two the broad-read happened to sample.
+
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). Both JESP titles render clean ("…qualitative change increase advocacy intentions", "…criminal justice system"); the canary titles (ip_feldman, efendic, chandrashekar) are unaffected. 320 render + title + masthead + normalization tests pass (incl. 2 new real-PDF CrossMark tests); a corpus title scan across 16 Elsevier/Sage papers confirms no title loses real content — only the CrossMark `T` artifact is removed.
+
 ## [2.4.105] — 2026-07-03
 
 **Sage / APA back-matter headings ("Authorship Declaration", "Declaration of Conflicting Interests", "ORCID iDs") render as `##` headings, not body text.** `SECTIONING_VERSION` → `1.2.3`. The cycle-1 canary AI-verify found ip_feldman_2025_pspb rendering three back-matter section headings as plain body prose while their siblings (Acknowledgments, Author Contributions, Funding) rendered correctly. In Sage PSPB back-matter typography these three headings immediately precede their paragraph with **no blank line**, so only canonical-heading recognition — not the line-isolated fallback (which needs the heading alone on its line) — can promote them, and these exact wordings were missing from the heading taxonomy.

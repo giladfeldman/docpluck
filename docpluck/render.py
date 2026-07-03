@@ -4684,6 +4684,15 @@ def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
             text = (w.get("text") or "").strip()
             if not text:
                 continue
+            # v2.4.106: drop the Elsevier CrossMark "Check for updates" widget.
+            # It renders as a lone "T"-shaped glyph in the title y-band (often at
+            # the right edge, in a slightly smaller font than the title), so it
+            # otherwise merges into the title mid-run — e.g. JESP "…qualitative
+            # change [T] increase advocacy intentions". A real title never has a
+            # bare single uppercase "T" as a standalone word, so dropping it is
+            # safe and general across Elsevier/ScienceDirect papers.
+            if text == "T":
+                continue
             try:
                 x0 = float(w.get("x0", 0) or 0)
             except (TypeError, ValueError):
