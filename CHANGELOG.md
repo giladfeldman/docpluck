@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.111] — 2026-07-04
+
+**A Key-Points finding sentence over-promoted into the abstract zone is demoted to body (D3).** Fixes a pre-existing failure (`test_d3_abstract_zone_no_intermediate_h2`, red at HEAD, not introduced by any recent change — surfaced when this run's full pytest ran the whole suite). jama_open_1 rendered `## TRE was more effective for weight loss` — a Key-Points *finding* that column-interleaved into the abstract and got promoted to `## `, leaving a stray h2 between `## Abstract` and `## Introduction`. `_demote_abstract_zone_inline_labels` only demoted an explicit allowlist of structured-abstract LABELS (IMPORTANCE, RESULTS, …), so a finding *sentence* slipped through.
+
+**The fix (`_is_abstract_finding_sentence`).** Inside the abstract zone only, a `## ` whose text is a full CLAUSE with a finite VERB (`was`/`reduced`/`showed`/`did`/…) is demoted to plain body text. The finite-verb requirement is the discriminator: it demotes `TRE **was** more effective for weight loss` but keeps a legitimate noun-phrase heading like `Effects of Diet on Body Weight` or `Comparison of TRE and CR` (lowercase prepositions/articles only, no verb) as a heading — the exact false-positive class an "any lowercase word" test would have hit. Scoped to the abstract zone (between `## Abstract` and the next body-section h2), so the blast radius is tiny.
+
+**Verification.** jama_open_1: the finding renders as body; `## Introduction` is now the first h2 after `## Abstract`. All 5 `test_jama_open_cluster` checks pass (D3 was the only red one). An abstract-zone FP-scan across the rendered corpus demotes ONLY the jama_open_1 target — zero other papers affected. 3 new unit-contract tests lock in the finding-vs-noun-phrase-heading discrimination (incl. the `Effects of Diet on Body Weight` / `Comparison of TRE and CR` FP guards).
+
 ## [2.4.110] — 2026-07-04
 
 **A Results subsection over-promoted to `## ` is demoted back to `### ` (C3).** The 2026-07-03 canary AI-verify found ip_feldman_2025_pspb rendering `## Prevalence Estimates Associations with WellBeing (Replication)` as a top-level `## ` when the gold has it as a `### ` Results subsection — SIBLING to `### Prevalence Estimate Errors` and `### Intensity Estimate Errors`. It is 7 words, above the ≤6-word `### ` subsection promoter's window, so the 5–12-word `## ` major-section promoter picked it up one level too high, breaking the section hierarchy.

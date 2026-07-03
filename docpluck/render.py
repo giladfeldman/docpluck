@@ -3763,6 +3763,38 @@ _STRUCTURED_ABSTRACT_INLINE_LABELS = frozenset({
     "Question", "Findings", "Meaning",
 })
 
+# jama-open-1 D3 (2026-07-04): a Key-Points FINDING sentence
+# ("TRE was more effective for weight loss") column-interleaved into the
+# abstract zone and over-promoted to `## `. Distinct from the labels above
+# (which are noun-phrase section labels): a finding is a full CLAUSE with a
+# finite VERB. The verb is the discriminator that separates a finding sentence
+# from a legitimate noun-phrase heading that merely carries lowercase
+# prepositions/articles ("Effects of Diet on Body Weight", "Comparison of TRE
+# and CR" — no verb, kept). Scoped to the abstract zone only (very narrow).
+_ABSTRACT_FINDING_VERBS = frozenset({
+    "was", "were", "is", "are", "had", "has", "have", "did", "do", "does",
+    "reduced", "increased", "decreased", "improved", "changed", "showed",
+    "found", "demonstrated", "differed", "associated", "predicted", "led",
+    "resulted", "produced", "yielded", "achieved", "lowered", "raised",
+    "declined", "rose", "fell", "remained", "occurred", "affected", "caused",
+    "correlated", "related", "moderated", "mediated", "explained", "revealed",
+    "indicated", "suggested", "supported", "confirmed", "exhibited",
+})
+
+
+def _is_abstract_finding_sentence(title: str) -> bool:
+    """True when an abstract-zone heading text is a FINDING SENTENCE (a clause
+    with a finite verb) rather than a structured-abstract label or a noun-phrase
+    section heading — see the block comment above."""
+    words = title.split()
+    if len(words) < 5:
+        return False
+    letters = re.sub(r"[^A-Za-z]", "", title)
+    if letters and letters.isupper():
+        return False  # an all-caps label (handled by the allowlist demoter)
+    lc = {re.sub(r"[^a-z]", "", w.lower()) for w in words}
+    return bool(lc & _ABSTRACT_FINDING_VERBS)
+
 
 def _demote_abstract_zone_inline_labels(text: str) -> str:
     """jama-open-1 ABSTRACT_LEVEL_MISMATCH fix (v2.4.74, 2026-05-25):
@@ -3818,6 +3850,15 @@ def _demote_abstract_zone_inline_labels(text: str) -> str:
                 if in_zone and heading in _STRUCTURED_ABSTRACT_INLINE_LABELS:
                     # Inside zone AND known inline label — demote to bold.
                     out.append(f"**{heading}**")
+                    i += 1
+                    continue
+                if in_zone and _is_abstract_finding_sentence(heading):
+                    # Inside zone AND a Key-Points FINDING sentence over-promoted
+                    # to `## ` (jama-open-1 D3: "TRE was more effective for weight
+                    # loss"). Demote to plain body text — it is a sentence, not a
+                    # label. The finite-verb gate keeps a real noun-phrase heading
+                    # ("Effects of Diet on Body Weight") as a heading.
+                    out.append(heading)
                     i += 1
                     continue
         out.append(line)
