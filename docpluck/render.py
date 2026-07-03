@@ -1980,6 +1980,152 @@ def _strip_frontmatter_masthead_block(text: str) -> str:
     return cleaned
 
 
+# ── Body affiliation-footnote block strip (v2.4.107) ────────────────────────
+#
+# Some publishers (Sage PSPB/PSPR, several Elsevier titles) print the author
+# affiliation + corresponding-author block as a PAGE-1 BOTTOM FOOTNOTE.
+# pdftotext serialises it in reading order, so the block lands in the MIDDLE of
+# an Introduction paragraph — splitting a sentence (efendic_2022: "…can be far
+# easier--more" │ <affiliation block> │ "efficient--than weighing…"). The
+# front-matter masthead strip only covers the H1→first-`##` zone, so this
+# body-position block is missed.
+#
+# The strip is BLOCK-LEVEL and strict, so a single body sentence that merely
+# mentions a university is never touched: it fires only on a RUN of ≥3
+# consecutive affiliation-shaped lines (blank-separated tolerated), and a line
+# that is a long body sentence (≥11 words ending in a period with several
+# lowercase words) is NOT counted as affiliation even if it names a university.
+_AFFIL_UNIV_RE = re.compile(
+    r"\b(?:University|Universit[ye]|Institut|Polytechnic|College|"
+    r"School of (?:Business|Economics|Medicine|Psychology|Public|Management|Law|Education)|"
+    r"Department of|Faculty of|Centre? for)\b"
+)
+_AFFIL_CITY_END_RE = re.compile(
+    r",\s*(?:the Netherlands|Hong Kong|United States|USA|United Kingdom|Germany|"
+    r"France|China|Japan|Canada|Australia|Singapore|Israel|Sweden|Norway|Denmark|"
+    r"Belgium|Switzerland|Italy|Spain|Austria|Portugal|Poland|Finland|Ireland|"
+    r"New Zealand|South Korea|Brazil|Mexico|India)\.?\s*$",
+    re.IGNORECASE,
+)
+_AFFIL_CONTRIB_RE = re.compile(
+    r"^\s*(?:Contributed equally|.*\bjoint first authors|These authors contributed|"
+    r"Corresponding author|\*+\s*$)",
+    re.IGNORECASE,
+)
+_AFFIL_ADDR_RE = re.compile(r"(?:\bRoad\b|\bStreet\b|\bAve\b|\bAvenue\b|\b\d{5,6}\b|Pok Fo Lam)")
+# A citation / reference-list line — MUST be excluded from affiliation
+# classification. References are runs of "Author, X. Y., & Author, Z. (YEAR)."
+# lines that superficially match affiliation grammar (journal names contain
+# "University"/"Press", author lists contain commas + country-like tokens), so
+# without this guard a whole reference block gets stripped as an "affiliation
+# block" (corpus content-loss scan caught exactly this on 5 papers). The
+# signature: a parenthesised 4-digit year (publication year) OR an author-initials
+# opener ("Surname, X. Y., &" / "Surname, X. Y. (").
+_AFFIL_CITATION_RE = re.compile(
+    r"\(\s*(?:19|20)\d{2}[a-z]?\s*\)"
+    r"|^\s*[A-Z][A-Za-z'\-]+,\s+[A-Z]\.\s*(?:[A-Z]\.\s*)?(?:,|&|\()"
+)
+
+
+def _is_affiliation_line(line: str) -> Optional[bool]:
+    """Classify a line for the body-affiliation-block scan.
+
+    Returns True (affiliation-shaped), False (a real non-affiliation line), or
+    None (blank — a tolerated within-block separator).
+    """
+    s = line.strip()
+    if not s:
+        return None
+    # Structural markup is never part of an affiliation footnote.
+    if s.startswith(("#", "*", "_", "<", ">", "|", "`", "-", "+", "=")) and s != "*":
+        return False
+    # A citation / reference-list line is never an affiliation, even though a
+    # journal name may contain "University"/"Press" and an author list has commas.
+    if _AFFIL_CITATION_RE.search(s):
+        return False
+    words = s.split()
+    # A long body sentence (≥11 words, ends in '.', several lowercase words) is a
+    # real paragraph even if it names a university ("The University of X provided
+    # seed funding for this research …") — never an affiliation line.
+    if (
+        len(words) >= 11
+        and s.rstrip().endswith(".")
+        and sum(1 for w in words if w[:1].islower()) >= 4
+    ):
+        return False
+    if s == "*" or _AFFIL_CONTRIB_RE.search(s):
+        return True
+    if _AFFIL_UNIV_RE.search(s) and ("," in s or len(words) <= 10):
+        return True
+    if _AFFIL_CITY_END_RE.search(s):
+        return True
+    if _AFFIL_ADDR_RE.search(s) and "," in s:
+        return True
+    return False
+
+
+def _strip_body_affiliation_block(text: str) -> str:
+    """Remove a page-1 author-affiliation footnote block that pdftotext
+    serialised into the body (mid-Introduction), reconnecting the split
+    paragraph. Fires only on a run of ≥3 consecutive affiliation-shaped lines
+    that begins AFTER the front-matter (i.e. after the first `## ` heading or,
+    lacking one, after the H1) so a genuine front-matter block is left to the
+    masthead strip. Strictly block-level → a single body university mention is
+    never removed.
+    """
+    if not text or "University" not in text and "niversit" not in text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    # Body starts after the first `## ` heading (or after H1 if none).
+    body_start = 0
+    for idx, line in enumerate(lines):
+        s = line.lstrip()
+        if s.startswith("## ") and not s.startswith("### "):
+            body_start = idx + 1
+            break
+        if s.startswith("# ") and not s.startswith("## "):
+            body_start = idx + 1
+    strip: set[int] = set()
+    i = body_start
+    while i < n:
+        if _is_affiliation_line(lines[i]) is True:
+            j = i
+            last_affil = i
+            count = 0
+            run: list[int] = []
+            while j < n:
+                v = _is_affiliation_line(lines[j])
+                if v is True:
+                    last_affil = j
+                    count += 1
+                    run.append(j)
+                    j += 1
+                elif v is None:  # a single blank separator within the block
+                    if j + 1 < n and _is_affiliation_line(lines[j + 1]) is True:
+                        run.append(j)
+                        j += 1
+                    else:
+                        break
+                else:
+                    break
+            if count >= 3:
+                # Strip the whole run (affiliation lines + interior blanks up to
+                # the last affiliation line).
+                for k in run:
+                    if k <= last_affil:
+                        strip.add(k)
+            i = j + 1
+        else:
+            i += 1
+    if not strip:
+        return text
+    out = [line for idx, line in enumerate(lines) if idx not in strip]
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
 # ── Column-wrapped subsection-heading repair (2026-06-06, Cycle 4 redux) ───
 #
 # Dense two-column Sage / PSPB / APA layouts column-wrap a subsection
@@ -5760,6 +5906,11 @@ def render_pdf_to_markdown(
     # the zone no longer contains a `### `-duplicate that would otherwise
     # terminate the zone early. Self-limiting >=2-hard-marker gate.
     md = _strip_frontmatter_masthead_block(md)
+    # v2.4.107: strip a page-1 author-affiliation footnote block that pdftotext
+    # serialised into the BODY (mid-Introduction), reconnecting the split
+    # paragraph (efendic_2022). Block-level + strict (≥3 affiliation-shaped
+    # lines), so a lone body university mention is never touched.
+    md = _strip_body_affiliation_block(md)
     # 2026-06-06 (run-11, ar_apa `### FlashReport`): strip heading markup
     # that sits ABOVE the document H1 — a journal-section label promoted to
     # a heading in the pre-title masthead zone. Runs after title rescue (H1
