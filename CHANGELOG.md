@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.105] — 2026-07-03
+
+**Sage / APA back-matter headings ("Authorship Declaration", "Declaration of Conflicting Interests", "ORCID iDs") render as `##` headings, not body text.** `SECTIONING_VERSION` → `1.2.3`. The cycle-1 canary AI-verify found ip_feldman_2025_pspb rendering three back-matter section headings as plain body prose while their siblings (Acknowledgments, Author Contributions, Funding) rendered correctly. In Sage PSPB back-matter typography these three headings immediately precede their paragraph with **no blank line**, so only canonical-heading recognition — not the line-isolated fallback (which needs the heading alone on its line) — can promote them, and these exact wordings were missing from the heading taxonomy.
+
+**The fix (general, one-line-per-variant taxonomy additions).** `docpluck/sections/taxonomy.py` gains: `"declaration of conflicting interests"` / `"declaration of conflicting interest"` → `conflict_of_interest` (the Sage wording, distinct from the "declaration of competing interest" already covered); `"authorship declaration"` / `"authorship statement"` → `author_contributions`; and `"orcid ids"` → `author_note`. Because the heading-detection alternation is built directly from the taxonomy dict, these become recognized headings automatically. Only the **plural** "orcid ids" heading form is canonical — a bare/singular/inline `ORCID:` is deliberately excluded so a line-leading identifier (`ORCID: 0000-…`) is never false-promoted; the inline `(ORCID: …)` mentions inside the Acknowledgments paragraph stay body text.
+
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). ip_feldman Camelot-off render: all three headings now `## `; the inline Acknowledgments ORCID identifier preserved as body. 359 sections + heading + taxonomy tests pass (incl. new taxonomy-recognition + real-PDF ip_feldman tests); a corpus diff of the old vs new taxonomy over 14 papers confirms the only new `##` headings introduced are the intended back-matter sections. Remaining ip_feldman defects (wrapped-heading split C1, heading-level over-promotion C3, Table 10 empty) are queued as their own cycles. Triage: `docs/TRIAGE_2026-07-03_head_v2.4.101_assessment.md`.
+
 ## [2.4.104] — 2026-07-03
 
 **Standard-error table cells no longer sign-flip — efendic's SE column reads `0.06`, not `-0.06`.** `NORMALIZATION_VERSION` → `1.9.39`. The third defect on efendic_2022_affect from the cycle-1 canary sweep: every regression table's standard-error (SE) column rendered some values negative (Intercept `SE = 0.06` → `-0.06`), which is impossible — a standard error is non-negative.

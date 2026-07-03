@@ -12,7 +12,7 @@ from typing import Literal
 from .taxonomy import SectionLabel, Confidence, DetectedVia
 from .types import Section, SectionedDocument
 
-SECTIONING_VERSION = "1.2.2"
+SECTIONING_VERSION = "1.2.3"  # v1.2.3 (v2.4.105): taxonomy gains Sage/APA back-matter heading variants — "declaration of conflicting interests" (conflict_of_interest), "authorship declaration" (author_contributions), "orcid ids" (author_note). These rendered as body text on ip_feldman/PSPB because they immediately precede their paragraph (no blank line) so only canonical-heading recognition can promote them. Only the plural "orcid ids" heading form is canonical (a bare/inline "ORCID:" is not, to avoid false-matching an identifier line).
 
 
 def _detect_format(file_bytes: bytes) -> str:

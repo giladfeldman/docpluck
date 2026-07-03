@@ -65,7 +65,14 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
     # Cf. test_summary_no_longer_abstract_canonical (2026-05-09).
     frozenset({"abstract"}): SectionLabel.abstract,
     frozenset({"keywords", "key words", "keyword"}): SectionLabel.keywords,
-    frozenset({"author note", "author's note", "authors' note", "authors note"}):
+    frozenset({"author note", "author's note", "authors' note", "authors note",
+               # ORCID identifier block (Sage / APA back matter) — a standalone
+               # "ORCID iDs" heading followed by author identifiers; was missing,
+               # so it rendered as body text when it immediately preceded the
+               # author-name list. Only the PLURAL "orcid ids" heading form is
+               # canonical — a bare "orcid" / "orcid id" would false-match a
+               # line-leading inline identifier ("ORCID: 0000-…").
+               "orcid ids"}):
         SectionLabel.author_note,
     # Body
     frozenset({"introduction", "background", "introduction and background"}):
@@ -116,6 +123,11 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
                "declaration of interest", "declaration of interests",
                "declaration of competing interest",
                "declaration of competing interests",
+               # Sage / APA (PSPB, PSPR, …) wording — was missing, so
+               # "Declaration of Conflicting Interests" rendered as body text
+               # when it immediately preceded its paragraph (no blank line).
+               "declaration of conflicting interest",
+               "declaration of conflicting interests",
                "declarations", "disclosure", "disclosures",
                "competing financial interests"}):
         SectionLabel.conflict_of_interest,
@@ -125,7 +137,13 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
         SectionLabel.data_availability,
     frozenset({"author contributions", "author contribution",
                "contributions", "credit authorship statement",
-               "credit author statement"}): SectionLabel.author_contributions,
+               "credit author statement",
+               # Sage / APA replication-report wording (PSPB, JESP, Collabra):
+               # a back-matter "Authorship Declaration" describing each author's
+               # role — was missing, so it rendered as body when it immediately
+               # preceded its paragraph.
+               "authorship declaration", "authorship statement"}):
+        SectionLabel.author_contributions,
     frozenset({"references", "bibliography", "works cited", "literature cited",
                "literature", "cited literature", "reference list",
                "list of references", "cited references"}): SectionLabel.references,
