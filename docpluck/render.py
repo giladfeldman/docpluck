@@ -1849,14 +1849,30 @@ _MASTHEAD_DOI_LABEL_RE = re.compile(
 _MASTHEAD_PAGE_RANGE_RE = re.compile(
     r"^[﻿­\s]*\d{1,4}\s*[­\-‐-―]\s*\d{1,4}\s*$"
 )
-# Author name with a trailing affiliation superscript digit (1-2 digits),
-# optionally led by "and " (pdftotext splits multi-author lists).
-_MASTHEAD_AUTHOR_SUPERSCRIPT_RE = re.compile(
-    r"^(?:and\s+)?[A-Z][a-zA-Z.’']+(?:\s+[A-Z][a-zA-Z.’']+){1,3}\d{1,2}$"
+# Journal volume/issue/page masthead line, e.g. Sage "2022, Vol. 13(7) 1173-1184"
+# (a `<year>, Vol. <vol>(<issue>) <NN>-<NN>` line the bare NN-NN pattern misses).
+_MASTHEAD_VOL_ISSUE_RE = re.compile(
+    r"^\s*(?:19|20)\d{2},?\s+Vol\.?\s*\d+\s*(?:\(\d+\))?\s*,?\s*\d{1,4}\s*[­\-‐-―]\s*\d{1,4}\s*$",
+    re.IGNORECASE,
 )
-# Copyright line / tail (© ... OR a "..., Inc"/"Society for ..." fragment).
+# Author name with a trailing affiliation superscript digit (1-2 digits) —
+# optionally led by "and ", and optionally followed by correspondence marks
+# (*, †, ‡) and/or a trailing comma (pdftotext splits multi-author lists, and
+# Sage prints a `*` corresponding-author mark: "Emir Efendić1*, …").
+_MASTHEAD_AUTHOR_SUPERSCRIPT_RE = re.compile(
+    r"^(?:and\s+)?[A-Z][a-zA-Z.’'´`À-ɏ]+"
+    r"(?:\s+(?:and\s+)?[A-Z][a-zA-Z.’'´`À-ɏ]+){1,4}"
+    r"\d{1,2}[*†‡§]*\s*,?\s*$"
+)
+# Copyright line / tail. Matches ©, the common "(c)"/"copyright" forms, AND the
+# frequent glyph-corruption of © to "Ó"/"Ã"/"Â©" on tight-kerned PDFs when it is
+# immediately followed by an author/year copyright phrase ("Ó The Author(s)
+# 2021"). Also a "..., Inc"/"Society for ..." fragment.
 _MASTHEAD_COPYRIGHT_RE = re.compile(
     r"(?:^\s*(?:©|\(c\)|copyright\b)"
+    r"|^\s*[ÓÃÂ]\s*(?:©\s*)?The\s+Authors?\b"
+    r"|^\s*[ÓÃÂ©]\s*(?:The\s+Author|\d{4}\b)"
+    r"|\bThe\s+Author\(s\)\s+(?:19|20)\d{2}\b"
     r"|\bSociety\s+for\b"
     r"|,\s*Inc\.?\s*$)",
     re.IGNORECASE,
@@ -1907,6 +1923,7 @@ def _looks_like_masthead_hard_marker(line: str) -> bool:
         _MASTHEAD_BARE_DOI_RE.match(s)
         or _MASTHEAD_DOI_LABEL_RE.match(s)
         or _MASTHEAD_PAGE_RANGE_RE.match(s)
+        or _MASTHEAD_VOL_ISSUE_RE.match(s)
         or _MASTHEAD_AUTHOR_SUPERSCRIPT_RE.match(s)
         or _MASTHEAD_COPYRIGHT_RE.search(s)
     )

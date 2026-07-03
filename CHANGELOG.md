@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.113] — 2026-07-04
+
+**The Sage `Social Psychological and Personality Science` masthead no longer leaks into the body.** The independent Sonnet canary audit found efendic_2022_affect rendering its full Sage masthead between the H1 title and `## Abstract` — `Social Psychological and` / `Personality Science` / `2022, Vol. 13(7) 1173-1184` / `Ó The Author(s) 2021` / the author byline. `_strip_frontmatter_masthead_block` fires only when the H1→first-`##` zone holds ≥2 hard masthead markers, but three Sage-specific shapes were missing from `_looks_like_masthead_hard_marker`:
+- the journal volume/issue/page line `2022, Vol. 13(7) 1173-1184` — the bare `NN-NN` page-range pattern didn't match the `<year>, Vol. <v>(<i>)` prefix;
+- the copyright line `Ó The Author(s) 2021` — the `©` glyph corrupted to `Ó` on this tight-kerned PDF;
+- the author byline with a `*` corresponding-author mark and a trailing comma.
+
+**The fix.** Add `_MASTHEAD_VOL_ISSUE_RE` (a `<year>, Vol. <v>(<i>) <NN>-<NN>` journal line); broaden `_MASTHEAD_COPYRIGHT_RE` to the `©`-glyph-corruption forms (`Ó`/`Ã`/`Â` immediately before `The Author(s) <year>`, plus a bare `The Author(s) <year>` phrase); and relax `_MASTHEAD_AUTHOR_SUPERSCRIPT_RE` to accept trailing correspondence marks (`*`/`†`/`‡`), a trailing comma, and accented author names. Only two markers need to match, so the whole Sage masthead zone (including the byline) is removed — the strip is still gated on the H1→first-`##` zone with ≥2 hard markers, so its blast radius is contained.
+
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds — the masthead is an `allowed_omissions` category, stripped by design). efendic: the render goes H1 → `## Abstract` with no masthead furniture in between; the H1 and Abstract are intact. A wide top-of-document FP-scan across the rendered corpus finds no paper losing real content. New unit tests assert the markers fire on the Sage shapes and NOT on body prose that merely contains years/numbers (`We ran three studies in 2021 and 2022 with 1184 participants`, `Table 3. Regression coefficients for the 2022 sample`). This resolves efendic's METADATA-LEAK masthead finding; its remaining findings (running-header `Efendić et al.` leak, two demoted subsection headings, and the two ×-as-3 residuals) are queued.
+
 ## [2.4.112] — 2026-07-04
 
 **`×`-as-`3` glyph corruption in body PROSE / flattened captions is now recovered (W0k).** `NORMALIZATION_VERSION` → `1.9.41`. The independent Sonnet canary audit found efendic_2022_affect's interaction terms rendering with a corrupted `3` for `×` in the body prose and in a flattened italic table-caption run — the table-cell-scoped W0i (v2.4.103) never saw these channels (the third `glyph-fixes-need-all-three-text-channels` gap on this paper, after the 2-for-minus W0j). Examples: `the three-way interaction (Direction 3 Manipulated Attribute 3 CMA)` and `… Direction 3 manipulated attribute PMA 3direction PMA 3 manipulated attribute …`.
