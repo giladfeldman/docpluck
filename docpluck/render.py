@@ -43,6 +43,7 @@ from .normalize import (
     recover_minus_via_ci_pairing,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
+    recover_times_interaction_glyph_in_prose,
 )
 from .sections import extract_sections
 from .tables.flatten import (
@@ -6222,6 +6223,13 @@ def render_pdf_to_markdown(
     # fallback that bypassed normalize_text. Same tight signatures (contrast
     # ±twin; difference-type subscript) — FP-validated, efendic-only.
     md = recover_prose_two_for_minus(md)
+    # v2.4.112 (W0k): recover '×'-as-'3' in body-prose / flattened-caption
+    # interaction terms (efendic "interaction (Direction 3 Manipulated Attribute
+    # 3 CMA)" + a flattened italic caption run) — the table-cell-scoped W0i can't
+    # reach these. Third-channel completion of the channel-1 normalize W0k. Tight
+    # signature (interaction-context + non-reference + non-count + ≥1 Title-Case/
+    # acronym flank) — the `3` is the most dangerous prose glyph, FP-validated.
+    md = recover_times_interaction_glyph_in_prose(md)
     # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
     # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
     # W0d above — body normalize covers body text; this final pass catches
