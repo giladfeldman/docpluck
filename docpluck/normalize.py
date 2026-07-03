@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.39"  # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
+NORMALIZATION_VERSION = "1.9.40"  # v1.9.40 (v2.4.109): W0j recover_prose_two_for_minus — recover '2'-for-U+2212 minus in body-prose contrast-coding notes ("direction: 20.5 = low, + 0.5 = high" → "-0.5 = …", disambiguated by the "+ X.X = <word>" ±contrast twin on the same line) and change/difference M-statistics ("Mchange = 20.14" → "-0.14", gated on a difference-type subscript so a genuine mean age "M = 20.14" is NEVER flipped). These two PROSE shapes carry no bracket CI, so W0b/W0d could not reach them — efendic_2022_affect's body/caption channel stayed corrupt after the A1/A2 table-cell fixes (glyph-fixes-need-all-three-text-channels). Wired into channel 1 (normalize_text) AND channel 3 (render post-process). FP-validated: 6-case adversarial battery (mean-age, %, ordinal coding, genuine M=2.84) + 20-paper corpus scan = 0 FPs (efendic-only). # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2673,6 +2673,72 @@ def recover_minus_via_ci_pairing(text: str) -> str:
     return "\n".join(out)
 
 
+# ── W0j: '2'-for-U+2212 minus in BODY PROSE that carries NO bracket CI ──────
+# (NORMALIZATION_VERSION 1.9.40, 2026-07-03). W0b/W0d recover the '2'-for-minus
+# glyph when a bracketed CI is present to pair against (or inside a <tr>). Two
+# PROSE shapes carry the same corruption with NO bracket, so they slip every
+# existing recovery — found on efendic_2022_affect by an independent canary
+# audit (the A1/A2 table-cell fixes had left the body-prose channel corrupt;
+# `glyph-fixes-need-all-three-text-channels`):
+#
+#   A · contrast-coding note:
+#       "direction: 20.5 = low, + 0.5 = high"  ->  "-0.5 = low, +0.5 = high"
+#     A ±k contrast code always names BOTH signs. The "+ 0.5 = <word>" twin on
+#     the SAME line is the disambiguator: a "2X.X = <word>" whose |X.X| twin is
+#     also present as "+ X.X = <word>" is the NEGATIVE arm, i.e. the leading 2 is
+#     a corrupted minus. Without the +twin the token is left ALONE (a bare
+#     "20.5 = ..." could be a genuine value).
+#
+#   B · change/difference M-statistic:
+#       "Mchange = 20.14"  ->  "Mchange = -0.14"
+#     This CANNOT key on magnitude — a corrupted "-0.14" and a genuine mean age
+#     "20.14" have identical digits. The ONLY safe disambiguator is the
+#     SUBSCRIPT: a change / difference / posterior-effect statistic is small and
+#     legitimately negative; a bare M / Mage is a raw mean (~20 for age) and must
+#     NEVER be flipped. So B fires ONLY when the M carries a difference-type
+#     subscript (change/diff/difference/posterior/delta/gain/shift).
+#
+# FP-validated 2026-07-03: a 6-case adversarial battery (incl. "mean age of
+# M = 20.14 years", "20.5% women", ordinary "1 = control, 2 = treatment",
+# "M = 2.84") changes NOTHING; a 20-paper rendered-corpus scan fires ONLY on
+# efendic (the target). Wired into channel 1 (normalize_text) AND channel 3
+# (render_pdf_to_markdown post-process) per the 3-channel glyph discipline.
+_PROSE_CODING_NEG_RE = re.compile(r"(?<![\d.\-−])2(\d\.\d+)(\s*=\s*)([A-Za-z])")
+_PROSE_CODING_TWIN_RE = re.compile(r"\+\s*(\d\.\d+)\s*=\s*[A-Za-z]")
+_PROSE_MSTAT_CHANGE_RE = re.compile(
+    r"(\bM(?:change|diff|difference|posterior|delta|gain|shift)\s*=\s*)2(\d\.\d+)",
+    re.IGNORECASE,
+)
+
+
+def recover_prose_two_for_minus(text: str) -> str:
+    """W0j: recover '2'-for-U+2212 minus in body-prose contrast-coding notes and
+    change/difference M-statistics that carry no bracket CI to pair against.
+
+    See the block comment above for the two structural signatures and the
+    disambiguators (the ``+ X.X = <word>`` contrast twin for the coding note; the
+    difference-type subscript for the M-statistic). Both are line-local and tight
+    enough that a 6-case FP battery + 20-paper corpus scan showed zero false
+    positives — only the efendic target changed.
+    """
+    if not text or "2" not in text:
+        return text
+    out = []
+    for line in text.split("\n"):
+        # Signature A: only when a "+ X.X = <word>" contrast twin is on the line.
+        twins = {m.group(1) for m in _PROSE_CODING_TWIN_RE.finditer(line)}
+        if twins:
+            def _repl_a(m: "re.Match[str]") -> str:
+                if m.group(1) in twins:
+                    return "-" + m.group(1) + m.group(2) + m.group(3)
+                return m.group(0)
+            line = _PROSE_CODING_NEG_RE.sub(_repl_a, line)
+        # Signature B: difference-type M-statistic.
+        line = _PROSE_MSTAT_CHANGE_RE.sub(lambda m: m.group(1) + "-" + m.group(2), line)
+        out.append(line)
+    return "\n".join(out)
+
+
 # §A R5 / B7 (NORMALIZATION_VERSION 1.9.23, 2026-05-23): recover the DROPPED
 # minus-sign class — distinct from W0d's '2'-for-U+2212 corruption. Here
 # pdftotext emits no glyph at all for the leading U+2212, so a coefficient
@@ -3414,6 +3480,12 @@ def normalize_text(
     before = t
     t = recover_minus_via_ci_pairing(t)
     report._track("W0d_minus_ci_pairing", before, t, "minus_signs_recovered")
+
+    # ── W0j: recover '2'-for-minus in body-prose contrast-coding notes and
+    # change/difference M-statistics that carry no bracket CI (efendic, 2026-07-03).
+    before = t
+    t = recover_prose_two_for_minus(t)
+    report._track("W0j_prose_minus_recovery", before, t, "minus_signs_recovered")
 
     # ── W0g (§A R5 / B7, 2026-05-23): recover DROPPED minus signs via CI ──
     # Distinct corruption class from W0d: pdftotext emits no glyph at all for

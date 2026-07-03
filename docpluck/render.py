@@ -41,6 +41,7 @@ from .normalize import (
     recover_corrupted_minus_signs,
     recover_dropped_minus_via_ci_pairing,
     recover_minus_via_ci_pairing,
+    recover_prose_two_for_minus,
     recover_pua_glyphs,
 )
 from .sections import extract_sections
@@ -6076,6 +6077,15 @@ def render_pdf_to_markdown(
     # B-coefficient table cell, the Mposterior mediation estimates — that
     # the descending-bracket rule structurally cannot see.
     md = recover_minus_via_ci_pairing(md)
+    # v2.4.109 (W0j): recover '2'-for-minus in body-prose contrast-coding notes
+    # ("20.5 = low, + 0.5 = high" → "-0.5 = …") and change/difference
+    # M-statistics ("Mchange = 20.14" → "-0.14") that carry NO bracket CI, so
+    # the W0d bracket-pairing above cannot reach them. Third-channel completion
+    # of the channel-1 normalize W0j — this pass also catches these shapes when
+    # they surface inside a flattened italic table-caption / Note line / raw_text
+    # fallback that bypassed normalize_text. Same tight signatures (contrast
+    # ±twin; difference-type subscript) — FP-validated, efendic-only.
+    md = recover_prose_two_for_minus(md)
     # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
     # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
     # W0d above — body normalize covers body text; this final pass catches
