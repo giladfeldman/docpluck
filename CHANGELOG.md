@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.4.109] — 2026-07-03
+
+**`2`-for-minus glyph corruption in body PROSE is now recovered (W0j).** `NORMALIZATION_VERSION` → `1.9.40`. An INDEPENDENT Sonnet canary AI-verify found efendic_2022_affect still FAIL: the A1/A2 table-cell glyph fixes (v2.4.102/103) recovered the `×`-as-`3` and `2`-for-`−` corruption **inside `<td>` cells only**, leaving the SAME corruption in the body-prose channel — the `glyph-fixes-need-all-three-text-channels` failure mode. Two prose shapes carry a `2`-for-minus glyph with NO bracket CI, so W0b/W0d (which pair a value against its confidence interval) structurally could not reach them:
+
+- **Contrast-coding notes** (`Note. … direction: 20.5 = low, + 0.5 = high; attribute: 20.5 = benefit, + 0.5 = risk`) — the `20.5` is a corrupted `−0.5`.
+- **Change/difference M-statistics** (`Mchange = 20.14`, `Mchange = 21.01`, `Mchange = 20.62`) — should be `−0.14`, `−1.01`, `−0.62`.
+
+**The fix (`recover_prose_two_for_minus`), keyed on two tight structural signatures — NOT magnitude.**
+- The coding-note recovery fires ONLY when the `+ X.X = <word>` ±contrast twin is present on the same line: a ±k contrast code always names both signs, so a `2X.X = <word>` whose `|X.X|` twin also appears as `+ X.X = <word>` is the negative arm. A bare `20.5 = threshold` with no `+`-twin is left untouched.
+- The M-statistic recovery CANNOT use magnitude (a corrupted `−0.14` and a genuine mean age `20.14` have identical digits), so it fires ONLY when the `M` carries a difference-type subscript (`change`/`diff`/`difference`/`posterior`/`delta`/`gain`/`shift`). A bare `M = 20.14` (mean age) or `M = 2.84` (genuine mean) is NEVER flipped.
+
+Wired into channel 1 (`normalize_text`, W0j after W0d) AND channel 3 (`render_pdf_to_markdown` post-process) per the 3-channel glyph discipline, so the corruption is caught whether the line reaches the reader as body text, a flattened italic table-`Note`, or a raw_text fallback.
+
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic: all three coding-note contrast codes and all three Mchange statistics now render with a minus; zero residual `20.5 =`/`Mchange = 2N.` corruption; the recovery is idempotent (running twice equals once). FP-validated: a 6-case adversarial battery (`mean age of M = 20.14 years`, `20.5% women`, ordinary `1 = control, 2 = treatment`, genuine `M = 2.84`, large numbers) changes nothing; a HEAD-vs-fix diff across 18 rendered corpus papers changes ONLY efendic (every other paper byte-identical). 5 new tests (2 real-PDF + 3 unit-contract incl. the mean-age FP guard). The remaining efendic findings — `×`-as-`3` in prose/caption, the Sage masthead + running-header leak, and two demoted subsection headings — are queued as their own cycles (`docs/FINDINGS_2026-07-03_efendic_glyph_in_prose_channel.md`).
+
 ## [2.4.108] — 2026-07-03
 
 **Wrapped Results-subsection headings are rejoined into one `### ` heading (C1).** A cycle-1 broad-read + canary AI-verify found ip_feldman_2025_pspb rendering FIVE long Results/Discussion-subsection headings mangled: pdftotext column-wrapped each multi-word title across 2–3 physical lines with no blank line between the head, the wrapped tail, and the following body paragraph — e.g. `Complementary Analysis: Interaction Between` │ `Self and Others in Predicting Well-Being` │ `(Exploratory Extension)` │ `We also explored interactions…`. The downstream promoters then mangled the SAME paper three different ways: the ≤6-word `### ` promoter fired on the head alone and stranded the wrapped tail in body; the 5–12-word `## ` major-section promoter grabbed a stranded tail line as its OWN over-promoted heading (`## Self and Others in Predicting Well-Being`); or the whole title fell to body. The gold has each as ONE `### ` heading.
