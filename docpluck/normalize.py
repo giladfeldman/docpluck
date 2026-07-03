@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.36"  # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
+NORMALIZATION_VERSION = "1.9.37"  # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2464,6 +2464,20 @@ _INDEPENDENT_STAT_BETWEEN_RE = re.compile(
 def _recover_minus_in_record(record: str) -> str:
     """Recover '2X.XX' tokens in a single record (a table row or a text line)
     by pairing each with a CI bracket present in the same record."""
+    # v2.4.102: an HTML table ROW is column-structured — each statistic sits in
+    # its own <td> cell and the CI column pairs with the estimate column of the
+    # SAME row by table geometry, not by prose adjacency. Camelot emits each
+    # <td> on its own line, so a B-column estimate and its CI cell are separated
+    # by the intervening SE cell (`</td>\n <td>-0.06</td>\n <td>`), which pushes
+    # the char-gap well past the 30-char BARE-bracket cap (efendic: 37 chars) —
+    # the recovery fired in the DISABLE_CAMELOT unstructured-table channel but
+    # silently missed every negative B-coefficient in the Camelot HTML-table
+    # channel (the production default). Inside a table row we therefore treat a
+    # bare bracket with the SAME relaxed proximity as a labeled bracket: pair
+    # across intervening cells UNLESS an independent-stat label intervenes
+    # (_INDEPENDENT_STAT_BETWEEN_RE still guards it). A prose text line (no <td>)
+    # keeps the strict 30-char cap, so the majumder false-positive stays blocked.
+    is_html_table_row = "<td" in record or "<th" in record
     # Each entry: (lo, hi, (bs, be), is_labeled). `is_labeled` is True when
     # the bracket is prefixed by `CI`/`95% CI`/etc. — see cycle 12 notes
     # at _CI_LABEL_PREFIX_RE.
@@ -2509,14 +2523,28 @@ def _recover_minus_in_record(record: str) -> str:
                 continue
             gap = bs - token_end
             intervening = record[token_end:bs]
-            if is_labeled:
-                # Labeled bracket: relaxed proximity, but still reject if
-                # an independent-stat label intervenes. The label gates the
-                # pairing to the variance-family (SD/SE/M/CI/%) of the
-                # SAME estimate. See _INDEPENDENT_STAT_BETWEEN_RE notes.
-                if _INDEPENDENT_STAT_BETWEEN_RE.search(intervening):
-                    continue
+            # A bracket never pairs back ACROSS an independent test statistic —
+            # the CI belongs to the estimate in the cell/token immediately
+            # before it, not to an earlier one. This guard applies to EVERY
+            # bracket kind. (v2.4.102: previously only labeled brackets ran it,
+            # so a bare bracket within 30 chars but separated by another stat —
+            # `M = 5.37, SD = 2.01, t(1827)=1.83, d = 0.09 [-1.86, 0.04]`, where
+            # the CI is `d`'s — wrongly recovered `SD = 2.01` to `-.01`. The
+            # gap check alone missed it because that variant is only 25 chars.)
+            if _INDEPENDENT_STAT_BETWEEN_RE.search(intervening):
+                continue
+            if is_labeled or is_html_table_row:
+                # Labeled bracket, OR any bracket inside an HTML table row:
+                # relaxed proximity. For a labeled bracket the `CI`/`95% CI`
+                # label gates the pairing to the variance-family (SD/SE/M/CI/%)
+                # of the SAME estimate; for a table row the column structure
+                # does the same job (the estimate column pairs with the CI
+                # column of the same row, across the intervening SE cell). The
+                # independent-stat guard above already rejects a new estimate.
+                pass
             else:
+                # Prose bare bracket: keep the strict distance cap on top of the
+                # independent-stat guard (belt-and-suspenders for prose).
                 if gap > _CI_PAIR_MAX_GAP:
                     continue
                 if _SENTENCE_BREAK_RE.search(intervening):

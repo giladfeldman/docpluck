@@ -91,6 +91,64 @@ def test_ci_pairing_recovers_above_one():
     assert "<td>-1.15</td>" in recover_minus_via_ci_pairing(row)
 
 
+def test_ci_pairing_recovers_multiline_html_row_across_se_cell():
+    """Camelot emits each <td> on its own line, so the SE cell sits between the
+    B-column estimate and the CI cell — pushing the char-gap past the 30-char
+    bare-bracket cap and defeating W0d in the Camelot HTML-table channel (the
+    production default), even though the no-Camelot unstructured-table channel
+    recovered it. In an HTML table row the columns are structurally paired, so
+    the estimate MUST recover regardless of the intervening SE cell. This is the
+    exact efendic Table 2 Intercept row rendered with Camelot ON."""
+    row = (
+        "<tr>\n"
+        "      <td>Intercept</td>\n"
+        "      <td>20.09</td>\n"
+        "      <td>-0.06</td>\n"
+        "      <td>[-0.21, 0.04]</td>\n"
+        "      <td>.185</td>\n"
+        "    </tr>"
+    )
+    out = recover_minus_via_ci_pairing(row)
+    assert "<td>-0.09</td>" in out, out
+    assert "20.09" not in out
+
+
+def test_ci_pairing_multiline_html_row_leaves_genuine_positive():
+    """The genuine Direction row (2.56 ∈ [2.42, 2.69]) must be left alone even
+    with the relaxed HTML-row gap — the containment invariant still guards it
+    (recovered -0.56 ∉ [2.42, 2.69], literal 2.56 ∈)."""
+    row = (
+        "<tr>\n"
+        "      <td>Direction (high vs.low)</td>\n"
+        "      <td>2.56</td>\n"
+        "      <td>0.07</td>\n"
+        "      <td>[2.42, 2.69]</td>\n"
+        "      <td>&lt;.001</td>\n"
+        "    </tr>"
+    )
+    assert recover_minus_via_ci_pairing(row) == row
+
+
+def test_ci_pairing_prose_line_keeps_strict_gap():
+    """The relaxed gap must apply ONLY to HTML table rows. A prose text line
+    (no <td>) keeps the strict 30-char bare-bracket cap so the majumder
+    false-positive stays blocked: the bare CI [-1.86, 0.04] belongs to `d`,
+    not to the far-away corrupt-looking `2.01`, and must NOT flip 2.01."""
+    line = "M = 5.37, SD = 2.01, t(1827) = 1.83, p tukey = .067, d = 0.09 [-1.86, 0.04]"
+    assert recover_minus_via_ci_pairing(line) == line
+
+
+def test_ci_pairing_bare_bracket_rejects_across_independent_stat():
+    """A bare CI never pairs back ACROSS an independent test statistic, even
+    inside the 30-char gap. Pre-existing FP (v2.4.102): the tight-spaced variant
+    `M = 5.37, SD = 2.01, t(1827)=1.83, d = 0.09 [-1.86, 0.04]` is only 25 chars
+    from `2.01` to the bracket, so the gap cap alone let `SD = 2.01` recover to
+    `-.01` — but the CI belongs to `d`, and `t`/`d` intervene, so it must be
+    rejected by the independent-stat guard."""
+    line = "M = 5.37, SD = 2.01, t(1827)=1.83, d = 0.09 [-1.86, 0.04]"
+    assert recover_minus_via_ci_pairing(line) == line
+
+
 def test_ci_pairing_recovers_body_line():
     line = "High only mediation: Mposterior = 20.54, SD=0.04, CI = [-0.61, -0.47];"
     assert "Mposterior = -0.54" in recover_minus_via_ci_pairing(line)
@@ -151,3 +209,55 @@ def test_efendic_table_point_estimates_recovered_via_ci():
     # survived. (The body `Mchange` / contrast-coding residuals carry no CI
     # and are documented escalations -- the pass leaves them untouched.)
     assert recover_minus_via_ci_pairing(md) == md
+
+
+def test_efendic_table_estimates_recovered_with_camelot_on():
+    """The production render path uses Camelot, which emits each table cell on
+    its own line inside a multi-line <tr>. Before this fix the SE cell between
+    the B-column estimate and the CI cell pushed the char-gap past the 30-char
+    bare-bracket cap, so W0d recovered the estimate in the DISABLE_CAMELOT
+    unstructured-table channel but left every negative B-coefficient corrupt as
+    '2X.XX' in the Camelot HTML-table channel. Every <tr> carrying a corrupt
+    '2X.XX' estimate also carries its CI in the same row, so all are
+    structurally recoverable. The genuine positive (2.56 in [2.42, 2.69]) stays.
+    """
+    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
+    if not pdf.exists():
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON (production default)
+    # No corrupt '2X.XX' B-column estimate cell may survive whose row carries a
+    # CI it must lie inside.
+    from docpluck.normalize import (
+        _CI_PAIR_BRACKET_RE,
+        _CORRUPT_NEG_TOKEN_RE,
+        _TABLE_ROW_RE,
+    )
+    surviving = []
+    for m in _TABLE_ROW_RE.finditer(md):
+        row = m.group(0)
+        if not _CI_PAIR_BRACKET_RE.search(row):
+            continue
+        lo_hi = [
+            (float(g1), float(g2))
+            for g1, g2 in _CI_PAIR_BRACKET_RE.findall(row)
+        ]
+        for tok in _CORRUPT_NEG_TOKEN_RE.finditer(row):
+            # inside a bracket span? skip (it's a CI bound, not an estimate)
+            if any(bm.start() <= tok.start() < bm.end() for bm in _CI_PAIR_BRACKET_RE.finditer(row)):
+                continue
+            frac = tok.group(1)
+            recovered = float("-" + frac)
+            literal = float("2" + frac)
+            # only count as a defect when the recovered value fits a CI and the
+            # literal does not (a genuine positive like 2.56 in [2.42,2.69] is
+            # correctly left and is NOT a defect).
+            for lo, hi in lo_hi:
+                if (lo - 0.005) <= recovered <= (hi + 0.005) and not (
+                    (lo - 0.005) <= literal <= (hi + 0.005)
+                ):
+                    surviving.append(tok.group(0))
+                    break
+    assert not surviving, (
+        f"{len(surviving)} corrupt '2X.XX' B-estimate cells survived in Camelot "
+        f"HTML tables despite a CI in the same row: {surviving[:8]}"
+    )
