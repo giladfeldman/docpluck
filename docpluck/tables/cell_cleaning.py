@@ -44,6 +44,7 @@ from docpluck.normalize import (
     recover_dropped_minus_ci_upper,
     recover_dropped_minus_ci_upper_in_text,
     recover_pua_glyphs,
+    recover_times_interaction_glyph,
 )
 
 
@@ -89,6 +90,15 @@ def _html_escape(s: str | None) -> str:
     # recovered operator is HTML-escaped like any other "<". Same shared
     # helper as normalize.py's W0c step (table cells bypass W0c).
     s = recover_corrupted_lt_operator(s)
+    # Recover '×'-as-'3' corruption in an interaction-term predictor cell —
+    # "Direction 3 manipulated attribute" is "Direction × manipulated attribute"
+    # (same AdvPS… broken-ToUnicode font as the '2'-for-minus / '<'-as-backslash
+    # corruptions above). TABLE-CELL ONLY (W0i): a bare '3' between words is
+    # ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"), so this never
+    # runs in normalize_text or the whole-markdown post-process — only here,
+    # where the cell is a Camelot predictor label. Self-guards a genuine ordinal
+    # after a reference word (Model/Study/Wave/…). v2.4.103 / GLYPH.
+    s = recover_times_interaction_glyph(s)
     # Recover a CI UPPER bound whose leading minus pdftotext/Camelot dropped or
     # detached into a stray en-dash — a same-cell "<estimate> ... [lo, hi]"
     # correlation cell ("−.73***\x00BR\x00[−0.78,  –  0.67] (−0.72)") where the
