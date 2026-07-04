@@ -161,3 +161,49 @@ def test_t3_legit_fallback_table_survives(chan_md: str):
     blocks = _unstructured_blocks(chan_md)
     assert "Median age" in blocks, "chan_feldman T3 descriptive fallback wrongly suppressed (FP)"
     assert "Origin was not explicitly mentioned" in blocks, "T3 Note over-trimmed (FP)"
+
+
+# ── RC-T TEXT-LOSS: the caption-tail-walk overshoot (diagnosed, deferred) ─────
+#
+# The chan_feldman Table 3 fallback DROPS its first four rows (Sample size
+# 239/794, Geographic origin, Gender, Ethnic group). Root cause (2026-07-04
+# run 3): `_extract_table_body_text`'s body_start walk preferred the next `\n\n`
+# paragraph break over the caption's OWN sentence terminator, so a caption that
+# wrapped to a short tail (`…target article and\nreplication.`) with the table
+# body serialized column-by-column immediately after (no blank line until row 5)
+# skipped PAST `replication.` to the `\n\n` after the 4th row label.
+#
+# A per-line-terminator walk fixes chan T3 — BUT a full corpus guard-diff (see
+# tmp/rct_body_text_diff.py) showed the walk is SHARED across every table's
+# raw_text extraction: the fix shifts body_start on ~310 captions (308 recover
+# legitimately, 2 TRUNCATE — amc_1 T3, xiao_2021 T6 — a regression, and ~53
+# recover chunks that look like body prose / a leading Fig caption). That is a
+# corpus-wide CAPTURE-PATH change, not a narrow fix — it belongs in the gated
+# RC-T cycle (full 48-paper structured guard-diff + 7-canary AI-gold, user
+# sign-off), NOT a session-tail patch. The tests below are XFAIL guards: they
+# document the exact TEXT-LOSS + the fix's blast radius so the RC-T cycle has a
+# precise, executable target. See docs/TRIAGE_2026-07-03 run-3 section and
+# docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md.
+
+
+@pytest.mark.xfail(
+    reason="RC-T caption-tail-walk TEXT-LOSS: chan T3 drops its first 4 rows. The "
+    "per-line-terminator fix is corpus-wide (310 captions, 2 truncations) — deferred "
+    "to the gated RC-T cycle. See docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md.",
+    strict=True,
+)
+@requires_pdftotext
+@_skip_under_xdist
+def test_t3_first_rows_not_dropped(chan_md: str):
+    """TEXT-LOSS guard: Table 3's FIRST rows must be present. XFAIL at HEAD (the
+    caption-tail walk over-skips); will pass once the RC-T cycle lands the
+    corpus-safe caption-tail-walk fix. Gold Table 3 is a 2-column comparison
+    (McCullough 1997 vs US Prolific) whose first four rows (Sample size 239/794,
+    Geographic origin, Gender, Ethnic group) are absent from the rendered
+    fallback."""
+    blocks = _unstructured_blocks(chan_md)
+    for needle in ("Sample size", "Geographic origin", "Gender", "Ethnic group", "239", "US Prolific"):
+        assert needle in blocks, (
+            f"chan_feldman T3 dropped a leading row: {needle!r} missing from the "
+            f"unstructured-table block (body_start caption-tail walk over-skipped)."
+        )
