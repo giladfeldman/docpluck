@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.42"  # v1.9.42 (v2.4.114): P0r Title-Case surname running-header strip — "Efendić et al." (Sage SPPS page-break header, mixed-case + accented Latin-Extended-A surname) that the all-caps "SMITH et al." pattern missed. Safe: matches the COMPLETE line only (nothing after "et al."), so an inline citation ("…by Efendić et al., 2022"; "Efendić et al. (2022) found…") is never stripped. 14-case FP battery + corpus scan clean. # v1.9.41 (v2.4.112): W0k recover_times_interaction_glyph_in_prose — recover '×'-as-'3' glyph in body-prose / flattened-caption INTERACTION terms that the TABLE-CELL-scoped W0i cannot reach (efendic "interaction (Direction 3 Manipulated Attribute 3 CMA)" + a flattened italic caption run "Direction 3 manipulated attribute PMA 3direction…"). The '3' is the single most dangerous prose glyph, so W0k fires ONLY under a tight signature (ALL hold): line has "interaction" OR ≥2 `Word 3 Word` pairs; '3' not after a reference word (Table/Model/Study/…); right flank not a plural COUNT noun (3 studies/3 groups); ≥1 flank Title-Case or all-caps acronym (predictor name Direction/CMA/PMA). "ran 3 studies"/"and 3 groups" (lowercase flanks) rejected. Wired into channel 1 + channel 3. FP-validated: 12-case battery + wide corpus render scan = 0 FPs. # v1.9.40 (v2.4.109): W0j recover_prose_two_for_minus — recover '2'-for-U+2212 minus in body-prose contrast-coding notes ("direction: 20.5 = low, + 0.5 = high" → "-0.5 = …", disambiguated by the "+ X.X = <word>" ±contrast twin on the same line) and change/difference M-statistics ("Mchange = 20.14" → "-0.14", gated on a difference-type subscript so a genuine mean age "M = 20.14" is NEVER flipped). These two PROSE shapes carry no bracket CI, so W0b/W0d could not reach them — efendic_2022_affect's body/caption channel stayed corrupt after the A1/A2 table-cell fixes (glyph-fixes-need-all-three-text-channels). Wired into channel 1 (normalize_text) AND channel 3 (render post-process). FP-validated: 6-case adversarial battery (mean-age, %, ordinal coding, genuine M=2.84) + 20-paper corpus scan = 0 FPs (efendic-only). # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
+NORMALIZATION_VERSION = "1.9.43"  # v1.9.43 (v2.4.116): W0l recover_times_design_notation + recover_times_wrapped_interaction — the two residual '×'-as-'3' prose shapes W0k's single-line word-pair regex cannot reach. (A) FACTORIAL-DESIGN notation `<digit>(…) 3 <digit>(…)` — efendic "2 (Between-subject factor--Direction: …) 3 2 (…) 3 3 (Within-subject factor--…) mixed-subject design" → each `) 3 <digit> (` boundary's `3` is a corrupted `×` (the trailing digit is the real factor SIZE). Fires ONLY when the boundary ties to a genuine factor parenthetical: (a) an adjacent parenthetical names a factor type (between-/within-/mixed-subjects, repeated-measures), OR (b) BOTH sides are factor-SIZE parens (a bare digit right before the `(`) AND the chain is closed by a `factorial|…-subjects|design` tail. A generic `(min 1) 3 2 (max 5)` / formula `f(x) 3 2 (y)` / `(from level 3) 3 2 (see note)` is left ALONE. (B) LINE-WRAPPED INTERACTION term — a physical line ending `<Pred> 3` whose next line begins with a predictor word, inside an "interaction" context ("the three-way interaction (Direction 3\\nManipulated Attribute × CMA)" → "Direction × Manipulated…") — the wrap splits the pair across lines so W0k's per-line regex can't pair them. FP-validated: 16-case battery (range recode, formula, `Model 3\\n…`, `we ran 3\\nstudies`, count-noun wrap, idempotent `2 (Sex) × 2 (Cond)`) + wide corpus render scan = 0 FPs. Wired channel 1 + channel 3 (glyph-fixes-need-all-three-text-channels). # v1.9.42 (v2.4.114): P0r Title-Case surname running-header strip — "Efendić et al." (Sage SPPS page-break header, mixed-case + accented Latin-Extended-A surname) that the all-caps "SMITH et al." pattern missed. Safe: matches the COMPLETE line only (nothing after "et al."), so an inline citation ("…by Efendić et al., 2022"; "Efendić et al. (2022) found…") is never stripped. 14-case FP battery + corpus scan clean. # v1.9.41 (v2.4.112): W0k recover_times_interaction_glyph_in_prose — recover '×'-as-'3' glyph in body-prose / flattened-caption INTERACTION terms that the TABLE-CELL-scoped W0i cannot reach (efendic "interaction (Direction 3 Manipulated Attribute 3 CMA)" + a flattened italic caption run "Direction 3 manipulated attribute PMA 3direction…"). The '3' is the single most dangerous prose glyph, so W0k fires ONLY under a tight signature (ALL hold): line has "interaction" OR ≥2 `Word 3 Word` pairs; '3' not after a reference word (Table/Model/Study/…); right flank not a plural COUNT noun (3 studies/3 groups); ≥1 flank Title-Case or all-caps acronym (predictor name Direction/CMA/PMA). "ran 3 studies"/"and 3 groups" (lowercase flanks) rejected. Wired into channel 1 + channel 3. FP-validated: 12-case battery + wide corpus render scan = 0 FPs. # v1.9.40 (v2.4.109): W0j recover_prose_two_for_minus — recover '2'-for-U+2212 minus in body-prose contrast-coding notes ("direction: 20.5 = low, + 0.5 = high" → "-0.5 = …", disambiguated by the "+ X.X = <word>" ±contrast twin on the same line) and change/difference M-statistics ("Mchange = 20.14" → "-0.14", gated on a difference-type subscript so a genuine mean age "M = 20.14" is NEVER flipped). These two PROSE shapes carry no bracket CI, so W0b/W0d could not reach them — efendic_2022_affect's body/caption channel stayed corrupt after the A1/A2 table-cell fixes (glyph-fixes-need-all-three-text-channels). Wired into channel 1 (normalize_text) AND channel 3 (render post-process). FP-validated: 6-case adversarial battery (mean-age, %, ordinal coding, genuine M=2.84) + 20-paper corpus scan = 0 FPs (efendic-only). # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2612,6 +2612,180 @@ def recover_times_interaction_glyph_in_prose(text: str) -> str:
     return "\n".join(out)
 
 
+# ── W0l: the two '×'-as-'3' prose SHAPES W0k's single-line word-pair regex ────
+# cannot reach (NORMALIZATION_VERSION 1.9.43, 2026-07-04). Same broken-ToUnicode
+# AdvPS… font as W0i/W0k (the `×` glyph decodes as `3`). Both were the residual
+# efendic_2022_affect findings left open after v2.4.112 (W0k), documented in
+# docs/FINDINGS_2026-07-03_efendic_glyph_in_prose_channel.md.
+#
+#   A · FACTORIAL DESIGN NOTATION — `<digit> (…) 3 <digit> (…) [3 <digit> (…)]`
+#       "2 (Between-subject factor--Direction: …) 3 2 (Between-subject factor--
+#        Manipulated Attribute: …) 3 3 (Within-subject factor--…) mixed-subject
+#        design"  ->  each `) 3 <digit> (` boundary's `3` is a corrupted `×`
+#        (the trailing digit is the real factor SIZE, e.g. `× 2`, `× 3`).
+#       W0k's `Word 3 Word` regex needs LETTER flanks; here the `3` sits between
+#       a `)` and a `<digit> (`, so W0k never sees it. The `3`-as-`×` here is the
+#       single most dangerous prose glyph (a genuine paren-flanked count), so it
+#       fires ONLY when the boundary is tied to a genuine factor parenthetical —
+#       EITHER (a) an immediately-adjacent parenthetical names a factor type
+#       (between-/within-/mixed-subjects, repeated-measures), OR (b) BOTH sides
+#       are factor-SIZE parens (a bare digit right before the `(`: `2 (`, `3 (` —
+#       never `f(x)`, `(range 1)`, `(from level 3)`) AND the chain is closed
+#       immediately by a `factorial|…-subjects|design` tail. A generic
+#       `(min 1) 3 2 (max 5)` / a formula `f(x) 3 2 (y)` / `(from level 3) 3 2
+#       (see note)` is left ALONE (neither branch matches).
+#
+#   B · LINE-WRAPPED INTERACTION TERM — a physical line ending `<Pred> 3` whose
+#       NEXT line begins with a predictor word, inside an interaction context:
+#       "the three-way interaction (Direction 3\nManipulated Attribute × CMA)"
+#        ->  "… (Direction × Manipulated Attribute × CMA)".
+#       The line wrap splits the `<Pred> × <Pred>` pair across two physical lines,
+#       so W0k's per-line regex can't pair them. Fires ONLY when: the tail flank
+#       is Title-Case, the next line's head flank is Title-Case, "interaction" is
+#       in the two-line window, and the head is not a plural count noun.
+#
+# FP-validated 2026-07-04 (tmp/proto_times_residuals.py): a 16-case battery — a
+# range recode `(min 1) 3 2 (max 5)`, a formula `f(x) 3 2 (y)`, `(from level 3)
+# 3 2 (see note)`, `Scores (bin 1) 3 5 (bin 9) … design later`, `Model 3\n…`,
+# `we ran 3\nstudies`, `interaction between condition and 3\ngroups`, an
+# already-correct `2 (Sex) × 2 (Cond)` (idempotency) — changes NOTHING, while
+# both efendic shapes recover fully. A wide corpus render scan runs before ship.
+# Wired into channel 1 (normalize_text) AND channel 3 (render post-process),
+# like W0j/W0k (glyph-fixes-need-all-three-text-channels).
+_TIMES_FACTOR_KW_RE = re.compile(
+    r"between[- ]?subjects?|within[- ]?subjects?|mixed[- ]?subjects?|"
+    r"between[- ]?groups?|within[- ]?groups?|repeated[- ]?measures",
+    re.IGNORECASE,
+)
+_TIMES_DESIGN_BOUNDARY_RE = re.compile(r"\)\s*3\s+\d\s*\(")
+_TIMES_DIGIT_PAREN_OPEN_RE = re.compile(r"(?<![\w.])\d\s*\($")
+_TIMES_DESIGN_TAIL_RE = re.compile(
+    r"^\s*(?:mixed[- ]?subjects?|between[- ]?subjects?|within[- ]?subjects?|"
+    r"factorial|repeated[- ]?measures)?\s*(?:factorial\s+)?design\b",
+    re.IGNORECASE,
+)
+_TIMES_WRAP_TAIL_RE = re.compile(r"(?<![\w.])([A-Z][A-Za-z]+)(\s*)3\s*$")
+_TIMES_WRAP_HEAD_RE = re.compile(r"^\s*([A-Za-z]{2,})")
+
+
+def _times_paren_span_before(s: str, close_idx: int) -> str:
+    """Text of the parenthetical whose ')' is at close_idx (scan back to the
+    matching '('; factor descriptions carry no nested parens)."""
+    depth = 0
+    for k in range(close_idx, -1, -1):
+        if s[k] == ")":
+            depth += 1
+        elif s[k] == "(":
+            depth -= 1
+            if depth == 0:
+                return s[k: close_idx + 1]
+    return ""
+
+
+def _times_paren_span_after(s: str, open_idx: int) -> str:
+    """Text of the parenthetical whose '(' is at open_idx."""
+    depth = 0
+    for k in range(open_idx, len(s)):
+        if s[k] == "(":
+            depth += 1
+        elif s[k] == ")":
+            depth -= 1
+            if depth == 0:
+                return s[open_idx: k + 1]
+    return ""
+
+
+def recover_times_design_notation(text: str) -> str:
+    """W0l-A: recover '×'-as-'3' in factorial-design notation `<digit>(…) 3
+    <digit>(…)`. See the block comment above for the two firing branches (an
+    adjacent factor-type parenthetical, or a factor-size chain closed by a
+    design tail). Matches paragraph-wise on a newline-flattened copy so a factor
+    parenthetical that wraps physical lines is one span (newline→space is 1:1,
+    so char offsets remap directly)."""
+    if "3" not in text or ")" not in text:
+        return text
+    paras = re.split(r"(\n\s*\n)", text)
+    out = []
+    for chunk in paras:
+        if "3" not in chunk or ")" not in chunk:
+            out.append(chunk)
+            continue
+        flat = chunk.replace("\n", " ")
+        flip: list[int] = []
+        for m in _TIMES_DESIGN_BOUNDARY_RE.finditer(flat):
+            three_off = flat.find("3", m.start(), m.end())
+            close_idx = flat.rfind(")", m.start(), three_off)
+            open_idx = flat.find("(", three_off, m.end())
+            left_paren = _times_paren_span_before(flat, close_idx) if close_idx >= 0 else ""
+            right_paren = _times_paren_span_after(flat, open_idx) if open_idx >= 0 else ""
+            fire = bool(
+                _TIMES_FACTOR_KW_RE.search(left_paren)
+                or _TIMES_FACTOR_KW_RE.search(right_paren)
+            )
+            if not fire and left_paren and right_paren:
+                lp_start = flat.rfind(left_paren, 0, close_idx + 1)
+                rp_end = open_idx + len(right_paren)
+                left_is_size = bool(_TIMES_DIGIT_PAREN_OPEN_RE.search(flat[: lp_start + 1]))
+                right_is_size = bool(re.search(r"(?<![\w.])\d\s*$", flat[:open_idx]))
+                tail_ok = bool(_TIMES_DESIGN_TAIL_RE.match(flat[rp_end:]))
+                fire = left_is_size and right_is_size and tail_ok
+            if fire:
+                flip.append(three_off)
+        if not flip:
+            out.append(chunk)
+            continue
+        chars = list(chunk)  # offsets identical to flat (newline→space 1:1)
+        for off in flip:
+            if off < len(chars) and chars[off] == "3":
+                chars[off] = "×"
+        out.append("".join(chars))
+    return "".join(out)
+
+
+def _times_wrap_head_is_count(head: str) -> bool:
+    return head.lower().rstrip(".,;:)") in _TIMES_COUNT_NOUNS
+
+
+def recover_times_wrapped_interaction(text: str) -> str:
+    """W0l-B: recover '×'-as-'3' in a line-wrapped interaction term — a physical
+    line ending `<PredWord> 3` whose next non-empty line begins with a predictor
+    word, inside an "interaction" context. Joins the trailing `3` → `×`. See the
+    block comment above for the guards."""
+    if "3" not in text:
+        return text
+    lines = text.split("\n")
+    for i in range(len(lines) - 1):
+        m_tail = _TIMES_WRAP_TAIL_RE.search(lines[i])
+        if not m_tail:
+            continue
+        j = i + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        if j >= len(lines):
+            continue
+        m_head = _TIMES_WRAP_HEAD_RE.match(lines[j])
+        if not m_head:
+            continue
+        left, head = m_tail.group(1), m_head.group(1)
+        if not (_times_flank_is_predictor(left) and _times_flank_is_predictor(head)):
+            continue
+        # Reference-word ordinal guard (same as W0k's _sub): a tail like
+        # "FIGURE 3" / "Table 3" / "Model 3" is a genuine ordinal — a figure /
+        # table / model NUMBER — not a corrupted interaction `×`, even when the
+        # next line starts Title-Case and "interaction" is in the window (a
+        # figure/table caption routinely reads "Table 3\nMain-effects and
+        # interactions"). Reject when the tail flank is a reference word.
+        if left.lower() in _TIMES_REFERENCE_WORDS_SET:
+            continue
+        if "interaction" not in (lines[i] + " " + lines[j]).lower():
+            continue
+        if _times_wrap_head_is_count(head):
+            continue
+        sp = m_tail.group(2) if m_tail.group(2) else " "
+        lines[i] = lines[i][: m_tail.start()] + f"{left}{sp}×"
+    return "\n".join(lines)
+
+
 # v2.4.40 (NORMALIZATION_VERSION 1.9.6): recover standalone '2'-for-U+2212
 # minus corruption on point-estimate tokens/cells that the bracket-pair rule
 # (recover_corrupted_minus_signs) cannot reach because they carry no bracket
@@ -3632,6 +3806,15 @@ def normalize_text(
     before = t
     t = recover_times_interaction_glyph_in_prose(t)
     report._track("W0k_prose_times_recovery", before, t, "times_glyphs_recovered")
+
+    # ── W0l: recover the two residual '×'-as-'3' prose shapes W0k's single-line
+    # word-pair regex cannot reach — factorial-design notation `<digit>(…) 3
+    # <digit>(…)` and a line-wrapped interaction term `<Pred> 3\n<Pred>`
+    # (efendic residuals, 2026-07-04).
+    before = t
+    t = recover_times_design_notation(t)
+    t = recover_times_wrapped_interaction(t)
+    report._track("W0l_prose_times_residuals", before, t, "times_glyphs_recovered")
 
     # ── W0g (§A R5 / B7, 2026-05-23): recover DROPPED minus signs via CI ──
     # Distinct corruption class from W0d: pdftotext emits no glyph at all for

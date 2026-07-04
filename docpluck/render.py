@@ -43,7 +43,9 @@ from .normalize import (
     recover_minus_via_ci_pairing,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
+    recover_times_design_notation,
     recover_times_interaction_glyph_in_prose,
+    recover_times_wrapped_interaction,
 )
 from .sections import extract_sections
 from .tables.flatten import (
@@ -6323,6 +6325,14 @@ def render_pdf_to_markdown(
     # signature (interaction-context + non-reference + non-count + ≥1 Title-Case/
     # acronym flank) — the `3` is the most dangerous prose glyph, FP-validated.
     md = recover_times_interaction_glyph_in_prose(md)
+    # v2.4.116 (W0l): recover the two residual '×'-as-'3' prose shapes W0k can't
+    # reach — factorial-design notation `<digit>(…) 3 <digit>(…) design` and a
+    # line-wrapped interaction term `<Pred> 3\n<Pred>` (efendic residuals). Same
+    # 3-channel discipline; also catches these shapes inside a flattened caption /
+    # raw_text fallback that bypassed normalize_text. FP-validated (a 16-case
+    # battery incl. range recodes, formulae, `Model 3\n…`, count wraps).
+    md = recover_times_design_notation(md)
+    md = recover_times_wrapped_interaction(md)
     # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
     # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
     # W0d above — body normalize covers body text; this final pass catches
