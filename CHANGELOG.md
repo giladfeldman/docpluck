@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.115] — 2026-07-04
+
+**An author affiliation no longer leaks into the Abstract body.** A canary AI-verify found chandrashekar_2023_mp rendering `Department of Philosophy, Lake Forest College` + `*Joint first authors` right after the `## Abstract` heading, before the abstract prose. The paper has three author affiliations; the section partitioner inserted `## Abstract` mid-affiliation-block, so the masthead strip (which stops AT `## Abstract`) caught the first two affiliations but left the third orphaned in the Abstract body, and the ≥3-consecutive-line `_strip_body_affiliation_block` could not reach a single surviving affiliation line.
+
+**The fix (`_strip_abstract_zone_affiliation_remnant`).** It removes an affiliation line (+ a joint-authors / corresponding-author companion note) that is the FIRST non-blank content after `## Abstract`. A real Abstract always opens with PROSE, so an affiliation LINE in that slot is unambiguously a boundary-split front-matter remnant — the structural signature is affiliation-grammar (via the existing `_is_affiliation_line`) at the Abstract-heading boundary, never paper identity. An abstract that merely MENTIONS a university mid-sentence is prose, not an affiliation line, and is never touched.
+
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds). chandrashekar: `## Abstract` now goes directly to the abstract body; all three affiliations are correctly in the front matter (stripped by design), none in the Abstract. An abstract-zone FP-scan across the rendered corpus fires ONLY on chandrashekar — every other paper's abstract is byte-identical. 4 new tests (incl. the real-abstract and university-mention FP guards). This resolves chandrashekar's METADATA-LEAK; its Tables 9/10 RC-T data-loss remains queued (architectural).
+
 ## [2.4.114] — 2026-07-04
 
 **The `Efendić et al.` Sage running header no longer leaks into the body.** `NORMALIZATION_VERSION` → `1.9.42`. The independent Sonnet canary audit found efendic_2022_affect leaking its running header `Efendić et al.` at 5 page breaks (the line arrives as `\fEfendić et al.`, splitting a sentence at one). The existing P0r running-header pattern only stripped an ALL-CAPS `SMITH et al.` header; a Title-Case surname was deliberately excluded because `Smith et al.` can be an inline citation.

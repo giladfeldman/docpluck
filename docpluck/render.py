@@ -2145,6 +2145,82 @@ def _strip_body_affiliation_block(text: str) -> str:
     return cleaned
 
 
+# ── Abstract-zone affiliation-remnant strip (2026-07-04) ────────────────────
+#
+# The masthead / front-matter strip stops AT the first `## ` heading. When
+# pdftotext serialises the LAST author-affiliation line (+ a joint-authors /
+# corresponding-author companion) AFTER the `## Abstract` heading — because the
+# section partitioner inserted the heading mid-affiliation-block — that one line
+# is orphaned in the Abstract body, and the ≥3-line `_strip_body_affiliation_block`
+# above cannot reach a SINGLE surviving affiliation line (chandrashekar_2023_mp:
+# "Department of Philosophy, Lake Forest College" + "*Joint first authors" land
+# right after `## Abstract`, before the abstract prose). This pass removes an
+# affiliation line (+ its companion) that is the FIRST non-blank content after
+# `## Abstract` — a real Abstract always opens with PROSE, so an affiliation LINE
+# in that slot is unambiguously a boundary-split front-matter remnant. Keyed on
+# affiliation grammar + the Abstract-heading boundary, never on paper identity;
+# an abstract that merely MENTIONS a university mid-sentence is prose (not an
+# affiliation line) and is never touched.
+_ABS_AFFIL_COMPANION_RE = re.compile(
+    r"^\s*(?:[*†‡]\s*)?(?:Joint\s+first\s+authors?|Corresponding\s+author|"
+    r"These\s+authors\s+contributed\s+equally|Equal\s+contribution)",
+    re.IGNORECASE,
+)
+
+
+def _strip_abstract_zone_affiliation_remnant(text: str) -> str:
+    """Strip an affiliation line (+ joint-authors/corresponding-author companion)
+    that the `## Abstract` heading boundary orphaned as the first content of the
+    Abstract body. See the block comment above."""
+    if not text or "## Abstract" not in text:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    strip: set[int] = set()
+    for i, line in enumerate(lines):
+        if line.strip() != "## Abstract":
+            continue
+        # First non-blank line after `## Abstract` must be an affiliation line.
+        j = i + 1
+        while j < n and not lines[j].strip():
+            j += 1
+        if j >= n or _is_affiliation_line(lines[j]) is not True:
+            break  # real prose (or nothing) follows — leave the Abstract alone
+        # Collect the remnant run: affiliation lines + interior blanks + optional
+        # companion note, until the abstract BODY prose begins.
+        run: list[int] = []
+        k = j
+        while k < n:
+            s = lines[k].strip()
+            if not s:
+                nxt = k + 1
+                while nxt < n and not lines[nxt].strip():
+                    nxt += 1
+                if nxt < n and (
+                    _is_affiliation_line(lines[nxt]) is True
+                    or _ABS_AFFIL_COMPANION_RE.match(lines[nxt])
+                ):
+                    run.append(k)
+                    k += 1
+                    continue
+                break
+            if _is_affiliation_line(lines[k]) is True or _ABS_AFFIL_COMPANION_RE.match(lines[k]):
+                run.append(k)
+                k += 1
+            else:
+                break
+        for r in run:
+            if lines[r].strip():  # keep blanks so the heading/body still separate
+                strip.add(r)
+        break  # only the first `## Abstract`
+    if not strip:
+        return text
+    out = [line for idx, line in enumerate(lines) if idx not in strip]
+    cleaned = "\n".join(out)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
 # ── Wrapped subsection-heading REJOIN (2026-07-03, C1) ────────────────────
 #
 # A LONG Results-subsection heading (RR / replication papers write these as
@@ -6325,6 +6401,13 @@ def render_pdf_to_markdown(
     # paragraph (efendic_2022). Block-level + strict (≥3 affiliation-shaped
     # lines), so a lone body university mention is never touched.
     md = _strip_body_affiliation_block(md)
+    # v2.4.115: strip an affiliation line (+ joint-authors/corresponding-author
+    # companion) that the `## Abstract` heading boundary orphaned as the FIRST
+    # content of the Abstract body (chandrashekar_2023_mp: "Department of
+    # Philosophy, Lake Forest College" + "*Joint first authors"). The masthead
+    # strip stops at `## Abstract`, and the ≥3-line body-affiliation strip can't
+    # reach a single surviving affiliation line. Runs after both.
+    md = _strip_abstract_zone_affiliation_remnant(md)
     # 2026-06-06 (run-11, ar_apa `### FlashReport`): strip heading markup
     # that sits ABOVE the document H1 — a journal-section label promoted to
     # a heading in the pre-title masthead zone. Runs after title rescue (H1
