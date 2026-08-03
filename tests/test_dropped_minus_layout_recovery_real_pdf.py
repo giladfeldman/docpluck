@@ -107,6 +107,60 @@ def test_layout_no_layout_is_noop():
     assert recover_dropped_minus_via_layout("b = .022", None) == "b = .022"
 
 
+# ── W0m: β-as-'b' recovery via the layout font tag (v2.4.117) ────────────────
+# The same JESP symbol-font family draws the Greek β itself with no ToUnicode
+# CMap, so pdftotext maps the glyph to a plain ASCII 'b' — the gold reads
+# `β = −.022` where the text channel says `b = -.022`. A text-only rewrite is
+# unsafe (`b`, the unstandardized coefficient, is a legitimate distinct
+# statistic), so W0m flips ONLY when the layout channel shows the 'b' drawn in
+# a math-symbol font (`AdvPSMP…`) immediately before `=` — a slot a genuine
+# body-font `b` never occupies.
+
+from docpluck.normalize import recover_beta_via_layout
+
+
+def _beta_char(x: float, *, top: float = 100.0, size: float = 8.0) -> dict:
+    """A 'b' drawn in the math-symbol font (the mis-rendered β)."""
+    return {"text": "b", "x0": x, "x1": x + size * 0.5, "top": top,
+            "bottom": top + size, "size": size,
+            "fontname": "MIICOL+AdvPSMP10"}
+
+
+def test_beta_recovered_when_layout_shows_symbol_font_b():
+    row = _row_chars(" = .48, t(87) = 1.12", x0=56.0)
+    layout = _layout([_beta_char(50.0)] + row)
+    out = recover_beta_via_layout("b = .48, t(87) = 1.12, ns", layout)
+    assert "β = .48" in out
+
+
+def test_genuine_body_font_b_never_flipped():
+    # The 'b' is in the BODY font (_row_chars default) → layout count 0 → no-op.
+    layout = _layout(_row_chars("b = .48, t(87) = 1.12"))
+    out = recover_beta_via_layout("b = .48, t(87) = 1.12, ns", layout)
+    assert "β" not in out and "b = .48" in out
+
+
+def test_symbol_font_b_not_before_equals_never_flipped():
+    # A math-font 'b' NOT followed by '=' (e.g. a figure label 'b0') → no-op.
+    row = _row_chars("0 baseline", x0=56.0)
+    layout = _layout([_beta_char(50.0)] + row)
+    out = recover_beta_via_layout("b0 baseline b = .48", layout)
+    assert "β" not in out
+
+
+def test_beta_flip_count_capped_by_layout():
+    # Layout proves ONE β; text has TWO `b = <coef>` slots → only the first flips.
+    row = _row_chars(" = .48,", x0=56.0)
+    layout = _layout([_beta_char(50.0)] + row)
+    out = recover_beta_via_layout("b = .48, and later b = .22, ns", layout)
+    assert out.count("β") == 1
+    assert "β = .48" in out and "b = .22" in out
+
+
+def test_beta_no_layout_is_noop():
+    assert recover_beta_via_layout("b = .48", None) == "b = .48"
+
+
 # ── Real-PDF regression test ─────────────────────────────────────────────────
 
 def test_ar_apa_betas_sign_recovered_in_render():
@@ -115,10 +169,18 @@ def test_ar_apa_betas_sign_recovered_in_render():
         pytest.skip(f"fixture missing: {pdf}")
     from docpluck.render import render_pdf_to_markdown
     md = render_pdf_to_markdown(pdf.read_bytes())
-    # The three layout-recoverable negatives must read negative.
-    assert "b = -.022" in md, "beta -.022 not sign-recovered"
-    assert "b = -.88" in md, "beta -.88 not sign-recovered"
-    assert "b = -.428" in md, "beta -.428 not sign-recovered"
-    # The genuinely-positive coefficient must stay positive (no over-flip).
-    assert "b = .48," in md and "b = -.48" not in md
-    # .245 is the documented OCR-only limitation — intentionally NOT asserted.
+    # W0h: the three layout-recoverable negatives must read negative.
+    # W0m (v2.4.117): all five coefficients must read β, not plain 'b' — the
+    # layout shows each drawn in the AdvPSMP math-symbol font before '='.
+    assert "β = -.022" in md, "beta -.022 not sign+glyph-recovered"
+    assert "β = -.88" in md, "beta -.88 not sign+glyph-recovered"
+    assert "β = -.428" in md, "beta -.428 not sign+glyph-recovered"
+    # The genuinely-positive coefficient stays positive (no sign over-flip),
+    # but its symbol is still a recovered β.
+    assert "β = .48," in md and "β = -.48" not in md and "b = -.48" not in md
+    # No coefficient slot may remain as plain 'b' on this paper.
+    import re as _re
+    assert not _re.search(r"(?<![\w.])b = [-−]?\.?\d?\.\d+", md), (
+        "a coefficient slot still renders as plain 'b' — W0m did not reach it"
+    )
+    # .245's minus is the documented OCR-only limitation — sign NOT asserted.
