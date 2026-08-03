@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.117] — 2026-07-07
+
+**A standardized β no longer reads as a plain `b`.** `NORMALIZATION_VERSION` → `1.9.44`. On tight-kerned JESP-family PDFs the Greek β is drawn in a math-symbol PostScript font (`AdvPSMP…` — the same broken-ToUnicode family behind the `×`/`<`/minus corruptions) with no CMap, so pdftotext maps the glyph to the visually-similar ASCII `b`. ar_apa's Supplemental-analyses paragraph rendered all five standardized coefficients as `b = -.022` etc. where the source shows `β = −.022` — a symbol-identity corruption a scientist reads as the *unstandardized* coefficient.
+
+**The fix (W0m — `recover_beta_via_layout`).** A text-only `b =` → `β =` rewrite is unsafe: `b` (unstandardized) is a legitimate, distinct statistic. The discriminator is the LAYOUT channel: the corrupted symbol is a `b` char whose font matches the math-symbol subset (`AdvPSMP…`) sitting immediately before `=` on its visual line — the coefficient operator slot. A genuine body `b` uses the body serif font; a word-internal `b` (`bleat…`) or a figure label (`b0`, ArialMT) is never followed by `=`. W0m flips at most as many `b = <coef>` text slots as the layout counted — the same conservative layout-correlation mechanism as W0h (dropped-minus). Gated on the same layout param, so the section path is a no-op.
+
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds). ar_apa: all five coefficients now render `β` (`β = -.022`, `β = .48`, `β = -.88`, `β = .245`, `β = -.428`), matching the gold's symbols; the genuinely-positive `.48` keeps its sign; `.245`'s missing minus remains the documented OCR-only limitation. A corpus-wide layout scan confirms the recovery fires only on papers whose layout carries math-symbol-font `b`-before-`=` glyphs. 5 new unit tests (symbol-font flip, body-font never flipped, non-`=` slot never flipped, layout-count cap, no-layout no-op) + the real-PDF render test updated to assert β (fails at v2.4.116). Also this release: the post-move editable install was repaired (`pip install -e .` at the new `~/Vibe` path) — the Dropbox→Vibe migration had left `import docpluck` broken machine-wide.
+
 ## [2.4.116] — 2026-07-04
 
 **The last two `×`-as-`3` glyph corruptions in efendic's prose are gone.** `NORMALIZATION_VERSION` → `1.9.43`. W0k (v2.4.112) recovered the `×`-as-`3` interaction-term glyph in body prose and flattened captions, but its single-line `Word 3 Word` regex structurally could not reach two residual shapes the FINDINGS doc flagged for a follow-up cycle — both silently rendered a `3` where a scientist should read `×`:
