@@ -23,7 +23,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.43"  # v1.9.43 (v2.4.116): W0l recover_times_design_notation + recover_times_wrapped_interaction — the two residual '×'-as-'3' prose shapes W0k's single-line word-pair regex cannot reach. (A) FACTORIAL-DESIGN notation `<digit>(…) 3 <digit>(…)` — efendic "2 (Between-subject factor--Direction: …) 3 2 (…) 3 3 (Within-subject factor--…) mixed-subject design" → each `) 3 <digit> (` boundary's `3` is a corrupted `×` (the trailing digit is the real factor SIZE). Fires ONLY when the boundary ties to a genuine factor parenthetical: (a) an adjacent parenthetical names a factor type (between-/within-/mixed-subjects, repeated-measures), OR (b) BOTH sides are factor-SIZE parens (a bare digit right before the `(`) AND the chain is closed by a `factorial|…-subjects|design` tail. A generic `(min 1) 3 2 (max 5)` / formula `f(x) 3 2 (y)` / `(from level 3) 3 2 (see note)` is left ALONE. (B) LINE-WRAPPED INTERACTION term — a physical line ending `<Pred> 3` whose next line begins with a predictor word, inside an "interaction" context ("the three-way interaction (Direction 3\\nManipulated Attribute × CMA)" → "Direction × Manipulated…") — the wrap splits the pair across lines so W0k's per-line regex can't pair them. FP-validated: 16-case battery (range recode, formula, `Model 3\\n…`, `we ran 3\\nstudies`, count-noun wrap, idempotent `2 (Sex) × 2 (Cond)`) + wide corpus render scan = 0 FPs. Wired channel 1 + channel 3 (glyph-fixes-need-all-three-text-channels). # v1.9.42 (v2.4.114): P0r Title-Case surname running-header strip — "Efendić et al." (Sage SPPS page-break header, mixed-case + accented Latin-Extended-A surname) that the all-caps "SMITH et al." pattern missed. Safe: matches the COMPLETE line only (nothing after "et al."), so an inline citation ("…by Efendić et al., 2022"; "Efendić et al. (2022) found…") is never stripped. 14-case FP battery + corpus scan clean. # v1.9.41 (v2.4.112): W0k recover_times_interaction_glyph_in_prose — recover '×'-as-'3' glyph in body-prose / flattened-caption INTERACTION terms that the TABLE-CELL-scoped W0i cannot reach (efendic "interaction (Direction 3 Manipulated Attribute 3 CMA)" + a flattened italic caption run "Direction 3 manipulated attribute PMA 3direction…"). The '3' is the single most dangerous prose glyph, so W0k fires ONLY under a tight signature (ALL hold): line has "interaction" OR ≥2 `Word 3 Word` pairs; '3' not after a reference word (Table/Model/Study/…); right flank not a plural COUNT noun (3 studies/3 groups); ≥1 flank Title-Case or all-caps acronym (predictor name Direction/CMA/PMA). "ran 3 studies"/"and 3 groups" (lowercase flanks) rejected. Wired into channel 1 + channel 3. FP-validated: 12-case battery + wide corpus render scan = 0 FPs. # v1.9.40 (v2.4.109): W0j recover_prose_two_for_minus — recover '2'-for-U+2212 minus in body-prose contrast-coding notes ("direction: 20.5 = low, + 0.5 = high" → "-0.5 = …", disambiguated by the "+ X.X = <word>" ±contrast twin on the same line) and change/difference M-statistics ("Mchange = 20.14" → "-0.14", gated on a difference-type subscript so a genuine mean age "M = 20.14" is NEVER flipped). These two PROSE shapes carry no bracket CI, so W0b/W0d could not reach them — efendic_2022_affect's body/caption channel stayed corrupt after the A1/A2 table-cell fixes (glyph-fixes-need-all-three-text-channels). Wired into channel 1 (normalize_text) AND channel 3 (render post-process). FP-validated: 6-case adversarial battery (mean-age, %, ordinal coding, genuine M=2.84) + 20-paper corpus scan = 0 FPs (efendic-only). # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
+NORMALIZATION_VERSION = "1.9.44"  # v1.9.44 (v2.4.117): W0m recover_beta_via_layout — recover a standardized-coefficient Greek β that pdftotext rendered as a plain ASCII 'b' (ar_apa/JESP: all five Supplemental-analyses betas, `β = −.022` read `b = -.022`). A text-only `b =`→`β =` rewrite is UNSAFE ('b', the unstandardized coefficient, is a legitimate distinct statistic), so W0m flips ONLY when the LAYOUT channel proves the glyph: a 'b' char drawn in a math-symbol PostScript font (`AdvPSMP…` — the same broken-ToUnicode family as the ×/</minus corruptions, W0i/W0c/W0h) sitting immediately before '=' on its visual line (the coefficient operator slot). A genuine body 'b' uses the body serif font; a word-internal 'b' (`bleat…`) or a figure label ('b0', ArialMT) is not followed by '='. Flips at most as many `b = <coef>` text slots as the layout counted (left to right), same conservative correlation mechanism as W0h. Gated on the dropped_minus_layout param (section path stays no-op). Corpus layout-scan: fires on the target JESP-family papers only; 5 unit tests + real-PDF render test (fails at v2.4.116). # v1.9.43 (v2.4.116): W0l recover_times_design_notation + recover_times_wrapped_interaction — the two residual '×'-as-'3' prose shapes W0k's single-line word-pair regex cannot reach. (A) FACTORIAL-DESIGN notation `<digit>(…) 3 <digit>(…)` — efendic "2 (Between-subject factor--Direction: …) 3 2 (…) 3 3 (Within-subject factor--…) mixed-subject design" → each `) 3 <digit> (` boundary's `3` is a corrupted `×` (the trailing digit is the real factor SIZE). Fires ONLY when the boundary ties to a genuine factor parenthetical: (a) an adjacent parenthetical names a factor type (between-/within-/mixed-subjects, repeated-measures), OR (b) BOTH sides are factor-SIZE parens (a bare digit right before the `(`) AND the chain is closed by a `factorial|…-subjects|design` tail. A generic `(min 1) 3 2 (max 5)` / formula `f(x) 3 2 (y)` / `(from level 3) 3 2 (see note)` is left ALONE. (B) LINE-WRAPPED INTERACTION term — a physical line ending `<Pred> 3` whose next line begins with a predictor word, inside an "interaction" context ("the three-way interaction (Direction 3\\nManipulated Attribute × CMA)" → "Direction × Manipulated…") — the wrap splits the pair across lines so W0k's per-line regex can't pair them. FP-validated: 16-case battery (range recode, formula, `Model 3\\n…`, `we ran 3\\nstudies`, count-noun wrap, idempotent `2 (Sex) × 2 (Cond)`) + wide corpus render scan = 0 FPs. Wired channel 1 + channel 3 (glyph-fixes-need-all-three-text-channels). # v1.9.42 (v2.4.114): P0r Title-Case surname running-header strip — "Efendić et al." (Sage SPPS page-break header, mixed-case + accented Latin-Extended-A surname) that the all-caps "SMITH et al." pattern missed. Safe: matches the COMPLETE line only (nothing after "et al."), so an inline citation ("…by Efendić et al., 2022"; "Efendić et al. (2022) found…") is never stripped. 14-case FP battery + corpus scan clean. # v1.9.41 (v2.4.112): W0k recover_times_interaction_glyph_in_prose — recover '×'-as-'3' glyph in body-prose / flattened-caption INTERACTION terms that the TABLE-CELL-scoped W0i cannot reach (efendic "interaction (Direction 3 Manipulated Attribute 3 CMA)" + a flattened italic caption run "Direction 3 manipulated attribute PMA 3direction…"). The '3' is the single most dangerous prose glyph, so W0k fires ONLY under a tight signature (ALL hold): line has "interaction" OR ≥2 `Word 3 Word` pairs; '3' not after a reference word (Table/Model/Study/…); right flank not a plural COUNT noun (3 studies/3 groups); ≥1 flank Title-Case or all-caps acronym (predictor name Direction/CMA/PMA). "ran 3 studies"/"and 3 groups" (lowercase flanks) rejected. Wired into channel 1 + channel 3. FP-validated: 12-case battery + wide corpus render scan = 0 FPs. # v1.9.40 (v2.4.109): W0j recover_prose_two_for_minus — recover '2'-for-U+2212 minus in body-prose contrast-coding notes ("direction: 20.5 = low, + 0.5 = high" → "-0.5 = …", disambiguated by the "+ X.X = <word>" ±contrast twin on the same line) and change/difference M-statistics ("Mchange = 20.14" → "-0.14", gated on a difference-type subscript so a genuine mean age "M = 20.14" is NEVER flipped). These two PROSE shapes carry no bracket CI, so W0b/W0d could not reach them — efendic_2022_affect's body/caption channel stayed corrupt after the A1/A2 table-cell fixes (glyph-fixes-need-all-three-text-channels). Wired into channel 1 (normalize_text) AND channel 3 (render post-process). FP-validated: 6-case adversarial battery (mean-age, %, ordinal coding, genuine M=2.84) + 20-paper corpus scan = 0 FPs (efendic-only). # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -3327,6 +3327,103 @@ def recover_dropped_minus_via_layout(text: str, layout) -> str:
     return text
 
 
+# ── W0m (§A / GLYPH): recover a standardized-coefficient 'β' that pdftotext ───
+# rendered as a plain ASCII 'b', using the layout channel's surviving font tag
+# (NORMALIZATION_VERSION 1.9.44, 2026-07-04). On tight-kerned PDFs that draw the
+# Greek β in a math-symbol PostScript font with no ToUnicode CMap (ar_apa: font
+# `MIICOL+AdvPSMP10`), pdftotext maps the glyph to the visually-similar ASCII
+# `b`. So a regression paragraph reads `b = -.022` where the source shows
+# `β = −.022` (ar_apa Supplemental analyses: all five standardized β's). This is
+# NOT a text-only fix: `b` (unstandardized coefficient) is a LEGITIMATE distinct
+# statistic, so a blind `b = ` → `β = ` rewrite would corrupt papers that report
+# a genuine `b`. The DISCRIMINATOR is the layout channel: the corrupted symbol
+# is a `b` char whose FONT is a math-symbol PostScript subset (`AdvPSMP…` — the
+# "Math Publisher" family that also mis-draws the `×`/`<`/minus glyphs, W0i/W0c),
+# distinct from the body serif font (`AdvGulliv`), AND it sits in the coefficient
+# operator slot (immediately before `=`). A genuine body `b` uses the body font;
+# a word-internal `b` (`bleat…`) or a figure label (`b0`, ArialMT) is not
+# followed by `=`. Same layout-correlation mechanism as W0h (dropped-minus).
+# Only flips as many `b = ` occurrences as the layout proves are β — never more.
+_BETA_SYMBOL_FONT_RE = re.compile(r"AdvPSMP", re.IGNORECASE)
+
+
+def _layout_beta_coefficients(layout) -> int:
+    """Count the standardized coefficients whose 'β' survives in the layout as a
+    math-symbol-font 'b' in the ``b = <coef>`` operator slot. Returns the number
+    of such 'b' glyphs (0 when no layout / no hit)."""
+    from .extract_layout import LayoutDoc  # local import (layout is optional)
+
+    if not isinstance(layout, LayoutDoc):
+        return 0
+    count = 0
+    for page in layout.pages:
+        chars = page.chars
+        if not chars:
+            continue
+        for c in chars:
+            if (c.get("text") or "") != "b":
+                continue
+            if not _BETA_SYMBOL_FONT_RE.search(str(c.get("fontname") or "")):
+                continue
+            # The 'b' must sit immediately before an '=' on its visual line — the
+            # coefficient operator slot (β = …). y-overlap line clustering, as in
+            # _layout_negative_coefficients (a symbol glyph can be off-baseline).
+            ctop = float(c.get("top") or 0.0)
+            cbot = float(c.get("bottom") or 0.0)
+            line = [
+                d for d in chars
+                if float(d.get("bottom") or 0.0) > ctop + 0.5
+                and float(d.get("top") or 0.0) < cbot - 0.5
+            ]
+            line.sort(key=lambda d: float(d.get("x0") or 0.0))
+            try:
+                i = next(k for k, d in enumerate(line) if d is c)
+            except StopIteration:
+                continue
+            # nearest non-space neighbour to the RIGHT is `=`.
+            right = None
+            k = i + 1
+            while k < len(line):
+                rt = str(line[k].get("text") or "").strip()
+                if rt:
+                    right = rt
+                    break
+                k += 1
+            if right == "=":
+                count += 1
+    return count
+
+
+# A `b = ` coefficient operator slot: a standalone `b` (word-boundary before,
+# excludes `Rb`/`sub`), then `=` (not `<=`/`>=`/`==`), then a signed decimal
+# coefficient. The `b` is the mis-rendered β. Captures (1) the `= <coef>` tail so
+# the flip preserves spacing/sign exactly, replacing only the leading `b`.
+_BETA_COEF_SLOT_RE = re.compile(
+    r"(?<![\w.])b(\s*=\s*[-−]?\s?\.?\d*\.\d+)"
+)
+
+
+def recover_beta_via_layout(text: str, layout) -> str:
+    """W0m: promote a standardized-coefficient 'b' back to 'β' when the layout
+    channel proves the glyph was a math-symbol-font β in the ``b = <coef>`` slot.
+    Conservative — flips only as many `b = <coef>` occurrences as the layout
+    counted, left to right. See the module comment above for the signature and
+    the reason a text-only rewrite is unsafe (genuine `b` coefficients exist)."""
+    if not text or layout is None or "b" not in text:
+        return text
+    remaining = [_layout_beta_coefficients(layout)]
+    if remaining[0] <= 0:
+        return text
+
+    def _sub(m: "re.Match[str]", _r=remaining) -> str:
+        if _r[0] <= 0:
+            return m.group(0)
+        _r[0] -= 1
+        return "β" + m.group(1)
+
+    return _BETA_COEF_SLOT_RE.sub(_sub, text)
+
+
 # §A R5 / B7 (NORMALIZATION_VERSION 1.9.36, 2026-06-30): recover a CI UPPER
 # bound whose leading minus pdftotext/Camelot DROPPED (or detached into a stray
 # en-dash). W0g (CI-pairing) and W0h (layout) repair a *coefficient* proven
@@ -3834,6 +3931,16 @@ def normalize_text(
         before = t
         t = recover_dropped_minus_via_layout(t, dropped_minus_layout)
         report._track("W0h_dropped_minus_layout", before, t, "dropped_minus_signs_recovered")
+
+        # ── W0m (§A / GLYPH, 2026-07-04): recover a standardized β rendered as a
+        # plain 'b'. Uses the SAME layout channel as W0h: the corrupted symbol is
+        # a `b` in a math-symbol font (`AdvPSMP…`) in the `b = <coef>` slot, which
+        # a genuine `b` coefficient never is. ar_apa Supplemental analyses: all
+        # five `β = …` betas surfaced as `b = …`. Gated on the layout param so
+        # the section path (no layout) is a no-op.
+        before = t
+        t = recover_beta_via_layout(t, dropped_minus_layout)
+        report._track("W0m_beta_via_layout", before, t, "beta_glyphs_recovered")
 
     # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
     # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a
