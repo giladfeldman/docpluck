@@ -452,7 +452,7 @@ def _cell_is_prose(text: str) -> bool:
 # A categorical/design table (predictions, 2×2 conditions, factor summaries) is a
 # real table that carries NO numeric cells — every cell is a short label
 # ("Risk is high", "Negative affect"). The numeric-data gates
-# (``_CLEAN_DATA_CELL_RE`` / ``_row_is_prose``) therefore read each of its rows as
+# (``_cell_is_clean_data`` / ``_row_is_prose``) therefore read each of its rows as
 # prose and discard the whole grid (efendic Table 1: a 5×3 predictions table whose
 # region-driven Camelot grid is perfect, then deleted by the prose guards). A cell
 # is "categorical-short" when it has at most this many word tokens AND characters —
@@ -588,13 +588,41 @@ def _trim_trailing_prose_rows(
     return kept
 
 
-# A "clean" standalone data cell: a number (incl. APA leading-dot / signed / CI
-# bracket / parenthesised), a comparison-op'd p, or a short stat marker. Used to
-# confirm a whitespace grid is a real DATA table, not absorbed prose.
-_CLEAN_DATA_CELL_RE = re.compile(
-    r"^\s*(?:[<>=≤≥]\s*)?[-+−(\[]?\s*\d*\.?\d+"
-    r"(?:\s*[,\-–—−]\s*[-+−]?\d*\.?\d+)?\s*[)\]%]?\s*$"
-)
+# A "clean" data cell: content that is essentially ALL numbers, separators and stat
+# punctuation, with no substantive word. Used to confirm a whitespace grid is a real
+# DATA table, not absorbed prose.
+#
+# Judged by NUMERIC DOMINANCE rather than by one token shape (2026-08-04). The previous
+# pattern anchored ^…$ around a SINGLE numeric token, so it accepted `2.84`, `.67`,
+# `[0.59, 0.73]`, `(170)`, `<.001` — but rejected every multi-token APA COMPOSITE:
+#
+#     2.84 [1.89]         mean [SD]              <- maier Tables 5 and 7
+#     3.47 [1.23] (170)   mean [SD] (n)          <- maier T7, gold-exact
+#     2.84 ± 1.89         mean ± SD
+#     0.42***             estimate with significance markers
+#
+# A descriptives table built from those cells scored clean_data_rows = 0 and was
+# discarded as "not a data table", so the grid was thrown away and the table rendered
+# as a caption-only stub. Chasing each new composite with another alternation does not
+# generalise; requiring "at least one digit AND no substantive word" does, and keeps the
+# prose side exactly where it was — a cell carrying real words is still not data, which
+# is what keeps absorbed body text out of the grid (cog_emo Table 3's 27x4 all-prose
+# grid). Guarded by tests/test_clean_data_cell_composites.py.
+#
+# A "substantive word" is an alphabetic run of 2+ letters, so single-letter statistic
+# markers (M, SD is two letters and deliberately NOT allowed here, n, p, r, d) do not
+# smuggle prose in: the cell must still be digit-bearing to qualify at all.
+_CLEAN_DATA_ALLOWED_RE = re.compile(r"^[\d\s.,;:%±*†‡/\-–—−+()\[\]<>=≤≥]+$")
+
+
+def _cell_is_clean_data(text: str) -> bool:
+    """True when ``text`` is a data cell: digit-bearing and free of substantive words."""
+    s = (text or "").strip()
+    if not s:
+        return False
+    if not any(ch.isdigit() for ch in s):
+        return False
+    return bool(_CLEAN_DATA_ALLOWED_RE.match(s))
 # A severely GARBLED cell — a long run of one repeated letter (vertical-text
 # merge: ``caaaaaaaaaDott…``), a very long unbroken alpha token (columns the
 # char-fallback fused), or an unmapped-glyph marker. ``(cid:N)`` / U+FFFD mean
@@ -615,7 +643,20 @@ _UNMAPPED_GLYPH_RE = re.compile(r"\(cid:\d+\)|�")
 # footnote is deliberately NOT included: it is a legitimate part of many real
 # tables — e.g. cog_emo Table 2's intercorrelation matrix — and rejecting on it
 # would discard good grids.)
-_CAPTION_LABEL_RE = re.compile(r"\b(?:Table|Figure|TABLE|FIGURE)\s+\d+\s*[.:]")
+# ANCHORED at the cell start (2026-08-04). Unanchored, this fired on a mid-sentence
+# CROSS-REFERENCE in a footnote/prose cell and condemned the whole grid: maier Table 5's
+# region carries "…al. (2007) in Table 8." and "…in Figure 2. We summarized the in-", so
+# its 3x5 descriptives grid was discarded and the table rendered as a caption-only stub
+# — even though the raw_text channel had captured the data correctly
+# (2.84 [1.89] {1.36}* (170) …). That is TEXT-LOSS from a false positive, verified
+# against the AI gold.
+#
+# An ABSORBED caption — the thing this guard exists to catch — always begins its cell;
+# a reference has sentence text before it. ``camelot_extract._CAPTION_ROW_PATTERN``
+# already encodes exactly this discipline (its comment notes that anchoring is why an
+# inline "see Table 2" does not match); the whitespace copy had simply lost the anchor.
+# Kept deliberately in sync with that pattern.
+_CAPTION_LABEL_RE = re.compile(r"^\s*(?:Table|Figure|TABLE|FIGURE)\s+\d+\s*[.:]")
 
 # A caption-anchored region ALWAYS contains its OWN caption line by construction:
 # ``detect._region_for_caption`` returns ``_union(caption_bbox, geom_bbox)`` because
@@ -755,7 +796,7 @@ def _whitespace_grid_is_clean(
             nonempty_rows += 1
         if any(_cell_is_garbled(t) for t in texts):
             garbled_rows += 1
-        if any(_CLEAN_DATA_CELL_RE.match(t) for t in texts if t):
+        if any(_cell_is_clean_data(t) for t in texts if t):
             clean_data_rows += 1
         if any(_cell_is_prose(t) for t in texts):
             prose_cell_rows += 1
@@ -763,7 +804,7 @@ def _whitespace_grid_is_clean(
     # Prose-contamination reject (region-driven false-positive guard, 2026-06-29):
     # a caption-anchored region can over-capture the surrounding 2-column body
     # text, and a wrapped prose line that happens to contain a year or sample size
-    # ("…participants (n = 264) were asked…") satisfies _CLEAN_DATA_CELL_RE, so
+    # ("…participants (n = 264) were asked…") satisfies _cell_is_clean_data, so
     # prose masquerades as data (cog_emo Table 3: a 27×4 grid that is entirely the
     # High/Low-Empathy procedure paragraph). Detect rows carrying a CELL that is a
     # genuine sentence fragment (``_cell_is_prose`` — many words, lowercase, spaces;

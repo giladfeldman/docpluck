@@ -71,12 +71,28 @@ def test_ci_upper_pattern_scales_sub_quadratically():
     )
 
 
-def test_normalize_stays_within_budget_on_pathological_input():
-    """The end-to-end shape of the edge-case test that surfaced this."""
+def test_normalize_scales_sub_quadratically_on_pathological_input():
+    """End-to-end complexity check for the shape that surfaced this defect.
+
+    Deliberately measures SCALING, not an absolute wall-clock budget. A budgeted
+    variant of this test was written first and was itself flaky: `normalize_text` on
+    this input runs 2.5-4.1s warm on this machine, so a 5s budget passed alone and
+    failed under `pytest -n 10` parallel load — the same false-alarm class as the
+    `test_regex_no_catastrophic_backtracking` test that started this investigation.
+    A ratio is load-independent: contention inflates both measurements together.
+    """
     from docpluck.normalize import NormalizationLevel, normalize_text
 
-    text = "p = " + "9" * 10000 + " end"
-    assert _elapsed(lambda: normalize_text(text, NormalizationLevel("academic"))) < 5.0
+    level = NormalizationLevel("academic")
+    small = "p = " + "9" * 5000 + " end"
+    large = "p = " + "9" * 10000 + " end"
+    t_small = _elapsed(lambda: normalize_text(small, level))
+    t_large = _elapsed(lambda: normalize_text(large, level))
+    # Linear => ~2x for a doubled input. The pre-fix pattern was ~4.6x per doubling.
+    # Allow generous slack for scheduler noise; a genuine quadratic regression fails.
+    assert t_large < max(t_small * 3.0, 0.5), (
+        f"superlinear scaling in normalize_text: {t_small:.3f}s -> {t_large:.3f}s"
+    )
 
 
 # --- behaviour must be unchanged -------------------------------------------------
@@ -99,3 +115,36 @@ def test_genuine_positive_upper_bound_untouched():
     """A legitimately positive upper bound is never flipped."""
     s = "r = 0.40 [0.21, 0.59]"
     assert recover_dropped_minus_ci_upper_in_text(s) == s
+
+
+# --- second quadratic pattern: the RSOS running-footer (found 2026-08-04) --------
+# Fixing _CI_UPPER_DROPPED_RE alone did NOT make normalize_text linear: it still
+# scaled ~4-5x per doubling. Instrumenting every COMPILED pattern's .sub() (a
+# module-level sweep misses these — they live inside a list literal) attributed
+# 3.165s of 3.7s at n=20000 to the RSOS running-footer pattern, whose leading
+# UNBOUNDED \d+ starts a match attempt at every digit of the run and then fails.
+# Bounding it to \d{1,6} (a page number is never longer) is ~1370x faster
+# (4.53s -> 0.0033s) and matches both real header forms identically.
+
+
+def test_rsos_running_footer_pattern_is_linear():
+    """The RSOS footer pattern must not scan quadratically on a long digit run."""
+    from docpluck.normalize import _WATERMARK_PATTERNS
+
+    rsos = [p for p in _WATERMARK_PATTERNS if "royalsocietypublishing" in p.pattern]
+    assert rsos, "RSOS running-footer pattern not found — has the list been renamed?"
+    text = "p = " + "9" * 20000 + " end"
+    for pat in rsos:
+        assert _elapsed(lambda: pat.sub("", text)) < 0.5, f"quadratic: {pat.pattern[:60]}"
+
+
+def test_rsos_running_footer_still_stripped():
+    """Behaviour unchanged: both real RSOS footer forms are still matched."""
+    from docpluck.normalize import _WATERMARK_PATTERNS
+
+    rsos = [p for p in _WATERMARK_PATTERNS if "royalsocietypublishing" in p.pattern][0]
+    for real in (
+        "41royalsocietypublishing.org/journal/rsos R. Soc. Open Sci. 12: 250979",
+        "12 royalsocietypublishing.org/journal/rsos R. Soc. Open Sci. 8: 2011",
+    ):
+        assert rsos.sub("<S>", real) == "<S>", f"no longer stripped: {real!r}"
