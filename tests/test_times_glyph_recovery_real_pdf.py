@@ -120,6 +120,97 @@ def test_leaves_glued_hypothesis_labels():
     assert recover_times_interaction_glyph("x3y") == "x3y"
 
 
+# ── W0i-range: a RANGE bound is not an interaction operator (v2.4.122) ──────
+
+def test_range_notation_lower_bound_is_never_times():
+    """`from 3 to 15` is a scale RANGE, not an interaction — the '3' is a real
+    number and must survive.
+
+    Found 2026-08-04 by the cycle-1 canary audit on chan_feldman_2025_cogemo:
+    its Table-2 note "Avoidance behaviour scores ranged from 3 to 15" rendered
+    as "ranged from × to 15" in the Camelot <td> channel, i.e. the library
+    DELETED a published scale bound and replaced it with an operator. Both text
+    channels confirm the source says '3'; this is docpluck corruption, not a
+    source artifact.
+
+    Root cause: W0i's only pre-digit guard was a reference-word list
+    (Model/Study/Table/…) that has no notion of range grammar. `from`/`to`
+    around the digit satisfied "letter, space, 3, space, letter", so EVERY
+    `from 3 to N` in any table cell was rewritten. A range bound is the single
+    most common numeric shape in a table note, so this is corpus-wide, not
+    paper-specific.
+    """
+    for cell in (
+        "Note: Avoidance behaviour scores ranged from 3 to 15. **p < .01.",
+        "Apology scores ranged from 2 to 10. Avoidance scores ranged from 3 to 15.",
+        "scores range from 3 to 7",
+        "increased from 3 to 5 points",
+        "aged from 3 to 12 years",
+        "Scores varied from 3 to 21 across conditions",
+    ):
+        assert recover_times_interaction_glyph(cell) == cell, (
+            f"range bound wrongly ×-converted: {recover_times_interaction_glyph(cell)!r}"
+        )
+
+
+def test_range_guard_covers_every_real_corpus_instance():
+    """The four range-frame sites that actually exist in the 101-PDF corpus.
+
+    Enumerated 2026-08-04 by a pdftotext sweep of ALL 152 corpus PDFs: 8 sites
+    with a `3` bound across 5 distinct articles (3 of the 8 are duplicate copies
+    of the same papers in the ESCIcheck corpus), out of 380 range frames overall.
+    Pinning the REAL population (not invented examples) is what makes this a
+    corpus guard rather than a spot check — and it is why the `between … and`
+    frame is in the guard at all: maier's Bayes-factor sentence and bmc_med_3's
+    lesion diameter both use it, so a `from … to`-only guard would have left
+    those exposed.
+    """
+    for cell in (
+        # chan_feldman Table-2 note — the site that exposed the defect
+        "Avoidance behaviour scores ranged from 3 to 15. **p < .01.",
+        # chen_2021_jesp — a reference TITLE carrying a range
+        "Hindsight bias from 3 to 95 years of age. Journal of Experimental",
+        # jdm_2023_15 — a payment range
+        "Earnings in this task varied from 3 to 18 Swiss francs (CHF) (mean = 10.6).",
+        # maier_2023_collabra — `between … and`, not `from … to`
+        "Bayes factors between 3 and 10 are often regarded as moderate evidence",
+        # bmc_med_3 — a clinical measurement range (Vancouver-style medical paper)
+        "the other half had a diameter between 3 and 10 mm, with only one lesion",
+    ):
+        assert recover_times_interaction_glyph(cell) == cell, (
+            f"real corpus range instance corrupted: {recover_times_interaction_glyph(cell)!r}"
+        )
+
+
+def test_range_guard_does_not_disarm_genuine_interactions():
+    """The range guard must not cost W0i its real recoveries — an interaction
+    term that merely happens to sit near range words still recovers."""
+    assert (
+        recover_times_interaction_glyph("Direction 3 manipulated attribute")
+        == "Direction × manipulated attribute"
+    )
+    # 'to'/'from' as part of a predictor NAME, not range grammar around the digit
+    assert (
+        recover_times_interaction_glyph("Openness 3 Attitude to risk")
+        == "Openness × Attitude to risk"
+    )
+
+
+@requires_camelot
+def test_chan_feldman_range_bound_survives_with_camelot_on():
+    """Real-PDF gate for the range false positive (Camelot ON = production path).
+
+    chan_feldman's Table-2 note must render the true lower bound `from 3 to 15`;
+    `from × to 15` anywhere in the document is the defect.
+    """
+    pdf = TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf"
+    if not pdf.exists():
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
+    assert "from × to" not in md, "range lower bound wrongly ×-converted in a table cell"
+    assert "ranged from 3 to 15" in md, "the true scale bound 3 is missing from the render"
+
+
 # ── Real-PDF regression test (Camelot ON — the production path) ─────────────
 
 @requires_camelot
