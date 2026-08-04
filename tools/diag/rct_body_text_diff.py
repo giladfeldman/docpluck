@@ -70,7 +70,10 @@ def _new_body_start(raw_text, cap, next_boundary):
     return pos
 
 
-CORPUS = os.path.expanduser(r"~/Dropbox/Vibe/MetaScienceTools/PDFextractor/test-pdfs")
+_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
+CORPUS = os.path.join(_VIBE_ROOT, "MetaScienceTools", "PDFextractor", "test-pdfs")
+if not os.path.isdir(CORPUS):
+    sys.exit(f"FATAL: corpus dir not found: {CORPUS} (set VIBE_ROOT?) — refusing to report a false CLEAN on 0 PDFs")
 pdfs = sorted(glob.glob(os.path.join(CORPUS, "**", "*.pdf"), recursive=True))
 print(f"guard-diff over {len(pdfs)} PDFs (body_start walk: old vs v2.4.117)\n")
 

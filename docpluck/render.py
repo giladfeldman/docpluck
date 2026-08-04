@@ -41,6 +41,7 @@ from .normalize import (
     recover_corrupted_minus_signs,
     recover_dropped_minus_via_ci_pairing,
     recover_minus_via_ci_pairing,
+    recover_p_threshold_dropped_decimal,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
     recover_times_design_notation,
@@ -6333,6 +6334,13 @@ def render_pdf_to_markdown(
     # battery incl. range recodes, formulae, `Model 3\n…`, count wraps).
     md = recover_times_design_notation(md)
     md = recover_times_wrapped_interaction(md)
+    # v2.4.118 (W0n): restore the dropped decimal point in a p significance
+    # threshold (`p < 05` → `p < .05`). Third-channel completion of the
+    # channel-1 normalize W0n — also catches the shape inside a flattened
+    # caption / table-note legend / raw_text fallback that bypassed
+    # normalize_text. Same four guards (canonical thresholds 05/01/001 only,
+    # never `=`, no longer-number continuation, significance-clause context).
+    md = recover_p_threshold_dropped_decimal(md)
     # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
     # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
     # W0d above — body normalize covers body text; this final pass catches

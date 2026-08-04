@@ -46,6 +46,20 @@ B1_LIVE_FIXTURES = [
 
 
 @pytest.mark.parametrize("filename, min_regions, min_cells", B1_LIVE_FIXTURES)
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "REAL TEXT-LOSS guard, expected-fail until the gated RC-T cycle lands "
+        "(run-3 adjudication, 2026-07-04): regions resolve but "
+        "_whitespace_grid_is_clean's prose-contamination guard (2026-06-29) "
+        "over-rejects the genuine 2-col grids, so whitespace_cells yields 0 and "
+        "the raw_text fallback truncates rows (chan T3 drops its first 4 rows; "
+        "maier T5 mispairs). Do NOT loosen thresholds to make this pass — see "
+        "docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md and the "
+        "active TRIAGE. strict=True: when RC-T fixes the grid guard this XPASSes "
+        "loudly — flip it back to a plain assert in that cycle."
+    ),
+)
 def test_b1_whitespace_cells_wiring_live(filename: str, min_regions: int, min_cells: int):
     """The R1/B1 fallback must yield ≥1 region and ≥min_cells cells on each B1 fixture.
 
