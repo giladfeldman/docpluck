@@ -35,7 +35,24 @@ from docpluck.render import render_pdf_to_markdown
 
 TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
-_CORRUPT_CI_RE = re.compile(r"\[2\d?\.\d+, ?2?\d?\.\d+\]")
+# A corrupt `2`-for-minus CI is one whose literal bounds DESCEND — impossible
+# for a real interval, so the leading `2`s are mis-mapped minus signs
+# (`[20.92, 20.30]` = `[-0.92, -0.30]`). The bare shape `[2X.XX, 2X.XX]` is NOT
+# sufficient: `[2.42, 2.69]` ascends and the AI gold confirms efendic Table 5's
+# is a GENUINELY POSITIVE interval (Direction high-vs-low, estimate 2.56).
+# Matching it here asserted a wrong published number into existence — the
+# reason the "column-consensus" recovery was rejected (2026-08-04). Only
+# per-record evidence (descending bounds, or W0d containment) proves a flip.
+_CORRUPT_CI_PAIR_RE = re.compile(r"\[(2\d?\.\d+), ?(2\d?\.\d+)\]")
+
+
+def _corrupt_descending_cis(md: str) -> list[str]:
+    """Every `[2X.XX, 2X.XX]` CI in ``md`` whose literal bounds DESCEND."""
+    return [
+        m.group(0)
+        for m in _CORRUPT_CI_PAIR_RE.finditer(md)
+        if float(m.group(1)) > float(m.group(2))
+    ]
 
 
 # ── Unit tests on recover_corrupted_minus_signs ─────────────────────────
@@ -184,7 +201,7 @@ def test_efendic_no_corrupt_minus_in_render():
     if not pdf.exists():
         pytest.skip(f"fixture missing: {pdf}")
     md = render_pdf_to_markdown(pdf.read_bytes())
-    bad_cis = _CORRUPT_CI_RE.findall(md)
+    bad_cis = _corrupt_descending_cis(md)
     assert not bad_cis, f"corrupt (descending '2'-prefixed) CIs remain: {bad_cis[:5]}"
     assert not re.search(r"\br = 2\.\d", md), "'r = 2.X' corrupted correlation remains"
     # The headline abstract effect size must read correctly.
@@ -318,3 +335,70 @@ def test_efendic_se_columns_all_positive_with_camelot_on():
     )
     negative_se = row_re.findall(md)
     assert not negative_se, f"SE column rendered negative (SE cannot be < 0): {negative_se[:6]}"
+
+
+# ── v2.4.119: column-structure minus recovery in raw_text table fallbacks ────
+#
+# A raw_text fallback linearizes each table COLUMN as its own run of lines, so
+# neither of W0b/W0d's per-record rules can reach two shapes. Both were exposed
+# by the v2.4.119 caption-tail walk, which recovers leading rows the previous
+# walk silently dropped (efendic Table 3/5).
+
+
+def test_ascending_positive_ci_is_never_flipped():
+    """REGRESSION GUARD (2026-08-04): a `2`-prefixed CI whose bounds ASCEND is
+    NOT provably corrupt, and must be left alone.
+
+    A rejected "column-consensus" recovery flipped efendic Table 5's
+    `[2.42, 2.69]` to `[-0.42, -0.69]` on the reasoning that its CI column
+    already held recovered negatives. The AI gold confirms `[2.42, 2.69]` is a
+    GENUINELY POSITIVE interval (the Direction high-vs-low contrast, estimate
+    2.56) — the recovery manufactured a wrong published number. Column
+    membership is not evidence for a sign flip; only per-record containment is.
+    """
+    from docpluck.normalize import recover_corrupted_minus_signs as rec
+
+    col = "\n".join(
+        ["[20.21, 0.04]", "[21.15, 21.03]", "[2.42, 2.69]", "[20.40, 20.13]"]
+    )
+    out = rec(col).split("\n")
+    # The genuinely-corrupt descending brackets still recover...
+    assert out[0] == "[-0.21, 0.04]"
+    assert out[1] == "[-1.15, -1.03]"
+    assert out[3] == "[-0.40, -0.13]"
+    # ...and the genuine positive interval is untouched.
+    assert out[2] == "[2.42, 2.69]"
+
+
+def test_estimate_column_recovered_by_positional_ci_pairing():
+    """W0b-est: the estimate column is separated from its CI column by the SE
+    column, so W0d's proximity window cannot pair them. Positional pairing
+    recovers each corrupt estimate whose fixed reading lands inside its CI —
+    and leaves the SE column and genuine positives alone."""
+    from docpluck.normalize import recover_corrupted_minus_signs as rec
+
+    block = "\n".join(
+        ["20.26", "20.21", "20.95", "21.15", "0.55", "0.14", "20.16", "21.34", "0.13"]
+        + ["0.10", "0.03", "0.03", "0.06", "0.06", "0.05", "0.06", "0.12", "0.11"]
+        + ["[-0.45, -0.06]", "[-0.27, -0.15]", "[-1.01, -0.89]", "[-1.27, -1.03]",
+           "[0.43, 0.67]", "[0.04, 0.25]", "[-0.27, -0.05]", "[-1.58, -1.10]",
+           "[-0.08, 0.35]"]
+    )
+    out = rec(block).split("\n")
+    assert out[:9] == ["-0.26", "-0.21", "-0.95", "-1.15", "0.55", "0.14",
+                       "-0.16", "-1.34", "0.13"], out[:9]
+    # SE column must stay positive (it is a different column from the estimate).
+    assert out[9:18] == ["0.10", "0.03", "0.03", "0.06", "0.06", "0.05",
+                         "0.06", "0.12", "0.11"], out[9:18]
+
+
+def test_estimate_column_pairing_leaves_genuine_positives():
+    """FP guard: a table whose estimates are genuinely positive and whose CIs
+    contain them is never rewritten (the containment test gates every fix)."""
+    from docpluck.normalize import recover_corrupted_minus_signs as rec
+
+    block = "\n".join(
+        ["2.42", "3.10", "1.05"] + ["0.10", "0.20", "0.30"]
+        + ["[2.20, 2.60]", "[3.00, 3.30]", "[1.00, 1.10]"]
+    )
+    assert rec(block) == block
