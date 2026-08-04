@@ -20,9 +20,10 @@ from docpluck.normalize import (
     recover_times_wrapped_interaction,
 )
 
-CORPUS = os.path.expanduser(
-    r"~/Dropbox/Vibe/MetaScienceTools/PDFextractor/test-pdfs"
-)
+_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
+CORPUS = os.path.join(_VIBE_ROOT, "MetaScienceTools", "PDFextractor", "test-pdfs")
+if not os.path.isdir(CORPUS):
+    sys.exit(f"FATAL: corpus dir not found: {CORPUS} (set VIBE_ROOT?) — refusing to report a false CLEAN on 0 PDFs")
 pdfs = sorted(glob.glob(os.path.join(CORPUS, "**", "*.pdf"), recursive=True))
 print(f"scanning {len(pdfs)} corpus PDFs for W0l false positives...\n")
 

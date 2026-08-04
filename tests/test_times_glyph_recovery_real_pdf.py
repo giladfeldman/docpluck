@@ -18,10 +18,21 @@ ordinal after a reference word (Model/Study/Wave/…).
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
 import pytest
+
+# The two "(Camelot ON)" tests below exercise the production Camelot HTML-table
+# channel. Under DOCPLUCK_DISABLE_CAMELOT=1 (the broad-suite default) the render
+# has no <td> cells at all, so their positive assertions fail and their
+# negative assertions false-pass — either way the test is meaningless. Skip
+# VISIBLY instead; the tests run in Camelot-enabled per-file gates.
+requires_camelot = pytest.mark.skipif(
+    os.environ.get("DOCPLUCK_DISABLE_CAMELOT") == "1",
+    reason="Camelot-ON production-path test; meaningless under DOCPLUCK_DISABLE_CAMELOT=1",
+)
 
 from docpluck.normalize import recover_times_interaction_glyph
 from docpluck.render import render_pdf_to_markdown
@@ -111,6 +122,7 @@ def test_leaves_glued_hypothesis_labels():
 
 # ── Real-PDF regression test (Camelot ON — the production path) ─────────────
 
+@requires_camelot
 def test_efendic_interaction_terms_recovered_with_camelot_on():
     """Every efendic interaction-term predictor cell must render with '×', not
     the corrupted '3', in the Camelot HTML-table channel (production default).
@@ -141,6 +153,7 @@ def test_efendic_interaction_terms_recovered_with_camelot_on():
     assert "Direction × manipulated attribute" in md and "Table × summarizes" not in md
 
 
+@requires_camelot
 def test_maier_hypothesis_labels_not_corrupted_with_camelot_on():
     """maier_2023_collabra has hypothesis-label cells H3a/H3b (Hypothesis 3a/3b),
     which are GLUED (H+3+a, no space) and must NOT be read as an interaction ×.

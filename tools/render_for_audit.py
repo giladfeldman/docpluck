@@ -173,7 +173,10 @@ except Exception as e:  # noqa: BLE001 - we want to surface everything the libra
 
 out_path = Path(args.out)
 out_path.parent.mkdir(parents=True, exist_ok=True)
-out_path.write_text(md, encoding="utf-8")
+# newline="\n" so the bytes on disk are exactly what rendered_sha hashes —
+# without it, Windows text-mode write emits CRLF and sha256(file) never
+# matches the recorded rendered_sha (provenance-verification footgun).
+out_path.write_text(md, encoding="utf-8", newline="\n")
 rendered_sha = sha256_bytes(md.encode("utf-8"))
 elapsed = round(time.time() - t0, 2)
 
@@ -200,7 +203,7 @@ manifest = {
 if args.manifest:
     manifest_path = Path(args.manifest)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8", newline="\n")
     _log(f"manifest: {manifest_path}")
 
 # Always echo the manifest as the last stdout line so callers can capture it.
