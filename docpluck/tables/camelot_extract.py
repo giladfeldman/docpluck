@@ -485,6 +485,7 @@ def _camelot_table_to_dict(
     id_prefix: str = "camelot_t",
     label: str | None = None,
     allow_categorical: bool = False,
+    own_caption_number: int | None = None,
 ) -> Table | None:
     """Convert one Camelot table object into a docpluck Table dict, applying the
     shared row-cleaning pipeline (running-header strip, caption-row drop, prose
@@ -577,7 +578,11 @@ def _camelot_table_to_dict(
     if id_prefix.startswith("region"):
         from .whitespace import _trim_trailing_prose_rows, _whitespace_grid_is_clean
         cells = _trim_trailing_prose_rows(cells, allow_categorical=allow_categorical)
-        if not _whitespace_grid_is_clean(cells, allow_categorical=allow_categorical):
+        if not _whitespace_grid_is_clean(
+            cells,
+            allow_categorical=allow_categorical,
+            own_caption_number=own_caption_number,
+        ):
             return None
         if not cells:
             return None
@@ -801,6 +806,7 @@ def extract_tables_camelot_by_region(
                 id_prefix="region_t",
                 label=spec.get("label"),
                 allow_categorical=bool(spec.get("isolate")),
+                own_caption_number=spec.get("number"),
             )
             if td is not None:
                 td["id"] = f"region_{spec['key']}"
