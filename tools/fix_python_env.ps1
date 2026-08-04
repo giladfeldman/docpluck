@@ -7,7 +7,7 @@
 # docpluck dependency set there. Verification is done by the caller afterwards.
 param(
   [string]$User = "filin",
-  [string]$Repo = "C:\Users\filin\Dropbox\Vibe\MetaScienceTools\docpluck",
+  [string]$Repo = "C:\Users\filin\Vibe\MetaScienceTools\docpluck",
   [string]$Py   = "C:\Python314\python.exe"
 )
 $ErrorActionPreference = "Continue"

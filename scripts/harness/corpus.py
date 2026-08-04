@@ -12,12 +12,20 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import os
 import re
 from pathlib import Path
 
-# All corpora live under ~/Dropbox/Vibe. Manifest paths are stored relative to
-# this root so the manifest is portable across machines.
-VIBE = Path.home() / "Dropbox" / "Vibe"
+# All corpora live under the Vibe portfolio root. Resolved via VIBE_ROOT so the
+# manifest stays portable across machines and future moves (the root moved off
+# ~/Dropbox/Vibe on 2026-08-03); never hardcode an absolute user path here.
+VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+if not VIBE.is_dir():
+    raise FileNotFoundError(
+        f"Vibe root not found at {VIBE} — set VIBE_ROOT. A missing root must "
+        "fail loudly: silently discovering 0 documents makes a broken run "
+        "look like a clean one."
+    )
 
 # (source, root-relative-to-VIBE, glob, format). Order is stable — it fixes the
 # manifest ordering so a regenerated manifest diffs cleanly.
@@ -80,7 +88,7 @@ def build_manifest() -> dict:
     return {
         "version": 1,
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
-        "vibe_root": "~/Dropbox/Vibe",
+        "vibe_root": "~/Vibe",
         "counts": {"total": len(docs), "by_format": by_fmt},
         "documents": docs,
     }
