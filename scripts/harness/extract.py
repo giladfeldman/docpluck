@@ -149,7 +149,15 @@ def _save_views(out_dir: Path, analyze: dict) -> list[str]:
     return written
 
 
-def _process(doc: dict, level: str, cfg: tuple[str, str], *, force: bool, timeout: int) -> dict:
+def _process(
+    doc: dict,
+    level: str,
+    cfg: tuple[str, str],
+    *,
+    force: bool,
+    timeout: int,
+    service_version: str | None = None,
+) -> dict:
     """Extract one (document, level). Returns its _meta record."""
     base_url, token = cfg
     src = corpus.resolve(doc)
@@ -162,7 +170,14 @@ def _process(doc: dict, level: str, cfg: tuple[str, str], *, force: bool, timeou
         if (
             prev.get("status") == "ok"
             and prev.get("source_sha1") == src_sha1
-            and prev.get("docpluck_version")  # extracted by a known build
+            # Extracted by the build the service is running RIGHT NOW. A bare
+            # presence check here let outputs from an old library version be
+            # skipped forever — the harness then "verified" a stale build
+            # (false green, R-0004). No known version to compare against →
+            # never skip.
+            and prev.get("docpluck_version") is not None
+            and service_version is not None
+            and prev.get("docpluck_version") == service_version
         ):
             prev["skipped"] = True
             return prev
@@ -210,8 +225,9 @@ def run(
 ) -> list[dict]:
     cfg = service_config()
     health = service_health(cfg[0])
+    service_version = health.get("docpluck_version")
     print(
-        f"service {cfg[0]} · docpluck {health.get('docpluck_version')} · "
+        f"service {cfg[0]} · docpluck {service_version} · "
         f"{len(docs)} docs × {len(levels)} levels = {len(docs) * len(levels)} extractions"
     )
     jobs = [(d, lv) for d in docs for lv in levels]
@@ -220,7 +236,10 @@ def run(
     if workers > 1:
         with _cf.ThreadPoolExecutor(max_workers=workers) as ex:
             futs = {
-                ex.submit(_process, d, lv, cfg, force=force, timeout=timeout): (d, lv)
+                ex.submit(
+                    _process, d, lv, cfg,
+                    force=force, timeout=timeout, service_version=service_version,
+                ): (d, lv)
                 for d, lv in jobs
             }
             for fut in _cf.as_completed(futs):
@@ -230,7 +249,7 @@ def run(
                 _log(done, len(jobs), m)
     else:
         for d, lv in jobs:
-            m = _process(d, lv, cfg, force=force, timeout=timeout)
+            m = _process(d, lv, cfg, force=force, timeout=timeout, service_version=service_version)
             results.append(m)
             done += 1
             _log(done, len(jobs), m)
