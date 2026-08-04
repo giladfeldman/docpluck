@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.122] — 2026-08-04
+
+**A published scale bound was being replaced by an operator.** `NORMALIZATION_VERSION` → `1.9.47`.
+
+**W0i rewrote range bounds as `×`.** The `×`-as-`3` glyph recovery (v2.4.103) fires on a `3` flanked by letters inside a Camelot table cell — the signature of a corrupted interaction operator (`Direction 3 attribute` → `Direction × attribute`). But `ranged from 3 to 15` matches that signature exactly: `from` sits where a predictor name would, `to` follows the digit. chan_feldman's Table-2 note rendered as **`ranged from × to 15`** — the library deleted a real scale bound and wrote an operator in its place, in the `<td>` channel only, while the same sentence rendered correctly in the raw-text channel a hundred lines earlier.
+
+This was **not paper-specific**: any `from 3 to N` / `between 3 and N` reaching a table cell was affected, in any publisher's paper.
+
+**Why the existing guard could not catch it.** W0i's only pre-digit guard was `_TIMES_REFERENCE_WORD_RE`, a list of reference *nouns* (`Model|Study|Table|Figure|…`) that makes `Model 3 predictor` a genuine ordinal. `from` is not a reference noun, so the guard had nothing to say. A vocabulary list cannot defend a grammatical position — the list is always missing the next word.
+
+**The fix keys on the grammatical FRAME, not on vocabulary.** A range is `from`/`between` before the digit **and** `to`/`and`/`through`/`until` after it. Both halves are required: a lone trailing `to` could be a wrapped predictor (`Attitude 3 to risk`), and a lone leading `from` is likewise ambiguous. A frame generalises across publishers; a word list does not.
+
+Full-corpus sweep (all 152 PDFs, pdftotext): **8 range-frame-with-3 sites across 5 distinct articles**, out of 380 range frames overall — all 5 now pinned as regression cases, including `between … and` shapes (maier's Bayes factors, bmc_med_3's lesion diameters) that a `from … to`-only guard would have missed. Targeted production-path guard-diff (affected papers + canaries, rendered twice with the guard on and off): **1 false positive removed, 0 regressions, every other paper byte-identical.** Suite: 1959 passed.
+
+Found by the run-5 cycle-1 canary audit. Ground truth: the AI multimodal gold, cross-checked against both docpluck text channels.
+
+
 ## [2.4.121] — 2026-08-04
 
 **Two false-negative classes in the table grid guard, and a 50× ReDoS in normalization.** `TABLE_EXTRACTION_VERSION` → `2.4.10`. `NORMALIZATION_VERSION` deliberately unchanged — the normalization fix is complexity-only, with byte-identical matching.
