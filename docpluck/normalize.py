@@ -102,7 +102,15 @@ _WATERMARK_PATTERNS = [
     re.compile(r"This\s+article\s+is\s+protected\s+by\s+copyright\.[^\n]*", re.IGNORECASE),
     # RSOS running-footer artifact glued onto body text:
     # "41royalsocietypublishing.org/journal/rsos R. Soc. Open Sci. 12: 250979"
-    re.compile(r"\d+\s*royalsocietypublishing\.org/journal/\w+\s+R\.\s*Soc\.\s*Open\s*Sci\.\s*\d+:\s*\d+"),
+    # The leading page number is BOUNDED (ReDoS fix, 2026-08-04). As an unbounded
+    # `\d+` it started a match attempt at every digit of a long numeric run and then
+    # failed — quadratic. It cost 3.165s of normalize_text's 3.7s on a 20k-digit input
+    # and was the reason normalize_text still scaled ~4-5x per doubling AFTER the
+    # _CI_UPPER_DROPPED_RE fix. Bounded, it is ~1370x faster (4.53s -> 0.0033s) and
+    # matches both real footer forms identically ("41royalsociety…" glued, and
+    # "12 royalsociety…" spaced) — a page number is never more than 6 digits.
+    # Guarded by tests/test_ci_upper_dropped_redos.py.
+    re.compile(r"\d{1,6}\s*royalsocietypublishing\.org/journal/\w+\s+R\.\s*Soc\.\s*Open\s*Sci\.\s*\d+:\s*\d+"),
     # Issue H — Publisher copyright stamp on its own line. Format:
     #   "© 2009 Elsevier Inc. All rights reserved."
     #   "Ó 2009 Elsevier Inc. All rights reserved."  (pdftotext sometimes flattens © → Ó)

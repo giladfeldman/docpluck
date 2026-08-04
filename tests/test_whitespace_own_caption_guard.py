@@ -220,3 +220,50 @@ def test_figure_caption_in_leading_row_still_rejects_grid():
         ]
     )
     assert _whitespace_grid_is_clean(cells) is False
+
+
+# --- inline cross-reference false positive (2026-08-04) -------------------------
+# _CAPTION_LABEL_RE was UNANCHORED (`\b(?:Table|Figure)\s+\d+\s*[.:]`), so it fired on
+# a mid-sentence cross-reference in a footnote/prose cell and condemned the grid.
+# maier Table 5's region carries two such cells — "al. (2007) in Table 8." and
+# "…in Figure 2. We summarized the in-" — so its 3x5 descriptives grid (whose data the
+# raw_text channel HAD captured correctly: 2.84 [1.89] {1.36}* (170) …) was discarded
+# and the table rendered as a caption-only stub. That is TEXT-LOSS from a false
+# positive, verified against the AI gold.
+#
+# A real absorbed caption ANCHORS at the start of its cell; a cross-reference has text
+# before it. camelot_extract._CAPTION_ROW_PATTERN already encodes exactly this
+# discipline ("^\s*Table\s+\d+\s*[.:]", whose comment notes anchoring is why
+# "see Table 2" mid-row does not match) — the whitespace copy had simply lost it.
+
+
+def test_inline_cross_reference_does_not_condemn_grid():
+    """A mid-sentence "in Table 8." / "in Figure 2." is a REFERENCE, not a caption."""
+    # Standalone numeric cells so the grid clears the clean-data-row bar and this
+    # test isolates the CAPTION rule (a mean-with-SD composite like "2.84 [1.89]"
+    # is not a _CLEAN_DATA_CELL_RE match, which is a separate concern).
+    cells = _grid(
+        [
+            ["Table 5. Hypothetical Donations: Descriptives", "", ""],
+            ["Condition", "Identifiable", "Statistical"],
+            ["Explicit learning", "2.84", "2.74"],
+            ["No intervention", "2.58", "2.72"],
+            ["Note. Based on Small et al. (2007) in Table 8.", "", ""],
+        ]
+    )
+    assert _whitespace_grid_is_clean(cells, own_caption_number=5) is True
+
+
+def test_absorbed_caption_at_cell_start_still_rejects():
+    """The anchored form is unchanged: a real absorbed caption still condemns."""
+    cells = _grid(
+        [
+            ["Table 5. Hypothetical Donations: Descriptives", "", ""],
+            ["Condition", "Identifiable", "Statistical"],
+            ["Explicit learning", "2.84", "2.74"],
+            ["No intervention", "2.58", "2.72"],
+            ["Table 8. Statistical tests for identifiability.", "", ""],
+            ["Hypothesis", "p", "Effect size"],
+        ]
+    )
+    assert _whitespace_grid_is_clean(cells, own_caption_number=5) is False
