@@ -41,6 +41,7 @@ from .normalize import (
     recover_corrupted_minus_signs,
     recover_dropped_minus_via_ci_pairing,
     recover_minus_via_ci_pairing,
+    recover_fffd_comparison_operators,
     recover_p_threshold_dropped_decimal,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
@@ -6341,6 +6342,17 @@ def render_pdf_to_markdown(
     # normalize_text. Same four guards (canonical thresholds 05/01/001 only,
     # never `=`, no longer-number continuation, significance-clause context).
     md = recover_p_threshold_dropped_decimal(md)
+    # v2.4.119 (S5b third channel): recover the cmsy10 `≥`/`≤` glyphs that
+    # pdftotext destroys to U+FFFD. The channel-1 normalize pass covers body
+    # prose, but a table's raw_text fallback / unstructured-table block and
+    # flattened captions bypass normalize_text entirely — plos_med Table 2's
+    # remnant-size rows (`≥5–10 mm` …) reach the .md as mojibake. Same
+    # three-channel discipline as W0b/W0c/W0j/W0k/W0l/W0n
+    # (`glyph-fixes-need-all-three-text-channels`). Rule 2's document-consensus
+    # gate makes this safe here: the assembled .md carries the SAME document's
+    # Rule-1 evidence, so a lone FFFD is only rewritten when this document's
+    # unanimous mapping is known.
+    md = recover_fffd_comparison_operators(md)
     # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
     # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
     # W0d above — body normalize covers body text; this final pass catches

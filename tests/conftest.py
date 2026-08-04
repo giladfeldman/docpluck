@@ -33,7 +33,10 @@ _HERE = os.path.dirname(__file__)
 # docpluck's sibling repos under the same parent (e.g. MetaScienceTools/).
 # Derived from this file so paths are robust to where the tree is checked out.
 _SIBLINGS = os.path.dirname(os.path.dirname(_HERE))  # parent of the docpluck repo
-_VIBE = os.path.join(os.path.expanduser("~"), "Dropbox", "Vibe")
+# Portfolio root: env override first, then the canonical ~/Vibe location
+# (moved out of ~/Dropbox/Vibe on 2026-08-03 — a hardcoded old root makes
+# every articlerepo/sibling-corpus test SKIP silently, which reads as green).
+_VIBE = os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe")
 
 PDF_PATHS = {
     # docpluck's test corpus = sibling PDFextractor repo's test-pdfs/.

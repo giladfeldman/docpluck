@@ -47,27 +47,9 @@ def _old_body_start(raw_text, cap, next_boundary):
 
 
 def _new_body_start(raw_text, cap, next_boundary):
-    """The v2.4.117 per-line-terminator walk (mirror of the patched code)."""
-    pos = cap.char_end
-    cap_tail_end = min(cap.char_end + 800, len(raw_text))
-    if next_boundary is not None and next_boundary > cap.char_end:
-        cap_tail_end = min(cap_tail_end, next_boundary)
-    while pos < cap_tail_end:
-        nxt = raw_text.find("\n", pos)
-        if nxt == -1 or nxt >= cap_tail_end:
-            pos = cap_tail_end
-            break
-        step = 2 if raw_text[nxt:nxt + 2] == "\n\n" else 1
-        line_start = raw_text.rfind("\n", pos, nxt)
-        line = raw_text[(line_start + 1 if line_start != -1 else pos):nxt].rstrip()
-        if re.search(r"[.!?][\"'\)\]]?$", line):
-            pos = nxt + step
-            break
-        if step == 2:
-            pos = nxt + step
-            break
-        pos = nxt + step
-    return pos
+    """The REAL guarded walk (v2.4.119) — exercises the shipped code path
+    (`_caption_tail_body_start`), never a drifting reimplementation."""
+    return ES._caption_tail_body_start(raw_text, cap, next_boundary)
 
 
 _VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
@@ -104,15 +86,41 @@ for p in pdfs:
         delta = old_bs - new_bs  # positive = new starts EARLIER (recovered rows)
         if new_bs < old_bs:
             grew += 1  # new body starts earlier → more content kept
-            recovered = raw[new_bs:old_bs].replace("\n", "\\n")
-            # Flag if the recovered chunk looks like BODY PROSE (long lowercase sentence)
-            words = raw[new_bs:old_bs].split()
-            is_prose = len(words) > 25 and sum(1 for w in words if w[:1].islower()) > len(words) * 0.6
-            tag = "  ⚠PROSE?" if is_prose else ""
-            print(f"  {stem} {cap.label}: new starts {delta} chars EARLIER (recovered rows){tag}")
+            recovered_raw = raw[new_bs:old_bs]
+            recovered = recovered_raw.replace("\n", "\\n")
+            # What does the leading-junk guard drop from the recovered head?
+            region_lines = recovered_raw.split("\n")
+            after_skip = ES._skip_leading_nontable_junk(list(region_lines))
+            skipped = len(region_lines) - len(after_skip)
+            # Flag if the POST-SKIP surviving chunk still looks like BODY PROSE.
+            # NOT a bare lowercase-word ratio: that fires on genuine wordy table
+            # content (quote columns, design-cell tables, wrapped title rows) —
+            # the 2026-07-04 "~53 prose-recovered" figure was this false alarm,
+            # and a 2026-08-04 sample of 5 flagged cases found 5 real tables.
+            # Use the library's own paragraph-scale prose predicate, which the
+            # leading-junk guard is built on, so the harness and the shipped
+            # code agree on what "prose" means.
+            surviving = "\n".join(after_skip)
+            paras, cur = [], []
+            for ln in after_skip:
+                if ln.strip():
+                    cur.append(ln.strip())
+                    if re.search(r"[.!?][\"'\)\]]?$", ln.rstrip()):
+                        paras.append(" ".join(cur)); cur = []
+                elif cur:
+                    paras.append(" ".join(cur)); cur = []
+            if cur:
+                paras.append(" ".join(cur))
+            is_prose = any(ES._line_is_body_prose(p) for p in paras)
+            tag = "  ⚠PROSE-SURVIVES" if is_prose else ""
+            jtag = f"  [junk-skip drops {skipped} leading line(s)]" if skipped else ""
+            print(f"  {stem} {cap.label}: new starts {delta} chars EARLIER (recovered rows){tag}{jtag}")
             print(f"      recovered: …{recovered[:120]}…")
+            if skipped:
+                dropped = " | ".join(l.strip() for l in region_lines[:skipped] if l.strip())
+                print(f"      junk-skipped: {dropped[:160]}")
             if is_prose:
-                suspicious.append((stem, cap.label, "prose-recovered"))
+                suspicious.append((stem, cap.label, "prose-survives-guard"))
         else:
             shrank += 1
             print(f"  {stem} {cap.label}: new starts {-delta} chars LATER (TRUNCATED — investigate)")

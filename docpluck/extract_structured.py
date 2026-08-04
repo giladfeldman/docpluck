@@ -37,7 +37,7 @@ from .tables.render import cells_to_html
 from .telemetry import record_fallback
 
 
-TABLE_EXTRACTION_VERSION = "2.4.7"  # v2.4.7 (concurrent-session reconciliation, 2026-07-02 — AI-gold-verified): landed six in-flight table fixes onto the v2.4.6 greedy+rescue base (the global-assignment pairing refactor was REJECTED — it regressed chan_feldman T6 + reshuffled ~24 papers, the same net-harmful class as prior global attempts). (1) chandrashekar side-by-side de-interleave: a page with ≥2 captions straddling a whitespace gutter drives each caption's region to its OWN column (_detect_column_gutters/_assign_caption_columns/_label_x_midpoint/_column_table_bottom + isolated Camelot calls), rebuilding caption+body from that column — Table 4 17×2-merge → clean 9×2, both captions gold-exact. (2) efendic T1 categorical + T2 detect: unified detect.py aligned-row-run (contiguous column-aligned run, prose-robust) + widen-aware geometry (_detect_geometry_widen_aware picks the more-columnar of narrow/widened band) + contiguous-footnote-gap + whitespace _is_categorical_grid acceptance — T1 3×2→5×3, T2 0×0-stub→11×5. (3) efendic T3 running-header strip (_RUNNING_HEADER_PATTERNS gains 'Author et al. <page>') + T2-5 leading caption-tail-PROSE strip (context-guarded: only above a genuine multi-cell header) — grids start at the real header. (4) collabra_77859 T2↔T3: bare integers excluded from the caption-overlap tokenizer (_CAPTION_TOKEN_RE → [a-z]{3,}|\d+\.\d+) so a stray 'Table 2' digit stops manufacturing false overlap; region-driven capture then pins pairing deterministically (a reading-order tie-break was tried + REJECTED — it perturbed greedy visit order and regressed chan_feldman T6). (5) cog_emo T8 caption-marker hint: an absorbed 'Table N.' first row (_leading_table_caption_number) authoritatively pins a grid to caption N, beating degenerate token-overlap ties — T8 recovers its 17×6 intercorrelation matrix, T9 its 12×8. Full 101-PDF structured diff vs v2.4.6 (Camelot verified DETERMINISTIC on this host: two identical-code runs byte-identical), AI-gold-verified on the changed papers. # v2.4.6 (duplicate-starvation rescue, 2026-07-01 — AI-gold-verified, PAIRING change): _rescue_duplicate_starved_captions repairs the greedy mis-pairing where, on a page with ≥2 captions, Camelot emits a near-identical DUPLICATE fragment of one table and the greedy first-come loop hands that duplicate to a SECOND caption — starving (dropping) that caption's own real table. When ≥2 captions were assigned identical-raw_text tables, the best-overlap caption keeps it and each other caption is reassigned to the best UNASSIGNED same-page table that fits it at least as well as the duplicate. Fires ONLY on that signature — a whole-corpus dup_rescue-firing scan confirms it activates on bmc_med_3 alone; every other page keeps its greedy assignment byte-identical (so the corpus-wide token-overlap fixes verified in prior cycles are untouched). bmc_med_3 Table 3 recovers its real 11×6 "Comparisons of SCE" grid (AI-gold-verified vs the source page; was a second copy of Table 2's 29×5). A full order-independent GLOBAL matching also fixed it but reshuffled ~24 papers + regressed chan_feldman T6 (prose fragment promoted to a caption) — rejected; see LEARNINGS / memory project_docpluck_region_driven_camelot. Camelot run-to-run non-determinism (feedback_camelot_flake_cumulative_load) defeats naive before/after fingerprint diffing, so surgicality is proven at the CODE-PATH level (no dup_rescue → identical HEAD path), not by comparing flaky shapes. # v2.4.5 (region-driven capture, 2026-06-29 — AI-gold-verified, CAPTURE-PATH change): each table caption now drives Camelot stream with its OWN caption-anchored region as table_areas (extract_tables_camelot_by_region + _region_driven_capture), so a caption gets exactly its table by construction — recovers stacked / side-by-side multi-table-per-page cases blind pages="all" + token-overlap pairing could not separate (efendic Table 4+5 split, 12 papers' 0×0 stubs → real). Region tables are CANDIDATES: _pick_better_table keeps the structurally-richer of {region, auto-detect} per caption (region too-narrow bbox can't collapse a wide table; jama_open_1 stays 43×7). Content-plausibility guards on the region path (_cell_is_prose dominance + _CAPTION_LABEL_RE absorption) reject prose-as-grid / caption-absorbed fragments → honest 0×0 stubs (cog_emo Table 3/9). Caption page-fix (char_start past leading \n\n/\f) is the foundation. Full 101-PDF structured diff (27 changed/0 err) + 6-paper AI-gold canary (all FIX/PASS/NET-BETTER, no new regressions). Known documented hard cases (not regressions vs prior): cog_emo T8 Camelot under-segmentation, chandrashekar 2-col caption interleave, efendic T2 Camelot-invisible, bmc_med_3 duplicate-fragment pairing (FIXED in v2.4.6 by _rescue_duplicate_starved_captions; the dedupe + bbox-proximity + global-matching approaches were net-harmful and rejected — see LEARNINGS). # v2.4.4 (ESCIcheck handoff 2026-06-25 — flatten-only, AI-gold-verified): (DP-3) flatten._infer_anova_eta2_hint types a font-dropped η²p effect column by STRUCTURE — an unlabeled estimate column in an F-test/ANOVA results table (F + BF01/CI, no competing d/r/OR) is keyed `eta2`, range-guarded to [0,1]; the η²p glyph itself is unrecoverable (NotoSerif uni:no, OCR-tier). (DP-5b) flatten._inline_stat_field types a self-labeled cell (`r = .67`, `d = 0.32`) by its token even under a generic "Effect size" header. (DP-5a) cell_cleaning._is_fragment_cell recognizes a bracketed-CI close tail (`0.73]`) so a CI split across rows rejoins (`[0.59, 0.73]`) and the junk fragment row is dropped (cog_emo T8 14→10 rows). These three are flatten/cell-cleaning ONLY — no capture-path change, so caption→table pairing is byte-identical to v2.4.3. (DP-1/DP-2 capture recovery — the caption page-attribution fix — was prototyped but REVERTED: AI-gold canary verify showed it mis-pairs same-page-caption tables (efendic T4/T5, cog_emo T8/T9) and only half-fixes plos_med; it is queued as its own gated cycle with same-page disambiguation + region-quality gating. See docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md.) # v2.4.3 (RC-T foundation): tables.whitespace gains a CHAR-LEVEL column-detection fallback (char_whitespace_cells) — when pdfplumber's word grouper glues a tight-kerned numeric row into one token so the word-gap detector finds < 2 columns, recover the grid from char x-gaps, voting on column-START edges (right-aligned data columns are left-edge-stable even when the label column is variable-width) and reinserting intra-cell word spacing from geometry. Fires ONLY as a fallback when the word path returns < 2 columns, so currently-correct tables are byte-unchanged (word path restored verbatim). Recovers ip_feldman Table 10's 7 regression rows in isolation. NOT yet wired to replace a degenerate MATCHED Camelot table (that extract_structured change + region prose-trim is the next gated cycle — see LEARNINGS 2026-06-25). # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
+TABLE_EXTRACTION_VERSION = "2.4.8" # v2.4.8 (RC-T caption-tail walk, 2026-08-04 — the gated RC-T cycle, user-approved): _extract_table_body_text's body_start walk stepped break-to-break (preferring ) and inspected only a 40-char window, so a WRAPPED caption whose table body serializes column-by-column (no early blank line) overshot the caption's own terminator and SILENTLY DROPPED leading rows (chan_feldman T3 lost its first four rows: Sample size / Geographic origin / Gender / Ethnic group; chan T1 lost hypothesis row 1). Replaced by _caption_tail_body_start: a per-LINE walk with three structural rules — (1) WHOLE-line terminator test measured from the true line start, so a self-terminated caption ("Table 6. Study 2 descriptive statistics.") breaks immediately (the xiao_2021 T6 truncation the run-3 prototype regressed on); (2) a blank line ends an unterminated caption; (3) a real caption wraps at most _CAPTION_TAIL_MAX_LINES physical lines — beyond that the "tail" is table CONTENT, so body_start returns to just after the caption line (the amc_1 T3 bibliography-table truncation). Plus _skip_leading_nontable_junk (drops a leading figure caption or wrapped body-prose paragraph from a recovered head; bounded + terminated-only so a genuine table's first rows are never eaten) and _raw_text_is_page_furniture_only (suppresses a fallback that is ONLY a next-page running header + page marker — jama_open_1 T2 rendered nothing but a journal banner, article title, date and "8/13"). _line_is_body_prose gains a bibliography-row exemption (author-initials opener + year) so a collection table's reference rows are not read as prose. 101-PDF guard-diff: 333 captions recover leading rows, 0 truncations (the run-3 prototype had 2). # v2.4.7 (concurrent-session reconciliation, 2026-07-02 — AI-gold-verified): landed six in-flight table fixes onto the v2.4.6 greedy+rescue base (the global-assignment pairing refactor was REJECTED — it regressed chan_feldman T6 + reshuffled ~24 papers, the same net-harmful class as prior global attempts). (1) chandrashekar side-by-side de-interleave: a page with ≥2 captions straddling a whitespace gutter drives each caption's region to its OWN column (_detect_column_gutters/_assign_caption_columns/_label_x_midpoint/_column_table_bottom + isolated Camelot calls), rebuilding caption+body from that column — Table 4 17×2-merge → clean 9×2, both captions gold-exact. (2) efendic T1 categorical + T2 detect: unified detect.py aligned-row-run (contiguous column-aligned run, prose-robust) + widen-aware geometry (_detect_geometry_widen_aware picks the more-columnar of narrow/widened band) + contiguous-footnote-gap + whitespace _is_categorical_grid acceptance — T1 3×2→5×3, T2 0×0-stub→11×5. (3) efendic T3 running-header strip (_RUNNING_HEADER_PATTERNS gains 'Author et al. <page>') + T2-5 leading caption-tail-PROSE strip (context-guarded: only above a genuine multi-cell header) — grids start at the real header. (4) collabra_77859 T2↔T3: bare integers excluded from the caption-overlap tokenizer (_CAPTION_TOKEN_RE → [a-z]{3,}|\d+\.\d+) so a stray 'Table 2' digit stops manufacturing false overlap; region-driven capture then pins pairing deterministically (a reading-order tie-break was tried + REJECTED — it perturbed greedy visit order and regressed chan_feldman T6). (5) cog_emo T8 caption-marker hint: an absorbed 'Table N.' first row (_leading_table_caption_number) authoritatively pins a grid to caption N, beating degenerate token-overlap ties — T8 recovers its 17×6 intercorrelation matrix, T9 its 12×8. Full 101-PDF structured diff vs v2.4.6 (Camelot verified DETERMINISTIC on this host: two identical-code runs byte-identical), AI-gold-verified on the changed papers. # v2.4.6 (duplicate-starvation rescue, 2026-07-01 — AI-gold-verified, PAIRING change): _rescue_duplicate_starved_captions repairs the greedy mis-pairing where, on a page with ≥2 captions, Camelot emits a near-identical DUPLICATE fragment of one table and the greedy first-come loop hands that duplicate to a SECOND caption — starving (dropping) that caption's own real table. When ≥2 captions were assigned identical-raw_text tables, the best-overlap caption keeps it and each other caption is reassigned to the best UNASSIGNED same-page table that fits it at least as well as the duplicate. Fires ONLY on that signature — a whole-corpus dup_rescue-firing scan confirms it activates on bmc_med_3 alone; every other page keeps its greedy assignment byte-identical (so the corpus-wide token-overlap fixes verified in prior cycles are untouched). bmc_med_3 Table 3 recovers its real 11×6 "Comparisons of SCE" grid (AI-gold-verified vs the source page; was a second copy of Table 2's 29×5). A full order-independent GLOBAL matching also fixed it but reshuffled ~24 papers + regressed chan_feldman T6 (prose fragment promoted to a caption) — rejected; see LEARNINGS / memory project_docpluck_region_driven_camelot. Camelot run-to-run non-determinism (feedback_camelot_flake_cumulative_load) defeats naive before/after fingerprint diffing, so surgicality is proven at the CODE-PATH level (no dup_rescue → identical HEAD path), not by comparing flaky shapes. # v2.4.5 (region-driven capture, 2026-06-29 — AI-gold-verified, CAPTURE-PATH change): each table caption now drives Camelot stream with its OWN caption-anchored region as table_areas (extract_tables_camelot_by_region + _region_driven_capture), so a caption gets exactly its table by construction — recovers stacked / side-by-side multi-table-per-page cases blind pages="all" + token-overlap pairing could not separate (efendic Table 4+5 split, 12 papers' 0×0 stubs → real). Region tables are CANDIDATES: _pick_better_table keeps the structurally-richer of {region, auto-detect} per caption (region too-narrow bbox can't collapse a wide table; jama_open_1 stays 43×7). Content-plausibility guards on the region path (_cell_is_prose dominance + _CAPTION_LABEL_RE absorption) reject prose-as-grid / caption-absorbed fragments → honest 0×0 stubs (cog_emo Table 3/9). Caption page-fix (char_start past leading \n\n/\f) is the foundation. Full 101-PDF structured diff (27 changed/0 err) + 6-paper AI-gold canary (all FIX/PASS/NET-BETTER, no new regressions). Known documented hard cases (not regressions vs prior): cog_emo T8 Camelot under-segmentation, chandrashekar 2-col caption interleave, efendic T2 Camelot-invisible, bmc_med_3 duplicate-fragment pairing (FIXED in v2.4.6 by _rescue_duplicate_starved_captions; the dedupe + bbox-proximity + global-matching approaches were net-harmful and rejected — see LEARNINGS). # v2.4.4 (ESCIcheck handoff 2026-06-25 — flatten-only, AI-gold-verified): (DP-3) flatten._infer_anova_eta2_hint types a font-dropped η²p effect column by STRUCTURE — an unlabeled estimate column in an F-test/ANOVA results table (F + BF01/CI, no competing d/r/OR) is keyed `eta2`, range-guarded to [0,1]; the η²p glyph itself is unrecoverable (NotoSerif uni:no, OCR-tier). (DP-5b) flatten._inline_stat_field types a self-labeled cell (`r = .67`, `d = 0.32`) by its token even under a generic "Effect size" header. (DP-5a) cell_cleaning._is_fragment_cell recognizes a bracketed-CI close tail (`0.73]`) so a CI split across rows rejoins (`[0.59, 0.73]`) and the junk fragment row is dropped (cog_emo T8 14→10 rows). These three are flatten/cell-cleaning ONLY — no capture-path change, so caption→table pairing is byte-identical to v2.4.3. (DP-1/DP-2 capture recovery — the caption page-attribution fix — was prototyped but REVERTED: AI-gold canary verify showed it mis-pairs same-page-caption tables (efendic T4/T5, cog_emo T8/T9) and only half-fixes plos_med; it is queued as its own gated cycle with same-page disambiguation + region-quality gating. See docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md.) # v2.4.3 (RC-T foundation): tables.whitespace gains a CHAR-LEVEL column-detection fallback (char_whitespace_cells) — when pdfplumber's word grouper glues a tight-kerned numeric row into one token so the word-gap detector finds < 2 columns, recover the grid from char x-gaps, voting on column-START edges (right-aligned data columns are left-edge-stable even when the label column is variable-width) and reinserting intra-cell word spacing from geometry. Fires ONLY as a fallback when the word path returns < 2 columns, so currently-correct tables are byte-unchanged (word path restored verbatim). Recovers ip_feldman Table 10's 7 regression rows in isolation. NOT yet wired to replace a degenerate MATCHED Camelot table (that extract_structured change + region prose-trim is the next gated cycle — see LEARNINGS 2026-06-25). # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 
@@ -2194,6 +2194,18 @@ def _line_is_body_prose(line: str) -> bool:
         return False
     if re.search(r"\(Source[:\s]", s, re.IGNORECASE):
         return False
+    # Bibliography rows: a collection/bibliography TABLE's cells are reference
+    # entries ("Davis, K. 1973. The Case for and Against … Journal, 16:") —
+    # sentence-shaped and stopword-dense, but table content, not body prose.
+    # Author-initials opener + a publication year is the reference-entry
+    # signature (the same discriminator as the affiliation-strip citation
+    # guard, project lesson 2026-07-03). Exposed by the v2.4.119 body_start
+    # fix: the corrected walk reaches leading bibliography rows the old walk
+    # skipped, and the prose gate must not eat them (amc_1 Table 3).
+    if re.match(r"^[A-Z][A-Za-zÀ-ɏ'\-]+,\s+[A-Z]\.", s) and re.search(
+        r"\b(?:19|20)\d{2}\b", s
+    ):
+        return False
     # Quoted instrument items: keep only when DOUBLE-quoted content is
     # substantial (multiple runs OR ≥40 chars total). Use double-quote
     # delimiters only — single curly quotes (‘ ’) double as apostrophes
@@ -2282,6 +2294,204 @@ def _raw_text_is_degenerate_prose(text: str) -> bool:
     return prose >= 0.6 * total
 
 
+# A page-break furniture line: a bare page ordinal ("8/13", "Page 3 of 12",
+# a lone number) or a publication date on its own line. Emitted by pdftotext
+# when a table caption sits at the foot of a page — the NEXT page's running
+# header is what follows the caption in reading order.
+_FURNITURE_LINE_RE = re.compile(
+    r"""^(?:
+          \d{1,4}\s*/\s*\d{1,4}
+        | [Pp]age\s+\d{1,4}(?:\s+of\s+\d{1,4})?
+        | (?:January|February|March|April|May|June|July|August|September
+           |October|November|December)\s+\d{1,2},\s*(?:19|20)\d{2}
+        | \d{1,4}
+      )$""",
+    re.VERBOSE,
+)
+
+
+def _raw_text_is_page_furniture_only(text: str) -> bool:
+    """True when a table raw_text fallback holds ONLY page-break furniture —
+    a next-page running header (journal banner, section rubric, repeated
+    article title) plus a hard page marker (page ordinal / publication date),
+    with no table cell content at all.
+
+    RC-T (v2.4.119). When a caption sits at a page foot, pdftotext's reading
+    order puts the next page's furniture between the caption and the table's
+    rows; if the table itself yields no cells, the fallback is pure furniture
+    (jama_open_1 Table 2 rendered exactly ``JAMA Network Open | Nutrition,
+    Obesity, and Exercise`` / the article title / ``October 27, 2023`` /
+    ``8/13``). Suppressing it makes render emit a clean caption-only table
+    instead of dumping page furniture as if it were data.
+
+    FP-safe by construction: requires a hard page marker to be PRESENT, and
+    every remaining line to be running-header TEXT — a long, mostly-alphabetic
+    banner or article title (a journal name, a section rubric, a paper title),
+    which is what a page header is made of. A data row is short and
+    number-dense (``23.9 (13.7)``, ``<5 mm``, ``Median age``), so one such
+    line — i.e. any real table content — keeps the block. Note the title may
+    legitimately contain digits ("… in Adults With Type 2 Diabetes"), so the
+    test is the ALPHABETIC SHARE of the line, not the absence of digits.
+    Keyed on the structural page-break signature, never on paper identity.
+    """
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    if not lines or len(lines) > 6:
+        return False
+    if not any(_FURNITURE_LINE_RE.match(ln) for ln in lines):
+        return False
+    header_lines = 0
+    for ln in lines:
+        if _FURNITURE_LINE_RE.match(ln):
+            continue
+        header_lines += 1
+        # Running-header text: long and overwhelmingly alphabetic. A table
+        # cell/row is short or number-dense and fails at least one test.
+        letters = sum(ch.isalpha() for ch in ln)
+        digits = sum(ch.isdigit() for ch in ln)
+        words = [w for w in re.split(r"\s+", ln) if w]
+        if not (len(ln) >= 25 and len(words) >= 4 and letters >= 8 * max(digits, 1)):
+            return False
+    # A furniture BLOCK is a running header plus its page marker. A bare page
+    # marker on its own is not evidence of one (and may be a legitimate lone
+    # cell), so require at least one running-header text line.
+    return header_lines >= 1
+
+
+# A genuine table-caption SENTENCE wraps across at most this many physical
+# lines. Beyond it, the "tail" the walk is consuming is table CONTENT, not a
+# caption continuation (amc_1 T3: caption "TABLE 3" + an unterminated title
+# line, then bibliography rows with no sentence-terminated line for hundreds
+# of chars — the pre-guard per-line walk truncated 352 chars of them).
+_CAPTION_TAIL_MAX_LINES = 4
+
+
+def _caption_tail_body_start(
+    raw_text: str,
+    cap: CaptionMatch,
+    next_boundary: Optional[int] = None,
+) -> int:
+    """RC-T (v2.4.119): find where a table's body text begins, walking past
+    the caption sentence's (possibly wrapped) tail.
+
+    The pre-v2.4.119 walk stepped break-to-break (preferring ``\\n\\n``) and
+    inspected only a 40-char window before each break — when a caption
+    wrapped and the table body was serialized column-by-column with no early
+    paragraph break, it overshot the caption's own terminator and silently
+    dropped leading rows (chan_feldman T3 lost its first four rows; the same
+    mechanism dropped chan T1's hypothesis row). The walk is now per-LINE,
+    with three structural rules:
+
+      1. WHOLE-line terminator test — the line is measured from its true
+         line start, not from ``cap.char_end``, so a self-terminated caption
+         (``Table 6. Study 2 descriptive statistics.``) breaks immediately
+         instead of walking into the table (the xiao_2021 T6 truncation).
+      2. A blank line (paragraph break) ends an unterminated caption.
+      3. A real caption sentence wraps at most ``_CAPTION_TAIL_MAX_LINES``
+         physical lines — if neither a terminator nor a blank line appears
+         by then, the walk is consuming table content, and the body starts
+         right after the caption's own first line (the amc_1 T3 guard).
+    """
+    pos = cap.char_end
+    cap_tail_end = min(cap.char_end + 800, len(raw_text))
+    if next_boundary is not None and next_boundary > cap.char_end:
+        cap_tail_end = min(cap_tail_end, next_boundary)
+    first_line_break: Optional[int] = None
+    lines_walked = 0
+    while pos < cap_tail_end:
+        nxt = raw_text.find("\n", pos)
+        if nxt == -1 or nxt >= cap_tail_end:
+            pos = cap_tail_end
+            break
+        step = 2 if raw_text[nxt:nxt + 2] == "\n\n" else 1
+        line_start = raw_text.rfind("\n", 0, nxt) + 1
+        line = raw_text[line_start:nxt].rstrip()
+        if first_line_break is None:
+            first_line_break = nxt + step
+        lines_walked += 1
+        if re.search(r"[.!?][\"'\)\]]?$", line):
+            pos = nxt + step  # caption sentence completes on this line
+            break
+        if step == 2:
+            pos = nxt + step  # paragraph break: caption over, unterminated
+            break
+        if lines_walked >= _CAPTION_TAIL_MAX_LINES:
+            pos = first_line_break  # tail is content, not a caption wrap
+            break
+        pos = nxt + step
+    return pos
+
+
+# Figure-caption opener: furniture that can sit between a table caption and
+# the table's first cell row in pdftotext reading order (plos_med T1 recovers
+# "Fig 1. Flow diagram of PROSECCO trial…" once the body_start walk stops
+# overshooting). A genuine table row never opens "Fig N".
+_LEADING_FIG_CAPTION_RE = re.compile(r"^Fig(?:ure)?\.?\s*\d")
+
+# Never skip more than this many leading physical lines — the guard exists
+# for a caption-adjacent furniture block, not to eat a whole region.
+_LEADING_JUNK_MAX_LINES = 14
+# A wrapped body-prose paragraph misplaced at a table's head is short; a
+# genuine table region (no blank lines, no sentence-terminated rows — the
+# xiao T6 shape) would otherwise join into one giant "run" whose aggregated
+# stopwords misclassify as prose. Runs longer than these bounds are table
+# content by construction and are never skipped.
+_LEADING_JUNK_RUN_MAX_LINES = 6
+_LEADING_FIG_RUN_MAX_LINES = 12  # figure captions legitimately wrap longer
+
+
+def _skip_leading_nontable_junk(lines: list[str]) -> list[str]:
+    """RC-T (v2.4.119): drop LEADING non-table furniture from a raw_text
+    table region — a figure caption or a wrapped body-prose paragraph that
+    sits between the table caption and the first cell row in reading order.
+
+    The corrected body_start walk recovers previously-skipped leading text;
+    on ~53 corpus captions that recovered chunk opens with furniture rather
+    than cell rows. Each leading RUN (lines up to and including the first
+    sentence-terminated line, or up to a blank line) is joined into its
+    logical paragraph and dropped ONLY when ALL hold:
+      * the run is SENTENCE-TERMINATED (furniture paragraphs end with a
+        terminator; a run cut off by a blank line or the run bound is not
+        provably prose),
+      * the run is short enough to be furniture (``_LEADING_JUNK_RUN_MAX_
+        LINES`` physical lines; figure captions get a longer allowance),
+      * it is a figure caption (``Fig N.``) or reads as body prose
+        (``_line_is_body_prose`` at paragraph scale — per-line testing
+        cannot see prose that pdftotext wrapped into ~50-char lines).
+    The skip stops at the first run that reads as table content and never
+    looks past ``_LEADING_JUNK_MAX_LINES`` physical lines, so mid-table
+    content is untouchable. Numeric/label rows join into stopword-poor,
+    usually-unterminated runs that never classify as prose, so genuine
+    tables keep their first rows.
+    """
+    i = 0
+    scanned = 0
+    n = len(lines)
+    while i < n and scanned < _LEADING_JUNK_MAX_LINES:
+        if not lines[i].strip():
+            i += 1
+            scanned += 1
+            continue
+        j = i
+        terminated = False
+        while j < n and lines[j].strip():
+            if re.search(r"[.!?][\"'\)\]]?$", lines[j].rstrip()):
+                terminated = True
+                break
+            j += 1
+        run = [ln.strip() for ln in lines[i:j + 1] if ln.strip()]
+        para = " ".join(run)
+        is_fig = bool(_LEADING_FIG_CAPTION_RE.match(para))
+        max_run = _LEADING_FIG_RUN_MAX_LINES if is_fig else _LEADING_JUNK_RUN_MAX_LINES
+        if not terminated or len(run) > max_run:
+            break  # unterminated or too long → table content, keep
+        if is_fig or _line_is_body_prose(para):
+            scanned += j + 1 - i
+            i = j + 1
+            continue
+        break
+    return lines[i:]
+
+
 def _extract_table_body_text(
     raw_text: str,
     cap: CaptionMatch,
@@ -2307,35 +2517,7 @@ def _extract_table_body_text(
     text channels are supported: the line-by-line walk doesn't depend on
     paragraph delimiters being doubled.
     """
-    # Walk past the caption's tail to find body_start. The caption sentence
-    # may continue across one or more wrapped lines; stop at the first
-    # paragraph-break following a sentence terminator.
-    pos = cap.char_end
-    cap_tail_end = min(cap.char_end + 800, len(raw_text))
-    if next_boundary is not None and next_boundary > cap.char_end:
-        cap_tail_end = min(cap_tail_end, next_boundary)
-    while pos < cap_tail_end:
-        # Prefer \n\n (Xpdf paragraph break) when present, otherwise treat
-        # a single \n as a candidate break (poppler).
-        nxt2 = raw_text.find("\n\n", pos)
-        nxt1 = raw_text.find("\n", pos)
-        if nxt2 != -1 and nxt2 < cap_tail_end:
-            nxt = nxt2
-            step = 2
-        elif nxt1 != -1 and nxt1 < cap_tail_end:
-            nxt = nxt1
-            step = 1
-        else:
-            pos = cap_tail_end
-            break
-        prev = raw_text[max(cap.char_start, nxt - 40):nxt].rstrip()
-        if not prev or len(prev.split()) < 2 or re.search(
-            r"[.!?][\"'\)\]]?$", prev
-        ):
-            pos = nxt + step
-            break
-        pos = nxt + step
-    body_start = pos
+    body_start = _caption_tail_body_start(raw_text, cap, next_boundary)
     body_end_hard = min(body_start + 1500, len(raw_text))
     if next_boundary is not None and next_boundary > body_start:
         body_end_hard = min(body_end_hard, next_boundary)
@@ -2348,9 +2530,15 @@ def _extract_table_body_text(
     if ff != -1:
         region = region[:ff]
 
+    # Leading-junk skip (RC-T v2.4.119): the corrected body_start walk can
+    # recover a chunk whose head is a figure caption or wrapped body prose
+    # sitting between the table caption and the first cell row — skip such
+    # leading runs (never mid-table content).
+    lines = _skip_leading_nontable_junk(region.split("\n"))
+
     # Line-by-line walk; stop at first body-prose-looking line.
     kept: list[str] = []
-    for ln in region.split("\n"):
+    for ln in lines:
         if _line_is_body_prose(ln):
             break
         kept.append(ln)
@@ -2424,6 +2612,11 @@ def _extract_table_body_text(
     # + this guard) to HEAD behavior — used only by the FP-scan harness to
     # diff guard-live vs guard-bypassed over the full corpus.
     if not os.environ.get("DOCPLUCK_RCT_L2_BYPASS") and _raw_text_is_degenerate_prose(result):
+        return ""
+    # v2.4.119: same suppression for a fallback that is ONLY page-break
+    # furniture (next-page running header + page ordinal / date), with no
+    # table cell content — jama_open_1 Table 2, a caption at a page foot.
+    if _raw_text_is_page_furniture_only(result):
         return ""
     return result
 

@@ -163,47 +163,163 @@ def test_t3_legit_fallback_table_survives(chan_md: str):
     assert "Origin was not explicitly mentioned" in blocks, "T3 Note over-trimmed (FP)"
 
 
-# ── RC-T TEXT-LOSS: the caption-tail-walk overshoot (diagnosed, deferred) ─────
+# ── RC-T TEXT-LOSS: the caption-tail-walk overshoot (FIXED, v2.4.119) ─────────
 #
-# The chan_feldman Table 3 fallback DROPS its first four rows (Sample size
+# The chan_feldman Table 3 fallback DROPPED its first four rows (Sample size
 # 239/794, Geographic origin, Gender, Ethnic group). Root cause (2026-07-04
 # run 3): `_extract_table_body_text`'s body_start walk preferred the next `\n\n`
-# paragraph break over the caption's OWN sentence terminator, so a caption that
-# wrapped to a short tail (`…target article and\nreplication.`) with the table
-# body serialized column-by-column immediately after (no blank line until row 5)
-# skipped PAST `replication.` to the `\n\n` after the 4th row label.
-#
-# A per-line-terminator walk fixes chan T3 — BUT a full corpus guard-diff (see
-# tmp/rct_body_text_diff.py) showed the walk is SHARED across every table's
-# raw_text extraction: the fix shifts body_start on ~310 captions (308 recover
-# legitimately, 2 TRUNCATE — amc_1 T3, xiao_2021 T6 — a regression, and ~53
-# recover chunks that look like body prose / a leading Fig caption). That is a
-# corpus-wide CAPTURE-PATH change, not a narrow fix — it belongs in the gated
-# RC-T cycle (full 48-paper structured guard-diff + 7-canary AI-gold, user
-# sign-off), NOT a session-tail patch. The tests below are XFAIL guards: they
-# document the exact TEXT-LOSS + the fix's blast radius so the RC-T cycle has a
-# precise, executable target. See docs/TRIAGE_2026-07-03 run-3 section and
+# paragraph break over the caption's OWN sentence terminator. Fixed in the
+# gated RC-T cycle (2026-08-04 run 4): `_caption_tail_body_start` walks
+# per-LINE with a whole-line terminator test (xiao T6 guard), a blank-line
+# stop, and a max-wrap-lines cap (amc_1 T3 guard); `_skip_leading_nontable_junk`
+# rejects a recovered leading chunk that is a figure caption or wrapped body
+# prose. The former XFAIL guard below is now a REAL assert (it XPASS-alerted
+# the moment the fix landed, as designed); the amc_1/xiao guards pin the two
+# truncation shapes the prototype walk regressed on. See
 # docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md.
 
 
-@pytest.mark.xfail(
-    reason="RC-T caption-tail-walk TEXT-LOSS: chan T3 drops its first 4 rows. The "
-    "per-line-terminator fix is corpus-wide (310 captions, 2 truncations) — deferred "
-    "to the gated RC-T cycle. See docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md.",
-    strict=True,
-)
 @requires_pdftotext
 @_skip_under_xdist
 def test_t3_first_rows_not_dropped(chan_md: str):
-    """TEXT-LOSS guard: Table 3's FIRST rows must be present. XFAIL at HEAD (the
-    caption-tail walk over-skips); will pass once the RC-T cycle lands the
-    corpus-safe caption-tail-walk fix. Gold Table 3 is a 2-column comparison
-    (McCullough 1997 vs US Prolific) whose first four rows (Sample size 239/794,
-    Geographic origin, Gender, Ethnic group) are absent from the rendered
-    fallback."""
+    """TEXT-LOSS guard (real assert since v2.4.119): Table 3's FIRST rows must
+    be present. Gold Table 3 is a 2-column comparison (McCullough 1997 vs US
+    Prolific) whose first four rows the pre-v2.4.119 caption-tail walk
+    dropped."""
     blocks = _unstructured_blocks(chan_md)
     for needle in ("Sample size", "Geographic origin", "Gender", "Ethnic group", "239", "US Prolific"):
         assert needle in blocks, (
             f"chan_feldman T3 dropped a leading row: {needle!r} missing from the "
             f"unstructured-table block (body_start caption-tail walk over-skipped)."
         )
+
+
+# ── The two truncation shapes the PROTOTYPE per-line walk regressed on ────────
+
+
+@requires_pdftotext
+def test_amc1_t3_bibliography_table_not_truncated_real_pdf():
+    """amc_1 Table 3 is a bibliography table: caption `TABLE 3` + an
+    UNTERMINATED title line, then reference rows with no sentence-terminated
+    line for hundreds of chars. The unguarded per-line walk consumed rows as
+    'caption tail' until the 800-char cap (−352 chars vs HEAD). The
+    max-wrap-lines cap must put body_start right after the caption's own
+    line, keeping the title line and every leading reference row."""
+    from docpluck.extract import extract_pdf
+    from docpluck.tables.captions import find_caption_matches
+    import docpluck.extract_structured as ES
+
+    pdf = pdf_path("docpluck", "aom", "amc_1.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip(f"fixture missing: {pdf}")
+    raw = extract_pdf(Path(pdf).read_bytes())[0]
+    caps = [c for c in find_caption_matches(raw, list(ES._page_offsets(raw))) if c.kind == "table"]
+    t3 = next((c for c in caps if c.label == "Table 3"), None)
+    assert t3 is not None, "amc_1 Table 3 caption not found"
+    starts = sorted(c.char_start for c in caps)
+    later = [s for s in starts if s > t3.char_end]
+    nb = later[0] if later else None
+    body = ES._extract_table_body_text(raw, t3, nb)
+    # The title line and the first bibliography rows must survive.
+    assert "Academy of Management Collection" in body, (
+        "amc_1 T3 lost its title line (caption-tail walk consumed content)"
+    )
+    assert "Davis, K. 1973" in body, (
+        "amc_1 T3 lost its first bibliography row (truncation regression)"
+    )
+
+
+@requires_pdftotext
+def test_xiao_t6_selfterminated_caption_not_truncated_real_pdf():
+    """xiao_2021 Table 6's caption is SELF-terminated (`…statistics.`) and ends
+    exactly at a line break. The prototype walk measured only the post-match
+    remainder (empty), missed the terminator, and consumed table rows until a
+    `.`-ending line (−799 chars). The whole-line terminator test must break
+    immediately, keeping every leading data row."""
+    from docpluck.extract import extract_pdf
+    from docpluck.tables.captions import find_caption_matches
+    import docpluck.extract_structured as ES
+
+    pdf = pdf_path("docpluck", "apa", "xiao_2021_crsp.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip(f"fixture missing: {pdf}")
+    raw = extract_pdf(Path(pdf).read_bytes())[0]
+    caps = [c for c in find_caption_matches(raw, list(ES._page_offsets(raw))) if c.kind == "table"]
+    t6 = next((c for c in caps if c.label == "Table 6"), None)
+    assert t6 is not None, "xiao Table 6 caption not found"
+    starts = sorted(c.char_start for c in caps)
+    later = [s for s in starts if s > t6.char_end]
+    nb = later[0] if later else None
+    body = ES._extract_table_body_text(raw, t6, nb)
+    assert "Choice of the target option" in body, (
+        "xiao T6 lost its first header row (self-terminated-caption truncation)"
+    )
+    assert "216/337" in body, "xiao T6 lost its first data row"
+
+
+# ── v2.4.119: page-break furniture suppression + FFFD third channel ──────────
+#
+# Both defects were EXPOSED by the corrected caption-tail walk: it recovers
+# leading content the old walk silently skipped, so a caption sitting at a page
+# foot now surfaces the next page's running header, and plos_med Table 2's
+# recovered rows carry the cmsy10 `≥`-as-U+FFFD corruption that only the
+# channel-1 normalize pass had been fixing.
+
+
+def test_page_furniture_only_block_detected():
+    """A fallback holding ONLY a next-page running header + page marker is
+    suppressed (jama_open_1 Table 2's exact shape)."""
+    from docpluck.extract_structured import _raw_text_is_page_furniture_only as furn
+
+    assert furn(
+        "JAMA Network Open | Nutrition, Obesity, and Exercise\n"
+        "Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes\n"
+        "October 27, 2023\n"
+        "8/13"
+    ) is True
+
+
+def test_page_furniture_guard_keeps_real_tables():
+    """FP battery: real table content is never suppressed — including a lone
+    page-like number, a table whose CELL is a date, and number-dense rows."""
+    from docpluck.extract_structured import _raw_text_is_page_furniture_only as furn
+
+    for block in (
+        "8/13",  # bare marker, no running-header text ⇒ not a furniture block
+        "Median age\n24.0\nAverage age\n28.8\n8",
+        "Enrollment start\nOctober 27, 2023\nSites\n12\nPatients enrolled overall\n284",
+        "Intracavitary remnant (mean SD) measured at baseline visit\n23.9 (13.7)\n5",
+        "Control\n12\nTreatment\n15\n3",
+    ):
+        assert furn(block) is False, block
+
+
+@requires_pdftotext
+def test_jama_open_1_t2_furniture_not_dumped_real_pdf():
+    """jama_open_1 Table 2's caption sits at a page foot; its raw_text fallback
+    was the next page's banner/title/date/page-number with no table content.
+    The rendered .md must not carry that furniture as an unstructured-table."""
+    pdf = pdf_path("docpluck", "ama", "jama_open_1.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(Path(pdf).read_bytes())
+    blocks = _unstructured_blocks(md)
+    assert "JAMA Network Open | Nutrition, Obesity, and Exercise" not in blocks, (
+        "jama_open_1 T2 still dumps page-break furniture as table content"
+    )
+    assert not re.search(r"^October 27, 2023\s*$", md, re.M), (
+        "standalone publication-date furniture line leaks into the render"
+    )
+
+
+@requires_pdftotext
+def test_plos_med_t2_ge_glyph_recovered_in_table_rows_real_pdf():
+    """plos_med Table 2's remnant-size rows reach the .md via the raw_text
+    fallback (channel 3), which bypasses normalize_text — the cmsy10 `≥` must
+    still be recovered there, not left as U+FFFD mojibake."""
+    pdf = pdf_path("docpluck", "vancouver", "plos_med_1.pdf")
+    if not os.path.isfile(pdf):
+        pytest.skip(f"fixture missing: {pdf}")
+    md = render_pdf_to_markdown(Path(pdf).read_bytes())
+    assert "�" not in md, f"{md.count(chr(0xFFFD))} replacement char(s) remain"
+    assert "≥5–10 mm" in md, "Table 2 remnant-size row lost its recovered ≥"
