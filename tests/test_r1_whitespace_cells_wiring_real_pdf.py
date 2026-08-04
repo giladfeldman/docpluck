@@ -39,27 +39,42 @@ _CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "
 
 # The two papers the R1 sweep confirmed should yield ≥1 cell post-repair:
 # chan_feldman (8 caps → 72 cells) and maier (11 caps → 100 cells).
+#
+# RC-T cycle 4 (2026-08-04) landed the own-caption exemption in
+# ``_whitespace_grid_is_clean`` (a caption-anchored region contains its OWN caption
+# by construction, so the caption-absorption guard was condemning every region grid).
+# maier now recovers 465 cells across 5 tables and is a REAL assert.
+#
+# chan_feldman is still expected-fail, but for a DIFFERENT, narrower reason than the
+# original xfail claimed — see the marker below.
 B1_LIVE_FIXTURES = [
-    ("chan_feldman_2025_cogemo.pdf", 8, 50),  # min 50 cells (actual: 72)
-    ("maier_2023_collabra.pdf", 11, 50),      # min 50 cells (actual: 100)
+    ("maier_2023_collabra.pdf", 11, 50),      # min 50 cells (actual: 465 post-cycle-4)
+    pytest.param(
+        "chan_feldman_2025_cogemo.pdf", 8, 50,
+        marks=pytest.mark.xfail(
+            strict=True,
+            reason=(
+                "REAL TEXT-LOSS guard, narrowed by RC-T cycle 4 (2026-08-04). The "
+                "own-caption over-rejection is FIXED (row-0 captions no longer "
+                "condemn the grid). chan_feldman's residual is the SEPARATE "
+                "region-over-capture defect: its caption-anchored regions absorb "
+                "surrounding 2-column body prose, so the grids fail the "
+                "prose-contamination / clean-data-row guards on their own merits "
+                "(T2 CLEAN(1<2)+PROSE(6/15), T3/T4/T6/T7/T9 CLEAN(0<2)). T5/T8 are "
+                "CORRECTLY rejected — their regions really do absorb Table 9's "
+                "caption at grid row 4 (the guard's original defence case, intact). "
+                "Do NOT loosen thresholds to make this pass; the fix is to trim the "
+                "region's prose edges. See "
+                "docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md and the "
+                "active TRIAGE. strict=True: when the region prose-trim lands this "
+                "XPASSes loudly — flip it to a plain assert in that cycle."
+            ),
+        ),
+    ),
 ]
 
 
 @pytest.mark.parametrize("filename, min_regions, min_cells", B1_LIVE_FIXTURES)
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "REAL TEXT-LOSS guard, expected-fail until the gated RC-T cycle lands "
-        "(run-3 adjudication, 2026-07-04): regions resolve but "
-        "_whitespace_grid_is_clean's prose-contamination guard (2026-06-29) "
-        "over-rejects the genuine 2-col grids, so whitespace_cells yields 0 and "
-        "the raw_text fallback truncates rows (chan T3 drops its first 4 rows; "
-        "maier T5 mispairs). Do NOT loosen thresholds to make this pass — see "
-        "docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md and the "
-        "active TRIAGE. strict=True: when RC-T fixes the grid guard this XPASSes "
-        "loudly — flip it back to a plain assert in that cycle."
-    ),
-)
 def test_b1_whitespace_cells_wiring_live(filename: str, min_regions: int, min_cells: int):
     """The R1/B1 fallback must yield ≥1 region and ≥min_cells cells on each B1 fixture.
 

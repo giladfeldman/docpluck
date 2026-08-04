@@ -98,7 +98,7 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
                 "bbox": (x_left, row_top, x_right, row_bot),
             })
     cells = _trim_trailing_prose_rows(cells)
-    return cells if _whitespace_grid_is_clean(cells) else []
+    return cells if _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)) else []
 
 
 def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
@@ -158,7 +158,18 @@ def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list
                 "bbox": (x_left, row_top, x_right, row_bot),
             })
     cells = _trim_trailing_prose_rows(cells)
-    return cells if _whitespace_grid_is_clean(cells) else []
+    return cells if _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)) else []
+
+
+def _region_caption_number(region: CandidateRegion) -> int | None:
+    """The table number of the caption this region was anchored on, if known.
+
+    Feeds ``_whitespace_grid_is_clean``'s identity-based own-caption exemption
+    (RC-T cycle 4). Returns None for a region with no caption match, which keeps
+    the strict "any caption condemns the grid" behaviour.
+    """
+    cap = getattr(region, "caption_match", None)
+    return getattr(cap, "number", None) if cap is not None else None
 
 
 # --- helpers ---
@@ -606,6 +617,34 @@ _UNMAPPED_GLYPH_RE = re.compile(r"\(cid:\d+\)|�")
 # would discard good grids.)
 _CAPTION_LABEL_RE = re.compile(r"\b(?:Table|Figure|TABLE|FIGURE)\s+\d+\s*[.:]")
 
+# A caption-anchored region ALWAYS contains its OWN caption line by construction:
+# ``detect._region_for_caption`` returns ``_union(caption_bbox, geom_bbox)`` because
+# the region-driven Camelot pass needs the caption for pairing. So the caption-
+# absorption guard above must exempt the region's own caption, or it condemns EVERY
+# region grid — which is exactly what it did (RC-T cycle 4, reproduced 2026-08-04:
+# 19/19 chan_feldman + maier regions rejected on their own caption, zeroing the
+# whitespace fallback corpus-wide and truncating rows in the raw_text fallback).
+#
+# The exemption is deliberately IDENTITY-BASED, not position-based. A position-only
+# rule ("the topmost caption is the region's own") was written first and REJECTED in
+# review (codex, 2026-08-04) — all three of its failure modes reproduced locally:
+#   * a NEIGHBOUR's caption landing in a leading row was blessed as "own", turning the
+#     old honest failure ("no table") into a WRONG table published silently;
+#   * ``(r, c)`` sort order picks the leftmost caption, which on a side-by-side page is
+#     the neighbour's, not the anchor's;
+#   * exempting the whole ROW let a second ``Table N.``/``Figure N.`` on that same row
+#     ride along free.
+# So the exemption requires the cell's caption NUMBER to equal the anchoring caption's,
+# and applies per-CELL. A grid whose own caption is char-fragmented across cells simply
+# fails to match and is rejected — the safe direction (a visible missing table beats an
+# invisible wrong one; cf. the run-4 sign-flip rule).
+_OWN_CAPTION_MAX_ROW: int = 2
+
+# Caption number extractor for the identity check. TABLE captions only: a region
+# anchored on a table caption that leads with a ``Figure N.`` label has absorbed a
+# neighbouring figure and is genuinely mis-bounded.
+_OWN_TABLE_CAPTION_NUM_RE = re.compile(r"\b(?:Table|TABLE)\s+(\d+)\s*[.:]")
+
 # A real data table the whitespace fallback should surface has at least this many
 # rows bearing a clean standalone numeric/stat cell. Below this it is almost
 # certainly absorbed prose or a misdetected region — discard.
@@ -627,7 +666,10 @@ def _cell_is_garbled(text: str) -> bool:
 
 
 def _whitespace_grid_is_clean(
-    cells: list[Cell], *, allow_categorical: bool = False
+    cells: list[Cell],
+    *,
+    allow_categorical: bool = False,
+    own_caption_number: int | None = None,
 ) -> bool:
     """Accept a whitespace/char grid ONLY when it looks like a real DATA table.
 
@@ -657,19 +699,39 @@ def _whitespace_grid_is_clean(
     a categorical grid there is trustworthy. The unmapped-glyph, caption-label, and
     prose-fragment guards below STILL apply, so absorbed prose is still rejected.
 
+    ``own_caption_number`` is the number of the caption this region was anchored on
+    (``region.caption_match.number``). When supplied, a leading cell naming THAT table
+    number is exempt from the caption-absorption reject — see _OWN_CAPTION_MAX_ROW.
+    Omit it (the default) to keep the strict "any caption condemns the grid" behaviour,
+    which is correct for any caller whose cells are not caption-anchored.
+
     Returns False ⇒ caller discards the grid and falls back to the caption-only
     stub (clean, no false structure) instead of emitting garbage.
     """
     if not cells:
         return False
+    seen_own_caption = False
     for c in cells:
         txt = c.get("text") or ""
         if _UNMAPPED_GLYPH_RE.search(txt):
             return False
-        # A caption label inside a cell ⇒ the region absorbed an adjacent table's
-        # caption (cog_emo Table 9's region reached up into Table 8's tail and
-        # pulled in the "Table 9." caption line). Mis-bounded → reject.
+        # A caption label inside a cell ⇒ the region absorbed an ADJACENT table's
+        # caption (cog_emo Table 8's region reached down into Table 9's caption at
+        # grid row 4). Mis-bounded → reject.
+        #
+        # EXEMPT the region's OWN caption: every caption-anchored region contains it
+        # by construction (RC-T cycle 4). Exempted only when the caller supplies the
+        # anchoring caption number AND this cell names that exact number AND it sits
+        # in a leading row — identity, not merely position, so a neighbour's caption
+        # can never be mistaken for the anchor's. Only the FIRST such match is
+        # exempt: a genuine caption line appears once, so a repeat means the region
+        # spans two copies and is mis-bounded.
         if _CAPTION_LABEL_RE.search(txt):
+            if own_caption_number is not None and not seen_own_caption and c["r"] <= _OWN_CAPTION_MAX_ROW:
+                m = _OWN_TABLE_CAPTION_NUM_RE.search(txt)
+                if m and int(m.group(1)) == own_caption_number:
+                    seen_own_caption = True
+                    continue
             return False
     # A purely-categorical table (predictions / design summary) carries no numeric
     # cells, so the clean-data-row count below is 0 and it would be rejected — yet

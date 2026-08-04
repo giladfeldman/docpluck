@@ -176,20 +176,48 @@ def test_cells_grid_to_html_recovers_separate_cell_ci_upper():
 
 @pytest.mark.skipif(
     os.environ.get("DOCPLUCK_DISABLE_CAMELOT", "0") == "1",
-    reason="Table 8's structured grid requires Camelot; disabled via "
+    reason="The hypothesis grid requires Camelot; disabled via "
     "DOCPLUCK_DISABLE_CAMELOT=1.",
 )
-def test_chan_feldman_table8_ci_upper_signs_recovered():
+def test_chan_feldman_hypothesis_table_ci_upper_signs_recovered():
+    """The 2bi/2bii hypothesis rows must carry recovered NEGATIVE upper bounds.
+
+    RE-TARGETED 2026-08-04 (RC-T cycle 4). This test previously read the rows out of
+    ``Table 8`` — which was wrong, and passed only because the caption→table pairing
+    was itself wrong. The AI gold (article-finder ``reading`` view, the only ground
+    truth per the project rule — never pdftotext) is unambiguous:
+
+        Table 8. Control condition (Replication): Intercorrelations with confidence
+                 intervals.          <- an M / SD / alpha / omega variable matrix
+        Table 9. Summary of statistical tests and their interpretation.
+                 | Hypothesis | ... |  <- 1a, 1b, 2a, 2bi, 2bii live HERE
+
+    Cycle 4's own-caption exemption FIXED that pairing, so the hypothesis rows now
+    resolve to Table 9 and this test follows the gold rather than the old defect.
+    The recovered values are unchanged and still gold-exact: 2bi target
+    ``[−0.78, −0.66]``, 2bi replication ``[−0.78, −0.67]``.
+
+    Selection is by CONTENT (the table carrying the hypothesis rows), not by a
+    hard-coded label, so a future pairing change surfaces as a real failure here
+    instead of silently re-passing against whichever table happens to be labelled 8.
+    """
     pdf = TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf"
     if not pdf.exists():
         pytest.skip(f"fixture missing: {pdf}")
 
     result = extract_pdf_structured(pdf.read_bytes())
-    t8 = next((t for t in result["tables"] if t.get("label") == "Table 8"), None)
-    if t8 is None or not (t8.get("cells") or []):
-        pytest.skip("Table 8 has no Camelot cells in this environment")
+    hypothesis_table = None
+    for t in result["tables"]:
+        if not (t.get("cells") or []):
+            continue
+        joined = " ".join((c.get("text") or "") for c in t["cells"])
+        if "Hypothesis" in joined and "2bi" in joined:
+            hypothesis_table = t
+            break
+    if hypothesis_table is None:
+        pytest.skip("hypothesis grid has no Camelot cells in this environment")
 
-    rows = flatten_table(t8)
+    rows = flatten_table(hypothesis_table)
     # Index flattened rows by (row-label, arm) via the sentence prefix.
     by_key: dict[str, dict] = {}
     for fr in rows:

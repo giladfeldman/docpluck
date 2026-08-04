@@ -3657,12 +3657,27 @@ def recover_dropped_minus_ci_upper(
 # (6) attached hi sign, (7) hi magnitude.
 _CI_SIGN = r"[-−]"
 _CI_DASH = r"[-−–—]"
+# ReDoS fix, 2026-08-04. The decimal atom was `\d*\.\d+`, whose UNBOUNDED integer part
+# is quadratic on a long digit run: at each of ~n start positions `\d*` consumes the
+# whole remaining run and then backtracks one digit at a time hunting for a `.`. On the
+# 10k-digit input of tests/test_edge_cases.py::test_regex_no_catastrophic_backtracking a
+# single pass cost 0.49s (2.27s at 20k, ~4.6x per doubling) — which is what made that
+# test fail intermittently, a real complexity defect rather than the load sensitivity it
+# had been recorded as.
+#
+# Bounding the INTEGER part is what fixes it (1.68s -> 0.006s at n=20000, ~270x): the
+# decoration gap and possessive quantifiers were both measured and are NOT the driver
+# (bounding the gap alone left it at 1.6s; a bare `\d*\.\d+` in isolation costs MORE
+# than the whole pattern). 20 integer digits is far beyond any real statistic, and the
+# atom matches every real form identically (`0.72`, `.67`, `12.5`, `100.25`).
+# Guarded by tests/test_ci_upper_dropped_redos.py.
+_CI_DEC = r"\d{0,20}\.\d+"
 _CI_UPPER_DROPPED_RE = re.compile(
-    r"(?:[A-Za-z]+\s*=\s*)?(" + _CI_SIGN + r"?)\s*(\d*\.\d+)"   # signed estimate
+    r"(?:[A-Za-z]+\s*=\s*)?(" + _CI_SIGN + r"?)\s*(" + _CI_DEC + r")"  # signed estimate
     r"[^\[\]\n]*?"                                              # decoration
-    r"(\[\s*(" + _CI_SIGN + r"?\s*\d*\.\d+)\s*,"                # [ lo ,
+    r"(\[\s*(" + _CI_SIGN + r"?\s*" + _CI_DEC + r")\s*,"        # [ lo ,
     r"\s*(" + _CI_DASH + r"\s+)?"                               # detached dash?
-    r"(" + _CI_SIGN + r"?)(\d*\.\d+)\s*\])"                     # attached-sign hi ]
+    r"(" + _CI_SIGN + r"?)(" + _CI_DEC + r")\s*\])"             # attached-sign hi ]
 )
 
 
