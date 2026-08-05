@@ -440,6 +440,27 @@ def _synthesize_abstract_from_leading_unknown(
     return [new_unknown, new_abstract] + sections[1:]
 
 
+def _is_metadata_label_line(line: str) -> bool:
+    """True when ``line`` is a bare metadata LABEL (``KEYWORDS``, ``Key words``)
+    carrying no value of its own.
+
+    Used by the keywords branch of
+    :func:`_synthesize_introduction_if_bloated_front_matter` to tell a label
+    line apart from the keyword content beneath it, so a paragraph break that
+    falls between the two is not mistaken for the end of the keywords span.
+
+    Resolves through the canonical taxonomy (``lookup_canonical_label``) rather
+    than a private word list, so a layout that labels the block "Key words" is
+    handled by the same vocabulary the section detector already uses. A line
+    that carries a value ("Keywords: decoy effect; regret") is NOT a bare
+    label — the separator and the text after it mean the content is present.
+    """
+    s = line.strip().rstrip(":").strip()
+    if not s or len(s) > 40:
+        return False
+    return lookup_canonical_label(s) is SectionLabel.keywords
+
+
 def _synthesize_introduction_if_bloated_front_matter(
     sections: list[Section],
     page_offsets: tuple[int, ...],
@@ -529,7 +550,42 @@ def _synthesize_introduction_if_bloated_front_matter(
         # the body prose begins. The 800-char rule used for ABSTRACT
         # would overshoot a short keyword line and pull intro paragraphs
         # into the keywords span.
-        cut_local = body.find("\n\n")
+        #
+        # 2026-08-05 (run 6, cycle 2 — xiao_2021_crsp): skip paragraph
+        # breaks that fall BEFORE any keyword content. Taylor & Francis
+        # (and other sidebar-metadata layouts) serialise the block as
+        #
+        #     KEYWORDS
+        #     <blank>
+        #     Decoy effect; decision
+        #     reversibility; regret;
+        #     attraction effect; replication
+        #
+        # so the FIRST "\n\n" sits between the label and its own values.
+        # Cutting there left a 10-char keywords span (`"KEYWORDS\n\n"`) and
+        # started the synthesized Introduction on the keyword list — the
+        # rendered document then reads as though "Decoy effect; decision
+        # reversibility; …" were the Introduction's opening sentence.
+        # Keyed on the structural signature (a candidate cut that leaves no
+        # keyword CONTENT behind), never on the label text or the paper.
+        cut_local = -1
+        search_from = 0
+        while True:
+            nxt = body.find("\n\n", search_from)
+            if nxt < 0:
+                break
+            # Does the span we would keep contain keyword content, i.e. any
+            # non-blank line beyond the metadata LABEL line itself?
+            kept = body[:nxt]
+            content_lines = [
+                ln.strip()
+                for ln in kept.split("\n")
+                if ln.strip() and not _is_metadata_label_line(ln)
+            ]
+            if content_lines:
+                cut_local = nxt
+                break
+            search_from = nxt + 2
         if cut_local < 0:
             return sections
         cut_local += 2

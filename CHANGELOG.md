@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.4.124] - 2026-08-05
+
+**Publisher furniture was splitting a sentence in half, and a keyword list was being read as the Introduction's first sentence.** `NORMALIZATION_VERSION` -> `1.9.49`; `SECTIONING_VERSION` -> `1.2.4`.
+
+### The wrapped `CONTACT` block (P0, normalize.py)
+
+`xiao_2021_crsp` rendered the Taylor & Francis correspondence footer *inside* a body sentence:
+
+```
+The option superior to the decoy is commonly referred to as the target,
+whereas the other option is referred to as the competitor. The target and the
+CONTACT Gilad Feldman
+Hong Kong, Hong Kong SAR
+competitor form a core choice set. With a decoy added ...
+```
+
+The v2.4.6 rule matches `CONTACT` + name + email **on one line**. Taylor & Francis column-wraps the block, so the name, the email and the region land on separate lines and the one-line pattern misses every one of them.
+
+**The instructive part is that four of the block's six lines were already stripped** - by other, unrelated P0 patterns (the email line, the supplemental-data sidebar, the copyright line, the truncated affiliation). So the failure mode was not "the strip is missing" but **"the strip is partial"**, and a partial strip is worse than none: it removes exactly the lines that made the block recognisable as furniture and welds the residue into prose. When auditing a strip rule, check what its neighbours already remove - a rule can look unnecessary because siblings cover most of its block, right up until the layout wraps.
+
+The fix keys on the structural signature (line-initial all-caps `CONTACT` followed **only** by a personal name), never on paper identity, and accepts `O'Brien` / `Mary-Jane` / `McDonald` / `Jose Alvarez` / `John R. Smith`. A `_CONTACT_NON_NAME_WORDS` veto keeps navigation and heading furniture (`CONTACT Details Below`, `CONTACT Support Team`, `CONTACT INFORMATION`).
+
+The orphaned `<City>, <Region>` tail is removed **only by adjacency** to a dropped opener - never on its own shape, because a bare `Hong Kong, Hong Kong SAR` is an ordinary prose fragment. A test pins that the tail survives when it stands alone; the adjacency requirement is the whole safety argument.
+
+One trap worth recording: the wrapped pattern deliberately does **not** live in `_PAGE_FOOTER_LINE_PATTERNS`. Putting it there silently defeats the veto, because the generic `any(p.match(...))` loop drops the vetoed line before the veto branch can run. A pattern that needs a veto or continuation state must be applied ahead of the list, not inside it.
+
+### The `KEYWORDS` label/value split (sections/core.py)
+
+The same paper produced a **10-character keywords section** - the label and nothing else - while its values became the opening line of the synthesized Introduction, so the document reads as though "Decoy effect; decision reversibility; ..." were the Introduction's first sentence.
+
+`_synthesize_introduction_if_bloated_front_matter` cuts the keywords span at the **first** paragraph break. Taylor & Francis serialises the block as `KEYWORDS` / blank / values, so that break sits between the label and its own values. The branch's comment anticipated "a short keyword line" and never considered the label-then-blank-then-values shape.
+
+The general rule: **any "cut at the first separator" heuristic needs a post-condition on what the cut leaves, not only on where it lands.** The cut now scans forward past any break whose kept span holds no non-blank line other than the metadata label itself, resolved through the canonical taxonomy rather than a private word list. Degenerate spans (label only, or no break at all) bail out unchanged rather than manufacturing an empty section.
+
+**A wrong comment cost more than the bug.** `render.py`'s `_demote_metadata_label_headings` attributed this exact symptom to "R4 column-aware extraction reorders the front-matter". Both halves were false: the raw pdftotext text has the label and its values adjacent and in the right order, and the string "Introduction" does not appear **anywhere** in that paper's source - the heading is synthesized. A future session trusting that comment would have gone hunting in the extraction layer. The comment is corrected in this change.
+
+### Test-suite composition was a function of scratch debris
+
+The project had **no pytest configuration at all**, so a bare `pytest` walked the whole working tree - including `tmp/`, the scratch directory every iterate run fills with one-off probes. Six files there matched pytest's default discovery globs, producing 10 collection errors and, worse, making the suite's **test count depend on whatever debris the last session left behind**.
+
+That defeats the project's own "a shrinking test count is a failure, not a pass" tripwire: run 5 recorded 1962 tests and this run's first pass saw 2295, and neither number was comparable to the other because the delta was mostly scratch files rather than real coverage. `testpaths = ["tests"]` is now pinned, so the count is a property of `tests/` alone and a genuine drop is meaningful.
+
+Verification: 44 new tests (24 contact + 20 keywords), each watched failing against the unfixed code first; 190 passed across every contact/footer/affiliation/front-matter/metadata test; production-path guard-diffs on 127 and 156 corpus documents, each with monkeypatch effectiveness verified so a zero result would be trustworthy.
+
+
 ## [2.4.123] — 2026-08-05
 
 **docpluck rendered an impossible F-statistic.** `NORMALIZATION_VERSION` → `1.9.48`.
