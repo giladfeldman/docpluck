@@ -1202,14 +1202,25 @@ def _demote_metadata_label_headings(text: str) -> str:
             label = m.group(2).strip()
             if label in _METADATA_LABEL_TOKENS:
                 # Find first metadata-shape line within ~15 non-heading
-                # lines. Skip intervening headings (some papers — e.g.
-                # xiao_2021_crsp — render with KEYWORDS / Introduction /
-                # metadata-list, where the keywords list lands BELOW
-                # `## Introduction` because R4 column-aware extraction
-                # reorders the front-matter). Without the heading-skip,
-                # the bare `## KEYWORDS` survived as an h2 even though
-                # its metadata payload was clearly present, just offset
-                # by one heading.
+                # lines. Skip intervening headings: a layout can render as
+                # KEYWORDS / <heading> / metadata-list, leaving the payload
+                # one heading below its label. Without the heading-skip the
+                # bare `## KEYWORDS` survives as an h2 even though its
+                # metadata payload is present, just offset.
+                #
+                # 2026-08-05 (run 6, cycle 2) — CORRECTION. This comment
+                # previously cited xiao_2021_crsp and blamed "R4 column-aware
+                # extraction reorders the front-matter". That diagnosis was
+                # WRONG on both counts: the raw pdftotext text has KEYWORDS
+                # and its values adjacent and in the right order, and the
+                # string "Introduction" does not occur in that paper's source
+                # at all (the heading is synthesized). The real cause was in
+                # the sectioning layer — the keywords branch of
+                # `_synthesize_introduction_if_bloated_front_matter` cut the
+                # span at the blank line BETWEEN the label and its values —
+                # and is fixed there. The heading-skip below is retained as
+                # defence for layouts that genuinely do offset the payload,
+                # but xiao is no longer one of them.
                 next_line = ""
                 j = i + 1
                 scanned = 0

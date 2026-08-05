@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docpluck"
-version = "2.4.123"
+version = "2.4.124"
 description = "PDF, DOCX, and HTML text extraction and normalization for academic papers"
 readme = "docs/README.md"
 requires-python = ">=3.10"
@@ -77,3 +77,29 @@ Changelog = "https://github.com/giladfeldman/docpluck/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["docpluck"]
+
+# 2026-08-05 (run 6): the project had NO pytest configuration at all, so a bare
+# `pytest` walked the whole working tree — including `tmp/`, the scratch
+# directory every iterate run fills with one-off probes. Six scratch files
+# there matched pytest's default discovery globs (`a2_rule_test.py`,
+# `cycle2_test.py`, `extract_test.py`, `test_majumder_head.py`,
+# `test_w0d_efendic.py`, `test_w0d_why.py`), producing 10 collection ERRORs
+# and — worse — making the suite's TEST COUNT depend on whatever debris the
+# last session happened to leave behind.
+#
+# That defeats the project's "a shrinking test count is a failure, not a pass"
+# tripwire: run 5 recorded 1962 tests and run 6 saw 2295, and neither number
+# was comparable to the other because the delta was mostly scratch files, not
+# real coverage. Pinning `testpaths` makes the count a property of `tests/`
+# alone, so it can be compared across runs and a genuine drop is meaningful.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    "tmp",
+    "build",
+    "dist",
+    ".git",
+    "*.egg-info",
+    "scripts",
+    "docs",
+]
