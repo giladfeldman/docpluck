@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.4.125] - 2026-08-05
+
+**An invisible character was surviving into rendered output, silently breaking string equality for every downstream consumer.** `NORMALIZATION_VERSION` -> `1.9.50`.
+
+### S6 BIDI FORMAT strip (normalize.py)
+
+`xiao_2021_crsp` rendered an invisible **LEFT-TO-RIGHT MARK** (U+200E) immediately after a citation's closing paren:
+
+```
+... Connolly, Reb, and Kausel (2013)‎ ...
+                                     ^ U+200E, invisible on screen
+```
+
+The S6 invisible-character block already stripped U+200B / U+200C / U+200D and U+FEFF, but **skipped U+200E / U+200F** — an omission in a sequence, not a design decision.
+
+**Why this is a correctness defect and not cosmetics.** An invisible character inside rendered output breaks **string equality and search** for every downstream consumer. A citation checker comparing `(2013)` against `(2013)‎` sees a mismatch it *cannot see on screen* — and docpluck's output feeds exactly such consumers (citelink, CitationGuard). This is the same rationale already recorded for the U+00AD soft-hyphen strip twelve lines above it ("invisible, breaks search").
+
+Now also stripping U+2060 WORD JOINER, which is in the same class.
+
+**Verification.**
+
+| Evidence | Result |
+|---|---|
+| New tests | 9, **watched FAILING at unfixed HEAD first** (7 failed / 2 passed — the 2 passing prove the pre-existing U+200B/C/D/FEFF strips still work) |
+| Strip effectiveness | **verified on a synthetic positive before the guard-diff**, so a zero result is trustworthy rather than a false green |
+| Corpus guard-diff (all 101 PDFs) | **100 byte-identical by construction** (they contain no bidi mark at all); the **1** touched is xiao, with exactly the 2 reported marks. Zero false positives possible. |
+| Idempotency + normalize guards | 41 passed, 0 failed (incl. `test_normalize_idempotent_real_pdf`) |
+
+Found via the run-7 triage of the open canary findings.
+
 ## [2.4.124] - 2026-08-05
 
 **Publisher furniture was splitting a sentence in half, and a keyword list was being read as the Introduction's first sentence.** `NORMALIZATION_VERSION` -> `1.9.49`; `SECTIONING_VERSION` -> `1.2.4`.
