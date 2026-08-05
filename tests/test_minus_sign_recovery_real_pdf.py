@@ -402,3 +402,51 @@ def test_estimate_column_pairing_leaves_genuine_positives():
         + ["[2.20, 2.60]", "[3.00, 3.30]", "[1.00, 1.10]"]
     )
     assert rec(block) == block
+
+
+# ── W0d non-negative-CI guard: an F-statistic is never negative (v2.4.123) ──
+
+def test_f_statistic_not_flipped_against_a_nonnegative_ci():
+    """W0d must not pair an estimate with a CI that cannot contain a negative.
+
+    Found 2026-08-04 by the run-5 canary audit on maier_2023_collabra Table 9.
+    The row is `Target article | 1, 114 | 2.00 | .16 | N/A | .02 | [.00, .09]`:
+    an F-statistic of 2.00, its p, its partial-eta-squared .02, and the CI OF
+    THE ETA-SQUARED. W0d read the leading `2` of `2.00` as a corrupted minus and
+    flipped it to `-.00`, because `-.00` falls inside `[.00, .09]` while `2.00`
+    does not — the containment invariant fires, but on the WRONG statistic's CI.
+
+    The rendered output then carried **F = -.00**, which is impossible (F is a
+    ratio of sums of squares and is non-negative by construction). Both text
+    channels confirm the source reads `2.00`; docpluck manufactured the sign.
+
+    The guard: a CI whose LOWER bound is >= 0 is an entirely non-negative
+    interval, so no negative value can lie inside it. If the "recovery" is only
+    accepted because the flipped value hits such an interval, the pairing is
+    wrong by construction and must be refused.
+    """
+    from docpluck.normalize import recover_minus_via_ci_pairing as rec
+
+    row = (
+        "<tr><td>Target article</td><td>1, 114</td><td>2.00</td><td>.16</td>"
+        "<td>N/A</td><td>.02</td><td>[.00, .09]</td></tr>"
+    )
+    assert rec(row) == row, f"F-statistic wrongly flipped negative: {rec(row)!r}"
+    assert "-.00" not in rec(row)
+
+
+def test_nonnegative_ci_guard_leaves_genuine_recoveries_armed():
+    """The guard must not disarm W0d where the CI genuinely admits a negative.
+
+    Both rows below carry a CI whose lower bound is < 0, so a negative estimate
+    is admissible and the containment invariant remains meaningful.
+    """
+    from docpluck.normalize import recover_minus_via_ci_pairing as rec
+
+    # efendic-shaped: intercept 20.09 -> -0.09, CI straddles zero
+    straddling = "<tr><td>Intercept</td><td>20.09</td><td>0.06</td><td>[-0.21, 0.04]</td></tr>"
+    assert "-0.09" in rec(straddling)
+
+    # wholly-negative CI: 20.42 -> -0.42
+    negative = "<tr><td>Direction</td><td>20.42</td><td>0.11</td><td>[-0.63, -0.21]</td></tr>"
+    assert "-0.42" in rec(negative)

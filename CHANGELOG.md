@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.123] — 2026-08-05
+
+**docpluck rendered an impossible F-statistic.** `NORMALIZATION_VERSION` → `1.9.48`.
+
+**`F = -.00`.** maier Table 9's row reads `Target article | 1, 114 | 2.00 | .16 | N/A | .02 | [.00, .09]` — an F-statistic, its p-value, its partial eta-squared, and **the CI of the eta-squared**. `recover_minus_via_ci_pairing` (W0d) repairs a font corruption in which a minus sign is read as `2`, accepting the flip when the corrected value falls inside a paired confidence interval and the literal does not. It paired the F-statistic with the *eta-squared's* CI: `-.00` sits inside `[.00, .09]`, `2.00` does not, so the rule fired.
+
+An F-statistic is a ratio of sums of squares — **non-negative by construction**. The rendered output was therefore not merely wrong but arithmetically impossible. Both text channels confirm the source reads `2.00`; the library manufactured the sign.
+
+**The guard keys on the interval's arithmetic, not on the statistic.** A CI whose lower bound is ≥ 0 is a wholly non-negative interval and cannot contain a negative value. Containment is then satisfiable only degenerately — the flipped `-.00` clipping the interval's zero edge — which is evidence of a **mis-pairing**, not of corruption. Refusing the pairing when `lo >= 0` covers every non-negative statistic that can sit beside a non-negative CI (F, χ², R², η², odds ratios, variance components) without enumerating any of them, and it cannot disarm a genuine recovery: a truly negative estimate always has a CI that admits negatives.
+
+All **31** pre-existing W0d tests stay green, including the efendic B-column recoveries the rule exists for. Suite: **1962 passed**, 3 xfail (the P1 table defects stay armed).
+
+Companion to the **rejected** `W0b-col` recovery (v2.4.119 notes): that one failed because column consensus is not per-record evidence. This one shows the converse — per-record containment *is* the right kind of evidence, but only when the record being paired is the right one. A containment test silently assumes the CI belongs to the token it is paired with; verify that assumption is arithmetically possible first.
+
+Found by the run-5 canary audit. Ground truth: the AI multimodal gold, cross-checked against both docpluck text channels.
+
+
 ## [2.4.122] — 2026-08-04
 
 **A published scale bound was being replaced by an operator.** `NORMALIZATION_VERSION` → `1.9.47`.
