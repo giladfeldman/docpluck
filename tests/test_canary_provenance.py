@@ -42,11 +42,28 @@ CACHE_CHECK = os.path.join(
 
 
 def _canary_papers():
+    # canary.json lives under .claude/, which is deliberately NOT tracked in
+    # this PUBLIC repo (see .gitignore + /docpluck-cleanup Section 0). A public
+    # clone therefore has no canary config, and the canary-dependent tests here
+    # must SKIP rather than error. This helper is called at COLLECTION time by
+    # the parametrize below, so it must never raise -- an exception here takes
+    # the module's three config-independent unit tests down with it.
+    if not os.path.exists(CANARY_JSON):
+        return []
     with open(CANARY_JSON, encoding="utf-8") as f:
         c = json.load(f)
     papers = list(c.get("canary", {}).get("fixed", []) or [])
     papers += list(c.get("canary", {}).get("rotating_pool", []) or [])
     return papers
+
+
+def _require_canary_json():
+    """Skip a canary-config-dependent test when the config isn't present."""
+    if not os.path.exists(CANARY_JSON):
+        pytest.skip(
+            "canary.json not present (untracked in the public repo) -- "
+            "canary provenance is verified only in the maintainer's working tree"
+        )
 
 
 # --- unit tests of the provenance helper ----------------------------------
@@ -76,6 +93,7 @@ def test_no_expected_sha_is_not_enforced():
 
 
 def test_every_canary_paper_has_pinned_sha():
+    _require_canary_json()
     papers = _canary_papers()
     assert papers, "canary.json declares no canary papers"
     for p in papers:
