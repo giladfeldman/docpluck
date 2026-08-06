@@ -8,25 +8,59 @@ venv/
 .pytest_cache/
 *.egg
 
-# Local worktree directories (used by superpowers:using-git-worktrees and
-# the Claude Agent harness)
-.worktrees/
-.claude/worktrees/
+# =====================================================================
+# THIS IS A PUBLIC REPO (github.com/giladfeldman/docpluck, MIT).
+#
+# Only the docpluck LIBRARY and its PUBLIC documentation belong here.
+# Internal working material — session logs, cross-project correspondence,
+# agent/skill definitions, backlogs, plans, specs — must NEVER be
+# committed. It leaks local filesystem paths, private-repo internals,
+# unreleased plans, and other projects' architecture to the whole world.
+#
+# Purged from the full history on 2026-08-06 (259 files). Do not
+# re-introduce. See LESSONS.md L-006 and /docpluck-cleanup check 0.
+#
+# The PUBLIC doc surface is exactly:
+#   README.md  docs/README.md  docs/NORMALIZATION.md
+#   docs/DESIGN.md  docs/BENCHMARKS*.md  CHANGELOG.md  LICENSE
+# Anything else under docs/ is internal by default.
+# =====================================================================
 
-# Private benchmark suite (real-corpus results + scripts with hardcoded paths
-# to CitationGuard / MetaESCI / PSPB files — not for public view).
+# --- Agent / skill working directories (never public) ---
+.claude/
+.worktrees/
+.codex/
+.cursor/
+
+# --- Internal session logs, plans, specs, backlogs ---
+docs/superpowers/
+docs/HANDOFF_*
+docs/FINDINGS_*
+docs/TRIAGE_*
+docs/PROMPTS_*
+docs/ITERATION_*
+docs/LIBRARY_*
+HANDOFF_*
+HANDOVER_*
+FINDINGS_*
+TRIAGE_*
+TODO.md
+todo.md
+
+# --- Cross-project / cross-team correspondence (never public) ---
+# Requests from and replies to ESCImate, MetaESCI, Scimeto, CitationGuard,
+# and the private docpluckapp repo.
+REQUEST_*
+REQUESTS_*
+REPLY_*
+REPLIES_*
+CUSTOMER_UPDATE_*
+
+# --- Private benchmark suite (real-corpus results + hardcoded local paths) ---
 benchmarks/
 
-# Archive of internal design specs and cross-team handoff drafts.
+# --- Archive of internal design specs and cross-team handoff drafts ---
 archive/
-
-# v1.6.1 surgical-fix brainstorm — content was rolled into the v2.0.0
-# release (not a separate release artifact). Local working docs only.
-docs/superpowers/specs/2026-05-06-section-identification-v1.6.1-surgical-fix-design.md
-docs/superpowers/plans/2026-05-06-section-identification-v1.6.1-surgical-fix.md
-
-# ESCImate -> Docpluck cross-team request doc (private handoff)
-REQUESTS_FROM_ESCIMATE.md
 
 # PDFs are never committed to this public MIT repo. Test fixtures use the
 # manifest-with-skip pattern via tests/conftest.py and tests/fixtures/structured/MANIFEST.json
@@ -48,8 +82,8 @@ tmp_*.py
 # Verification harness outputs (scripts/harness) — extraction artifacts, not committed.
 verify_out/
 
-# Canary-audit persistent open-finding ledger (per-machine cross-run audit
-# STATE written by ~/.claude/skills/_shared/iterate-loop/canary-audit.sh). It is
-# git-SHA-keyed but reflects local audit history, so it's machine-local state —
-# not committed (canary.json, the sibling CONFIG, IS tracked).
-.claude/skills/_project/canary-findings-ledger.json
+# NOTE: the whole of .claude/ is ignored above (public-repo rule), which
+# covers the project skills, canary.json, and the machine-local
+# canary-findings-ledger.json written by canary-audit.sh. Those files
+# still live on disk and the skills still run — they are simply never
+# committed to this public repo.
