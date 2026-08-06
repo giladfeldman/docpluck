@@ -1,6 +1,6 @@
 """Cell-cleaning pipeline for academic-table cell grids.
 
-Ported from the 2026-05 splice spike (docs/superpowers/plans/spot-checks/
+Ported from the 2026-05 splice spike (an internal design doc
 splice-spike/splice_spike.py) into the library as part of v2.3.0
 (TABLE_EXTRACTION_VERSION 2.1.0).
 
@@ -28,7 +28,7 @@ The pipeline (orchestrated in :func:`cells_grid_to_html`):
    as ``<tr><td colspan="N"><strong>...</strong></td></tr>``.
 
 Returns ``""`` for tables with fewer than 2 rows after cleaning, per the
-v2.3.0 spec (`docs/HANDOFF_2026-05-11_visual_review_findings.md`).
+v2.3.0 spec (`an internal handoff doc (2026-05-11)`).
 """
 
 from __future__ import annotations

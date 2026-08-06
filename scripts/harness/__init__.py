@@ -8,7 +8,7 @@ whole-corpus regression checks against a committed verdict baseline.
 Built 2026-05-17 after a post-mortem found the prior loop verified the library
 in isolation (never the app), per-cycle/per-target only (no corpus-wide
 regression backcheck), against snapshot baselines that could themselves be
-broken. See ``docs/ITERATION_VERIFICATION_LESSONS.md``.
+broken. See ``an internal iteration doc``.
 
 Modules:
 - ``corpus``  — discover corpus documents (PDF/DOCX/HTML) → committed manifest.

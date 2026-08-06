@@ -176,7 +176,7 @@ def test_t3_legit_fallback_table_survives(chan_md: str):
 # prose. The former XFAIL guard below is now a REAL assert (it XPASS-alerted
 # the moment the fix landed, as designed); the amc_1/xiao guards pin the two
 # truncation shapes the prototype walk regressed on. See
-# docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md.
+# an internal findings doc (2026-07-04).
 
 
 @requires_pdftotext

@@ -5,9 +5,12 @@
 # (visible even under `python -s` / PYTHONNOUSERSITE — the failure mode that made
 # the canary report "No module named docpluck"), then (re)installs the full
 # docpluck dependency set there. Verification is done by the caller afterwards.
+# Defaults are DERIVED, never hardcoded to one machine's user or checkout
+# (this is a public repo; see LESSONS.md L-010). $Repo resolves to this
+# script's own parent repo, so it is correct from any clone location.
 param(
-  [string]$User = "filin",
-  [string]$Repo = "C:\Users\filin\Vibe\MetaScienceTools\docpluck",
+  [string]$User = $env:USERNAME,
+  [string]$Repo = (Split-Path -Parent $PSScriptRoot),
   [string]$Py   = "C:\Python314\python.exe"
 )
 $ErrorActionPreference = "Continue"

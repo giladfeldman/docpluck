@@ -448,7 +448,7 @@ def _f0_strip_running_and_footnotes(
     # headers / footers / footnotes; those lines are then stripped from the
     # pdftotext body. Sourcing the body from pdftotext lifts the held-out PMC
     # token-F1 mean from ~0.745 (span rebuild) to ~0.77 (pdftotext + F0 strip),
-    # on par with raw pdftotext — see docs/HANDOFF_2026-06-13_*.md and L-007.
+    # on par with raw pdftotext — see an internal handoff doc (2026-06-13) and L-007.
     def _key(s: str) -> str:
         return " ".join(s.split())
 
@@ -779,7 +779,7 @@ def _pair_two_column_bibliography(refs_text: str) -> str:
 
 
 # ── H0 / T0 / P0 / H1 : document-shape strips (NORMALIZATION_VERSION 1.8.0) ──
-# Ported from docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py
+# Ported from an internal design doc
 # (iter-20, iter-25, iter-26, iter-27). These run BEFORE the unicode/whitespace
 # steps so the line-level regexes match raw pdftotext output.
 
@@ -2844,7 +2844,7 @@ def recover_times_interaction_glyph_in_prose(text: str) -> str:
 # cannot reach (NORMALIZATION_VERSION 1.9.43, 2026-07-04). Same broken-ToUnicode
 # AdvPS… font as W0i/W0k (the `×` glyph decodes as `3`). Both were the residual
 # efendic_2022_affect findings left open after v2.4.112 (W0k), documented in
-# docs/FINDINGS_2026-07-03_efendic_glyph_in_prose_channel.md.
+# an internal findings doc (2026-07-03).
 #
 #   A · FACTORIAL DESIGN NOTATION — `<digit> (…) 3 <digit> (…) [3 <digit> (…)]`
 #       "2 (Between-subject factor--Direction: …) 3 2 (Between-subject factor--

@@ -1,6 +1,6 @@
 """Tests for the v1.8.0 document-shape strip passes: H0, T0, P0.
 
-Ported from docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py
+Ported from an internal design doc
 (iter-25 / iter-26 / iter-27 / iter-33 / iter-31 blocks).
 """
 

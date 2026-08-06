@@ -64,7 +64,7 @@ archive/
 
 # PDFs are never committed to this public MIT repo. Test fixtures use the
 # manifest-with-skip pattern via tests/conftest.py and tests/fixtures/structured/MANIFEST.json
-# referencing PDFs in the local ~/Dropbox/Vibe/ corpus.
+# referencing PDFs in the local corpus ($VIBE_ROOT, default ~/Vibe).
 *.pdf
 
 # Verifier-output artifacts from scripts/verify_corpus.py + ad-hoc test

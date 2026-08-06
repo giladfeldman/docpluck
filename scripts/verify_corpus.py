@@ -5,7 +5,7 @@ For each paper:
   - Run docpluck.render_pdf_to_markdown
   - Compute health metrics on the output
   - Compare against the spike's known-good baseline in
-    docs/superpowers/plans/spot-checks/splice-spike/outputs[-new]/
+    an internal design doc[-new]/
   - Print a per-paper PASS/WARN/FAIL line and a summary
 
 Metrics computed per paper:
@@ -43,8 +43,8 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_PDFS = REPO_ROOT.parent / "PDFextractor" / "test-pdfs"
 SPIKE_OUT_DIRS = [
-    REPO_ROOT / "docs/superpowers/plans/spot-checks/splice-spike/outputs",
-    REPO_ROOT / "docs/superpowers/plans/spot-checks/splice-spike/outputs-new",
+    REPO_ROOT / "an internal design doc",
+    REPO_ROOT / "an internal design doc",
 ]
 
 

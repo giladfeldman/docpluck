@@ -1,7 +1,7 @@
 """
 docpluck.sections — section identification for academic papers.
 
-See docs/superpowers/specs/2026-05-06-section-identification-design.md.
+See an internal design doc.
 
 Public API: extract_sections, SectionedDocument, Section, SectionLabel,
 Confidence, DetectedVia, SECTIONING_VERSION.

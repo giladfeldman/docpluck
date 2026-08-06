@@ -299,7 +299,7 @@ Internally the two functions share the PDF parse via the v1.6.0 `LayoutDoc` abst
 
 Confidence is scored in two stages — `score_table()` returns the raw pre-clamp value (used for the isolation fall-back decision at threshold 0.4); `clamp_confidence()` applies per-rendering floor/ceiling to produce the user-visible `Table.confidence`. The separation matters: the whitespace floor is 0.4, equal to the threshold — clamping inside `score_table()` would silently absorb the fall-back signal.
 
-See `docs/superpowers/specs/2026-05-06-table-extraction-design.md` for full data model and detection algorithm.
+See `an internal design doc` for full data model and detection algorithm.
 
 ---
 

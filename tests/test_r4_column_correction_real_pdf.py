@@ -16,7 +16,7 @@ rendered abstract is therefore word-intact; the structured-abstract labels stay
 in document order and the Key Points block is present without the correction.
 Properly de-interleaving this page (a full-width title/byline band crossing the
 two abstract/sidebar columns) requires the per-band Step 2 region-aware crop
-(`docs/superpowers/specs/2026-06-08-rc1-region-aware-column-architecture.md`),
+(`an internal design doc`),
 which can de-interleave WITHOUT cutting words. Until then word-integrity wins.
 
 Real-PDF (rule 0d) + structural-signature general fix (rule 16). Closes

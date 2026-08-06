@@ -34,8 +34,8 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_PDFS = REPO_ROOT.parent / "PDFextractor" / "test-pdfs"
 SPIKE_OUT_DIRS = [
-    REPO_ROOT / "docs/superpowers/plans/spot-checks/splice-spike/outputs",
-    REPO_ROOT / "docs/superpowers/plans/spot-checks/splice-spike/outputs-new",
+    REPO_ROOT / "an internal design doc",
+    REPO_ROOT / "an internal design doc",
 ]
 RENDERS_DIR = REPO_ROOT / "tmp" / "renders_v2.4.0"
 

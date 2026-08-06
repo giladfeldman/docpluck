@@ -11,8 +11,8 @@ any consumer that scans for references *after* the heading silently misses them.
 
 Reported by citationguard-iterate (2026-06-07, O5: "36 chen refs stranded before
 the References header"). Root cause + fix are documented in
-``docs/superpowers/handoffs/2026-06-07-text-extraction-defects-from-citationguard-iterate.md``
-and ``docs/superpowers/specs/2026-06-07-ip_feldman-B4-R4-column-interleave-diagnosis.md``.
+``an internal design doc``
+and ``an internal design doc``.
 
 The fix (general, keyed on a STRUCTURAL SIGNATURE — reference-list entries
 appearing before their own ``References`` heading on a page, never on paper

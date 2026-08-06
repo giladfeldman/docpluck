@@ -12,7 +12,7 @@ The renderer is built on top of the existing library primitives:
 
 After the markdown is assembled the file runs through a sequence of
 *markdown-level* post-processors ported from the iter-23 → iter-34
-splice-spike (docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py).
+splice-spike (an internal design doc).
 These passes fix concrete quality issues observed across a 26-paper corpus:
 JAMA Key Points sidebars, multi-line FIGURE / TABLE captions, compound
 section headings (``CONCLUSIONS AND RELEVANCE``), numbered subsection
@@ -122,7 +122,7 @@ def _pretty_label(label: str) -> str:
     return s.replace("_", " ").title()
 
 
-# v2.3.1 Bug 6 fix (`docs/HANDOFF_2026-05-11_visual_review_findings.md`):
+# v2.3.1 Bug 6 fix (`an internal handoff doc (2026-05-11)`):
 # papers print short publication-format badge text immediately below the
 # title (e.g. "Registered Report", "Pre-Registered", "Stage 1 Registered
 # Report"). Without this pass they render as a stray plain-text line just
@@ -5557,7 +5557,7 @@ def _apply_title_rescue(out: str, title_text: str) -> str:
 # connector (``of``, ``from``, ``for``, ``the``, ``and``, etc.) is almost
 # certainly truncated mid-sentence by the layout-title font-boundary
 # filter. Better to skip rescue than render a fragment as ``# Title``.
-# Per `docs/HANDOFF_2026-05-11_visual_review_findings.md` Bug 5.
+# Per `an internal handoff doc (2026-05-11)` Bug 5.
 _TITLE_CONNECTOR_TAIL_WORDS = frozenset({
     "of", "from", "for", "the", "and", "or", "to", "with", "on", "at",
     "by", "in", "as", "is", "a", "an", "but", "into", "onto", "upon",
@@ -5774,7 +5774,7 @@ def _render_sections_to_markdown(
     # table/figure caption text inside ``text``.
     #
     # v2.3.0 fix for Bug 3 (figures spliced before abstract; per
-    # ``docs/HANDOFF_2026-05-11_visual_review_findings.md``): the previous
+    # ``an internal handoff doc (2026-05-11)``): the previous
     # ``text.find(cap)`` was too fragile — caption text was extracted with
     # newlines flattened to spaces by ``_extract_caption_text``, but
     # ``sectioned.normalized_text`` preserves paragraph breaks. The exact-

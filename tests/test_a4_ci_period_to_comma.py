@@ -8,7 +8,7 @@ substitution / pdftotext glyph map). Downstream parsers cannot disambiguate
 `[d.d.d.d]` → `[d.d, d.d]` and likewise for parens.
 
 Triage source:
-docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md → cluster EC-T3.
+an internal triage doc (2026-05-14) → cluster EC-T3.
 """
 
 from __future__ import annotations

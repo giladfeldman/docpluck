@@ -7,7 +7,7 @@ Fixtures synthesize the 6 canary table shapes from the ESCIcheck handoffs
 ``list[Cell]`` matching docpluck's `Table` schema, fed through
 `flatten_table` and asserted at the sentence + fields level.
 
-Triage: `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` → cluster EC-T1.
+Triage: `an internal triage doc (2026-05-14)` → cluster EC-T1.
 """
 
 from __future__ import annotations

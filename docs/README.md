@@ -133,7 +133,7 @@ docpluck extract paper.pdf --structured --html-tables-to ./out/
 
 `extract_pdf()` (the v1 text-only path) is unchanged. New consumers opt in to the structured path; existing consumers see no behavioral change.
 
-See `docs/superpowers/specs/2026-05-06-table-extraction-design.md` for the full schema and design rationale.
+See `an internal design doc` for the full schema and design rationale.
 
 ---
 
