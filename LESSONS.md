@@ -338,7 +338,73 @@ Cite (SHIPPED v2.4.4): `docpluck/tables/flatten.py::_infer_anova_eta2_hint` +
 `_inline_stat_field`, `docpluck/tables/cell_cleaning.py::_is_fragment_cell` (bracket-CI
 tail). REVERTED (queued): the `captions.find_caption_matches` char_start advance +
 `whitespace._whitespace_grid_is_clean` / `_trim_trailing_prose_rows` gates.
-See `docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md`, CHANGELOG v2.4.98.
+See CHANGELOG v2.4.98. (The originating triage doc is internal — see L-010.)
+
+---
+
+## L-010 — This repo is PUBLIC; internal working material must never be tracked here
+
+**Surface:** On 2026-08-06 the user noticed `github.com/giladfeldman/docpluck`
+was serving a large volume of internal `.md` files to the world. A scan found
+**259 tracked internal files**: cross-project correspondence with downstream
+consumers (`REPLY_FROM_*`, `REQUEST_*`, `CUSTOMER_UPDATE_*`), 98 session
+handoff / findings / triage logs, 123 `docs/superpowers/` plans, specs and
+spike outputs, 23 `.claude/` agent-skill definitions, and the backlog. They
+leaked absolute local filesystem paths, the **private** app repo's internals,
+unreleased plans, and other projects' architecture. No credentials leaked.
+
+All 259 were purged from the full history (478 commits, 126 tags) with
+`git-filter-repo` and force-pushed; commit *messages* were redacted in the
+same rewrite.
+
+**Why it happened — the part worth remembering.** The cleanup skill had a
+`.gitignore` audit and had passed over these files repeatedly without flagging
+them, because:
+
+1. **It scanned for known-bad filenames.** A denylist cannot catch a category
+   that should not exist — the next `HANDOFF_2026-09-01_*.md` is a new name the
+   old rule never matched. The fix is an **allowlist**: assert every tracked
+   path is on the list of what may be public, and treat anything else as a
+   failure. Denylist thinking is why three cleanups reported "clean".
+2. **It named these files as things to PRESERVE** — the checklist literally
+   said "ASK before deleting these — they are intentional cross-project
+   communication" and "NEVER delete spec/plan files … historical record". Both
+   are true and both are irrelevant: **preserve ≠ publish.** Keep the content
+   somewhere private; keep it out of the public repo. A rule written to prevent
+   data loss silently authorized data exposure.
+3. **`.gitignore` had per-file entries**, added reactively one at a time
+   (`REQUESTS_FROM_ESCIMATE.md`, two specific spec paths). Each was correct and
+   none generalized. Ignore rules must be **categorical**.
+
+**Rules:**
+- Only the library, its tests/tooling, CI, and the public doc set
+  (`README`, `docs/README`, `docs/DESIGN`, `docs/NORMALIZATION`,
+  `docs/BENCHMARKS*`, `CHANGELOG`, `LICENSE`) may be tracked here. Everything
+  else under `docs/` is internal by default. `CLAUDE.md` and `LESSONS.md` are
+  public by explicit user decision (2026-08-06).
+- **`git rm --cached` is only half a fix.** It cleans the tip; the file stays
+  readable at every prior commit and tag on GitHub. Never report an exposure as
+  "removed" when only the tip changed — say plainly that a history rewrite is
+  required, and that clones/forks will break.
+- **Commit messages leak too** — they cite purged filenames, other projects,
+  and local paths. Redact them in the *same* rewrite (`--replace-message`); a
+  second pass means a second force-push.
+- **A secret found in a public repo must be ROTATED, not just purged.** A
+  history rewrite does not un-leak a key that was already public.
+- Before any rewrite: `git bundle create ../backup.bundle --all`. After: verify
+  zero internal paths in `git log --all --name-only`, all tags resolve, every
+  kept file's blob SHA is unchanged, and the test suite passes.
+
+**Known accepted residue** (deliberate, re-stated every run so it stays conscious):
+`.github/workflows/bump-app-pin.yml` names the private app repo because it must
+push a pin bump there; `tests/test_metaesci_followups.py` and
+`tests/test_request_09_reference_normalization.py` embed a downstream
+consumer's name in public test filenames.
+
+Cite: `.gitignore` (categorical block + rationale header), `/docpluck-cleanup`
+**Section 0 — PUBLIC-REPO EXPOSURE GATE** (blocking, allowlist-based),
+`tests/test_canary_provenance.py` (must SKIP when the untracked `canary.json`
+is absent, not error at collection).
 
 ---
 

@@ -1,6 +1,6 @@
 """Unit tests for docpluck.tables.cell_cleaning.
 
-Ported from docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py
+Ported from an internal design doc
 as part of the v2.3.0 Section F port. Synthetic inputs only — no PDF I/O.
 """
 

@@ -1,5 +1,5 @@
 """Bundled-cycle tests for the 2026-05-23 residual handoff
-(``docs/superpowers/handoffs/2026-05-23-residual-after-iterate-spine-cycles-1-3.md``).
+(``an internal design doc``).
 
 Covers §C P0r-F, §B-new-1..5, §A R3a, §A R3b, §A R5, §A R1, §A R4.
 Real-PDF regression tests use the manifest-with-skip pattern: fixtures live

@@ -21,7 +21,7 @@ real-PDF tests across 4 files**, because a real row can legitimately be TALL: xi
 Table 4's row 2 spans **94.4pt** as a multi-line stacked data block, and a hard anchor
 cap shatters it. The previous-word test under-splits; a naive anchor cap over-splits.
 Neither rule alone is correct — see
-``docs/FINDINGS_2026-08-04_row_cluster_chain_merge.md`` for the measured evidence and
+``an internal findings doc (2026-08-04)`` for the measured evidence and
 three candidate directions.
 
 The chain-merge test below is therefore ``xfail(strict)``: it pins a REAL, still-open
@@ -52,7 +52,7 @@ def _w(top: float, x0: float = 0.0, height: float = 9.5) -> dict:
         "anchor-relative fix was attempted and REVERTED: it broke 9 real-PDF tests "
         "because a real row can legitimately be tall (xiao T4 row 2 spans 94.4pt as a "
         "multi-line stacked block). Do NOT loosen this assertion to make it pass — see "
-        "docs/FINDINGS_2026-08-04_row_cluster_chain_merge.md. strict=True: a correct "
+        "an internal findings doc (2026-08-04). strict=True: a correct "
         "fix XPASSes loudly; make it a plain assert then."
     ),
 )

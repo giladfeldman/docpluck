@@ -1,6 +1,6 @@
 """Stable CLI for rendering a single docpluck canary paper at current library HEAD.
 
-Used by `~/.claude/skills/_shared/iterate-loop/canary-audit.sh` to produce the
+Used by `~/an internal skill file` to produce the
 artifact the audit subagent compares against the AI gold.
 
 This file is the STABLE entry point. The ad-hoc tmp/render_canary_cycle1.py is

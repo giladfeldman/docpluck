@@ -9,7 +9,7 @@ internal library call.
 Why the app and not ``render_pdf_to_markdown`` directly: the 2026-05-17
 post-mortem found defects living in the app↔library gap (stale pins, caches,
 level defaults) that a library-only test cannot see. See
-``docs/ITERATION_VERIFICATION_LESSONS.md``.
+``an internal iteration doc``.
 
 Idempotent + resumable: a document whose source bytes and the service's
 docpluck version are unchanged is skipped unless ``--force``. An errored

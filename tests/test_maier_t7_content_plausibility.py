@@ -21,7 +21,7 @@ just never consults it. Widening that gate wholesale was already tried and rejec
 belongs at SELECTION time as a relative judgement between candidates.
 
 Full analysis + candidate fix directions:
-``docs/FINDINGS_2026-08-04_pick_better_table_ignores_content.md``.
+``an internal findings doc (2026-08-04)``.
 
 This test is `xfail(strict)`: it pins REAL, gold-verified TEXT-LOSS that is not yet
 safely fixable (the fix is a pairing-class change, and this project's history shows
@@ -59,7 +59,7 @@ _GOLD_T7_VALUES = ["3.47", "2.91", "2.94", "3.11"]
         "grid from the auto-detect path, because _pick_better_table selects on shape "
         "only and never checks content plausibility. Fix is a pairing-class change "
         "requiring a 101-PDF guard-diff + AI-gold canary sweep — see "
-        "docs/FINDINGS_2026-08-04_pick_better_table_ignores_content.md. Do NOT weaken "
+        "an internal findings doc (2026-08-04). Do NOT weaken "
         "this assertion. strict=True: a correct fix XPASSes loudly."
     ),
 )

@@ -5,7 +5,7 @@ A regression-safe, automated extraction-and-inspection harness. It drives the
 saves every output view for every normalization level, and gates on
 deterministic whole-corpus regression checks plus AI-gold deep inspection.
 
-Built 2026-05-17 after a post-mortem (`docs/ITERATION_VERIFICATION_LESSONS.md`)
+Built 2026-05-17 after a post-mortem (`an internal iteration doc`)
 found the prior loop verified the library in isolation, per-cycle/per-target
 only, against snapshot baselines that could themselves be broken.
 

@@ -1,6 +1,6 @@
 """Tests for v2.3.0 code-only Rendered-view bug fixes.
 
-Per `docs/HANDOFF_2026-05-11_visual_review_findings.md`:
+Per `an internal handoff doc (2026-05-11)`:
 - Bug 4: caption text concatenates across figure boundaries.
 - Bug 5: layout title rescue produces truncated title ending in
   a connector word like "of".

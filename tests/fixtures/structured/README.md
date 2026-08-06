@@ -4,9 +4,9 @@ This directory does NOT contain PDF files. PDFs are gitignored repo-wide.
 
 The fixture corpus is referenced via `MANIFEST.json`, which lists each
 fixture by category, expected table/figure counts, and `source_path` —
-a path relative to `~/Dropbox/Vibe/` pointing at the real PDF in the
-local Dropbox corpus (typically under
-`MetaScienceTools/PDFextractor/test-pdfs/<style>/<filename>.pdf`).
+a path relative to the local corpus root pointing at the real PDF. The
+root is resolved by `tests/conftest.py` as `$VIBE_ROOT`, falling back to
+`~/Vibe`; tests SKIP cleanly when the corpus is absent (CI, public clones).
 
 Tests load PDFs via `MANIFEST.json` lookups. When a `source_path` is
 not available on the running machine (CI, fresh clone, missing

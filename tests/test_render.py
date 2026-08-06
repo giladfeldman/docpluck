@@ -1,7 +1,7 @@
 """Tests for docpluck.render — the v2.2.0 markdown render entry point and
 its markdown-level post-processors.
 
-Ported from docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py
+Ported from an internal design doc
 (iter-29 / iter-32 / iter-34 / iter-23 / iter-20 blocks).
 """
 

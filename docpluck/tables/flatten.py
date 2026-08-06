@@ -35,7 +35,7 @@ The two outputs share a single code path — the inline block is *generated
 from* the JSONL records, so they cannot drift relative to each other.
 
 ESCIcheck handoff source: `ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md`.
-Triage cluster: `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` → EC-T1.
+Triage cluster: `an internal triage doc (2026-05-14)` → EC-T1.
 """
 
 from __future__ import annotations

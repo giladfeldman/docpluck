@@ -65,7 +65,7 @@ B1_LIVE_FIXTURES = [
                 "caption at grid row 4 (the guard's original defence case, intact). "
                 "Do NOT loosen thresholds to make this pass; the fix is to trim the "
                 "region's prose edges. See "
-                "docs/FINDINGS_2026-07-04_rct_caption_tail_walk_textloss.md and the "
+                "an internal findings doc (2026-07-04) and the "
                 "active TRIAGE. strict=True: when the region prose-trim lands this "
                 "XPASSes loudly — flip it to a plain assert in that cycle."
             ),

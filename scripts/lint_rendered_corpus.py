@@ -5,7 +5,7 @@ upstream filters in normalize.py + render.py. Each match is a FAIL — the
 defect class should have been stripped before reaching .md.
 
 Five signatures, from the 2026-05-13 xiao_2021_crsp + maier_2023_collabra
-audit (see docs/HANDOFF_2026-05-13_apa_50_expansion.md):
+audit (see an internal handoff doc (2026-05-13)):
 
   RH — running-header `Q. XIAO ET AL.` / `Q.M. SMITH ET AL`
   CT — `CONTACT <Name> <email>` Taylor & Francis footer

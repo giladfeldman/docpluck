@@ -135,7 +135,7 @@ def extract_pdf(
                 # FFFD-containing word in pdftotext, find a same-shape
                 # candidate in pdfplumber's output and substitute. This
                 # is the 50-LOC fix from
-                # ``docs/HANDOFF_2026-05-11_visual_review_findings.md``
+                # ``an internal handoff doc (2026-05-11)``
                 # \u2014 "18 residual FFFDs in Adelina body".
                 patched, n_patched = _patch_fffds_word_by_word(text, recovered)
                 if n_patched > 0:
