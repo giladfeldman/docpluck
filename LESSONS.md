@@ -394,6 +394,20 @@ them, because:
 - Before any rewrite: `git bundle create ../backup.bundle --all`. After: verify
   zero internal paths in `git log --all --name-only`, all tags resolve, every
   kept file's blob SHA is unchanged, and the test suite passes.
+- **Verify against a fresh `--mirror` clone of the REMOTE, not the local repo.**
+  The local repo is what you just rewrote; it cannot testify about what GitHub
+  still serves. This is how the survivors below were caught.
+- **A force-push does not clean everything.** Three server-side survivors:
+  **(1) stale remote branches** — 4 existed here, all fully merged into main, all
+  still serving every purged file until deleted; **(2) `refs/pull/N/head`** —
+  GitHub PR refs that **git cannot delete and force-push does not touch**. A
+  merged PR pins its original commits forever and their blobs stay readable at
+  `/blob/<sha>/<path>` and via the API. A *mirror* clone reveals them; a normal
+  clone does not, so a normal clone falsely reports CLEAN. **Only GitHub Support
+  can purge them.** **(3) forks** — separate repos a rewrite never reaches.
+  On 2026-08-06 `main` + all 126 tags came back clean while `refs/pull/1/head`
+  still served 126 internal files, `TODO.md` among them — verified readable.
+  Cleaning main and the tags but leaving a PR ref is **PARTIAL**, not done.
 
 **Known accepted residue** (deliberate, re-stated every run so it stays conscious):
 `.github/workflows/bump-app-pin.yml` names the private app repo because it must
