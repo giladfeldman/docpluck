@@ -49,7 +49,6 @@ from docpluck.batch import (
 from docpluck.version import (
     _ENGINE_MODULES,
     _PDFTOTEXT_VERSION_RE,
-    _distribution_owning_module,
     _resolve_engine_version,
     _resolve_pdftotext,
     resolve_pdftotext_executable,

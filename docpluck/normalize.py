@@ -14,7 +14,6 @@ import re
 import unicodedata
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class NormalizationLevel(str, Enum):

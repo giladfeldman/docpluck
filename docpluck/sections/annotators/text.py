@@ -202,7 +202,6 @@ def _is_fully_isolated_heading(text: str, line_start: int, heading_end: int) -> 
     k = line_end + 1
     while k < len(text):
         # Skip whitespace at line start
-        line_content_start = k
         while k < len(text) and text[k] in " \t":
             k += 1
         if k >= len(text):

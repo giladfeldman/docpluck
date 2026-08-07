@@ -9,6 +9,7 @@ Confidence, DetectedVia, SECTIONING_VERSION.
 
 from typing import Literal
 
+from ..normalize import NormalizationLevel
 from .taxonomy import SectionLabel, Confidence, DetectedVia
 from .types import Section, SectionedDocument
 
@@ -32,7 +33,7 @@ def extract_sections(
     text: str | None = None,
     source_format: Literal["pdf", "docx", "html"] | None = None,
     preserve_math_glyphs: bool = False,
-    normalization_level: "NormalizationLevel | None" = None,
+    normalization_level: NormalizationLevel | None = None,
     _dropped_minus_layout=None,
 ) -> SectionedDocument:
     """Public entry point. Either pass `file_bytes` (with optional
@@ -56,7 +57,6 @@ def extract_sections(
             ``render_pdf_to_markdown``, where it was accepted, documented as
             forwarded, and silently discarded.)
     """
-    from ..normalize import NormalizationLevel
     level = (
         NormalizationLevel.academic
         if normalization_level is None
@@ -108,7 +108,7 @@ def extract_sections(
         # detection, sections/core.py for synthesis, sections/taxonomy.py
         # for canonical variants and numbering prefixes.
         from ..extract import extract_pdf
-        from ..normalize import normalize_text, NormalizationLevel
+        from ..normalize import normalize_text
         from .annotators.text import annotate_text
         from .core import partition_into_sections
 

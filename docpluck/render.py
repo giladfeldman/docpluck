@@ -51,7 +51,6 @@ from .normalize import (
 )
 from .sections import extract_sections
 from .tables.flatten import (
-    FlattenedRow,
     flatten_table,
     render_flattened_inline,
 )
@@ -4366,7 +4365,6 @@ def _promote_study_subsection_headings(text: str) -> str:
         if not stripped or stripped.startswith("#"):
             out.append(line)
             continue
-        promoted_h2 = False
         # Cycle 15d: inline Roman-numeral-prefixed ALL-CAPS heading
         # ("I. INTRODUCTION", "V.: SUPPLEMENTARY INDEX"). The `.`/`:` after
         # the numeral blocks the bare ALL-CAPS regex, so handle this form
@@ -4377,7 +4375,6 @@ def _promote_study_subsection_headings(text: str) -> str:
                 out.append("")
             out.append(f"## {stripped}")
             out.append("")
-            promoted_h2 = True
         elif _ALL_CAPS_SECTION_HEADING_RE.match(stripped) and _is_safe_all_caps_promote(
             lines, i, stripped
         ):
@@ -4421,7 +4418,6 @@ def _promote_study_subsection_headings(text: str) -> str:
             else:
                 out.append(f"## {stripped}")
             out.append("")
-            promoted_h2 = True
         elif _STUDY_SUBSECTION_RE.match(stripped) or _OVERVIEW_HEADING_RE.match(stripped):
             # Promote with blank-line padding so downstream tools see it as
             # a standalone heading paragraph. Avoid double blank lines.

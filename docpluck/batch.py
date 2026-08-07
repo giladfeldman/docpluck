@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from dataclasses import dataclass, field, asdict, fields
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Iterable, Optional, Union
 

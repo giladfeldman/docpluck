@@ -4,7 +4,6 @@ Quality Scoring
 From CitationGuard's _check_text_quality() + MetaESCI's artifact detection.
 """
 
-import re
 
 COMMON_WORDS = {
     "the", "and", "for", "that", "with", "this", "from", "are", "was",
