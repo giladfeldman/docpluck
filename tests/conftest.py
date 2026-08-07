@@ -17,6 +17,28 @@ import pytest
 os.environ.setdefault("PYTHONUTF8", "1")
 
 
+def pytest_addoption(parser):
+    """Flags for the v2 backwards-compatibility checksum gate.
+
+    The gate used to store the full ``extract_pdf()`` text of 12 published
+    papers under ``tests/snapshots/`` — 984 KB of somebody else's article,
+    tracked in a PUBLIC repo. A sha256 gives the identical byte-for-byte
+    guarantee in ~1 KB, so the text is gone. What the text bought that a hash
+    does not is *diff context on failure*; ``--snapshot-explain`` regenerates
+    that locally, on demand, from the PDF that is already on the machine.
+    """
+    g = parser.getgroup("docpluck snapshots")
+    g.addoption(
+        "--snapshot-update", action="store_true", default=False,
+        help="rewrite tests/snapshots/checksums.json from a live extract run",
+    )
+    g.addoption(
+        "--snapshot-explain", action="store_true", default=False,
+        help="on mismatch, dump the actual extract_pdf() text to tmp/snapshots/ "
+             "so it can be diffed locally (never committed)",
+    )
+
+
 def pdftotext_available():
     """Check if pdftotext binary is on PATH."""
     return shutil.which("pdftotext") is not None

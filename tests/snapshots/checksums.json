@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "algorithm": "sha256",
+  "encoding": "utf-8",
+  "newline": "\n",
+  "captured_from": "docpluck v2.4.126",
+  "fixtures": {
+    "amj_lattice": {
+      "sha256": "b00654d9c2fc5384a0fdab08e5104dff5b3e31d27be04da1843b474e573838af",
+      "bytes": 127103,
+      "method": "pdftotext_default"
+    },
+    "apa_chan_feldman_lineless": {
+      "sha256": "496d0ce235426980ec5c5e3eac35dc056275f2e0fdd5182c529b77debafcc1b0",
+      "bytes": 82084,
+      "method": "pdftotext_default"
+    },
+    "apa_chen_jesp_lineless": {
+      "sha256": "ea799af9e7e8e647ff3c757dcc1f9d26327d10f8002139b2b7e4fee8bd5192a5",
+      "bytes": 137545,
+      "method": "pdftotext_default+column_corrected:19"
+    },
+    "apa_efendic_affect": {
+      "sha256": "8d7dc505c9bddb7f324f4ab0a3a88b281f2d13f1f1abee8f149db1bff8675616",
+      "bytes": 52468,
+      "method": "pdftotext_default"
+    },
+    "apa_ip_feldman_pspb": {
+      "sha256": "b17218f0dd33ddcbbba0eab80619e82c2807e383856a26dbf66655672638c6ab",
+      "bytes": 89487,
+      "method": "pdftotext_default"
+    },
+    "bmc_lattice": {
+      "sha256": "5a0ddff7a1faf47122ab5a7fc8992b41a874c0ed39838c4352d6c7428f7afc7c",
+      "bytes": 42494,
+      "method": "pdftotext_default"
+    },
+    "ieee_figure_heavy": {
+      "sha256": "74c88e035da3f754f65592a5101a2ef54b6cb6365cc3340c507c868a62d9c1df",
+      "bytes": 81919,
+      "method": "pdftotext_default"
+    },
+    "ieee_lattice": {
+      "sha256": "038e40d41cc0a08790eeb50c0f5556cc59fe6061bb073c6f6b294729959761a8",
+      "bytes": 72431,
+      "method": "pdftotext_default"
+    },
+    "jama_lattice": {
+      "sha256": "a1d0f7d759339bf1866035f4eb210c9fcf34dcab8f134ca44e4d285f0bef12f9",
+      "bytes": 51112,
+      "method": "pdftotext_default"
+    },
+    "nat_comms_figure_only": {
+      "sha256": "e7c7769b5fb6d85d2ca20bd83879a5a6cc04cf94be3f4d86767dbd74d13c9c8c",
+      "bytes": 82439,
+      "method": "pdftotext_default"
+    },
+    "nature_minimal_rule": {
+      "sha256": "efb5c0baf642aaaf834e8a96bfd599dea9015afb91b57186e106c3d6f6772692",
+      "bytes": 77718,
+      "method": "pdftotext_default"
+    },
+    "scirep_minimal_rule": {
+      "sha256": "ce9f2292c2529ad3759ef965312080788c4f3df709137c04496d6aa068d4ef0b",
+      "bytes": 58362,
+      "method": "pdftotext_default"
+    }
+  }
+}

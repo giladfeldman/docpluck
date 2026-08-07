@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "vibe_relative": true,
   "fixtures": [
     {
@@ -8,7 +8,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chan_feldman_2025_cogemo.pdf",
       "expected_tables": 8,
       "expected_figures": 11,
-      "notes": "APA 2-column psychology paper, primary use case. Lineless tables. Calibrated 2026-05-07: table/figure detector identifies sub-regions and candidate cells more granularly."
+      "notes": "APA 2-column psychology paper, primary use case. Lineless tables. Calibrated 2026-05-07: table/figure detector identifies sub-regions and candidate cells more granularly.",
+      "canonical_key": "10.1080/02699931.2024.2434156"
     },
     {
       "id": "apa_chen_jesp_lineless",
@@ -16,7 +17,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/chen_2021_jesp.pdf",
       "expected_tables": 11,
       "expected_figures": 0,
-      "notes": "APA JESP paper, lineless tables. Calibrated 2026-05-07: granular table region detection."
+      "notes": "APA JESP paper, lineless tables. Calibrated 2026-05-07: granular table region detection.",
+      "canonical_key": "10.1016/j.jesp.2021.104154"
     },
     {
       "id": "apa_efendic_affect",
@@ -24,7 +26,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/efendic_2022_affect.pdf",
       "expected_tables": 1,
       "expected_figures": 0,
-      "notes": "APA Affect paper, lineless tables."
+      "notes": "APA Affect paper, lineless tables.",
+      "canonical_key": "10.1177/19485506211056761"
     },
     {
       "id": "apa_ip_feldman_pspb",
@@ -32,7 +35,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/apa/ip_feldman_2025_pspb.pdf",
       "expected_tables": 7,
       "expected_figures": 0,
-      "notes": "APA PSPB paper. Lineless tables, possibly correlation matrix. Calibrated 2026-05-07: granular region detection."
+      "notes": "APA PSPB paper. Lineless tables, possibly correlation matrix. Calibrated 2026-05-07: granular region detection.",
+      "canonical_key": "10.1177/01461672251327169"
     },
     {
       "id": "bmc_lattice",
@@ -40,7 +44,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/vancouver/bmc_med_1.pdf",
       "expected_tables": 1,
       "expected_figures": 4,
-      "notes": "BMC Medicine — Springer-style lattice tables. Calibrated 2026-05-07: figure detection now active."
+      "notes": "BMC Medicine \u2014 Springer-style lattice tables. Calibrated 2026-05-07: figure detection now active.",
+      "canonical_key": "10.1186/s12916-023-03229-3"
     },
     {
       "id": "ieee_lattice",
@@ -48,7 +53,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_2.pdf",
       "expected_tables": 1,
       "expected_figures": 37,
-      "notes": "IEEE Access — heavy-grid lattice tables. Recalibrated 2026-05-12 for v2.3.0: case-insensitive FIGURE caption regex now catches all 37 figures in the paper (previously missed the all-caps ones)."
+      "notes": "IEEE Access \u2014 heavy-grid lattice tables. Recalibrated 2026-05-12 for v2.3.0: case-insensitive FIGURE caption regex now catches all 37 figures in the paper (previously missed the all-caps ones).",
+      "canonical_key": "10.1109/access.2025.3645087"
     },
     {
       "id": "jama_lattice",
@@ -56,7 +62,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ama/jama_open_1.pdf",
       "expected_tables": 1,
       "expected_figures": 0,
-      "notes": "JAMA Open — biomedical lattice tables."
+      "notes": "JAMA Open \u2014 biomedical lattice tables.",
+      "canonical_key": "10.1001/jamanetworkopen.2023.39337"
     },
     {
       "id": "amj_lattice",
@@ -64,7 +71,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/aom/amj_1.pdf",
       "expected_tables": 5,
       "expected_figures": 7,
-      "notes": "Academy of Management Journal — lattice tables. Recalibrated 2026-05-12 for v2.3.0: case-insensitive TABLE/FIGURE caption regex now catches the all-caps captions used by AOM."
+      "notes": "Academy of Management Journal \u2014 lattice tables. Recalibrated 2026-05-12 for v2.3.0: case-insensitive TABLE/FIGURE caption regex now catches the all-caps captions used by AOM.",
+      "canonical_key": "10.5465/amj.2016.1196"
     },
     {
       "id": "nature_minimal_rule",
@@ -72,7 +80,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_1.pdf",
       "expected_tables": 1,
       "expected_figures": 1,
-      "notes": "Nature Communications — minimal-rule tables, gray-band header."
+      "notes": "Nature Communications \u2014 minimal-rule tables, gray-band header.",
+      "canonical_key": "10.1038/s41467-023-43885-w"
     },
     {
       "id": "scirep_minimal_rule",
@@ -80,7 +89,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/sci_rep_1.pdf",
       "expected_tables": 1,
       "expected_figures": 1,
-      "notes": "Scientific Reports — minimal-rule tables."
+      "notes": "Scientific Reports \u2014 minimal-rule tables.",
+      "canonical_key": "10.1038/s41598-023-50423-7"
     },
     {
       "id": "nat_comms_figure_only",
@@ -88,7 +98,8 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/nature/nat_comms_2.pdf",
       "expected_tables": 0,
       "expected_figures": 2,
-      "notes": "Nature Communications paper with figures, expected no tables."
+      "notes": "Nature Communications paper with figures, expected no tables.",
+      "canonical_key": "10.1038/s41467-023-42320-4"
     },
     {
       "id": "ieee_figure_heavy",
@@ -96,12 +107,14 @@
       "source_path": "MetaScienceTools/PDFextractor/test-pdfs/ieee/ieee_access_3.pdf",
       "expected_tables": 8,
       "expected_figures": 1,
-      "notes": "IEEE engineering paper, figure-heavy. Recalibrated 2026-05-12 for v2.3.0: case-insensitive TABLE caption regex + improved Camelot lattice/stream picker now extract the 8 stat tables this paper actually has."
+      "notes": "IEEE engineering paper, figure-heavy. Recalibrated 2026-05-12 for v2.3.0: case-insensitive TABLE caption regex + improved Camelot lattice/stream picker now extract the 8 stat tables this paper actually has.",
+      "canonical_key": "10.1109/ACCESS.2024.3358206"
     }
   ],
   "known_gaps": [
-    "table_of_contents_negative — no fixture currently in the corpus",
-    "negative_no_tables_no_figures — no fixture currently in the corpus",
-    "uncaptioned_table — no fixture currently in the corpus"
-  ]
+    "table_of_contents_negative \u2014 no fixture currently in the corpus",
+    "negative_no_tables_no_figures \u2014 no fixture currently in the corpus",
+    "uncaptioned_table \u2014 no fixture currently in the corpus"
+  ],
+  "custodian": "article-finder (~/.claude/skills/article-finder). Each fixture's canonical key is its DOI; the PDF and the pinned extract_pdf() text both live in the shared ArticleRepository, never in this repo."
 }
