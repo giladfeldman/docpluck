@@ -625,55 +625,17 @@ def _synthesize_introduction_if_bloated_front_matter(
     return sections[:cand_idx] + [new_cand, new_intro] + sections[cand_idx + 1:]
 
 
-def append_footnotes_section(
-    sections: tuple[Section, ...],
-    normalized_text: str,
-    footnote_raw_spans: tuple[tuple[int, int], ...],
-) -> tuple[Section, ...]:
-    """If F0 produced a footnote appendix in `normalized_text` (sentinel
-    ``\\n\\f\\f\\n``), wrap it as a single `footnotes` Section."""
-    sentinel = "\n\f\f\n"
-    idx = normalized_text.find(sentinel)
-    if idx < 0:
-        return sections
-    appendix_start = idx + len(sentinel)
-    if appendix_start >= len(normalized_text):
-        return sections
-    appendix_text = normalized_text[appendix_start:]
-    if not appendix_text.strip():
-        return sections
-
-    # Truncate any existing section that overlaps the appendix so it doesn't
-    # include the sentinel or the footnote content.
-    truncated: list[Section] = []
-    for s in sections:
-        if s.char_end > idx:
-            truncated.append(Section(
-                label=s.label,
-                canonical_label=s.canonical_label,
-                text=normalized_text[s.char_start:idx],
-                char_start=s.char_start,
-                char_end=idx,
-                pages=s.pages,
-                confidence=s.confidence,
-                detected_via=s.detected_via,
-                heading_text=s.heading_text,
-            ))
-        else:
-            truncated.append(s)
-
-    footnotes = Section(
-        label="footnotes",
-        canonical_label=SectionLabel.footnotes,
-        text=appendix_text,
-        char_start=appendix_start,
-        char_end=len(normalized_text),
-        pages=(),
-        confidence=Confidence.medium,
-        detected_via=DetectedVia.layout_signal,
-        heading_text=None,
-    )
-    return tuple(truncated + [footnotes])
+# `append_footnotes_section` lived here until v2.4.126. It was DEAD in two
+# independent ways: zero call sites anywhere (library, tests, or the service),
+# and its precondition was unreachable — it looked for the F0 footnote-appendix
+# sentinel (newline, two form feeds, newline), which only
+# `normalize_text(layout=...)` produces, and
+# `extract_sections` never passes `layout=`. So it could not have fired even if
+# it had been called. The 2026-05-06 sectioning plan shows the intended wiring
+# if anyone wants to revive it; doing so also requires running F0 in the
+# sections path, which is a corpus-wide behaviour change, not a re-wiring.
+# A `footnotes` section is still produced the ordinary way, from a literal
+# "Footnotes" heading via the taxonomy.
 
 
 def extract_sections_from_text(

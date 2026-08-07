@@ -98,24 +98,11 @@ def _cmd_sections(args: argparse.Namespace) -> int:
         sys.stdout.write("\n".join(lines) + "\n")
         return 0
 
-    payload = {
-        "sectioning_version": doc.sectioning_version,
-        "source_format": doc.source_format,
-        "sections": [
-            {
-                "label": s.label,
-                "canonical_label": s.canonical_label.value,
-                "char_start": s.char_start,
-                "char_end": s.char_end,
-                "pages": list(s.pages),
-                "confidence": s.confidence.value,
-                "detected_via": s.detected_via.value,
-                "heading_text": s.heading_text,
-                "text": s.text,
-            }
-            for s in doc.sections
-        ],
-    }
+    # SectionedDocument.to_dict() rather than a key list built here: the key
+    # list this replaced was written before v1.6.1 added `Section.subheadings`
+    # and never grew, so the CLI silently omitted a working feature. See
+    # sections/types.py.
+    payload = doc.to_dict()
     sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
     return 0
 
@@ -208,9 +195,14 @@ def main(argv: list[str] | None = None) -> int:
     render.add_argument("file")
     render.add_argument(
         "--level",
-        default="standard",
+        # Was "standard" while render_pdf_to_markdown ignored the value and
+        # always normalized at `academic`. v2.4.126 made the flag real; the
+        # default moved to `academic` so rendered output is unchanged.
+        default="academic",
         choices=["none", "standard", "academic"],
-        help="Normalization level applied during section detection. Default: standard.",
+        help="Normalization level applied during section detection. "
+             "Default: academic (includes statistical-expression repairs). "
+             "Lower levels detect fewer sections.",
     )
     render.add_argument(
         "--flatten-tables-inline",

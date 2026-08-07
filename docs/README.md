@@ -376,26 +376,41 @@ def process_corpus(pdf_dir: str) -> list[dict]:
 
 ### Reproducibility receipts
 
-A docpluck version alone does **not** pin extraction: `pdftotext_default` shells
-out to whatever poppler (or Xpdf) binary is on `PATH`, and tables/layout run
-through pdfplumber and camelot. `get_version_info()` reports every input that
-can change the output, so two runs can be compared honestly:
+A docpluck version alone does **not** pin extraction. `pdftotext_default` shells
+out to whatever poppler (or Xpdf) binary is on `PATH`; tables and layout run
+through camelot and pdfplumber; DOCX runs through mammoth and HTML through
+beautifulsoup4/lxml; and `normalize_text` applies `unicodedata.normalize`, whose
+behaviour is fixed by the Unicode database your CPython shipped with. Every one
+of those can change under a fixed docpluck SHA, so `get_version_info()` reports
+all of them:
 
 ```python
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.126',
-#  'normalize_version': '1.9.50',
-#  'sectioning_version': '1.2.4',
+# {'version': '2.4.126',            # docpluck itself
+#  'git_sha': '…',
+#  'normalize_version': '1.9.50',   # in-repo pipeline versions, bumped
+#  'sectioning_version': '1.2.4',   #   independently of the package version
 #  'table_extraction_version': '2.4.10',
-#  'git_sha': '917d1d9...',
-#  'pdftotext_version': '24.08.0',   # the system binary, NOT pinned by the SHA
-#  'pdftotext_engine': 'poppler',    # 'poppler' | 'xpdf' | 'unknown'
-#  'poppler_version': '24.08.0',     # None when the engine is not poppler
-#  'pdfplumber_version': '0.11.9',
-#  'camelot_version': '2.0.0'}
+#  'python_version': '3.14.5',      # the interpreter…
+#  'unicodedata_version': '16.0.0', #   …and its Unicode database
+#  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs
+#  'pdftotext_version': '24.08.0',  # the system binary, NOT pinned by the SHA
+#  'pdftotext_engine': 'poppler',   # 'poppler' | 'xpdf' | 'unknown'
+#  'poppler_version': '24.08.0',    # None when the engine is not poppler
+#  'pdfplumber_version': '0.11.9',  # PDF layout channel…
+#  'pdfminer_six_version': '…',     #   …and the text engine under it
+#  'camelot_version': '2.0.0',      # tables…
+#  'pypdfium2_version': '5.9.0',    #   …and what lattice rasterizes through
+#  'opencv_version': '4.13.0.92',
+#  'mammoth_version': '1.12.0',        # DOCX
+#  'beautifulsoup4_version': '4.13.5', # HTML
+#  'lxml_version': '6.1.1'}
 ```
+
+Engines that are not installed report `"not installed"` rather than being
+omitted, so an absent optional extra is visible instead of invisible.
 
 `pdftotext_engine` is reported separately because poppler and Xpdf differ
 *behaviourally*, not just in version number (Xpdf 4.x emits `\n\n` paragraph

@@ -6076,7 +6076,7 @@ def _dedupe_label_in_table_figure_caption(text: str) -> str:
 def render_pdf_to_markdown(
     pdf_bytes: bytes,
     *,
-    normalization_level: NormalizationLevel = NormalizationLevel.standard,
+    normalization_level: NormalizationLevel = NormalizationLevel.academic,
     flatten_tables_inline: bool = False,
     _structured: Optional[dict] = None,
     _sectioned=None,
@@ -6100,9 +6100,23 @@ def render_pdf_to_markdown(
 
     Args:
         pdf_bytes: Raw PDF bytes.
-        normalization_level: Forwarded to ``extract_sections`` via the
-            normalize step. Default is ``standard``; pass ``academic`` to
-            also apply statistical-expression repairs.
+        normalization_level: Forwarded to ``extract_sections``, which applies
+            it in its normalize step. Default ``academic``, which includes the
+            statistical-expression repairs; lower it only if you want the
+            un-repaired text, and expect fewer sections to be detected (the
+            heading regexes are calibrated on academic-normalized text).
+
+            **Fixed in v2.4.126:** this argument was previously accepted,
+            documented as forwarded, and then discarded — ``extract_sections``
+            took no level and hard-coded ``academic``, so every value produced
+            byte-identical output. The default is now ``academic`` rather than
+            ``standard`` so that the *behaviour* is unchanged for callers who
+            never passed it; only callers who explicitly asked for a different
+            level see a difference, which is what they were asking for.
+
+            Ignored when ``_sectioned`` is supplied — that document was
+            normalized by whoever built it, and this function does not
+            re-section it.
         flatten_tables_inline: When True, emit a human-readable
             ``### {label} — rendered as text`` block immediately after each
             ``<table>``, with one bullet per body row carrying the labelled
@@ -6173,6 +6187,10 @@ def render_pdf_to_markdown(
             pdf_bytes,
             source_format="pdf",
             preserve_math_glyphs=True,
+            # v2.4.126: actually forwarded. This call previously omitted the
+            # level entirely, so `render_pdf_to_markdown(normalization_level=…)`
+            # and the CLI's `--level` were silent no-ops.
+            normalization_level=normalization_level,
             # W0h dropped-minus layout recovery (R5/B7): reuse the layout_doc
             # already computed above so the section/normalize path can read the
             # surviving `(cid:N)` minus glyph without a 3rd pdfplumber pass.

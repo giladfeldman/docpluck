@@ -32,6 +32,7 @@ def extract_sections(
     text: str | None = None,
     source_format: Literal["pdf", "docx", "html"] | None = None,
     preserve_math_glyphs: bool = False,
+    normalization_level: "NormalizationLevel | None" = None,
     _dropped_minus_layout=None,
 ) -> SectionedDocument:
     """Public entry point. Either pass `file_bytes` (with optional
@@ -39,13 +40,52 @@ def extract_sections(
 
     Supports text path, HTML bytes, DOCX bytes, and PDF bytes (layout-aware
     via pdfplumber).
+
+    Args:
+        normalization_level: Level applied to the extracted text before
+            heading detection. Defaults to ``academic``, which is what this
+            function has always used — the heading regexes, taxonomy variants
+            and watermark patterns are calibrated against academic-normalized
+            text, so lowering it will detect fewer sections.
+
+            **PDF only.** The DOCX and HTML branches reconstruct text from
+            markup and never call ``normalize_text``, so there is no level to
+            apply; passing a non-default level for those formats raises
+            ``ValueError`` rather than accepting an argument it would ignore.
+            (v2.4.126 — the parameter previously existed one layer up, on
+            ``render_pdf_to_markdown``, where it was accepted, documented as
+            forwarded, and silently discarded.)
     """
+    from ..normalize import NormalizationLevel
+    level = (
+        NormalizationLevel.academic
+        if normalization_level is None
+        else NormalizationLevel(normalization_level)
+    )
+    level_is_default = level is NormalizationLevel.academic
+
+    def _reject_unusable_level(where: str) -> None:
+        """Refuse a level this branch cannot apply, instead of ignoring it.
+
+        Accepting an argument that changes nothing is the exact defect this
+        parameter was added to fix one layer up.
+        """
+        if not level_is_default:
+            raise ValueError(
+                f"normalization_level={level.value!r} is not applicable to "
+                f"{where}: only the PDF branch runs normalize_text. Normalize "
+                "the text yourself before calling, or omit the argument."
+            )
+
     if text is not None:
         if source_format is None:
             raise ValueError(
                 "extract_sections(text=...) requires source_format= "
                 "('pdf', 'docx', or 'html')"
             )
+        # Caller-supplied text has already been through whatever pipeline the
+        # caller chose; docpluck does not re-normalize it.
+        _reject_unusable_level("extract_sections(text=...)")
         from .core import extract_sections_from_text
         return extract_sections_from_text(text, source_format=source_format)
 
@@ -75,7 +115,7 @@ def extract_sections(
         raw_text, _method = extract_pdf(file_bytes)
         normalized, report = normalize_text(
             raw_text,
-            NormalizationLevel.academic,
+            level,
             preserve_math_glyphs=preserve_math_glyphs,
             dropped_minus_layout=_dropped_minus_layout,
         )
@@ -92,6 +132,7 @@ def extract_sections(
         )
 
     if fmt == "html":
+        _reject_unusable_level("HTML input")
         from .annotators.html import annotate_html
         from .core import partition_into_sections
         reconstructed_text, hints = annotate_html(file_bytes)
@@ -106,6 +147,7 @@ def extract_sections(
         )
 
     if fmt == "docx":
+        _reject_unusable_level("DOCX input")
         from .annotators.docx import annotate_docx
         from .core import partition_into_sections
         reconstructed_text, hints = annotate_docx(file_bytes)
