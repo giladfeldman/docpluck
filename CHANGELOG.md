@@ -1,5 +1,58 @@
 # Changelog
 
+## [2.4.126] - 2026-08-07
+
+**The reproducibility receipt was incomplete: a docpluck SHA did not pin extraction.** MetaESCI asks A-1 and A-2 (`INBOX_FROM_METAESCI_2026-08-07.md`). No normalization change, so `NORMALIZATION_VERSION` stays `1.9.50`.
+
+### The incident
+
+MetaESCI ran the **same** docpluck SHA (`a5c02ef`) against the **same** PDF (`10.1098/rsos.202336`) in April and in August and got **49,091 vs 50,101** normalized characters, and 9 vs 10 downstream effect rows. Cause: the system poppler binary was replaced on 2026-05-14. `get_version_info()` reported `{version, normalize_version, git_sha}` — all three **identical** across both runs — so nothing docpluck recorded made the change detectable. The downstream spent real time attributing an external change to its own code.
+
+`method=pdftotext_default` shells out to whatever `pdftotext` is on `PATH`. A library SHA cannot pin that, and the receipt never said so.
+
+### The general defect, not just poppler
+
+Three classes of input determine docpluck's output; the receipt covered one and a half of them. All three are now reported by `get_version_info()`:
+
+| | Before | After |
+|---|---|---|
+| docpluck itself | `version`, `git_sha` | unchanged |
+| in-repo pipeline versions | `normalize_version` only | + `sectioning_version`, `table_extraction_version` |
+| external engines | *nothing* | `pdftotext_version`, `pdftotext_engine`, `poppler_version`, `pdfplumber_version`, `camelot_version` |
+
+`SECTIONING_VERSION` and `TABLE_EXTRACTION_VERSION` were already exported from the package and bumped independently of the package version — they were simply never on the receipt, so anyone using `sections/` or `tables/` had the same unpinnable-input problem for a different reason.
+
+`NORMALIZATION_VERSION` is now exported from the package top level too; `SECTIONING_VERSION` and `TABLE_EXTRACTION_VERSION` already were, and the omission was an inconsistency rather than a decision.
+
+### Details that are load-bearing
+
+- **`pdftotext_engine` is reported separately from the version.** poppler and Xpdf are behaviourally different, not merely differently versioned — Xpdf 4.x emits `\n\n` paragraph breaks where poppler emits `\n`, which every line-level post-processor in `render.py` copes with. Both banner themselves as `pdftotext version N`, so the number alone cannot tell them apart.
+- **`poppler_version` is `None` under Xpdf**, not the Xpdf version. Reporting an Xpdf version under a `poppler_` key would be a false provenance claim.
+- **The return code of `pdftotext -v` is deliberately ignored.** Xpdf prints its banner and exits non-zero; gating on `returncode == 0` would report `unknown` for exactly the engine whose identity matters most. The banner is read from **both** stdout and stderr (poppler 24.08.0 uses stderr).
+- **pdfplumber/camelot versions prefer the module already imported in-process** over distribution metadata, falling back to `importlib.metadata` only when the module is not loaded (importing camelot pulls in OpenCV). A shadowing module or an editable install pointing elsewhere makes metadata disagree with the code that actually runs.
+
+### A-2 — per-file quality signals (`batch.py`)
+
+`ExtractionFileResult` gains `n_replacement_chars` (U+FFFD) and `n_greek_chars`, both measured on the **normalized** text — exactly the bytes written to `<stem>.txt`. MetaESCI's G1/G2 acceptance gates re-scanned every written file for these. New public helpers `count_replacement_chars()` / `count_greek_chars()`; Greek covers U+0370–U+03FF and U+1F00–U+1FFF.
+
+### Serializer drift — the same defect class, three more instances
+
+`ExtractionReport.to_dict()` hand-enumerated its keys, so any field added to the dataclass afterwards was **silently dropped from the written receipt**. Sweeping the package for that shape found the same construction in two more places, one of which was already losing data:
+
+- **`NormalizationReport.to_dict()` (`normalize.py`) was dropping `column_interleave_pages`.** The field is populated by `_detect_column_interleave_pages`, and `extract_columns.py` documents `NormalizationReport.column_interleave_pages` as the canonical source of the column-interleave signal — but it never survived serialization, so every consumer reading the serialized report saw a complete-looking object with the signal missing. This was live, and predates this release.
+- The per-file `<stem>.json` sidecar was hand-built from a picked key list.
+
+All three now derive from `asdict()`, with a parametrized guard asserting `to_dict()` covers every declared field.
+
+Two sidecar corrections found by cross-model review while making that change:
+
+- The sidecar recorded **`ok: false` on every successful extraction** — it serialized the result before `ok` was set. A wrong value on disk, contradicting both the written `.txt` and the report.
+- The sidecar no longer emits `elapsed_seconds` (not final at write time — it recorded a `0.0` that read as a measurement) or a bare generic `version` key beside five `*_version` keys. All pre-existing sidecar keys are preserved.
+
+### Tests
+
+`tests/test_provenance_completeness.py`, 31 tests, all verified failing against the unfixed code first. The structural guard is `test_no_exported_version_constant_is_missing_from_the_receipt`: any future `*_VERSION` constant exported from the package fails the suite until it is added to `get_version_info()`. A test asserting only `"poppler_version" in info` would have let the next unreported input through — which is exactly how this one arrived.
+
 ## [2.4.125] - 2026-08-05
 
 **An invisible character was surviving into rendered output, silently breaking string equality for every downstream consumer.** `NORMALIZATION_VERSION` -> `1.9.50`.

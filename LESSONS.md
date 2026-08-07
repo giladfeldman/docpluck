@@ -338,11 +338,11 @@ Cite (SHIPPED v2.4.4): `docpluck/tables/flatten.py::_infer_anova_eta2_hint` +
 `_inline_stat_field`, `docpluck/tables/cell_cleaning.py::_is_fragment_cell` (bracket-CI
 tail). REVERTED (queued): the `captions.find_caption_matches` char_start advance +
 `whitespace._whitespace_grid_is_clean` / `_trim_trailing_prose_rows` gates.
-See CHANGELOG v2.4.98. (The originating triage doc is internal — see L-010.)
+See CHANGELOG v2.4.98. (The originating triage doc is internal — see L-011.)
 
 ---
 
-## L-010 — This repo is PUBLIC; internal working material must never be tracked here
+## L-011 — This repo is PUBLIC; internal working material must never be tracked here
 
 **Surface:** On 2026-08-06 the user noticed `github.com/giladfeldman/docpluck`
 was serving a large volume of internal `.md` files to the world. A scan found
@@ -419,6 +419,79 @@ Cite: `.gitignore` (categorical block + rationale header), `/docpluck-cleanup`
 **Section 0 — PUBLIC-REPO EXPOSURE GATE** (blocking, allowlist-based),
 `tests/test_canary_provenance.py` (must SKIP when the untracked `canary.json`
 is absent, not error at collection).
+
+---
+
+## L-012 — A provenance receipt that omits an input is worse than no receipt; and a hand-enumerated serializer will silently drop the next field added
+
+**Surface (2026-08-07, MetaESCI `INBOX_FROM_METAESCI_2026-08-07.md`).** MetaESCI
+ran the **same** docpluck SHA (`a5c02ef`) against the **same** PDF
+(`10.1098/rsos.202336`) in April and in August: 49,091 vs 50,101 normalized
+characters, 9 vs 10 downstream effect rows. The system poppler binary had been
+replaced on 2026-05-14. `get_version_info()` reported
+`{version, normalize_version, git_sha}` — **all three identical across both
+runs**. Nothing docpluck recorded made the change detectable, so the downstream
+spent real time hunting the difference in its own code.
+
+**The rule.** `method=pdftotext_default` shells out to whatever `pdftotext` is
+on `PATH`. A library SHA cannot pin an external binary, and a receipt that does
+not say so is *actively misleading* — a complete-looking object is read as a
+complete pin. Every input that can change output goes on the receipt:
+
+1. docpluck itself (`version`, `git_sha`);
+2. **every in-repo `*_VERSION` constant** — `SECTIONING_VERSION` and
+   `TABLE_EXTRACTION_VERSION` were exported and bumped independently of the
+   package version, and were simply never on the receipt;
+3. **every external engine** — the pdftotext binary, pdfplumber, camelot.
+
+Pinned by `tests/test_provenance_completeness.py::test_no_exported_version_constant_is_missing_from_the_receipt`,
+which fails on any future `*_VERSION` export until it reaches
+`get_version_info()`. A test asserting only `"poppler_version" in info` would
+have let the next unreported input through — which is exactly how this one
+arrived.
+
+**Record the ENGINE, not just the version, when two engines share a name.**
+poppler and Xpdf both banner as `pdftotext version N`, and they differ
+*behaviourally* (Xpdf 4.x emits `\n\n` paragraph breaks where poppler emits
+`\n` — cf. memory `feedback_pdftotext_version_skew`). Hence
+`pdftotext_engine`; hence `poppler_version` is `None` under Xpdf rather than
+carrying an Xpdf number under a `poppler_` key. And **do not gate the probe on
+its return code**: Xpdf prints its banner and exits non-zero, so
+`returncode == 0` would report `unknown` for exactly the engine whose identity
+matters most. Read both stdout and stderr (poppler 24.08.0 uses stderr).
+
+**Prefer the module already imported over distribution metadata.** A shadowing
+module, an editable install pointing elsewhere, or a vendored copy makes
+`importlib.metadata` disagree with the code that will actually run — a
+confidently wrong provenance value, worse than an absent one.
+
+**The sibling defect, found by looking for the class rather than the bug.**
+Three serializers in this repo hand-enumerated their keys, so any field added
+to the dataclass afterwards was silently dropped on the way to disk. Every unit
+was individually correct; the value just never arrived:
+
+- `ExtractionReport.to_dict()` (`batch.py`) — would have dropped every field
+  added in this very change.
+- `NormalizationReport.to_dict()` (`normalize.py`) — **was already dropping
+  `column_interleave_pages`**, a populated field that `extract_columns.py`
+  documents as the canonical source of the column-interleave signal.
+- The per-file `<stem>.json` sidecar, hand-built from a picked key list.
+
+All three now derive from `asdict()`, with a parametrized guard asserting
+`to_dict()` covers every declared field. **When you add a field to a dataclass,
+grep for its serializer** — or better, make the serializer incapable of
+disagreeing with the dataclass.
+
+**Two wrong values on disk fell out of the same review.** The sidecar recorded
+`ok: false` on every *successful* extraction (it serialized the result before
+`ok` was set), and an `elapsed_seconds: 0.0` written before the timer stopped.
+Both read as measurements. Neither crashed anything, neither failed a test, and
+neither was found by re-reading the code — they were found by a cross-model
+review and then **reproduced locally** before being fixed.
+
+Cite: `docpluck/version.py`, `docpluck/batch.py`, `docpluck/normalize.py`
+(`NormalizationReport.to_dict`), `tests/test_provenance_completeness.py`,
+CHANGELOG `[2.4.126]`, `REPLY_FROM_DOCPLUCK_v2.4.126.md`.
 
 ---
 

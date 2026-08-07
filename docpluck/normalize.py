@@ -12,7 +12,7 @@ Levels:
 
 import re
 import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Optional
 
@@ -2422,16 +2422,27 @@ class NormalizationReport:
                 self.changes_made[metric_name] = abs(diff)
 
     def to_dict(self) -> dict:
-        return {
-            "level": self.level,
-            "version": self.version,
-            "steps_applied": self.steps_applied,
-            "steps_changed": self.steps_changed,
-            "changes_made": self.changes_made,
-            "footnote_spans": [list(s) for s in self.footnote_spans],
-            "footnote_texts": list(self.footnote_texts),
-            "page_offsets": list(self.page_offsets),
-        }
+        """JSON-ready view of the whole report, field-for-field.
+
+        Derived from ``asdict`` rather than a hand-written key list on
+        purpose. The hand-written version silently dropped
+        ``column_interleave_pages`` — a populated field
+        (:func:`_detect_column_interleave_pages`) that ``extract_columns``
+        documents as the canonical source of the column-interleave signal — so
+        every consumer reading the serialized report saw a complete-looking
+        object with that signal missing. See ``batch.ExtractionReport.to_dict``
+        for the same defect in its sibling class, fixed in the same release
+        (v2.4.126).
+
+        Tuple fields are converted to lists so the Python-side shape matches
+        what a JSON round-trip produces.
+        """
+        d = asdict(self)
+        d["footnote_spans"] = [list(s) for s in self.footnote_spans]
+        d["footnote_texts"] = list(self.footnote_texts)
+        d["page_offsets"] = list(self.page_offsets)
+        d["column_interleave_pages"] = list(self.column_interleave_pages)
+        return d
 
 
 # v2.4.38 (NORMALIZATION_VERSION 1.9.4): recover U+2212 minus signs that

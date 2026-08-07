@@ -59,9 +59,20 @@ from .extract import extract_pdf, extract_pdf_file, count_pages
 from .extract_layout import extract_pdf_layout
 from .extract_docx import extract_docx
 from .extract_html import extract_html, html_to_text
-from .normalize import normalize_text, NormalizationLevel, NormalizationReport
+from .normalize import (
+    NORMALIZATION_VERSION,
+    normalize_text,
+    NormalizationLevel,
+    NormalizationReport,
+)
 from .quality import compute_quality_score
-from .batch import ExtractionReport, extract_to_dir
+from .batch import (
+    ExtractionFileResult,
+    ExtractionReport,
+    count_greek_chars,
+    count_replacement_chars,
+    extract_to_dir,
+)
 from .version import get_version_info
 from .sections import (
     extract_sections, SectionedDocument, Section,
@@ -78,7 +89,7 @@ from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
 from .render import render_pdf_to_markdown
 
-__version__ = "2.4.125"
+__version__ = "2.4.126"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
@@ -95,11 +106,15 @@ __all__ = [
     "normalize_text",
     "NormalizationLevel",
     "NormalizationReport",
+    "NORMALIZATION_VERSION",
     # Quality
     "compute_quality_score",
     # Batch
+    "ExtractionFileResult",
     "ExtractionReport",
     "extract_to_dir",
+    "count_replacement_chars",
+    "count_greek_chars",
     # Version
     "get_version_info",
     # Sections
