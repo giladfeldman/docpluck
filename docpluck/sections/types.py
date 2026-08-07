@@ -104,7 +104,10 @@ class SectionedDocument:
 
     def all(self, label: str) -> tuple[Section, ...]:
         # Match canonical_label so doc.all("methods") returns methods + methods_2 + ...
-        canonical = label.split("_")[0] if label not in {l.value for l in SectionLabel} else label
+        # (A `canonical = label.split("_")[0] …` local was computed here and never
+        # used — a leftover from an earlier approach. Removed 2026-08-07 after
+        # verifying every documented case still resolves: "methods" returns both
+        # methods and methods_2; a non-canonical label matches exactly.)
         try:
             target = SectionLabel(label)
         except ValueError:

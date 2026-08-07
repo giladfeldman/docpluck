@@ -1241,7 +1241,6 @@ def _rescue_duplicate_starved_captions(
         for rt, dup_caps in by_rawtext.items():
             if len(dup_caps) < 2:
                 continue  # no duplicate → greedy was fine for this group
-            shared_td = auto_by_cap[id(dup_caps[0])]
             shared_tokens = _caption_overlap_tokens(rt)
             # The caption that overlaps the shared table best legitimately keeps
             # it; the rest are "starved" and eligible for a real table.
