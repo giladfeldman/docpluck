@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from .telemetry import record_fallback
+from .version import resolve_pdftotext_executable
 
 def extract_pdf(
     pdf_bytes: bytes,
@@ -87,7 +88,7 @@ def extract_pdf(
     try:
         # Primary: pdftotext default mode (no -layout flag — critical)
         result = subprocess.run(
-            ["pdftotext", "-enc", "UTF-8", tmp_path, "-"],
+            [resolve_pdftotext_executable(), "-enc", "UTF-8", tmp_path, "-"],
             capture_output=True,
             timeout=pdftotext_timeout_seconds,
             encoding="utf-8",

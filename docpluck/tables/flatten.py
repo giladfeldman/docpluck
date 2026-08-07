@@ -1499,6 +1499,15 @@ def _detect_packed_arms(
 ) -> Optional[tuple[int, list[str]]]:
     """Detect a table whose parallel arms are packed into single cells.
 
+    ``header`` is accepted but **not read**: the packed-arm signature lives
+    entirely in the body cells (the same arm names repeating on every data
+    row), and a packed table's header is exactly the part that is missing or
+    blank. Kept in the signature because it is part of the tested contract and
+    reads naturally beside ``body`` at the call site. (Documented 2026-08-07
+    after an "unused parameter" sweep removed it and broke seven tests — a
+    parameter's contract includes its call sites, not just its body.)
+
+
     The Request-11 "Separate/Joint" shape: one arm-label column repeats the SAME
     ``k≥2`` arm names on every data row (``"Separate Joint"``) and the other data
     cells each pack ``k`` space-joined values, one per arm. This is distinct from

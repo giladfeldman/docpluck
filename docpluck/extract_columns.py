@@ -50,6 +50,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Iterable
 
+from .version import resolve_pdftotext_executable
+
 
 # Minimum number of words on a page before we attempt column-mode re-extraction.
 # A page with <40 words is likely a figure-only page or a title page — column
@@ -237,7 +239,7 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
             # Left column: x=0, width=midline_x.
             left_proc = subprocess.run(
                 [
-                    "pdftotext", "-enc", "UTF-8",
+                    resolve_pdftotext_executable(), "-enc", "UTF-8",
                     "-f", page_arg, "-l", page_arg,
                     "-x", "0", "-y", "0",
                     "-W", str(int(midline_x)),
@@ -251,7 +253,7 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
                 return ""
             right_proc = subprocess.run(
                 [
-                    "pdftotext", "-enc", "UTF-8",
+                    resolve_pdftotext_executable(), "-enc", "UTF-8",
                     "-f", page_arg, "-l", page_arg,
                     "-x", str(int(midline_x)), "-y", "0",
                     "-W", str(int(page_width - midline_x)),
@@ -900,7 +902,7 @@ def extract_page_text_banded(layout_doc, page_index: int,
         pa = str(page_index + 1)  # pdftotext is 1-indexed
         try:
             proc = subprocess.run(
-                ["pdftotext", "-enc", "UTF-8", "-f", pa, "-l", pa,
+                [resolve_pdftotext_executable(), "-enc", "UTF-8", "-f", pa, "-l", pa,
                  "-x", str(int(x)), "-y", str(int(y)),
                  "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
                 capture_output=True, timeout=30, encoding="utf-8", errors="replace",

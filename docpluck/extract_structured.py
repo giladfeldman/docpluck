@@ -217,7 +217,7 @@ def extract_pdf_structured(
     for ct in camelot_tables:
         if (ct.get("page") or 0) not in pages_with_table_caption:
             continue
-        match = _find_caption_for_table(ct, table_captions, raw_text, used_caption_ids)
+        match = _find_caption_for_table(ct, table_captions, used_caption_ids)
         if match is not None:
             used_caption_ids.add(id(match))
             ct["label"] = match.label
@@ -1105,7 +1105,6 @@ def _column_body_text(
 def _find_caption_for_table(
     camelot_table: Table,
     captions: list[CaptionMatch],
-    raw_text: str,
     used_caption_ids: set[int],
 ) -> Optional[CaptionMatch]:
     """Pick the best ``Table N:`` caption on the same page as the camelot table.

@@ -26,14 +26,33 @@ Example::
 from __future__ import annotations
 
 import json
+import re
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
 from pathlib import Path
 from typing import Iterable, Optional, Union
 
 from .extract import extract_pdf_file
 from .normalize import NormalizationLevel, normalize_text
-from .version import get_version_info
+from .version import UNKNOWN, get_version_info
+
+#: ``get_version_info()`` key -> :class:`ExtractionReport` field name.
+#: Identity for every key except ``version``, which the report has always
+#: spelled ``docpluck_version`` and which downstream receipts depend on.
+_REPORT_FIELD_FOR_INFO_KEY = {"version": "docpluck_version"}
+
+
+def _provenance_kwargs(info: dict) -> dict:
+    """Translate ``get_version_info()`` into ``ExtractionReport`` kwargs.
+
+    Splatted into the constructor rather than assigned field by field: a key
+    added to ``get_version_info()`` without a matching field then raises
+    ``TypeError`` on the first batch run, which is loud and immediate. The
+    field-by-field alternative silently leaves the new field at its
+    ``"unknown"`` default — a receipt that looks complete and is not, i.e.
+    precisely the defect this surface exists to prevent.
+    """
+    return {_REPORT_FIELD_FOR_INFO_KEY.get(k, k): v for k, v in info.items()}
 
 
 #: Unicode ranges counted as Greek by :func:`count_greek_chars`. Greek and
@@ -42,6 +61,15 @@ from .version import get_version_info
 #: they are counted, and they do not occur in the statistical notation this
 #: signal exists to measure.
 _GREEK_RANGES = ((0x0370, 0x03FF), (0x1F00, 0x1FFF))
+
+#: Compiled FROM :data:`_GREEK_RANGES` rather than written out, so the two
+#: cannot drift. A per-character Python loop over these ranges measured **60x
+#: slower** than the regex (29 ms vs 0.5 ms on a 50k-char paper — 247 s vs 4 s
+#: across MetaESCI's 8,431-document corpus), which is a real cost for a signal
+#: computed on every file of every batch.
+_GREEK_RE = re.compile(
+    "[" + "".join(f"\\u{lo:04X}-\\u{hi:04X}" for lo, hi in _GREEK_RANGES) + "]"
+)
 
 
 def count_replacement_chars(text: str) -> int:
@@ -64,11 +92,7 @@ def count_greek_chars(text: str) -> int:
     downstreams use to detect a PDF whose Greek statistical symbols
     (η, β, χ, σ, α) were dropped or transliterated away.
     """
-    return sum(
-        1
-        for ch in text
-        if any(lo <= ord(ch) <= hi for lo, hi in _GREEK_RANGES)
-    )
+    return len(_GREEK_RE.findall(text))
 
 
 @dataclass
@@ -101,15 +125,28 @@ class ExtractionReport:
     git_sha: str
     level: str
     out_dir: str
-    # Provenance beyond docpluck's own SHA. These mirror get_version_info();
-    # see version.py for why an incomplete receipt is worse than none.
-    sectioning_version: str = "unknown"
-    table_extraction_version: str = "unknown"
-    pdftotext_version: str = "unknown"
-    pdftotext_engine: str = "unknown"
+    # Provenance beyond docpluck's own SHA — one field per get_version_info()
+    # key, same spelling (except `version`, which this class has always called
+    # `docpluck_version`). See version.py for why an incomplete receipt is
+    # worse than none. `extract_to_dir` fills these by **splatting**
+    # get_version_info(), so a key added there without a field here raises
+    # TypeError on the first batch run instead of silently defaulting.
+    sectioning_version: str = UNKNOWN
+    table_extraction_version: str = UNKNOWN
+    python_version: str = UNKNOWN
+    unicodedata_version: str = UNKNOWN
+    pdftotext_path: str = UNKNOWN
+    pdftotext_version: str = UNKNOWN
+    pdftotext_engine: str = UNKNOWN
     poppler_version: Optional[str] = None
-    pdfplumber_version: str = "unknown"
-    camelot_version: str = "unknown"
+    pdfplumber_version: str = UNKNOWN
+    pdfminer_six_version: str = UNKNOWN
+    camelot_version: str = UNKNOWN
+    pypdfium2_version: str = UNKNOWN
+    opencv_version: str = UNKNOWN
+    mammoth_version: str = UNKNOWN
+    beautifulsoup4_version: str = UNKNOWN
+    lxml_version: str = UNKNOWN
     n_total: int = 0
     n_ok: int = 0
     n_failed: int = 0
@@ -216,18 +253,9 @@ def extract_to_dir(
     level_str = level.value if isinstance(level, NormalizationLevel) else str(level)
 
     report = ExtractionReport(
-        docpluck_version=info["version"],
-        normalize_version=info["normalize_version"],
-        git_sha=info["git_sha"],
         level=level_str,
         out_dir=str(out),
-        sectioning_version=info["sectioning_version"],
-        table_extraction_version=info["table_extraction_version"],
-        pdftotext_version=info["pdftotext_version"],
-        pdftotext_engine=info["pdftotext_engine"],
-        poppler_version=info["poppler_version"],
-        pdfplumber_version=info["pdfplumber_version"],
-        camelot_version=info["camelot_version"],
+        **_provenance_kwargs(info),
     )
 
     batch_start = time.monotonic()

@@ -2,56 +2,91 @@
 
 ## [2.4.126] - 2026-08-07
 
-**The reproducibility receipt was incomplete: a docpluck SHA did not pin extraction.** MetaESCI asks A-1 and A-2 (`INBOX_FROM_METAESCI_2026-08-07.md`). No normalization change, so `NORMALIZATION_VERSION` stays `1.9.50`.
+**Four surfaces claimed something the code did not do.** MetaESCI asks A-1/A-2 (`INBOX_FROM_METAESCI_2026-08-07.md`) opened on one of them; sweeping for the *class* found the other three. No normalization change, so `NORMALIZATION_VERSION` stays `1.9.50`, and default output is byte-identical.
 
-### The incident
+### The incident that started it
 
 MetaESCI ran the **same** docpluck SHA (`a5c02ef`) against the **same** PDF (`10.1098/rsos.202336`) in April and in August and got **49,091 vs 50,101** normalized characters, and 9 vs 10 downstream effect rows. Cause: the system poppler binary was replaced on 2026-05-14. `get_version_info()` reported `{version, normalize_version, git_sha}` — all three **identical** across both runs — so nothing docpluck recorded made the change detectable. The downstream spent real time attributing an external change to its own code.
 
 `method=pdftotext_default` shells out to whatever `pdftotext` is on `PATH`. A library SHA cannot pin that, and the receipt never said so.
 
-### The general defect, not just poppler
+### 1. `get_version_info()` — 3 keys to 18
 
-Three classes of input determine docpluck's output; the receipt covered one and a half of them. All three are now reported by `get_version_info()`:
+The receipt now covers four classes of input instead of one and a half:
 
 | | Before | After |
 |---|---|---|
 | docpluck itself | `version`, `git_sha` | unchanged |
-| in-repo pipeline versions | `normalize_version` only | + `sectioning_version`, `table_extraction_version` |
-| external engines | *nothing* | `pdftotext_version`, `pdftotext_engine`, `poppler_version`, `pdfplumber_version`, `camelot_version` |
+| in-repo pipeline versions | `normalize_version` | + `sectioning_version`, `table_extraction_version` |
+| the interpreter | *nothing* | `python_version`, `unicodedata_version` |
+| external engines | *nothing* | `pdftotext_version`, `pdftotext_engine`, `poppler_version`, `pdfplumber_version`, `pdfminer_six_version`, `camelot_version`, `pypdfium2_version`, `opencv_version`, `mammoth_version`, `beautifulsoup4_version`, `lxml_version` |
 
-`SECTIONING_VERSION` and `TABLE_EXTRACTION_VERSION` were already exported from the package and bumped independently of the package version — they were simply never on the receipt, so anyone using `sections/` or `tables/` had the same unpinnable-input problem for a different reason.
+`SECTIONING_VERSION` and `TABLE_EXTRACTION_VERSION` were already exported and bumped independently of the package version — they were simply never on the receipt. `NORMALIZATION_VERSION` is now exported from the package top level too; its absence was an inconsistency rather than a decision.
 
-`NORMALIZATION_VERSION` is now exported from the package top level too; `SECTIONING_VERSION` and `TABLE_EXTRACTION_VERSION` already were, and the omission was an inconsistency rather than a decision.
+`unicodedata_version` is there because `normalize.py` calls `unicodedata.normalize` (NFC and NFKC): the Unicode database CPython ships with is a direct input to normalized text. The DOCX (mammoth) and HTML (bs4/lxml) engines are there because two of docpluck's three input formats were unpinned entirely. pypdfium2 and OpenCV are there because camelot's lattice flavor rasterizes pages through them.
 
-### Details that are load-bearing
+Details that are load-bearing:
 
-- **`pdftotext_engine` is reported separately from the version.** poppler and Xpdf are behaviourally different, not merely differently versioned — Xpdf 4.x emits `\n\n` paragraph breaks where poppler emits `\n`, which every line-level post-processor in `render.py` copes with. Both banner themselves as `pdftotext version N`, so the number alone cannot tell them apart.
+- **`pdftotext_engine` is reported separately from the version.** poppler and Xpdf are behaviourally different, not merely differently versioned — Xpdf 4.x emits `\n\n` paragraph breaks where poppler emits `\n`. Both banner themselves as `pdftotext version N`, so the number alone cannot tell them apart.
 - **`poppler_version` is `None` under Xpdf**, not the Xpdf version. Reporting an Xpdf version under a `poppler_` key would be a false provenance claim.
 - **The return code of `pdftotext -v` is deliberately ignored.** Xpdf prints its banner and exits non-zero; gating on `returncode == 0` would report `unknown` for exactly the engine whose identity matters most. The banner is read from **both** stdout and stderr (poppler 24.08.0 uses stderr).
-- **pdfplumber/camelot versions prefer the module already imported in-process** over distribution metadata, falling back to `importlib.metadata` only when the module is not loaded (importing camelot pulls in OpenCV). A shadowing module or an editable install pointing elsewhere makes metadata disagree with the code that actually runs.
+- **The receipt names the exact `pdftotext` binary** (`pdftotext_path`), and extraction runs *that* binary. Both go through one cached `resolve_pdftotext_executable()`; resolving the bare name separately in each place meant a `PATH` change between them could have the receipt swear to binary A while binary B produced the text (codex). One process, one binary — a caller that genuinely swaps `PATH` mid-run must `cache_clear()`.
+- **Engine versions come from installed distribution metadata, not the imported module's `__version__`.** Preferring the module made the value depend on **when you asked**: `opencv_version` read `4.13.0.92` before `cv2` was imported and `4.13.0` after — one process, one unchanged install, two answers (sonnet). A provenance value that changes with call order hides exactly the wheel-patch bump it should surface. The module is consulted only when *no* candidate distribution is installed (a vendored copy or source tree). The accepted cost, stated rather than hidden: a module **shadowing** an installed distribution is not detected. A first attempt to detect it compared the module's path against `distribution(name).locate_file("")` — which is the whole `site-packages` directory, so the test answered *true* for essentially everything and reintroduced the order dependence it was meant to remove (codex). A stable slightly-imprecise value beats an unstable sometimes-wrong one.
+- **OpenCV is looked up under all three of its distribution names**, and when more than one is installed the tie is broken by asking which distribution owns the file `find_spec` would import (no execution). camelot's `[cv]` extra names only `opencv-python`; a machine with `opencv-python-headless` would have been reported as "not installed" while `cv2` imports fine — a wrong value, not a missing one.
+- **The expensive path stays off the normal path.** A first cut called `packages_distributions()` once per engine — 6–11 s per call, uncached by the stdlib — which turned `get_version_info()` from milliseconds into **~24 s**, on a function that runs on every batch and on `docpluck --version`. Ownership resolution is now reached only when several candidate distributions are actually *installed*. Measured on the shipped form: 122 ms first call (dominated by the two subprocess probes), 13 ms thereafter.
+
+### 2. `render_pdf_to_markdown(normalization_level=...)` was a silent no-op
+
+The argument was accepted, documented as "forwarded to `extract_sections`", and **discarded** — `extract_sections` took no level at all and hard-coded `academic`. Verified end to end: `none`, `standard` and `academic` produced byte-identical markdown (same SHA-256). The CLI's `docpluck render --level` and the service's `/render?level=` both rode on it, so a documented user-facing option had never done anything.
+
+`extract_sections` now takes `normalization_level` and applies it. **The default moved from `standard` to `academic` so that behaviour is unchanged** for everyone who never passed it — only callers who explicitly asked for a different level see a difference, which is what they were asking for. The CLI default moved for the same reason. A non-default level on the DOCX/HTML/text branches raises `ValueError` rather than being accepted and ignored, since those branches never call `normalize_text`.
+
+> **Cross-repo, and it takes three files, not one.** `/render` defaulted `level=standard` at every tier while the library ignored the argument. The load-bearing one is the **Next.js route**, which forwards `level` *explicitly* to the service — fixing only the FastAPI default would have been overridden by it. All three (`frontend/src/app/api/render/route.ts`, `service/app/main.py`, `API.md`) are moved to `academic` in the app repo; they are no-ops against the current pin and **must be deployed before the tag auto-bumps it**, or production silently drops the statistical-expression repairs. `/analyze` already defaulted to `academic` on both tiers.
+
+### 3. `Section.subheadings` reached no consumer
+
+v1.6.1 added the field, `sections/core.py` populates it, tests cover it — and **both** consumer surfaces (`docpluck sections --format json` and the service's `/sections`) had independently enumerated the nine keys that existed beforehand. The feature worked and was invisible. `Section.to_dict()` and `SectionedDocument.to_dict()` now derive from `fields()`, and the CLI uses them. `SectionedDocument.to_dict()` omits exactly one field, `normalized_text` (megabytes on a long paper), which is named in `_TO_DICT_OMITS` and represented by `normalized_text_length` — a decision rather than an accident.
+
+### 4. Serializer drift — the same shape in three more places
+
+`ExtractionReport.to_dict()` hand-enumerated its keys, so any field added afterwards was silently dropped from the written receipt. Sweeping the package for that shape found:
+
+- **`NormalizationReport.to_dict()` was dropping `column_interleave_pages`.** The field is populated by `_detect_column_interleave_pages`, and `extract_columns.py` documents it as the canonical source of the column-interleave signal — but it never survived serialization. Live, and predates this release.
+- The per-file `<stem>.json` sidecar was hand-built from a picked key list.
+
+All now derive from `asdict()`/`fields()`, with a parametrized guard asserting `to_dict()` covers every declared field. `extract_to_dir` also **splats** `get_version_info()` into `ExtractionReport(...)` instead of assigning field by field, so a key added to the receipt without a matching field raises `TypeError` on the first batch run rather than silently sitting at its `"unknown"` default.
+
+Two wrong values on disk fell out of cross-model review of that change:
+
+- The sidecar recorded **`ok: false` on every successful extraction** — it serialized the result before `ok` was set. A wrong value on disk, contradicting both the written `.txt` and the report.
+- The sidecar emitted `elapsed_seconds` before the timer stopped, recording a `0.0` that read as a measurement. It is no longer emitted there. All pre-existing sidecar keys are preserved.
 
 ### A-2 — per-file quality signals (`batch.py`)
 
-`ExtractionFileResult` gains `n_replacement_chars` (U+FFFD) and `n_greek_chars`, both measured on the **normalized** text — exactly the bytes written to `<stem>.txt`. MetaESCI's G1/G2 acceptance gates re-scanned every written file for these. New public helpers `count_replacement_chars()` / `count_greek_chars()`; Greek covers U+0370–U+03FF and U+1F00–U+1FFF.
+`ExtractionFileResult` gains `n_replacement_chars` (U+FFFD) and `n_greek_chars`, both measured on the **normalized** text — exactly the bytes written to `<stem>.txt`. MetaESCI's G1/G2 acceptance gates re-scanned every written file for these. New public helpers `count_replacement_chars()` / `count_greek_chars()`; Greek covers U+0370–U+03FF and U+1F00–U+1FFF, and the matcher is compiled **from** the range table so the two cannot drift.
 
-### Serializer drift — the same defect class, three more instances
+The first implementation was a per-character Python loop: **60x slower** than the equivalent regex (29 ms vs 0.5 ms on a 50k-char paper — 247 s vs 4 s across MetaESCI's 8,431-document corpus). Replaced, with an exhaustive boundary test proving the regex and the range table agree on every codepoint around both blocks.
 
-`ExtractionReport.to_dict()` hand-enumerated its keys, so any field added to the dataclass afterwards was **silently dropped from the written receipt**. Sweeping the package for that shape found the same construction in two more places, one of which was already losing data:
+### Dead code removed
 
-- **`NormalizationReport.to_dict()` (`normalize.py`) was dropping `column_interleave_pages`.** The field is populated by `_detect_column_interleave_pages`, and `extract_columns.py` documents `NormalizationReport.column_interleave_pages` as the canonical source of the column-interleave signal — but it never survived serialization, so every consumer reading the serialized report saw a complete-looking object with the signal missing. This was live, and predates this release.
-- The per-file `<stem>.json` sidecar was hand-built from a picked key list.
+`append_footnotes_section` (`sections/core.py`) was dead in two independent ways: **zero call sites** anywhere — library, tests, or service — and an **unreachable precondition** (it looked for the F0 footnote-appendix sentinel, which only `normalize_text(layout=...)` produces, and `extract_sections` never passes `layout=`). It was orphaned by the v1.6.1 change that took F0 out of the sections path; `tests/test_sections_footnote_section.py` already documents the resulting behaviour. `/docpluck-review` SKILL.md check 9 described it as live and has been corrected. One vestigial unused parameter removed (`_find_caption_for_table(raw_text)`). Two others were left in place and documented instead: `_detect_2col_midline_gutter(page_height)` was already unused *by documented design*, and removing `_detect_packed_arms(header)` broke seven tests that pass it positionally — a parameter's contract includes its call sites, not just its body.
 
-All three now derive from `asdict()`, with a parametrized guard asserting `to_dict()` covers every declared field.
+### Known limitation surfaced, not fixed
 
-Two sidecar corrections found by cross-model review while making that change:
-
-- The sidecar recorded **`ok: false` on every successful extraction** — it serialized the result before `ok` was set. A wrong value on disk, contradicting both the written `.txt` and the report.
-- The sidecar no longer emits `elapsed_seconds` (not final at write time — it recorded a `0.0` that read as a measurement) or a bare generic `version` key beside five `*_version` keys. All pre-existing sidecar keys are preserved.
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
-`tests/test_provenance_completeness.py`, 31 tests, all verified failing against the unfixed code first. The structural guard is `test_no_exported_version_constant_is_missing_from_the_receipt`: any future `*_VERSION` constant exported from the package fails the suite until it is added to `get_version_info()`. A test asserting only `"poppler_version" in info` would have let the next unreported input through — which is exactly how this one arrived.
+`tests/test_provenance_completeness.py`, 46 tests. Full suite: **2061 passed, 0 failed** (2015 before this change plus the 46 new ones — no test loss).
+
+Every defect above was **reproduced against the unfixed code before being fixed**: the missing receipt keys and quality signals as 11 red tests in a HEAD worktree; `NormalizationReport`'s drop by restoring the old `to_dict` onto the live class and watching the guard go red; the sidecar's `ok: false`, the `normalization_level` no-op (three identical SHA-256s), the `subheadings` omission, the `extract_to_dir` `TypeError`, the `opencv_version` import-order split and the 24 s `get_version_info()` by direct runs. The remaining tests are structural guards that pass today by design and fail on the next drift; they are not counted as reproductions.
+
+Two of those guards are the ones that matter for the future:
+
+- `test_every_declared_runtime_dependency_reaches_the_receipt` derives its expectation from `pyproject.toml`, so adding a dependency without adding its key fails the suite.
+- `test_no_exported_version_constant_is_missing_from_the_receipt` does the same for any future `*_VERSION` export.
+
+A test asserting only `"poppler_version" in info` would have let the next unreported input through — which is exactly how this one arrived.
 
 ## [2.4.125] - 2026-08-05
 
@@ -1503,6 +1538,10 @@ skipped — those are typically range expressions, not decimals.
 
 NORMALIZATION_VERSION bumped 1.8.8 → 1.8.9.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - `tests/test_chart_data_trim_real_pdf.py` (NEW — 14 contract +
@@ -1542,6 +1581,10 @@ is treated as a spanning section-row label (and NOT merged) when:
 - xiao Table 6: `Control` and `Regret-Salient` section rows now
   surface as separate `<tr>` rows, no longer merged into the
   `Choice set N | 112/172 | ...` data rows.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -1592,6 +1635,10 @@ Final fix: render-layer post-processor. Extended
   FUTURE WORK`, `## REFERENCES`.
 - `xiao_2021_crsp` — no change (uses Title Case headings; existing
   detection works).
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -1674,6 +1721,10 @@ chart-data trim and the new body-prose-boundary trim both pass them
 through. Would require a flow-chart-node-name detector (Title Case
 phrases interleaved with single-digit ordinals). Queued for a future
 cycle.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -2293,6 +2344,10 @@ intact rather than guessing at a wrong split.
 - `__version__`: `2.4.14` → `2.4.15`. Patch (section-partition tightening;
   no API or schema change).
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - New: `tests/test_sections_core_partition.py`:
@@ -2402,6 +2457,10 @@ empathy. We provided full analyses…") is excluded.
   raw_text content tightened; new fenced `unstructured-table` code-block tag
   is additive markdown).
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - 192 normalize / caption / extract-filter tests PASS unchanged.
@@ -2445,6 +2504,10 @@ After Railway redeploys with the new Dockerfile + library pin:
 
 - `__version__`: `2.4.12` → `2.4.13`. Patch (dependency declaration; no API surface change).
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 230 unit tests PASS unchanged. (The bug couldn't be caught by unit tests because the test environment had Camelot installed — same as local dev. Catching this class of bug requires the new /_diag endpoint to assert dep presence on the actual deployment.)
@@ -2469,6 +2532,10 @@ On chan_feldman Table 1 (the hypothesis table): `raw_text` now contains 2446 cha
 ### Bumps
 
 - `__version__`: `2.4.11` → `2.4.12`. Patch (additive — `raw_text` was already a typed field, populating it doesn't change schema).
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -2501,6 +2568,10 @@ Fix: greedy clustering. Walk sorted values, extend a cluster while the next valu
 
 - `__version__`: `2.4.10` → `2.4.11`. Patch.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - 3 new tests in `tests/test_render.py` (threshold 2, italic-caption case from chan_feldman Table 2, regression for single-orphan preserved).
@@ -2525,6 +2596,10 @@ The v2.4.6 `_suppress_orphan_table_cell_text` split input on `\n\n+` to identify
 
 - `__version__`: `2.4.9` → `2.4.10`. Patch (single render-pipeline function rewrite).
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - 1 new regression test in `tests/test_render.py::test_suppress_orphan_table_cell_text_poppler_single_newline_format` that simulates poppler-style single-newline cell row joining. All 55 render tests + 227 render+normalize tests PASS.
@@ -2542,6 +2617,10 @@ Regression hotfix for v2.4.8's `_demote_false_single_word_headings`. The 26-pape
 1. **`docpluck/render.py::_demote_false_single_word_headings`** —
    - Added `_STRONG_SECTION_NAMES` allowlist: abstract / introduction / background / methods / materials / results / discussion / conclusion / references / bibliography / acknowledgments / funding / limitations / appendix / keywords. Headings with these words are NEVER demoted — they are authoritative section markers.
    - Added numbered-subsection guard: if next line matches `^\d+(?:\.\d+){1,3}\.?\s+\w` (e.g., `3.1. Subjects`, `3.1.2. Foo`), the heading stays — the numbered subsection is legitimate body content.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -2602,6 +2681,10 @@ Conservative: a legit `## Results\n\nWe found...` (capitalized first char of nex
 
 - `__version__`: `2.4.7` → `2.4.8`. Patch.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - 7 new tests in `tests/test_render.py` (false-heading demoter — basic, h3, idempotent, preserved-when-capitalized-next, lowercase / digit / continuation cases).
@@ -2645,6 +2728,10 @@ Follow-up to v2.4.6 — three more visible-defect fixes plus expanded linter and
 ### Bumps
 
 - `__version__`: `2.4.6` → `2.4.7`. Patch.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -2696,6 +2783,10 @@ On `xiao_2021_crsp`: 18 `Q. XIAO ET AL.` standalone leaks → 0 (one residual is
 
 - `__version__`: `2.4.5` → `2.4.6`. Patch (additive normalize patterns + new render post-processor; no API surface change).
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - 7 new tests in `tests/test_render.py` for `_suppress_orphan_table_cell_text` (drops leaked rows, preserves prose, requires ≥ 3 orphans, skips already-italic caption, stops at next caption, idempotent, no-op when no caption).
@@ -2720,6 +2811,10 @@ Continuation of v2.4.3's 4-digit page-number strip. v2.4.3 required the same 4-d
 
 - `__version__`: `2.4.4` → `2.4.5`. Patch.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 2 new tests in `tests/test_normalization.py` (sequential page-number stripping, unrelated 4-digit value preservation).
@@ -2740,6 +2835,10 @@ Bug fix on v2.4.3's caption-trim feature + extension to a second chart-data sign
 
 - `__version__`: `2.4.3` → `2.4.4`. Patch — figure-caption truncation is now real and broader.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 3 new tests in `tests/test_figure_detect.py` (tick-run truncation, prose-with-inline-numbers no-op, earlier-of-two-signatures priority).
@@ -2758,6 +2857,10 @@ Same-day follow-up. Two preventative improvements aimed at quality issues that d
 
 - `__version__`: `2.4.2` → `2.4.3`. Patch — both fixes are conservative pdftotext post-processing.
 - `NORMALIZATION_VERSION`: `1.8.1` → `1.8.2`.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -2780,6 +2883,10 @@ Iterative follow-up. After v2.4.1 the 101-PDF corpus run was 98/101 PASS (`scrip
 ### Bumps
 
 - `__version__`: `2.4.1` → `2.4.2`. Patch — render behavior changes affect only the 2 H-tagged papers + lowercase-abstract heading on Elsevier-style papers; no API change.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -2853,6 +2960,10 @@ Follow-up to v2.3.0. Closes the four remaining items from `docs/HANDOFF_2026-05-
 - `__version__`: `2.3.0` → `2.3.1`.
 - `TABLE_EXTRACTION_VERSION`: unchanged at `2.1.0` (no table-pipeline behavior change).
 - `NORMALIZATION_VERSION`: unchanged at `1.8.1`.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 
@@ -3061,6 +3172,10 @@ Strict-bar iteration on a 101-PDF corpus across 9 academic styles (apa, ieee, na
 - `NORMALIZATION_VERSION`: `1.6.0` → `1.7.0` (additive: new W0 watermark patterns).
 - Section partitioning output may differ on Collabra Psychology, RSOS, IEEE, and Elsevier two-column papers — these previously emitted bloated front-matter / missing abstract / `discussion_2` instead of `conclusion`. Behavior on the 250+ unit-test corpus is unchanged.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - 749 passed, 18 skipped (full repo suite). 255 passed + 2 skipped on `tests/test_sections_*.py` + `tests/test_normalization.py`.
@@ -3198,6 +3313,10 @@ A combined release: structured-extraction (tables + figures) and a section-ident
   order, so PDFs with both a main and a supplementary bibliography get
   R2/R3 applied to each.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - Added `tests/test_request_09_reference_normalization.py` (5 cases) gated on
@@ -3242,6 +3361,10 @@ Corpus dry-run: 51 PDFs, 0 regressions, 46 changed.
   to a test statistic (as in `F[2,42]= 13.689`), not a reference list.
   Caught in the docpluck-review skill pass immediately after v1.4.3 tag.
 
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
+
 ### Tests
 
 - Added `test_a3b_does_not_fire_on_short_word_citations` with 4 probes.
@@ -3277,6 +3400,10 @@ Corpus dry-run: 51 PDFs, 0 regressions, 46 changed.
 - `NORMALIZATION_VERSION` bumped `"1.4.1"` → `"1.4.2"` to reflect the A3b
   addition and the A3 lookbehind semantic change. Downstream consumers
   should invalidate their extraction cache on this bump.
+
+### Known limitation surfaced, not fixed
+
+**`Section.pages` is always `()` — for every format.** Page mapping needs `NormalizationReport.page_offsets`, which only `normalize_text(layout=...)` fills, and `extract_sections` deliberately omits `layout=` (v1.6.1 took the layout channel out of the sections path — LESSONS L-001); the DOCX/HTML branches never supply offsets either. Confirmed on a 3-page PDF: every section came back with `pages=()`. The CLI and the service both emit `"pages": []`, which reads as "spans no pages" rather than "not computed". Wiring it up would run F0 and is precisely the corpus-wide change L-001 records being reverted, so it is queued with its own gated cycle rather than bolted on here. The field now documents the truth in `sections/types.py`.
 
 ### Tests
 

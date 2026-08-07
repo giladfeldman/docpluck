@@ -422,76 +422,195 @@ is absent, not error at collection).
 
 ---
 
-## L-012 — A provenance receipt that omits an input is worse than no receipt; and a hand-enumerated serializer will silently drop the next field added
+## L-012 — Four ways this repo told the truth in a docstring and a lie in the call graph
 
-**Surface (2026-08-07, MetaESCI `INBOX_FROM_METAESCI_2026-08-07.md`).** MetaESCI
-ran the **same** docpluck SHA (`a5c02ef`) against the **same** PDF
+**Origin (2026-08-07, MetaESCI `INBOX_FROM_METAESCI_2026-08-07.md`).** MetaESCI ran
+the **same** docpluck SHA (`a5c02ef`) against the **same** PDF
 (`10.1098/rsos.202336`) in April and in August: 49,091 vs 50,101 normalized
 characters, 9 vs 10 downstream effect rows. The system poppler binary had been
-replaced on 2026-05-14. `get_version_info()` reported
-`{version, normalize_version, git_sha}` — **all three identical across both
-runs**. Nothing docpluck recorded made the change detectable, so the downstream
-spent real time hunting the difference in its own code.
+replaced on 2026-05-14. `get_version_info()` reported three keys, **all identical
+across both runs**. Nothing docpluck recorded made the change detectable, so the
+downstream hunted the difference in its own code.
 
-**The rule.** `method=pdftotext_default` shells out to whatever `pdftotext` is
-on `PATH`. A library SHA cannot pin an external binary, and a receipt that does
-not say so is *actively misleading* — a complete-looking object is read as a
-complete pin. Every input that can change output goes on the receipt:
+They filed one ask. Sweeping for the *class* found three more defects of the same
+shape, two of them user-facing and one of them older than the ask.
 
-1. docpluck itself (`version`, `git_sha`);
-2. **every in-repo `*_VERSION` constant** — `SECTIONING_VERSION` and
-   `TABLE_EXTRACTION_VERSION` were exported and bumped independently of the
-   package version, and were simply never on the receipt;
-3. **every external engine** — the pdftotext binary, pdfplumber, camelot.
+### 1. An incomplete provenance receipt is worse than none
 
-Pinned by `tests/test_provenance_completeness.py::test_no_exported_version_constant_is_missing_from_the_receipt`,
-which fails on any future `*_VERSION` export until it reaches
-`get_version_info()`. A test asserting only `"poppler_version" in info` would
-have let the next unreported input through — which is exactly how this one
-arrived.
+A complete-*looking* receipt is read as a complete pin. A library SHA cannot pin
+an external binary: `pdftotext_default` shells out to whatever is on `PATH`.
 
-**Record the ENGINE, not just the version, when two engines share a name.**
-poppler and Xpdf both banner as `pdftotext version N`, and they differ
-*behaviourally* (Xpdf 4.x emits `\n\n` paragraph breaks where poppler emits
-`\n` — cf. memory `feedback_pdftotext_version_skew`). Hence
-`pdftotext_engine`; hence `poppler_version` is `None` under Xpdf rather than
-carrying an Xpdf number under a `poppler_` key. And **do not gate the probe on
-its return code**: Xpdf prints its banner and exits non-zero, so
-`returncode == 0` would report `unknown` for exactly the engine whose identity
-matters most. Read both stdout and stderr (poppler 24.08.0 uses stderr).
+**Enumerate four classes, not one:** the library itself; **every in-repo
+`*_VERSION` constant** (`SECTIONING_VERSION` / `TABLE_EXTRACTION_VERSION` were
+exported and independently bumped, just never on the receipt); **the interpreter**
+(`normalize.py` calls `unicodedata.normalize`, so CPython's Unicode database is a
+direct input); and **every external engine** — including the ones for the formats
+you were not thinking about. Two of docpluck's three input formats (DOCX via
+mammoth, HTML via bs4/lxml) were unpinned entirely, and camelot's lattice flavor
+rasterizes through pypdfium2 and OpenCV.
 
-**Prefer the module already imported over distribution metadata.** A shadowing
-module, an editable install pointing elsewhere, or a vendored copy makes
-`importlib.metadata` disagree with the code that will actually run — a
-confidently wrong provenance value, worse than an absent one.
+**Guard it structurally, not by name.** A test asserting `"poppler_version" in
+info` passes forever while the next input goes unreported. Two guards now derive
+their expectations from the repo itself:
+`test_every_declared_runtime_dependency_reaches_the_receipt` reads
+`pyproject.toml`; `test_no_exported_version_constant_is_missing_from_the_receipt`
+reads `docpluck.__all__`.
 
-**The sibling defect, found by looking for the class rather than the bug.**
-Three serializers in this repo hand-enumerated their keys, so any field added
-to the dataclass afterwards was silently dropped on the way to disk. Every unit
-was individually correct; the value just never arrived:
+**Record the ENGINE when two engines share a name.** poppler and Xpdf both banner
+as `pdftotext version N` and differ *behaviourally* (Xpdf 4.x emits `\n\n`
+paragraph breaks — memory `feedback_pdftotext_version_skew`). Hence
+`pdftotext_engine`; hence `poppler_version` is `None` under Xpdf. And **do not
+gate the probe on its exit code** — Xpdf prints the banner and exits non-zero, so
+`returncode == 0` would report `unknown` for the very engine whose identity
+matters most. Read both stdout and stderr.
 
-- `ExtractionReport.to_dict()` (`batch.py`) — would have dropped every field
-  added in this very change.
-- `NormalizationReport.to_dict()` (`normalize.py`) — **was already dropping
-  `column_interleave_pages`**, a populated field that `extract_columns.py`
-  documents as the canonical source of the column-interleave signal.
-- The per-file `<stem>.json` sidecar, hand-built from a picked key list.
+**Prefer the module in `sys.modules` over `importlib.metadata`, and allow several
+distribution names.** Metadata can name code that never runs (this checkout's own
+`importlib.metadata.version("docpluck")` lags `docpluck.__version__`). OpenCV
+ships as `opencv-python` / `-headless` / `-contrib`; camelot's extra names only
+the first, so a single-name lookup reports "not installed" on a machine where
+`cv2` imports fine. **Wrong is worse than missing.**
 
-All three now derive from `asdict()`, with a parametrized guard asserting
-`to_dict()` covers every declared field. **When you add a field to a dataclass,
-grep for its serializer** — or better, make the serializer incapable of
-disagreeing with the dataclass.
+### 2. A declared option the code never branches on
 
-**Two wrong values on disk fell out of the same review.** The sidecar recorded
-`ok: false` on every *successful* extraction (it serialized the result before
-`ok` was set), and an `elapsed_seconds: 0.0` written before the timer stopped.
-Both read as measurements. Neither crashed anything, neither failed a test, and
-neither was found by re-reading the code — they were found by a cross-model
-review and then **reproduced locally** before being fixed.
+`render_pdf_to_markdown(normalization_level=…)` was accepted, documented as
+"forwarded to `extract_sections`", and **discarded** — `extract_sections` took no
+level and hard-coded `academic`. `none`, `standard` and `academic` produced
+byte-identical markdown. The CLI's `--level` and the service's `/render?level=`
+both rode on it: a documented user-facing option that had never done anything.
+
+**When you make such an option real, the default must preserve today's
+behaviour.** The declared default was `standard` while the code did `academic`;
+plumbing it through as-declared would have silently downgraded every render in the
+corpus. Move the default to what the code actually did, so only callers who
+explicitly asked for something else see a change. **Check the other repo too** —
+the service's `/render` defaulted to `standard`, so the library fix alone would
+have changed production output the moment the pin bumped.
+
+And where a branch genuinely cannot honour the option (DOCX/HTML never call
+`normalize_text`), **raise** rather than accept-and-ignore. Accepting an argument
+that changes nothing is the defect, not the fix.
+
+### 3. A hand-enumerated serializer drops the next field added
+
+Four of them here. Every unit was individually correct; the value just never
+reached the consumer.
+
+- **`Section.subheadings` reached NO consumer.** v1.6.1 added the field,
+  `sections/core.py` populates it, tests cover it — and both surfaces
+  (`docpluck sections --format json` and the service's `/sections`) had
+  *independently* enumerated the nine keys that existed beforehand. The feature
+  worked and was invisible. Two consumers writing the same key list is a
+  duplicated hazard, not a redundancy.
+- **`NormalizationReport.to_dict()` dropped `column_interleave_pages`**, a
+  populated field `extract_columns.py` documents as the canonical source of that
+  signal. Live, and older than the ask.
+- **`ExtractionReport.to_dict()`** would have dropped every field added by this
+  very change.
+- The per-file `<stem>.json` sidecar, built from a picked key list.
+
+Derive from `fields()` / `asdict()`, and pin it with a guard asserting `to_dict()`
+covers every declared field. Where an omission is genuinely wanted (a
+megabyte-sized `normalized_text`), **name it** in a constant and emit something in
+its place, so it reads as a decision. Also **splat** rather than assign
+field-by-field when copying one structure into another: a new key then raises
+`TypeError` immediately instead of silently sitting at its default.
+
+### 4. Dead code that documentation described as live
+
+`append_footnotes_section` had **zero call sites** anywhere *and* an unreachable
+precondition (it looked for the F0 sentinel that only `normalize_text(layout=…)`
+produces; `extract_sections` never passes `layout=`). It was orphaned by the
+v1.6.1 change that took F0 out of the sections path — and `/docpluck-review`
+SKILL.md check 9 still described it as the thing that finds the sentinel. **A
+comment or doc that names a function is a claim about the call graph; verify the
+function is invoked.**
+
+### How these were found, and how they were nearly mis-found
+
+An AST sweep, not grep: dict literals mirroring a dataclass, dataclass fields
+never assigned, function parameters never referenced. Grep cannot see any of them.
+
+But the sweep's *first* answers were mostly wrong. It flagged eleven `Section(…)`
+rebuilds as dropping `subheadings`; reproduction showed subheadings are attached
+at `core.py:299`, **after** the coalesce and truncation rebuilds, and are never
+attached to `unknown` spans at all (`core.py:283`) — so all but the dead one were
+false. It flagged `_detect_2col_midline_gutter(page_height)` as a dead parameter;
+the docstring already explains why it is deliberately unused. **Every finding is a
+hypothesis until a reproduction confirms it — including your own tool's.**
+
+Two more, both found by cross-model review rather than by re-reading the code, and
+both *wrong values on disk* rather than missing ones: a sidecar recording
+`ok: false` on every **successful** extraction, and an `elapsed_seconds: 0.0`
+written before the timer stopped. Neither crashed, neither failed a test.
+
+### What the SECOND review pass taught (the fix needed four more rounds)
+
+The work above was reviewed once, declared clean, and then re-reviewed at higher
+rigor. The second pass found **more defects in the fix than the fix had found in
+the code** — every one of them a value that was wrong or unstable rather than
+missing:
+
+- **A crash I shipped between two reviews.** Adding `pdftotext_path` to the
+  receipt without adding the matching `ExtractionReport` field made
+  `extract_to_dir` — the public batch API — raise `TypeError` 100% of the time.
+  The *splat* construction is what made it loud instead of silent, which is why
+  it is built that way; but it still reached a review, not a test run.
+- **A provenance value that changed with call order.** Preferring the imported
+  module's `__version__` made `opencv_version` read `4.13.0.92` before `cv2` was
+  imported and `4.13.0` after — one process, one install, two answers. **Ask of
+  any recorded value: does it depend on *when* I ask?**
+- **A "fix" for that whose premise was false.** Detecting a shadowing module by
+  comparing its path against `distribution(name).locate_file("")` fails because
+  that root is the whole `site-packages` — the test answers *true* for
+  essentially everything. It would have returned wrong versions. Dropped in
+  favour of a stated limitation: **a stable slightly-imprecise value beats an
+  unstable sometimes-wrong one, and an honest documented gap beats an
+  unreliable detector.**
+- **A 60x-and-then-3000x performance regression, in the correctness fix.**
+  `packages_distributions()` costs 6–11 s per call and the stdlib does not cache
+  it; calling it once per engine took `get_version_info()` from milliseconds to
+  ~24 s. **Measure the helper you just added to a per-file path.**
+- **A cosmetic cleanup that broke seven tests.** Removing an unused parameter
+  from a private helper — genuinely unused *in the body* — broke every test that
+  passed it positionally. **A parameter's contract includes its call sites.**
+  Reverted and documented instead, matching what this codebase already does for
+  `_detect_2col_midline_gutter(page_height)`.
+
+Two of those (the crash, the order-instability) were found by a model, not by
+re-reading; two more (the false `locate_file` premise, the dead
+`_cached_packages_distributions` left behind by my own refactor) were found by
+asking a model to falsify the *fix* rather than review the code. **Route the
+remedy past a second model, not just the defect** — and re-run the full suite
+after every "obviously safe" cleanup.
+
+### A declared field with no way to populate it
+
+`Section.pages` is documented as 1-indexed page numbers and is **always `()`**,
+for every format: page mapping needs `NormalizationReport.page_offsets`, which
+only `normalize_text(layout=...)` fills, and `extract_sections` deliberately
+omits `layout=` (v1.6.1 — see L-001). The CLI and the service both emit
+`"pages": []`, which reads as "spans no pages" rather than "not computed".
+
+Not fixed here, and that is the point of recording it: wiring it up runs F0 and
+is exactly the corpus-wide change L-001 records being reverted. **When the fix
+is a behaviour change you cannot verify in the current run, say so at the field,
+queue it, and tell the user — do not leave the field looking functional.**
+
+### And one performance defect in the fix itself
+
+The first `count_greek_chars` was a per-character Python loop — **60x slower**
+than the equivalent regex (29 ms vs 0.5 ms per paper; 247 s vs 4 s across the
+requester's 8,431-document corpus). Measure a helper that runs on every file of
+every batch. The regex is compiled *from* the range table so the readable
+definition and the fast implementation cannot drift, with an exhaustive
+boundary test proving they agree.
 
 Cite: `docpluck/version.py`, `docpluck/batch.py`, `docpluck/normalize.py`
-(`NormalizationReport.to_dict`), `tests/test_provenance_completeness.py`,
-CHANGELOG `[2.4.126]`, `REPLY_FROM_DOCPLUCK_v2.4.126.md`.
+(`NormalizationReport.to_dict`), `docpluck/sections/types.py`,
+`docpluck/sections/__init__.py`, `docpluck/sections/core.py`, `docpluck/cli.py`,
+`docpluck/render.py`, `tests/test_provenance_completeness.py`, CHANGELOG
+`[2.4.126]`, `REPLY_FROM_DOCPLUCK_v2.4.126.md`.
 
 ---
 
