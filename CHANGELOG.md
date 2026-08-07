@@ -1,5 +1,44 @@
 # Changelog
 
+## [Unreleased] - 2026-08-07
+
+**984 KB of published article text left this repo, and the gate that needed it kept its full strength.** No library code changed — `docpluck/` is untouched, so there is no version bump and no output change.
+
+### `tests/snapshots/*.txt` -> `tests/snapshots/checksums.json`
+
+Twelve files, 984 KB, were the byte-identical `extract_pdf()` output of real published papers: title, all authors, affiliations, full body. `apa_efendic_affect.txt` carried SAGE's own `Article reuse guidelines` notice verbatim. They were tracked and served from this **public** remote since 2026-05-07. Plaintext is *more* scrapable than the PDFs this repo already refuses to commit.
+
+A sha256 asserts the identical byte-for-byte guarantee in ~80 bytes per fixture. The pins were generated from the old `.txt` files and then **re-derived from a live extraction run, matching digest-for-digest, before anything was deleted** — so the new gate provably encodes what the old one did. `checksums.json` also pins `method`, which the previous gate only checked for set-membership.
+
+The one capability a hash lacks — printing a diff — is restored, not dropped:
+
+- `pytest --snapshot-explain` dumps the actual text to `tmp/` (gitignored) **and** diffs it against the custodian's copy, fetched from article-finder by the paper's DOI. Verified end-to-end: with a pin deliberately corrupted, it produced a 0-byte diff (contents identical).
+- `pytest --snapshot-update` re-pins after an intentional extraction change.
+
+The 12 texts now live in article-finder as versioned tool artifacts (`extract-text__docpluck@2.4.126`), keyed by DOI, outside every repo. Every `MANIFEST.json` fixture gained its `canonical_key`.
+
+Two new tests, because the absence of each is what let this sit for three months:
+
+- `test_no_article_text_in_snapshot_dir` — watched FAIL against the 12 real files before they were removed. A shape check on the directory, not a filename denylist: these files were named exactly like ordinary fixtures, which is why three filename-based cleanup passes and an allowlist-based exposure gate all passed them.
+- `test_checksums_cover_every_manifest_fixture` — coverage asserted, not counted at runtime.
+
+### History purge
+
+Swept all 283 commits with a new content-based detector: these 12 files, in 28 blob revisions, are the **only** publication text this repo has ever held. No PDF was ever committed; `tests/golden/`, `MANIFEST.json` and `scripts/harness/` are clean. `git-filter-repo` removed them; 21,597 retained file entries across 136 refs verified **byte-identical** against a pre-purge bundle. `main` and all 127 tags force-pushed and verified clean by mirror clone.
+
+**`refs/pull/1/head` is not clean and cannot be made clean by git.** It still serves 312 pre-purge commits and 37 article-text paths, readable **unauthenticated** — including 24 splice-spike render baselines that were believed safe because they were gitignored. Only GitHub Support can purge a merged PR's ref. See `LESSONS.md` L-013.
+
+### `scripts/verify_corpus.py` — everything now comes from article-finder
+
+The expected paper set, each PDF, and each baseline. No directory glob, no `../PDFextractor` coupling, no `DOCPLUCK_SPIKE_BASELINE_DIR`, no `docs/superpowers/` default path.
+
+The coverage defect this fixes: the gate derived its corpus from `glob("*.md")` and printed `N / N` where N was *whatever it found*, so a half-present corpus reported a clean pass. The denominator now comes from `papers-with-view`, and three outcomes are kept distinct — nothing resolvable is a clean `SKIP` (exit 0), a shortfall is `PARTIAL COVERAGE` (exit 1), and only then per-paper PASS/WARN/FAIL.
+
+New `PDF_DRIFT` status: the repository's copy of a paper is not the manifestation the baseline was built from (publisher PDF vs arXiv preprint vs PMC author manuscript share a DOI, not bytes). Comparing a render of one against a baseline built from the other measures nothing and would report the difference as a docpluck regression.
+
+Papers are now addressed by canonical key: `--paper 10.1177/19485506211056761`.
+
+
 ## [2.4.126] - 2026-08-07
 
 **Four surfaces claimed something the code did not do.** MetaESCI asks A-1/A-2 (`INBOX_FROM_METAESCI_2026-08-07.md`) opened on one of them; sweeping for the *class* found the other three. No normalization change, so `NORMALIZATION_VERSION` stays `1.9.50`, and default output is byte-identical.
