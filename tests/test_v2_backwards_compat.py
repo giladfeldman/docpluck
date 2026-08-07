@@ -10,7 +10,19 @@ import pytest
 _HERE = Path(__file__).parent
 _MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
 _SNAPSHOT_DIR = _HERE / "snapshots"
-_VIBE = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe"
+
+# The portfolio root. Resolution order per the ~/Vibe/CLAUDE.md hard rule
+# ("Never hardcode the Vibe root — use VIBE_ROOT"): env var, then $HOME/Vibe.
+#
+# 2026-08-07: this was hardcoded to `$HOME/Dropbox/Vibe`. The portfolio moved
+# OUT of Dropbox on 2026-08-03 (Dropbox syncing a live .git corrupts repos), so
+# every fixture resolved to a path that no longer exists and **all 12 tests
+# SKIPPED** — silently, for four days. That is the precise failure the hard
+# rule warns about: "a discovery helper that returns empty when the root is
+# wrong makes a broken run look like a clean one". Worse here than usual,
+# because these tests are the reason 984 KB of published article text sits in
+# `tests/snapshots/` — all of the exposure, none of the protection.
+_VIBE = Path(os.environ.get("VIBE_ROOT") or (Path(os.path.expanduser("~")) / "Vibe"))
 
 
 def _entries():
@@ -23,6 +35,24 @@ def _resolve(entry: dict) -> Path:
     data = json.loads(_MANIFEST.read_text(encoding="utf-8"))
     base = _VIBE if data.get("vibe_relative") else Path("/")
     return base / entry["source_path"]
+
+
+def test_fixture_root_exists():
+    """Fail loudly when the corpus root is wrong, instead of skipping 12 tests.
+
+    Without this, a relocated portfolio turns the whole snapshot suite into a
+    silent no-op and the run still reports green. A missing *individual* PDF is
+    a legitimate skip (not everyone has the closed-access corpus); a missing
+    *root* is a broken configuration and must be visible.
+    """
+    data = json.loads(_MANIFEST.read_text(encoding="utf-8")) if _MANIFEST.is_file() else {}
+    if not data.get("vibe_relative"):
+        pytest.skip("manifest is not vibe-relative")
+    assert _VIBE.is_dir(), (
+        f"corpus root {_VIBE} does not exist — every fixture would skip and the "
+        "suite would report green. Set VIBE_ROOT, or check whether the portfolio "
+        "moved (it left ~/Dropbox/Vibe on 2026-08-03)."
+    )
 
 
 @pytest.mark.parametrize("entry", _entries(), ids=lambda e: e.get("id", "?"))
