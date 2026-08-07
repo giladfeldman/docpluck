@@ -33,6 +33,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -42,10 +43,22 @@ from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 APP_PDFS = REPO_ROOT.parent / "PDFextractor" / "test-pdfs"
-SPIKE_OUT_DIRS = [
-    REPO_ROOT / "an internal design doc",
-    REPO_ROOT / "an internal design doc",
-]
+# Where the 26-paper known-good render baselines live. They are LOCAL,
+# gitignored artifacts — never committed to this public repo — so the location
+# is resolved at runtime rather than assumed.
+#
+# 2026-08-07: this list previously held two identical literals reading
+# "an internal design doc". The 2026-08-06 de-referencing pass replaced real
+# paths with that placeholder prose and silently BROKE this gate: every run
+# since printed "ERROR: no spike baselines found" and exited 1, while the QA
+# skill documented that message as an expected clean skip on a fresh checkout.
+# A CRITICAL render-regression gate was dead for a week and its deadness read
+# as normal. Set DOCPLUCK_SPIKE_BASELINE_DIR to point elsewhere.
+_SPIKE_ROOT = Path(
+    os.environ.get("DOCPLUCK_SPIKE_BASELINE_DIR")
+    or REPO_ROOT / "docs" / "superpowers" / "plans" / "spot-checks" / "splice-spike"
+)
+SPIKE_OUT_DIRS = [_SPIKE_ROOT / "outputs", _SPIKE_ROOT / "outputs-new"]
 
 
 # Set of connector words copy-pasted from docpluck.render._TITLE_CONNECTOR_TAIL_WORDS.
@@ -228,7 +241,27 @@ def main() -> int:
 
     papers = [args.paper] if args.paper else _list_spike_papers()
     if not papers:
-        print("ERROR: no spike baselines found", file=sys.stderr)
+        # Distinguish "the optional fixture is absent" from "it is present and
+        # broken". Only the second is a failure. Conflating them is how this
+        # gate spent a week exiting 1 on every fresh checkout until people
+        # learned to ignore it — the same SKIP-vs-ERROR confusion already fixed
+        # once in tests/test_canary_provenance.py.
+        present = [d for d in SPIKE_OUT_DIRS if d.exists()]
+        if not present:
+            looked = "\n  ".join(str(d) for d in SPIKE_OUT_DIRS)
+            print(
+                f"SKIP: no render baselines on disk — looked in:\n  {looked}\n"
+                "Set DOCPLUCK_SPIKE_BASELINE_DIR to point at them. This is a "
+                "clean skip on a fresh checkout, not a failure.",
+                file=sys.stderr,
+            )
+            return 0
+        print(
+            "ERROR: baseline director%s exist but contain no .md files: %s"
+            % ("ies" if len(present) > 1 else "y",
+               ", ".join(str(d) for d in present)),
+            file=sys.stderr,
+        )
         return 1
 
     print(f"# Corpus verification — {len(papers)} papers")
