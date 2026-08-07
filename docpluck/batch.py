@@ -5,8 +5,10 @@ MetaESCI, Scimeto, and ESCImate all want the same "walk a list of PDFs,
 normalize them, drop a sidecar, and give me a receipt" pattern. Instead of
 each downstream re-implementing it, :func:`extract_to_dir` lives here and
 returns an :class:`ExtractionReport` that doubles as a reproducibility
-receipt (``docpluck_version``, ``normalize_version``, ``git_sha``, per-file
-status).
+receipt: everything :func:`docpluck.get_version_info` reports — docpluck's own
+version and SHA, the in-repo pipeline versions, **and the external engines
+(pdftotext/poppler, pdfplumber, camelot) that a docpluck SHA does not pin** —
+plus per-file status and quality signals.
 
 Example::
 
@@ -34,6 +36,41 @@ from .normalize import NormalizationLevel, normalize_text
 from .version import get_version_info
 
 
+#: Unicode ranges counted as Greek by :func:`count_greek_chars`. Greek and
+#: Coptic (U+0370–U+03FF) plus Greek Extended (U+1F00–U+1FFF, polytonic).
+#: The first block carries a handful of Coptic-only letters (U+03E2–U+03EF);
+#: they are counted, and they do not occur in the statistical notation this
+#: signal exists to measure.
+_GREEK_RANGES = ((0x0370, 0x03FF), (0x1F00, 0x1FFF))
+
+
+def count_replacement_chars(text: str) -> int:
+    """Count U+FFFD REPLACEMENT CHARACTER occurrences in ``text``.
+
+    A non-zero count means some glyph was lost before docpluck saw it —
+    typically a broken ``ToUnicode`` map, or Xpdf refusing an SMP codepoint.
+    Downstreams gate acceptance on this (MetaESCI's G1), so it is recorded on
+    the report rather than re-scanned from the written ``.txt``.
+    """
+    # Escape, not the literal glyph: a literal U+FFFD in source is exactly the
+    # character most likely to be mangled by an encoding-unaware tool.
+    return text.count("\ufffd")
+
+
+def count_greek_chars(text: str) -> int:
+    """Count Greek letters in ``text`` (see :data:`_GREEK_RANGES`).
+
+    Paired with ``n_chars_normalized`` this gives Greek *density*, which
+    downstreams use to detect a PDF whose Greek statistical symbols
+    (η, β, χ, σ, α) were dropped or transliterated away.
+    """
+    return sum(
+        1
+        for ch in text
+        if any(lo <= ord(ch) <= hi for lo, hi in _GREEK_RANGES)
+    )
+
+
 @dataclass
 class ExtractionFileResult:
     path: str
@@ -41,6 +78,10 @@ class ExtractionFileResult:
     method: Optional[str] = None
     n_chars_raw: int = 0
     n_chars_normalized: int = 0
+    #: Quality signals, both measured on the NORMALIZED text — i.e. on exactly
+    #: the bytes written to ``<stem>.txt``, not on the raw extraction.
+    n_replacement_chars: int = 0
+    n_greek_chars: int = 0
     normalize_steps_changed: list[str] = field(default_factory=list)
     error: Optional[str] = None
     elapsed_seconds: float = 0.0
@@ -60,6 +101,15 @@ class ExtractionReport:
     git_sha: str
     level: str
     out_dir: str
+    # Provenance beyond docpluck's own SHA. These mirror get_version_info();
+    # see version.py for why an incomplete receipt is worse than none.
+    sectioning_version: str = "unknown"
+    table_extraction_version: str = "unknown"
+    pdftotext_version: str = "unknown"
+    pdftotext_engine: str = "unknown"
+    poppler_version: Optional[str] = None
+    pdfplumber_version: str = "unknown"
+    camelot_version: str = "unknown"
     n_total: int = 0
     n_ok: int = 0
     n_failed: int = 0
@@ -67,24 +117,71 @@ class ExtractionReport:
     results: list[ExtractionFileResult] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
-            "docpluck_version": self.docpluck_version,
-            "normalize_version": self.normalize_version,
-            "git_sha": self.git_sha,
-            "level": self.level,
-            "out_dir": self.out_dir,
-            "n_total": self.n_total,
-            "n_ok": self.n_ok,
-            "n_failed": self.n_failed,
-            "elapsed_seconds": round(self.elapsed_seconds, 3),
-            "results": [asdict(r) for r in self.results],
-        }
+        """Serialize the whole report, field-for-field.
+
+        Derived from ``asdict`` rather than a hand-written key list on
+        purpose: the previous hand-enumerated version silently dropped any
+        field added to the dataclass afterwards, which is the same
+        incomplete-provenance failure this class exists to prevent.
+        """
+        d = asdict(self)
+        d["elapsed_seconds"] = round(self.elapsed_seconds, 3)
+        return d
 
     def write_receipt(self, path: Union[str, Path]) -> Path:
         out = Path(path)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
         return out
+
+
+#: Keys of the per-file result that the sidecar deliberately omits.
+#: ``path`` is already emitted as ``source``; ``elapsed_seconds`` is not final
+#: when the sidecar is written, so emitting it would record a 0.0 that reads
+#: as a real measurement; ``normalize_steps_changed`` is emitted under its
+#: historic sidecar name ``steps_changed``, and carrying both spellings of one
+#: value invites them to drift apart.
+_SIDECAR_SKIP_RESULT_FIELDS = ("path", "elapsed_seconds", "normalize_steps_changed")
+
+
+def _build_sidecar(
+    *,
+    source: Path,
+    level: str,
+    info: dict,
+    result: ExtractionFileResult,
+    changes_made,
+) -> dict:
+    """Assemble the per-file ``<stem>.json`` sidecar.
+
+    Built from ``info`` and ``result`` wholesale rather than a hand-picked key
+    list, so a provenance or quality field added to either cannot land on the
+    report while silently missing from the sidecar — that divergence is the
+    same incomplete-receipt defect this whole surface exists to prevent.
+
+    ``info["version"]`` is re-keyed to ``docpluck_version`` and the bare
+    ``version`` key is dropped: the sidecar's historic shape uses the explicit
+    name, and a generic top-level ``version`` in a document that also carries
+    four other ``*_version`` keys invites a downstream to read the wrong one.
+    """
+    provenance = {k: v for k, v in info.items() if k != "version"}
+    provenance["docpluck_version"] = info["version"]
+
+    per_file = {
+        k: v
+        for k, v in asdict(result).items()
+        if k not in _SIDECAR_SKIP_RESULT_FIELDS
+    }
+
+    return {
+        "source": str(source),
+        "level": level,
+        **provenance,
+        **per_file,
+        # Historic alias for `normalize_steps_changed`; downstreams read it.
+        "steps_changed": result.normalize_steps_changed,
+        "changes_made": dict(changes_made),
+    }
 
 
 def extract_to_dir(
@@ -116,12 +213,21 @@ def extract_to_dir(
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
 
+    level_str = level.value if isinstance(level, NormalizationLevel) else str(level)
+
     report = ExtractionReport(
         docpluck_version=info["version"],
         normalize_version=info["normalize_version"],
         git_sha=info["git_sha"],
-        level=level.value if isinstance(level, NormalizationLevel) else str(level),
+        level=level_str,
         out_dir=str(out),
+        sectioning_version=info["sectioning_version"],
+        table_extraction_version=info["table_extraction_version"],
+        pdftotext_version=info["pdftotext_version"],
+        pdftotext_engine=info["pdftotext_engine"],
+        poppler_version=info["poppler_version"],
+        pdfplumber_version=info["pdfplumber_version"],
+        camelot_version=info["camelot_version"],
     )
 
     batch_start = time.monotonic()
@@ -141,6 +247,8 @@ def extract_to_dir(
             else:
                 normalized, norm_report = normalize_text(raw_text, level)
                 result.n_chars_normalized = len(normalized)
+                result.n_replacement_chars = count_replacement_chars(normalized)
+                result.n_greek_chars = count_greek_chars(normalized)
                 result.normalize_steps_changed = list(
                     getattr(norm_report, "steps_changed", norm_report.steps_applied)
                 )
@@ -148,25 +256,26 @@ def extract_to_dir(
                 text_path = out / f"{p.stem}.txt"
                 text_path.write_text(normalized, encoding="utf-8")
 
+                # Set BEFORE the sidecar is built: the sidecar serializes
+                # `result`, and a sidecar reporting ok=false beside a
+                # successfully written .txt is a wrong value on disk.
+                result.ok = True
+
                 if write_sidecar:
-                    sidecar = {
-                        "source": str(p),
-                        "method": method,
-                        "level": level.value if isinstance(level, NormalizationLevel) else str(level),
-                        "normalize_version": info["normalize_version"],
-                        "docpluck_version": info["version"],
-                        "git_sha": info["git_sha"],
-                        "n_chars_raw": result.n_chars_raw,
-                        "n_chars_normalized": result.n_chars_normalized,
-                        "steps_changed": result.normalize_steps_changed,
-                        "changes_made": dict(norm_report.changes_made),
-                    }
                     sidecar_path = out / f"{p.stem}.json"
                     sidecar_path.write_text(
-                        json.dumps(sidecar, indent=2), encoding="utf-8"
+                        json.dumps(
+                            _build_sidecar(
+                                source=p,
+                                level=level_str,
+                                info=info,
+                                result=result,
+                                changes_made=norm_report.changes_made,
+                            ),
+                            indent=2,
+                        ),
+                        encoding="utf-8",
                     )
-
-                result.ok = True
         except FileNotFoundError as e:
             result.error = f"FileNotFoundError: {e}"
         except Exception as e:  # noqa: BLE001 — batch runner must never raise

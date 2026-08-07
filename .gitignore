@@ -55,6 +55,14 @@ REQUESTS_*
 REPLY_*
 REPLIES_*
 CUSTOMER_UPDATE_*
+# 2026-08-07: INBOX_*/OUTBOX_* were MISSING from this block, and
+# INBOX_FROM_METAESCI_2026-08-07.md was committed to this public repo across
+# two (fortunately unpushed) commits before it was caught. A denylist of
+# prefixes only covers the naming conventions someone thought of — see
+# LESSONS.md L-011 and the allowlist gate in /docpluck-cleanup Section 0,
+# which is the actual guard. These entries are the belt, not the braces.
+INBOX_*
+OUTBOX_*
 
 # --- Private benchmark suite (real-corpus results + hardcoded local paths) ---
 benchmarks/

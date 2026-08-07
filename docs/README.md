@@ -374,6 +374,48 @@ def process_corpus(pdf_dir: str) -> list[dict]:
     return results
 ```
 
+### Reproducibility receipts
+
+A docpluck version alone does **not** pin extraction: `pdftotext_default` shells
+out to whatever poppler (or Xpdf) binary is on `PATH`, and tables/layout run
+through pdfplumber and camelot. `get_version_info()` reports every input that
+can change the output, so two runs can be compared honestly:
+
+```python
+from docpluck import get_version_info
+
+get_version_info()
+# {'version': '2.4.126',
+#  'normalize_version': '1.9.50',
+#  'sectioning_version': '1.2.4',
+#  'table_extraction_version': '2.4.10',
+#  'git_sha': '917d1d9...',
+#  'pdftotext_version': '24.08.0',   # the system binary, NOT pinned by the SHA
+#  'pdftotext_engine': 'poppler',    # 'poppler' | 'xpdf' | 'unknown'
+#  'poppler_version': '24.08.0',     # None when the engine is not poppler
+#  'pdfplumber_version': '0.11.9',
+#  'camelot_version': '2.0.0'}
+```
+
+`pdftotext_engine` is reported separately because poppler and Xpdf differ
+*behaviourally*, not just in version number (Xpdf 4.x emits `\n\n` paragraph
+breaks where poppler emits `\n`), and both banner themselves as
+"pdftotext version N".
+
+`extract_to_dir()` records the same fields on its `ExtractionReport`, plus
+per-file quality signals measured on the normalized output:
+
+```python
+from docpluck import extract_to_dir
+
+report = extract_to_dir(pdf_paths, out_dir="normalized_text")
+report.write_receipt("normalized_text/_docpluck_receipt.json")
+
+r = report.results[0]
+r.n_replacement_chars   # U+FFFD count — a glyph was lost before docpluck saw it
+r.n_greek_chars         # Greek letters; pair with n_chars_normalized for density
+```
+
 ### MetaMisCitations (URL-based)
 
 ```python
