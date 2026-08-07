@@ -614,6 +614,76 @@ Cite: `docpluck/version.py`, `docpluck/batch.py`, `docpluck/normalize.py`
 
 ---
 
+## L-013 — An allowlist of allowed PATHS cannot see disallowed CONTENT; and a force-push does not end a purge
+
+**Surface.** `tests/snapshots/*.txt` — 12 files, 984 KB — were the byte-identical
+`extract_pdf()` output of real published papers: title, all authors,
+affiliations, full body. `apa_efendic_affect.txt` carried SAGE's own
+`Ó The Author(s) 2021 / Article reuse guidelines: sagepub.com/journals-permissions`
+verbatim. They were git-tracked and served from a **public** remote from
+2026-05-07 to 2026-08-07. Plaintext is *more* scrapable and indexable than the
+PDFs this repo already refuses to commit (`.gitignore` `*.pdf`).
+
+**Why three cleanup passes missed them.** All three scanned for known-bad
+*filenames*, and these are named exactly like ordinary fixtures. The 2026-08-06
+pass fixed that by **inverting** to an allowlist of paths that may be public
+(L-011) — and `tests/**` is on it, so the allowlist passed them too. An allowlist
+answers *"is this path allowed to be public?"*. It cannot answer *"should this
+content exist at all?"*. **Both checks are required**, and the content one has to
+be content-based:
+
+```bash
+python ~/.claude/skills/article-finder/publication-text-scan.py . --history
+```
+
+**The obvious content rule is the wrong one — measured, not assumed.** "Flag a
+DOI plus >2 KB of prose, or publisher boilerplate" flagged **24 files to catch
+12**: `normalize.py`, `render.py` and `CHANGELOG.md` all carry
+`Article reuse guidelines` and `journals.sagepub.com` *as the patterns this
+library strips*. Boilerplate proves a file MENTIONS a publisher, never that it IS
+one. A **bibliography** discriminates — over these 12 leaks versus this repo's
+own source and docs, (APA entries + numbered entries + in-text citations) scored
+**28–130 against 0–1**. Two false-negative traps found during calibration: the
+five APA papers had zero numbered references while the seven
+Nature/IEEE/JAMA/BMC papers had zero APA ones (an APA-only detector clears seven
+leaks), and 43 KB of column-wrapped BMC measured 1,509 B of prose until lines
+were de-wrapped, falling under the floor entirely.
+
+**The fixtures were exposed AND unused.** The test they served had resolved
+under the abandoned `~/Dropbox/Vibe` root since 2026-08-03, so all 12 SKIPPED
+while the suite reported green — all of the exposure, none of the protection.
+
+**A sha256 gives the identical guarantee in ~80 bytes per fixture.**
+`tests/snapshots/checksums.json` pins digest + byte count + `method`; the pins
+were generated from the old `.txt` files and then re-derived from a live
+extraction run, matching digest-for-digest before anything was deleted. The one
+thing a hash cannot do — print a diff — is restored by `--snapshot-explain`,
+which fetches the expected text from **article-finder**, where the 12 texts now
+live as versioned tool artifacts (`extract-text__docpluck@2.4.126`) keyed by DOI.
+
+**A force-push does not end a purge.** After rewriting the history (283 commits,
+127 tags; 21,597 retained file entries verified byte-identical against a
+pre-purge bundle) and force-pushing `main` and every tag — all verified clean by
+mirror clone — **`refs/pull/1/head` still serves 312 pre-purge commits and 37
+article-text paths, HTTP 200 UNAUTHENTICATED.** That includes 24 splice-spike
+render baselines everyone believed were safely gitignored. Git cannot delete a
+merged PR's ref and a force-push does not touch it; only GitHub Support can.
+**Verify a purge with `git clone --mirror` plus an unauthenticated `curl` at the
+PR SHA — a normal clone shows clean.** Gitignoring is not protection: those
+baselines reached the public remote through exactly this ref.
+
+**Rule.** Papers, publication text, ground truth, test corpora and tool
+baselines belong to **article-finder**, not to this repo and not to a gitignored
+corner of it. Never commit the extracted text of a paper — "it's just text, no
+copyright issue" was the written rationale for these fixtures, and it was wrong.
+
+Cite: `tests/snapshots/checksums.json`, `tests/test_v2_backwards_compat.py`,
+`tests/conftest.py`, `scripts/verify_corpus.py`,
+`~/.claude/skills/article-finder/{publication-text-scan.py,_lib_textleak.py,_lib_artifacts.py,ingest-local-pdf.py}`,
+memory `feedback_articlefinder_is_sole_custodian_of_papers`, 2026-08-07.
+
+---
+
 ## When to add a new lesson here
 
 Add a lesson when:
