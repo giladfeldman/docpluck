@@ -107,6 +107,29 @@ class ExtractionFileResult:
     n_replacement_chars: int = 0
     n_greek_chars: int = 0
     normalize_steps_changed: list[str] = field(default_factory=list)
+    #: Whether the LAYOUT channel was available for this file (v2.4.128).
+    #: The layout-gated repairs — W0h dropped minus, W0m beta-as-`b`, W0p
+    #: superscript footnote-marker split — run only when it is. Published per
+    #: file rather than assumed, so a consumer is never left guessing WHICH
+    #: repairs its text did or did not receive. ``layout_error`` names the cause
+    #: when pdfplumber could not open the file.
+    layout_available: bool = False
+    layout_error: Optional[str] = None
+    #: Fallback paths that fired while normalizing THIS file — `{}` when nothing
+    #: unusual happened. Keys are stable event names; `fallback_details` carries
+    #: the specific instance (the font, the exception type, the refused token).
+    #:
+    #: **This field exists because the v2.4.134 telemetry work stopped one layer
+    #: short, and an independent review found it.** That release gave
+    #: `NormalizationReport` a `fallbacks` channel precisely so silent
+    #: substitutions would stop being write-only — and then `batch.py`, which
+    #: OWNS the corpus pipeline and writes the `.json` sidecar a consumer
+    #: actually reads, never copied it out of the report. `grep -i fallback
+    #: docpluck/batch.py` returned nothing. The fix for write-only telemetry was
+    #: itself write-only for the highest-volume consumer of it, which is the
+    #: third time this exact shape has appeared in this file's history.
+    fallbacks: dict = field(default_factory=dict)
+    fallback_details: dict = field(default_factory=dict)
     error: Optional[str] = None
     elapsed_seconds: float = 0.0
 
@@ -131,6 +154,10 @@ class ExtractionReport:
     # worse than none. `extract_to_dir` fills these by **splatting**
     # get_version_info(), so a key added there without a field here raises
     # TypeError on the first batch run instead of silently defaulting.
+    #: The symbol transliteration contract consumers build their patterns
+    #: against (docs/SYMBOL_CONTRACT.md). Without it a consumer cannot tell
+    #: a CHANGED convention from a parse failure.
+    symbol_contract_version: str = UNKNOWN
     sectioning_version: str = UNKNOWN
     table_extraction_version: str = UNKNOWN
     python_version: str = UNKNOWN
@@ -273,13 +300,87 @@ def extract_to_dir(
             if raw_text.startswith("ERROR:"):
                 result.error = raw_text
             else:
-                normalized, norm_report = normalize_text(raw_text, level)
+                # LAYOUT is passed, so the batch path gets the same repairs as
+                # every other path (v2.4.128). It previously called
+                # `normalize_text(raw_text, level)` with no layout at all, so a
+                # corpus run silently received NONE of the layout-proven glyph
+                # repairs — the `(cid:N)` dropped minus (W0h), the beta-as-`b`
+                # recovery (W0m), and the superscript footnote-marker split
+                # (W0p) — while the sections path received all of them. Each has
+                # a green test, via the other path. A capability the production
+                # caller does not reach is not shipped.
+                #
+                # Best-effort: a PDF pdfplumber cannot open still normalizes,
+                # just without the layout-gated steps, and `layout_available`
+                # records which it was so a consumer is never left guessing
+                # WHICH repairs its text did or did not receive.
+                layout = None
+                try:
+                    from .extract_layout import extract_pdf_layout
+
+                    layout = extract_pdf_layout(p.read_bytes())
+                except Exception as exc:  # pragma: no cover - defensive
+                    result.layout_error = f"{type(exc).__name__}: {exc}"
+                result.layout_available = layout is not None
+                # SYMBOL-FONT CORRUPTION, on the corpus channel too (v2.4.134,
+                # register G6i). The detector shipped in v2.4.133 and was called
+                # ONLY from `extract_pdf_structured`, so register H4's claim that
+                # "every affected document now reports
+                # `symbol_font_greek_corruption_detected` to its consumer instead
+                # of shipping `a5(.93)` in silence" was FALSE for this pipeline —
+                # `grep -c detect_symbol_font_corruption docpluck/batch.py` returned
+                # 0. Same shape as I1: telemetry wired into one caller and claimed
+                # for all. The layout is ALREADY materialised above for
+                # `dropped_minus_layout=`, so this costs nothing extra.
+                #
+                # CAPTURED DIRECTLY, not via `record_fallback`. The first version of
+                # this fix called `record_fallback` here — outside the
+                # `fallback_scope` that `normalize_text` opens — so the events went
+                # into a sink nothing reads and `result.fallbacks` stayed empty.
+                # That is the very defect being fixed, re-created by its own fix, and
+                # it was caught by this file's own test rather than by review.
+                symbol_font_counts: dict[str, int] = {}
+                if layout is not None:
+                    try:
+                        from .extract_layout import detect_symbol_font_corruption
+
+                        symbol_font_counts = dict(
+                            detect_symbol_font_corruption(layout) or {}
+                        )
+                    except Exception as exc:  # pragma: no cover - defensive
+                        result.layout_error = (
+                            result.layout_error
+                            or f"symbol_font_scan: {type(exc).__name__}"
+                        )
+                normalized, norm_report = normalize_text(
+                    raw_text, level, dropped_minus_layout=layout
+                )
                 result.n_chars_normalized = len(normalized)
                 result.n_replacement_chars = count_replacement_chars(normalized)
                 result.n_greek_chars = count_greek_chars(normalized)
                 result.normalize_steps_changed = list(
                     getattr(norm_report, "steps_changed", norm_report.steps_applied)
                 )
+                # READ THE CHANNEL BACK OUT. `steps_changed` says WHICH steps
+                # fired; `fallbacks` says what the library silently did INSTEAD
+                # of what it was asked to do, which is the half a consumer
+                # cannot reconstruct from the text.
+                result.fallbacks = dict(getattr(norm_report, "fallbacks", {}) or {})
+                result.fallback_details = {
+                    k: dict(v)
+                    for k, v in (getattr(norm_report, "fallback_details", {}) or {}).items()
+                }
+                # Merged with the SAME key and the SAME per-glyph counting
+                # `extract_pdf_structured` uses, so the two channels give a consumer
+                # one answer about one document rather than two.
+                if symbol_font_counts:
+                    _key = "symbol_font_greek_corruption_detected"
+                    result.fallbacks[_key] = result.fallbacks.get(_key, 0) + sum(
+                        symbol_font_counts.values()
+                    )
+                    _det = result.fallback_details.setdefault(_key, {})
+                    for _font, _n in symbol_font_counts.items():
+                        _det[_font] = _det.get(_font, 0) + _n
 
                 text_path = out / f"{p.stem}.txt"
                 text_path.write_text(normalized, encoding="utf-8")

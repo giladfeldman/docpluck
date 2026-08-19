@@ -1,24 +1,43 @@
-"""Full-corpus verifier: run v2.4.0 render across all 101 PDFs in
-PDFextractor/test-pdfs/ and flag papers with structural issues, even those
-without a spike baseline.
+"""Wide-corpus BASELINE-FREE render verifier: structural heuristics, no comparison.
 
-For papers WITH a spike baseline, full metrics (char-ratio, Jaccard, D-tag)
-apply just like in verify_corpus.py.
+Sibling of ``verify_corpus.py``, and the division of labour is now explicit:
 
-For papers WITHOUT a spike baseline (75 of the 101), we apply baseline-free
-heuristics:
+    verify_corpus.py        compares each render against a PINNED baseline
+                            registered with article-finder. That is the gate.
+    verify_corpus_full.py   applies baseline-FREE structural heuristics to a WIDER
+                            corpus, so a paper with no registered baseline is still
+                            looked at. It is a smoke, never a gate.
+
+Heuristics applied per paper:
   - title present? non-trivial? not trailing-truncated?
   - section count >= 4 (most academic papers have at least Abstract +
     Introduction + Methods/Results + Discussion + References)
   - rendered length plausible (>5 KB)
   - title block not duplicated immediately in body (Nature-style)
 
-Output: one line per paper with status + tags, then a triage section
-listing the top issues for follow-up.
+TWO DEFECTS FIXED 2026-08-19, both of the same "silently measures nothing" family
+this repo has met repeatedly:
+
+1. **The spike-baseline arm compared against nothing.** ``SPIKE_OUT_DIRS`` held two
+   filesystem paths that the 2026-08-06 public-repo redaction rewrote into the PROSE
+   placeholder ``"an internal design doc"`` — twice, identically. ``_find_spike_md``
+   therefore returned ``None`` for every paper, so the char-ratio / Jaccard / D-tag
+   comparison never ran, and the script printed PASS lines the whole time. A redaction
+   pass that rewrites a path CONSTANT as if it were a docstring leaves working-looking
+   code that does nothing. The arm is REMOVED rather than repaired: baseline
+   comparison belongs to ``verify_corpus.py``, which does it against the custodian.
+
+2. **The corpus came from ``rglob`` over a sibling repo.** That violates the custody
+   hard rule (article-finder is the sole custodian) and carries the coverage defect
+   ``verify_corpus.py`` was rewired to remove on 2026-08-07: a denominator computed by
+   globbing reports whatever it happens to find, so a corpus that has silently shrunk
+   still prints a clean run. The paper set now comes from the custodian via
+   ``tools/diag/_corpus.py`` and every run prints its COVERAGE line.
 
 Usage:
   python scripts/verify_corpus_full.py
   python scripts/verify_corpus_full.py --only-fails
+  python scripts/verify_corpus_full.py --sample 60      # wider than the baseline set
   python scripts/verify_corpus_full.py --paper jama_open_5
 """
 from __future__ import annotations
@@ -32,11 +51,7 @@ from typing import Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-APP_PDFS = REPO_ROOT.parent / "PDFextractor" / "test-pdfs"
-SPIKE_OUT_DIRS = [
-    REPO_ROOT / "an internal design doc",
-    REPO_ROOT / "an internal design doc",
-]
+sys.path.insert(0, str(REPO_ROOT))
 RENDERS_DIR = REPO_ROOT / "tmp" / "renders_v2.4.0"
 
 
@@ -53,16 +68,15 @@ _TABLE_HTML_RE = re.compile(r"<table>")
 _FIG_CAPTION_RE = re.compile(r"^\*Figure\s+\d+\.?\s+[^\n]*?\*\s*$", re.MULTILINE)
 
 
-def _all_pdfs() -> list[Path]:
-    return sorted(APP_PDFS.rglob("*.pdf"))
+def _corpus(sample: Optional[int]) -> list[tuple[str, Path]]:
+    """The paper set, from the CUSTODIAN — never a directory glob.
 
+    See the module docstring: a denominator computed by globbing reports whatever it
+    happens to find, so a corpus that has silently shrunk still prints a clean run.
+    """
+    from tools.diag._corpus import baseline_corpus, sampled_corpus
 
-def _find_spike_md(name: str) -> Optional[Path]:
-    for d in SPIKE_OUT_DIRS:
-        p = d / f"{name}.md"
-        if p.exists():
-            return p
-    return None
+    return sampled_corpus(sample) if sample else baseline_corpus()
 
 
 def _word_set(text: str) -> set[str]:
@@ -218,23 +232,37 @@ def _run_render(pdf_path: Path) -> tuple[str, float]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--paper")
+    ap.add_argument("--sample", type=int, default=None,
+                    help="sample N papers from the shared repository instead of the baseline set")
     ap.add_argument("--only-fails", action="store_true")
     ap.add_argument("--save-renders", action="store_true",
                     help="dump each rendered .md to tmp/renders_v2.4.0/")
     args = ap.parse_args()
 
+    from tools.diag._corpus import coverage_line
+
+    corpus = _corpus(args.sample)
+    resolved = len(corpus)
     if args.paper:
-        pdfs = [p for p in _all_pdfs() if p.stem == args.paper]
-    else:
-        pdfs = _all_pdfs()
-    if not pdfs:
-        print("ERROR: no PDFs found", file=sys.stderr)
+        corpus = [(k, p) for k, p in corpus if p.stem == args.paper or k == args.paper]
+    if not corpus:
+        print("ERROR: the custodian resolved no PDFs for this selection", file=sys.stderr)
         return 1
+    pdfs = [p for _, p in corpus]
     if args.save_renders:
         RENDERS_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"# Full-corpus verification — {len(pdfs)} PDFs (v2.4.0)")
-    print(f"# legend: M=missing_title T=title_trunc D=title_words_dropped R=title_repeat_in_body S=few_sections H=missing_html C=cap_too_long X=output_too_short L=much_shorter J=low_jaccard")
+    print(f"# Wide-corpus BASELINE-FREE verification — {len(pdfs)} PDFs")
+    print(f"# {coverage_line()}")
+    if len(corpus) != resolved:
+        # Never let a --paper filter hide behind the corpus-wide COVERAGE line: the
+        # two numbers mean different things and printing only the larger one is the
+        # denominator defect this script was just repaired for.
+        print(f"# FILTERED: --paper selected {len(corpus)} of the {resolved} resolved papers.")
+    print("# HEURISTIC SMOKE, NOT A GATE: no render is compared against a baseline here.")
+    print("#   The baseline comparison is scripts/verify_corpus.py, which does it against")
+    print("#   the custodian's pinned view. A clean run here is not evidence of no regression.")
+    print("# legend: M=missing_title T=title_trunc R=title_repeat_in_body S=few_sections H=missing_html C=cap_too_long X=output_too_short")
     print()
     print(f"{'STATUS':6} {'PAPER':40} {'TAGS':15} {'CHARS':>8} {'SECT':>5} {'TABS':>5}  TIME")
     print("-" * 100)
@@ -244,8 +272,10 @@ def main() -> int:
 
     for pdf in pdfs:
         name = pdf.stem
-        spike_path = _find_spike_md(name)
-        spike_md = spike_path.read_text(encoding="utf-8", errors="ignore") if spike_path else None
+        # No baseline arm here by design — see the module docstring. Passing None is
+        # the honest statement that nothing is being compared, rather than a lookup
+        # that silently finds nothing and reports PASS.
+        spike_md = None
         try:
             md, elapsed = _run_render(pdf)
         except Exception as e:
