@@ -25,6 +25,13 @@ def test_table_typed_dict_fields():
         "accuracy", "whitespace", "camelot_flavor",
         "n_rows", "n_cols", "header_rows",
         "cells", "html", "raw_text",
+        # v2.4.135: whether `cells[].bbox` carries REAL per-cell geometry, and
+        # if not, why. Every table from every path declares a state — an earlier
+        # draft set it only on the Camelot path and the census caught 11.6% of
+        # tables reporting nothing at all, which both hid the state and
+        # understated what we ship (the whitespace path's boxes are built from
+        # pdfplumber words and are real by construction).
+        "cell_geometry",
     }
     assert set(hints.keys()) == expected
 

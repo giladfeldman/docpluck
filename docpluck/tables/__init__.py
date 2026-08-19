@@ -56,6 +56,14 @@ class Table(TypedDict):
     cells: list[Cell]
     html: Optional[str]
     raw_text: str
+    # Whether `cells[].bbox` carries REAL per-cell geometry, and if not, why.
+    # `"verified:<fraction>"` when the round-trip identity guard passed and every
+    # cell rectangle is a genuine pdfplumber-space box; otherwise
+    # `"<reason>"` naming the refusal (`no_layout`, `camelot_rotated_page:...`,
+    # `grid_shape_mismatch:...`, `roundtrip_failed:...`). Never absent and never
+    # silent: a zero bbox with no reason is indistinguishable from a document
+    # that simply had no rotated pages. See `docpluck/tables/cell_geometry.py`.
+    cell_geometry: Optional[str]
 
 
 __all__ = ["Cell", "Table", "TableKind", "TableRendering"]
