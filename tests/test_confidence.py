@@ -4,7 +4,6 @@ from docpluck.tables import Cell
 from docpluck.tables.confidence import (
     score_table,
     should_fall_back_to_isolated,
-    ISOLATION_THRESHOLD,
 )
 
 

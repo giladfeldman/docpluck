@@ -291,53 +291,59 @@ After:  "t(28.7) = 2.43, p = .021"
 
 ---
 
-### A2 — Dropped decimal repair
+### A2, A3, A3a, A3c, A3d, W0n — ALL RETIRED (v2.4.129 / v2.4.130, 2026-08-14)
 
-**What:** Restores the dropped leading `0.` from p-values and effect sizes.
+**These sections used to document six live rules. Every one is deleted.** They are recorded here
+rather than removed because a consumer upgrading from an older version needs to know exactly what
+stopped happening, and because the reasoning is the contract.
 
-**Detection:** A 2-3 digit integer value in a p-value context where the value > 1.0 and < 1000 (p-values must be 0–1, so any integer > 1 is a dropped decimal).
+| rule | it used to do | why it is gone |
+|---|---|---|
+| `A2` | `p = 484` → `p = .484` | Repaired the **paper's** error. No cited paper in its code; both firing sites across 297 English papers were the author's, confirmed by rasterizing. |
+| `A3` | `d = 0,45` → `d = 0.45` | EU→US conversion, out of scope. Fired 9 times in 2 papers and **not once correctly**. |
+| `A3a` | `N = 1,182` → `1182` | Existed only to pre-empt `A3`, which is gone. Produced 1000× errors on comma-decimal tables. |
+| `A3c` | `(0,003)` → `(0.003)` | EU→US conversion. Its one firing in 297 papers broke a reference-list URL. |
+| `A3d` | `p = ,025` → `p = .025` | **0 sites in 897 papers.** Built on a constructed string copied forward through four documents. |
+| `W0n` | `p < 05` → `p < .05` | Premise false — the same shape has **opposite owners** in two real papers. |
 
-**Pattern:** `p = 484` → `p = .484`
+#### The two rules that decide all six
 
-**Also handles:**
-- `d = 484` → `d = .484`
-- `g = 37` → `g = .37`
+**1. docpluck canonicalises NOTATION; it does not repair the PAPER.** A Greek letter becomes
+`chi`, a Unicode minus becomes ASCII, a superscript becomes a caret — those preserve the
+statistical referent. Correcting an author's or a journal's mistake is different in kind, because
+**docpluck has no channel through which to announce a repair**, so a silent one launders a real
+defect into a meta-science pipeline: the consumer validates a number the paper never printed and
+the author never learns. Flagging is ESCImate's and Scimeto's role — they have the UI and the
+mandate. **The one exception:** a defect docpluck's own pipeline introduced (a fused exponent, a
+glyph our text layer lost) is ours, because we caused it and the source is intact underneath.
 
-**Why:** 4.88% rate in MetaESCI 121,000 results. Caused by PDF column layout splitting the decimal point from the digits (`.` on left column end, digits on right column).
+**2. A rewrite must earn its evidentiary cost.** `1,000` is not a problem; it is clearly one
+thousand. Rewriting it to `1000` repairs nothing and **removes information** — including the only
+evidence a consumer would have that a table is European. The test: *could a competent downstream
+consumer make a better decision if it saw the original token?* If yes, do not rewrite by default.
 
-**Limitations:**
-- Does not fix single-digit values (`p = 5`) — ambiguous, could be valid
-- Does not fix `N = 484` (not a p-value/effect size context)
+#### The evidence that settled it, in one line
 
-**Example:**
-```
-Before: "F(2, 430) = 12.38, p = 484, eta2 = 54"
-After:  "F(2, 430) = 12.38, p = .484, eta2 = .54"
-```
+**The same text shape has OPPOSITE OWNERS in two real English papers.**
+`10.1016/j.jesp.2009.12.011` p3 **prints** `p < 05` — the author dropped the period.
+`10.1177/0956797613482946` p6 **prints** `p < .05` — our OCR text layer lost it. A layout gate
+calibrated to separate them (advance ratio 0.51 vs 0.99) was built and **refuted**: the second
+paper is a scan whose char boxes come from an OCR engine, so the gate manufactures its own
+evidence for exactly the case it exists to catch. Under irreducible ambiguity the default is
+**pass-through**, because pass-through is reversible for the consumer and a repair is not.
 
-**Source:** MetaESCI extraction report, ESCIcheck Lesson 14.
+#### What a consumer must now do
 
----
+- Handle `1,182` and `0,45` yourself. `.replace(",", "")` is one line in your layer and reversible;
+  it was irreversible in ours.
+- Detect `p = 38.`, `p < 05`, `p = 001` yourself — and you are better placed to, because you hold
+  the parsed statistic and its context.
+- You may now run your own locale inference on our output, and you could not before: `academic`
+  used to convert `d = 0,80` to `d = 0.80`, so a consumer inferring locale from our text was
+  reading evidence we had manufactured.
 
-### A3 — Decimal comma normalization
-
-**What:** Converts European-locale decimal commas to decimal points.
-
-**Pattern:** `0,05` → `0.05`
-
-**Detection:** Digit, comma, 1-3 digits, followed by whitespace or end of statistical expression (not followed by more digits, which would indicate a thousands separator like `1,234`).
-
-**Why:** European journals (German, French, Dutch, Scandinavian) often use comma as decimal separator. `p = 0,05` is the same as `p = 0.05`.
-
-**Limitation:** Cannot perfectly distinguish `d = 1,234` (European decimal: d = 1.234) from `N = 1,234` (thousands separator: N = 1234). Currently converts both. The ambiguity is rare in practice since very few effect sizes have 3 post-decimal digits.
-
-**Example:**
-```
-Before: "p = 0,001, d = 0,44"
-After:  "p = 0.001, d = 0.44"
-```
-
-**Source:** MetaESCI extraction report — European journal corpus.
+**See `docs/SCOPE.md`, `docs/INVENTORY_2026-08-14_notation_vs_repair.md`, and `LESSONS.md`
+L-026/L-029/L-031/L-032.**
 
 ---
 
@@ -429,6 +435,61 @@ After:  "p < .001, 95% CI [0.1, 0.5]"
 
 ---
 
+## Glyph-recovery steps (W0…) — and the EVIDENCE each one decides on
+
+These undo corruption **docpluck's own input channel introduced**: a PDF whose embedded font has a
+broken character map makes pdftotext deliver a glyph that is not what the page prints. That is
+docpluck's to fix, unlike an error the authors made, which passes through untouched.
+
+Every rule declares which kind of evidence it rests on. The distinction is a contract with
+consumers, not bookkeeping:
+
+* **TYPOGRAPHIC** — something the renderer actually put on the page: a surviving `(cid:N)` glyph,
+  the font of *this* character, its size and baseline, a backslash glued to a numeral, a dash in a
+  slot where its class is grammatically impossible. docpluck acts on these.
+* **INFERENTIAL** — what a value *ought* to be given the values around it. This is properly the
+  consumer's call: they hold the parsed statistic and a UI to flag it. Where docpluck keeps such a
+  rule, it is **declared in `fallbacks`**, never silent.
+
+| step | corruption | evidence | notes |
+|---|---|---|---|
+| W0b | `2` for U+2212 in a CI (`[20.45, 20.06]`) | INFERENTIAL | self-gated on a DESCENDING bracket, which is impossible for a real interval |
+| W0c / W0o | `<` as `\` or as `b` (`\.001`) | **TYPOGRAPHIC** | a literal backslash glued to a numeral is not text |
+| W0d | `2`-for-minus proven by point-estimate ∈ CI | INFERENTIAL | |
+| W0e | Adobe-Symbol PUA codepoints | **TYPOGRAPHIC** | codepoint table |
+| W0g | dropped minus proven by a CI bracket | INFERENTIAL | |
+| W0h | dropped minus, proven by the layout's surviving `(cid:N)` | **TYPOGRAPHIC** | identity-based pairing since v2.4.133; REFUSES when context cannot separate candidates |
+| W0i / W0k / W0l | `×` extracted as `3` | **TYPOGRAPHIC** | the font mis-draws the multiply glyph; the token conditions only bound where it is trusted |
+| W0j sig. A | `2`-for-minus in a contrast-coding note | INFERENTIAL, self-corroborating | the `+ X.X = <word>` twin on the same line is a second emitted token |
+| **W0j sig. B** | `Mchange = 20.14` | **INFERENTIAL** | keys on the variable NAME. `20.14` is not impossible in that slot, only implausible. Records `w0j_mstat_sign_inferred_from_variable_name` on every firing |
+| W0m | `β` extracted as `b`, proven by the layout font | **TYPOGRAPHIC** | the coefficient value is part of the identity |
+| W0p | a superscript footnote marker fused into a number (`2,5801`) | **TYPOGRAPHIC** | font size + baseline. Emits caret notation (`2,580^1`) — lossless, never deletion |
+| **W0q** | a CI upper bound whose minus is DETACHED (`[-0.58,  -  0.18]`) | **TYPOGRAPHIC** | new in v2.4.134 |
+
+### W0q — detached CI-upper minus (new in v2.4.134)
+
+pdftotext separates a U+2212 from its digits on some fonts, so a printed `[−0.58, −0.18]` arrives
+as `[- 0.58,\n- 0.18]`. A consumer whose CI pattern requires the sign adjacent to the digit reads
+the upper bound as POSITIVE — a silently inverted interval.
+
+The dash is a glyph the renderer emitted, and **the comma is what makes its reading unambiguous**:
+in `[lo, – hi]` the comma already occupies the separator role, so the dash cannot be a range
+separator (`0.19–0.45`) and can only be a sign that lost its kerning. The rule refuses to emit a
+bracket that would run backwards.
+
+This repair previously existed **only in the table-cell channel**, so a CI in a results sentence
+never met it — the three-channel rule, violated. Confirmed against the rasterized page of
+`10.1016/j.jesp.2021.104154` p13.
+
+Recovery is reported per evidence class, and consumers should treat the two differently:
+
+| `fallbacks` key | meaning |
+|---|---|
+| `ci_upper_minus_reattached_from_detached_dash` | typographic — the dash was on the page |
+| `ci_upper_minus_inferred_from_containment` | inferential — no glyph survived; treat as a hypothesis |
+
+**Neither key present does not mean the interval is sound.** See `docs/SCOPE.md`.
+
 ## Ordering Summary
 
 ```
@@ -448,8 +509,14 @@ S8  Mid-sentence line break joining
 A1  Statistical line break repair  ← before S9 (prevents page number stripping)
 S9  Header/footer removal
     (limit consecutive newlines to 2)
-A2  Dropped decimal repair
-A3  Decimal comma normalization
+    [A2 / A3 / A3a / A3c / A3d and infer_numeric_locale() WERE HERE — all
+     deleted v2.4.129-130; numbers pass through exactly as printed]
+A3b Statistical df-bracket harmonization
+W0  glyph-recovery family (see the section above for each step's EVIDENCE class)
+    W0_watermark, W0b, W0c, W0o, W0d, W0j, W0k, W0l, W0g,
+    W0q  ← new v2.4.134: detached CI-upper minus, body-prose channel
+    W0h, W0m, W0p  (layout-gated — only when `layout=` is supplied)
+    W0e
 A4  CI delimiter harmonization
 A5  Math symbol and Greek letter normalization
 A6  Footnote marker removal
@@ -457,4 +524,52 @@ A6  Footnote marker removal
     normalized text + NormalizationReport
 ```
 
+**Ordering constraint (v2.4.134):** W0q runs immediately after W0g. It must run **after** the
+CI-pairing rules, because it rewrites the very bracket they read — repairing the bracket first
+would change what W0g adjudicates. It exposed a latent defect in exactly that seam: with the CI
+made parseable, W0g read the detached-minus ESTIMATE beside it as bare-positive and emitted
+`d = - -0.38`. `_already_carries_a_sign` closes that, and the idempotency corpus gate is what
+caught it.
+
 **Critical ordering constraint:** A1 must run before S9. If S9 runs first, standalone digits like `484` (from `p =\n484`) are stripped as page numbers before A1 can rejoin them.
+
+**Ordering constraint REMOVED (v2.4.130):** this document used to specify that the numeric-locale
+inference had to run after header/footer removal and before A2/A3, "later and A3 has already
+resolved the very commas it needs to read". That sentence is the clearest statement of the problem
+that eventually deleted the whole feature: **docpluck's own normalization INVERTED the evidence the
+inference depended on.** A consumer running locale inference on our output was reading commas we
+had already converted. The inference, A2, A3, A3a, A3c, A3d and W0n are all gone, so the
+constraint no longer exists — and a consumer's own inference is now valid, because the separators
+it reads are the ones the paper printed.
+
+## Report field: `numeric_locale` — DELETED (v2.4.129)
+
+**There is no `NormalizationReport.numeric_locale`.** This section used to document a
+`NumericLocale` with a `verdict`, `confidence`, per-marker `evidence` counts and `computed_at`,
+and told consumers to read it. The field, `infer_numeric_locale()`, `NumericLocale`,
+`is_gating` and `LOCALE_MIN_GATING_CONFIDENCE` are all gone. A consumer following the old advice
+would get an `AttributeError`.
+
+**Why it was deleted, measured rather than argued.** Its verdict was **confidently wrong** on the
+only genuine European table ever found in an English-language paper: `10.1177/0956797620935584`
+Table S2, roughly 130 comma-decimal cells, scored `european_markers=0`, verdict `decisive_us`,
+confidence 1.0. Every marker it used required an operator (`=`, `<`, `>`) immediately before the
+value, and a bare table cell has none. So the reassuring measurement *"396 English articles → 0
+European-locale documents"* described the **reach of the instrument**, not the corpus.
+
+**Its stated purpose no longer exists either.** The field was justified by the fact that
+"normalization inverts the evidence it is derived from" — `academic` turned every `d = 0,80` into
+`d = 0.80`, so a consumer inferring locale from our output was reading evidence we had
+manufactured, and this field was "the only channel through which the true verdict survives".
+**That inversion is gone.** No rule converts or strips a numeric separator any more, so the text
+you receive carries the paper's own separators and **your own inference on our output is now
+valid**. An unmodified token beats a verdict we computed for you, and unlike the verdict it cannot
+be wrong.
+
+**The marker vocabulary is retained internally and unwired** (`tests/test_numeric_locale_markers.py`)
+solely as the foundation for a future **LINE- or TABLE-scoped** guard — never for another
+document-level verdict. The bilingual problem makes any whole-document answer false for part of the
+document: a single SciELO paper carries `1,738 adult patients` (English abstract, a genuine
+thousands group) and `528,329` (native-language body, the decimal 528.329).
+
+See `docs/SCOPE.md`.

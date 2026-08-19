@@ -166,22 +166,38 @@ def test_render_preserves_comma_thousands_in_body_prose():
     assert not re.search(r"\b33719\b", md), "Render emitted '33719' — comma-stripped"
 
 
-def test_render_preserves_european_decimal_in_render_path():
-    """Synthetic check: in preserve mode, '0,87' should NOT be converted to '0.87'.
-    Downstream stat-extraction (which uses preserve_math_glyphs=False) still gets
-    the dot form."""
-    from docpluck.normalize import normalize_text, NormalizationLevel
+def test_both_paths_now_AGREE_on_a_european_decimal():
+    """RE-FIXTURED 2026-08-14 — and the old expectation was the DEFECT.
+
+    This test used to assert that the two paths DISAGREED, and treated that as
+    correct: with `preserve_math_glyphs=False` (the batch/sections path) `0,87`
+    became `0.87` and `1,675` became `1675`; with `preserve_math_glyphs=True`
+    (the render path) both were kept. Its own docstring called the divergence
+    the design — "downstream stat-extraction still gets the dot form".
+
+    **One library was giving two different answers for one input**, decided by
+    a flag about GLYPH preservation that has nothing to do with numeric
+    convention. Counting `standard` level, which also passed both through,
+    there were three answers. That is the "one concept, one table" failure
+    (LESSONS.md L-024), and it is exactly the shape that let A3a's 1000x error
+    reach some consumers and not others — invisibly, because each path had a
+    green test asserting its own behaviour.
+
+    A3/A3c (v2.4.129) and A3a (v2.4.130) are deleted, so every path agrees.
+    """
+    from docpluck.normalize import NormalizationLevel, normalize_text
+
     sample = "Effect size d = 0,87 was found. Sample size N = 1,675."
-    # Default behavior: A3 + A3a strip and normalize
-    normalized_default, _ = normalize_text(sample, NormalizationLevel.academic)
-    assert "0.87" in normalized_default  # A3 converted
-    assert "1675" in normalized_default  # A3a stripped
-    # Preserve behavior: both kept as-is
-    normalized_preserve, _ = normalize_text(
+    default, _ = normalize_text(sample, NormalizationLevel.academic)
+    preserve, _ = normalize_text(
         sample, NormalizationLevel.academic, preserve_math_glyphs=True
     )
-    assert "0,87" in normalized_preserve  # A3 skipped
-    assert "1,675" in normalized_preserve  # A3a skipped
+    standard, _ = normalize_text(sample, NormalizationLevel.standard)
+
+    assert default.strip() == preserve.strip() == standard.strip() == sample
+    for out in (default, preserve, standard):
+        assert "0.87" not in out
+        assert "1675" not in out
 
 
 # ───────────────────────────────────────────────────────────────────────────
@@ -200,7 +216,9 @@ def test_normalize_recomposes_combining_diacritics():
     assert "Förster" in normalized, "NFC composition didn't recompose o + combining diaeresis"
 
     # Space-before-combining-mark form (pdftotext bug pattern)
-    spaced_sample = "Author: Fö ̈rster"  # implausible but trace pattern
+    # An earlier draft built a second fixture here and never used it; its
+    # own comment called it "implausible", so it is dropped rather than
+    # exercised. Restored to lint-clean 2026-08-15.
     # The simpler real-world case: a stray space between letter and a combining mark
     spaced_real = "Author: o ̈rster"  # 'o' + space + combining-diaeresis + 'rster'
     normalized_spaced, _ = normalize_text(spaced_real, NormalizationLevel.academic)

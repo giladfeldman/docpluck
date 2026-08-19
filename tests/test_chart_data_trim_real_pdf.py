@@ -26,8 +26,6 @@ can't itself anchor a cluster.
 
 from __future__ import annotations
 
-import os
-import re
 from pathlib import Path
 
 import pytest
@@ -41,7 +39,13 @@ from docpluck.extract_structured import (
 )
 
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
@@ -65,10 +69,19 @@ class TestAxisTickPairRe:
     ])
     def test_rejects_non_chart_patterns(self, text):
         # Either no match, or any match isn't the full string.
-        m = _AXIS_TICK_PAIR_RE.search(text)
         # All these strings legitimately mention numbers and should NOT
         # be flagged as axis-tick patterns. We're checking the cluster
         # threshold protects against single matches.
+        #
+        # THIS TEST ASSERTED NOTHING until 2026-08-15: it bound the match to
+        # `m` and ended. It passed unconditionally for every input, including
+        # inputs the regex flagged — a test that cannot fail is not coverage,
+        # it is the appearance of coverage. Found via an F841 lint the handoff
+        # had filed as cosmetic.
+        m = _AXIS_TICK_PAIR_RE.search(text)
+        assert m is None or m.group(0) != text, (
+            f"{text!r} was flagged as an axis-tick pattern in full"
+        )
 
 
 class TestNumberedChartNodeRe:

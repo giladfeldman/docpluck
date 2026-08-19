@@ -88,3 +88,125 @@ def pdf_available(corpus: str, *parts: str) -> bool:
     """Check if a test PDF exists."""
     path = pdf_path(corpus, *parts)
     return bool(path) and os.path.isfile(path)
+
+
+# ---------------------------------------------------------------------------
+# A test may not leak a DOCPLUCK_* environment variable into the next test
+# ---------------------------------------------------------------------------
+#
+# Several tests disable Camelot (or enable an experimental path) with
+# `os.environ["DOCPLUCK_…"] = "1"` to keep themselves fast. If one forgets to
+# restore it, every test that runs AFTERWARDS in the same process silently gets a
+# different library.
+#
+# That is not hypothetical. `test_major_section_heading_promotion._render_cogemo`
+# set `DOCPLUCK_DISABLE_CAMELOT=1` and never restored it, so every real-PDF table
+# test collected after it found no tables and failed. The symptom — nine table
+# tests failing in a full run and passing when run per-file — was recorded in
+# CLAUDE.md, in a memory, and in three handoffs as "Camelot tests flake under
+# cumulative load (even serial)", with the workaround "run each file separately".
+# **It was never load, and the folklore is what stopped anyone looking**: a
+# documented flake is a failure nobody re-investigates.
+#
+# So the class gets a guard rather than another one-line fix. This fails the
+# offending test itself, naming the variable — instead of failing an innocent
+# test several files later, which is what made it look like nondeterminism.
+@pytest.fixture(autouse=True)
+def _no_leaked_docpluck_env():
+    before = {k: v for k, v in os.environ.items() if k.startswith("DOCPLUCK_")}
+    yield
+    after = {k: v for k, v in os.environ.items() if k.startswith("DOCPLUCK_")}
+    if before != after:
+        changed = sorted(set(before) | set(after))
+        detail = ", ".join(
+            f"{k}: {before.get(k)!r} -> {after.get(k)!r}"
+            for k in changed
+            if before.get(k) != after.get(k)
+        )
+        # Restore, so ONE offending test does not cascade into the rest of the run.
+        for k in set(after) - set(before):
+            os.environ.pop(k, None)
+        for k, v in before.items():
+            os.environ[k] = v
+        raise AssertionError(
+            f"this test leaked a DOCPLUCK_* environment variable into the rest of "
+            f"the process: {detail}. Set it with `monkeypatch.setenv` or restore it "
+            f"in a `finally` — an unrestored flag silently reconfigures every test "
+            f"that runs after it (see the comment above this fixture)."
+        )
+
+
+# ---------------------------------------------------------------------------
+# ...and a MODULE-level mutation happens before any test runs, so the per-test
+# fixture above structurally cannot see it.
+# ---------------------------------------------------------------------------
+#
+# `test_rc1_banded_column_real_pdf.py` had
+# `os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")` at module scope. That
+# executes during COLLECTION — before the first test's snapshot is taken — and was
+# never undone, so merely COLLECTING that file disabled Camelot for the entire
+# pytest process. Every real-PDF table test that ran afterwards found no tables.
+#
+# Together with the unrestored variable in `test_major_section_heading_promotion`,
+# that is the whole of the "Camelot tests flake under cumulative load (even
+# serial)" folklore, which was recorded in CLAUDE.md, in a memory, and in three
+# handoffs with the workaround "run each file separately". It was never load, and
+# the folklore is precisely what stopped anyone from looking: a documented flake
+# is a failure nobody re-investigates.
+#
+# This check fails the RUN, loudly, naming the variable — because a module-scope
+# environment mutation cannot be attributed to a single test, and there is no
+# legitimate reason for one. Use a module-scoped autouse fixture instead.
+_ENV_AT_CONFIGURE: dict = {}
+
+
+def pytest_configure(config):
+    _ENV_AT_CONFIGURE.clear()
+    _ENV_AT_CONFIGURE.update(
+        {k: v for k, v in os.environ.items() if k.startswith("DOCPLUCK_")}
+    )
+
+
+def pytest_collection_finish(session):
+    after = {k: v for k, v in os.environ.items() if k.startswith("DOCPLUCK_")}
+    if after != _ENV_AT_CONFIGURE:
+        changed = sorted(set(_ENV_AT_CONFIGURE) | set(after))
+        detail = ", ".join(
+            f"{k}: {_ENV_AT_CONFIGURE.get(k)!r} -> {after.get(k)!r}"
+            for k in changed
+            if _ENV_AT_CONFIGURE.get(k) != after.get(k)
+        )
+        raise pytest.UsageError(
+            f"a test MODULE mutated a DOCPLUCK_* environment variable at import "
+            f"time: {detail}. That runs during collection and reconfigures the "
+            f"library for every test in the process — it is the cause of the "
+            f"historical 'Camelot flakes under cumulative load'. Move it into a "
+            f"module-scoped autouse fixture that restores the prior value."
+        )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _camelot_disabled_per_module(request):
+    """Honour a module's `DISABLE_CAMELOT = True` flag — and undo it afterwards.
+
+    36 test modules used to write `os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT",
+    "1")` at module scope for speed. That executes during COLLECTION and was never
+    undone, so importing ANY of them disabled Camelot for the entire process and
+    every real-PDF table test collected afterwards found no tables.
+
+    The intent was fine; the mechanism was a process-wide side effect at import
+    time. The flag is now declarative and this fixture owns the lifetime, so the
+    modules keep their speed and nothing leaks past them.
+    """
+    if not getattr(request.module, "DISABLE_CAMELOT", False):
+        yield
+        return
+    prior = os.environ.get("DOCPLUCK_DISABLE_CAMELOT")
+    os.environ["DOCPLUCK_DISABLE_CAMELOT"] = "1"
+    try:
+        yield
+    finally:
+        if prior is None:
+            os.environ.pop("DOCPLUCK_DISABLE_CAMELOT", None)
+        else:
+            os.environ["DOCPLUCK_DISABLE_CAMELOT"] = prior

@@ -15,6 +15,8 @@ import unicodedata
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 
+from .telemetry import fallback_scope, record_fallback
+
 
 class NormalizationLevel(str, Enum):
     none = "none"
@@ -22,7 +24,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.50"  # v1.9.50 (v2.4.125): S6 BIDI FORMAT strip - U+200E LEFT-TO-RIGHT MARK / U+200F RIGHT-TO-LEFT MARK / U+2060 WORD JOINER. The S6 invisible-character block already stripped U+200B/C/D and U+FEFF but SKIPPED the bidi marks - an omission in a sequence, not a decision. An invisible LRM survived normalization into rendered output immediately after a citation closing paren (xiao_2021_crsp: "Connolly, Reb, and Kausel (2013)<U+200E>"). This is a CORRECTNESS defect, not cosmetics: an invisible char inside rendered output breaks STRING EQUALITY and SEARCH for every downstream consumer - a citation checker comparing "(2013)" against "(2013)<LRM>" sees a mismatch it cannot see on screen, and docpluck feeds exactly such consumers (citelink, CitationGuard). Same stated rationale as the existing U+00AD strip ("invisible, breaks search"). Measured blast radius: 2 occurrences in 1 of 101 corpus PDFs, so the 100 other papers are byte-identical by construction. 9 regression tests, all watched FAILING at unfixed HEAD first (7 failed / 2 passed, the 2 proving the pre-existing strips still work).  # v1.9.49 (v2.4.124): P0 wrapped-CONTACT strip — the Taylor & Francis correspondence footer leaked INTO a body sentence when the source PDF column-wraps it. The v2.4.6 pattern requires CONTACT + name + email on ONE line; T&F wraps the block so the name, the email and the region land on separate lines and every line individually missed. Four of the block's six lines were ALREADY dropped by sibling patterns (email, supplemental-data sidebar, copyright, truncated affiliation), so the failure was a PARTIAL strip — worse than none, because it removes the lines that make the block recognisable as furniture and welds the residue into prose: xiao_2021_crsp rendered "The target and the / CONTACT Gilad Feldman / Hong Kong, Hong Kong SAR / competitor form a core choice set". Keyed on the structural signature (line-initial all-caps CONTACT followed ONLY by a personal name), never on paper identity; a _CONTACT_NON_NAME_WORDS veto keeps nav/heading furniture ("CONTACT Details Below", "CONTACT Support Team"). The orphaned "<City>, <Region>" tail is removed ONLY by ADJACENCY to a dropped opener — never on its own shape, since a bare "Hong Kong, Hong Kong SAR" is ordinary prose (a test pins that it survives alone). NOTE the wrapped pattern deliberately does NOT live in _PAGE_FOOTER_LINE_PATTERNS: the generic any()-match would drop the vetoed lines before the veto branch could run.  #   # v1.9.48 (v2.4.123): W0d NON-NEGATIVE-CI guard — refuse a sign flip when the paired CI's LOWER bound is >= 0. W0d flips `2X.XX`->`-X.XX` when the recovered reading falls inside a paired CI and the literal does not; on maier T9 it paired an F-statistic with the CI of a DIFFERENT statistic (the row is `Target article | 1, 114 | 2.00 | .16 | N/A | .02 | [.00, .09]` — F, p, partial eta-squared, and the ETA-SQUARED's CI) and rendered **F = -.00**. An F is a ratio of sums of squares: non-negative by construction, so the output was not merely wrong but IMPOSSIBLE; both text channels confirm the source reads 2.00, i.e. the library manufactured the sign. A wholly non-negative interval cannot contain a negative, so containment is satisfied only degenerately (`-.00` clipping the zero edge) — evidence of MIS-PAIRING, not corruption. The guard keys on the interval's ARITHMETIC rather than on F specifically, so it covers every non-negative statistic that can sit beside a non-negative CI (F, chi-square, R2, eta2, odds ratios, variance components) without enumerating them, and cannot disarm a real recovery (a genuinely negative estimate always has a CI admitting negatives). All 31 pre-existing W0d tests stay green incl. the efendic B-column recoveries. Companion to the REJECTED W0b-col: that failed because column consensus is not per-record evidence; this shows per-record containment is the right evidence only if the record paired is the right one.  # v1.9.47 (v2.4.122): W0i RANGE-BOUND guard — a '3' inside range grammar ("scores ranged from 3 to 15", "Bayes factors between 3 and 10") is a REAL NUMBER, never a corrupted interaction '×'. W0i's letter-space-3-space-letter signature matched it exactly (`from` sits in the predictor slot, `to` follows), so chan_feldman's Table-2 note rendered "ranged from × to 15" — a PUBLISHED SCALE BOUND replaced by an operator, in the Camelot <td> channel only (the raw-text channel rendered the same sentence correctly). The pre-existing guard was a list of reference NOUNS (Model/Study/Table/…) and had nothing to say about `from`; a vocabulary list cannot defend a grammatical position. The guard now keys on the grammatical FRAME — `from|between` BEFORE the digit AND `to|and|through|until` AFTER it, BOTH halves required (a lone trailing `to` could be a wrapped predictor "Attitude 3 to risk"). General across publishers. Corpus sweep (152 PDFs): 8 sites / 5 distinct articles, all pinned as regression cases; targeted production-path guard-diff = 1 FP removed, 0 regressions.  # v1.9.46 (v2.4.119): W0b-est _recover_estimate_column_via_ci_column — recover the `2`-for-minus ESTIMATE column in a raw_text table fallback, EXPOSED by the RC-T caption-tail walk (which recovers leading rows the old walk silently dropped, so previously-invisible corruption now reaches the render). A raw_text fallback linearizes each table COLUMN as its own run of lines, so the estimate column is separated from its CI column by the SE column and W0d's proximity window cannot span the gap (efendic T3 `21.34` stayed corrupt while its CI `[-1.58, -1.10]` recovered). Pairs estimate[i] with CI[i] POSITIONALLY — pdftotext emits adjacent numeric columns as ONE run, so a numeric run that is an exact multiple of the CI-run length is split and its FIRST block taken (estimate precedes SE) — and rewrites ONLY when the corrupt reading lands INSIDE that CI while the literal reading does not (W0d's containment invariant, resolved by column index instead of distance). SE column and genuine positives untouched; FP battery + real-PDF tests. NOTE: a companion "W0b-col" CI-column-consensus recovery was written and REJECTED before release — it flipped efendic T5's `[2.42, 2.69]`, which the AI gold confirms is a GENUINELY POSITIVE interval (the Direction high-vs-low contrast), i.e. it manufactured a wrong published number. Column-consensus is NOT sufficient evidence for a sign flip; only per-record containment (W0d/W0b-est) is. # v1.9.45 (v2.4.118): W0n recover_p_threshold_dropped_decimal — restore the dropped '.' in a p significance threshold (`p < 05` → `p < .05`; ar_apa/JESP `β = -.88, t(87) = 2.01, p < 05`). The '.' glyph vanishes from BOTH text channels on the AdvGulliv broken-ToUnicode family (pdftotext emits nothing; the pdfplumber char stream shows `p<05(see` with no dot char — same absent-glyph class as the painted-pixel `.245` minus), so unlike W0h/W0m there is NO layout evidence to gate on: W0n is a pure text-shape recovery, safe because a DOTLESS leading-zero-free canonical threshold (05/01/001) after `<`/`>`/`≤`/`≥` is never legitimate notation. Four guards (never `=` — zero-padded ID / exact-p ambiguity; canonical threshold set only — `005`/`0001` are ambiguous between corrupted `0.05` and corrupted `.005`; no longer-number continuation; significance-clause context: comma-after-stat / paren / legend-marker / line-start — a prose subject like "the probability p < 0.5" never fires, FNs preferred over a 10-fold wrong number). Wired channel 1 + channel 3 (glyph-fixes-need-all-three-text-channels). FP-validated: adversarial battery + 101-PDF raw-text corpus scan. # v1.9.44 (v2.4.117): W0m recover_beta_via_layout — recover a standardized-coefficient Greek β that pdftotext rendered as a plain ASCII 'b' (ar_apa/JESP: all five Supplemental-analyses betas, `β = −.022` read `b = -.022`). A text-only `b =`→`β =` rewrite is UNSAFE ('b', the unstandardized coefficient, is a legitimate distinct statistic), so W0m flips ONLY when the LAYOUT channel proves the glyph: a 'b' char drawn in a math-symbol PostScript font (`AdvPSMP…` — the same broken-ToUnicode family as the ×/</minus corruptions, W0i/W0c/W0h) sitting immediately before '=' on its visual line (the coefficient operator slot). A genuine body 'b' uses the body serif font; a word-internal 'b' (`bleat…`) or a figure label ('b0', ArialMT) is not followed by '='. Flips at most as many `b = <coef>` text slots as the layout counted (left to right), same conservative correlation mechanism as W0h. Gated on the dropped_minus_layout param (section path stays no-op). Corpus layout-scan: fires on the target JESP-family papers only; 5 unit tests + real-PDF render test (fails at v2.4.116). # v1.9.43 (v2.4.116): W0l recover_times_design_notation + recover_times_wrapped_interaction — the two residual '×'-as-'3' prose shapes W0k's single-line word-pair regex cannot reach. (A) FACTORIAL-DESIGN notation `<digit>(…) 3 <digit>(…)` — efendic "2 (Between-subject factor--Direction: …) 3 2 (…) 3 3 (Within-subject factor--…) mixed-subject design" → each `) 3 <digit> (` boundary's `3` is a corrupted `×` (the trailing digit is the real factor SIZE). Fires ONLY when the boundary ties to a genuine factor parenthetical: (a) an adjacent parenthetical names a factor type (between-/within-/mixed-subjects, repeated-measures), OR (b) BOTH sides are factor-SIZE parens (a bare digit right before the `(`) AND the chain is closed by a `factorial|…-subjects|design` tail. A generic `(min 1) 3 2 (max 5)` / formula `f(x) 3 2 (y)` / `(from level 3) 3 2 (see note)` is left ALONE. (B) LINE-WRAPPED INTERACTION term — a physical line ending `<Pred> 3` whose next line begins with a predictor word, inside an "interaction" context ("the three-way interaction (Direction 3\\nManipulated Attribute × CMA)" → "Direction × Manipulated…") — the wrap splits the pair across lines so W0k's per-line regex can't pair them. FP-validated: 16-case battery (range recode, formula, `Model 3\\n…`, `we ran 3\\nstudies`, count-noun wrap, idempotent `2 (Sex) × 2 (Cond)`) + wide corpus render scan = 0 FPs. Wired channel 1 + channel 3 (glyph-fixes-need-all-three-text-channels). # v1.9.42 (v2.4.114): P0r Title-Case surname running-header strip — "Efendić et al." (Sage SPPS page-break header, mixed-case + accented Latin-Extended-A surname) that the all-caps "SMITH et al." pattern missed. Safe: matches the COMPLETE line only (nothing after "et al."), so an inline citation ("…by Efendić et al., 2022"; "Efendić et al. (2022) found…") is never stripped. 14-case FP battery + corpus scan clean. # v1.9.41 (v2.4.112): W0k recover_times_interaction_glyph_in_prose — recover '×'-as-'3' glyph in body-prose / flattened-caption INTERACTION terms that the TABLE-CELL-scoped W0i cannot reach (efendic "interaction (Direction 3 Manipulated Attribute 3 CMA)" + a flattened italic caption run "Direction 3 manipulated attribute PMA 3direction…"). The '3' is the single most dangerous prose glyph, so W0k fires ONLY under a tight signature (ALL hold): line has "interaction" OR ≥2 `Word 3 Word` pairs; '3' not after a reference word (Table/Model/Study/…); right flank not a plural COUNT noun (3 studies/3 groups); ≥1 flank Title-Case or all-caps acronym (predictor name Direction/CMA/PMA). "ran 3 studies"/"and 3 groups" (lowercase flanks) rejected. Wired into channel 1 + channel 3. FP-validated: 12-case battery + wide corpus render scan = 0 FPs. # v1.9.40 (v2.4.109): W0j recover_prose_two_for_minus — recover '2'-for-U+2212 minus in body-prose contrast-coding notes ("direction: 20.5 = low, + 0.5 = high" → "-0.5 = …", disambiguated by the "+ X.X = <word>" ±contrast twin on the same line) and change/difference M-statistics ("Mchange = 20.14" → "-0.14", gated on a difference-type subscript so a genuine mean age "M = 20.14" is NEVER flipped). These two PROSE shapes carry no bracket CI, so W0b/W0d could not reach them — efendic_2022_affect's body/caption channel stayed corrupt after the A1/A2 table-cell fixes (glyph-fixes-need-all-three-text-channels). Wired into channel 1 (normalize_text) AND channel 3 (render post-process). FP-validated: 6-case adversarial battery (mean-age, %, ordinal coding, genuine M=2.84) + 20-paper corpus scan = 0 FPs (efendic-only). # v1.9.39 (v2.4.104): A3 guard on recover_dropped_minus_via_ci_pairing — do NOT flip a bare-positive TABLE-CELL token to negative when a signed-negative number (the already-recovered point estimate) precedes it in the same <tr>. In the standard "B | SE | CI" row the CI describes the B estimate; the SE (standard error) legitimately falls OUTSIDE B's CI, so the recovery wrongly flipped efendic's SE cells (Intercept SE 0.06 → -0.06 because -0.06 ∈ [-0.21, 0.04]). SE/SD is non-negative and is a different column from the estimate the CI pairs with. Scoped to <td> rows (prose keeps recovering a genuinely-first dropped-minus estimate). All SE columns now positive; 109 dropped-minus/idempotence tests pass; ar_apa body betas byte-identical. # v1.9.38 (v2.4.103): W0i recover_times_interaction_glyph recovers '×'-as-'3' glyph corruption in TABLE CELLS (efendic: "Direction 3 manipulated attribute" → "Direction × manipulated attribute", every interaction term across Tables 2-5). Same broken-ToUnicode AdvPS… font as W0b/W0d/W0c. TABLE-CELL SCOPED (wired into cell_cleaning._html_escape only, NEVER normalize_text / render post-process) because a bare '3' between letters is ambiguous in prose ("Table 3 summarizes", "osf.io/pg3ae"); a Camelot predictor cell is not. Self-guards a genuine ordinal after a reference word (Model/Study/Wave/…) and recovers across a wrap break (<br>/merge placeholder) for 3-way interactions. Corpus scan (18 papers): 0 false positives. # v1.9.37 (v2.4.102): W0d recover_minus_via_ci_pairing now recovers '2'-for-U+2212 minus in HTML TABLE CELLS. Camelot emits each <td> on its own line, so the SE cell sits between a B-column estimate and its CI cell, pushing the char-gap past the 30-char bare-bracket cap — the recovery fired in the DISABLE_CAMELOT unstructured-table channel but silently missed every negative B-coefficient in the Camelot HTML-table channel (efendic Tables 2-5: 27 corrupt cells, `20.09` for `-0.09`). Inside a `<tr>` columns pair structurally so a bare bracket now uses the relaxed (labeled) proximity, guarded by _INDEPENDENT_STAT_BETWEEN_RE which still blocks pairing across a new estimate. Also closes a PRE-EXISTING prose bare-bracket FP: the independent-stat guard now runs for EVERY bracket kind (majumder `SD = 2.01 … d = 0.09 [-1.86,0.04]` no longer flips 2.01). AI-gold-verified (efendic B-column exact; genuine 2.56 preserved; 0 new regressions). # v1.9.36: recover_dropped_minus_ci_upper — a CI's UPPER bound loses its leading minus on tight-kerned PDFs (a negative interval [-0.78,-0.66] parsed as [-0.78,0.67], a sign flip). The estimate-containment invariant (est<0, CI straddles 0, negating hi centres est far better) flips the dropped-minus upper bound; self-guards legitimate zero-straddling null CIs. Complements W0g/W0h (which trust the bracket) — this recovers a minus dropped from the bracket itself. Wired into flatten (sidecar est/CI cols), cell_cleaning._html_escape (same-cell est+CI), and cells_grid_to_html (separate est/CI grid cells). R-0040 Part B; cog_emo Table 8/9 2bi/2bii AI-gold-verified.
+NORMALIZATION_VERSION = "1.9.56"  # v1.9.56 (v2.4.134): THE EVIDENCE EACH REPAIR RESTS ON IS NOW DECLARED, AND ONE RULE STOPPED FABRICATING A SECOND MINUS SIGN. (1) `_ALREADY_SIGNED` is a ONE-CHARACTER lookbehind, so it refused `-0.38` and ACCEPTED `- 0.38`: on a DETACHED sign W0g read a bare-positive estimate, proved it negative from the CI, and emitted `d = - -0.38` - a double-signed effect size no paper printed. The comment above `_SIGNED_DASHES` records that `-2.68 -> --.68` already happened once and that "the fix then covered the one dash form in front of us"; it covered the ATTACHED form. Caught by the idempotency corpus gate, not by reading the rule. (2) W0q: `recover_dropped_minus_ci_upper_in_text` existed ONLY in the table channel, so a CI written in a results SENTENCE never met it - confirmed against the rasterized page of 10.1016/j.jesp.2021.104154 p13, which prints `d = -0.38, 95% CI [-0.58, -0.18]` while pdftotext detaches every minus. 3 brackets in 1 of 26 baseline papers, and the containment arithmetic repaired 0 of them (it had grabbed `S.D = 1.43` as the "estimate"). (3) That rule now splits TYPOGRAPHIC from INFERENTIAL: a DETACHED DASH is a glyph the renderer emitted and the comma proves it is a sign rather than a range separator, so group 5 - captured since the rule was written and never read (register O5) - finally decides. The containment arm is KEPT because chan_feldman_2025_cogemo Table 9 row 2bii has no dash and only the arithmetic recovers its published -0.33, but it is now DECLARED via `ci_upper_minus_inferred_from_containment`. (4) O10: `_recover_estimate_column_via_ci_column` treated any negative bound as proof of the 2-for-minus corruption - including bounds `recover_corrupted_minus_signs` had manufactured one line earlier. It now fires only on a bracket THIS pass actually repaired. (5) O8: W0j signature B is labelled INFERENTIAL in the code and records every firing; W0p records its positional pairing. (6) `NormalizationReport.fallbacks` - every `record_fallback` inside normalization was outside `extract_pdf_structured`'s window and therefore write-only, INCLUDING the ambiguous-pairing refusals added in v2.4.133 to make W0h/W0m observable. # v1.9.55 (v2.4.133): THE LAYOUT-GATED REPAIRS STOP ASSIGNING THEIR EVIDENCE POSITIONALLY. W0h/W0m proved "N glyphs of shape X are corrupt" in pdfplumber's stream and then rewrote the first N matching tokens in pdftotext's stream, document-wide with no page key - so a glyph proven on page 7 licensed flipping a token on page 2. REPRODUCED, not reasoned about: with a decoy `q = .428` prepended to the W0h source paper (ar_apa_j_jesp_2009_12_011), the old code flipped the DECOY and left the genuine coefficient corrupt - one number fabricated, one missed. Each evidence site now carries its own page and its own layout line text, and pairing REFUSES (recording `w0h_ambiguous_pairing_refused`) when the context cannot separate candidates, because pass-through is reversible for the consumer and a rewrite is not. Page-INDEX scoping was measured and rejected: by the time W0h runs the text holds 7 form feeds for a 12-page document, so aligning text page k to layout page k is an off-by-k that produces a confidently WRONG pairing rather than an empty one. W0m was the worse of the two - it counted beta glyphs and flipped the first N `b = <anything>` WITHOUT requiring the coefficient to match, so a beta proven on one page could relabel a genuine unstandardized `b` (a different statistic) elsewhere; the coefficient is now part of the identity. See tests/test_w0h_pairing_is_identity_based.py and docs/OVERHAUL_REGISTER.md G5. # v1.9.54 (v2.4.130): THE SEPARATION OF DUTIES, EXECUTED. Three rules that repaired the PAPER rather than canonicalising NOTATION are DELETED, together with the guard that existed only to serve them. A2 (dropped-decimal repair, `p = 38.` -> `p = .38.`) had NO CITED PAPER anywhere in its code; asked for one, BOTH of its firing sites across 297 English papers turned out to be the paper's own error, rasterized: 10.1177/0146167210380928 p13 prints `B = -0.28, SE = 0.31, p = 38.` and 10.1016/j.jesp.2016.11.001 p7 prints `t(186) = 3.90, p = 001`, each with correctly-dotted numbers on the same line. W0n (`p < 05` -> `p < .05`) is deleted in BOTH channels because its premise is false: the SAME shape has OPPOSITE OWNERS in two real English papers - 10.1016/j.jesp.2009.12.011 p3 PRINTS `p < 05` (the author dropped it; advance 2.00pt vs 3.90pt at a dotted site on the same page, no rect/curve/line in the gap) while 10.1177/0956797613482946 p6 PRINTS `p < .05` and our OCR text layer lost it. A calibrated layout-advance gate (0.51 vs 0.99) was built and REFUTED: Dong p6 is a SCAN whose char boxes come from an OCR engine, so the gate manufactures its own evidence for the exact case it exists to catch. Under irreducible ambiguity the default is PASS-THROUGH, because pass-through is reversible for the consumer and a repair is not. A3a (thousands strip) is deleted because ITS PURPOSE EVAPORATED: its own comment said it strips "so A3 sees the already-clean integer and leaves it alone", and A3 was deleted in v2.4.129. It also produced 1000x errors - 10.1177/0956797620935584 Table S2 p24 prints a Satterthwaite df of `185,178` (fractional by construction, i.e. 185.178) and we delivered `185178`; the collision is STRUCTURAL, since its discriminator is satisfied by construction for any comma-locale number with a 3-digit integer part and 3-decimal precision. It made the library answer one input THREE ways (standard preserved, academic+preserve_math_glyphs counted-but-preserved, academic stripped), and ITS TELEMETRY SAID THE OPPOSITE OF WHAT IT DID: step `A3a_thousands_separator_protect`, metric key `thousands_separators_preserved`, operation `.replace(",", "")` - a false all-clear, which is worse than silence because silence invites a check. ALSO IN THIS RELEASE, the biggest finding of the audit and one that indicts its own framing: THE RENDER CHANNEL DELETES PUBLISHED STATISTICS. The numeric rules were audited exhaustively; the same question was never asked of render.py, which is the channel that reaches the user. Measured on the baseline corpus, 10.1017/s1930297500009189 lost an ENTIRE published-results sentence (two correlations, a Hotelling's t, three p-values, two confidence intervals) to `_suppress_inline_duplicate_table_captions`, and 10.1001/jamanetworkopen.2023.48333 lost a hazard ratio `1.31 (1.20-1.44)` to `_strip_phantom_camelot_tables` - with NO count, NO key in changes_made and NO log line, because render_pdf_to_markdown() chained 54 `md = fn(md)` calls and returned a bare str. Fixed: `_carries_statistical_content` guards every deleting step (delete FURNITURE, never DATA, all-or-nothing per run), and an opt-in `RenderReport` gives the channel telemetry for the first time. See docs/SCOPE.md, LESSONS.md L-032, and tests/test_render_never_deletes_published_statistics.py.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -2384,6 +2386,125 @@ def _fix_hyphenated_line_breaks(text: str) -> str:
     return "\n".join(lines)
 
 
+# ── document-level numeric locale (decision D5, v2.4.128) ───────────────
+#
+# `N = 1,234` is 1234 in an English paper and 1.234 in a German one, and the two
+# conventions are MUTUALLY EXCLUSIVE within one article — so one unambiguous
+# token anywhere in a document settles how every ambiguous token in it should be
+# read. That is a document-level fact, and docpluck is the only layer that still
+# holds it.
+#
+# WHY WE PUBLISH IT: our own normalization INVERTS this evidence. Measured on a
+# real document, before and after `academic`:
+#
+#     RAW       ->  decisive_eu   (6 European markers, 0 US)
+#     DELIVERED ->  decisive_us   (0 European, 6 US)      the verdict FLIPS
+#
+# Academic normalization turns every `d = 0,80` into `d = 0.80`, so the
+# delivered text looks decisively US *by construction*. A consumer running this
+# same inference on our output — which is exactly what effectcheck's
+# `infer_numeric_locale` does — cannot recover the fact. It is not merely
+# inconvenient to recompute downstream; it is impossible. So we compute it while
+# the evidence exists and hand it over.
+#
+# The marker patterns are ported from effectcheck's implementation, whose
+# exclusions are themselves already debugged. Three details are load-bearing:
+#
+#   * markers are OPERATOR-GUARDED. A bare `0,1` also matches coded variables,
+#     version numbers, ratios and lists (it misfires on 5 of 10 realistic
+#     strings).
+#   * `\d,\d{1,2}` is NOT evidence. Tight CI separators (`[0.57,0.73]`) produced
+#     a false CONFLICT on a real article whose six "European" signals were all
+#     CI commas.
+#   * a PLAIN space is EXCLUDED from the full-notation separator class, which
+#     admits only `.`, U+00A0, U+202F and `'`. In English journals a space
+#     between digit groups separates two numbers far more often than it groups
+#     one, and `403,669 107,081` was read as a single European number and
+#     flipped a whole document. Codex's 2026-08-13 review flagged this class as
+#     admitting a plain space; checked against the source, it does not, and the
+#     finding was REFUTED — it was the review DOCUMENT that had transcribed the
+#     no-break spaces as ordinary ones. Spelled with explicit escapes below so
+#     the distinction can never again be lost to a copy-paste.
+_LOCALE_OP = r"[=<>≤≥]\s*"
+_LOCALE_GROUP_SEP = "[.  ']"
+
+_LOCALE_EUROPEAN_MARKERS = {
+    "F1_full_notation": r"\d" + _LOCALE_GROUP_SEP + r"\d{3},\d",
+    "E2_leading_comma": _LOCALE_OP + r",\d{2,}",
+    "E3_zero_comma": _LOCALE_OP + r"0,\d",
+    # E4 carries its bracket guard IN THE PATTERN as of v2.4.129. It used to
+    # live in `infer_numeric_locale`'s body, which recorded an
+    # `E4_bracketed_excluded` count — and when that function was deleted the
+    # guard went with it, silently, leaving the raw marker voting European on
+    # an ML tensor shape `(70,64472)` again. A guard that lives in the CALLER
+    # is lost the moment the caller changes; a guard in the pattern cannot be.
+    # (Reproduced 2026-08-14 by the very test written to pin this vocabulary.)
+    "E4_four_decimals": r"(?<![(\[])\d{1,3},\d{4,}",
+    "E5_sci_notation": r"\d,\d+[eE][-+]?\d",
+}
+_LOCALE_US_MARKERS = {
+    "F2_full_notation": r"\d,\d{3}\.\d",
+    "U2_leading_dot": _LOCALE_OP + r"\.\d{2,}",
+    "U3_zero_dot": _LOCALE_OP + r"0\.\d",
+    "U4_two_groups": r"\d,\d{3},\d{3}",
+}
+
+# E4 fires on machine-learning TENSOR SHAPES: `(70,64472)` is a matrix
+# dimension, not a four-decimal European value. This produced the ONLY
+# "conflict" verdict in a 101-paper corpus scan, on an IEEE paper that is
+# plainly US-convention — i.e. the single disagreement in the whole measurement
+# was an artifact of this one pattern. A bracket-delimited pair is never a
+# decimal, so bracketed E4 hits are excluded from the evidence count.
+# Publishing a WRONG locale is worse than publishing none, because a field
+# creates confidence a missing field does not.
+_LOCALE_E4_BRACKETED = re.compile(r"[(\[]\s*\d+,\d{4,}\s*[)\]]")
+
+# Below this, a verdict is reportable but must not GATE any text change. One
+# marker in a long document is a fact about one token, not about the document;
+# `us=0, eu=1` yields `decisive_eu` on a single possibly-spurious hit.
+# ── The locale MARKER VOCABULARY is retained; the VERDICT is not ──────────
+#
+# v2.4.129 DELETED the document-level numeric-locale feature: `NumericLocale`,
+# `infer_numeric_locale()`, `LOCALE_MIN_GATING_CONFIDENCE`, `is_gating`, and
+# `NormalizationReport.numeric_locale`. The tables above survive it deliberately.
+#
+# WHY THE VERDICT WENT (user directive 2026-08-14). docpluck's scope is English
+# papers in **US** numeric convention. We do not know how to handle European
+# numbers, and we no longer pretend to: they pass through unconverted. A
+# document-level verdict was the wrong shape for that world, and it was worse
+# than useless — it was CONFIDENTLY WRONG on the one real case ever found:
+#
+#     10.1177/0956797620935584 Table S2 — ~130 comma-decimal cells in an
+#     English paper — scored verdict='decisive_us', european_markers=0,
+#     us_markers=61, confidence=1.0.
+#
+# Every European marker here is OPERATOR-GATED (`_LOCALE_OP`), and a flattened
+# table cell has no operator, so the instrument cannot see the exact place
+# European decimals actually appear. The measurement that justified the feature
+# — "396 English articles -> 0 European-locale" — therefore described the
+# INSTRUMENT, not the corpus. It also gated nothing: `is_gating` had zero
+# non-test call sites for its whole life.
+#
+# WHY THE TABLES STAYED — and this is a DELIBERATE, DOCUMENTED exception to the
+# "no dead code" rule, not an oversight:
+#
+#   1. They carry hard-won false-positive resistance. Each exclusion below was
+#      paid for by a real corpus regression — ML tensor shapes, bracket-delimited
+#      pairs, CI commas, and the plain-space case that read `403,669 107,081` as
+#      one European number and flipped a whole document. An independent reviewer's
+#      throwaway detector, written fresh on 2026-08-14, immediately reproduced the
+#      RGB-triple false positive these guards already solve.
+#   2. They are the intended vocabulary for the **local-window** locale guard —
+#      "does THIS table use comma decimals?" — which is the identified remedy for
+#      A3a's 1000x error class. Deleting and rebuilding them later means
+#      rediscovering the same bugs.
+#
+# **They are NOT WIRED and must not be wired to a document-level verdict again.**
+# Anything built on them is line- or table-scoped. Pinned by
+# `tests/test_numeric_locale_markers.py`, which exists so this vocabulary is
+# tested rather than merely retained.
+
+
 @dataclass
 class NormalizationReport:
     level: str
@@ -2405,6 +2526,23 @@ class NormalizationReport:
     # downstream consumers (a follow-up cycle will re-extract these pages
     # via a column-aware path; this cycle lands the detector + flag).
     column_interleave_pages: tuple[int, ...] = ()
+    # Fallback paths that fired during THIS normalization — `{}` when nothing
+    # unusual happened.
+    #
+    # **This field exists because the previous release's telemetry fix stopped
+    # one layer short.** v2.4.133 made `record_fallback` reach a consumer
+    # through `StructuredResult["fallbacks"]` — but `normalize_text` runs AFTER
+    # `extract_pdf_structured` has returned, so every event recorded HERE fell
+    # outside that window and stayed write-only. That included
+    # `w0h_ambiguous_pairing_refused` / `w0m_ambiguous_pairing_refused`, the
+    # counters the same release added to make W0h/W0m's new REFUSAL mode
+    # observable: the refusal was the whole point of the Risk-A fix, and it
+    # shipped with no witness. A repair that declines to fire and tells nobody
+    # is indistinguishable from a document that never needed it.
+    fallbacks: dict[str, int] = field(default_factory=dict)
+    # The same events with the specific instance that fired them — for a refusal,
+    # the coefficient the layout proved but the text could not place.
+    fallback_details: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def _track(self, step_code: str, before: str, after: str, metric_name: str):
         # ``steps_applied`` records every step that ran (kept for backward
@@ -2488,9 +2626,20 @@ def recover_corrupted_minus_signs(text: str) -> str:
             pass
         return m.group(0)
 
-    t = _BRACKET_PAIR_RE.sub(_fix_bracket, text)
+    # WHICH brackets THIS call actually repaired. Passed downstream so the
+    # estimate-column recovery cannot treat a bound it just manufactured as
+    # independent proof of corruption — register O10.
+    repaired: set[str] = set()
+
+    def _fix_bracket_tracking(m: "re.Match[str]") -> str:
+        out = _fix_bracket(m)
+        if out != m.group(0):
+            repaired.add(out.strip())
+        return out
+
+    t = _BRACKET_PAIR_RE.sub(_fix_bracket_tracking, text)
     t = _CORRUPT_R_RE.sub(r"\1-\2", t)
-    t = _recover_estimate_column_via_ci_column(t)
+    t = _recover_estimate_column_via_ci_column(t, repaired_brackets=repaired)
     return t
 
 
@@ -2512,9 +2661,25 @@ def recover_corrupted_minus_signs(text: str) -> str:
 _BARE_NUM_LINE_RE = re.compile(r"^\s*(-?\d+\.\d+)\s*$")
 
 
-def _recover_estimate_column_via_ci_column(text: str) -> str:
+def _recover_estimate_column_via_ci_column(
+    text: str, *, repaired_brackets: "set[str] | None" = None
+) -> str:
     """Recover a `2`-for-minus ESTIMATE column by pairing it positionally with
-    its already-recovered CI column. See the block comment above."""
+    its already-recovered CI column. See the block comment above.
+
+    ``repaired_brackets`` are the bracket strings the CALLER just rewrote in this
+    same pass, and **this argument is what stops the evidence being circular**
+    (register O10). The ``recovered_negative`` gate below is meant to establish
+    *"this table demonstrably carries the 2-for-minus corruption"*, and it was
+    computed as ``lo < 0 or hi < 0`` — which is true of most psychology tables,
+    and, worse, was true of the very bounds ``recover_corrupted_minus_signs`` had
+    manufactured one line earlier. A rewrite became its own proof.
+
+    The gate now fires only on a bracket THIS pass actually repaired, which is
+    the only bound carrying real evidence of the corruption. Passing ``None``
+    keeps the old self-proving behaviour and exists solely for tests that call
+    this helper directly; production always passes the set.
+    """
     if "[" not in text:
         return text
     lines = text.split("\n")
@@ -2547,7 +2712,10 @@ def _recover_estimate_column_via_ci_column(text: str) -> str:
             assert m is not None
             lo, hi = float(m.group(1)), float(m.group(2))
             if lo < 0 or hi < 0:
-                recovered_negative = True
+                if repaired_brackets is None:
+                    recovered_negative = True
+                elif any(b in lines[k] for b in repaired_brackets):
+                    recovered_negative = True
             cis.append((min(lo, hi), max(lo, hi)))
         if not recovered_negative:
             continue
@@ -2609,6 +2777,83 @@ def recover_corrupted_lt_operator(text: str) -> str:
     if not text or "\\" not in text:
         return text
     return _CORRUPT_LT_RE.sub(r"<\1", text)
+
+
+# ── W0o: '<'-as-'b' glyph corruption (v2.4.130, 2026-08-14) ─────────────────
+#
+# RASTER-VERIFIED, and it is OURS. `10.1016/j.jesp.2016.11.001` page 4 PRINTS
+# `p < 0.001` in `BFDKFC+AdvTT94c8263f.I` — the same broken-ToUnicode AdvTT
+# family behind W0n's Dong case — and pdftotext yields `p b 0.001`. The page is
+# correct and our extraction is not, so this is docpluck's to fix under the ONE
+# EXCEPTION to the separation-of-duties directive: a defect our own pipeline
+# introduced, where the source is intact underneath.
+#
+# WHY IT WAS NOT FIXED BEFORE. The 2026-08-14 handoff recorded "that one is
+# ours (`W0c` owns it) and stays." **That is false.** `recover_corrupted_lt_operator`
+# above recovers `<`-as-BACKSLASH only; nothing anywhere handled `<`-as-`b`. The
+# claim was copied forward unverified and read as settled — L-027 in miniature.
+#
+# WHY THE SIGNATURE IS THE OPERATOR SLOT, not "a `b` near a number". Unlike a
+# backslash — which never legitimately touches a numeral in extracted academic
+# text — **`b` is a real statistical symbol**, the unstandardized regression
+# coefficient. The SAME paper carries 17 legitimate uses (`b = 2.73`,
+# `b = -3.26`, `b = 4.98`). So the discriminator is structural: a statistic
+# ALWAYS has an operator between its symbol and its value, and `b` is NEVER an
+# operator. A bare `b` sitting in that slot therefore cannot be a coefficient —
+# a coefficient would carry its own `=`.
+#
+# MEASURED before shipping (`tools/diag/b_for_lt_scan.py`):
+#     31 hits in 10.1016/j.jesp.2016.11.001 — every one a real `p < 0.001`
+#      0 hits across the 26-paper baseline corpus       (no false positives)
+#     17 legitimate `b` uses in the affected paper       (all untouched)
+# Note the affected paper is NOT in the baseline corpus, so "0 in 26" describes
+# the absence of FALSE POSITIVES, never the absence of the shape — a denominator
+# that excludes the known case cannot speak to prevalence.
+#
+# RE-MEASURED 2026-08-15 on a proper denominator — 200 papers sampled from the
+# 9,825-PDF article repository — and the rule is FAR more load-bearing than the
+# single-paper justification suggested:
+#
+#     181 firing sites across 21 of 200 papers  (10.5% of the sample)
+#     every one of them an Elsevier/JESP paper (10.1016/j.jesp.*)
+#
+# This is not a one-paper quirk; it is a SYSTEMATIC failure of one publisher's
+# font pipeline. Sample sites, each sitting immediately after a completed test
+# statistic, so the reading is unambiguous:
+#
+#     t(76) = - 2.01, p b .05          F(1.74,134.13) = 59.24, p b .001
+#     Wald = 19.17, p b .001           means differ at p b .05.
+#
+# In the SAME sentences `B = - .30` and `beta = .25` extract correctly, so only
+# the `<` glyph is affected. Verified by RASTERIZING two independent papers:
+# `10.1016/j.jesp.2016.11.001` p4 and `10.1016/j.jesp.2015.09.003` p3 both PRINT
+# `p < .001`. Fonts on both are the AdvTT family (`AdvTT94c8263f.I`).
+#
+# A rule justified from ONE document turning up in 10% of a random sample is a
+# reminder that the single-paper standard establishes the SHAPE IS REAL; it says
+# nothing about prevalence. Measure the denominator separately.
+#
+# CONSUMER IMPACT: 31 published p-values that no `p\s*<` regex could match, in
+# one paper. Silent coverage loss, not a visible corruption.
+#
+# Only `<` is recovered. `>` is not attempted: no corpus evidence shows which
+# glyph that font maps `>` to, and inventing one would be the hypothetical this
+# project forbids.
+_STAT_SYMBOL_FOR_B = r"(?:[pPtFrRzZdgQ]|chi2|eta2|BF|OR|RR|HR|SE|SD|CI|F\([^)]*\))"
+_CORRUPT_LT_AS_B_RE = re.compile(
+    r"(\b" + _STAT_SYMBOL_FOR_B + r"\s)b(\s(?=[-+]?\.?\d))"
+)
+
+
+def recover_lt_as_b_operator(text: str) -> str:
+    """W0o: recover the '<' operator that some AdvTT fonts extract as 'b'.
+
+    `p b 0.001` -> `p < 0.001`. Fires only when the `b` occupies a statistic's
+    OPERATOR SLOT, which a coefficient `b` never does.
+    """
+    if not text or " b " not in text:
+        return text
+    return _CORRUPT_LT_AS_B_RE.sub(r"\1<\2", text)
 
 
 # v2.4.103 (NORMALIZATION_VERSION 1.9.38): recover the '×' MULTIPLICATION SIGN
@@ -3024,72 +3269,56 @@ def recover_times_wrapped_interaction(text: str) -> str:
     return "\n".join(lines)
 
 
-# ── W0n: p-threshold dropped decimal point ──────────────────────────────────
-# (NORMALIZATION_VERSION 1.9.45, 2026-08-03). On the AdvGulliv/AdvPS broken-
-# ToUnicode font family the '.' glyph of a significance threshold can vanish
-# from BOTH text channels: pdftotext emits nothing, and the pdfplumber char
-# stream shows `p<05(see` with no dot char at all (ar_apa/JESP page 3 —
-# every healthy site on the same page carries an explicit '.' char). Same
-# absent-glyph class as the painted-pixel `.245` minus: there is NO layout
-# evidence to gate on (unlike W0h/W0m), so W0n is a pure text-shape recovery.
+# W0n WAS HERE AND IS DELETED (v2.4.130, 2026-08-14).
 #
-# The shape is provably corrupt: a DOTLESS, leading-zero-free threshold digit
-# run after a p-comparator (`p < 05`, `p > 01`, `p < 001`) is never legitimate
-# statistical notation (APA writes `.05`). Because a wrong insertion would
-# silently change a number 10-fold, W0n fires ONLY when ALL hold:
-#   1. operator is `<`, `>`, `≤`, or `≥` — never `=`: an exact `p = 05` could
-#      be a zero-padded participant/model ID, and an exact p-value's digits
-#      are not confined to the canonical threshold set.
-#   2. digits are exactly one of the canonical thresholds 05 / 01 / 001.
-#      Leading-zero variants (`005`, `0001`) are AMBIGUOUS — corrupted `0.05`
-#      vs corrupted `.005` (both real thresholds) — and are left alone.
-#   3. digits are not part of a longer number: no trailing digit and no
-#      `.digit` decimal continuation (`p < 05.3` / `p < 052` untouched).
-#   4. the clause reads as a significance statement — the `p` is preceded by
-#      a comma/semicolon trailing a statistic token (`= 2.01, p < 05`), an
-#      opening paren/bracket (`(p < 05)`), a significance-legend marker
-#      (`* p < 05`), or line start (table-note legends). A prose subject
-#      (e.g. "the probability p < 0.5" hypothetically losing its dot) never
-#      fires — the FN leaves already-corrupt text no worse, while an FP
-#      would manufacture a wrong number.
-# Residual accepted risk (documented): a source-code listing `if (p < 05)`
-# (octal constant) inside a CS paper would match via the paren context; the
-# corpus scan shows no such site and psychology/medicine corpora do not carry
-# octal literals.
-_P_DOTLESS_THRESHOLD_RE = re.compile(
-    r"\b[pP]\s*[<>≤≥]\s*(?P<digits>001|01|05)(?!\d)(?!\.\d)"
-)
-_P_SIG_CONTEXT_TAIL_RES = (
-    re.compile(r"[\(\[][ \t]*\Z"),          # parenthetical: "(p < 05)"
-    re.compile(r"[*†][ \t]*\Z"),            # significance legend: "* p < 05"
-    re.compile(r"[\d\)\]%][ \t]*[,;][ \t]*\Z"),  # trailing-stat clause: "= 2.01, p < 05"
-)
-
-
-def _p_sig_context_ok(before: str) -> bool:
-    """True when the text immediately before a dotless-threshold match reads
-    as a significance-statement position (W0n guard 4)."""
-    if before == "" or before.endswith("\n"):
-        return True  # line start — table-note / legend column
-    return any(r.search(before) for r in _P_SIG_CONTEXT_TAIL_RES)
-
-
-def recover_p_threshold_dropped_decimal(text: str) -> str:
-    """W0n: restore the dropped decimal point in a p-value significance
-    threshold (`p < 05` → `p < .05`; also 01/001 and >/≤/≥). See the block
-    comment above for the corruption evidence and the four guards."""
-    if "0" not in text:
-        return text
-
-    def _sub(m: re.Match) -> str:
-        if not _p_sig_context_ok(text[: m.start()]):
-            return m.group(0)
-        whole = m.group(0)
-        digits_off = m.start("digits") - m.start()
-        return whole[:digits_off] + "." + whole[digits_off:]
-
-    return _P_DOTLESS_THRESHOLD_RE.sub(_sub, text)
-
+# It restored a dropped decimal point in a p-value significance threshold
+# (`p < 05` -> `p < .05`), on the theory that a DOTLESS leading-zero-free
+# threshold after a p-comparator "is provably corrupt" because APA writes
+# `.05`.
+#
+# THE PREMISE WAS FALSE, and the disproof is the strongest single result of the
+# 2026-08-14 audit: **the same text shape has OPPOSITE OWNERS in two real
+# English papers.** Both verdicts reached by RASTERIZING the page — never by
+# asking an extractor, because "pdftotext cannot see it" is not "it is not
+# there".
+#
+#   10.1016/j.jesp.2009.12.011 p3   PRINTS  `t(87) = 2.01, p < 05`   NO DOT
+#       The AUTHOR dropped the period. 6 of the 7 `p <` sites on that page
+#       carry the dot; the `<`-to-digit advance is 2.00pt where a dotted site
+#       on the same page measures 3.90pt; there is NO rect/curve/line object
+#       in the gap, so no vector-painted dot; the page is natively typeset
+#       with no images. W0n was LAUNDERING a published typo.
+#
+#   10.1177/0956797613482946 p6     PRINTS  `F(2, 93) = 5.69, p < .05`  DOT
+#       Ours: page 6 is a SCAN with an OCR text layer in base-14 fonts, and
+#       the same pass renders `F(2, 93)` as `K2, 93)` and Greek eta-squared-p
+#       as `^p'`. The dot was lost by our extraction.
+#
+# A LAYOUT GATE TO SEPARATE THEM WAS BUILT AND REFUTED. Calibrated on
+# advance-width ratio (0.51 dotless vs 0.99 dotted) it looked decisive, and it
+# is worthless: Dong's char boxes come from an OCR ENGINE rather than the
+# typesetter, so the gate manufactures its own evidence for exactly the case it
+# exists to catch. It is broken independently by justified-text stretch, by
+# mixed styles on one page, by pages with no healthy site to calibrate against,
+# and by the fact that pdfplumber's `x0`/`x1` are glyph BOUNDING BOXES rather
+# than advances.
+#
+# So the ambiguity is irreducible from the text, and irreducible from the
+# layout. **Under irreducible ambiguity the default is PASS-THROUGH**, because
+# pass-through is reversible for the consumer and a repair is not: the source
+# token stays intact and the consumer can still decide, which it could not once
+# we had already rewritten it. Directive 2026-08-13 — docpluck extracts and
+# normalizes what is PRINTED; flagging a suspected author error is ESCImate's
+# and Scimeto's role, because they have the UI and the mandate for it.
+#
+# STATED CONSEQUENCE, not hidden: where the dot really was ours to restore
+# (Dong), the consumer now receives `p < 05` and must decide for itself. That
+# is a coverage change, it was measured before the decision, and it was
+# accepted by the owner of every consumer on 2026-08-14.
+#
+# Pinned by tests/test_p_threshold_decimal_real_pdf.py, re-fixtured rather than
+# deleted so both papers keep carrying their evidence.
+# See docs/SCOPE.md and LESSONS.md L-031 trap 1.
 
 # v2.4.40 (NORMALIZATION_VERSION 1.9.6): recover standalone '2'-for-U+2212
 # minus corruption on point-estimate tokens/cells that the bracket-pair rule
@@ -3114,7 +3343,61 @@ _CI_PAIR_BRACKET_RE = re.compile(r"\[\s*(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)\s*\]")
 # missing `-` in the lookbehind was the cause of `normalize_text` non-
 # idempotence on ip-feldman 2025 (the value first recovers correctly as
 # `-2.68`, then pass 2 re-fires and corrupts it to `--.68`).
-_CORRUPT_NEG_TOKEN_RE = re.compile(r"(?<![\d.\-])2(\d?\.\d+)\b")
+# ── the shared "this token is ALREADY signed" guard (v2.4.128) ───────────
+#
+# Three sibling W0 patterns each need to refuse a token that already carries a
+# sign, and each had written the guard out separately:
+#
+#     _CORRUPT_NEG_TOKEN_RE   (?<![\d.\-])     hyphen-minus only
+#     _PROSE_CODING_NEG_RE    (?<![\d.\-−])    hyphen-minus + U+2212
+#     _BARE_POS_TOKEN_RE      (?<![\d.\-])     hyphen-minus only
+#
+# One guard, three spellings, written at three different times — and the drift
+# was a WRONG NUMBER in the production path, not a tidiness issue:
+#
+#     'B = <U+2212>20.09, 95% CI [-0.21, 0.04]'  ->  'B = --0.09, ...'
+#
+# W0d runs at the `recover_minus_via_ci_pairing` call below, and S5 does not
+# fold U+2212 to ASCII until much later in `normalize_text`, so W0d sees the raw
+# glyph. The estimate's minus sailed past a hyphen-only guard and the recovery
+# signed the number a SECOND time. `--0.09` is not merely wrong, it is
+# unparseable by every consumer. The comment above records that the ASCII case
+# already caused exactly this (`-2.68` -> `--.68`, a non-idempotence bug in
+# v2.4.62); the fix then covered the one dash form in front of us.
+#
+# The set is the dash forms scientific typography actually uses AS A SIGN.
+# U+2014 EM DASH is deliberately absent: it is sentence punctuation, never a
+# numeric sign, so a digit run after one is a candidate like any other. That is
+# a decision with a reason rather than an omission.
+_SIGNED_DASHES = "\\-\u2010\u2011\u2012\u2013\u2212\ufe63\uff0d"
+_ALREADY_SIGNED = rf"(?<![\d.{_SIGNED_DASHES}])"
+
+# ...AND THE SIGN MAY BE DETACHED. `_ALREADY_SIGNED` is a ONE-CHARACTER
+# lookbehind, so it refuses `-0.38` and accepts `- 0.38`, where the character
+# before the token is a space. On a detached sign W0g therefore read a
+# bare-positive estimate, proved it negative from the CI, and emitted
+# `d = - -0.38` — a double-signed effect size no paper printed.
+#
+# The comment above records that `-2.68 -> --.68` already happened once
+# (v2.4.62) and that "the fix then covered the one dash form in front of us".
+# It covered the ATTACHED form; this is the DETACHED one, and pdftotext produces
+# it routinely on the fonts that motivated these rules at all — confirmed on
+# `10.1016/j.jesp.2021.104154` p13, whose printed `d = −0.38, 95% CI
+# [−0.58, −0.18]` arrives with every minus separated from its digit.
+#
+# A function rather than a wider lookbehind because Python requires fixed-width
+# lookbehinds, and the gap is an unbounded whitespace run (it can be a line
+# wrap). Applied at the decision point, where the whole preceding text is in
+# hand.
+_TRAILING_SIGN_RE = re.compile(rf"[{_SIGNED_DASHES}]\s*$")
+
+
+def _already_carries_a_sign(text_before: str) -> bool:
+    """True when the token starting at the end of ``text_before`` is already
+    signed — including a sign DETACHED from it by spaces or a line break."""
+    return bool(_TRAILING_SIGN_RE.search(text_before))
+
+_CORRUPT_NEG_TOKEN_RE = re.compile(_ALREADY_SIGNED + r"2(\d?\.\d+)\b")
 _TABLE_ROW_RE = re.compile(r"<tr\b.*?</tr>", re.DOTALL | re.IGNORECASE)
 
 
@@ -3210,6 +3493,13 @@ def _recover_minus_in_record(record: str) -> str:
         for _lo, _hi, (bs, be), _lab in brackets:
             if bs <= m.start() < be:
                 return m.group(0)
+        # Never sign a value that is ALREADY signed, even when the sign is
+        # DETACHED from its digits by whitespace or a line wrap. See
+        # `_already_carries_a_sign` — the one-character lookbehind cannot see
+        # past the space, and a detached sign is exactly what the fonts these
+        # rules exist for produce.
+        if _already_carries_a_sign(record[: m.start()]):
+            return m.group(0)
         frac = m.group(1)
         try:
             literal = float("2" + frac)
@@ -3346,7 +3636,9 @@ def recover_minus_via_ci_pairing(text: str) -> str:
 # "M = 2.84") changes NOTHING; a 20-paper rendered-corpus scan fires ONLY on
 # efendic (the target). Wired into channel 1 (normalize_text) AND channel 3
 # (render_pdf_to_markdown post-process) per the 3-channel glyph discipline.
-_PROSE_CODING_NEG_RE = re.compile(r"(?<![\d.\-−])2(\d\.\d+)(\s*=\s*)([A-Za-z])")
+_PROSE_CODING_NEG_RE = re.compile(
+    _ALREADY_SIGNED + r"2(\d\.\d+)(\s*=\s*)([A-Za-z])"
+)
 _PROSE_CODING_TWIN_RE = re.compile(r"\+\s*(\d\.\d+)\s*=\s*[A-Za-z]")
 _PROSE_MSTAT_CHANGE_RE = re.compile(
     r"(\bM(?:change|diff|difference|posterior|delta|gain|shift)\s*=\s*)2(\d\.\d+)",
@@ -3372,12 +3664,38 @@ def recover_prose_two_for_minus(text: str) -> str:
         twins = {m.group(1) for m in _PROSE_CODING_TWIN_RE.finditer(line)}
         if twins:
             def _repl_a(m: "re.Match[str]") -> str:
+                # Same detached-sign guard as W0d/W0g. `- 20.5 = low` is already
+                # signed; signing it again emits `- -0.5`.
+                if _already_carries_a_sign(line[: m.start()]):
+                    return m.group(0)
                 if m.group(1) in twins:
                     return "-" + m.group(1) + m.group(2) + m.group(3)
                 return m.group(0)
             line = _PROSE_CODING_NEG_RE.sub(_repl_a, line)
         # Signature B: difference-type M-statistic.
-        line = _PROSE_MSTAT_CHANGE_RE.sub(lambda m: m.group(1) + "-" + m.group(2), line)
+        #
+        # EVIDENCE CLASS: **INFERENTIAL** — the ruling register O8 asked for, and
+        # it is recorded here rather than only in a doc, because a ruling that
+        # lives in prose is a claim about the code and not a property of it.
+        #
+        # Signature A is inferential too but self-corroborating: the `+ X.X =
+        # <word>` twin ON THE SAME LINE is a second token the renderer emitted,
+        # and a ±k contrast code always names both arms. B has no such witness.
+        # It decides from the variable NAME (`Mchange`), and a name is not
+        # something the renderer put on the page — `20.14` is not grammatically
+        # impossible in that slot, merely implausible for a difference score.
+        # That is exactly the judgement docpluck assigns to consumers, who hold
+        # the parsed statistic and a UI to flag it.
+        #
+        # KEPT, narrowly, and DECLARED. Retiring it moves work onto consumers who
+        # have not been told yet, and the owner alone may make that call. What it
+        # must not do is fire silently, which is what it did until v2.4.134.
+        def _repl_b(m: "re.Match[str]") -> str:
+            record_fallback("w0j_mstat_sign_inferred_from_variable_name",
+                            detail=m.group(0)[:40])
+            return m.group(1) + "-" + m.group(2)
+
+        line = _PROSE_MSTAT_CHANGE_RE.sub(_repl_b, line)
         out.append(line)
     return "\n".join(out)
 
@@ -3408,7 +3726,7 @@ def recover_prose_two_for_minus(text: str) -> str:
 #   3. The recovered negative falls inside [lo, hi] AND the literal positive
 #      falls strictly OUTSIDE [lo, hi] (the same record-internal sign-flip
 #      proof W0d relies on).
-_BARE_POS_TOKEN_RE = re.compile(r"(?<![\d.\-])(\d?\.\d+)\b")
+_BARE_POS_TOKEN_RE = re.compile(_ALREADY_SIGNED + r"(\d?\.\d+)\b")
 # A signed-negative numeric value: a real minus (ASCII '-' or U+2212) glued to a
 # decimal. Used by the A3 guard below to detect that the point estimate the CI
 # belongs to ALREADY sits between the candidate token and the CI — meaning the
@@ -3447,6 +3765,10 @@ def _recover_dropped_minus_in_record(record: str) -> str:
         for _lo, _hi, (bs, be), _lab in brackets:
             if bs <= m.start() < be:
                 return m.group(0)
+        # Never sign a value that is ALREADY signed, even when pdftotext left
+        # the sign detached from its digits. See `_already_carries_a_sign`.
+        if _already_carries_a_sign(record[: m.start()]):
+            return m.group(0)
         frac_with_lead = m.group(1)
         try:
             literal = float(frac_with_lead)
@@ -3560,18 +3882,67 @@ _CID_GLYPH_RE = re.compile(r"^\(cid:\d+\)$")
 _LAYOUT_COEF_SHAPE_RE = re.compile(r"^\d?\.\d+$")  # .NNN or D.NNN
 
 
-def _layout_negative_coefficients(layout) -> dict[str, int]:
-    """Scan the layout channel for coefficients whose dropped U+2212 minus
-    survives as an unmapped ``(cid:N)`` glyph in the ``<stat> = <minus><coef>``
-    operator slot. Returns ``{coef_string: count}`` (e.g. ``{".022": 1}``) for
-    the coefficients the layout proves negative. Empty when no layout / no hit.
+def _layout_line_text(line) -> str:
+    """Reconstruct a layout line as readable text, inserting spaces at gaps.
+
+    pdfplumber's char stream carries NO space characters — a space is an
+    absence of glyphs — so joining chars directly yields
+    ``"Thedatawasanalyzedusinga4"``. That glues every word together, and the
+    context matcher downstream compares WORD tokens against pdftotext's spaced
+    text, where nothing would ever match. A gap wider than a fraction of the
+    glyph size is a word boundary.
+    """
+    out: list[str] = []
+    prev = None
+    for d in line:
+        t = str(d.get("text") or "")
+        if prev is not None:
+            gap = float(d.get("x0") or 0.0) - float(prev.get("x1") or 0.0)
+            if gap > 0.28 * max(float(prev.get("size") or 0.0), 1.0):
+                out.append(" ")
+        out.append(t)
+        prev = d
+    return "".join(out).strip()
+
+
+def _layout_negative_coefficient_sites(layout) -> list[dict]:
+    """Every coefficient the layout proves negative, WITH the evidence's own
+    location and surrounding line text.
+
+    ## Why this replaced a bare ``{coef: count}`` (Risk A / register C1, F7f)
+
+    The layout channel is **pdfplumber's** character stream; the substitution
+    happens in **pdftotext's** text. Until v2.4.133 the bridge between them was
+    a bare count: *"the layout found 2 negative `.022`s, so flip the first 2
+    textual `= .022`s, left to right, ANYWHERE in the document."* The counts
+    carried no page key and the rewrite ran over the whole document, so
+    **a glyph proven on page 7 licensed flipping the first matching token on
+    page 2** — fabricating a minus on a statistic that was never corrupt.
+
+    That is the same class as the v2.4.131 OMML regression (a repair that emits
+    a WRONG value rather than no value), sitting inside the rules everyone
+    treats as safely typographic because they are gated on real glyph evidence.
+    The evidence WAS real; the *assignment* of it to a token was positional.
+
+    ## Why not page-scoping
+
+    Page-index scoping looks like the obvious fix and does not work here:
+    measured on `10.1177/19485506211056761`, by the time W0h runs the text
+    carries **7 form feeds for a 12-page document** — earlier normalization
+    steps consume them — so aligning text page *k* to layout page *k* is an
+    off-by-k that produces a CONFIDENTLY WRONG pairing rather than an empty
+    one. Anchoring on the evidence's own line text needs no page alignment.
+
+    Returns one dict per proven site::
+
+        {"num": ".022", "page": 5, "line": "b = .022, t(87) = .17"}
     """
     from .extract_layout import LayoutDoc  # local import (layout is optional)
 
-    counts: dict[str, int] = {}
+    sites: list[dict] = []
     if not isinstance(layout, LayoutDoc):
-        return counts
-    for page in layout.pages:
+        return sites
+    for page_index, page in enumerate(layout.pages):
         chars = page.chars
         if not chars:
             continue
@@ -3624,8 +3995,116 @@ def _layout_negative_coefficients(layout) -> dict[str, int]:
                 k -= 1
             if left != "=":
                 continue
-            counts[num] = counts.get(num, 0) + 1
+            # The evidence's OWN line, as the layout channel sees it. This is
+            # what makes the later pairing identity-based instead of ordinal.
+            sites.append({
+                "num": num,
+                "page": page_index,
+                "line": _layout_line_text(line),
+            })
+    return sites
+
+
+def _layout_negative_coefficients(layout) -> dict[str, int]:
+    """Backward-compatible count view of :func:`_layout_negative_coefficient_sites`.
+
+    Kept because the counts are still the right shape for telemetry and for
+    tests that only assert "the layout proved N negatives". The REPAIR no
+    longer uses this — a count cannot say *which* token it licenses.
+    """
+    counts: dict[str, int] = {}
+    for site in _layout_negative_coefficient_sites(layout):
+        counts[site["num"]] = counts.get(site["num"], 0) + 1
     return counts
+
+
+def _layout_superscript_fusions(layout) -> list[tuple[str, str]]:
+    """Find `(fused, base, marker)` runs the LAYOUT proves are superscripts.
+
+    Returns `[(fused_token, repaired_token), ...]` in reading order.
+
+    A footnote marker is typographically a superscript, but pdftotext renders a
+    positioned glyph as an ordinary digit — the paper that motivated this
+    (`10.1525/collabra.34606`) contains ZERO Unicode superscript codepoints, so
+    the text channel has nothing to key on. Font size plus baseline are the only
+    evidence, and they live here.
+    """
+    out: list[tuple[str, str]] = []
+    for page in getattr(layout, "pages", ()) or ():
+        chars = [c for c in (getattr(page, "chars", ()) or ())
+                 if c.get("upright", True)]
+        i = 0
+        while i < len(chars):
+            # a base run: digits (and separators) at one size, on one baseline
+            j = i
+            while (j < len(chars)
+                   and chars[j]["text"] in "0123456789,."
+                   and abs(chars[j]["size"] - chars[i]["size"]) < 0.01
+                   and abs(chars[j]["top"] - chars[i]["top"]) < 0.01):
+                j += 1
+            if j == i or not any(c["text"].isdigit() for c in chars[i:j]):
+                i += 1
+                continue
+            base_size, base_top = chars[i]["size"], chars[i]["top"]
+            # a marker run: digits, SMALLER and RAISED, immediately after
+            k = j
+            while (k < len(chars)
+                   and chars[k]["text"].isdigit()
+                   and chars[k]["size"] < base_size * 0.9
+                   and chars[k]["top"] < base_top - 0.5):
+                k += 1
+            if k > j:
+                base = "".join(c["text"] for c in chars[i:j])
+                marker = "".join(c["text"] for c in chars[j:k])
+                out.append((base + marker, base + "^" + marker))
+                i = k
+                continue
+            i = j
+    return out
+
+
+def recover_superscript_via_layout(text: str, layout) -> str:
+    """W0p: never fuse a typographically-superscript digit into the number.
+
+    `N = 2,5801` is the sample size 2,580 carrying footnote marker 1. Fused, it
+    reads as 25,801 AND it matches the numeric-locale rule's European marker
+    `\\d,\\d{4,}`, so a footnote marker manufactures a false locale signal — that
+    accounted for one of only two `conflict` verdicts across 396 English papers.
+
+    Caret notation rather than deletion, because decision D4 forbids deleting
+    superscript digits from body text: geometry cannot distinguish a footnote
+    marker from a real exponent (`×10⁹/L`), and deleting the wrong one loses nine
+    orders of magnitude. `2,580^1` is lossless, keeps both readings recoverable,
+    and is the same form A5 already produces for a Unicode superscript after a
+    digit — one rule, two evidence sources.
+
+    Conservative correlation, as W0h and W0m do: rewrite at most as many text
+    sites as the layout counted, left to right.
+    """
+    if not text or layout is None:
+        return text
+    for fused, repaired in _layout_superscript_fusions(layout):
+        n = text.count(fused)
+        if not n:
+            record_fallback("w0p_no_text_match_for_layout_evidence", detail=fused)
+            continue
+        if n > 1:
+            # POSITIONAL PAIRING, DECLARED. `replace(..., 1)` assigns the layout's
+            # evidence to the FIRST textual occurrence — the same class W0h/W0m
+            # were converted away from this release, because a glyph proven on
+            # one page licensed rewriting a token anywhere in the paper.
+            #
+            # Not converted here, and the reason is a measurement rather than a
+            # judgement: W0p's key is a WHOLE FUSED TOKEN (`2,5801`), not a bare
+            # coefficient, so collisions are far rarer than W0h's; and the repair
+            # is LOSSLESS — `2,580^1` keeps both readings recoverable, so a
+            # mis-placed caret is visible and reversible where a fabricated minus
+            # is neither. Recording the ambiguity is what turns "rare" from an
+            # assumption into a number; convert it the day this counter is
+            # non-zero on real papers.
+            record_fallback("w0p_ambiguous_positional_pairing", detail=f"{fused}x{n}")
+        text = text.replace(fused, repaired, 1)
+    return text
 
 
 def recover_dropped_minus_via_layout(text: str, layout) -> str:
@@ -3637,23 +4116,138 @@ def recover_dropped_minus_via_layout(text: str, layout) -> str:
     """
     if not text or layout is None:
         return text
-    counts = _layout_negative_coefficients(layout)
-    if not counts:
+    sites = _layout_negative_coefficient_sites(layout)
+    if not sites:
         return text
-    for num, count in counts.items():
+
+    edits: list[tuple[int, int, str]] = []
+    claimed: set[int] = set()
+
+    # AN "EXHAUSTIVE MATCH" SHORTCUT WAS WRITTEN HERE AND THEN REMOVED, ON A
+    # MEASUREMENT. A post-fix review observed that when the layout proves k>1
+    # sites all reading the same `num` and the text holds exactly k candidates,
+    # the counts force a bijection — every candidate is provably corrupt, so
+    # refusing all k (which is what the code below does on a context tie) is
+    # provably wrong. The argument is sound. The shape is not observed:
+    # `tools/diag/w0h_pairing_prevalence_scan.py` over **60 sampled papers plus
+    # the W0h source paper (2026-08-15)** found 3 sites, **0 of which had more
+    # than one textual candidate at all** — so the ambiguous branch never
+    # executes, let alone its exhaustive special case.
+    #
+    # A rewrite must earn its evidentiary cost, and a rule with no observed
+    # input is false-positive surface for no benefit (the A3d precedent). The
+    # missed repair is a PASS-THROUGH — the paper's own token, which a consumer
+    # can still challenge — so declining to add the branch costs nothing that
+    # matters. Re-open it the day the scan reports a non-zero R1a count.
+    def _candidates_for(num: str) -> list:
         # `(?<=[\w\s])` ties the `=` to a label/space (excludes `<=` `>=` `==`);
         # `(?![\d.])` stops a partial match of a longer number.
         pat = re.compile(r"(?<=[\w\s])(=\s{0,3})(" + re.escape(num) + r")(?![\d.])")
-        remaining = [count]
+        return list(pat.finditer(text))
 
-        def _sub(m: "re.Match[str]", _r=remaining) -> str:
-            if _r[0] <= 0:
-                return m.group(0)
-            _r[0] -= 1
-            return m.group(1) + "-" + m.group(2)
+    for site in sites:
+        num = site["num"]
+        candidates = [m for m in _candidates_for(num) if m.start() not in claimed]
+        if not candidates:
+            record_fallback("w0h_no_text_match_for_layout_evidence", detail=num)
+            continue
+        if len(candidates) == 1:
+            # Unambiguous: exactly one place this evidence can belong. This is
+            # the overwhelmingly common case, and behaviour is unchanged from
+            # the pre-v2.4.133 count-based rewrite.
+            chosen = candidates[0]
+        else:
+            chosen = _best_context_match(candidates, text, site["line"], num)
+            if chosen is None:
+                # AMBIGUOUS — two or more textual tokens could be the one the
+                # layout proved, and the line context does not separate them.
+                # REFUSE. Passing through leaves a value the consumer can still
+                # challenge; guessing fabricates a minus on a statistic that
+                # may never have been corrupt, and nothing downstream can tell.
+                record_fallback("w0h_ambiguous_pairing_refused", detail=num)
+                continue
+        claimed.add(chosen.start())
+        edits.append((chosen.start(), chosen.end(),
+                      chosen.group(1) + "-" + chosen.group(2)))
 
-        text = pat.sub(_sub, text)
+    # Apply right-to-left so earlier offsets stay valid.
+    for start, end, replacement in sorted(edits, reverse=True):
+        text = text[:start] + replacement + text[end:]
     return text
+
+
+# An unmapped-glyph marker in a layout line. It is an ARTEFACT of the very
+# corruption W0h/W0m are repairing, never content, and it exists in the LAYOUT
+# channel only — pdftotext drops the glyph entirely, so the text window can
+# never contain it.
+_CID_MARKER_RE = re.compile(r"\(cid:\d+\)")
+
+
+def _context_tokens(s: str) -> set[str]:
+    """Alphanumeric tokens of a context window, lowercased.
+
+    Compared as a SET because the two channels do not agree on spacing or
+    reading order — pdfplumber's line and pdftotext's line are the same words,
+    not the same string.
+
+    ``(cid:N)`` markers are stripped FIRST, and that is not cosmetic. The layout
+    line around a proven site reads ``…control,b=(cid:2).428,t(44)=`` — so ``cid``
+    entered the wanted-token set, and no text window can ever contain it because
+    pdftotext dropped the glyph. Every candidate therefore lost the same fraction
+    of the score, and on a sparse line that was enough to push the best candidate
+    under the 0.12 corroboration floor and force a REFUSAL — the repair declining
+    to fire because of a token that is evidence of the corruption itself. The
+    marker's glyph id is stripped with it: ``12`` in ``(cid:12)`` is an internal
+    font index, not a word, and would survive the ``len > 1`` filter.
+    """
+    s = _CID_MARKER_RE.sub(" ", s)
+    return {t for t in re.findall(r"[A-Za-z0-9.]+", s.lower()) if len(t) > 1}
+
+
+def _best_context_match(candidates, text: str, layout_line: str, num: str):
+    """Pick the textual match whose surroundings match the layout's own line.
+
+    Returns the single best candidate, or ``None`` when the evidence does not
+    separate them — in which case the caller MUST refuse rather than guess.
+
+    ## Why the bar is SEPARATION, not a high absolute score
+
+    A layout "line" is a band of constant *y*, and academic papers are set in
+    two columns — so on a two-column page the reconstructed line splices text
+    from BOTH columns, while pdftotext emits them in reading order. Measured on
+    the W0h source paper (`ar_apa_j_jesp_2009_12_011`), the layout line around
+    the proven `.428` is
+
+        "F(1,88)=7.49, p<.01. Most importantly, participants in some
+         control,b=(cid:2).428,t(44)="
+
+    of which only `control`, `44` and `3.14` are actually adjacent to the token
+    in reading order. The CORRECT match therefore scores 0.231 and a planted
+    decoy scores 0.000. Demanding a high absolute score would refuse the very
+    case this exists to resolve; demanding a decisive *gap* answers the only
+    question being asked — *which of these candidates is the one the layout
+    proved?* — and still refuses a genuine tie.
+
+    Substring containment rather than set equality, because the channels split
+    words differently: the layout's `control` lives inside pdftotext's
+    `selfcontrol`.
+    """
+    want = _context_tokens(layout_line) - {num.lower()}
+    if not want:
+        return None
+    scored: list[tuple[float, object]] = []
+    for m in candidates:
+        window = text[max(0, m.start() - 70): m.end() + 70].lower()
+        hits = sum(1 for tok in want if tok in window)
+        scored.append((hits / len(want), m))
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    best, runner_up = scored[0][0], (scored[1][0] if len(scored) > 1 else 0.0)
+    # Some real corroboration, AND a decisive lead over the next candidate.
+    # A tie means the context did not discriminate, which is a refusal, not a
+    # coin-flip: the whole point is to stop assigning evidence positionally.
+    if best < 0.12 or best < 2.0 * runner_up + 0.08:
+        return None
+    return scored[0][1]
 
 
 # ── W0m (§A / GLYPH): recover a standardized-coefficient 'β' that pdftotext ───
@@ -3676,16 +4270,24 @@ def recover_dropped_minus_via_layout(text: str, layout) -> str:
 _BETA_SYMBOL_FONT_RE = re.compile(r"AdvPSMP", re.IGNORECASE)
 
 
-def _layout_beta_coefficients(layout) -> int:
-    """Count the standardized coefficients whose 'β' survives in the layout as a
-    math-symbol-font 'b' in the ``b = <coef>`` operator slot. Returns the number
-    of such 'b' glyphs (0 when no layout / no hit)."""
+def _layout_beta_coefficient_sites(layout) -> list[dict]:
+    """Every 'b' the layout proves is a math-symbol-font β in the ``b = <coef>``
+    slot, WITH the coefficient it governs and its own line text.
+
+    Same Risk A fix as :func:`_layout_negative_coefficient_sites`, and W0m was
+    the worse of the two: it counted β glyphs and then flipped the first N
+    ``b = <anything>`` occurrences in the document, **without even requiring
+    the coefficient to match**. So a β proven on one page could promote a
+    genuine unstandardized `b` on another — and `b` is a real, distinct
+    statistic, which is exactly why this rule is layout-gated in the first
+    place. The coefficient value is now part of the identity.
+    """
     from .extract_layout import LayoutDoc  # local import (layout is optional)
 
+    sites: list[dict] = []
     if not isinstance(layout, LayoutDoc):
-        return 0
-    count = 0
-    for page in layout.pages:
+        return sites
+    for page_index, page in enumerate(layout.pages):
         chars = page.chars
         if not chars:
             continue
@@ -3718,9 +4320,39 @@ def _layout_beta_coefficients(layout) -> int:
                     right = rt
                     break
                 k += 1
-            if right == "=":
-                count += 1
-    return count
+            if right != "=":
+                continue
+            # The coefficient this β governs — part of the site's identity, so
+            # the evidence cannot be spent on an unrelated `b = ` elsewhere.
+            coef = ""
+            j = k + 1
+            while j < len(line):
+                t = str(line[j].get("text") or "")
+                # Skip a leading sign before the digits start. The sign is
+                # often the very `(cid:N)` unmapped-minus glyph W0h recovers —
+                # missing that case left `coef` empty on every dropped-minus
+                # beta, which is precisely the paper this rule was built on.
+                if not coef and (t in "-−" or _CID_GLYPH_RE.match(t)):
+                    j += 1
+                    continue
+                if len(t) == 1 and t in "0123456789.":
+                    coef += t
+                    j += 1
+                elif not t.strip() and not coef:
+                    j += 1
+                else:
+                    break
+            sites.append({
+                "coef": coef,
+                "page": page_index,
+                "line": _layout_line_text(line),
+            })
+    return sites
+
+
+def _layout_beta_coefficients(layout) -> int:
+    """Backward-compatible count view of :func:`_layout_beta_coefficient_sites`."""
+    return len(_layout_beta_coefficient_sites(layout))
 
 
 # A `b = ` coefficient operator slot: a standalone `b` (word-boundary before,
@@ -3740,17 +4372,48 @@ def recover_beta_via_layout(text: str, layout) -> str:
     the reason a text-only rewrite is unsafe (genuine `b` coefficients exist)."""
     if not text or layout is None or "b" not in text:
         return text
-    remaining = [_layout_beta_coefficients(layout)]
-    if remaining[0] <= 0:
+    sites = _layout_beta_coefficient_sites(layout)
+    if not sites:
         return text
 
-    def _sub(m: "re.Match[str]", _r=remaining) -> str:
-        if _r[0] <= 0:
-            return m.group(0)
-        _r[0] -= 1
-        return "β" + m.group(1)
+    all_matches = list(_BETA_COEF_SLOT_RE.finditer(text))
+    if not all_matches:
+        return text
 
-    return _BETA_COEF_SLOT_RE.sub(_sub, text)
+    def _digits(s: str) -> str:
+        return "".join(ch for ch in s if ch in "0123456789.")
+
+    edits: list[tuple[int, int, str]] = []
+    claimed: set[int] = set()
+    for site in sites:
+        pool = [m for m in all_matches if m.start() not in claimed]
+        # IDENTITY FIRST: the coefficient the layout saw must be the coefficient
+        # in the text. Only fall back to the whole pool when the layout could
+        # not read a coefficient at all (it stays empty on a line break).
+        if site["coef"]:
+            exact = [m for m in pool if _digits(m.group(1)) == site["coef"]]
+            pool = exact or []
+        if not pool:
+            record_fallback("w0m_no_text_match_for_layout_evidence",
+                            detail=site["coef"] or "?")
+            continue
+        if len(pool) == 1:
+            chosen = pool[0]
+        else:
+            chosen = _best_context_match(pool, text, site["line"], site["coef"])
+            if chosen is None:
+                # `b` is a LEGITIMATE distinct statistic (an unstandardized
+                # coefficient). Promoting the wrong one silently relabels a real
+                # published number as a different quantity.
+                record_fallback("w0m_ambiguous_pairing_refused",
+                                detail=site["coef"] or "?")
+                continue
+        claimed.add(chosen.start())
+        edits.append((chosen.start(), chosen.end(), "β" + chosen.group(1)))
+
+    for start, end, replacement in sorted(edits, reverse=True):
+        text = text[:start] + replacement + text[end:]
+    return text
 
 
 # §A R5 / B7 (NORMALIZATION_VERSION 1.9.36, 2026-06-30): recover a CI UPPER
@@ -3854,7 +4517,39 @@ def recover_dropped_minus_ci_upper_in_text(text: str) -> str:
     stray detached dash collapsed), leaving the lower bound and all surrounding
     text untouched. A bound that ALREADY carries an attached minus is parsed as
     negative, so the invariant's ``lo < 0 < hi`` gate leaves it alone (no churn
-    on correct rows). No-op when no estimate-anchored bracket is present."""
+    on correct rows). No-op when no estimate-anchored bracket is present.
+
+    ## Which EVIDENCE each rewrite rests on — and why both are now declared
+
+    The project's evidence-axis rule splits repairs into TYPOGRAPHIC (something
+    the renderer emitted) and INFERENTIAL (what the number ought to be), and
+    assigns inferential judgement to consumers. This function was doing both and
+    saying neither, so the two are now separated and each is RECORDED:
+
+    * **TYPOGRAPHIC** — the bracket carries a DETACHED DASH before its upper
+      bound (``[−0.78,  –  0.67]``). The dash is a glyph the renderer put on the
+      page; what used to be inferential was its *reading*, and the COMMA settles
+      that: in ``[lo, – hi]`` the comma already occupies the separator role, so
+      the dash cannot be a range separator and can only be a sign that lost its
+      kerning. (Both independent reviewers reached this argument separately on
+      2026-08-15.) ``_CI_UPPER_DROPPED_RE`` requires that comma, so the gate
+      inherits the condition rather than assuming it. Group 5 CAPTURED this dash
+      all along and nothing ever read it — register O5.
+    * **INFERENTIAL** — no dash, nothing on the page to point at, and only the
+      estimate-containment arithmetic says the bound lost a minus.
+
+    **The inferential arm is KEPT, deliberately, and this is not a re-derivation
+    of the doctrine.** Retiring it was proposed and then refuted against the
+    primary source: `chan_feldman_2025_cogemo` Table 9 row 2bii extracts as
+    ``[−0.52,  0.33]`` with NO dash and no font signal, and the arithmetic is the
+    only mechanism that recovers its published ``−0.33``. Deleting it would drop
+    a repair with a real-DOI justification. The doctrine's stated REASON for
+    assigning inferential calls to consumers is that *docpluck has no channel
+    through which to relay that it guessed* — and that premise changed in this
+    release: `NormalizationReport.fallbacks` now reaches them. So the guess is
+    declared instead of hidden, and the retirement stays an owner decision with a
+    measurement attached rather than a plan author's call.
+    """
     if not text or "[" not in text:
         return text
 
@@ -3867,6 +4562,7 @@ def recover_dropped_minus_ci_upper_in_text(text: str) -> str:
         # upper bound as negative so the invariant skips it. A DETACHED dash
         # (group 5) is treated as a dropped/garbled minus, NOT a present sign:
         # the magnitude is parsed positive and the invariant adjudicates.
+        detached_dash = bool(m.group(5))
         hi_signed = ("-" if attached_sign in ("-", "−") else "") + m.group(7)
         try:
             est = float(_fold(m.group(1) + m.group(2)))
@@ -3874,9 +4570,24 @@ def recover_dropped_minus_ci_upper_in_text(text: str) -> str:
             hi = float(hi_signed)
         except ValueError:
             return m.group(0)
-        fixed_hi = recover_dropped_minus_ci_upper(est, lo, hi)
-        if fixed_hi is None:
-            return m.group(0)
+        if detached_dash and lo < 0 < hi and lo < -hi:
+            # Typographic: reattach the dash the renderer emitted. The
+            # monotonicity check (`lo < -hi`) is a well-formedness test on the
+            # RESULT, not estimate arithmetic — it refuses to produce a bracket
+            # that runs backwards, which would be a new defect rather than a
+            # repair.
+            fixed_hi = -hi
+            record_fallback("ci_upper_minus_reattached_from_detached_dash",
+                            detail=f"{m.group(3)}")
+        else:
+            fixed_hi = recover_dropped_minus_ci_upper(est, lo, hi)
+            if fixed_hi is None:
+                return m.group(0)
+            # INFERENTIAL — declared, so a consumer can find every one of these
+            # and re-check it against the paper. Nothing the renderer emitted
+            # supports this rewrite; only the containment arithmetic does.
+            record_fallback("ci_upper_minus_inferred_from_containment",
+                            detail=f"{m.group(3)}")
         # Preserve the lower bound's original glyph (e.g. U+2212) verbatim,
         # stripping only interior spaces, so a corrected row's lo still matches
         # the sibling rows' display; emit the upper bound with a single minus
@@ -3905,6 +4616,146 @@ _LIGATURE_MAP = {
     "ﬃ": "ffi", "ﬄ": "ffl", "ﬅ": "st", "ﬆ": "st",
 }
 _LIGATURE_RE = re.compile("[ﬀ-ﬆ]")
+
+
+# Greek transliteration comes from THE canonical table (`docpluck.symbols`), so
+# this module and `extract.py`'s SMP fallback cannot drift apart again — they
+# had, on 9 of 9 shared letters, and the same chi-square left as `chi2` or `ch2`
+# depending only on which extraction path ran.
+from .symbols import (  # noqa: E402
+    GREEK_TO_ASCII,
+    GREEK_UPPER_AMBIGUOUS_TO_ASCII,
+)
+
+_GREEK_TRANSLATION = {ord(k): v for k, v in GREEK_TO_ASCII.items()}
+
+# Standalone-token guard for the Latin-lookalike capitals — see the A5 comment.
+_GREEK_AMBIGUOUS_UPPER_RE = re.compile(
+    r"(?<![^\W\d_]|[-‐-―_.])["
+    + "".join(GREEK_UPPER_AMBIGUOUS_TO_ASCII)
+    + r"](?![^\W\d_]|[-‐-―_.])"
+)
+
+
+# A5 SUBSCRIPT LETTERS (v2.4.128, decision D6a) — the completion of a table that
+# already mapped subscript DIGITS.
+#
+# A5 flattens the typographic forms publishers use into the ASCII downstream
+# consumers parse. It did that for U+2080-U+2089 and stopped, so the subscript
+# LETTER blocks passed through untouched and the most common effect size in
+# psychology left as a mixed ASCII/Unicode token: `eta2` + a live U+209A. Nothing
+# errors — effectcheck's fixed `(?:eta2p|eta_p2|...)` alternation simply misses
+# it, and the row degrades from PASS (checked, .04) to OK (nothing was checked).
+#
+# Keyed on the BLOCK, not on the letters we happened to see in a corpus: the
+# same "what is not on this list?" question that produced the A3/A3a defects in
+# v2.4.127. U+1D66-U+1D6A are GREEK subscripts and take the Greek ASCII spelling
+# A5 already uses for the base letters — a subscript beta is not the letter 'b',
+# and renaming it would silently change which statistic the token names.
+# A5 EXPONENT GUARD (v2.4.128) — a superscript run after a DIGIT is never fused.
+#
+# A5 flattens superscript digits to ASCII so downstream regexes can match
+# `eta2`/`chi2`. After a LETTER that is exactly right: `η²` is one symbol whose
+# flat spelling is `eta2`. After a DIGIT it is an EXPONENT, and flattening fuses
+# it into the mantissa:
+#
+#     'leucocyte count (×10⁹/L)'   ->   'x109/L'      nine orders of magnitude
+#     '∼5×10⁶ possible'            ->   '5x106'
+#     'p < .001¹'                  ->   '.0011'       a different p-value
+#
+# `docs/FINDINGS_2026-08-13` examined these exact tokens when rejecting decision
+# D4's "delete citation superscripts" option — "deleting the 9 loses nine orders
+# of magnitude" — and the reasoning was right. But it measured a PROPOSED rule
+# while this SHIPPED one was already doing equivalent damage to the same tokens.
+# The hazard was named; the existing behaviour was never tested against it.
+#
+# Caret notation rather than "leave the glyph": it is flat ASCII, unambiguous,
+# and already what the consumer produces internally — effectcheck's normalizer
+# folds Unicode superscripts to carets before its extraction regexes run.
+#
+# STATED RESIDUAL: `N = 42³` may be a footnote marker rather than 42-cubed, and
+# the text channel cannot decide. `42^3` keeps both readings recoverable where
+# `423` destroys them — the same principle A3 applies to an ambiguous comma.
+_SUPERSCRIPT_TO_ASCII = {
+    0x2070: "0", 0x00B9: "1", 0x00B2: "2", 0x00B3: "3", 0x2074: "4",
+    0x2075: "5", 0x2076: "6", 0x2077: "7", 0x2078: "8", 0x2079: "9",
+    0x207A: "+", 0x207B: "-",
+}
+_SUPERSCRIPT_EXPONENT_RE = re.compile(
+    r"(?<=\d)([⁰¹²³⁴-⁹⁺⁻]+)"
+)
+
+
+def _superscript_run_to_caret(m: "re.Match[str]") -> str:
+    return "^" + m.group(1).translate(_SUPERSCRIPT_TO_ASCII)
+
+
+# THE NUMERIC-TUPLE GUARD WAS HERE AND IS DELETED (v2.4.130, 2026-08-14).
+#
+# `_NUMERIC_RUN_RE`, `_THOUSANDS_GROUPED_RE`, `_NUMERIC_RUN_WINDOW`,
+# `_in_numeric_tuple`, `_VALUE_END_MARKERS` and `_a3c_leading_zero_sub` all
+# existed to stop A3a and A3c from mangling a comma-separated integer run. Both
+# of those rules are now deleted, so the guard has nothing left to guard and is
+# removed with them rather than left standing as dead code the next reader
+# re-enables (the A3d precedent).
+#
+# THE KNOWLEDGE IT CARRIED, kept because the corpus sites are real and were
+# expensive to find. Every one of these is now preserved by DEFAULT, because
+# nothing rewrites a comma-separated integer run any more:
+#
+#     10.1177/0146167210380928 p13   a reference-list URL
+#       'http://content.time.com/time/specials/article/0,9171,1848755,00.html'
+#       A3c read `0,9171` as a leading-zero decimal and emitted a URL that 404s.
+#     collabra.320                   an RGB stimulus specification
+#       'purple (128,0,128), orange (255,165,0)'
+#       A3a fused `255,165` into `255165` and A3c read `0,128` as a decimal —
+#       two rules destroying one construct, so a replication built from this
+#       text would show participants different colours.
+#     nat_comms_2                    an interquartile range beside a median
+#       '148 (52,272)' fused to '148 (52272)', one fictional number, while the
+#       adjacent row '8 (4,14)' survived: one table, two spellings.
+#     an ISBN comma form  978,0,306,40615,7   and an ML tensor shape.
+#
+# The lesson the guard taught, which outlives it: telling a tuple from a
+# thousands-grouped number needs a POSITIVE signature (a grouped NUMBER has
+# every group after the first exactly three digits), never an exclusion list —
+# an enumeration is never complete, and that incompleteness is this module's
+# recurring failure mode. Retained in
+# tests/test_numeric_tuple_and_terminator.py as pass-through assertions.
+# A run of subscript characters, with the word character it attaches to.
+# Built from the canonical table so it cannot drift from what A5 maps.
+_SUBSCRIPT_RUN_RE = re.compile(
+    r"(?P<lead>\w)?(?P<run>[" + "".join(
+        __import__("docpluck.symbols", fromlist=["x"]).SUBSCRIPT_TO_ASCII
+    ) + r"]+)"
+)
+
+
+def _subscript_run_to_ascii(m: "re.Match[str]") -> str:
+    """A subscript RUN becomes `_` + its ASCII, joined to what precedes it.
+
+    One underscore per run, not per character, so `BF01` reads `BF_01`. The
+    underscore is inserted only when the run follows a word character — there is
+    nothing to separate otherwise.
+    """
+    from .symbols import SUBSCRIPT_TO_ASCII
+
+    body = "".join(SUBSCRIPT_TO_ASCII.get(c, c) for c in m.group("run"))
+    return (m.group("lead") + "_" + body) if m.group("lead") else body
+
+
+_SUBSCRIPT_LETTER_MAP = {
+    # Latin subscripts, U+2090-U+209C (complete block)
+    0x2090: "a", 0x2091: "e", 0x2092: "o", 0x2093: "x",
+    0x2094: "e",   # SCHWA — 'e' is its conventional ASCII transliteration
+    0x2095: "h", 0x2096: "k", 0x2097: "l", 0x2098: "m",
+    0x2099: "n", 0x209A: "p", 0x209B: "s", 0x209C: "t",
+    # Phonetic Latin subscripts, U+1D62-U+1D65
+    0x1D62: "i", 0x1D63: "r", 0x1D64: "u", 0x1D65: "v",
+    # Greek subscripts, U+1D66-U+1D6A — spelled out, as A5 spells their bases
+    0x1D66: "beta", 0x1D67: "gamma", 0x1D68: "rho",
+    0x1D69: "phi", 0x1D6A: "chi",
+}
 
 
 def decompose_ligatures(text: str) -> str:
@@ -4100,6 +4951,40 @@ def normalize_text(
     preserve_math_glyphs: bool = False,
     dropped_minus_layout=None,
 ) -> tuple[str, NormalizationReport]:
+    """Apply the normalization pipeline, and report what it silently did.
+
+    Thin wrapper over :func:`_normalize_text` that holds a
+    :class:`telemetry.fallback_scope` open across the whole pipeline and attaches
+    the result to ``report.fallbacks`` / ``report.fallback_details``. Without it
+    every `record_fallback` inside normalization — including W0h/W0m's
+    ambiguous-pairing REFUSALS — is write-only, because this function runs after
+    ``extract_pdf_structured`` has already returned its own telemetry.
+
+    See :func:`_normalize_text` for the arguments.
+    """
+    with fallback_scope() as fb:
+        out, report = _normalize_text(
+            text,
+            level,
+            layout=layout,
+            table_regions=table_regions,
+            preserve_math_glyphs=preserve_math_glyphs,
+            dropped_minus_layout=dropped_minus_layout,
+        )
+    report.fallbacks = dict(fb.counters)
+    report.fallback_details = fb.details
+    return out, report
+
+
+def _normalize_text(
+    text: str,
+    level: NormalizationLevel,
+    *,
+    layout=None,
+    table_regions: list[dict] | None = None,
+    preserve_math_glyphs: bool = False,
+    dropped_minus_layout=None,
+) -> tuple[str, NormalizationReport]:
     """Apply normalization pipeline at the specified level.
 
     When `layout` is provided (a docpluck.extract_layout.LayoutDoc), the
@@ -4244,6 +5129,16 @@ def normalize_text(
     t = recover_corrupted_lt_operator(t)
     report._track("W0c_lt_operator_recovery", before, t, "lt_operators_recovered")
 
+    # ── W0o: recover '<'-as-'b' glyph corruption (AdvTT family) ────────
+    # Same class as W0c, different glyph. Raster-verified on
+    # 10.1016/j.jesp.2016.11.001 p4, which PRINTS `p < 0.001` and extracts as
+    # `p b 0.001` — 31 sites in that one paper, every one a p-value no
+    # consumer's `p\s*<` regex could match. Gated on the OPERATOR SLOT because
+    # `b` is a real coefficient symbol (17 legitimate uses in the same paper).
+    before = t
+    t = recover_lt_as_b_operator(t)
+    report._track("W0o_lt_as_b_recovery", before, t, "lt_operators_recovered")
+
     # ── W0d: recover standalone '2'-for-minus via point-estimate ∈ CI ──
     before = t
     t = recover_minus_via_ci_pairing(t)
@@ -4270,13 +5165,12 @@ def normalize_text(
     t = recover_times_wrapped_interaction(t)
     report._track("W0l_prose_times_residuals", before, t, "times_glyphs_recovered")
 
-    # ── W0n: restore the dropped decimal point in a p significance threshold
-    # (`p < 05` → `p < .05`; ar_apa/JESP, 2026-08-03). The '.' glyph vanishes
-    # from BOTH text channels on the AdvGulliv font family — no layout gate
-    # possible; the dotless canonical-threshold shape is provably corrupt.
-    before = t
-    t = recover_p_threshold_dropped_decimal(t)
-    report._track("W0n_p_threshold_decimal_recovery", before, t, "p_decimal_points_recovered")
+    # ── W0n's CALL SITE WAS HERE AND IS DELETED (v2.4.130, 2026-08-14).
+    # `p < 05` now passes through as printed. The rule's premise — that a
+    # dotless threshold is "provably corrupt" — was disproved by two real
+    # papers whose identical text shape has OPPOSITE owners. Full reasoning at
+    # the deleted definition above; pinned by
+    # tests/test_p_threshold_decimal_real_pdf.py.
 
     # ── W0g (§A R5 / B7, 2026-05-23): recover DROPPED minus signs via CI ──
     # Distinct corruption class from W0d: pdftotext emits no glyph at all for
@@ -4286,6 +5180,30 @@ def normalize_text(
     before = t
     t = recover_dropped_minus_via_ci_pairing(t)
     report._track("W0g_dropped_minus_ci_pairing", before, t, "dropped_minus_signs_recovered")
+
+    # ── W0q: reattach a DETACHED minus on a CI upper bound in BODY PROSE ──
+    # AUDIT EVERY CHANNEL. `recover_dropped_minus_ci_upper_in_text` existed only
+    # in `cell_cleaning.clean_cell_text`, i.e. the TABLE channel — so a CI
+    # written in a RESULTS SENTENCE never met it. Found by measuring O5's
+    # blast radius and then confirmed against the primary source
+    # (`10.1016/j.jesp.2021.104154`, rasterized p13): the page prints
+    #
+    #     t(399) = -3.79, p < .001, d = -0.38, 95% CI [-0.58, -0.18]
+    #
+    # and pdftotext delivers `[- 0.58,\n- 0.18]` — both minus signs detached
+    # from their digits. Three such brackets in that paper, in body prose, and
+    # the table channel could never reach any of them. A consumer whose CI
+    # pattern requires the sign adjacent to the digit reads the upper bound as
+    # POSITIVE, inverting a published interval.
+    #
+    # The repair is typographic: the dash is on the page, and the comma proves
+    # it is a sign rather than a range separator. Measured over the 26-paper
+    # baseline: fires on 3 brackets in 1 paper, and the estimate-containment
+    # arithmetic repaired 0 of the 3 (it had grabbed `S.D = 1.43` as the
+    # "estimate" and the containment test failed on an unrelated number).
+    before = t
+    t = recover_dropped_minus_ci_upper_in_text(t)
+    report._track("W0q_ci_upper_detached_minus", before, t, "dropped_minus_signs_recovered")
 
     # ── W0h (§A R5 / B7, 2026-06-15): recover DROPPED minus via LAYOUT ──
     # The residual W0g cannot reach: a coefficient with only a t/p value and NO
@@ -4306,6 +5224,26 @@ def normalize_text(
         before = t
         t = recover_beta_via_layout(t, dropped_minus_layout)
         report._track("W0m_beta_via_layout", before, t, "beta_glyphs_recovered")
+
+        # ── W0p (2026-08-13): a typographic SUPERSCRIPT digit, fused ────────
+        # `N = 2,5801` is the sample size 2,580 carrying footnote marker 1.
+        # pdftotext renders a positioned glyph as an ordinary digit — the paper
+        # this was proven on contains ZERO Unicode superscript codepoints — so
+        # A5's exponent guard, which keys on the CODEPOINT, cannot see it. Only
+        # font size + baseline prove it, and they live in the layout channel.
+        #
+        # Two injuries, both silent: the sample size reads as 25,801, and the
+        # fused token matches the numeric-locale European marker `\d,\d{4,}`, so
+        # a footnote marker MANUFACTURES a false locale signal (it produced one
+        # of only two `conflict` verdicts across 396 English papers).
+        #
+        # This capability was validated and documented in August 2026 and then
+        # wired into nothing — recorded as "signal validated, not yet wired".
+        # That is the defect class this release exists to close: a capability
+        # nothing invokes is indistinguishable from one never built.
+        before = t
+        t = recover_superscript_via_layout(t, dropped_minus_layout)
+        report._track("W0p_superscript_layout", before, t, "superscript_markers_split")
 
     # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
     # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a
@@ -4729,121 +5667,133 @@ def normalize_text(
     # Limit consecutive newlines
     t = re.sub(r"\n{3,}", "\n\n", t)
 
+    # ── D5 numeric-locale inference: DELETED in v2.4.129 ───────────────
+    #
+    # A document-level verdict used to be computed here and published on the
+    # report. It is gone, with its whole apparatus. The short version: it gated
+    # nothing, it was never released, and it was confidently WRONG on the one
+    # real case ever found — an English paper whose ~130-cell comma-decimal
+    # table scored `european_markers=0` because every marker it recognised
+    # requires an operator and a table cell has none.
+    #
+    # docpluck assumes English papers in US numeric convention and passes
+    # European numbers through unconverted. See `docs/SCOPE.md` and the marker
+    # tables above, which survive as the vocabulary for a future LINE- or
+    # TABLE-scoped guard — never for another document-level verdict.
+
     # ── Academic steps (A2-A5) ─────────────────────────────────────────
     # Note: A1 already ran above (before S9) to prevent number stripping
 
     if level == NormalizationLevel.academic:
 
-        # A2: Dropped decimal repair (p > 1.0 -> p = 0.xxx)
+        # A2 AND A3a WERE HERE AND ARE DELETED (v2.4.130, 2026-08-14).
         #
-        # Changed 2026-04-11 (v1.3.1): accept val >= 1.0 (not > 1.0) so that
-        # `p = 01` and `p = 10` (both evaluating to 1.0 or 10.0) get repaired.
-        # The `\d{2,3}` prefix in the regex already guarantees we never touch
-        # single-digit values like `p = 1`, so this widening is safe.
+        # A2 restored a decimal point it believed the PDF had lost
+        # (`p = 38.` -> `p = .38.`); A3a stripped thousands separators from
+        # integers (`N = 1,182` -> `N = 1182`). They are deleted for DIFFERENT
+        # reasons, recorded separately below so neither argument is used to
+        # justify the other.
         #
-        # Changed 2026-04-11: lookahead accepts `.` only when not followed by
-        # another digit — so `p = 01.` (sentence-ending period) matches but
-        # `p = 15.8` (legitimate decimal) does not.
-        before = t
-
-        def _fix_dropped_decimal(m):
-            val = float(m.group(2))
-            if val >= 1.0 and val < 1000:
-                return f"{m.group(1)}.{m.group(2)}"
-            return m.group(0)
-
-        # Fix p-values and effect sizes with dropped leading "0."
-        _A2_LOOKAHEAD = r"(?=\s|[,;)\]]|\.(?!\d)|$)"
-        t = re.sub(r"([pP]\s*[=]\s*)(\d{2,3})" + _A2_LOOKAHEAD, _fix_dropped_decimal, t)
-        t = re.sub(r"(\b[dDgG]\s*[=]\s*)(\d{2,3})" + _A2_LOOKAHEAD, _fix_dropped_decimal, t)
-        report._track("A2_dropped_decimal_repair", before, t, "decimals_fixed")
-
-        # A3a: Protect thousands separators in N-context integers (ESCImate Request 1.1)
-        # Problem: A3 converts "0,05" -> "0.05" (European decimal commas). The same
-        # rule corrupts "N = 1,182" -> "N = 1.182" which downstream parses as a
-        # sample size of 1.182 people. This step strips commas from ONLY the
-        # matched integer token in sample-size contexts, so A3 sees the already-
-        # clean integer and leaves it alone.
+        # ── A2 — it repaired the PAPER, which is not ours to repair ─────────
         #
-        # Runs in academic level because A3 itself is academic-only; in standard
-        # level the commas are preserved by default (no A3 to corrupt them).
-        before = t
-        _thousands_count = [0]
-
-        def _strip_commas_integer(m):
-            _thousands_count[0] += 1
-            groups = list(m.groups())
-            # The integer token is always the second capture group below
-            groups[1] = groups[1].replace(",", "")
-            return "".join(g for g in groups if g is not None)
-
-        _N_PROTECT_PATTERNS = [
-            # N = 1,182 / n = 2,443 / N=(1,234,567)
-            re.compile(r"(\b[Nn]\s*=\s*\(?\s*)(\d{1,3}(?:,\d{3})+)(\s*\)?)"),
-            # df = 1,197 (rare — df large enough to need thousands separator)
-            re.compile(r"(\bdf\s*=\s*)(\d{1,3}(?:,\d{3})+)(\b)"),
-            # "sample size of 2,443"
-            re.compile(r"(\bsample\s+size\s+of\s+)(\d{1,3}(?:,\d{3})+)(\b)", re.IGNORECASE),
-            # "total of 2,443 participants"
-            re.compile(r"(\btotal\s+of\s+)(\d{1,3}(?:,\d{3})+)(\s+participants)", re.IGNORECASE),
-            # v2.4.17 widening (NORMALIZATION_VERSION 1.8.5): generic body-integer
-            # with thousands-separator. The original 4 patterns above only protect
-            # narrow syntactic contexts (`N =`, `df =`, "sample size of", "total
-            # of … participants"). Real academic prose uses thousands-separated
-            # integers in many more constructions:
-            #     "1,001 participants"           (xiao_2021_crsp)
-            #     "4,200 followers"              (amj_1)
-            #     "3,000 hours"                  (amle_1)
-            #     "7,445 sources, 33,719 articles, 32,981 authors"   (amle_1)
-            #     "5,792 people"
-            #     "1,675 entries"
-            #     "1,842 records"
-            # Without this widening, A3 (decimal-comma normalization) corrupts
-            # these to "1.001 participants", "4.200 followers", etc., destroying
-            # the meaning of sample sizes and count statistics. Confirmed via
-            # v2.4.16 Phase 5d AI verify across xiao + amj_1 + amle_1.
-            #
-            # Guards (four independent):
-            #   1. Integer must start with [1-9] (rejects `0,001` decimal form
-            #      — a European-decimal pattern A3 is supposed to fix).
-            #   2. Integer must have exactly `\d{1,3}(?:,\d{3})+` structure
-            #      (requires comma-thousands-separator; "0,05" → 1 digit after
-            #      comma, won't match; "1,5" → 1 digit, won't match; "1,500" →
-            #      3 digits, matches).
-            #   3. Followed by a lookahead boundary `\s|[,;.)\]:]|$` (must not
-            #      be in mid-citation context like "Smith, 1992" — that has
-            #      no comma between digits).
-            #   4. NEGATIVE LOOKBEHIND `(?<![A-Z][\(\[])` blocks the
-            #      degrees-of-freedom stat-bracket context "F[7,140]",
-            #      "F(7,140)", "t(1,197)", "chi2(2,42)" — those are stat
-            #      df brackets, not thousands-separators. A3b handles them
-            #      separately (bracket-to-paren harmonization). Without this
-            #      guard, stripping the comma from "7,140" inside "F[7,140]"
-            #      destroys the df pair and A3b can no longer harmonize.
-            #
-            # Effect: strips the comma from "1,001" → "1001" BEFORE A3 runs,
-            # so A3 sees the plain integer and leaves it alone. Reader sees
-            # "1001 participants" instead of "1.001 participants" — same
-            # meaning, no thousands-separator (acceptable; consistent with
-            # Methods sections that often use comma-free format).
-            re.compile(
-                r"(?<![A-Z][\(\[])(\b)([1-9]\d{0,2}(?:,\d{3})+)(?=[\s,;.)\]:]|$)"
-            ),
-        ]
-        if preserve_math_glyphs:
-            # Render path: count matches for telemetry but DO NOT strip commas.
-            # Thousands separators (`7,445`, `33,719`, etc.) are source glyphs
-            # the rendered .md must preserve. A3 below is also gated to skip
-            # in preserve mode so it doesn't corrupt these into decimals.
-            for pattern in _N_PROTECT_PATTERNS:
-                _thousands_count[0] += len(pattern.findall(t))
-        else:
-            for pattern in _N_PROTECT_PATTERNS:
-                t = pattern.sub(_strip_commas_integer, t)
-        report.steps_applied.append("A3a_thousands_separator_protect")
-        if _thousands_count[0] > 0:
-            report.changes_made["thousands_separators_preserved"] = _thousands_count[0]
-            report.steps_changed.append("A3a_thousands_separator_protect")
+        # Directive 2026-08-13: docpluck extracts and normalizes what is
+        # PRINTED. A defect docpluck's own pipeline introduced is docpluck's to
+        # fix; a defect the AUTHOR or the JOURNAL printed is not, because
+        # docpluck has no channel through which to announce a repair, so a
+        # silent one LAUNDERS a real error into a meta-science pipeline: the
+        # consumer then validates a number the paper never printed, and the
+        # author never learns.
+        #
+        # A2 had NO CITED PAPER anywhere in its code. Asked for one, both of
+        # its firing sites in 297 English papers turned out to be the paper's
+        # own error, confirmed by RASTERIZING the page rather than by asking an
+        # extractor:
+        #
+        #   10.1177/0146167210380928 p13   prints `B = -0.28, SE = 0.31, p = 38.`
+        #   10.1016/j.jesp.2016.11.001 p7  prints `t(186) = 3.90, p = 001, d = 0.6`
+        #
+        # In BOTH, correctly-dotted numbers sit on the same line — `0.28`/`0.31`
+        # and `3.90`/`$4.00` — so the text layer did not drop anything. The
+        # author did. A2 was rewriting a published typo into a plausible
+        # statistic, 2 sites out of 2.
+        #
+        # THE DECIDING EVIDENCE, and why no gate can save this rule: the SAME
+        # text shape has OPPOSITE OWNERS in two real English papers.
+        # `10.1016/j.jesp.2009.12.011` p3 prints `p < 05` with no dot (the
+        # author's error) while `10.1177/0956797613482946` p6 prints `p < .05`
+        # and our OCR text layer lost it (ours). A layout-advance gate to
+        # separate them was built and REFUTED — the second paper is a SCAN
+        # whose char boxes come from an OCR engine rather than the typesetter,
+        # so the gate manufactures its own evidence for exactly the case it
+        # exists to catch. Under irreducible ambiguity the default is
+        # PASS-THROUGH, because pass-through is reversible for the consumer and
+        # a repair is not. The same reasoning retires W0n (see its own block).
+        #
+        # ── A3a — its purpose evaporated, and it produced 1000x errors ──────
+        #
+        # A3a existed to pre-empt A3. Its own comment said so: "This step
+        # strips commas from ONLY the matched integer token in sample-size
+        # contexts, SO A3 SEES THE ALREADY-CLEAN INTEGER AND LEAVES IT ALONE",
+        # and "Runs in academic level because A3 itself is academic-only; in
+        # standard level the commas are preserved by default (no A3 to corrupt
+        # them)." A3 was deleted in v2.4.129. The rule was left standing with
+        # nothing left to protect against, and what remained was not protection
+        # but a default rewrite that DELETES a separator the paper printed.
+        #
+        # It also made the library answer one question three ways, which is the
+        # "one concept, one table" failure (L-024). For `N = 1,182`:
+        #     standard level                     ->  `1,182`   preserved
+        #     academic + preserve_math_glyphs    ->  `1,182`   counted, not stripped
+        #     academic, default                  ->  `1182`    stripped
+        # A library that converts one input three ways has no contract at all.
+        #
+        # THE HARM, measured and rasterized twice independently:
+        #   10.1177/0956797620935584  Battal et al., Psych Sci, Table S2 p24
+        #     'df- satterthwaite' PRINTS  185,178   31,836   188,193
+        #     we delivered                185178    31836    188193
+        #     t-ratios         PRINT      -1,966    -7,799
+        #     we delivered                -1966     -7799
+        # A Satterthwaite df is FRACTIONAL by construction. The collision is
+        # STRUCTURAL, not a tail case: A3a's discriminator ("every group after
+        # the first is exactly 3 digits") is satisfied BY CONSTRUCTION for any
+        # comma-locale number with a 3-digit integer part and 3-decimal
+        # precision, so an affected table collides on EVERY qualifying row.
+        # This class has already produced wrong published numbers downstream —
+        # a consumer recorded `U = 55,890` read as `55.89`, publishing a
+        # rank-biserial of 0.99938 where the truth is 0.38275.
+        #
+        # THE COUNTER-EVIDENCE, stated rather than buried: 137 A3a firing sites
+        # read individually across 65 papers are 137/137 unambiguous US counts.
+        # A3a was right almost always. That does not save it, because being
+        # right is only a defence of a rewrite that is NEEDED, and once A3
+        # was gone nothing needed it. `1,000` is not a problem; it is clearly
+        # one thousand. Rewriting it to `1000` repairs nothing and REMOVES the
+        # evidence a consumer would need to notice a European table — which is
+        # precisely the evidence the future line-scoped locale guard requires.
+        #
+        # ITS TELEMETRY SAID THE OPPOSITE OF WHAT IT DID. The step was named
+        # `A3a_thousands_separator_protect` and its metric key was
+        # `thousands_separators_preserved`, while the operation was
+        # `.replace(",", "")`. A consumer reading `changes_made` saw
+        # "thousands_separators_preserved: 3" and would reasonably conclude
+        # nothing had been lost. That is worse than no instrumentation: silence
+        # invites a check, a false all-clear forecloses one.
+        #
+        # ── STATED CONSEQUENCE, not hidden ──────────────────────────────────
+        #
+        # Both are BREAKING output changes. `p = 38.` and `p < 05` now reach
+        # the consumer as printed, and `N = 1,182` keeps its separator. This
+        # MOVES WORK ONTO THE CONSUMER and can cost them coverage rather than
+        # producing a loud failure: ESCImate's `pat_CI3` does not match
+        # `[-0.60, -0,26]`, so an interval SILENTLY VANISHES from their record
+        # instead of misparsing. That cost is real, was measured before the
+        # decision, and was accepted by the owner of every consumer on
+        # 2026-08-14, who directed that we ship the correct behaviour and
+        # notify consumers to adapt afterwards.
+        #
+        # Pinned by tests/test_a2_does_not_repair_the_paper.py and
+        # tests/test_a3a_thousands_separators_pass_through.py.
+        # See docs/SCOPE.md and LESSONS.md L-026, L-029, L-031.
 
         # A3: Decimal comma normalization (European locale)
         #
@@ -4885,47 +5835,153 @@ def normalize_text(
         # still doesn't match because the next char after the comma group
         # is `.` followed by a digit. Validated against the existing A3 +
         # A4 regression suite.
-        before = t
-        if not preserve_math_glyphs:
-            t = re.sub(
-                r"(?<![a-zA-Z,0-9\[\(])(\d),(\d{1,3})(?=\s|[;)\]]|\.(?!\d)|$)",
-                r"\1.\2",
-                t,
-            )
-        # In preserve mode, A3 is SKIPPED so the rendered .md keeps European-
-        # decimal comma form ("d = 0,87") AND thousands-separator form
-        # ("7,445 sources") exactly as printed. Downstream stat extraction
-        # that wants ENG decimal can normalize on its own.
-        report._track("A3_decimal_comma_normalization", before, t, "decimal_commas_fixed")
+        # ── v2.4.127: A3 now converts ONLY in the VALUE POSITION ─────────────
+        #
+        # The lookbehind above is an enumeration of what may not precede the
+        # number, and an enumeration is never complete. Measured on the
+        # 101-PDF corpus, the shipped rule fired 29 times across 13 papers and
+        # ~27 of those were not decimals at all — every one of them a shape the
+        # lookbehind does not list:
+        #
+        #   'compared with controls.7,8 However'  -> 'controls.7.8 However'
+        #        a Vancouver citation superscript run: the digits follow a
+        #        SENTENCE PERIOD, which the lookbehind allows
+        #   'up to ~25%6,28.'                     -> '...%6.28.'   (after '%')
+        #   'Erik. T. Frank 1,2 , Lucie Kesner 3' -> 'Frank 1.2 ,'
+        #        an affiliation run: only its INTERIOR is comma-preceded, so
+        #        the first element was protected by nothing
+        #   'Experiments 1,2 showed'              -> 'Experiments 1.2 showed'
+        #   flattened ANOVA table cells '9,57'    -> '9.57'  (a df pair)
+        #
+        # The only two genuine European decimals in the whole corpus are
+        # leading-zero hazard ratios ('0,92', '0,77'), which A3c converts on
+        # its own. So the rule was ~2 right and ~27 wrong.
+        #
+        # The replacement discriminator is STRUCTURAL and positive rather than
+        # a growing list of exclusions: an operator immediately before the
+        # number proves the token is a VALUE. It is the same key ESCImate's
+        # shared spec uses for its D1b rule ("the guard is the value position,
+        # not the locale"), so both implementations now agree on the principle
+        # rather than on a regex.
+        #
+        # Digit bounds carry the rest of the discrimination:
+        #   - 1-2 digits AFTER the comma. A thousands group is EXACTLY three
+        #     by construction, so this rule can never collide with A3a.
+        #     STATED LIMIT (adversarial review, 2026-08-12, reproduced): the
+        #     3-digit case is not merely "left ambiguous" — A3a has already
+        #     RESOLVED it toward thousands and removed the comma, so
+        #     `HR = 1,234` reaches the consumer as `1234` and a continental
+        #     1.234 is unrecoverable downstream. That is the shared spec's
+        #     agreed T1 default (it is the right default for English APA
+        #     text, and `N = 1,182` needs it), but the consumer cannot
+        #     "record that a value was resolved under ambiguity" if the
+        #     evidence is gone. Raised with ESCImate rather than changed
+        #     unilaterally: flipping it would alter every English paper.
+        #   - 1-4 digits BEFORE it, so `M = 12,34` and `t = 1234,56` convert.
+        #     The old rule required exactly one and silently missed both
+        #     (ESCImate conformance case `decimal-two-integer-digits`).
+        # The lookahead now admits a LIST comma — the divergence ESCImate
+        # filed on 2026-08-09, where `t(28) = 2,21, d = 0,45` left `2,21`
+        # unconverted and a parser read 2. Admitting `,` is safe ONLY under
+        # the operator gate: measured over the corpus, admitting it without
+        # the gate would have converted 52 citation/affiliation superscript
+        # runs across 16 of 101 papers and zero real decimals, and an
+        # adversarial pass then broke the narrower "comma + space" variant too
+        # ('Studies 1,2, and 3 replicated' -> 'Studies 1.2, and 3').
+        #
+        # The admitted list comma carries `(?!\d)`: a list comma in prose is
+        # followed by a space, a digit-run separator by a digit. Without it the
+        # rule fired on an `=`-coded categorical enumeration — `Group = 1,2,3`
+        # -> `Group = 1.2,3` — which is a value POSITION but not a value
+        # (adversarial review, 2026-08-12; reproduced, then pinned).
+        #
+        # ACCEPTED, STATED COSTS — three, all measured, none hidden:
+        #   1. A European decimal with no operator is left VERBATIM. That is
+        #      "prose" in the common case ("The score was 123,4 on that
+        #      scale") but the class is broader: a bare TABLE CELL has no
+        #      operator either, so a flattened `Estimate | 1,23` column is not
+        #      converted. Zero instances in the 101-PDF corpus, which contains
+        #      no continental tables — an absence, not a proof.
+        #   2. The operator does not prove "value" for a coding declaration:
+        #      `Sex = 0,1 (0 = male, 1 = female)` still becomes `0.1`. Same
+        #      shape as a real `d = 0,5`; undecidable without vocabulary.
+        #      Pre-existing, unchanged, and stated rather than implied.
+        #   3. Preserving an ambiguous token is NOT the same as getting it
+        #      wrong: the source form is intact and both readings remain
+        #      recoverable, where a fused pair is irreversible. Resolving it
+        #      needs document-level locale evidence — the consumer's layer in
+        #      the agreed split (ESCImate SPEC "Residual ambiguity").
+        # `tools/diag/a3_comma_lookahead_scan.py`.
+        # A3 and A3c WERE HERE AND ARE DELETED (v2.4.129, 2026-08-14).
+        #
+        # A3 converted an operator-gated European decimal comma
+        # (`d = 0,45` -> `d = 0.45`); A3c converted a leading-zero decimal
+        # (`(0,003)` -> `(0.003)`). Together with A3d, deleted earlier the same
+        # day, they were docpluck's entire EU->US conversion apparatus.
+        #
+        # USER DIRECTIVE, 2026-08-14 — this is scope, not tuning:
+        #
+        #   docpluck's focus is ENGLISH papers in US locale formatting. We do
+        #   not know how to handle EU numbers or conversions, and those are
+        #   PASSED AS-IS. All "fixes" converting EU to US are stopped.
+        #
+        # The measurements that produced that directive, over 297 English
+        # papers from the custodian (`tools/diag/repair_site_scan.py`):
+        #
+        #   A3   9 sites / 2 papers, and NOT ONE CORRECT.
+        #        8 corrupted mathematical constraints in 10.1515/bpasts-2016-0057
+        #          `|S| >= 2,`      ->  `|S| >= 2.2,`
+        #        1 laundered an author's error in 10.1371/journal.pone.0285114
+        #          `M = 26,21, SD = 28.88`  ->  `M = 26.21, ...`
+        #   A3c  1 site / 297 papers, and it was a URL:
+        #        10.1177/0146167210380928 p13
+        #          `article/0,9171,1848755,00.html` -> `0.9171,...`  (404s)
+        #
+        # And where a comma decimal IS genuine — 10.1177/0956797620935584
+        # Table S2, ~130 cells — the values are bare table cells with no
+        # operator, so A3 could never see them anyway. The rules were not
+        # merely risky; they were not doing the job they existed for, while
+        # reliably damaging text that was correct.
+        #
+        # STATED CONSEQUENCE, not hidden: a European decimal now reaches the
+        # consumer VERBATIM. That is a coverage change, and it is recoverable —
+        # the source token is intact, so the consumer can decide for itself,
+        # which it could not once we had already converted.
+        #
+        # Pinned by tests/test_european_numbers_pass_through.py.
+        # See docs/SCOPE.md.
 
-        # A3c: Leading-zero decimal recovery (cycle 14, HANDOFF_2026-05-14
-        # deferred item D, NORMALIZATION_VERSION 1.8.9).
+
+        # A3d WAS HERE AND IS DELETED (v2.4.129, 2026-08-14).
         #
-        # A3's lookbehind ``(?<![a-zA-Z,0-9\[\(])`` blocks legitimate
-        # European-decimal p-values inside parens or brackets, e.g.
-        # ``(0,003)``, ``[0,05]``, ``(p < 0,001)`` with the parenthesis
-        # directly preceding the integer. This exclusion exists to
-        # protect statistical-df forms like ``F(2,42)`` and citation
-        # superscripts. But the leading-zero form ``0,XX[X[X]]`` is
-        # unambiguous: degrees-of-freedom never use 0 as the first df
-        # value, and citation superscripts never start with 0.
+        # It converted `p = ,025` -> `p = .025`, the "continental" spelling of an
+        # APA leading-zero-free value (ESCImate shared spec rule D1b).
         #
-        # Rule: convert ``0,(\d{2,4})`` (zero + comma + 2-4 digits)
-        # regardless of lookbehind, as long as it's at a word boundary
-        # and followed by a non-digit terminator. Single-digit-after-
-        # comma cases like ``[0,5]`` are skipped — they're typically
-        # range expressions like ``[0,5]`` meaning ``[0, 5]``, not a
-        # decimal.
-        before = t
-        if not preserve_math_glyphs:
-            t = re.sub(
-                r"\b0,(\d{2,4})(?=[\s)\];,.:]|$)",
-                r"0.\1",
-                t,
-            )
-        # In preserve mode, A3c is SKIPPED so the rendered .md keeps the
-        # European-decimal form ("0,003") exactly as printed.
-        report._track("A3c_leading_zero_decimal_recovery", before, t, "leading_zero_decimals_fixed")
+        # Its entire justification was the string `p = ,025`, and that string was
+        # never observed in a document. It came from a consumer's spec, was copied
+        # into a reply doc, then a handoff, then the CHANGELOG, then
+        # `docs/NORMALIZATION.md`, then into this file — acquiring the appearance
+        # of consensus at every hop while remaining ONE UNCHECKED STRING. It was
+        # recorded as "reproduced against unfixed code", which is true and
+        # irrelevant: running a constructed string through the pipeline proves
+        # what the CODE does, never that the SHAPE OCCURS.
+        #
+        # Measured over real English-language articles from the custodian:
+        #     0 sites / 0 papers in 297 English papers   (repair_site_scan, 08-14)
+        #     0 sites / 0 papers in a prior 600-paper hunt          (08-13)
+        #
+        # A rule with no observed input is pure false-positive surface for no
+        # measured benefit. Deleting it cannot cost a consumer coverage, because
+        # it never fired. The divergence from spec rule D1b is deliberate and is
+        # reported outbound; if a real article — DOI and page — is ever found
+        # printing this shape, the rule comes back with that citation attached.
+        #
+        # Pinned by tests/test_a3d_deleted_leading_comma_passes_through.py, which
+        # asserts the shape passes through AND that no step named A3d is tracked:
+        # a rule left in place "disabled" is dead code the next reader re-enables.
+        #
+        # Directive 2026-08-13: a rule must point at a real paper.
+        # Repetition is not verification.
 
         # A3b: Statistical df-bracket harmonization (MetaESCI D2, 2026-04-11)
         #
@@ -4953,17 +6009,73 @@ def normalize_text(
         # 2026-05-24 D2: `[0.25.0.54]` → `[0.25, 0.54]`). Some PDFs render the
         # CI comma glyph as a period (font substitution or pdftotext mapping),
         # which downstream parsers cannot disambiguate from a decimal-continuation
-        # and so they drop the CI entirely. Each side must be `\d+\.\d+`
-        # (digits-dot-digits) — this blocks false-positives on section refs like
-        # `[1.2.3]` where the trailing token has no decimal.
+        # and so they drop the CI entirely.
+        #
+        # v2.4.129 — NOW REQUIRES CONFIDENCE-INTERVAL CONTEXT. The old guard was
+        # "each side must be `\d+\.\d+`", justified as blocking a section ref
+        # like `[1.2.3]` where the trailing token has no decimal. That is true
+        # for THREE components and false for FOUR, which have a decimal on both
+        # sides and sail straight through:
+        #
+        #   10.3389/fpsyg.2023.1214699 (Frontiers, English)
+        #     '...regarding the semantic annotation (3.2.2.1)' -> '(3.2, 2.1)'
+        #     '...and the quantification (3.2.2.2) of lexemes' -> '(3.2, 2.2)'
+        #
+        # This is worse than an ordinary corruption: it FABRICATES a statistic
+        # that is not in the paper, and `(3.2, 2.1)` has its bounds in DESCENDING
+        # order — the shape of a *reversed confidence interval*, which is one of
+        # the exact defect classes our consumers are being asked to detect. We
+        # would be manufacturing the defect the downstream tool exists to catch.
+        # Found by `tools/diag/non_statistic_corpus_scan.py` on its first run.
+        #
+        # The remedy is POSITIVE rather than another exclusion, because an
+        # enumeration of what must not match is never complete — that is this
+        # module's entire defect history. The rule is named for the confidence
+        # interval; if nothing establishes that the bracket IS one, it does not
+        # fire. Where the evidence is absent we pass through, leaving the source
+        # intact and both readings recoverable.
+        #
+        # MEASURED, and recorded so a later pass can go further: over 148
+        # English papers from the custodian this arm matched **0 times** in
+        # either bracket form (`tools/diag/repair_site_scan.py` companion probe),
+        # while its false-positive shape occurred twice in a 60-paper sample. Its
+        # original justification cites no DOI. On that evidence it is a DELETE
+        # candidate like A3d; it is GUARDED rather than deleted here only because
+        # proving the target never occurs needs a wider hunt than this run made.
+        # The context that proves it IS an interval, in the two forms real papers
+        # actually use. Both come from real sources, neither is invented:
+        #
+        #   (a) the words        '95% CI (0.25.0.54) overlapped zero'
+        #   (b) the ESTIMATE     'd=0.39[0.25.0.54]'   collabra_57785 abstract,
+        #                        the shape A4a was originally built for — note it
+        #                        carries NO 'CI' text at all, which is why an
+        #                        earlier draft of this guard requiring the words
+        #                        broke the rule's own evidenced target.
+        #
+        # (b) requires the preceding token to be a DECIMAL (`\d+\.\d+`), not any
+        # digit: an estimate has a decimal point, whereas the prose that precedes
+        # a section reference ends in a word ('annotation', 'section', 'see') or
+        # a bare integer ('in Experiment 2'). That is what separates
+        # `d=0.39[0.25.0.54]` from `the semantic annotation (3.2.2.1)`.
+        _A4A_INTERVAL_CONTEXT = re.compile(
+            r"(?:\bCI\b|\bC\.I\.|confidence\s+interval)[^\[\(]{0,24}$"
+            r"|\d+\.\d+\s*$",
+            re.IGNORECASE,
+        )
+
+        def _a4a_middle_period(m: "re.Match[str]", open_ch: str, close_ch: str) -> str:
+            if not _A4A_INTERVAL_CONTEXT.search(m.string[:m.start()]):
+                return m.group(0)
+            return f"{open_ch}{m.group(1)}, {m.group(2)}{close_ch}"
+
         t = re.sub(
             r"\[(\s*[-+]?\d+\.\d+)\s*\.\s*([-+]?\d+\.\d+\s*)\]",
-            r"[\1, \2]",
+            lambda m: _a4a_middle_period(m, "[", "]"),
             t,
         )
         t = re.sub(
             r"\((\s*[-+]?\d+\.\d+)\s*\.\s*([-+]?\d+\.\d+\s*)\)",
-            r"(\1, \2)",
+            lambda m: _a4a_middle_period(m, "(", ")"),
             t,
         )
         # Semicolons → commas inside square brackets and parens
@@ -4971,9 +6083,32 @@ def normalize_text(
         t = re.sub(r"\((\s*[-+]?\d*\.?\d+)\s*;\s*([-+]?\d*\.?\d+\s*)\)", r"(\1, \2)", t)
         # Curly braces → square brackets
         t = re.sub(r"\{\s*([-+]?\d*\.?\d+)\s*[,;]\s*([-+]?\d*\.?\d+)\s*\}", r"[\1, \2]", t)
-        # Normalize spacing inside brackets and parens
-        t = re.sub(r"\[\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\]", r"[\1, \2]", t)
-        t = re.sub(r"\(\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)", r"(\1, \2)", t)
+        # Normalize spacing inside brackets and parens.
+        #
+        # v2.4.129: at least ONE side must carry a DECIMAL POINT. Without that,
+        # this arm asserted "the comma is a separator" on a token where, under
+        # the 2026-08-14 scope directive, docpluck has no basis for the claim:
+        #
+        #     '(0,003)'  ->  '(0, 003)'     a European p-value rendered as a
+        #                                   two-element pair — a reading the
+        #                                   paper never printed
+        #     '[0,05]'   ->  '[0, 05]'
+        #
+        # Found immediately after A3/A3c were deleted: with the converters gone,
+        # `(0,003)` reaches this arm intact and it invents the separator reading
+        # that A3c used to invent the decimal reading. **The same defect wearing
+        # the other hat**, which is worth stating — removing a rule can expose a
+        # sibling that was previously masked by it.
+        #
+        # A real CI carries decimals on its bounds (`[7.77,31.28]`), so requiring
+        # one is a positive signature rather than another exclusion. Spacing is
+        # cosmetic; asserting a reading is not, and only the second needs
+        # evidence.
+        _A4_SPACING_NEEDS_A_DECIMAL = r"(?=[^]\)]*\.\d)"
+        t = re.sub(r"\[" + _A4_SPACING_NEEDS_A_DECIMAL +
+                   r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\]", r"[\1, \2]", t)
+        t = re.sub(r"\(" + _A4_SPACING_NEEDS_A_DECIMAL +
+                   r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)", r"(\1, \2)", t)
         report._track("A4_ci_delimiter_harmonization", before, t, "ci_delimiters_fixed")
 
         # A5: Math symbol and Greek letter normalization
@@ -4987,29 +6122,55 @@ def normalize_text(
             # Skip A5 entirely \u2014 preserve source glyphs.
             report._track("A5_skipped_preserve_math_glyphs", before, t, "preserved")
         else:
-            t = t.replace("\u00D7", "x")     # multiplication sign
+            # U+00D7 -> `*`, not the letter `x` (contract v2.0). The letter
+            # collides with a variable named x: `2 x 3 design` and `x10^9`
+            # are indistinguishable from an expression involving x. `*` is
+            # unambiguous in the operand position; a significance star is
+            # positionally distinct (it TRAILS a value, never sits between
+            # two operands).
+            t = t.replace("×", "*")     # multiplication sign
             t = t.replace("\u2264", "<=")     # less-than-or-equal
             t = t.replace("\u2265", ">=")     # greater-than-or-equal
             t = t.replace("\u2260", "!=")     # not-equal
 
-            # Greek statistical letters → ASCII (for downstream regex matching)
-            # Order matters: multi-char sequences before single chars
-            t = t.replace("\u03B7\u00B2", "eta2")    # η² → eta2
-            t = t.replace("\u03B7\u00B2", "eta2")    # η² variant
-            t = t.replace("\u03C7\u00B2", "chi2")    # χ² → chi2
-            t = t.replace("\u03C9\u00B2", "omega2")  # ω² → omega2
-            t = re.sub(r"\u03B7\s*2", "eta2", t)     # η 2 → eta2 (space variant)
-            t = re.sub(r"\u03C7\s*2", "chi2", t)     # χ 2 → chi2
-            t = re.sub(r"\u03C9\s*2", "omega2", t)   # ω 2 → omega2
-            t = t.replace("\u03B7", "eta")            # η → eta
-            t = t.replace("\u03C7", "chi")            # χ → chi
-            t = t.replace("\u03C9", "omega")          # ω → omega
-            t = t.replace("\u03B1", "alpha")          # α → alpha
-            t = t.replace("\u03B2", "beta")           # β → beta
-            t = t.replace("\u03B4", "delta")          # δ → delta
-            t = t.replace("\u03C3", "sigma")          # σ → sigma
-            t = t.replace("\u03C6", "phi")            # φ → phi
-            t = t.replace("\u03BC", "mu")             # μ → mu
+            # Greek -> ASCII, from THE canonical table in `docpluck.symbols`.
+            #
+            # This block used to be a hand-written chain of ten .replace()
+            # calls, and `extract.py`'s SMP fallback carried a SECOND,
+            # DIFFERENT chain. They disagreed on 9 of 9 shared letters, so the
+            # same chi-square left as `chi2` or `ch2` depending purely on
+            # which extraction path ran -- and a consumer matching `chi2(`
+            # silently never checked the test on one of them. Both paths now
+            # read `docpluck.symbols`, which is published to consumers via
+            # `symbol_contract()`.
+            #
+            # Composite forms first: eta + superscript-2 must become `eta2`,
+            # and the space variant likewise, before bare letters are mapped.
+            t = t.replace("η²", "eta2")
+            t = t.replace("χ²", "chi2")
+            t = t.replace("ω²", "omega2")
+            t = re.sub(r"η\s*2", "eta2", t)
+            t = re.sub(r"χ\s*2", "chi2", t)
+            t = re.sub(r"ω\s*2", "omega2", t)
+            t = t.translate(_GREEK_TRANSLATION)
+
+            # Uppercase Greek VISUALLY IDENTICAL to a Latin capital is mapped
+            # ONLY as a standalone token. A broken font encoding emitting
+            # Greek Alpha for a Latin A inside a word would otherwise turn
+            # `ANOVA` into `AlphaNOVA` -- corrupting prose to fix a symbol.
+            # Standalone, the codepoint is the only evidence there is, and it
+            # says Greek: an author who meant `A` would have typed `A`.
+            t = _GREEK_AMBIGUOUS_UPPER_RE.sub(
+                lambda m: GREEK_UPPER_AMBIGUOUS_TO_ASCII[m.group(0)], t
+            )
+
+            # EXPONENT GUARD, before any superscript is flattened: a run that
+            # directly follows an ASCII digit is an exponent, not a symbol
+            # suffix, and flattening would FUSE it into the mantissa
+            # (`×10⁹/L` -> `x109/L`). Caret notation instead — see
+            # _SUPERSCRIPT_EXPONENT_RE for the full argument. Must run BEFORE
+            # the per-character replaces below, which destroy the distinction.
+            t = _SUPERSCRIPT_EXPONENT_RE.sub(_superscript_run_to_caret, t)
 
             # Superscript digits → regular digits (² → 2, ³ → 3, etc.)
             t = t.replace("\u00B2", "2")   # ²
@@ -5023,28 +6184,78 @@ def normalize_text(
             t = t.replace("\u2078", "8")   # ⁸
             t = t.replace("\u2079", "9")   # ⁹
 
-            # Subscript digits → regular digits
-            t = t.replace("\u2080", "0")   # ₀
-            t = t.replace("\u2081", "1")   # ₁
-            t = t.replace("\u2082", "2")   # ₂
-            t = t.replace("\u2083", "3")   # ₃
-            t = t.replace("\u2084", "4")   # ₄
-            t = t.replace("\u2085", "5")   # ₅
-            t = t.replace("\u2086", "6")   # ₆
-            t = t.replace("\u2087", "7")   # ₇
-            t = t.replace("\u2088", "8")   # ₈
-            t = t.replace("\u2089", "9")   # ₉
+            # SUBSCRIPTS -> `_` + ASCII, as a RUN (contract v2.0).
+            #
+            # Contract v1.0 fused a subscript into the token before it, which
+            # produced tokens that read as something else entirely:
+            #
+            #     eta-squared-partial  ->  'eta2p'   the p collides with p-value
+            #     M-sub-p              ->  'Mp'      or a variable named Mp?
+            #     M-sub-beta           ->  'Mbeta'   reads as one word
+            #
+            # `_` is the universal plain-text subscript convention and makes the
+            # boundary explicit, so a real variable named `Mp` stays distinct
+            # from M-sub-p. It applies as ONE rule to every subscript rather
+            # than a per-symbol special case, and effectcheck's own alternation
+            # already carries underscore forms (`eta_p2`, `eta_p^2`), so the
+            # shape is one consumers expect.
+            #
+            # RUN-based, so `BF01` takes a single underscore (`BF_01`) rather
+            # than one per character. The underscore is only inserted when the
+            # run actually follows a word character — a subscript with nothing
+            # to attach to is just transliterated.
+            t = _SUBSCRIPT_RUN_RE.sub(_subscript_run_to_ascii, t)
 
             report._track("A5_math_symbol_normalization", before, t, "math_symbols_normalized")
 
-        # A6: Footnote marker removal after statistical values
-        # "p < .001¹" → "p < .001", "95% CI [0.1, 0.5]²" → "95% CI [0.1, 0.5]"
-        # Only remove isolated superscript/subscript digits that follow stat-adjacent chars
-        # Note: A5 already converted ² → 2, so we look for isolated digits after ] ) or stat values
-        # This catches remaining Unicode superscripts that A5 missed
+        # A6: Footnote marker removal after a CLOSING BRACKET only.
+        #
+        #     "95% CI [0.1, 0.5]²" -> "95% CI [0.1, 0.5]"   a footnote marker
+        #     "the value 10⁹"      -> UNCHANGED             an EXPONENT
+        #
+        # -- THE DEFECT THIS FIXES (v2.4.133), and why it survived --
+        #
+        # The left context used to be `[\d\]\)]`, under the comment "A5 already
+        # converted ² -> 2, so we look for isolated digits after ] ) or stat
+        # values." THAT PREMISE IS FALSE WHENEVER `preserve_math_glyphs=True`,
+        # because A5 is SKIPPED in that mode -- the step trace literally records
+        # `A5_skipped_preserve_math_glyphs`. A6 then met the raw superscript
+        # codepoints A5 would have turned into carets and DELETED them, on the
+        # one path whose whole contract is not to touch glyphs:
+        #
+        #     normalize_text("the value 10⁹", academic, preserve_math_glyphs=True)
+        #         -> "the value 10"        A BILLION-FOLD ERROR
+        #     normalize_text("N = 42³",      academic, preserve_math_glyphs=True)
+        #         -> "N = 42"
+        #
+        # ...and it was booked as `footnotes_removed: 1`, so the telemetry
+        # asserted a footnote had been stripped while a published exponent was
+        # destroyed. This is the exact loss `W0p`'s own docstring warns about --
+        # "deleting the wrong one loses nine orders of magnitude" -- committed by
+        # a different step in the same file. Note the inversion: a REAL footnote
+        # marker after a word ("Smith et al.¹") never matched at all, so the
+        # rule spared the case it was written for and deleted the case it was
+        # warned about.
+        #
+        # -- WHY THE LEFT CONTEXT IS NOW BRACKETS ONLY --
+        #
+        # After a DIGIT, a superscript digit is ambiguous between an exponent
+        # and a footnote marker, and the codepoint alone cannot separate them --
+        # which is precisely why `W0p` exists and reads font size and baseline.
+        # A6 has no typographic evidence at all, so under "if you cannot point
+        # at something the renderer emitted, pass through" it must not decide.
+        # After `]` or `)` the ambiguity is gone: nothing exponentiates a closing
+        # bracket, so the slot is grammatically impossible for an exponent --
+        # the one form of evidence this rule can legitimately claim.
+        #
+        # Cost: `p < .001¹` keeps its marker, a visible and recoverable
+        # cosmetic residue. `10⁹ -> 10` is an unrecoverable error in a published
+        # number. Not a close call. Nothing is lost on the
+        # `preserve_math_glyphs=False` path, where A5 has already rewritten every
+        # superscript to caret form before A6 runs.
         before = t
         t = re.sub(
-            r"([\d\]\)])[\u00B9\u00B2\u00B3\u2070\u2074-\u2079\u2080-\u2089](?=\s|[,;.\)]|$)",
+            r"([\]\)])[\u00B9\u00B2\u00B3\u2070\u2074-\u2079\u2080-\u2089](?=\s|[,;.\)]|$)",
             r"\1", t
         )
         report._track("A6_footnote_removal", before, t, "footnotes_removed")

@@ -27,10 +27,12 @@ to v2.3.0 — v2.2.0 uses Camelot for table cells.
 from __future__ import annotations
 
 import re
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 from .extract_layout import LayoutDoc
 from .extract_structured import extract_pdf_structured
+from .telemetry import fallback_scope
 from .normalize import (
     NormalizationLevel,
     _looks_like_running_header_or_footer,
@@ -38,11 +40,11 @@ from .normalize import (
     decompose_ligatures,
     destyle_math_alphanumeric,
     recover_corrupted_lt_operator,
+    recover_lt_as_b_operator,
     recover_corrupted_minus_signs,
     recover_dropped_minus_via_ci_pairing,
     recover_minus_via_ci_pairing,
     recover_fffd_comparison_operators,
-    recover_p_threshold_dropped_decimal,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
     recover_times_design_notation,
@@ -2054,9 +2056,29 @@ _AFFIL_ADDR_RE = re.compile(r"(?:\bRoad\b|\bStreet\b|\bAve\b|\bAvenue\b|\b\d{5,6
 # block" (corpus content-loss scan caught exactly this on 5 papers). The
 # signature: a parenthesised 4-digit year (publication year) OR an author-initials
 # opener ("Surname, X. Y., &" / "Surname, X. Y. (").
+#
+# EXTENDED 2026-08-15. The two original arms are both APA-shaped, so an
+# IEEE/numbered bibliography matched NEITHER and a reference block was stripped
+# as an author-affiliation footnote. Found by the render-deletion gate on its
+# first genuine run — the gate had been instrumenting nothing, so this had been
+# invisible since the guard was written. Reproduced on
+# `10.48550/arxiv.2406.11713`: seven reference entries deleted, e.g.
+#
+#     [21] P. Dhariwal and A. Nichol, "Diffusion models beat gans on image
+#          synthesis", CoRR, arXiv:2105.05233, 2021. 2
+#
+# classified True (affiliation-shaped) because it is comma-rich, under the
+# word-count bar, and carries no parenthesised year and no `Surname, A.` opener.
+#
+# The three added arms are STRUCTURAL citation markers, not paper identity: a
+# bracketed reference number at line start, an arXiv identifier, and a DOI. None
+# of the three ever occurs in an author-affiliation footnote.
 _AFFIL_CITATION_RE = re.compile(
     r"\(\s*(?:19|20)\d{2}[a-z]?\s*\)"
     r"|^\s*[A-Z][A-Za-z'\-]+,\s+[A-Z]\.\s*(?:[A-Z]\.\s*)?(?:,|&|\()"
+    r"|^\s*\[\d{1,3}\]\s"
+    r"|\barXiv:\s*\d{4}\.\d{4,5}"
+    r"|\b(?:doi:\s*)?10\.\d{4,9}/\S+"
 )
 
 
@@ -3834,7 +3856,41 @@ def _strip_phantom_camelot_tables(text: str) -> str:
         return False
 
     def replacement(m):
-        return "" if is_phantom(m.group(0)) else m.group(0)
+        block = m.group(0)
+        if not is_phantom(block):
+            return block
+        # v2.4.130 DELETION GUARD. "Intentionally LOSSY" is defensible only
+        # while what is lost is garbage HTML. Measured on
+        # 10.1001/jamanetworkopen.2023.48333, it was not: a body cell reading
+        # `1.31 (1.20-1.44)` — a hazard ratio with its confidence interval —
+        # was removed along with the masthead text welded into the same cell by
+        # Camelot. A phantom table is diagnosed from its <th> (a masthead
+        # pattern, or absorbed body prose); that diagnosis says nothing about
+        # whether the <tbody> holds real measurements, and when it does, this
+        # block is the only place they appear in the output.
+        #
+        # So: keep the block whenever its BODY carries a published quantity.
+        # The cost is a retained ugly table; the alternative cost is a deleted
+        # published statistic, and those are not comparable. See LESSONS.md
+        # L-032 and docs/SCOPE.md.
+        # `<th>` as well as `<td>`: the JAMA hazard ratio this guard exists for
+        # was one row away from landing in a header cell, and the Camelot
+        # mis-capture that produces a phantom table is exactly what puts body
+        # content in a `<th>`. Inspecting only `<td>` let a statistic welded
+        # into a header cell be deleted with the block (found 2026-08-15,
+        # Fable review). One `findall` — there is no reason to leave the half
+        # of the table the mis-capture is most likely to corrupt unguarded.
+        body_cells = re.findall(
+            r"<t[dh][^>]*>(.*?)</t[dh]>", block, re.DOTALL | re.IGNORECASE
+        )
+        for cell in body_cells:
+            cleaned = re.sub(r"<[^>]+>", " ", cell)
+            # `bare_number_counts=False`: this block is ALREADY diagnosed as a
+            # Camelot mis-capture, so a lone digit in it is wreckage, not a
+            # measurement. See `_carries_statistical_content` for the two cases.
+            if _carries_statistical_content(cleaned, bare_number_counts=False):
+                return block
+        return ""
 
     return pattern.sub(replacement, text)
 
@@ -4495,6 +4551,120 @@ _ORPHAN_CELL_STOPWORDS = (
     " from ", " on ", " by ", " an ", " a ",
 )
 
+# ── The deletion guard (v2.4.130, 2026-08-14) ───────────────────────────────
+#
+# Six of this module's post-processors REMOVE lines rather than transform them,
+# and until v2.4.130 none of them asked whether the line carried a published
+# number. Measured on the baseline corpus at v2.4.129:
+#
+#   10.1017/s1930297500009189   an entire published-results sentence deleted:
+#       "…(r(6) = 0.94, p < .001, 95% CI [0.71, .99]); and … (r(6) = 0.99,
+#        p < .001, 95% CI [0.96, .99]). Hotelling's (1940) t indicated these
+#        correlations to be different from each other (t(5) = 4.66, p = .006)."
+#       -> _suppress_inline_duplicate_table_captions
+#   10.1001/jamanetworkopen.2023.48333   a hazard ratio and its CI deleted:
+#       "<td>1.31 (1.20-1.44)<br>…</td>"      -> _strip_phantom_camelot_tables
+#
+# WHY THE SUPPRESSORS WERE WRONG, precisely. Their rationale was that leaked
+# cell text has "no structural value in the rendered view (the user is told to
+# consult the Raw view)". That is defensible for a LABEL — "Target article",
+# "Study design" — which is furniture the table's own structure would have
+# carried. It is FALSE for a cell holding a measurement: when Camelot fails on
+# a table, the linearized cells are the ONLY copy of those numbers anywhere in
+# the output, so suppressing them does not tidy a duplicate — it destroys the
+# data. `_is_orphan_cell_paragraph` had no numeric guard at all: it rejects
+# prose by stopword density and sentence shape, and a statistical cell has
+# neither, so `M = 4.52`, `SD = 1.13`, `N = 245`, `t(87) = 2.01`, `p < .001`
+# and `95% CI [0.12, 0.44]` were all classified as droppable.
+#
+# THE RULE: delete FURNITURE, never DATA. A run containing any statistical
+# quantity is left entirely alone — not filtered down to its numeric lines,
+# because a half-suppressed table is a new defect (the reader cannot tell which
+# rows were removed). See LESSONS.md L-032 and docs/SCOPE.md.
+
+# A measurement, as opposed to a bare integer that is usually furniture (a page
+# number, a year, a heading index). Deliberately generous on the DATA side:
+# a false "this is data" costs a retained furniture line, while a false "this is
+# furniture" costs a published statistic.
+_STATISTICAL_CONTENT_RE = re.compile(
+    r"""(?x)
+    [-+−]?\d+[.,]\d+            # any decimal:      4.52   0,87   -1.13
+  | (?<![\w.])\.\d+                  # leading-dot value: .006  .05
+  | \d+\s*%                          # a percentage:     68 %
+  | \b(?:[MSDNnprtzFbd]|SD|SE|CI|OR|RR|HR|BF|df|chi2|eta2|beta)\s*
+        [=<>≤≥]\s*[-+−]?[\d.]     # a labelled statistic: N = 245
+  | \b[A-Za-z][A-Za-z0-9]*\s*\([^)]*\)\s*[=<>≤≥]\s*[-+−]?\d
+                                     # a bracketed statistic: F(2, 42) = 5
+  | \b\d+\s*(?:×|x)\s*\d+       # a design:         2 x 3
+  | [βχηρωΒΧΗΡΩ][²³₀-₉0-9]*\s*[=<>≤≥(]
+                                     # a Greek-labelled statistic: β = , χ²(1)
+  | \b(?:R|Z|Q|F|BF)[²³0-9₀-₉]*\s*[=<>≤≥(]
+                                     # R² = , Z = , BF₁₀ = , F(
+    """
+)
+# The Greek/`R²` arms were merged in from `_suppress_inline_duplicate_figure_
+# captions`, which carried its OWN second detector — one that knew β/χ²/η²/R²
+# and did NOT know `M =`, `SD =`, `N =`, `r =`, percentages, or a bare
+# `CI [0.12, 0.44]`. Two tables for one concept, inside the very file whose fix
+# codified "one concept, one table" (found 2026-08-15, Fable review). The
+# integer-valued Greek case is the one both halves needed: `χ2(1) = 4` matched
+# NEITHER, because the ASCII-only labelled arm cannot reach it and `\b` does not
+# fire before a Greek letter.
+
+# A line that is NOTHING BUT a number is a table cell, and a count is data.
+#
+# Added after an adversarial review (codex, 2026-08-14) produced the case the
+# main pattern missed and I could reproduce: a table of COUNTS carries no
+# decimal, no percent and no `label =` syntax, so `245` and `12` on their own
+# lines scored as furniture and stayed deletable — the exact orphan-cell shape
+# this guard exists for, in the one flavour it could not see.
+#
+# The asymmetry decides the tie: a false "this is data" costs one retained
+# furniture line; a false "this is furniture" costs a published statistic.
+# Genuine page-number furniture is separately excluded by the callers that care
+# (`tools/diag/render_deletion_scan.py::_FURNITURE_RE`), and a page number
+# sitting inside a post-caption orphan run is not a shape the corpus shows.
+_BARE_NUMBER_LINE_RE = re.compile(r"^[-+−(\[]?\s*\d[\d,. ]*\s*[)\]%]?$")
+
+
+def _carries_statistical_content(line: str, *, bare_number_counts: bool = True) -> bool:
+    """Would deleting this line destroy a published quantity?
+
+    Used by every post-processor that REMOVES content. A line answering True is
+    never dropped, because when a table fails to capture, the linearized cell
+    text is the only remaining copy of the numbers in it.
+
+    `bare_number_counts=False` drops the lone-integer arm, and exactly one
+    caller wants that: `_strip_phantom_camelot_tables`. The two situations look
+    similar and are not.
+
+    * **Linearized orphan cells** (`_suppress_orphan_table_cell_text`) — a
+      COUNTS table is nothing but bare integers, and those lines are the only
+      surviving copy of the data. A bare `245` must count.
+    * **A table already diagnosed as PHANTOM** — its `<th>` holds a masthead or
+      absorbed body prose, so it is a Camelot mis-capture rather than a table.
+      A lone digit inside that grid is a fragment of the wreckage, not a
+      measurement. Measured on `10.1525/collabra.90203` Table 7: a degenerate
+      prose grid whose only `<td>` numeral is `4` was kept from stripping by
+      the lone-integer arm, and a real regression test caught it. The JAMA case
+      the guard exists for carries `1.31 (1.20-1.44)` — a decimal with an
+      interval — which still vetoes the strip.
+    """
+    if not line:
+        return False
+    if bare_number_counts and _BARE_NUMBER_LINE_RE.match(line.strip()):
+        return True
+    return bool(_STATISTICAL_CONTENT_RE.search(line))
+
+
+def _run_carries_statistical_content(lines) -> bool:
+    """True if ANY line in a candidate deletion run carries a quantity.
+
+    All-or-nothing on purpose: suppressing the label rows of a table while
+    keeping its numeric rows produces output whose gaps nobody can see.
+    """
+    return any(_carries_statistical_content(ln) for ln in lines)
+
 
 def _is_orphan_cell_paragraph(p: str) -> bool:
     """Return True iff ``p`` looks like a leaked table cell row, not prose.
@@ -4625,9 +4795,22 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
                     j += 1
                     continue
                 break
+            # v2.4.130 DELETION GUARD: a run holding any published quantity is
+            # not furniture, and when Camelot failed on the table these lines
+            # are the ONLY copy of those numbers in the output. Checked BEFORE
+            # the threshold so the decision is visible at the deletion point.
+            if orphans and _run_carries_statistical_content(
+                lines[k] for k in orphans
+            ):
+                out.append(line)
+                i += 1
+                continue
             if len(orphans) >= 2:
                 # Italicize plain captions; leave italic ones unchanged.
                 # In both cases drop the orphan lines.
+                # (The docstring above said "3+ consecutive"; the v2.4.11
+                # note lowered the threshold to 2 for two-column tables and
+                # the prose was never updated. It is `>= 2`.)
                 if is_plain_caption:
                     out.append(f"*{stripped}*")
                 else:
@@ -4800,7 +4983,22 @@ def _suppress_inline_duplicate_table_captions(text: str) -> str:
             j += 1
         # Only drop the cell run if it's clearly cell content (each line short
         # AND none ends in a body-prose-sentence terminator with > 80 chars).
-        if cell_lines_consumed:
+        #
+        # v2.4.130 DELETION GUARD. The "real prose" stop above requires a line
+        # of >= 80 chars ENDING in `.!?`, and pdftotext wraps body text, so a
+        # genuine sentence spans several lines and NO single line qualifies.
+        # Measured on 10.1017/s1930297500009189: this walk consumed
+        #     "…we found a strong relationship … (r(6) = 0.94,"
+        #     "= 4.66, p = .006)."
+        # and deleted two correlations, a Hotelling's t, three p-values and two
+        # confidence intervals from the rendered output with no telemetry at
+        # all. A run carrying a published quantity is never a duplicate to be
+        # tidied away — the caption above it may be a duplicate, the DATA is
+        # not. All-or-nothing: dropping only the non-numeric lines would leave
+        # a gap no reader could see.
+        if cell_lines_consumed and not _run_carries_statistical_content(
+            lines[k] for k in cell_lines_consumed
+        ):
             drop.update(cell_lines_consumed)
         # Drop trailing blank line.
         if j < n and not lines[j].strip():
@@ -4808,6 +5006,44 @@ def _suppress_inline_duplicate_table_captions(text: str) -> str:
     if not drop:
         return text
     return "\n".join(ln for i, ln in enumerate(lines) if i not in drop)
+
+
+def _extend_block_caption(
+    lines: list, block_cap: dict, block_cap_idx: dict, num: int, overhang: str
+) -> bool:
+    """Append a caption OVERHANG to the surviving block caption in place.
+
+    The superset branch of `_suppress_inline_duplicate_figure_captions` drops an
+    inline caption run that is LONGER than the block caption it duplicates — so
+    the difference between them survived nowhere, and the step's own docstring
+    promises the opposite ("an inline run that EXCEEDS the block caption is left
+    untouched so no caption text can be lost").
+
+    Measured 2026-08-15 on `10.1109/access.2025.3645087` Figure 5, found by the
+    render-deletion gate the moment it could see anything: the inline copy ran
+    121 characters longer and the tail
+
+        "All rounding method comparisons were conducted at a time step of 20 PN
+         time steps per unit time per 1 ODE time interval."
+
+    — a methods parameter — appeared NOWHERE in the rendered output. That is
+    L-032's "a deletion wearing a dedup's name": deduplication is legitimate
+    only when a copy demonstrably survives, and here the surviving copy was
+    strictly smaller.
+
+    Extending first makes the drop a real deduplication. Returns False when the
+    caption line cannot be located, in which case the caller must NOT drop.
+    """
+    idx = block_cap_idx.get(num)
+    if idx is None or not overhang:
+        return False
+    cm = re.match(r"^(\s*)\*(Figure\s+\d+.+?)\*(\s*)$", lines[idx])
+    if not cm:
+        return False
+    joined = f"{cm.group(2).rstrip()} {overhang.strip()}"
+    lines[idx] = f"{cm.group(1)}*{joined}*{cm.group(3)}"
+    block_cap[num] = re.sub(r"\s+", " ", joined).strip()
+    return True
 
 
 def _suppress_inline_duplicate_figure_captions(text: str) -> str:
@@ -4830,7 +5066,11 @@ def _suppress_inline_duplicate_figure_captions(text: str) -> str:
     """
     lines = text.split("\n")
     # 1. Collect "### Figure N" block captions (label included).
+    #    `block_cap_idx` records WHERE each caption lives, so the superset
+    #    branch below can extend the surviving copy instead of discarding the
+    #    difference. See `_extend_block_caption`.
     block_cap: dict[int, str] = {}
+    block_cap_idx: dict[int, int] = {}
     for i, ln in enumerate(lines):
         m = re.match(r"^#{2,4} Figure (\d+)\s*$", ln)
         if not m:
@@ -4841,6 +5081,7 @@ def _suppress_inline_duplicate_figure_captions(text: str) -> str:
                 block_cap[int(m.group(1))] = re.sub(
                     r"\s+", " ", cm.group(1)
                 ).strip()
+                block_cap_idx[int(m.group(1))] = j
                 break
     if not block_cap:
         return text
@@ -4899,12 +5140,12 @@ def _suppress_inline_duplicate_figure_captions(text: str) -> str:
                     and acc_norm.lower().startswith(bc.lower())
                 ):
                     overhang = acc_norm[len(bc):].strip()
-                    has_stat_shape = bool(re.search(
-                        r"\b(?:F|t|d|B|β|χ²|χ2|η²|η2|R²|R2|OR|RR|HR|Z|Q)\s*[=(]"
-                        r"|\bp\s*[=<>]"
-                        r"|\b\d+\s*,\s*\d+\)\s*=\s*\d",
-                        overhang,
-                    ))
+                    # ONE detector, shared with every other deleting step.
+                    # `bare_number_counts=False`: a lone numeral in a caption
+                    # overhang is a figure index, not a measurement.
+                    has_stat_shape = _carries_statistical_content(
+                        overhang, bare_number_counts=False
+                    )
                     # Body-prose signature: first-person / sentence-starter
                     # words at the START of the overhang. If the overhang
                     # starts with "We ", "In ", "Although ", "However ", etc.,
@@ -4923,9 +5164,14 @@ def _suppress_inline_duplicate_figure_captions(text: str) -> str:
                         and 0 < len(overhang) <= 120
                         and overhang[-1] in ".?!"
                     ):
-                        drop.update(run)
-                        i = j
-                        continue
+                        # Extend the SURVIVOR before dropping the copy, so the
+                        # overhang is deduplicated rather than deleted.
+                        if _extend_block_caption(
+                            lines, block_cap, block_cap_idx, num, overhang
+                        ):
+                            drop.update(run)
+                            i = j
+                            continue
                     # R3b wider form (v2.4.74, 2026-05-25): allow up to 250
                     # chars overhang when the overhang is clearly caption-
                     # continuation shape. Stricter than the ≤120 path —
@@ -4947,9 +5193,12 @@ def _suppress_inline_duplicate_figure_captions(text: str) -> str:
                         and 120 < len(overhang) <= 250
                         and overhang[-1] in ".?!"
                     ):
-                        drop.update(run)
-                        i = j
-                        continue
+                        if _extend_block_caption(
+                            lines, block_cap, block_cap_idx, num, overhang
+                        ):
+                            drop.update(run)
+                            i = j
+                            continue
         i += 1
     if not drop:
         return text
@@ -6066,6 +6315,239 @@ def _dedupe_label_in_table_figure_caption(text: str) -> str:
     return "\n".join(lines)
 
 
+# ── Render telemetry (v2.4.130) ────────────────────────────────────────────
+
+
+# The RENDER channel's own contract version — and the answer to a question the
+# 2026-08-15 handoff left open ("__version__ moved but NORMALIZATION_VERSION did
+# not; decide which reading is right, this will recur").
+#
+# THE RULE, settled 2026-08-15: each CHANNEL versions its own contract.
+#   NORMALIZATION_VERSION  -> `normalize_text`'s step sequence      (normalize.py)
+#   SECTIONING_VERSION     -> `extract_sections`' partitioning      (sections/)
+#   RENDER_VERSION         -> the markdown post-process chain       (render.py)
+#   __version__            -> the PACKAGE; bumps for any shipped change
+#
+# A fix in `extract_docx.py` or `render.py` therefore moves `__version__` and
+# NOT `NORMALIZATION_VERSION` — the normalization contract genuinely did not
+# change, and bumping it would tell every consumer to re-run a pipeline whose
+# behaviour is identical. The reason the question felt ambiguous is that the
+# render channel was the ONLY one of the three with no version of its own, so a
+# render change had nowhere to be recorded except the package number. It has one
+# now, and `RenderReport` carries it.
+RENDER_VERSION = "1.0.2"  # v1.0.2 (v2.4.134): the render channel becomes a telemetry CONSUMER, not just a producer. `render_pdf_to_markdown` calls `extract_pdf_structured` and `extract_sections` internally and DISCARDED both of their reports, so every fallback recorded beneath the function that produces the user-visible .md - a table dropped by the likeness gate, a repair refused as ambiguous, a symbol font flagged as corrupt - was invisible to every caller. Found by an independent review of the very release whose headline was that telemetry now reaches consumers, which is the same defect one layer up for the third time. The public name is now a thin wrapper holding a `fallback_scope` (a `with` block, so an exception mid-chain cannot leak a sink into the next render in this context) and the chain moved to `_render_pdf_to_markdown`; `RenderReport` gains `fallbacks` / `fallback_details`. NOTE the rename broke `tools/diag/render_deletion_scan.py`, which scrapes that function's source for `_step(_report, ...)` calls - and it REFUSED TO RUN rather than report a clean zero, which is the instrument guard built one release earlier working exactly as designed against the session that wrote it. # v1.0.1 (v2.4.132): removed_lines compares stripped-to-stripped and treats a reflow (a line merged into a longer one) as survival — the two instrument defects that made the repaired deletion gate report 84 false positives on its first genuine run; `_carries_statistical_content` absorbs the Greek/R²/BF arms from the figure-caption suppressor's private duplicate detector (one concept, one table) and gains the integer-valued Greek case `χ2(1) = 4` that matched NEITHER half; `_AFFIL_CITATION_RE` gains three structural citation markers (bracketed reference number, arXiv id, DOI) after a numbered bibliography was stripped as an author-affiliation block on 10.48550/arxiv.2406.11713 — the class the guard's own comment says it was written to prevent, walked back in through a citation style neither APA-shaped arm covered; `_strip_phantom_camelot_tables` inspects `<th>` as well as `<td>`; `_rescue_title_from_layout` is wrapped in `_step` (it deletes, and was the one chain step invisible to RenderReport); `report=` is the public spelling of the telemetry parameter. # v1.0.0 (v2.4.130): the chain gains telemetry for the first time.
+
+
+def removed_lines(before: str, after: str) -> list:
+    """Lines a single step REMOVED, with rewrites and reflows folded out.
+
+    **The canonical definition, used by both `RenderReport._track` and
+    `tools/diag/render_deletion_scan.py`.** It lives here rather than in the
+    scan because two implementations of one rule diverge silently (L-024) — and
+    these two did: the first version of `_track` asked only whether the old line
+    was a *substring* of some output line, so `recover_corrupted_minus_signs`
+    rewriting `[20.21, 0.04]` to `[-0.21, 0.04]` was reported as 55 deleted
+    statistics on one paper while the scan, which used difflib, correctly
+    reported none. A field consumers are told to check must not cry wolf.
+
+    Three things are deliberately NOT removals:
+
+    * a **rewrite** — difflib pairs the line with its replacement (`replace`);
+    * a **reflow** — the content reappears elsewhere in the step's output;
+    * a **dedup** — a near-identical copy survives, which is the whole point of
+      `_dedupe_h2_sections` and the duplicate-caption suppressors.
+
+    Apply PER STEP. Across the whole 54-step chain the pairing is meaningless,
+    because a later step's reflow is attributed to an earlier step's deletion.
+    """
+    import difflib
+
+    b_lines = [ln.rstrip() for ln in before.split("\n")]
+    a_lines = [ln.rstrip() for ln in after.split("\n")]
+    a_stripped = [ln.strip() for ln in a_lines]
+    out = []
+    sm = difflib.SequenceMatcher(None, b_lines, a_lines, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        # `delete` AND `replace` both have to be inspected. A step that
+        # rewrites one line while deleting its neighbours produces a SINGLE
+        # `replace` opcode covering all of them, and looking only at `delete`
+        # misses every deletion in that block — a FALSE NEGATIVE in the field
+        # consumers are told to check, which is worse than the false positives
+        # this function was written to remove.
+        #
+        # Measured: `_suppress_orphan_table_cell_text` italicises the caption
+        # (a rewrite) and drops the orphan rows beneath it (deletions) in one
+        # contiguous change, so difflib emits one `replace` and four genuine
+        # removals were reported as none.
+        if tag not in ("delete", "replace"):
+            continue
+        for line in b_lines[i1:i2]:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # TWO different survival claims, and they need DIFFERENT evidence.
+            #
+            # (a) A REWRITE — the step replaced this line in place. Its
+            #     counterpart is in THIS opcode's inserted side, at this
+            #     position. The numbers are allowed to change: that is what a
+            #     repair IS (`recover_corrupted_minus_signs` turning
+            #     `[20.21, 0.04]` into `[-0.21, 0.04]`). Position is the
+            #     evidence, so no digit check applies.
+            #
+            # (b) A DEDUP or REFLOW — the line vanished here and is claimed to
+            #     survive SOMEWHERE ELSE in the output. That claim must be
+            #     checked on the numbers, because a 0.9-similar line carrying a
+            #     DIFFERENT statistic is not a surviving copy, it is a second
+            #     measurement — and calling it a copy hides the deletion of the
+            #     first. Found 2026-08-15 (Fable review) and reproduced:
+            #     deleting `OR 1.31 (95% CI 1.20-1.44), p < .001` while
+            #     `OR 1.32 (95% CI 1.21-1.45), p < .001` survived scored as NO
+            #     removal. Model tables, correlation matrices and dose-response
+            #     rows are precisely where one-digit-apart statistical lines
+            #     cluster, so this blinded `statistics_removed`, the release
+            #     gate that reads it, and every consumer told to assert it is
+            #     empty. L-032's own words: dedup is legitimate only when a copy
+            #     DEMONSTRABLY survives, else it is a deletion wearing a dedup's
+            #     name.
+            # Compare STRIPPED to STRIPPED. Comparing a stripped line against
+            # unstripped candidates made indentation count against similarity:
+            # `<td>20.09</td>` vs `    <td>-0.09</td>` scores 0.80 and fails the
+            # 0.9 cutoff, so an ordinary W0d rewrite inside an indented table
+            # was reported as 26 deleted statistics on one paper. Invisible until
+            # 2026-08-15, because the gate that would have shown it was
+            # instrumenting nothing.
+            if difflib.get_close_matches(stripped, a_stripped[j1:j2], n=1, cutoff=0.9):
+                continue
+            # A REFLOW: the step merged this line into a longer one (the
+            # caption-join family). The content is present verbatim in the
+            # output, just not as its own line — that is not a removal, and no
+            # similarity ratio can see it, because a short line inside a long
+            # one scores far below any useful cutoff.
+            if stripped in after:
+                continue
+            # ...and the same test on the line's CONTENT, with surrounding
+            # markdown emphasis removed. A step that EXTENDS a line in place
+            # (`*A*` -> `*A B*`) leaves the original content present, but the
+            # closing marker defeats a raw substring test and the length change
+            # can push the pair below the 0.9 similarity cutoff — so an
+            # extension read as a deletion. Measured on
+            # `10.1109/access.2025.3645087`, where the figure-caption survivor
+            # is extended with the inline copy's overhang.
+            core = stripped.strip("*_`~ ").strip()
+            if len(core) >= 20 and core in after:
+                continue
+            elsewhere = difflib.get_close_matches(stripped, a_stripped, n=5, cutoff=0.9)
+            if elsewhere:
+                signature = _digit_signature(stripped)
+                if not signature or any(
+                    _digit_signature(c) == signature for c in elsewhere
+                ):
+                    continue
+            out.append(stripped)
+    return out
+
+
+# Every numeric literal in a line, in order — the identity of the quantities it
+# carries. Two lines with the same prose and different numbers are different
+# data, however similar difflib finds them.
+_DIGIT_RUN_RE = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def _digit_signature(line: str) -> tuple:
+    return tuple(_DIGIT_RUN_RE.findall(line))
+
+
+@dataclass
+class RenderReport:
+    """What the markdown post-process chain did — and especially what it REMOVED.
+
+    Carries its own ``render_version``. See ``RENDER_VERSION`` below for why —
+    it settles a question the 2026-08-15 handoff left open.
+
+    Until v2.4.130 `render_pdf_to_markdown()` returned a bare `str` while
+    chaining 54 `md = fn(md)` calls, so a step that deleted a line deleted it
+    with **zero telemetry**: no count, no key in any report, no log. That is how
+    two real papers lost published statistics without anyone noticing for
+    months (see LESSONS.md L-032, and
+    `tests/test_render_never_deletes_published_statistics.py`).
+
+    Deliberately mirrors `NormalizationReport` (`steps_applied` /
+    `steps_changed` / `_track`) rather than inventing a second shape, so
+    `tools/diag/repair_site_scan.py` and every other measurement built on that
+    vocabulary can see the render channel too. One concept, one table (L-024).
+
+    Opt-in and non-breaking: pass `_report=RenderReport()` to
+    `render_pdf_to_markdown`. Existing callers are unaffected and still get a
+    plain `str`.
+    """
+
+    steps_applied: List[str] = field(default_factory=list)
+    steps_changed: List[str] = field(default_factory=list)
+    lines_removed: List[dict] = field(default_factory=list)
+    chars_delta: int = 0
+    render_version: str = ""
+    #: Every fallback recorded ANYWHERE beneath this render — extraction, table
+    #: capture, normalization and the post-process chain — keyed by stable event
+    #: name, with `fallback_details` naming the specific instance.
+    #:
+    #: Added v2.4.134 after an independent review observed that the release
+    #: claiming "telemetry reaches a consumer from every channel" had wired
+    #: `StructuredResult` and `NormalizationReport` and left the RENDERED path —
+    #: the one that produces the `.md` a user actually reads — with no way to see
+    #: any of it. `render_pdf_to_markdown` calls `extract_pdf_structured` and
+    #: `normalize_text` internally and discarded both of their reports, so a
+    #: table dropped by the likeness gate or a repair refused as ambiguous was
+    #: invisible to every caller of this function.
+    fallbacks: dict = field(default_factory=dict)
+    fallback_details: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.render_version:
+            self.render_version = RENDER_VERSION
+
+    def _track(self, step: str, before: str, after: str) -> None:
+        self.steps_applied.append(step)
+        if after == before:
+            return
+        self.steps_changed.append(step)
+        self.chars_delta += len(after) - len(before)
+        for stripped in removed_lines(before, after):
+            self.lines_removed.append({
+                "step": step,
+                "line": stripped[:200],
+                "carried_statistic": _carries_statistical_content(stripped),
+            })
+
+    @property
+    def statistics_removed(self) -> List[dict]:
+        """Removals that took a published quantity with them. Should be EMPTY."""
+        return [d for d in self.lines_removed if d["carried_statistic"]]
+
+    def to_dict(self) -> dict:
+        return {
+            "steps_applied": list(self.steps_applied),
+            "steps_changed": list(self.steps_changed),
+            "lines_removed": list(self.lines_removed),
+            "statistics_removed": self.statistics_removed,
+            "chars_delta": self.chars_delta,
+            "render_version": self.render_version,
+        }
+
+
+def _step(report, name: str, fn, md: str, *args, **kwargs) -> str:
+    """Apply one post-processor, recording what it did when a report is given.
+
+    The chain is written as `md = _step(_report, "name", fn, md)` rather than
+    `md = fn(md)` so that the record is produced AT the call site. A separate
+    list of step names maintained elsewhere would be a second definition of the
+    chain and would drift from it silently.
+    """
+    out = fn(md, *args, **kwargs)
+    if report is not None:
+        report._track(name, md, out)
+    return out
+
+
 # ── Public entry point ─────────────────────────────────────────────────────
 
 
@@ -6077,6 +6559,56 @@ def render_pdf_to_markdown(
     _structured: Optional[dict] = None,
     _sectioned=None,
     _layout_doc: Optional[LayoutDoc] = None,
+    report: Optional[RenderReport] = None,
+    _report: Optional[RenderReport] = None,
+) -> str:
+    """Render a PDF as a complete markdown document.
+
+    Thin wrapper over :func:`_render_pdf_to_markdown` whose only job is to hold a
+    :class:`telemetry.fallback_scope` open across the whole render, so
+    ``RenderReport.fallbacks`` reports what happened underneath it.
+
+    **THE RENDERED PATH IS A CONSUMER TOO.** This function calls
+    ``extract_pdf_structured`` and ``extract_sections`` internally and discarded
+    both of their reports, so every fallback recorded beneath it — a table
+    dropped by the likeness gate, a repair refused as ambiguous, a symbol font
+    flagged as corrupt — was invisible to every caller of the function that
+    produces the ``.md`` a user actually reads. Found by an independent review of
+    the very release whose headline was that telemetry reaches consumers.
+
+    A ``with`` block rather than a manual enter/exit, so an exception mid-chain
+    cannot leave a sink on the stack for whatever runs next in this context.
+    Callers who pass no report are unaffected and still receive a plain ``str``.
+
+    See :func:`_render_pdf_to_markdown` for the arguments.
+    """
+    _rep = report or _report
+    with fallback_scope() as fb:
+        md = _render_pdf_to_markdown(
+            pdf_bytes,
+            normalization_level=normalization_level,
+            flatten_tables_inline=flatten_tables_inline,
+            _structured=_structured,
+            _sectioned=_sectioned,
+            _layout_doc=_layout_doc,
+            report=_rep,
+        )
+    if _rep is not None:
+        _rep.fallbacks = dict(fb.counters)
+        _rep.fallback_details = fb.details
+    return md
+
+
+def _render_pdf_to_markdown(
+    pdf_bytes: bytes,
+    *,
+    normalization_level: NormalizationLevel = NormalizationLevel.academic,
+    flatten_tables_inline: bool = False,
+    _structured: Optional[dict] = None,
+    _sectioned=None,
+    _layout_doc: Optional[LayoutDoc] = None,
+    report: Optional[RenderReport] = None,
+    _report: Optional[RenderReport] = None,
 ) -> str:
     """Render a PDF as a complete markdown document.
 
@@ -6151,6 +6683,15 @@ def render_pdf_to_markdown(
     #    `_layout_doc` parameter is None-tolerant — falls back to its own
     #    extraction if the shared doc isn't available, preserving the existing
     #    caller contract.
+    #
+    # `report=` is the PUBLIC name. `docs/SCOPE.md` told consumers to pass
+    # `_report=RenderReport()` — publishing a contract on an underscore-prefixed
+    # parameter, i.e. asking every consumer to depend on something the leading
+    # underscore declares private (found 2026-08-15, Fable review). `_report`
+    # still works so nothing in flight breaks; the public spelling is `report`.
+    if _report is not None and report is None:
+        report = _report
+    _report = report
     if _layout_doc is not None:
         layout_doc = _layout_doc
     else:
@@ -6204,21 +6745,21 @@ def render_pdf_to_markdown(
     )
 
     # 4. Post-process (spike pipeline order).
-    md = _dedupe_h2_sections(md)
-    md = _fix_hyphenated_line_breaks(md)
-    md = _join_multiline_caption_paragraphs(md)
-    md = _suppress_orphan_table_cell_text(md)
-    md = _demote_inline_footnotes_to_blockquote(md)
-    md = _promote_study_subsection_headings(md)
-    md = _demote_false_single_word_headings(md)
+    md = _step(_report, "_dedupe_h2_sections", _dedupe_h2_sections, md)
+    md = _step(_report, "_fix_hyphenated_line_breaks", _fix_hyphenated_line_breaks, md)
+    md = _step(_report, "_join_multiline_caption_paragraphs", _join_multiline_caption_paragraphs, md)
+    md = _step(_report, "_suppress_orphan_table_cell_text", _suppress_orphan_table_cell_text, md)
+    md = _step(_report, "_demote_inline_footnotes_to_blockquote", _demote_inline_footnotes_to_blockquote, md)
+    md = _step(_report, "_promote_study_subsection_headings", _promote_study_subsection_headings, md)
+    md = _step(_report, "_demote_false_single_word_headings", _demote_false_single_word_headings, md)
     # HALLUC-HEAD-1: demote a `## <CRediT-role>` heading (e.g. `## Methodology`)
     # that the partitioner promoted from inside the contributor-roles block.
-    md = _demote_credit_role_headings(md)
+    md = _step(_report, "_demote_credit_role_headings", _demote_credit_role_headings, md)
     # B2b (2026-05-22): demote orphan generic-label `##` headings that the
     # partitioner promoted from a front-matter sidebar or appendix marker
     # (``## Conclusion`` / ``## Evaluation`` / ``## Findings`` /
     # ``## Implications`` / ``## Limitations`` with no body prose after).
-    md = _demote_orphan_generic_headings(md)
+    md = _step(_report, "_demote_orphan_generic_headings", _demote_orphan_generic_headings, md)
     # HALLUC-HEAD-2 / G5d-2 (2026-05-23 cycle 3): demote ``## <Title>`` that
     # the partitioner over-promoted from the second half of a soft-wrap-split
     # sentence. Fires when the IMMEDIATELY-PRIOR non-empty line ends in a
@@ -6226,21 +6767,21 @@ def render_pdf_to_markdown(
     # Specific defect: ip_feldman_2025_pspb cycle-2 line 409
     # ``## Supplemental Materials`` promoted from "summarized in the\n
     # Supplemental Materials".
-    md = _demote_continuation_promoted_headings(md)
+    md = _step(_report, "_demote_continuation_promoted_headings", _demote_continuation_promoted_headings, md)
     # §B-new-2 (2026-05-23) HALLUC-HEAD-3: demote ``## KEYWORDS`` and other
     # all-caps single-token metadata labels when followed by metadata-shape
     # content (separator-bearing list with no sentence verb).
-    md = _demote_metadata_label_headings(md)
+    md = _step(_report, "_demote_metadata_label_headings", _demote_metadata_label_headings, md)
     # §B-new-4 (2026-05-23): demote ``## <Heading>`` that was wrongly split
     # off a comma-broken italic metadata label (``*Data Availability,
     # Preregistration, and Open-Science Disclosures.*``).
-    md = _demote_italic_label_with_comma_headings(md)
+    md = _step(_report, "_demote_italic_label_with_comma_headings", _demote_italic_label_with_comma_headings, md)
     # B2c (2026-05-22): promote isolated bare method-subsection labels
     # (``Participants`` / ``Materials`` / ``Procedure`` / ``Measures`` /
     # ``Stimuli`` / ``Design`` / ``Apparatus`` / ``Analysis``) sitting on
     # their own line with paragraph isolation, after the demote passes
     # have settled the major heading layout.
-    md = _promote_isolated_method_subsection_headings(md)
+    md = _step(_report, "_promote_isolated_method_subsection_headings", _promote_isolated_method_subsection_headings, md)
     # C1 (2026-07-03): rejoin a Results-subsection heading that pdftotext
     # column-wrapped across 2-3 physical lines into ONE line, BEFORE the
     # promoters below classify it. Runs FIRST among the isolated-heading
@@ -6250,7 +6791,7 @@ def render_pdf_to_markdown(
     # Analysis / External Analysis / Intensity Estimates headings). Strict
     # structural signature (hang-word or paren-qualifier tail + substantial
     # head + no figure-adjacency), FP-validated across a 16-paper set.
-    md = _rejoin_wrapped_subsection_heading(md)
+    md = _step(_report, "_rejoin_wrapped_subsection_heading", _rejoin_wrapped_subsection_heading, md)
     # §B-new-1 (2026-05-23): wider analogue — promote any paragraph-isolated
     # Title-Case short line (≤6 words, ≤60 chars) followed by prose, gated
     # by strict shape checks. Runs AFTER B2c so the narrow set still wins.
@@ -6260,8 +6801,12 @@ def render_pdf_to_markdown(
     # no-blank-before subsection-heading relaxation so JESP/Elsevier glued
     # headings promote without re-opening the two-column G5d over-promotion trap.
     _is_single_column = _raw_text_is_single_column(structured["text"])
-    md = _promote_isolated_titlecase_subsection_headings(
-        md, is_single_column=_is_single_column
+    md = _step(
+        _report,
+        "_promote_isolated_titlecase_subsection_headings",
+        _promote_isolated_titlecase_subsection_headings,
+        md,
+        is_single_column=_is_single_column,
     )
     # §B-new-5 (2026-07-01): major-section (`## `) promotion for LONG
     # Sentence-case titles (5-12 words, ≤80 chars) that the ≤6-word ``### ``
@@ -6274,7 +6819,7 @@ def render_pdf_to_markdown(
     # double promotion). Strict structural signature (paragraph-isolation +
     # Sentence-case + word/char window + no sentence terminator except a colon
     # + genuine following prose) keeps it from touching the ≤6-word guarded set.
-    md = _promote_isolated_major_section_headings(md)
+    md = _step(_report, "_promote_isolated_major_section_headings", _promote_isolated_major_section_headings, md)
     # C3 (2026-07-04): demote a `## ` heading the major-section promoter
     # over-promoted from a Results SUBSECTION back to `### `, keyed on a
     # parallel-prefix `### ` sibling in the same section (ip_feldman
@@ -6282,19 +6827,19 @@ def render_pdf_to_markdown(
     # `### Prevalence Estimate Errors`). Divergence-guarded so a duplicate `###`
     # of the same title never demotes the gold-correct `## `. Runs immediately
     # after the promoter so it sees the final `## `/`### ` levels.
-    md = _demote_parallel_prefix_subsection_headings(md)
+    md = _step(_report, "_demote_parallel_prefix_subsection_headings", _demote_parallel_prefix_subsection_headings, md)
     # 2026-06-06 (Cycle 4 redux): repair column-wrapped subsection-heading
     # titles carrying a citation — Rule A promotes a body `{Title} et al.`
     # + bare `(YYYY)` wrap to `### {Title} et al. (YYYY)` (finding #3);
     # Rule B reattaches a short colon-/paren-led orphan tail onto an
     # existing heading that was split mid-title (finding #4). Runs AFTER
     # the titlecase promoter so Rule B sees the partially-promoted `###`.
-    md = _repair_column_wrapped_headings(md)
+    md = _step(_report, "_repair_column_wrapped_headings", _repair_column_wrapped_headings, md)
     # v2.4.74 (jama-open-1 HALLUC_HEAD fix): demote ### headings that the
     # promoters just stranded inside table-cell-region clusters. Runs AFTER
     # all promoters so it sees the final ### state and can target promotions
     # that landed in cell-cluster contexts.
-    md = _demote_isolated_table_cell_headings(md)
+    md = _step(_report, "_demote_isolated_table_cell_headings", _demote_isolated_table_cell_headings, md)
     # v2.4.74 (jama-open-1 ABSTRACT_LEVEL_MISMATCH fix): demote misplaced
     # ## headings between ## Abstract and the next body-section h2. JAMA-
     # style structured-abstract inline labels (IMPORTANCE / OBJECTIVE /
@@ -6302,32 +6847,37 @@ def render_pdf_to_markdown(
     # (Question / Findings / Meaning) get wrongly promoted by upstream
     # promoters when column-interleave drops them onto their own lines.
     # Belt-and-braces until R4 column-aware re-extraction lands.
-    md = _demote_abstract_zone_inline_labels(md)
+    md = _step(_report, "_demote_abstract_zone_inline_labels", _demote_abstract_zone_inline_labels, md)
     # v2.4.74 (jama-open-1 TABLE_STRUCTURE_CORRUPT fix): strip Camelot
     # phantom tables whose <th> cells carry running-header/masthead text
     # and whose body is essentially empty or a single section-name leak
     # (Discussion / Conclusion / Methods).
-    md = _strip_phantom_camelot_tables(md)
-    md = _rejoin_garbled_ocr_headers(md)
+    md = _step(_report, "_strip_phantom_camelot_tables", _strip_phantom_camelot_tables, md)
+    md = _step(_report, "_rejoin_garbled_ocr_headers", _rejoin_garbled_ocr_headers, md)
     # v2.4.34: final guarantee — strip Mathematical-Alphanumeric styling from
     # the assembled markdown. S0 (body channel) and tables/cell_cleaning
     # (table HTML) already de-style their channels; this catches the
     # remaining surfaces — figure/table captions, unstructured-table fences,
     # raw_text fallbacks — so no math-italic glyph (𝜂, 𝛽, …) reaches the
     # rendered .md from ANY channel.
-    md = destyle_math_alphanumeric(md)
+    md = _step(_report, "destyle_math_alphanumeric", destyle_math_alphanumeric, md)
     # v2.4.38: final guarantee — recover '2'-for-U+2212 minus corruption from
     # the assembled markdown. W0b (body channel) and cell_cleaning (Camelot
     # table cells) already cover their channels; this catches the remaining
     # surfaces — unstructured-table fenced blocks, raw_text table fallbacks
     # when Camelot is unavailable — so no sign-flipped CI reaches the .md.
-    md = recover_corrupted_minus_signs(md)
+    md = _step(_report, "recover_corrupted_minus_signs", recover_corrupted_minus_signs, md)
     # v2.4.39: final guarantee — recover '<'-as-backslash glyph corruption from
     # the assembled markdown. W0c (body channel) and cell_cleaning (Camelot
     # table cells) already cover their channels; this catches the remaining
     # surfaces — unstructured-table fenced blocks and raw_text table fallbacks
     # when Camelot is unavailable — so no corrupted "p < .001" reaches the .md.
-    md = recover_corrupted_lt_operator(md)
+    md = _step(_report, "recover_corrupted_lt_operator", recover_corrupted_lt_operator, md)
+    # v2.4.130 (W0o): third-channel completion of the '<'-as-'b' recovery.
+    # Same three-channel discipline as W0b/W0c/W0j/W0k/W0l — a repair wired
+    # into two channels of three makes a body sentence and a flattened
+    # caption disagree about the same input.
+    md = _step(_report, "recover_lt_as_b_operator", recover_lt_as_b_operator, md)
     # v2.4.40: recover standalone '2'-for-U+2212 minus corruption on
     # point-estimate cells/tokens by pairing each with the confidence
     # interval reported in the same table row or text line. The bracketed
@@ -6335,7 +6885,7 @@ def render_pdf_to_markdown(
     # pass reaches the bracket-less point estimates — every negative
     # B-coefficient table cell, the Mposterior mediation estimates — that
     # the descending-bracket rule structurally cannot see.
-    md = recover_minus_via_ci_pairing(md)
+    md = _step(_report, "recover_minus_via_ci_pairing", recover_minus_via_ci_pairing, md)
     # v2.4.109 (W0j): recover '2'-for-minus in body-prose contrast-coding notes
     # ("20.5 = low, + 0.5 = high" → "-0.5 = …") and change/difference
     # M-statistics ("Mchange = 20.14" → "-0.14") that carry NO bracket CI, so
@@ -6344,29 +6894,28 @@ def render_pdf_to_markdown(
     # they surface inside a flattened italic table-caption / Note line / raw_text
     # fallback that bypassed normalize_text. Same tight signatures (contrast
     # ±twin; difference-type subscript) — FP-validated, efendic-only.
-    md = recover_prose_two_for_minus(md)
+    md = _step(_report, "recover_prose_two_for_minus", recover_prose_two_for_minus, md)
     # v2.4.112 (W0k): recover '×'-as-'3' in body-prose / flattened-caption
     # interaction terms (efendic "interaction (Direction 3 Manipulated Attribute
     # 3 CMA)" + a flattened italic caption run) — the table-cell-scoped W0i can't
     # reach these. Third-channel completion of the channel-1 normalize W0k. Tight
     # signature (interaction-context + non-reference + non-count + ≥1 Title-Case/
     # acronym flank) — the `3` is the most dangerous prose glyph, FP-validated.
-    md = recover_times_interaction_glyph_in_prose(md)
+    md = _step(_report, "recover_times_interaction_glyph_in_prose", recover_times_interaction_glyph_in_prose, md)
     # v2.4.116 (W0l): recover the two residual '×'-as-'3' prose shapes W0k can't
     # reach — factorial-design notation `<digit>(…) 3 <digit>(…) design` and a
     # line-wrapped interaction term `<Pred> 3\n<Pred>` (efendic residuals). Same
     # 3-channel discipline; also catches these shapes inside a flattened caption /
     # raw_text fallback that bypassed normalize_text. FP-validated (a 16-case
     # battery incl. range recodes, formulae, `Model 3\n…`, count wraps).
-    md = recover_times_design_notation(md)
-    md = recover_times_wrapped_interaction(md)
-    # v2.4.118 (W0n): restore the dropped decimal point in a p significance
-    # threshold (`p < 05` → `p < .05`). Third-channel completion of the
-    # channel-1 normalize W0n — also catches the shape inside a flattened
-    # caption / table-note legend / raw_text fallback that bypassed
-    # normalize_text. Same four guards (canonical thresholds 05/01/001 only,
-    # never `=`, no longer-number continuation, significance-clause context).
-    md = recover_p_threshold_dropped_decimal(md)
+    md = _step(_report, "recover_times_design_notation", recover_times_design_notation, md)
+    md = _step(_report, "recover_times_wrapped_interaction", recover_times_wrapped_interaction, md)
+    # W0n's THIRD-CHANNEL CALL SITE WAS HERE AND IS DELETED (v2.4.130,
+    # 2026-08-14), together with the channel-1 call in `normalize_text` and the
+    # rule itself. `p < 05` now reaches the rendered .md as printed. Removing
+    # BOTH call sites in the same change is the three-channel discipline: a
+    # repair retired in one channel and left in another makes a body sentence
+    # and a flattened caption disagree about the same input.
     # v2.4.119 (S5b third channel): recover the cmsy10 `≥`/`≤` glyphs that
     # pdftotext destroys to U+FFFD. The channel-1 normalize pass covers body
     # prose, but a table's raw_text fallback / unstructured-table block and
@@ -6377,18 +6926,18 @@ def render_pdf_to_markdown(
     # gate makes this safe here: the assembled .md carries the SAME document's
     # Rule-1 evidence, so a lone FFFD is only rewritten when this document's
     # unanimous mapping is known.
-    md = recover_fffd_comparison_operators(md)
+    md = _step(_report, "recover_fffd_comparison_operators", recover_fffd_comparison_operators, md)
     # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
     # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
     # W0d above — body normalize covers body text; this final pass catches
     # the table-cell / unstructured-table / raw_text fallback surfaces.
-    md = recover_dropped_minus_via_ci_pairing(md)
+    md = _step(_report, "recover_dropped_minus_via_ci_pairing", recover_dropped_minus_via_ci_pairing, md)
     # v2.4.44: final guarantee — decompose Latin typographic ligatures
     # (ﬁ->fi, ﬂ->fl, …) from the assembled markdown. normalize (body) and
     # cell_cleaning (table cells) cover their channels; this catches the
     # remaining surfaces — figure/table captions, unstructured-table fences,
     # raw_text fallbacks — so no presentation-form ligature reaches the .md.
-    md = decompose_ligatures(md)
+    md = _step(_report, "decompose_ligatures", decompose_ligatures, md)
     # v2.4.54: final guarantee — recover Adobe-Symbol-font glyphs surfaced as
     # U+F0xx PUA codepoints (β→U+F062, χ→U+F063, •→U+F0B7). W0e (body channel)
     # and cell_cleaning (Camelot table cells) cover their channels; this
@@ -6396,7 +6945,7 @@ def render_pdf_to_markdown(
     # table fences, raw_text fallbacks — so no Symbol-PUA glyph reaches the .md
     # from ANY channel. Runs with the other glyph passes, before the caption
     # de-dup that compares spans for equality (FIG-3c lesson).
-    md = recover_pua_glyphs(md)
+    md = _step(_report, "recover_pua_glyphs", recover_pua_glyphs, md)
     # FIG-3c: drop a figure caption pdftotext also left inline in the body
     # text, when a ``### Figure N`` block already carries it (double-emission).
     # Runs AFTER every glyph-normalization pass (destyle / minus-recovery /
@@ -6404,36 +6953,42 @@ def render_pdf_to_markdown(
     # caption are compared in the SAME final glyph form — a stray ligature in
     # the block caption (``reﬂection`` vs body ``reflection``) would otherwise
     # defeat the equality check.
-    md = _suppress_inline_duplicate_figure_captions(md)
+    md = _step(_report, "_suppress_inline_duplicate_figure_captions", _suppress_inline_duplicate_figure_captions, md)
     # 2026-05-25 (Cluster B): parallel for tables — drop body-text duplicate
     # of `*Table N. <caption>.*` when the `### Table N` block already carries
     # it.  Same root cause as figure variant (pdftotext linearises captions
     # into body text); without this pass, ip_feldman shows the Table 3
     # caption twice in body prose plus a third time inside its real block.
-    md = _suppress_inline_duplicate_table_captions(md)
+    md = _step(_report, "_suppress_inline_duplicate_table_captions", _suppress_inline_duplicate_table_captions, md)
     # §C P0r-F (2026-05-23): strip P0r-shape running-header / page-footer
     # lines that survived inside ``unstructured-table`` fenced blocks
     # (third-channel completion of the body normalize-stage P0r).
-    md = _strip_running_header_lines_in_unstructured_table_fences(md)
-    md = _merge_compound_heading_tails(md)
-    md = _reformat_jama_key_points_box(md)
-    md = _promote_numbered_subsection_headings(md)
+    md = _step(_report, "_strip_running_header_lines_in_unstructured_table_fences", _strip_running_header_lines_in_unstructured_table_fences, md)
+    md = _step(_report, "_merge_compound_heading_tails", _merge_compound_heading_tails, md)
+    md = _step(_report, "_reformat_jama_key_points_box", _reformat_jama_key_points_box, md)
+    md = _step(_report, "_promote_numbered_subsection_headings", _promote_numbered_subsection_headings, md)
     # Cycle 15d (G6): fold orphan Roman-numeral lines into the following
     # `## ` heading produced by the section partitioner. Runs LAST among
     # heading post-processors so it operates on the final heading shapes.
-    md = _fold_orphan_roman_numerals_into_headings(md)
-    md = _fold_orphan_arabic_numerals_into_headings(md)
+    md = _step(_report, "_fold_orphan_roman_numerals_into_headings", _fold_orphan_roman_numerals_into_headings, md)
+    md = _step(_report, "_fold_orphan_arabic_numerals_into_headings", _fold_orphan_arabic_numerals_into_headings, md)
     # Cycle G5c-1: multi-level analogue — fold an orphan `N.N.` number line
     # into the immediately following generic heading (`5.4.`\n\n`## Discussion`
     # -> `### 5.4. Discussion`). Runs alongside the single-level folders.
-    md = _fold_orphan_multilevel_numerals_into_headings(md)
+    md = _step(_report, "_fold_orphan_multilevel_numerals_into_headings", _fold_orphan_multilevel_numerals_into_headings, md)
     # Cycle 11 (G5a): promote single-level `N. Title` lines to `## N. Title`,
     # gated on the document already numbering its sections. Runs AFTER the
     # orphan-numeral folders so `## 1. Introduction` exists as an anchor.
-    md = _promote_numbered_section_headings(md)
+    md = _step(_report, "_promote_numbered_section_headings", _promote_numbered_section_headings, md)
 
     # 5. Title rescue — uses the layout_doc computed once at step 0 (v2.4.74).
-    md = _rescue_title_from_layout(md, layout_doc)
+    # Wrapped in `_step` like every other post-processor: it DELETES
+    # (`_apply_title_rescue` removes matched blocks, `_strip_duplicate_title_
+    # occurrences` does `del lines[i:j+1]`) and was the ONE step in the chain
+    # invisible to `RenderReport` — an uninstrumented deleting step inside the
+    # release that made instrumentation the rule (found 2026-08-15, Fable
+    # review). Rule 0g: go to the uninstrumented channel first.
+    md = _step(_report, "_rescue_title_from_layout", _rescue_title_from_layout, md, layout_doc)
     # 2026-06-06 (Cycle 4 redux, Cluster E side-effect protection): strip
     # the `### {prefix-of-H1}` + continuation block that pdftotext column-
     # wraps emit on PSPB/Sage layouts. MUST run AFTER `_rescue_title_from_
@@ -6443,35 +6998,35 @@ def render_pdf_to_markdown(
     # under a `## ` parent (e.g. `### Background`) are not located ≤2 blank
     # lines below the H1 and don't reproduce the H1's token sequence as an
     # ordered prefix.
-    md = _demote_wrapped_title_duplicate(md)
+    md = _step(_report, "_demote_wrapped_title_duplicate", _demote_wrapped_title_duplicate, md)
     # 2026-06-06 (Cycle 4 redux step 2): strip the residual publisher
     # masthead block (author+superscript, journal-name wraps, page range,
     # copyright tail, DOI: label, bare DOI) between the H1 and the first
     # `## ` body-section heading. Runs AFTER the wrapped-title demoter so
     # the zone no longer contains a `### `-duplicate that would otherwise
     # terminate the zone early. Self-limiting >=2-hard-marker gate.
-    md = _strip_frontmatter_masthead_block(md)
+    md = _step(_report, "_strip_frontmatter_masthead_block", _strip_frontmatter_masthead_block, md)
     # v2.4.107: strip a page-1 author-affiliation footnote block that pdftotext
     # serialised into the BODY (mid-Introduction), reconnecting the split
     # paragraph (efendic_2022). Block-level + strict (≥3 affiliation-shaped
     # lines), so a lone body university mention is never touched.
-    md = _strip_body_affiliation_block(md)
+    md = _step(_report, "_strip_body_affiliation_block", _strip_body_affiliation_block, md)
     # v2.4.115: strip an affiliation line (+ joint-authors/corresponding-author
     # companion) that the `## Abstract` heading boundary orphaned as the FIRST
     # content of the Abstract body (chandrashekar_2023_mp: "Department of
     # Philosophy, Lake Forest College" + "*Joint first authors"). The masthead
     # strip stops at `## Abstract`, and the ≥3-line body-affiliation strip can't
     # reach a single surviving affiliation line. Runs after both.
-    md = _strip_abstract_zone_affiliation_remnant(md)
+    md = _step(_report, "_strip_abstract_zone_affiliation_remnant", _strip_abstract_zone_affiliation_remnant, md)
     # 2026-06-06 (run-11, ar_apa `### FlashReport`): strip heading markup
     # that sits ABOVE the document H1 — a journal-section label promoted to
     # a heading in the pre-title masthead zone. Runs after title rescue (H1
     # is the anchor).
-    md = _strip_pre_title_heading_noise(md)
-    md = _italicize_known_subtitle_badges(md)
+    md = _step(_report, "_strip_pre_title_heading_noise", _strip_pre_title_heading_noise, md)
+    md = _step(_report, "_italicize_known_subtitle_badges", _italicize_known_subtitle_badges, md)
     # v2.4.83: runs LAST — strip the redundant ``Table N.`` / ``Figure N.``
     # label from a caption that sits directly under its ``### Table N`` heading.
     # Must follow the caption-detecting passes above that key on the prefix.
-    md = _dedupe_label_in_table_figure_caption(md)
+    md = _step(_report, "_dedupe_label_in_table_figure_caption", _dedupe_label_in_table_figure_caption, md)
 
     return md.rstrip() + "\n"

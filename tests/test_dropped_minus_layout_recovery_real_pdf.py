@@ -28,12 +28,17 @@ This test therefore asserts the 3 recoverable flips + the genuinely-positive
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 
 from docpluck.extract_layout import LayoutDoc, PageLayout
 from docpluck.normalize import recover_dropped_minus_via_layout

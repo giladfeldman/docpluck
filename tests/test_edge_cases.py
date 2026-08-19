@@ -5,7 +5,6 @@ MetaMisCitations LESSONS.md.
 """
 
 import re
-import pytest
 from docpluck.normalize import normalize_text, NormalizationLevel
 from docpluck.quality import compute_quality_score
 
@@ -54,11 +53,15 @@ class TestESCIcheckEdgeCases:
         assert "2.43" in result
 
     def test_p_at_column_boundary(self):
-        """ESCIcheck: combined line break + dropped decimal."""
-        text = "p =\n484"
-        result = norm(text)
-        # A1 should fix line break, A2 should fix dropped decimal
-        assert ".484" in result
+        """ESCIcheck: combined line break + dotless value.
+
+        RE-FIXTURED 2026-08-14. The subject is A1's column-boundary rejoin,
+        which is NOTATION and still runs. A2 (which invented the decimal
+        afterwards) is deleted, so the value is delivered as printed.
+        """
+        result = norm("p =\n484")
+        assert "p = 484" in result   # A1 still rejoins the wrapped statistic
+        assert ".484" not in result  # A2 retired: no decimal invented
 
     def test_utf8_encoding_validation(self):
         """ESCIcheck Lesson 1: null bytes must be stripped."""
@@ -106,20 +109,24 @@ class TestMetaESCIEdgeCases:
         # Triple+ newlines get collapsed to double
         assert "\n\n\n" not in result
 
-    def test_european_decimal_comma(self):
-        """MetaESCI: European locale p = 0,001."""
-        assert "0.001" in norm("p = 0,001")
+    def test_european_decimal_comma_passes_through(self):
+        """RE-FIXTURED 2026-08-14. MetaESCI filed this as "European locale
+        p = 0,001". A3 is deleted under the scope directive: docpluck serves
+        English papers in US numeric convention and passes European numbers
+        through as printed, so the consumer still holds the source token and
+        can decide — which it could not once we had converted."""
+        assert norm("p = 0,001").strip() == "p = 0,001"
 
-    def test_dropped_decimal_multiple(self):
-        """MetaESCI: 4.88% rate — test multiple patterns."""
-        cases = [
-            ("p = 484", ".484"),
-            ("p = 37", ".37"),
-            ("p = 999", ".999"),
-        ]
-        for raw, expected in cases:
-            result = norm(raw)
-            assert expected in result, f"Failed: {raw} → expected {expected}, got {result}"
+    def test_dropped_decimal_multiple_passes_through(self):
+        """RE-FIXTURED 2026-08-14. MetaESCI filed a "4.88% rate" for this shape.
+
+        That figure counts how often the SHAPE appears; it never established
+        that docpluck CAUSED it. Both of A2's firing sites across 297 English
+        papers were the paper's own error, rasterized. A2 is deleted.
+        """
+        for raw in ("p = 484", "p = 37", "p = 999"):
+            result = norm(raw).strip()
+            assert result == raw, f"{raw!r} -> {result!r}"
 
 
 # ── From PDFextractor LESSONS.md ─────────────────────────────────────
@@ -138,7 +145,7 @@ class TestPDFextractorLessons:
         import time
         long_text = "p = " + "9" * 10000 + " end"
         start = time.perf_counter()
-        result = norm(long_text)
+        norm(long_text)  # the assertion below is on ELAPSED TIME, not output
         elapsed = time.perf_counter() - start
         assert elapsed < 5.0, f"Normalization took {elapsed:.1f}s — possible catastrophic backtracking"
 
@@ -163,7 +170,6 @@ class TestPDFextractorLessons:
             source = f.read()
         # Check that -layout does not appear in actual pdftotext command invocations
         # It IS mentioned in comments/docstrings as a warning — that's fine
-        import re
         # Find all subprocess.run calls containing pdftotext
         calls = re.findall(r'subprocess\.run\(\s*\[.*?\]', source, re.DOTALL)
         for call in calls:
@@ -225,8 +231,18 @@ class TestBenchmarkRegressions:
     def test_ieee_figure_fragments_not_stats(self):
         """Lesson 7: 'r>1', 'r>2' from figure axis labels are NOT correlations."""
         text = "Figure 2: Performance for r>1 and r>2 conditions"
-        # These should NOT be counted as statistical patterns
-        # This is a downstream consumer concern, not normalization
+        # Whether `r>1` COUNTS as a correlation is a downstream consumer
+        # concern. What is docpluck's concern — and what this test asserts as
+        # of 2026-08-15 — is that normalization passes the shape through
+        # UNCHANGED, so the consumer decides on what the paper printed.
+        #
+        # The test previously bound `text` and ended, asserting nothing. It
+        # could not fail, so it never established the pass-through it was
+        # named for; a rule that mangled `r>1` would have shipped green.
+        out = norm(text)
+        assert "r>1" in out and "r>2" in out, (
+            f"figure-axis labels were rewritten: {out!r}"
+        )
 
     def test_normalization_report_version(self):
         """Report must include version for consumer apps."""

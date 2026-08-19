@@ -34,12 +34,18 @@ v2.3.0 spec (`an internal handoff doc (2026-05-11)`).
 from __future__ import annotations
 
 import re
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
+
+from docpluck.telemetry import record_fallback
+
+if TYPE_CHECKING:  # `Cell` is a TypedDict used only in annotations here
+    from . import Cell
 
 from docpluck.normalize import (
     decompose_ligatures,
     destyle_math_alphanumeric,
     recover_corrupted_lt_operator,
+    recover_lt_as_b_operator,
     recover_corrupted_minus_signs,
     recover_dropped_minus_ci_upper,
     recover_dropped_minus_ci_upper_in_text,
@@ -53,10 +59,41 @@ _SUP_OPEN = "\x00SUP\x00"  # placeholder swapped to <sup> after escaping
 _SUP_CLOSE = "\x00/SUP\x00"  # placeholder swapped to </sup> after escaping
 
 
-def _html_escape(s: str | None) -> str:
-    """Escape HTML special characters for safe inclusion in cell content,
-    then convert merge-separator placeholders to ``<br>`` and superscript
-    placeholders to ``<sup>``/``</sup>``."""
+def clean_cell_text(s: str | None) -> str:
+    """Every glyph repair a table cell needs — and NOTHING about HTML.
+
+    **This is the canonical repair chain for the table-cell channel.** It was
+    extracted from ``_html_escape`` on 2026-08-15 because fusing the repairs
+    into the HTML escaper made them reachable *only* by the HTML path, so one
+    input gave two answers depending on which consumer asked:
+
+        cell text ``"[20.45, 20.06]"`` (a `2`-for-U+2212 corrupted CI)
+          ``cells_to_html``            -> ``[-0.45, -0.06]``   repaired
+          ``flatten._cells_to_grid``   -> ``[20.45, 20.06]``   RAW
+          ``Table["cells"][i]["text"]``-> ``[20.45, 20.06]``   RAW
+          ``Table["raw_text"]``        -> ``[20.45, 20.06]``   RAW
+
+    ``flatten`` is production (``cli.py``, ``render.py``), and it feeds the
+    JSONL sidecar — so a p-value that renders correctly in the HTML table was
+    simultaneously being shipped corrupt to every structured consumer. That is
+    the ONE CONCEPT, ONE TABLE rule's exact failure mode: a library that can
+    convert one input two ways has no contract at all.
+
+    Applied once per cell by :func:`repair_cells`, rather than at each consumer:
+    the cleaning pipeline merges and splits cells, so cell↔position
+    correspondence degrades as the pipeline runs, and a repair keyed on cell
+    content must happen while the cell still is what the capture emitted.
+
+    **v2.4.133 first placed that call at cell CONSTRUCTION, and that was wrong
+    for a reason worth keeping written down**: the capture paths run their
+    structural gates on the cells they have just built, so repairing at
+    construction silently changed what those gates judge — and a correct
+    `×`-as-`3` repair began deleting the rows below it. The call now sits after
+    the gates. See :func:`repair_cells` and `whitespace._repaired_view`.
+
+    MUST BE IDEMPOTENT — ``_html_escape`` still calls it, so a constructed cell
+    is cleaned twice. Pinned by ``test_clean_cell_text_is_idempotent``.
+    """
     if s is None:
         return ""
     # Strip math-alphanumeric styling (𝜂->η, 𝛽->β, 𝐴->A) — table cells come
@@ -90,6 +127,8 @@ def _html_escape(s: str | None) -> str:
     # recovered operator is HTML-escaped like any other "<". Same shared
     # helper as normalize.py's W0c step (table cells bypass W0c).
     s = recover_corrupted_lt_operator(s)
+    # W0o: same class as W0c, different glyph ('<' extracted as 'b').
+    s = recover_lt_as_b_operator(s)
     # Recover '×'-as-'3' corruption in an interaction-term predictor cell —
     # "Direction 3 manipulated attribute" is "Direction × manipulated attribute"
     # (same AdvPS… broken-ToUnicode font as the '2'-for-minus / '<'-as-backslash
@@ -109,6 +148,63 @@ def _html_escape(s: str | None) -> str:
     # v2.4.100). The merge-separator placeholders are still present, so the
     # decoration span matches across a "\x00BR\x00" wrap.
     s = recover_dropped_minus_ci_upper_in_text(s)
+    return s
+
+
+_CELL_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def normalize_cell_whitespace(text: str) -> str:
+    """Canonicalise a freshly-clustered cell's whitespace — and NOTHING else.
+
+    Soft hyphen dropped, U+2212 folded to ASCII hyphen (CLAUDE.md hard rule 4),
+    whitespace runs collapsed. Deliberately NOT a glyph repair: the capture paths
+    run their structural gates on the text this returns, and repairing before a
+    gate is what deleted rows in v2.4.133. :func:`repair_cells` is the repair.
+
+    One definition, three capture paths. This existed verbatim in
+    `whitespace.py` AND `cluster.py`, which is the one-concept-one-table rule's
+    failure mode sitting one wiring change away from mattering.
+    """
+    text = (text or "").replace("­", "")   # soft hyphen
+    text = text.replace("−", "-")          # unicode minus -> ASCII hyphen
+    return _CELL_WHITESPACE_RE.sub(" ", text).strip()
+
+
+def repair_cells(cells: "list[Cell]") -> "list[Cell]":
+    """Apply :func:`clean_cell_text` to every cell — the LAST step before emission.
+
+    **Where a capture path calls this is load-bearing, not a detail.** It must run
+    AFTER the structural gates and BEFORE the return:
+
+      * after the gates, so a repair can never change which rows survive. When
+        v2.4.133 repaired at cell CONSTRUCTION instead, the region-path gates
+        began judging repaired text and a correct `×`-as-`3` repair started
+        deleting the rows below it (register R4);
+      * before the return, so `flatten`, `cells[].text`, `raw_text` and the
+        rendered `<table>` all carry the same text (register F7a).
+
+    Lives here rather than in either capture module so the two paths cannot
+    diverge on what "repaired" means — the one-concept-one-table rule applied to
+    the seam that broke it last time. Mutates in place and returns the same list.
+    """
+    for c in cells:
+        c["text"] = clean_cell_text(c.get("text") or "")
+    return cells
+
+
+def _html_escape(s: str | None) -> str:
+    """Repair, then escape HTML special characters for safe inclusion in cell
+    content, then convert merge-separator placeholders to ``<br>`` and
+    superscript placeholders to ``<sup>``/``</sup>``.
+
+    The repairs live in :func:`clean_cell_text`. This function is kept as the
+    HTML-path entry point so grids that never went through cell construction
+    (the whitespace fallback, the isolated path, tests) still get repaired —
+    removing the repairs from here would silently strip them from those paths.
+    ``clean_cell_text`` is idempotent, so the double application is a no-op.
+    """
+    s = clean_cell_text(s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -574,23 +670,58 @@ def _is_running_header_cell(s: str) -> bool:
     return _is_strong_running_header(s) or _is_weak_running_header(s)
 
 
+# A running header is a NAME and a PAGE NUMBER — at most two populated cells.
+# A row that fills the grid is a data row, whatever its cells look like.
+#
+# **This cap is the guard that was missing**, and its absence deleted published
+# counts. `_WEAK_RH_PATTERNS` matches any single capitalised word (`Positive`,
+# `Control`) and `_STRONG_RH_PATTERNS` matches any 1-4 digit integer — which is
+# precisely what a frequency table is made of. So `["Positive", "245", "12"]`
+# above `["Mean reaction time (ms)", "452.3", "18.7"]` was dropped whole, and in
+# the blanking pass below a surviving `["Total sample size", "1240", "96"]` came
+# back as `["Total sample size", "", ""]`. Bare integers in a counts table ARE
+# the data and are often the only surviving copy of it — the case
+# `render._carries_statistical_content` already documents.
+#
+# The value is not new: `camelot_extract._looks_like_running_header` has always
+# rejected rows with more than two populated cells. This module held a second
+# implementation of the same concept and never had the cap. One concept, two
+# implementations, silently diverged.
+_MAX_RUNNING_HEADER_CELLS = 2
+
+
+def _row_can_be_a_running_header(row: list[str]) -> bool:
+    """True when ``row`` is shaped like a leaked running header at all.
+
+    Shape first, patterns second: a row wide enough to be data is not a header
+    no matter how header-like its individual cells read.
+    """
+    populated = [c for c in row if (c or "").strip()]
+    if not populated or len(populated) > _MAX_RUNNING_HEADER_CELLS:
+        return False
+    if not any(_is_strong_running_header(c) for c in populated):
+        return False
+    return all(
+        _is_strong_running_header(c) or _is_weak_running_header(c)
+        for c in populated
+    )
+
+
 def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
     """Drop top rows of the grid that look like leaked running headers /
-    page numbers rather than real column labels."""
+    page numbers rather than real column labels.
+
+    Records every removal. Until v2.4.133 this module had ZERO telemetry — the
+    register's "darkest channel" — so a deleted row left no count, no key and no
+    log line anywhere, which is exactly the condition under which the data loss
+    above went unnoticed.
+    """
     if not rows:
         return rows
     out = list(rows)
     while len(out) >= 2:
         top = out[0]
-        populated = [c for c in top if (c or "").strip()]
-        if not populated:
-            break
-        if not any(_is_strong_running_header(c) for c in populated):
-            break
-        if not all(
-            _is_strong_running_header(c) or _is_weak_running_header(c)
-            for c in populated
-        ):
+        if not _row_can_be_a_running_header(top):
             break
         has_real_below = any(
             (c or "").strip()
@@ -601,19 +732,38 @@ def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
         )
         if not has_real_below:
             break
+        record_fallback("cell_cleaning_running_header_row_dropped",
+                        detail=" | ".join(c for c in top if (c or "").strip())[:60])
         out = out[1:]
     if out:
         top = list(out[0])
-        has_strong = any(_is_strong_running_header(c) for c in top)
+        strong = [c for c in top if _is_strong_running_header(c)]
         has_real = any(
             (c or "").strip()
             and not _is_strong_running_header(c)
             and not _is_weak_running_header(c)
             for c in top
         )
-        if has_strong and has_real:
+        # A LEAKED PAGE NUMBER IS ONE CELL; A COUNTS COLUMN IS SEVERAL.
+        #
+        # This pass blanks the "strong" cells of a row that also holds real
+        # header text — correct for `["1236", "Target article", "Replication",
+        # "Reason for change"]`, where a page number leaked into a genuine
+        # header row. Applied to a DATA row it is worse than dropping the row:
+        # `["Total sample size", "1240", "96"]` came back as
+        # `["Total sample size", "", ""]`, so the table still looked complete
+        # while its numbers were gone — a deletion that does not announce itself,
+        # which this project ranks as the more dangerous kind.
+        #
+        # Requiring exactly one strong cell separates the two by their shape: a
+        # running header contributes a single page number, while a frequency
+        # table contributes a value per column. The row-width cap above cannot
+        # do this job — the legitimate case is four cells wide.
+        if len(strong) == 1 and has_real:
             for i, c in enumerate(top):
                 if _is_strong_running_header(c):
+                    record_fallback("cell_cleaning_running_header_cell_blanked",
+                                    detail=(c or "").strip()[:40])
                     top[i] = ""
             out = [top] + out[1:]
     return out
@@ -823,24 +973,38 @@ def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
     header, fold super-headers, fold suffix continuations, attach
     significance markers, render group separators). Returns ``""`` for
     tables with fewer than 2 rows after cleaning.
+
+    **Every one of those ``""`` returns discards a whole table**, and until
+    v2.4.133 all five did it silently — a caller receives an empty string that
+    is indistinguishable from "this grid had no HTML worth rendering". Each now
+    records which stage gave up and what the grid looked like when it did, so a
+    vanished table is at least countable. (Register O11: this module had zero
+    telemetry of any kind.)
     """
     if len(rows) < 2:
+        record_fallback("cells_grid_to_html_too_few_rows", detail=f"{len(rows)}rows")
         return ""
 
     norm: list[list[str]] = []
     for row in rows:
         norm.append([(c or "").strip() if c is not None else "" for c in row])
 
+    before_rh = len(norm)
     norm = _drop_running_header_rows(norm)
     if len(norm) < 2:
+        record_fallback("cells_grid_to_html_empty_after_running_header_strip",
+                        detail=f"{before_rh}->{len(norm)}")
         return ""
 
     merged = _merge_continuation_rows(norm)
     if len(merged) < 2:
+        record_fallback("cells_grid_to_html_empty_after_continuation_merge",
+                        detail=f"{len(norm)}->{len(merged)}")
         return ""
 
     n_cols = max(len(r) for r in merged) if merged else 0
     if n_cols == 0:
+        record_fallback("cells_grid_to_html_no_columns", detail=f"{len(merged)}rows")
         return ""
 
     for r in merged:
@@ -852,8 +1016,11 @@ def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
             row[ci] = _strip_leader_dots(row[ci])
             row[ci] = _split_mashed_cell(row[ci])
 
+    before_sig = len(merged)
     merged = _merge_significance_marker_rows(merged)
     if len(merged) < 2:
+        record_fallback("cells_grid_to_html_empty_after_significance_merge",
+                        detail=f"{before_sig}->{len(merged)}")
         return ""
 
     n_header = 1

@@ -23,11 +23,17 @@ belongs at SELECTION time as a relative judgement between candidates.
 Full analysis + candidate fix directions:
 ``an internal findings doc (2026-08-04)``.
 
-This test is `xfail(strict)`: it pins REAL, gold-verified TEXT-LOSS that is not yet
-safely fixable (the fix is a pairing-class change, and this project's history shows
-global pairing changes are net-harmful unless gated by a guard-diff + AI-gold sweep).
-**Do NOT weaken the assertion to make it pass**, and do not delete it — a correct fix
-XPASSes loudly and should become a plain assert then.
+FIXED v2.4.134 (2026-08-19), and NOT by widening the whole gate. `extract_structured`
+now tests each candidate for PROSE DOMINANCE before `_pick_better_table` arbitrates
+(`whitespace.grid_is_body_prose` — the single sub-test of `_whitespace_grid_is_clean`
+that a paragraph of Discussion cannot pass and cog_emo T5/T6/T7 can). A caption left
+with no plausible candidate returns to the unmatched pool, so it reaches the raw_text
+fallback that had its real data all along — which is exactly what the control test
+below proves. Rejections are recorded as `table_candidate_rejected_as_body_prose`,
+because a candidate dropped silently is indistinguishable from one never captured.
+
+Now a PLAIN assert. Do NOT weaken it: it is the only thing standing between a published
+descriptives table and a paragraph of Discussion wearing its caption.
 """
 
 from __future__ import annotations
@@ -50,18 +56,6 @@ _GOLD_T7_VALUES = ["3.47", "2.91", "2.94", "3.11"]
     os.environ.get("DOCPLUCK_DISABLE_CAMELOT", "0") == "1",
     reason="The defect only manifests with Camelot enabled (auto-detect supplies the "
     "prose grid that outranks the correct raw_text data).",
-)
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "REAL gold-verified TEXT-LOSS (2026-08-04). maier Table 7's 3x5 descriptives "
-        "grid is captured correctly by raw_text but replaced by a 4x2 Discussion-prose "
-        "grid from the auto-detect path, because _pick_better_table selects on shape "
-        "only and never checks content plausibility. Fix is a pairing-class change "
-        "requiring a 101-PDF guard-diff + AI-gold canary sweep — see "
-        "an internal findings doc (2026-08-04). Do NOT weaken "
-        "this assertion. strict=True: a correct fix XPASSes loudly."
-    ),
 )
 def test_maier_table7_keeps_its_data():
     """Table 7 must carry its own descriptives, not Discussion prose."""

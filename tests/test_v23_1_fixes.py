@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import struct
-import zlib
 
 from docpluck.extract import _patch_fffds_word_by_word, count_pages
 from docpluck.render import (

@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
 
 from docpluck.normalize import (
     _CI_UPPER_DROPPED_RE,

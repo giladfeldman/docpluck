@@ -37,6 +37,39 @@ IGNORED_TAGS = frozenset({
     'script', 'style', 'meta', 'link', 'head', 'noscript', 'svg', 'object', 'embed', 'iframe'
 })
 
+# Inline elements that wrap a run with ZERO visual gap to its neighbours, so a
+# space around them would invent a word boundary the document does not have.
+#
+# The generic inline rule below pads every inline element with a space. That
+# exists for a real bug — two adjacent `<a>` tags merging into `ChanORCID` — but
+# it was applied to the whole inline class, and a superscript is glued to its
+# base character:
+#
+#     '<i>&#951;</i><sup>2</sup><sub>p</sub>'  ->  'η 2 p'  ->  'eta2 p'
+#
+# `eta2 p` matches nothing downstream, where `eta2p` is what every consumer
+# looks for. This is the SAME defect the v2.4.128 subscript-letter map fixed,
+# arriving by a different door: that map handles a source carrying genuine
+# Unicode subscript CODEPOINTS, and Word's native superscript/subscript
+# FORMATTING — overwhelmingly the more common way the token is authored —
+# never produces those codepoints at all. DOCX is affected too, because mammoth
+# converts it to HTML before this runs.
+#
+# Named as a CLASS rather than as the two tags in front of us: `<a>` is a
+# separate referent and keeps its space; a styling wrapper never is.
+#
+# `span` is deliberately EXCLUDED. It is the one inline tag with no consistent
+# typographic meaning — publishers use it both as a pure styling wrapper and as
+# a structural separator. The `ChanORCID` bug this padding was written for is
+# itself a span case (`<span>Chan</span><span>ORCID</span>` in an author list),
+# so gluing spans would reintroduce exactly the defect the rule exists to
+# prevent. A pre-existing regression test caught this; it is pinned below.
+GLUED_INLINE_ELEMENTS = frozenset({
+    'sup', 'sub',                     # typographically glued to the base char
+    'i', 'b', 'em', 'strong',         # emphasis: no visual gap to neighbours
+    'u', 's', 'small', 'mark', 'var', 'abbr',
+})
+
 
 def html_to_text(html: str) -> str:
     """Extract text from an HTML string preserving block/inline structure.
@@ -103,11 +136,16 @@ def _walk(element: Any, parts: list[str], NavigableString: type, Tag: type) -> N
                 continue
 
             is_block = tag_name in BLOCK_ELEMENTS
+            # A GLUED wrapper (sup/sub/i/b/...) gets NO padding: it wraps a run
+            # with zero visual gap to its neighbours, so a space here would
+            # invent a word boundary the document does not have. See
+            # GLUED_INLINE_ELEMENTS for why this is a class, not two tags.
+            is_glued = tag_name in GLUED_INLINE_ELEMENTS
 
             if is_block:
                 if parts and not parts[-1].endswith('\n'):
                     parts.append('\n')
-            else:
+            elif not is_glued:
                 # Space before inline elements (prevents "ChanORCID" merging)
                 if parts and not (parts[-1].endswith(' ') or parts[-1].endswith('\n')):
                     parts.append(' ')
@@ -117,7 +155,7 @@ def _walk(element: Any, parts: list[str], NavigableString: type, Tag: type) -> N
             if is_block:
                 if parts and not parts[-1].endswith('\n'):
                     parts.append('\n')
-            else:
+            elif not is_glued:
                 # Space after inline elements
                 if parts and not (parts[-1].endswith(' ') or parts[-1].endswith('\n')):
                     parts.append(' ')

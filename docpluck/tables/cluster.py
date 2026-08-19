@@ -14,7 +14,6 @@ Algorithm (per spec §5.3):
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from typing import Any
 
@@ -22,6 +21,7 @@ from docpluck.extract_layout import LayoutDoc
 
 from . import Cell
 from .bbox_utils import chars_in_bbox, words_in_bbox
+from .cell_cleaning import normalize_cell_whitespace, repair_cells
 from .detect import CandidateRegion
 
 
@@ -81,7 +81,13 @@ def lattice_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
                 "bbox": (x_left, y_top, x_right, y_bot),
             })
 
-    return cells
+    # Repair on the way out, exactly as the two shipping capture paths do.
+    # This module is NOT wired to any non-test caller (register H3e) and this
+    # line is deliberately here anyway: it carried a private copy of the cell
+    # normaliser that never called the repair chain, so wiring it in later would
+    # silently have reintroduced the pre-v2.4.133 unrepaired-cell divergence.
+    # A dormant fourth capture path is exactly where that defect would come back.
+    return repair_cells(cells)
 
 
 # --- helpers ---
@@ -183,13 +189,9 @@ def _row_is_header(row_chars: list[dict[str, Any]], body_size: float) -> bool:
     return bold_count >= len(row_chars) * HEADER_BOLD_RATIO
 
 
-_WHITESPACE_RE = re.compile(r"\s+")
-
-
 def _normalize_cell_text(text: str) -> str:
-    text = text.replace("­", "")    # soft hyphen
-    text = text.replace("−", "-")   # unicode minus → ASCII hyphen
-    return _WHITESPACE_RE.sub(" ", text).strip()
+    """Delegates to the canonical definition — see the module docstring."""
+    return normalize_cell_whitespace(text)
 
 
 __all__ = ["lattice_cells"]

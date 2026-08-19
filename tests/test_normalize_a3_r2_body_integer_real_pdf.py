@@ -91,20 +91,80 @@ def test_a3_widening_preserves_three_thousand_hours():
     assert "3.000 hours" not in out
 
 
-def test_a3_still_normalizes_european_decimal():
-    # European decimal `0,05` should still be normalized to `0.05` by A3.
+def test_a3_no_longer_normalizes_a_european_decimal():
+    """RE-FIXTURED 2026-08-14. A3 is DELETED under the scope directive.
+
+    Measured over 297 English papers before removal: A3 fired 9 times in 2
+    papers and NOT ONCE correctly. A European decimal now reaches the consumer
+    verbatim, so the source token is intact and the consumer can still decide.
+    """
     text = "We rejected the null hypothesis (p = 0,05) and tested d = 0,87."
     out, _ = normalize_text(text, NormalizationLevel.academic)
-    assert "0.05" in out
-    assert "0.87" in out
+    assert out.strip() == text
+    assert "0.05" not in out
+    assert "0.87" not in out
 
 
-def test_a3_still_normalizes_one_digit_decimal_comma():
-    # `1,5` (German for 1.5) must still convert.
+def test_bare_prose_decimal_comma_is_PRESERVED_not_guessed(_decision="D1"):
+    """Re-fixtured in v2.4.128 (decision D1). The old expectation was wrong.
+
+    This test used to assert that `The mean was 1,5` converts to `1.5`. The
+    reason it no longer does is not an oversight — it is the whole point of
+    v2.4.127's A3 rewrite, and the REASON matters more than the value:
+
+    **Nothing in that sentence decides it.** `1,5` is one-point-five under a
+    German convention and "items 1 and 5" under an English one. The old rule
+    guessed, using a lookbehind that enumerated what may not precede the number
+    — and measured over 101 papers it fired 29 times in 13 of them with **~27
+    of those not decimals at all**: Vancouver citation runs, affiliation
+    markers, enumerations, flattened df pairs. A3 now converts only in the
+    VALUE POSITION (an operator immediately before the number), which is a
+    positive structural signature rather than a growing denylist.
+
+    ESCImate's own shared conformance corpus contains this exact token shape
+    TWICE with OPPOSITE expectations, two cases apart:
+
+        'decimal-single-digit-fraction' : "The ratio was 1,5 times higher."  -> 1.5
+        'list-items'                    : "items 1,5 and 7 were reversed"    -> 1,5
+
+    Only the surrounding words differ, and their own lesson says a word
+    vocabulary "can never be complete and must not be the primary mechanism".
+
+    Preserving the token is not the same as getting it wrong: the source form
+    is intact and BOTH readings stay recoverable, where a wrong conversion is
+    irreversible. Resolving it needs document-level evidence, which as of
+    v2.4.128 docpluck computes and publishes (`NormalizationReport
+    .numeric_locale`) but deliberately does not yet act on — see
+    `tests/test_numeric_locale_inference.py` for why the aggressive form was
+    refuted before implementation.
+
+    `SD 0,3` is unchanged too, and for a different reason worth stating: A3c
+    handles the leading-zero form `0,XX` only from two digits, because `[0,5]`
+    is far more often the range "0 to 5" than the decimal 0.5.
+    """
     text = "The mean was 1,5 and SD 0,3."
     out, _ = normalize_text(text, NormalizationLevel.academic)
-    assert "1.5" in out
-    assert "0.3" in out
+    assert "1,5" in out, "an ambiguous prose token must be preserved verbatim"
+    assert "1.5" not in out
+    assert "0,3" in out
+
+
+def test_the_same_token_ALSO_passes_through_in_the_value_position():
+    """RE-FIXTURED 2026-08-14 — and this one records a genuine simplification.
+
+    Its companion above (`test_bare_prose_decimal_comma_is_PRESERVED_not_guessed`)
+    pinned v2.4.127's decision that A3 was a POSITION rule: outside the value
+    position the token was ambiguous and preserved; inside it, an operator made
+    it a value and it converted. This test was the "and then it converts" half.
+
+    The position distinction is gone with the rule, and the outcome is that
+    docpluck now gives ONE answer for `1,5` instead of two that depended on
+    whether an operator happened to precede it. A library that converts one
+    input two ways has no contract at all (LESSONS.md L-024).
+    """
+    out, _ = normalize_text("The mean was M = 1,5", NormalizationLevel.academic)
+    assert "M = 1,5" in out
+    assert "M = 1.5" not in out
 
 
 def test_r2_body_phrase_helper_matches_years():

@@ -41,8 +41,12 @@ from pathlib import Path
 from . import corpus
 
 LEVELS = ("none", "standard", "academic")
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-OUT_ROOT = _REPO_ROOT / "verify_out"
+# ONE definition, in `corpus`, and it points OUTSIDE this repo.
+# See `corpus._out_root`: this used to be `<repo>/verify_out`, declared
+# identically in three modules, and it held 347 MB of rendered publication
+# text inside the working tree. Custody rule: article-finder is the sole
+# custodian, and gitignoring is not containment.
+OUT_ROOT = corpus.OUT_ROOT
 
 # The local FastAPI extraction service. The service URL + internal token live
 # in the app repo's env files; read them so the harness never hard-codes a

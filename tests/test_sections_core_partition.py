@@ -117,7 +117,7 @@ def test_resolve_label_strong_layout_unrecognized_returns_none():
 def test_resolve_label_canonical_strong_layout_returns_high_marker():
     from docpluck.sections.core import _resolve_label
     from docpluck.sections.blocks import BlockHint
-    from docpluck.sections.taxonomy import SectionLabel, Confidence
+    from docpluck.sections.taxonomy import SectionLabel
 
     hint = BlockHint(
         text="Methods",
@@ -136,7 +136,7 @@ def test_resolve_label_canonical_strong_layout_returns_high_marker():
 def test_resolve_label_canonical_weak_layout_returns_medium_marker():
     from docpluck.sections.core import _resolve_label
     from docpluck.sections.blocks import BlockHint
-    from docpluck.sections.taxonomy import SectionLabel, Confidence
+    from docpluck.sections.taxonomy import SectionLabel
 
     hint = BlockHint(
         text="Methods",

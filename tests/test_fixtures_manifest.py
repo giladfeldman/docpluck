@@ -10,7 +10,7 @@ import pytest
 _HERE = Path(__file__).parent
 _FIXTURES_DIR = _HERE / "fixtures" / "structured"
 _MANIFEST = _FIXTURES_DIR / "MANIFEST.json"
-_VIBE = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe"
+_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 
 
 def _load_manifest() -> dict:

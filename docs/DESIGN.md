@@ -100,8 +100,10 @@ If S9 runs first, it strips `484` as a page number before A1 can recognize it as
 
 This is why the pipeline order in `normalize.py` is:
 ```
-S0-S8 → [A1 in academic mode] → S9 → [A2-A6 in academic mode]
+S0-S8 → [A1 in academic mode] → S9 → [A3b, W0…, A4-A6 in academic mode]
 ```
+(A2, A3, A3a, A3c, A3d and W0n were deleted in v2.4.129-130 — see §9 and `docs/SCOPE.md`. The full
+current ordering, including the W0 glyph family, is in `docs/NORMALIZATION.md`.)
 
 ---
 
@@ -144,19 +146,71 @@ Found in **14 out of 50 test PDFs**, with up to 151 instances in a single paper 
 
 ---
 
-## 9. Dropped decimal repair (A2) — 4.88% artifact rate
+## 9. Dropped decimal repair (A2) — ~~4.88% artifact rate~~ **DELETED v2.4.130**
 
-MetaESCI analysis of 121,000 results found that 4.88% of p-values had dropped leading decimal points:
+**This rule no longer exists.** The section is kept, struck rather than removed, because the
+reasoning that justified it is the clearest example in this document of a mistake the project now
+has a hard rule against.
 
-- `p = 484` (should be `p = .484`)
-- `p = 37` (should be `p = .37`)
-- `p = 999` (should be `p = .999`)
+~~MetaESCI analysis of 121,000 results found that 4.88% of p-values had dropped leading decimal
+points (`p = 484` for `p = .484`). Detection heuristic: a p-value > 1.0 and < 1000 with 2-3 digits
+is almost certainly a dropped decimal.~~
 
-This happens when PDF column layout splits the decimal point onto a different line or column than the digits.
+**Why it went.** The rule had **no cited paper anywhere in its code**. Asked for one, both of its
+firing sites across 297 English papers turned out to be the **paper's own error**, confirmed by
+rasterizing the page:
 
-**Detection heuristic:** A p-value > 1.0 and < 1000 with exactly 2-3 digits is almost certainly a dropped decimal. Insert a `.` before the digits.
+* `10.1177/0146167210380928` p13 prints `B = -0.28, SE = 0.31, p = 38.`
+* `10.1016/j.jesp.2016.11.001` p7 prints `t(186) = 3.90, p = 001`
 
-**Limitation:** Cannot distinguish `p = 5` (too small to be a valid 2-digit dropped decimal) from a genuine value. Currently only repairs 2-3 digit values.
+each with correctly-dotted numbers elsewhere on the same line. The "4.88% artifact rate" measured
+how often the SHAPE appears, never how often docpluck had CAUSED it — and the answer to the second
+question was zero. **docpluck extracts and normalizes; it does not fix the paper.** Silently
+repairing an author's error launders it into a meta-science pipeline, where the downstream tool then
+validates a number the paper never printed and the author never learns of the mistake. Flagging is
+ESCImate's and Scimeto's role: they hold the parsed statistic and a UI for it.
+
+See `docs/SCOPE.md`, and the NOTATION-vs-REPAIR and TYPOGRAPHIC-vs-INFERENTIAL axes in
+`docs/NORMALIZATION.md`.
+
+---
+
+## 9a. The table-cell repair happens ONCE, and AFTER the gates
+
+A table's text reaches consumers through **four surfaces**, and they must agree:
+
+```
+Table["cells"][i]["text"]      structured consumers
+Table["raw_text"]              the JSONL sidecar / raw fallback
+Table["html"]                  the rendered <table>
+tables.flatten                 production (cli.py, render.py) — the stat sidecar
+```
+
+Until v2.4.133 the glyph repairs lived inside `cell_cleaning._html_escape`, so they were reachable
+**only** by the HTML path: `cells_to_html` shipped `[-0.45, -0.06]` while `flatten`,
+`cells[].text` and `raw_text` all shipped the corrupt `[20.45, 20.06]` for the same cell. A p-value
+that rendered correctly was simultaneously shipped corrupt to every structured consumer. A library
+that converts one input two ways has no contract at all.
+
+**The design, as of v2.4.134:**
+
+* `cell_cleaning.clean_cell_text` is the **single** repair chain. Every other site derives from it.
+* `cell_cleaning.repair_cells` applies it **once per cell, at emission**, in all four capture paths
+  (`camelot_extract`, `whitespace_cells`, `char_whitespace_cells`, and the dormant
+  `cluster.lattice_cells`).
+* It runs **after** the structural gates, never before. This ordering is load-bearing: the capture
+  paths run their gates on the cells they have just built, and v2.4.133's first attempt repaired at
+  CONSTRUCTION — which silently changed what those gates judge, so a correct `×`-as-`3` repair began
+  deleting the rows below it. See `whitespace._repaired_view` for the per-predicate rule and
+  LESSONS L-041.
+* `cell_cleaning.normalize_cell_whitespace` is the single whitespace/soft-hyphen/minus
+  canonicaliser, and it deliberately does NOT repair glyphs — the gates read its output.
+
+**The guard is a test that the sites AGREE**, not a second copy of the constants
+(`tests/test_cell_normalisers_agree.py`, `tests/test_table_cell_channels_agree.py`). The precedent:
+`normalize.py` and `extract.py` each carried a Latin→Greek table and disagreed on **9 of 9** shared
+letters, so a chi-square left docpluck as `chi2` or `ch2` depending purely on which extraction path
+ran — and a consumer matching `chi2\(` silently never checked that test.
 
 ---
 

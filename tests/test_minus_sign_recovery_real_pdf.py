@@ -18,13 +18,18 @@ An ascending CI / a plausible correlation is never touched.
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 
 from docpluck.normalize import (
     recover_corrupted_minus_signs,
@@ -208,24 +213,52 @@ def test_efendic_no_corrupt_minus_in_render():
     assert "r = -.74" in md
 
 
-def test_efendic_table_point_estimates_recovered_via_ci():
-    """Every negative B-coefficient that pairs with a CI must read as a
-    recovered negative, not the corrupted '2X.XX' literal. Mode-agnostic:
-    tables emit as <td> HTML (Camelot) or as unstructured-table lines, and
-    the CI-pairing recovery reaches the point estimate in either mode."""
+def test_efendic_table_point_estimates_in_the_DISABLE_CAMELOT_fallback():
+    """RE-FIXTURED 2026-08-14 — **this test was passing because of DATA LOSS.**
+
+    It used to assert ``"21.34" not in md`` and read that as proof the
+    CI-pairing recovery had reached the point estimate in the no-Camelot
+    fallback ("Mode-agnostic: ... the CI-pairing recovery reaches the point
+    estimate in either mode"). It had not. The token was absent because
+    ``_suppress_orphan_table_cell_text`` was **deleting the entire linearized
+    table**, corrupt estimates and all.
+
+    Measured by disabling the v2.4.130 guard and re-rendering: the guard
+    restores **2,544 characters** to this document, and `21.34` / `21.05`
+    reappear with them. **A green result from an emptied input is a false
+    green** (CLAUDE.md) — and this is a worked example of it surviving in the
+    suite for months, because the assertion was written as an absence.
+
+    WHAT IS ACTUALLY TRUE IN THIS MODE, and is now asserted:
+
+    * The data is PRESENT rather than deleted.
+    * The B-column point estimates are still corrupt (`21.34` for `-1.34`),
+      because pdftotext linearizes this table COLUMN BY COLUMN — the B values
+      land in one run of lines and their CIs in another — so
+      `recover_minus_via_ci_pairing`, which needs the estimate and its interval
+      within one record, structurally cannot reach them.
+    * **The CIs themselves are correct and present** (`[-1.58, -1.10]`), so a
+      consumer still holds the interval and can recover the sign. That is the
+      whole reason preserving beats deleting here: deletion removed both.
+
+    The PRODUCTION path (Camelot ON) recovers these correctly and is pinned by
+    `test_efendic_table_estimates_recovered_with_camelot_on` below, unchanged.
+
+    ⚠ KNOWN GAP, newly VISIBLE rather than newly created: column-run pairing for
+    the no-Camelot fallback. Deletion was hiding it.
+    """
     pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
     if not pdf.exists():
         pytest.skip(f"fixture missing: {pdf}")
     md = render_pdf_to_markdown(pdf.read_bytes())
-    # Mediation estimate recovered in body prose (confirmed vs AI gold).
+    # Mediation estimate recovered in body prose (confirmed vs AI gold) — this
+    # one has its CI on the same line, so the pairing reaches it.
     assert "Mposterior = -0.54" in md
-    # Distinctive corrupt point-estimate forms must be gone (recovered).
-    assert "21.34" not in md  # Table 3, Direction x Attribute -> -1.34
-    assert "21.05" not in md  # Table 4, PMA -> -1.05
-    # Idempotence: the render already applies the CI-pairing recovery, so a
-    # second pass must be a no-op -- proving no CI-paired corrupt estimate
-    # survived. (The body `Mchange` / contrast-coding residuals carry no CI
-    # and are documented escalations -- the pass leaves them untouched.)
+    # The table's data survives the render chain at all.
+    assert "21.34" in md, "the linearized table must not be deleted"
+    assert "[-1.58, -1.10]" in md, "the CI column must survive"
+    # Idempotence still holds: a second pairing pass changes nothing, because
+    # everything it can structurally reach has already been recovered.
     assert recover_minus_via_ci_pairing(md) == md
 
 
@@ -374,7 +407,51 @@ def test_estimate_column_recovered_by_positional_ci_pairing():
     """W0b-est: the estimate column is separated from its CI column by the SE
     column, so W0d's proximity window cannot pair them. Positional pairing
     recovers each corrupt estimate whose fixed reading lands inside its CI —
-    and leaves the SE column and genuine positives alone."""
+    and leaves the SE column and genuine positives alone.
+
+    **The CI lines below are the CORRUPT forms the paper actually contains**, not
+    the repaired ones. They were repaired forms until 2026-08-15, which quietly
+    made this test assert the circular evidence of register O10: it fed CIs that
+    were already negative and demanded the estimate column be rewritten on that
+    basis, when "some bound is negative" is true of most psychology tables and
+    proves nothing about the `2`-for-minus corruption.
+
+    Re-derived from the source rather than reasoned about — `efendic_2022_affect`
+    raw pdftotext contains `[21.58, 21.10]` and `[20.08,` verbatim, so the whole
+    block arrives corrupt and `recover_corrupted_minus_signs` repairs the CI
+    column and the estimate column in one pass. That is the real input shape, and
+    it is what now licenses the estimate rewrite.
+    """
+    from docpluck.normalize import recover_corrupted_minus_signs as rec
+
+    block = "\n".join(
+        ["20.26", "20.21", "20.95", "21.15", "0.55", "0.14", "20.16", "21.34", "0.13"]
+        + ["0.10", "0.03", "0.03", "0.06", "0.06", "0.05", "0.06", "0.12", "0.11"]
+        + ["[20.45, 20.06]", "[20.27, 20.15]", "[21.01, 20.89]", "[21.27, 21.03]",
+           "[0.43, 0.67]", "[0.04, 0.25]", "[20.27, 20.05]", "[21.58, 21.10]",
+           "[20.08, 0.35]"]
+    )
+    out = rec(block).split("\n")
+    assert out[:9] == ["-0.26", "-0.21", "-0.95", "-1.15", "0.55", "0.14",
+                       "-0.16", "-1.34", "0.13"], out[:9]
+    # SE column must stay positive (it is a different column from the estimate).
+    assert out[9:18] == ["0.10", "0.03", "0.03", "0.06", "0.06", "0.05",
+                         "0.06", "0.12", "0.11"], out[9:18]
+    # ...and the CI column itself is recovered in the same pass.
+    assert out[18] == "[-0.45, -0.06]", out[18]
+    assert out[25] == "[-1.58, -1.10]", out[25]
+
+
+def test_estimate_column_needs_evidence_this_pass_actually_produced():
+    """Register O10: the evidence must not be circular.
+
+    When the CI column arrives ALREADY negative, nothing in this text
+    demonstrates the `2`-for-minus corruption — negative CI bounds are ordinary
+    in psychology — so the estimate column must be left alone. Before the fix,
+    `recovered_negative` was computed as `lo < 0 or hi < 0` and fired on any
+    negative bound, INCLUDING bounds `recover_corrupted_minus_signs` had
+    manufactured one line earlier, so a rewrite became its own proof.
+    """
     from docpluck.normalize import recover_corrupted_minus_signs as rec
 
     block = "\n".join(
@@ -385,11 +462,10 @@ def test_estimate_column_recovered_by_positional_ci_pairing():
            "[-0.08, 0.35]"]
     )
     out = rec(block).split("\n")
-    assert out[:9] == ["-0.26", "-0.21", "-0.95", "-1.15", "0.55", "0.14",
-                       "-0.16", "-1.34", "0.13"], out[:9]
-    # SE column must stay positive (it is a different column from the estimate).
-    assert out[9:18] == ["0.10", "0.03", "0.03", "0.06", "0.06", "0.05",
-                         "0.06", "0.12", "0.11"], out[9:18]
+    assert out[:9] == ["20.26", "20.21", "20.95", "21.15", "0.55", "0.14",
+                       "20.16", "21.34", "0.13"], (
+        "the estimate column was rewritten on evidence this pass never produced"
+    )
 
 
 def test_estimate_column_pairing_leaves_genuine_positives():

@@ -27,29 +27,37 @@ def _normalize(text: str) -> str:
 
 
 class TestA3cLeadingZeroPositive:
+    """A3c's former POSITIVE cases. Every one now passes through UNCHANGED.
+
+    These also pin the v2.4.129 fix for a sibling A3c had been MASKING: with
+    A3c gone, ``(0,003)`` reached A4's delimiter-spacing arm intact for the
+    first time and became ``(0, 003)`` — a European p-value rendered as a
+    two-element pair. A3c had been inventing the DECIMAL reading; A4 invented
+    the SEPARATOR reading. Removing a rule can expose one it was masking, so
+    the assertions below are exact equality, not substring.
+    """
+
     def test_paren_p_value_three_digit(self):
-        assert _normalize("(0,003)") == "(0.003)"
+        assert _normalize("(0,003)") == "(0,003)"
 
     def test_paren_p_value_two_digit(self):
-        assert _normalize("(0,05)") == "(0.05)"
+        assert _normalize("(0,05)") == "(0,05)"
 
     def test_paren_p_value_four_digit(self):
-        assert _normalize("(0,0001)") == "(0.0001)"
+        assert _normalize("(0,0001)") == "(0,0001)"
 
     def test_bracket_form(self):
-        assert _normalize("[0,05]") == "[0.05]"
+        assert _normalize("[0,05]") == "[0,05]"
 
     def test_paren_with_p_less_than(self):
-        assert _normalize("(p < 0,001)") == "(p < 0.001)"
+        assert _normalize("(p < 0,001)") == "(p < 0,001)"
 
-    def test_unbracketed_still_works(self):
-        # A3 (not A3c) handles this — included to verify no regression.
-        assert _normalize("p = 0,003") == "p = 0.003"
+    def test_unbracketed_also_passes_through(self):
+        # A3 (not A3c) used to handle this; A3 is deleted too.
+        assert _normalize("p = 0,003") == "p = 0,003"
 
     def test_after_comma_in_citation_context(self):
-        # "Smith, 0,003" — A3 is blocked by the preceding comma but
-        # A3c fires on the leading-zero form.
-        assert _normalize("Smith, 0,003") == "Smith, 0.003"
+        assert _normalize("Smith, 0,003") == "Smith, 0,003"
 
 
 # ---- A3c negative cases (must NOT fire) -----------------------------------

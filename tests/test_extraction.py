@@ -19,7 +19,7 @@ requires_pdftotext = pytest.mark.skipif(
     reason="pdftotext not installed (apt-get install poppler-utils)"
 )
 
-_VIBE = os.path.join(os.path.expanduser("~"), "Dropbox", "Vibe")
+_VIBE = os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe")
 _PDF_DIR = os.path.join(_VIBE, "PDFextractor", "test-pdfs")
 
 

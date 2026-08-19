@@ -16,6 +16,13 @@ def test_table_typed_dict_fields():
     expected = {
         "id", "label", "page", "bbox", "caption", "footnote",
         "kind", "rendering", "confidence",
+        # v2.4.133: the COMPONENTS of `confidence` plus the engine record.
+        # `confidence` used to be `accuracy/100`, so an 80%-empty capture
+        # scored 0.95; it is now Camelot's own `(accuracy/100)*(1-whitespace)`
+        # applied to the grid docpluck ships. Shipping only the composite
+        # would repeat the original mistake — one number, no way to tell
+        # which half moved — so the parts travel with it.
+        "accuracy", "whitespace", "camelot_flavor",
         "n_rows", "n_cols", "header_rows",
         "cells", "html", "raw_text",
     }

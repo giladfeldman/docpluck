@@ -16,7 +16,6 @@ from docpluck.normalize import (
     NORMALIZATION_VERSION,
     _HEADER_BANNER_PATTERNS,
     _detect_column_interleave_pages,
-    _looks_like_running_header_or_footer,
     _recover_dropped_minus_in_record,
     recover_dropped_minus_via_ci_pairing,
 )
@@ -401,10 +400,22 @@ class TestCitationCellSignature:
 
 
 class TestFigure3c2PrefixSuperset:
-    def test_drops_inline_when_block_caption_is_prefix(self):
+    def test_dedups_inline_but_KEEPS_the_overhang(self):
         # The block caption is shorter than the inline (block was trimmed
-        # earlier). When the inline starts with the block caption text +
-        # short sentence-terminated overhang, drop the inline run.
+        # earlier). The inline run is deduplicated — but the text the block
+        # caption LACKS must survive, by extending the block caption.
+        #
+        # THIS TEST USED TO ASSERT THE OPPOSITE, and was pinning a data loss.
+        # It read `assert "…and the overhang" not in out`, i.e. it required the
+        # suppressor to DELETE the only copy of the overhang text. v2.4.132
+        # found that behaviour destroying real content on
+        # 10.1109/access.2025.3645087 — 121 characters including a methods
+        # parameter that appeared nowhere else in the document — and added
+        # `_extend_block_caption()` so the surviving copy absorbs the overhang.
+        #
+        # This is the project rule about absence assertions, demonstrated on
+        # itself: **a test asserting an ABSENCE can be satisfied by data loss.**
+        # Every absence is now paired with a presence.
         text = (
             "Body intro.\n"
             "\n"
@@ -417,7 +428,12 @@ class TestFigure3c2PrefixSuperset:
             "*Figure 1. Mean response time by condition across the three trials*\n"
         )
         out = _suppress_inline_duplicate_figure_captions(text)
-        assert "Mean response time by condition across the three trials and the overhang" not in out
+        # PRESENCE: the overhang is the only copy of that text — it must live.
+        assert "and the overhang" in out
+        # ABSENCE: but only ONE copy of the caption survives (the dedup worked).
+        assert out.count("Mean response time by condition across the three trials") == 1
+        # The inline run is gone from the body; the surviving copy is the block.
+        assert "Body intro.\n\nMore body prose continues here" in out
         assert "More body prose continues here" in out
 
     def test_preserves_inline_when_overhang_is_long(self):

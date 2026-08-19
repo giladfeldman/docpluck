@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import hashlib
 import json
 import subprocess
 import sys
@@ -37,8 +36,12 @@ from pathlib import Path
 
 from . import checks, corpus
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-OUT_ROOT = _REPO_ROOT / "verify_out"
+# ONE definition, in `corpus`, and it points OUTSIDE this repo.
+# See `corpus._out_root`: this used to be `<repo>/verify_out`, declared
+# identically in three modules, and it held 347 MB of rendered publication
+# text inside the working tree. Custody rule: article-finder is the sole
+# custodian, and gitignoring is not containment.
+OUT_ROOT = corpus.OUT_ROOT
 JOBS_PATH = OUT_ROOT / "inspect_jobs.json"
 GOLD_KEYS_PATH = Path(__file__).with_name("gold_keys.json")
 AI_GOLD = Path.home() / ".claude" / "skills" / "article-finder" / "ai-gold.py"

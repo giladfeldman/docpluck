@@ -44,8 +44,12 @@ from pathlib import Path
 
 from . import corpus
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-OUT_ROOT = _REPO_ROOT / "verify_out"
+# ONE definition, in `corpus`, and it points OUTSIDE this repo.
+# See `corpus._out_root`: this used to be `<repo>/verify_out`, declared
+# identically in three modules, and it held 347 MB of rendered publication
+# text inside the working tree. Custody rule: article-finder is the sole
+# custodian, and gitignoring is not containment.
+OUT_ROOT = corpus.OUT_ROOT
 MATRIX_PATH = OUT_ROOT / "matrix.json"
 BASELINE_PATH = Path(__file__).with_name("baseline_matrix.json")
 

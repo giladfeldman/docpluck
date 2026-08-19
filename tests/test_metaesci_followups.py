@@ -71,12 +71,18 @@ class TestStepsChanged:
 
     def test_real_stats_record_relevant_changed_steps(self):
         text = "Results showed eta\u00b2 = .054, p = 03 and CI [0.1; 0.5]."
-        _, report = normalize_text(text, NormalizationLevel.academic)
-        # The input actually needs A2 (dropped decimal), A4 (CI delimiter),
-        # A5 (Greek/superscript) — all three should appear.
-        assert "A2_dropped_decimal_repair" in report.steps_changed
+        # RE-FIXTURED 2026-08-14: A2 is deleted, so it can no longer appear.
+        # The INVARIANT this test exists for is untouched and still asserted —
+        # `steps_changed` records exactly the steps that altered the text, and
+        # is a strict subset of `steps_applied`. Only the roster changed: A4 (CI
+        # delimiter) and A5 (Greek/superscript) are NOTATION and stay; A2 was
+        # REPAIR of the paper's own error and went, so `p = 03` passes through
+        # and no step is credited for it.
+        out, report = normalize_text(text, NormalizationLevel.academic)
         assert "A4_ci_delimiter_harmonization" in report.steps_changed
         assert "A5_math_symbol_normalization" in report.steps_changed
+        assert not any("A2" in s for s in report.steps_changed), report.steps_changed
+        assert "p = 03" in out, "A2 is retired; the value is delivered as printed"
         # steps_changed is a strict subset of steps_applied.
         assert set(report.steps_changed).issubset(set(report.steps_applied))
 

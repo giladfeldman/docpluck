@@ -82,9 +82,40 @@ class TestInlineElements:
         assert "importantresult" not in text
 
     def test_multiple_inline_elements(self):
+        """RE-FIXTURED 2026-08-14 — the expected value INVERTED, deliberately.
+
+        This asserted ``"ABC" not in text``, i.e. that `<b>A</b><i>B</i><u>C</u>`
+        should come out spaced. `extract_html` used to pad every inline element
+        on both sides, so it did.
+
+        That padding was written for a real bug — `<span>Chan</span><span>ORCID</span>`
+        in an author list merging into `ChanORCID` — but applying it to the whole
+        inline class broke the token scientists actually care about:
+        `<i>&#951;</i><sup>2</sup><sub>p</sub>` became `η 2 p`, normalized to
+        `eta2 p`, **which matches nothing downstream** where consumers look for
+        `eta2p`. DOCX inherits it, because mammoth converts to HTML first.
+
+        `GLUED_INLINE_ELEMENTS` now names the class: an inline element wrapping a
+        run with **zero visual gap** to its neighbours is not padded — `sup`,
+        `sub`, `i`, `b`, `em`, `strong`, `u`, `s`, `small`, `mark`, `var`, `abbr`.
+        A browser renders `<b>A</b><i>B</i><u>C</u>` as `ABC` with no spaces, so
+        `ABC` is the correct extraction.
+
+        **`span` is deliberately NOT in that class** and still pads — it is the
+        one inline tag with no consistent typographic meaning, and the ChanORCID
+        bug is itself a span case. `test_inline_elements_separated` above pins
+        that, and it is why these two tests now disagree on purpose.
+
+        This test was simply left behind when the class landed: it went red and
+        stayed red rather than being re-fixtured, which is how a stale assertion
+        looks from the outside — indistinguishable from a regression.
+        """
         text = html_to_text("<p><b>A</b><i>B</i><u>C</u></p>")
-        assert "ABC" not in text
-        assert "A" in text and "B" in text and "C" in text
+        assert "ABC" in text, "styling wrappers must not be padded"
+        # And the span case must still behave the other way.
+        assert "HelloWorld" not in html_to_text(
+            "<span>Hello</span><span>World</span>"
+        )
 
 
 # ---------------------------------------------------------------------------

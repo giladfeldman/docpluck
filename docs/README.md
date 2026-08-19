@@ -13,6 +13,33 @@ All three formats feed into the same normalization pipeline and quality scoring.
 
 ---
 
+## Scope — read this before you build on the output
+
+> **docpluck extracts and normalizes ENGLISH-language science articles written in US numeric
+> convention (`.` decimal, `,` thousands).**
+>
+> **It canonicalises NOTATION. It does not fix the paper.**
+
+Two consequences that are deliberate limits, not bugs:
+
+1. **European numbers pass through exactly as printed.** `d = 0,45` stays `d = 0,45`; `N = 1,182`
+   keeps its comma. We do not convert them, because the source token is the only evidence you have
+   of what the paper meant — once converted, that evidence is gone. `.replace(",", "")` is one line
+   on your side and irreversible on ours.
+2. **The paper's own errors reach you untouched.** `p = 38.`, `p < 05` and `p = 001` are what those
+   pages actually print (each verified by rasterizing the page). Silently repairing them would
+   launder a real defect into your analysis: you would validate a number the paper never printed,
+   and the author would never learn. Detecting and flagging them is yours — you hold the parsed
+   statistic and its context.
+
+**What we DO fix is damage our own pipeline caused** — a glyph the text layer lost, a fused
+exponent, a sign-flipped interval, a `<` extracted as `b`. That is the whole distinction: *did we
+break this, or did the paper?*
+
+Full statement, including the known limits: **[SCOPE.md](SCOPE.md)**.
+
+---
+
 ## Install
 
 ```bash
@@ -109,6 +136,56 @@ for t in result["tables"]:
     if t["kind"] == "structured":
         print(f"    {t['n_rows']} rows × {t['n_cols']} cols")
 ```
+
+### `fallbacks` — what the library silently did instead (read this)
+
+Every result carries a record of the fallback paths that fired for **that document**. This is the
+half of the story the text cannot tell you: a table Camelot detected and we discarded, a glyph
+repair we refused because the evidence was ambiguous, a font whose Greek letters are unreliable.
+
+```python
+result = extract_pdf_structured(pdf_bytes)
+
+result["fallbacks"]
+# {'camelot_table_failed_table_likeness_gate': 26,
+#  'symbol_font_greek_corruption_detected': 13}
+
+result["fallback_details"]          # which font, which exception, which token
+# {'symbol_font_greek_corruption_detected': {'AdvPS7DA6': 13}}
+```
+
+`{}` means **every detector ran and found nothing** — never "we did not look". A detector that
+cannot run says so explicitly (`symbol_font_scan_not_run`), because a silent instrument and a clean
+result must not look alike.
+
+The same channel exists on the other two entry points:
+
+```python
+text, report = normalize_text(raw, NormalizationLevel.academic)
+report.fallbacks, report.fallback_details
+
+from docpluck.render import RenderReport
+rep = RenderReport()
+md = render_pdf_to_markdown(pdf_bytes, report=rep)
+rep.fallbacks
+```
+
+Batch runs get it per file in the `<stem>.json` sidecar.
+
+**Keys worth acting on immediately:**
+
+| key | meaning |
+|---|---|
+| `symbol_font_greek_corruption_detected` | Greek letters in this document are unreliable — a Cronbach's α can arrive as `a5(.93)` |
+| `ci_upper_minus_inferred_from_containment` | a CI sign was inferred, not read off the page — treat as a hypothesis |
+| `w0j_mstat_sign_inferred_from_variable_name` | likewise |
+| `w0h_ambiguous_pairing_refused` / `w0m_…` | a repair was declined; the token is what the paper printed |
+| `camelot_table_*` / `region_grid_*` / `cells_grid_to_html_*` | a table or its rows were dropped by us |
+| `flatten_dropped_*` | a parsed statistic was dropped from the structured sidecar |
+
+Repairs are labelled by the **evidence** they rest on: *typographic* (something the renderer put on
+the page) is acted on; *inferential* (what a number ought to be) is properly your call, and where we
+keep such a repair it is declared here rather than applied silently. See `docs/SCOPE.md`.
 
 ### Modes
 
@@ -388,9 +465,9 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.126',            # docpluck itself
+# {'version': '2.4.134',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.50',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.56',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.4',   #   independently of the package version
 #  'table_extraction_version': '2.4.10',
 #  'python_version': '3.14.5',      # the interpreter…

@@ -176,7 +176,7 @@ def test_char_path_empty_on_single_column_block():
 # --- real-PDF: ip_feldman Table 10 (the canonical RC-T case) ----------------
 
 def _articlerepo(key_file: str) -> Path | None:
-    p = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe" / "ArticleRepository" / "fulltext" / key_file
+    p = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe") / "ArticleRepository" / "fulltext" / key_file
     return p if p.is_file() else None
 
 

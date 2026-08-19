@@ -273,10 +273,14 @@ class TestA1_S9_Interaction:
     """A1 runs before S9 — standalone numbers are joined to stats before
     S9 strips them as page numbers."""
 
-    def test_p_equals_newline_484_joined_then_fixed(self):
-        """'484' would be stripped as page number by S9, but A1 joins it first."""
+    def test_p_equals_newline_484_joined_and_NOT_decimal_fixed(self):
+        """RE-FIXTURED 2026-08-14. The A1/S9 ORDERING invariant is the subject
+        here and it still holds: '484' alone would be stripped as a page number
+        by S9, and A1 joins it to the statistic first. What changed is only the
+        tail — A2 used to invent a decimal afterwards, and A2 is deleted."""
         result = norm("p =\n484")
-        assert ".484" in result  # A1 joins, A2 fixes decimal
+        assert "p = 484" in result   # A1 joined it: S9 did not eat it
+        assert ".484" not in result  # A2 retired: no decimal invented
 
     def test_p_equals_newline_42_joined(self):
         """'42' looks like a page number but A1 joins it to stat context."""
@@ -410,7 +414,17 @@ class TestS9_PageNumberBoundary:
 
 
 class TestA2_DroppedDecimalEdgeCases:
-    """A2 fixes p = 45 → p = .45 (dropped leading '0.')."""
+    """A2 is DELETED (v2.4.130) — a dotless value passes through as printed.
+
+    RE-FIXTURED 2026-08-14, not removed. A2 had no cited paper anywhere in its
+    code; both of its firing sites across 297 English papers were the PAPER's
+    own error (10.1177/0146167210380928 p13, 10.1016/j.jesp.2016.11.001 p7,
+    both rasterized, both with correctly-dotted numbers on the same line).
+    Repairing them laundered a published defect into a meta-science pipeline.
+
+    The NEGATIVE cases below are unchanged: not corrupting a correct value was
+    always docpluck's own obligation.
+    """
 
     def test_valid_decimal_untouched(self):
         assert "p = 0.05" in norm("p = 0.05")
@@ -422,17 +436,18 @@ class TestA2_DroppedDecimalEdgeCases:
         """p = 15.8 has a real decimal — must NOT be touched."""
         assert "15.8" in norm("p = 15.8")
 
-    def test_dropped_01_fixed(self):
-        assert "p = .01" in norm("p = 01.")
+    def test_dropped_01_passes_through(self):
+        assert "p = 01." in norm("p = 01.")
+        assert "p = .01" not in norm("p = 01.")
 
-    def test_dropped_45_fixed(self):
-        assert "p = .45" in norm("p = 45")
+    def test_dropped_45_passes_through(self):
+        assert norm("p = 45").strip() == "p = 45"
 
-    def test_d_dropped_44_fixed(self):
-        assert "d = .44" in norm("d = 44")
+    def test_d_dropped_44_passes_through(self):
+        assert norm("d = 44").strip() == "d = 44"
 
-    def test_g_uppercase_dropped_52_fixed(self):
-        assert "G = .52" in norm("G = 52")
+    def test_g_uppercase_dropped_52_passes_through(self):
+        assert norm("G = 52").strip() == "G = 52"
 
     def test_single_digit_excluded(self):
         """Single digit p = 5 must NOT be touched (\\d{2,3} excludes it)."""
@@ -449,10 +464,16 @@ class TestA2_DroppedDecimalEdgeCases:
 
 
 class TestA3_DecimalCommaEdgeCases:
-    """A3 converts European decimal comma 0,05 → 0.05."""
+    """A3 is DELETED (v2.4.129) — a European decimal comma passes through.
 
-    def test_european_decimal_converts(self):
-        assert "0.05" in norm("p = 0,05")
+    RE-FIXTURED 2026-08-14, not removed. The three POSITIVE cases inverted; the
+    five NEGATIVE cases (author superscripts, CI internals, df brackets) are
+    UNCHANGED, because refusing to corrupt those shapes is docpluck's own
+    obligation and outlives the rule that used to threaten them.
+    """
+
+    def test_european_decimal_passes_through(self):
+        assert norm("p = 0,05").strip() == "p = 0,05"
 
     def test_author_superscript_pair_preserved(self):
         """Smith1,2 — letter lookbehind blocks."""
@@ -474,11 +495,11 @@ class TestA3_DecimalCommaEdgeCases:
         assert "F(2.42)" not in result
 
     def test_decimal_comma_at_end(self):
-        """End of string triggers lookahead."""
-        assert "0.05" in norm("p = 0,05")
+        """End of string used to trigger A3's lookahead. Now: unchanged."""
+        assert norm("p = 0,05").strip() == "p = 0,05"
 
     def test_decimal_comma_before_semicolon(self):
-        assert "0.73" in norm("r = 0,73;")
+        assert norm("r = 0,73;").strip() == "r = 0,73;"
 
     def test_square_bracket_lookbehind_blocks(self):
         """F[2,42] — square bracket lookbehind blocks."""
@@ -490,25 +511,28 @@ class TestA3_DecimalCommaEdgeCases:
 
 
 class TestA3a_ThousandsSeparator:
-    """A3a strips commas from N=1,182 before A3 can corrupt them."""
+    """A3a is DELETED (v2.4.130) — the separator is delivered as printed.
+
+    It existed only to pre-empt A3 ("strips commas from N=1,182 before A3 can
+    corrupt them"), and A3 was deleted in v2.4.129.
+    """
 
     def test_n_equals_thousands(self):
         result = norm("N = 1,182")
-        assert "1182" in result
+        assert "1,182" in result
+        assert "1182" not in result
         assert "1.182" not in result
 
     def test_df_equals_thousands(self):
         result = norm("df = 1,197")
-        assert "1197" in result
+        assert "1,197" in result
         assert "1.197" not in result
 
     def test_sample_size_of(self):
-        result = norm("sample size of 2,443")
-        assert "2443" in result
+        assert "2,443" in norm("sample size of 2,443")
 
     def test_total_of_participants(self):
-        result = norm("total of 2,443 participants")
-        assert "2443" in result
+        assert "2,443" in norm("total of 2,443 participants")
 
 
 # ── A3b: Bracket harmonization edge cases ──────────────────────────────
@@ -763,9 +787,8 @@ class TestExtremeEdgeCases_Unicode:
         assert "0.05" in result
 
     def test_european_decimal_near_stat(self):
-        """European comma in stat context → period."""
-        result = norm("p = 0,034")
-        assert "0.034" in result
+        """RE-FIXTURED: the stat context was A3's gate; A3 is deleted."""
+        assert norm("p = 0,034").strip() == "p = 0,034"
 
 
 # ── Line 238 + Line 260: moderate-risk regexes ─────────────────────────

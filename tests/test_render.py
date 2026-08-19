@@ -274,9 +274,25 @@ def test_suppress_orphan_table_cell_text_fires_on_two_orphans():
 
 
 def test_suppress_orphan_table_cell_text_fires_on_italic_caption():
-    """v2.4.11: italic ``*Table N. ...*`` captions emitted by the v2.4.2
-    Camelot-0-cells fix are followed by orphan rows just as easily.
-    The suppressor now strips those too."""
+    """v2.4.11: italic ``*Table N. ...*`` captions are followed by orphan rows
+    just as easily as plain ones, and the suppressor strips those too.
+
+    RE-FIXTURED 2026-08-14 — **and the original fixture was pinning the defect.**
+
+    It ran the suppressor over a caption followed by cell LABELS
+    (``1. Degree of apology``) AND the table's actual DATA
+    (``5.63 / 13.22 / 16.82`` — means and standard deviations) and asserted that
+    ``"13.22" not in out``. Those are published statistics, and this branch only
+    runs when Camelot returned zero cells, so the linearized text was the ONLY
+    copy of them anywhere in the output. Deleting them was not tidying a
+    duplicate; it was destroying the table.
+
+    The v2.4.130 guard (``_run_carries_statistical_content``) refuses the whole
+    run when any line carries a quantity — all-or-nothing, because a
+    half-suppressed table leaves gaps no reader can see. The v2.4.11 behaviour
+    this test exists for is preserved and asserted in the test below, on a run
+    of pure label furniture, which is the shape the rule was written for.
+    """
     text = (
         "*Table 2. Target article: Means, standard deviations, internal "
         "consistency reliabilities and intercorrelations.*\n\n"
@@ -286,10 +302,33 @@ def test_suppress_orphan_table_cell_text_fires_on_italic_caption():
     )
     out = _suppress_orphan_table_cell_text(text)
     assert "*Table 2. Target article" in out
+    assert "13.22" in out, "a published mean must not be deleted"
+    assert "5.63" in out
+    assert "16.82" in out
+    assert "1. Degree of apology" in out, (
+        "all-or-nothing: keeping the numbers while dropping their row labels "
+        "would leave a table nobody can read"
+    )
+    assert "Note: Apology scores" in out
+
+
+def test_suppress_orphan_table_cell_text_still_strips_pure_label_furniture():
+    """The v2.4.11 behaviour, on the shape the rule was actually written for.
+
+    An italic caption followed by orphan cell LABELS and nothing numeric. These
+    carry no data — the table's own structure would have carried them — so
+    suppressing them is exactly what the rule is for, and it still happens.
+    """
+    text = (
+        "*Table 2. Target article: Means, standard deviations, internal "
+        "consistency reliabilities and intercorrelations.*\n\n"
+        "1. Degree of apology\n2. Empathy\n3. Forgiving\n\n"
+        "Note: Apology scores ranged from 2 to 10."
+    )
+    out = _suppress_orphan_table_cell_text(text)
+    assert "*Table 2. Target article" in out
     assert "1. Degree of apology" not in out
-    assert "13.22" not in out
-    # The Note line is short but starts with "Note" — would be excluded by
-    # _is_orphan_cell_paragraph's Note check, so it stays.
+    assert "2. Empathy" not in out
     assert "Note: Apology scores" in out
 
 

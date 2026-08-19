@@ -97,8 +97,21 @@ class FlattenedRow(TypedDict):
 def _cells_to_grid(cells: list[Cell]) -> list[list[str]]:
     """Reconstruct a row-major 2-D grid from a flat Cell list.
 
-    Same logic the HTML emitter uses (`cells_grid_to_html` in
-    cell_cleaning.py:650-660). Defensive against missing rows/cols.
+    Same logic the HTML emitter uses — see ``cell_cleaning.cells_grid_to_html``.
+
+    **Cite the SYMBOL, never a line number.** This docstring used to read
+    "cell_cleaning.py:650-660"; the function it names has never been there. It
+    was at :821 when the drift was first noticed on 2026-08-15 and at :860 by
+    the end of the same day, while lines 650-660 hold an unrelated super-header
+    folding heuristic. A maintainer checking "are these two still in sync?" was
+    sent to the wrong function — the copy did not know where its original lived
+    (register B2).
+
+    As of v2.4.133 the glyph repairs no longer live behind the HTML escaper:
+    cells arrive already repaired by ``cell_cleaning.clean_cell_text`` (applied
+    at construction), so this grid and the rendered ``<table>`` carry the same
+    text. Before that they did not, and this function shipped the corrupt value
+    to the JSONL sidecar while the HTML showed the repaired one (register F7a).
     """
     if not cells:
         return []
@@ -493,6 +506,7 @@ def _resolve_hyphen_ci(
 # HTML), and the render post-process over the assembled .md. Imported here so
 # there is exactly one definition of the estimate-containment invariant.
 from docpluck.normalize import recover_dropped_minus_ci_upper  # noqa: E402
+from docpluck.telemetry import record_fallback  # noqa: E402
 
 
 def _parse_ci_cell(
@@ -1180,15 +1194,29 @@ def _flatten_one_row(
     # garbage, not data. Drop it (and its sentence part) rather than emit an
     # impossible field. Universal: an invalid statistic is wrong wherever it
     # comes from, recovered or grid-classified ("never display garbage").
+    #
+    # EVERY DROP IS RECORDED (register H3g). These guards are correct, and they
+    # were also completely silent: the rendered cell survives while the
+    # structured sidecar quietly loses the statistic, so a consumer reading the
+    # JSONL sees a record with no `r` and cannot tell whether the paper reported
+    # none or docpluck discarded one it could not parse. An out-of-domain value
+    # is usually a capture defect — a column mis-assignment or a glyph
+    # corruption — so the count is a lead, not just bookkeeping.
     if "r" in role_nums and not (-1.0 <= role_nums["r"] <= 1.0):
+        record_fallback("flatten_dropped_out_of_domain_field",
+                        detail=f"r={role_nums['r']}")
         role_nums.pop("r")
         role_vals.pop("r", None)
     if "p" in role_nums and not (0.0 <= role_nums["p"] <= 1.0):
+        record_fallback("flatten_dropped_out_of_domain_field",
+                        detail=f"p={role_nums['p']}")
         role_nums.pop("p")
         role_vals.pop("p", None)
         role_vals.pop("p_op", None)
     for k in ("n", "N"):
         if k in role_nums and (role_nums[k] <= 0 or role_nums[k] != int(role_nums[k])):
+            record_fallback("flatten_dropped_out_of_domain_field",
+                            detail=f"{k}={role_nums[k]}")
             role_nums.pop(k)
             role_vals.pop(k, None)
     # Dropped-minus on a CI UPPER bound (B7 / GLYPH, table channel). pdftotext
@@ -1218,6 +1246,15 @@ def _flatten_one_row(
         and "CI_upper" in role_nums
         and role_nums["CI_lower"] > role_nums["CI_upper"]
     ):
+        # A DESCENDING interval is impossible, so the pair is not trustworthy —
+        # but dropping it deletes the whole CI from the sidecar with no trace,
+        # and a reversed CI is precisely the shape docpluck commits to passing
+        # THROUGH so a consumer can flag the paper's own error. Recorded so the
+        # class is at least countable while the drop stands.
+        record_fallback(
+            "flatten_dropped_descending_ci",
+            detail=f"[{role_nums['CI_lower']}, {role_nums['CI_upper']}]",
+        )
         role_nums.pop("CI_lower")
         role_nums.pop("CI_upper")
         role_vals.pop("CI", None)

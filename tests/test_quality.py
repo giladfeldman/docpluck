@@ -3,7 +3,6 @@ Tests for quality scoring system.
 Validates common-word ratio, garbled detection, ligature counting, and confidence levels.
 """
 
-import pytest
 from docpluck.quality import compute_quality_score
 
 

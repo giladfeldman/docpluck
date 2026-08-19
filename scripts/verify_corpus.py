@@ -377,7 +377,7 @@ def main() -> int:
     print(f"# Corpus verification — baseline {view}")
     print(f"# expected corpus: {len(expected)} papers (from article-finder, "
           f"not from a directory listing)")
-    print(f"# legend: T=title_truncated D=title_words_dropped S=few_sections H=missing_html C=caption_too_long L=much_shorter J=low_jaccard")
+    print("# legend: T=title_truncated D=title_words_dropped S=few_sections H=missing_html C=caption_too_long L=much_shorter J=low_jaccard")
     print()
     print(f"{'STATUS':9} {'PAPER':40} {'TAGS':12} {'CHARS':>8} {'SECT':>5} {'TABS':>5} {'CAP':>6} {'RATIO':>6} {'JACC':>6}  TIME")
     print("-" * 113)

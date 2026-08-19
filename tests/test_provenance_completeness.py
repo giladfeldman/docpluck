@@ -168,6 +168,7 @@ class TestVersionInfoCompleteness:
             "NORMALIZATION_VERSION": "normalize_version",
             "SECTIONING_VERSION": "sectioning_version",
             "TABLE_EXTRACTION_VERSION": "table_extraction_version",
+            "SYMBOL_CONTRACT_VERSION": "symbol_contract_version",
         }
         exported = {n for n in docpluck.__all__ if n.endswith("_VERSION")}
         assert exported, "sanity: the package should export version constants"

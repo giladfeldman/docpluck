@@ -22,16 +22,42 @@ from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
-
 from docpluck.extract import extract_pdf
-from docpluck.extract_layout import LayoutDoc, PageLayout
+from docpluck.extract_layout import PageLayout
 from docpluck.extract_columns import (
     _band_gutter_x,
     _row_is_2col,
     _segment_bands,
     extract_page_text_banded,
 )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _camelot_disabled_for_this_module():
+    """Disable Camelot for this module's tests, and RESTORE it afterwards.
+
+    This was `os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")` at MODULE
+    level, which runs at COLLECTION time — before any test executes — and was
+    never undone. So merely *collecting* this file disabled Camelot for the whole
+    pytest process, and every real-PDF table test that ran afterwards found no
+    tables and failed.
+
+    That is the second half of the "Camelot tests flake under cumulative load"
+    folklore (the first was an unrestored env var in
+    `test_major_section_heading_promotion`). It was never load. A module-scope
+    fixture is the fix: same speed benefit for this file, no effect on any other.
+
+    Note a per-test autouse guard cannot catch the module-level form — the
+    mutation happens before the first test's snapshot is taken — which is why
+    `conftest.py` also checks the environment across COLLECTION.
+    """
+    prior = os.environ.get("DOCPLUCK_DISABLE_CAMELOT")
+    os.environ["DOCPLUCK_DISABLE_CAMELOT"] = "1"
+    yield
+    if prior is None:
+        os.environ.pop("DOCPLUCK_DISABLE_CAMELOT", None)
+    else:
+        os.environ["DOCPLUCK_DISABLE_CAMELOT"] = prior
 
 TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
