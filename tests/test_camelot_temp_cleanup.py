@@ -18,7 +18,7 @@ import pytest
 
 
 def _tiny_pdf() -> bytes:
-    rl = pytest.importorskip("reportlab")
+    pytest.importorskip("reportlab")  # the skip IS the effect; no binding needed
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import letter
     buf = io.BytesIO()
@@ -37,16 +37,20 @@ def test_cleanup_oserror_does_not_propagate(monkeypatch):
     a list rather than raising — so extract_structured does not see a spurious
     camelot failure and zero out all tables."""
     pytest.importorskip("camelot")
+    from docpluck import tempfiles
     from docpluck.tables import camelot_extract
 
-    real_unlink = camelot_extract.Path.unlink
+    # The unlink now lives in `docpluck.tempfiles` — ONE implementation for all
+    # five temp-PDF sites in the library, because this guard used to exist at two
+    # of them and `extract_pdf` raised straight through. Patch it where it lives.
+    real_unlink = tempfiles.Path.unlink
 
     def boom(self, *args, **kwargs):
         raise PermissionError(32, "The process cannot access the file")
 
-    monkeypatch.setattr(camelot_extract.Path, "unlink", boom)
+    monkeypatch.setattr(tempfiles.Path, "unlink", boom)
     # Must NOT raise PermissionError out of the finally block.
     result = camelot_extract.extract_tables_camelot(_tiny_pdf())
     assert isinstance(result, list)
     # restore (monkeypatch auto-undoes, but be explicit for clarity)
-    monkeypatch.setattr(camelot_extract.Path, "unlink", real_unlink)
+    monkeypatch.setattr(tempfiles.Path, "unlink", real_unlink)

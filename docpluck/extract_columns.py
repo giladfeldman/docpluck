@@ -47,9 +47,11 @@ API
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Iterable
 
+from .telemetry import record_fallback
+from .tempfiles import unlink_temp_pdf
 from .version import resolve_pdftotext_executable
 
 
@@ -228,7 +230,6 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
     even when spacing is lost).
     """
     try:
-        import os
         import subprocess
         import tempfile
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
@@ -250,6 +251,14 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
                 encoding="utf-8", errors="replace",
             )
             if left_proc.returncode != 0:
+                # READ THE DIAGNOSTIC CHANNEL. `capture_output=True` collects
+                # pdftotext's stderr and every one of these paths dropped it,
+                # returning a bare "" that the caller reads as "no column text
+                # here" — identical to a clean no-op (register H3f).
+                record_fallback(
+                    "column_extract_pdftotext_failed",
+                    detail=(left_proc.stderr or "").strip()[:120] or f"rc={left_proc.returncode}",
+                )
                 return ""
             right_proc = subprocess.run(
                 [
@@ -264,18 +273,27 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
                 encoding="utf-8", errors="replace",
             )
             if right_proc.returncode != 0:
+                record_fallback(
+                    "column_extract_pdftotext_failed",
+                    detail=(right_proc.stderr or "").strip()[:120] or f"rc={right_proc.returncode}",
+                )
                 return ""
             left_text = (left_proc.stdout or "").rstrip("\f").strip()
             right_text = (right_proc.stdout or "").rstrip("\f").strip()
             if not left_text or not right_text:
+                record_fallback(
+                    "column_extract_empty_column",
+                    detail=f"left={len(left_text)} right={len(right_text)}",
+                )
                 return ""
             return left_text + "\n\n" + right_text
         finally:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
-    except Exception:
+            # One cleanup, one implementation — see `docpluck/tempfiles.py`. The
+            # bare `except: pass` this replaces was SILENT, and silence is what
+            # let 1,535 temp copies of user documents accumulate unnoticed.
+            unlink_temp_pdf(tmp_path)
+    except Exception as exc:
+        record_fallback("column_extract_exception", detail=type(exc).__name__)
         return ""
 
 
@@ -352,7 +370,6 @@ def _word_multiset(text: str) -> "Counter":
     that noise would defeat the O5 fix. The reorder must preserve every real
     word; trivial digit/punctuation churn is tolerated.
     """
-    from collections import Counter
     import re
     toks = re.findall(r"[^\W\d_]{2,}", text.casefold(), flags=re.UNICODE)
     return Counter(toks)
@@ -892,7 +909,6 @@ def extract_page_text_banded(layout_doc, page_index: int,
         cuts.append((bands[i][2] + bands[i + 1][1]) / 2.0)
     cuts.append(page_height)
 
-    import os
     import subprocess
     import tempfile
 
@@ -943,9 +959,7 @@ def extract_page_text_banded(layout_doc, page_index: int,
             if not did_2col:
                 parts.append(_crop(tmp_path, 0, top, page_width, h))
     finally:
-        if tmp_path:
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+        # `unlink_temp_pdf` is a no-op on a falsy path, so the `if tmp_path`
+        # guard this replaces lives in one place now rather than at each site.
+        unlink_temp_pdf(tmp_path)
     return "\n".join(p for p in parts if p.strip())

@@ -15,14 +15,15 @@ silently fall back to the existing pdfplumber path.
 from __future__ import annotations
 
 import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import re
 
 from docpluck.tables import Cell, Table
+from docpluck.tables.cell_cleaning import repair_cells
 from docpluck.tables.render import cells_to_html
 from docpluck.telemetry import record_fallback
+from docpluck.tempfiles import unlink_temp_pdf
 
 
 # Patterns used to detect rows that look like running headers / page footers.
@@ -477,6 +478,36 @@ def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
     return lattice_ct
 
 
+def _camelot_flavor(ct) -> str | None:
+    """Which Camelot parser produced this table — ``"stream"`` / ``"lattice"``.
+
+    Camelot sets ``Table.flavor`` on the object (``camelot/core.py``,
+    ``__init__``). docpluck runs BOTH flavors and picks per page
+    (:func:`_pick_best_per_page`), then hardcoded ``rendering="whitespace"`` on
+    the result, so the winner was never recorded. Returns ``None`` rather than
+    guessing when the attribute is absent — an unlabelled fallback is the thing
+    this field exists to prevent.
+    """
+    try:
+        flavor = getattr(ct, "flavor", None)
+    except Exception:
+        return None
+    return str(flavor) if flavor else None
+
+
+def _unlink_temp_pdf(tmp_path: str, *held) -> None:
+    """Deprecated alias for :func:`docpluck.tempfiles.unlink_temp_pdf`.
+
+    This function used to hold the ONLY working temp-PDF cleanup in the library,
+    under a comment claiming both of its call sites were covered. Both of *this
+    module's* were; the library had **five**, and `extract.py` — the primary text
+    entry point — was raising `PermissionError` straight out of `extract_pdf`.
+    The implementation now lives in `docpluck/tempfiles.py` so there is one, and
+    the alias is kept only so an existing import does not break.
+    """
+    unlink_temp_pdf(tmp_path, *held)
+
+
 def _camelot_table_to_dict(
     ct,
     idx: int,
@@ -510,6 +541,15 @@ def _camelot_table_to_dict(
     except (AttributeError, ValueError, TypeError):
         accuracy = 0.0
     if accuracy < accuracy_threshold:
+        # A REJECTION IS A DELETION AND MUST LEAVE A TRACE. Every `return None`
+        # in this function discards a table Camelot actually detected, and until
+        # v2.4.133 they were silent — while the exception paths a few lines away
+        # all called `record_fallback`. So a genuine published table that scored
+        # below threshold vanished from the pipeline with no record anywhere,
+        # indistinguishable from a page that had no table at all. Rank by
+        # whether the wrong output announces itself: this one announces nothing.
+        record_fallback("camelot_table_below_accuracy_threshold",
+                        detail=f"{accuracy:.1f}<{accuracy_threshold:.1f}")
         return None
     df = ct.df
     try:
@@ -519,6 +559,7 @@ def _camelot_table_to_dict(
         record_fallback("camelot_table_frame_exception", detail=type(exc).__name__)
         return None
     if n_rows < 2 or n_cols < 2:
+        record_fallback("camelot_table_too_small", detail=f"{n_rows}x{n_cols}")
         return None
 
     # Build the row matrix first; trim noisy rows; then emit cells.
@@ -540,13 +581,35 @@ def _camelot_table_to_dict(
     # the top of a 2-column page with body prose below).
     row_matrix = _trim_prose_tail(row_matrix)
     if not _is_table_like(row_matrix):
+        record_fallback("camelot_table_failed_table_likeness_gate",
+                        detail=f"{len(row_matrix)}rows")
         return None
 
     n_rows = len(row_matrix)
     n_cols = max((len(r) for r in row_matrix), default=0)
 
+    # CELLS ARE BUILT RAW AND REPAIRED ON THE WAY OUT.
+    #
+    # Until v2.4.133 the glyph repairs lived inside `cell_cleaning._html_escape`,
+    # so they were reachable only through the HTML path: `cells_to_html` shipped
+    # `[-0.45, -0.06]` while `flatten`, `Table["cells"][i]["text"]` and
+    # `raw_text` all shipped the corrupt `[20.45, 20.06]` for the same cell.
+    # `flatten` is production and feeds the JSONL sidecar, so structured
+    # consumers received the corrupt value while the rendered table looked
+    # correct. See `clean_cell_text`.
+    #
+    # v2.4.133 fixed that by repairing HERE, at construction — which fixed the
+    # channel divergence and silently created a second defect: the region-path
+    # gates below (`_trim_trailing_prose_rows`, `_whitespace_grid_is_clean`)
+    # consume `cells`, so THEY began judging repaired text too, and one of their
+    # predicates changes in the DELETING direction. A repaired `×`-as-`3`
+    # interaction label loses its only digit and reads as prose, and three such
+    # rows deleted every row below them. So the repair moved again, to
+    # `_repair_cells` after the gates: the row gates above (`row_matrix`) and the
+    # cell gates below both see raw, and every emitted channel sees repaired.
+    # `whitespace._repaired_view` documents the per-predicate rule; pinned by
+    # `tests/test_repair_never_deletes_a_row.py`.
     cells: list[Cell] = []
-    raw_row_texts: list[str] = []
     for r, row_cells in enumerate(row_matrix):
         for c, text in enumerate(row_cells):
             if not text:
@@ -562,9 +625,6 @@ def _camelot_table_to_dict(
                     "bbox": (0.0, 0.0, 0.0, 0.0),
                 }
             )
-        row_text = " ".join(s for s in row_cells if s).strip()
-        if row_text:
-            raw_row_texts.append(row_text)
 
     # Region-driven path only: apply the prose-contamination + caption-absorption
     # guard. A caption-anchored region extends a fixed distance from the caption,
@@ -577,29 +637,51 @@ def _camelot_table_to_dict(
     # keeps its own _trim_prose_tail / _is_table_like gate.
     if id_prefix.startswith("region"):
         from .whitespace import _trim_trailing_prose_rows, _whitespace_grid_is_clean
+        rows_before = len({c["r"] for c in cells})
         cells = _trim_trailing_prose_rows(cells, allow_categorical=allow_categorical)
+        rows_after = len({c["r"] for c in cells})
+        if rows_after < rows_before:
+            # A ROW DELETION MUST LEAVE A TRACE. This trim cuts from the first
+            # sustained prose row to the END of the grid, so it can remove
+            # published data rows; before v2.4.133 it did so with no record at
+            # all, which is what made the R4 dispute unadjudicable — the
+            # deletion it describes would have been invisible either way.
+            record_fallback("region_grid_prose_rows_trimmed",
+                            detail=f"{rows_before}->{rows_after}")
         if not _whitespace_grid_is_clean(
             cells,
             allow_categorical=allow_categorical,
             own_caption_number=own_caption_number,
         ):
+            # A REJECTION IS A DELETION AND MUST LEAVE A TRACE — the same norm
+            # the three sibling gates at the top of this function already
+            # follow. These two `return None`s were the exceptions.
+            record_fallback("region_grid_failed_clean_gate",
+                            detail=f"{rows_after}rows")
             return None
         if not cells:
+            record_fallback("region_grid_empty_after_trim", detail=f"{rows_before}rows")
             return None
-        # Recompute shape + raw_text from the trimmed cell set.
+        # Recompute shape from the trimmed cell set.
         n_rows = max((c["r"] for c in cells), default=-1) + 1
         n_cols = max((c["c"] for c in cells), default=-1) + 1
-        kept_rows = sorted({c["r"] for c in cells})
-        by_row: dict[int, list[Cell]] = {}
-        for c in cells:
-            by_row.setdefault(c["r"], []).append(c)
-        raw_row_texts = []
-        for r in kept_rows:
-            row_text = " ".join(
-                (c.get("text") or "") for c in sorted(by_row[r], key=lambda c: c["c"])
-            ).strip()
-            if row_text:
-                raw_row_texts.append(row_text)
+
+    # REPAIR, ONCE, AFTER EVERY GATE. Both branches converge here, so the
+    # auto-detect and region paths cannot diverge on whether a cell was
+    # repaired — the "one concept, one table" rule applied to the thing that
+    # broke it last time. `raw_row_texts` is derived from the repaired cells
+    # below so `raw_text` agrees with `cells[].text` and the rendered HTML.
+    cells = repair_cells(cells)
+    by_row: dict[int, list[Cell]] = {}
+    for c in cells:
+        by_row.setdefault(c["r"], []).append(c)
+    raw_row_texts = []
+    for r in sorted(by_row):
+        row_text = " ".join(
+            (c.get("text") or "") for c in sorted(by_row[r], key=lambda c: c["c"])
+        ).strip()
+        if row_text:
+            raw_row_texts.append(row_text)
 
     try:
         page = int(ct.page)
@@ -616,6 +698,42 @@ def _camelot_table_to_dict(
         record_fallback("camelot_html_render_exception", detail=type(exc).__name__)
         html = None
 
+    # CONFIDENCE — Camelot's own formula, applied to the grid WE ship.
+    #
+    # Until v2.4.133 this was `accuracy / 100`, which ignores how much of the
+    # capture is empty. Camelot itself exposes a purpose-built score,
+    # `Table.confidence = (accuracy/100) * (1 - whitespace/100)`, and we
+    # recomputed a worse one *under the same name*: an 80%-empty capture at 95%
+    # accuracy reported 0.95 where Camelot says 0.19. That is the register's
+    # A-pattern — the library already computed the number we then guessed at.
+    #
+    # But we do NOT adopt `ct.confidence` verbatim, because `ct.whitespace`
+    # describes Camelot's RAW grid, and by this point docpluck has run
+    # `_strip_running_header_rows`, `_drop_caption_first_row`, `_trim_prose_tail`
+    # (and, on the region path, `_trim_trailing_prose_rows`). Measured over 591
+    # tables from 40 papers: docpluck's shipped grid is CLEANER than Camelot's
+    # raw grid on 345 and dirtier on 47 (median whitespace 41.7% -> 35.9%), so
+    # `ct.confidence` would score our output using their pre-trim measurement.
+    # We therefore apply Camelot's formula to the cells we actually emit.
+    #
+    # THE ACCEPT GATE AT THE TOP OF THIS FUNCTION IS DELIBERATELY UNCHANGED.
+    # Camelot's docstring suggests `confidence >= 0.8` as a production
+    # threshold; measured over 1,751 accepted tables from 78 papers across 60
+    # publishers, that gate would REJECT 79% of them, and `>= 0.5` still
+    # rejects 30%. Academic tables are legitimately sparse — a correlation
+    # matrix leaves its upper triangle empty — so re-gating on this number
+    # would delete real tables wholesale. Whitespace is reported, never gated.
+    filled = len(cells)
+    total_slots = (n_rows or 0) * (n_cols or 0)
+    whitespace_pct = (
+        100.0 * (1.0 - filled / float(total_slots)) if total_slots > 0 else 0.0
+    )
+    # Clip to [0, 1] — Camelot's `accuracy` is occasionally ≥ 100 due to
+    # floating-point arithmetic; without this clip, ``confidence > 1.0``
+    # fails the ``test_table_html_renders_when_structured`` invariant.
+    acc_frac = max(0.0, min(1.0, accuracy / 100.0))
+    confidence = max(0.0, min(1.0, acc_frac * (1.0 - whitespace_pct / 100.0)))
+
     return {
         "id": f"{id_prefix}{idx}",
         "label": label,
@@ -624,11 +742,24 @@ def _camelot_table_to_dict(
         "caption": None,
         "footnote": None,
         "kind": "structured",
-        "rendering": "whitespace",
-        # Clip to [0, 1] — Camelot's `accuracy` is occasionally ≥ 100 due to
-        # floating-point arithmetic; without this clip, ``confidence > 1.0``
-        # fails the ``test_table_html_renders_when_structured`` invariant.
-        "confidence": max(0.0, min(1.0, accuracy / 100.0)),
+        # Finally emits the declared "lattice" vocabulary. `_pick_best_per_page`
+        # really does return lattice captures; hardcoding "whitespace" made them
+        # indistinguishable from stream ones for every consumer.
+        "rendering": "lattice" if _camelot_flavor(ct) == "lattice" else "whitespace",
+        "confidence": confidence,
+        # The COMPONENTS, so a consumer can reconstruct any threshold it likes
+        # and can see exactly what changed when `confidence` changed meaning.
+        # Shipping only the composite would repeat the original mistake in a
+        # new place: one number, no way to tell which half moved.
+        "accuracy": accuracy,
+        "whitespace": whitespace_pct,
+        # WHICH ENGINE ACTUALLY PRODUCED THIS (register F7e). `rendering` was
+        # hardcoded to "whitespace" for every Camelot table, so the declared
+        # "lattice" vocabulary was never emitted and a lattice capture was
+        # indistinguishable from a stream one — an unlabelled engine
+        # substitution, against "record which engine actually produced each
+        # result". `_pick_best_per_page` genuinely returns both flavors.
+        "camelot_flavor": _camelot_flavor(ct),
         "n_rows": n_rows,
         "n_cols": n_cols,
         "header_rows": 1,
@@ -700,18 +831,19 @@ def extract_tables_camelot(
                 out.append(td)
         return out
     finally:
-        # Best-effort temp cleanup. On Windows, camelot (>=2.0) can still hold
-        # the temp-file handle open when we reach here, so ``unlink`` raises
-        # ``PermissionError [WinError 32]``. That exception used to propagate out
-        # of this function and be swallowed by ``extract_structured``'s broad
-        # ``except`` (→ ``camelot_failed``, zero tables) — silently dropping
-        # EVERY table on Windows even though extraction succeeded. POSIX allows
-        # unlinking an open file, so prod/Linux never saw it. Swallow the
-        # cleanup error; the OS temp dir reclaims the file later.
-        try:
-            Path(tmp_path).unlink(missing_ok=True)
-        except OSError:
-            pass
+        # On Windows, camelot (>=2.0) still holds the temp-file handle through the
+        # `Table` objects it returned, so a bare `unlink` raises
+        # `PermissionError [WinError 32]`. `_unlink_temp_pdf` drops those
+        # references and collects before retrying — see its docstring for the
+        # 1,535-file measurement that showed the old "the OS reclaims it later"
+        # comment was false, and for why this is also the cause of the
+        # "Camelot cumulative-load flake".
+        _unlink_temp_pdf(
+            tmp_path,
+            locals().get("stream_tables"),
+            locals().get("lattice_tables"),
+            locals().get("tables_obj"),
+        )
 
 
 def _area_overlap_frac(a: tuple[float, ...], b: tuple[float, ...]) -> float:
@@ -851,10 +983,10 @@ def extract_tables_camelot_by_region(
                 _match_and_emit(batched, tables)
         return out
     finally:
-        try:
-            Path(tmp_path).unlink(missing_ok=True)
-        except OSError:
-            pass
+        # Same leak, same fix — see `_unlink_temp_pdf`. BOTH call sites, because a
+        # cleanup fixed at one of two is not fixed, and this module has a
+        # documented history of exactly that.
+        _unlink_temp_pdf(tmp_path, locals().get("tables"))
 
 
 def _bboxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
@@ -916,9 +1048,17 @@ def merge_camelot_with_docpluck(
             enriched["n_rows"] = ct["n_rows"]
             enriched["n_cols"] = ct["n_cols"]
             enriched["header_rows"] = ct.get("header_rows", 1)
-            enriched["rendering"] = "whitespace"
+            enriched["rendering"] = ct.get("rendering", "whitespace")
             enriched["kind"] = "structured"
             enriched["confidence"] = ct.get("confidence", enriched.get("confidence"))
+            # The quality COMPONENTS and the engine record travel with the cells
+            # they describe. Copying `confidence` alone would leave a merged
+            # table whose accuracy/whitespace/flavor described the docpluck
+            # capture while its cells came from Camelot — provenance that is
+            # complete-LOOKING and wrong, which is worse than absent.
+            enriched["accuracy"] = ct.get("accuracy")
+            enriched["whitespace"] = ct.get("whitespace")
+            enriched["camelot_flavor"] = ct.get("camelot_flavor")
             enriched["html"] = ct.get("html")
             # Keep docpluck's label/caption/footnote/raw_text/bbox
             out.append(enriched)

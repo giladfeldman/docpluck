@@ -1,5 +1,1397 @@
 # Changelog
 
+## [2.4.134] - 2026-08-15/16
+
+**Closing the defects v2.4.133 itself introduced, plus the register's §H backlog. The headline:
+this release's own telemetry fix had re-created the write-only defect one layer up, a
+data-integrity fix had quietly started deleting table rows, and a sign-recovery rule was one
+detached space away from printing a number no paper contains.**
+
+Two independent reviews (Fable, Sonnet) on a frozen tree; where they split, a reproduction decided,
+and where a reproduction was impossible without a denominator, the denominator was measured and the
+change was **not** shipped. Every number below is re-runnable from a tool in `tools/diag/`.
+
+### A repair may no longer delete a row (register R4 — the reviewers' split, resolved)
+
+v2.4.133 moved `clean_cell_text` to cell CONSTRUCTION so every table-text channel would agree. It
+did — and it also changed what the region-path structural gates are handed, which nobody measured.
+One predicate moved in the DELETING direction: the W0i class prints `×` as `3`, so a raw
+`Direction 3 manipulated attribute` carries a digit and reads as DATA, while the repaired
+`Direction × manipulated attribute` has none and reads as PROSE. Three such rows form a
+`_PROSE_RUN_MIN` run and `_trim_trailing_prose_rows` cuts **from the first of them to the end of the
+grid**.
+
+The handoff could not reproduce it in three attempts; the missing condition was that the rows must
+be CONSECUTIVE. Verified by breaking the guard: under the pre-fix composition a six-row fixture
+keeps rows 0–1 and loses `Gender`'s published coefficients `0.31 / 0.09`.
+
+Fixed at both levels, deliberately:
+* **root** — `_STAT_TOKEN_RE` never knew `×`, the notation the repair chain itself emits. A row
+  containing `×` in an academic table is an interaction term, never running prose.
+* **structural** — the repair moved again, to `cell_cleaning.repair_cells`, which runs AFTER the
+  gates at all four call sites (including the dormant `cluster.lattice_cells`). The gates receive
+  RAW cells and split their predicates by what a rejection costs: a CONTENT-DELETING predicate
+  (`_row_is_prose`, `_cell_is_prose`) must agree on **both** the raw and repaired forms before it
+  deletes, so a repair can never manufacture a deletion; a VALIDITY predicate (`_cell_is_garbled`,
+  `_cell_is_clean_data`, `_CAPTION_LABEL_RE`) judges the REPAIRED form, because that is the text
+  shipped and rejecting there costs a whole table rather than silent rows. Both forms are derived
+  once per gate by `whitespace._repaired_view`, keyed on `(r, c)` — not a parallel list, which would
+  drift the moment the trim did its job. The split is the reviewers' converged position.
+
+**Measured** (`tools/diag/repair_gate_guard_diff.py`, 26-paper baseline): **0 rows lost, 0 tables
+lost, 129 cells repaired across 9 papers**. The last figure is the instrument's known positive — a
+four-way zero without it would be unreadable.
+
+Both region-path `return None` sites, and the row trim itself, now record. They were the only gates
+in that function without telemetry, which is why the dispute could not be adjudicated from output.
+
+### A sign that is DETACHED is still a sign (`- -0.38`)
+
+`_ALREADY_SIGNED` is a one-character negative lookbehind. It refuses `-0.38` and **accepts**
+`- 0.38`, so W0g read the estimate as bare-positive, proved it negative from the CI, and emitted
+`d = - -0.38` — a fabricated value, the class this project ranks above all others. The comment
+above `_SIGNED_DASHES` records that `-2.68 -> --.68` already happened in v2.4.62 and says plainly
+that *"the fix then covered the one dash form in front of us"*. It covered the attached form.
+
+Found by the **idempotency corpus gate**, not by reading the rule.
+
+### W0q — the CI repair reaches body prose (three-channel rule)
+
+`recover_dropped_minus_ci_upper_in_text` lived only in `cell_cleaning`, so a confidence interval
+written in a results SENTENCE never met it. Confirmed against the rasterized page of
+`10.1016/j.jesp.2021.104154` p13, which prints
+
+    t(399) = −3.79, p < .001, d = −0.38, 95% CI [−0.58, −0.18]
+
+while pdftotext delivers `[- 0.58,\n- 0.18]` with every minus detached. **3 brackets in 1 of 26
+baseline papers, and the estimate-containment arithmetic repaired 0 of them** — it had grabbed
+`S·D = 1.43` as the "estimate" and tested containment against an unrelated number.
+
+### Each repair declares WHICH evidence it used (registers O5, O8, O10)
+
+* **O5** — `_CI_UPPER_DROPPED_RE` captured a detached dash as group 5 and **never read it**. It now
+  decides: the dash is a glyph the renderer emitted, and the comma proves it is a sign rather than a
+  range separator, so `[lo, – hi]` is TYPOGRAPHIC. The containment arithmetic is **kept**, because
+  `chan_feldman_2025_cogemo` Table 9 row 2bii has no dash and only the arithmetic recovers its
+  published `−0.33` — both reviewers verified that from the source independently. It is now
+  declared as `ci_upper_minus_inferred_from_containment` rather than hidden. Retiring it moves work
+  onto consumers and remains an owner decision.
+* **O10** — `_recover_estimate_column_via_ci_column` treated *any* negative bound as proof of the
+  `2`-for-minus corruption, including bounds `recover_corrupted_minus_signs` had manufactured one
+  line earlier. It now fires only on a bracket **this pass actually repaired**. A test fixture that
+  fed already-repaired CIs was re-derived from the paper's real corrupt text (`[21.58, 21.10]`,
+  `[20.08,` — both verbatim in `efendic_2022_affect`).
+* **O8** — the ruling, written into the code and `docs/SCOPE.md`: W0i/W0k/W0l are TYPOGRAPHIC;
+  **W0j signature B is INFERENTIAL** (it keys on a variable NAME, and a name is not something the
+  renderer emitted) and records every firing. W0p records its positional pairing rather than
+  converting on an unmeasured shape.
+
+### Telemetry that actually reaches a consumer, from every channel
+
+* `NormalizationReport.fallbacks` / `.fallback_details` — every `record_fallback` inside
+  normalization fired **after** `extract_pdf_structured` returned, outside its snapshot window, so
+  all of it was write-only — **including the ambiguous-pairing refusals v2.4.133 added to make
+  W0h/W0m observable**. The fix for write-only telemetry had re-created the defect one layer up.
+* **Concurrency (R5)** — the counters were one process-global `Counter`, and the service runs sync
+  extraction in a threadpool. A two-thread probe showed each document reporting the other's events.
+  Sinks are now `ContextVar`-scoped; `fallback_snapshot` / `fallbacks_since` are removed rather than
+  left as a trap.
+* **`detail` reaches the consumer** — `record_fallback(event, detail=font)` keyed the Counter on the
+  event alone and dropped the font, so the doc comment promising a consumer could "see which
+  document to distrust" was false of the artifact.
+* **`fallbacks: {}` no longer overclaims** — the symbol-font scan ran only when layout happened to
+  exist, so "we found nothing" and "we never looked" were identical. It now always scans and emits
+  `symbol_font_scan_not_run` / `symbol_font_scan_layout_materialized`.
+* **`cell_cleaning` had zero telemetry** (register O11, the "darkest channel") — the five
+  `cells_grid_to_html` `return ""` points, each discarding a whole table, now record; so do
+  `extract_columns`' discarded pdftotext stderr (H3f), mammoth's own conversion messages (H3d), and
+  `flatten`'s silent stat-field drops (H3g).
+
+### `_drop_running_header_rows` was deleting counts (register O11)
+
+The register's filed example did not reproduce — its own `has_real_below` test blocks it. The real
+shape needs an ordinary label row beneath, and is worse than what was recorded:
+
+    [["Positive","245","12"], ["Mean reaction time (ms)","452.3","18.7"]]   row deleted
+    [["Control","120","8"],   ["Total sample size","1240","96"]]            row deleted AND
+                                              ->  ["Total sample size","",""]   counts blanked
+
+`_WEAK_RH_PATTERNS` matches any capitalised word and `_STRONG_RH_PATTERNS` any 1–4 digit integer —
+which is exactly what a frequency table is made of. `camelot_extract._looks_like_running_header` has
+always capped a running header at two populated cells; this module's copy of the same concept never
+did. Cap restored for the drop; the blank pass now requires **exactly one** strong cell, since a
+leaked page number is one cell and a counts column is several.
+
+### The symbol-font detector's false positives (R8)
+
+`_SYMBOL_GREEK_PREIMAGES` covers 25 of 26 lowercase letters, so a subset face drawing only
+statistical italics qualified. The two negative filters the diagnostic scan had already validated
+now live in the library and are imported by the scan (one concept, one table). **Measured by
+disabling each: 6 false positives on `ieee_access_7`, 2 on `bmc_med_3`, every true positive
+preserved.**
+
+### One concept, one table
+
+`_normalize_cell_text` existed verbatim in `whitespace.py` and `cluster.py`, and `cluster`'s copy
+never called the repair chain — a dormant fourth capture path that would have reintroduced the
+pre-v2.4.133 divergence the day anyone wired it in. Both now delegate to
+`cell_cleaning.normalize_cell_whitespace`, pinned by a test that asserts the sites AGREE rather than
+restating the constants.
+
+### The "Camelot cumulative-load flake" was never load — and the folklore is why nobody looked
+
+Nine real-PDF table tests failed in every full-suite run and passed when run per-file. This was
+recorded in `CLAUDE.md`, in a memory, and in three handoffs as *"Camelot tests flake under
+cumulative load (even serial)"*, with the standing workaround **"run each file separately"**.
+
+It is **36 test modules doing `os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")` at module
+scope.** That executes during COLLECTION — before any test runs — and was never undone, so importing
+any one of them disabled Camelot for the entire pytest process and every real-PDF table test
+collected afterwards found no tables. A second, smaller instance was an unrestored assignment in
+`test_major_section_heading_promotion._render_cogemo`.
+
+Reproduced in 48 seconds with two files, after a whole session of repeating the received
+explanation:
+
+    pytest tests/test_major_section_heading_promotion.py \
+           tests/test_tables_superheader_alignment_real_pdf.py     -> 2 failed
+
+**A documented flake is a failure nobody re-investigates.** The write-up was load-bearing in the
+wrong direction: it made an ordinary state leak look like a property of a third-party library, and
+it made every full-suite run untrustworthy for months.
+
+Fixed by making the flag DECLARATIVE (`DISABLE_CAMELOT = True`, read by a module-scoped autouse
+fixture in `conftest.py` that restores the prior value), plus two guards, because the two forms fail
+differently:
+
+* a **per-test** autouse fixture fails the offending test BY NAME if it leaks a `DOCPLUCK_*`
+  variable — instead of failing an innocent test several files later, which is what made this look
+  like nondeterminism;
+* a **collection-time** check (`pytest_configure` / `pytest_collection_finish`) fails the whole run
+  for a module-scope mutation, which no per-test fixture can see because it happens before the first
+  test's snapshot.
+
+**Result: the decisive subset went from 9 failed to 426 passed, and the full suite is green.**
+
+### Camelot leaked a copy of every input PDF — including user uploads
+
+Separately, and found while testing the (wrong) hypothesis that the leak caused the flake:
+`extract_tables_camelot` and `extract_tables_camelot_by_region` each write the input to a
+`NamedTemporaryFile(delete=False)`, and the `finally` unlink fails on Windows because camelot ≥2.0
+still holds the handle through the `Table` objects it returned. The code caught the error and
+concluded *"the OS temp dir reclaims the file later"*.
+
+It does not. **Measured: 1,535 leaked `tmp*.pdf` files** in this machine's temp directory, one per
+call, each a full copy of the input document. On the FastAPI service that means every uploaded PDF
+is copied into the container's temp directory and left there — a data-retention property nobody
+chose.
+
+`_unlink_temp_pdf` drops the references and collects before retrying, and pays for the collection
+only when the first unlink fails, so POSIX is unaffected. A cleanup that still fails now RECORDS
+rather than passing silently — a silent cleanup failure is what let 1,535 files accumulate unnoticed.
+
+### …and that fix covered TWO of the library's FIVE temp-PDF sites (2026-08-19)
+
+The paragraph above shipped under a source comment reading *"BOTH call sites, because a fix applied
+to one of two is not fixed, and this module has a documented history of exactly that."* The sentence
+was true about `camelot_extract.py` and false about the library. `grep` for
+`NamedTemporaryFile(suffix=".pdf", delete=False)` returns **five** sites:
+
+| site | cleanup as shipped | consequence |
+|---|---|---|
+| `camelot_extract.py:834` | `_unlink_temp_pdf` | retried, recorded |
+| `camelot_extract.py:947` | `_unlink_temp_pdf` | retried, recorded |
+| `extract.py:249` | bare `os.unlink`, **no guard at all** | **raises out of `extract_pdf`** |
+| `extract_columns.py:292` | `except Exception: pass` | silent |
+| `extract_columns.py:965` | `except Exception: pass` | silent |
+
+**Reproduced, not reasoned about.** With the unlink forced to raise `PermissionError [WinError 32]`
+— the error this machine has already produced at the sibling site — `extract_pdf`,
+`extract_pdf_structured` and `render_pdf_to_markdown` all propagate it, *after the text has already
+been extracted successfully*, and nothing anywhere records it. The 2026-06-13 incident is what this
+costs: a raised cleanup error reaches `extract_structured`'s broad `except`, reads as "camelot
+failed", and zeroes every table on a document whose extraction entirely succeeded. `extract_pdf` has
+no such net — it simply raises.
+
+The invariant is now stated once and held everywhere: **a temp-PDF cleanup failure must never
+propagate out of an extraction entry point, and must never be silent.** The implementation moved to
+`docpluck/tempfiles.py::unlink_temp_pdf` (one concept, one table); all five sites call it;
+`camelot_extract._unlink_temp_pdf` remains as a deprecated alias. The telemetry key is
+`temp_pdf_not_deleted` — renamed from `camelot_temp_pdf_not_deleted` because the event is no longer
+camelot's, and free to rename because v2.4.134 is the release introducing it (`git show
+v2.4.126:docpluck/tables/camelot_extract.py` has no occurrence, so no consumer can be reading it).
+
+**Nothing is currently leaking**: instrumented per entry point, all five sites delete their own temp
+file, every time. The defect is what happens when one of them cannot — and 1,469 files from before
+the v2.4.134 fix are still on this machine.
+
+### The leak test could not see the property it named
+
+`test_camelot_temp_pdf_is_not_leaked` asserted `after <= before` where both were
+`len(glob(tempfile.gettempdir() + "/tmp*.pdf"))` — a count of a directory **every process on the
+machine shares**. It failed in the full suite and passed in isolation, and was on its way to being
+recorded as another flake.
+
+Measured, both directions wrong:
+
+| arm | directory delta | verdict | docpluck's own telemetry |
+|---|---|---|---|
+| run alone | **+1** | **FAIL** | 0 cleanup failures |
+| run with a concurrent extractor | 0 | PASS | 0 cleanup failures |
+
+The +1 was another process's temp file existing at the instant of the count — it does not even need
+to leak, only to be mid-extraction. A second full pytest run was live on this machine at the time.
+So the gate goes red when nothing is wrong, and would go green while something is.
+
+Replaced by `tests/test_temp_pdf_cleanup_invariant.py`, which spies on `tempfile.NamedTemporaryFile`
+and checks the paths **this process** created — process-local, so a concurrent run cannot touch it —
+and asserts the invariant at all five sites plus the recording. Written against the unfixed tree
+first and watched fail: 4 failed / 8 passed before, 13 passed after.
+
+### 21 test files still resolved fixtures under the pre-2026-08-03 Dropbox root
+
+`conftest.py` has the correct `VIBE_ROOT`-aware resolver. 21 test modules bypassed it with their own
+`Path.home() / "Dropbox" / "Vibe"`, so their fixtures "were not present" and the tests **skipped
+silently** — on a machine where those PDFs are sitting at the current root. An earlier commit fixed
+the snapshot suite only; the rest were missed, which is the same *covered-the-case-in-front-of-us*
+shape as the two defects above.
+
+This is the failure mode `CLAUDE.md`'s own rule warns about verbatim: *"a discovery helper that
+returns empty when the root is wrong makes a broken run look like a clean one — that is exactly why
+the 2026-08-03 move went unnoticed for five weeks while the weekly reviews passed."* All 21 now
+resolve `VIBE_ROOT` with a `~/Vibe` fallback.
+
+### What the two final reviews found — and it was the same defect twice more
+
+Both reviewers were run adversarially on the frozen tree and **both independently found the same
+Sev-1**, which is the pattern this release is about:
+
+**The telemetry fix stopped one hop short, a third time.** `batch.py` — the corpus pipeline, and the
+one production caller that passes `dropped_minus_layout=` where the W0h/W0m refusals actually fire —
+received a `NormalizationReport` carrying `fallbacks` and never copied it out. `grep -i fallback
+docpluck/batch.py` returned **zero matches**, so the per-file `.json` sidecar, the artifact a
+consumer reads, contained none of it. A refusal changes no text, so it appears in neither
+`steps_changed` nor `changes_made`: for the corpus channel the refusals were recorded, attached to a
+report, and dropped at the serializer. `ExtractionFileResult` now carries `fallbacks` /
+`fallback_details`, and a test asserts that **every** declared field either reaches the sidecar or is
+named in `_SIDECAR_SKIP_RESULT_FIELDS` — a general guard, since this is the third field to go
+missing there.
+
+**The same, for the rendered path.** `render_pdf_to_markdown` calls `extract_pdf_structured` and
+`extract_sections` internally and discarded both reports, so nothing recorded beneath the function
+that produces the `.md` a user reads was visible to any caller. It is now a thin wrapper holding a
+`fallback_scope`, and `RenderReport` carries `fallbacks` / `fallback_details`.
+
+**And the `- -0.38` fix had covered the one RULE in front of it.** `_already_carries_a_sign` was
+wired into W0g only. Reproduced by the reviewer on this tree and confirmed here:
+
+    recover_minus_via_ci_pairing('M = - 20.54, SD=0.04, CI = [-0.61, -0.47]')
+        -> 'M = - -0.54, ...'                                          W0d
+    recover_prose_two_for_minus('direction: - 20.5 = low, + 0.5 = high')
+        -> 'direction: - -0.5 = low, ...'                              W0j sig. A
+
+The v2.4.62 comment laments that *"the fix then covered the one dash form in front of us"*; the
+sequel was *the fix covered the one rule in front of us*. The guard is now applied at every
+substitution site, and `tests/test_w0_minus_lookbehind_completeness.py` — the file created for
+exactly this class — gained the detached cases across all rules plus one end-to-end assertion that
+no rule emits a double sign.
+
+Two honest residuals recorded rather than fixed: a sign left at the END of one line with its digits
+wrapped to the next is still invisible (these rules process one line at a time), pinned as a
+**strict xfail** with the reason — no real paper exhibits it, and this project does not build
+machinery for an unobserved shape. And one of this release's own earlier tests was found to pass
+that case **vacuously**, because `-\n-0.38` contains neither `--` nor `- -`; its assertion is now
+an exact-equality check.
+
+### Two shipped rules were REVERTED on measurement, not on judgement
+
+* **R1(a) "exhaustive match needs no pairing"** — a sound argument, written and then removed.
+  `tools/diag/w0h_pairing_prevalence_scan.py` over **60 sampled papers plus the W0h source paper**
+  finds 3 sites, **0 with more than one textual candidate**, so the ambiguous branch never executes.
+  The missed repair is a pass-through. Re-open it when that scan reports non-zero.
+* **The `64/68` vs `135/135` figure (G6e)** — corrected in all three documents, and its
+  *replacement* in register §G3 ("9 differ, 2 match, no overlap") **did not reproduce either**:
+  re-measured it gives 10/6 **with** overlap. A per-token ratio depends on how tokens are
+  enumerated and no method was ever recorded. Replaced by the font census — `AdvTimes` 35,682
+  glyphs / 86 distinct vs `AdvP586B` 124 / 3 (`'2'`×99, `'3'`×24, `'.'`×1) — and by the command that
+  regenerates it: `python tools/diag/symbol_font_census.py <pdf>`.
+
+### The three TEXT-LOSS defects behind `xfail(strict)` are closed (2026-08-19)
+
+Three gold-verified text-loss defects had been pinned as `xfail(strict)` because a fix for each was
+attempted and **reverted as net-harmful**. All three now XPASS and are plain asserts. Two of the
+reverts, and the first version of this release's own remedy, rested on claims nobody had
+re-measured. Full account in `docs/OVERHAUL_REGISTER.md` §J; the shape lessons are L-046 and L-047.
+
+**1. A caption's bbox spanned both text columns — DIAGNOSED, FIX REVERTED, STILL OPEN.**
+The paragraph below describes a fix that **does not ship**; see "Both capture-path fixes were
+reverted" below and register §J14. What ships is the diagnosis. Filed for five sessions as a *vertical*
+over-capture ("the region absorbs the prose below the table"). It is horizontal.
+`detect._bbox_of_caption_line` grouped a page's chars by `round(top)` **across the whole page** and
+returned `min(x0)`/`max(x1)`, so on a two-column page the caption's y-row also held the neighbouring
+column's body line — `chan_feldman_2025_cogemo` p8 gave a **441.8pt** caption bbox for a table that
+occupies 214pt, and every grid guard downstream then rejected the table "on its own merits". The
+matched row is now clipped to the column run carrying the caption (`detect._column_runs`), keyed on
+the page's own gutter: the caption's median inter-word gap is **2.9pt** against a **10.5pt**
+gutter. Typographic evidence — a whitespace band the renderer emitted. Region words 266 → 107.
+
+**2. Row clustering measured the y-gap to the previous WORD — DIAGNOSED, FIX REVERTED, STILL OPEN.**
+The paragraph below describes a fix that **does not ship**; see "The row-clustering fix was reverted"
+further down and register §J12 for why. What ships is the diagnosis and the measurement. Words are sorted by `(top, x0)`, so
+the running "previous top" creeps forward in sub-threshold steps and an arbitrarily tall band
+collapses into one row. `python tools/diag/row_cluster_census.py` over the 26-paper baseline:
+**30 of 60 caption-anchored regions smeared, across 8 papers** — half the corpus, not one paper's
+quirk. The gap is now measured from the row's ANCHOR.
+
+**The 2026-08-04 revert's counter-example was itself the defect.** That revert was justified with
+*"a real row can legitimately be TALL: xiao Table 4's row 2 spans 94.4pt as a multi-line stacked
+data block"*. That "row" is the **entire table body** — stacked header, five product rows, five CI
+continuation lines, 75 words — and `whitespace_cells` returned **nothing** for it. Four geometric
+discriminators had been designed and rejected *around* a constraint that did not exist. After the
+fix `xiao_2021_crsp` Table 4 is 7 rows / 35 cells, matching the printed page, and the 9 real-PDF
+tests the 2026-08-04 attempt broke are green.
+
+**3. `_pick_better_table` never asked whether the winner was a table.** Arbitration was on SHAPE
+alone — column count, then cell count — so a Discussion paragraph that Camelot's auto-detect
+structured as a 4x2 grid outranked and replaced `maier_2023_collabra` Table 7's gold-exact 3x5
+descriptives, and the rendered `### Table 7` carried its caption and zero data values. Candidates
+are now tested for prose dominance (`whitespace.grid_is_body_prose`) before arbitration.
+
+### The first version of this release's own remedy re-created the defect it repaired
+
+The anchor rule can split a wrapped cell away from its row, so a continuation re-merge was added:
+fold an indented, single-baseline, vertically-contiguous line back into the row above it. It passed
+every unit test, the 9 previously-broken real-PDF tests and all three defect tests — **31 green
+tests.** The corpus guard-diff said **21 tables lost cells (-867) and 12 lost raw_text**.
+
+Each fold EXTENDED the row, so the contiguity test compared the next line against an ever-lower
+bottom edge and could never fail: an **unbounded chain merge produced by the fix for unbounded chain
+merges**. On `10.1111/jomf.13036` Table 6 the data rows are labelled `1`, `2`, `3`, `4+` in a column
+indented past `Overall childhood disadvantage`, so all five folded into a single 75pt row.
+Re-anchoring the bound on the preceding LINE did not save it either — inter-line leading is only
+~3pt, so it never bit. **Deleted rather than tuned:** corpus-wide it bought one correct fold.
+
+The same guard-diff found two further defects, both in remedies rather than in original code:
+
+* `grid_is_body_prose` condemned a REAL table — `10.5465/amc.2022.0006` Table 4, a 33x4 qualitative
+  synthesis under `Criteria | Synthesis and Evaluation | Recommendations`, **70 cells and 2,008
+  characters**, every data cell a sentence-length phrase. Closed with a HEADER-ROW veto reusing
+  `cell_cleaning._is_header_like_row` rather than restating it: a running paragraph sliced into a
+  grid has no row naming its columns.
+* Worse, when that guard rejected, the fallback produced **nothing** — 0 cells and 0 raw_text. The
+  guard was a deletion. The rejection is now PROVISIONAL: the candidate is stashed and restored
+  unless a replacement actually materialises, recording
+  `table_prose_rejection_reverted_no_replacement`. **Never trade content for emptiness.**
+
+### Both pre-release reviewers found defects in THIS release's own fixes
+
+Fable and Sonnet, one adversarial brief, frozen tree, run independently. **They converged on the
+same two findings** — which is what made them credible — and every finding was reproduced locally
+before being acted on. Full account in `docs/OVERHAUL_REGISTER.md` §J7.
+
+* **Pass 3 of `_bbox_of_caption_line` returned a bbox covering only the label.** The clip was
+  "strictly non-regressive" for passes 1–2 only: pass 3 matches a loose SUBSTRING, so a run holding
+  just `Table 3.` satisfied it before the loop reached the unsplit-row fallback. Reproduced as **a
+  35pt bbox for a 247.6pt caption**. A label-only match is now REMEMBERED and returned only when
+  nothing richer exists, so a caption that genuinely is `Table 1` on its own line still resolves —
+  `10.1016/j.joep.2020.102350` is exactly that, and the other content on its row is a stray `.`
+  617pt away.
+* **The header-row veto could be bought with one short cell.** `_is_header_like_row` returns True
+  for a single short non-numeric cell, so one row containing `Overview` above a three-row Discussion
+  paragraph flipped `grid_is_body_prose` to False. A header must now NAME AT LEAST TWO COLUMNS.
+* **A smaller replacement now announces itself** (`table_prose_replacement_smaller_than_candidate`).
+  The decision is deliberately NOT flipped — smaller is usually correct here — but a shrink nobody
+  can see is the difference between a guard and a quiet deletion.
+
+**One finding was reproduced and then REJECTED on the evidence.** A wrapped CI (`[0.12,` / `0.45]`)
+does split onto its own row, but it is not a regression (the retired previous-word rule splits the
+identical input), the fragment survives the prose trim, and `cell_cleaning._merge_continuation_rows`
+— the v2.4.4 fix built for this shape — rejoins it into `[0.12, 0.45]`. The residual is a phantom
+row in `cells`/HTML on the whitespace path, named in `docs/SCOPE.md`. A reject is a claim too, so
+the reproduction that decided it is recorded.
+
+**A guard with no known positive was found and given one.**
+`table_prose_rejection_reverted_no_replacement` fired **0 times in the 26-paper baseline**, because
+the header veto spared the paper it was built for. It was not removed — the veto is a heuristic and
+the backstop is what makes "never trade content for emptiness" structural. Tightening the veto put
+`10.5465/amc.2022.0006` back on the rejection path; the backstop now fires on a real DOI and
+`tests/test_prose_rejection_never_deletes_real_pdf.py` pins the wiring end to end.
+
+### A THIRD defect in this release's own guard, found by re-running the gate
+
+The reviewers reviewed tree *N*; their fixes made tree *N+1*; the gate had only ever run on *N*.
+Re-running it caught `10.48550/arxiv.2406.11713` **Table 1 losing its published FID values** — a
+12x7 grid whose first rows are absorbed Discussion prose and whose later rows are the real table
+(`Dataset | Scale factor f | Ouput size | FID`, `CIFAR-10 | 2 | 16 x 16 x 4 | 1.32`). Prose
+dominance condemned all 27 cells and the fallback carried 61 of 511 characters.
+
+The guard was being used as a CLEANLINESS test. It is narrowed to what justifies it: **a grid
+carrying real data is never body prose** (`_MIN_CLEAN_DATA_ROWS`, reused from
+`_whitespace_grid_is_clean`, not a second threshold). maier Table 7 still fails it, because its only
+clean-data cell is the stray footnote digit `4` — one row, under the threshold of two.
+
+One of this release's own tests asserted the over-broad behaviour and was CORRECTED rather than
+deleted: a grid whose three rows carry real numbers is not body prose. *A test that pins an
+over-broad guard is that guard's strongest defender.*
+
+**Given up deliberately, and queued rather than banked:** the over-broad guard was incidentally
+suppressing FUSED grids — `10.1016/j.jesp.2009.12.010` T3 ships `4.603.804.80` (three glued numbers)
+and `10.1177/01461672251327169` T3 ships `104594` (two published numbers glued into one). Those are a
+real wrong-number defect and they now ship again. They need their own rule with their own evidence;
+a prose guard must not fix them by accident.
+
+**Three defects were found in this release's own remedies, one at each verification stage** —
+guard-diff (the chaining re-merge), the reviewers (pass 3, the header veto), guard-diff again (this
+one). Re-run the gate on the tree you intend to ship, not the tree that was reviewed.
+
+### The row-clustering fix was REVERTED — it ships a wrong number
+
+Anchor-relative clustering closed the chain merge and recovered real tables, and it **regressed
+`efendic_2022_affect` by 11 sign-flipped B-coefficients on the production path**: the grid it enables
+is under-segmented (one cell fusing two rows), which separates each corrupt `2X.XX` estimate from the
+CI proving it negative, so `21.09` ships where the paper prints `-1.09`. By this project's ranking a
+sign-flipped coefficient outranks a missing grid, so it does not ship.
+
+**The corpus guard-diff was blind to it** — it compares cell counts and lengths, never values, and by
+those measures efendic improved. Only the test suite caught it, on the re-run after the reviewers'
+fixes.
+
+Three containments were tried and all failed (continuation re-merge — chained; bounded fixed-point
+on the CI pairing — wrong hypothesis; signature-keyed hybrid — efendic smears too). All three are
+named in `whitespace._cluster_into_rows`' docstring and register §J12 so nobody pays for them twice.
+
+**So this release closes 1 of the 3 text-loss defects, not 3:**
+
+| # | defect | status |
+|---|---|---|
+| 1 | maier T7 — a prose grid outranks the correct data | **CLOSED** |
+| 2 | `_cluster_into_rows` chain merge | **OPEN**, `xfail(strict)` restored with a measured reason |
+| 3 | chan_feldman region over-capture | **HALF CLOSED** — the horizontal cause (caption bbox spanning both columns) is fixed and `10.1177/01461672251327169` Table 10 gains 32 cells; the clustering half is open |
+
+What is left behind is still substantial: the 2026-08-04 revert's premise is **proven false**, the
+prevalence is **measured** (30 of 60 regions across 8 papers), and the blocker is now specific —
+clustering is blocked on column-segmentation quality (A1/G6a), not on a fifth threshold.
+
+### Both capture-path fixes were REVERTED — this release closes 1 of 3 text-loss defects
+
+Two of the three fixes shipped a defect of their own and were reverted rather than tuned:
+
+* **Row clustering** (§J12) — anchor-relative clustering closed the chain merge and regressed
+  `efendic_2022_affect` by **11 sign-flipped B-coefficients** (`21.09` where the paper prints
+  `-1.09`). A sign-flipped coefficient outranks a missing grid.
+* **The caption clip** (§J14) — clipping a caption bbox to its own column is correct about captions,
+  and cost `ip_feldman_2025_pspb` Table 10 a **stat column** (4 → 3), because that table is
+  full-width under a narrow caption and the old whole-row bbox was accidentally covering it.
+  `chan_feldman` needs its region NARROW and `ip_feldman` needs it WIDE, on the same signature.
+
+**Both are blocked on the same thing: real per-cell/region geometry (A1/G6a)**, which also gates the
+FUSED-GRID class. That is now the highest-value unblocking item in the repo.
+
+| # | defect | status |
+|---|---|---|
+| 1 | maier T7 — a prose grid outranks the correct data | **CLOSED** |
+| 2 | `_cluster_into_rows` chain merge | **OPEN**, `xfail(strict)`, blocker measured |
+| 3 | chan_feldman region over-capture | **OPEN**, `xfail(strict)`, cause re-diagnosed as HORIZONTAL |
+
+What this release leaves behind is the diagnosis and the measurement, not the patch: defect 3 had been
+filed as a vertical "trim the prose edges" problem for five sessions and is horizontal; the
+2026-08-04 revert's counter-example was itself the defect; prevalence is measured; and six dead ends
+are named so nobody pays for them twice.
+
+### New re-runnable diagnostics
+
+* `tools/diag/row_cluster_census.py` — how often the previous-word rule smeared a region, with
+  before/after row counts per table. **30 of 60 regions across 8 papers.**
+* `tools/diag/caption_bbox_census.py` — regenerates every figure quoted for the caption clip.
+  **7 of 59 table captions (11.9%) sit on a row that splits at a gutter**; the other 52 are
+  byte-unchanged.
+* `tools/diag/table_capture_guard_diff.py` — what the three capture-path changes do to table
+  CONTENT corpus-wide, in one process, with `--isolate <change>` to attribute a regression to a
+  single fix. This is the gate that caught all three remedy defects above.
+* `tests/test_row_cluster_census_baseline.py` pins the census's "before" arm so it cannot drift into
+  agreeing with the shipped rule — a diagnostic whose baseline has become the treatment reports a
+  clean zero on a corpus full of defects.
+
+## [2.4.133] - 2026-08-15
+
+**Executing the cell-channel detour. Two of the plan's own instructions were measured and found
+wrong; one paper filed as a "known negative" turned out, on the rasterized page, to be a NEW
+corruption class; and a production defect that fabricates a minus sign on the wrong statistic was
+reproduced and fixed.**
+
+Work queue: `docs/OVERHAUL_REGISTER.md` (living backlog — **tracked**, ships in a clone). Full
+run record in its new §G.
+
+### The layout-gated repairs stop assigning their evidence positionally (register C1 / F7f — "Risk A")
+
+`W0h` (dropped minus) and `W0m` (β-as-`b`) prove *"N glyphs of shape X are corrupt"* in
+**pdfplumber's** character stream, then rewrote **pdftotext's** text. The bridge between the two
+channels was a bare count with **no page key**, applied over the whole document — so **a glyph
+proven on page 7 licensed flipping the first matching token on page 2.**
+
+**Reproduced, not reasoned about.** With a decoy `q = .428` prepended to the W0h source paper
+(`ar_apa_j_jesp_2009_12_011`), the pre-2.4.133 code **flipped the decoy AND left the genuine
+coefficient corrupt** — one published number fabricated, one repair missed, from a single
+mis-assignment. Neither failure crashes, and both produce plausible output.
+
+Each evidence site now carries its own page index and its own reconstructed layout line, and the
+pairing **refuses** — recording `w0h_ambiguous_pairing_refused` / `w0m_ambiguous_pairing_refused` —
+when the surrounding context cannot separate the candidates. Pass-through leaves the paper's own
+token intact and reversible for the consumer; a guessed rewrite is neither.
+
+- **Page-INDEX scoping was measured and rejected**, though it is the obvious fix: by the time W0h
+  runs, the text carries **7 form feeds for a 12-page document** (earlier steps consume them), so
+  aligning text page *k* to layout page *k* is an off-by-k producing a confidently WRONG pairing
+  rather than an empty one — the failure mode no emptiness check catches.
+- **W0m was the worse of the two.** It counted β glyphs and flipped the first N `b = <anything>`
+  **without requiring the coefficient to match**, so a β proven on one page could relabel a genuine
+  unstandardized `b` — a different, legitimate statistic — elsewhere. The coefficient is now part
+  of the site's identity.
+- Layout lines are reconstructed with gap-derived spaces; pdfplumber's char stream has no space
+  characters, and a naive join yields `Thedatawasanalyzedusinga4`, against which no word token from
+  pdftotext could ever match — the anchor would have been silently inert.
+
+Pinned by `tests/test_w0h_pairing_is_identity_based.py` (10 tests).
+
+### One input, one answer: the table-cell repairs reach every consumer (register F7a)
+
+The glyph repairs lived *inside* `cell_cleaning._html_escape`, which fused them to the HTML
+escaper — so only the consumer that rendered HTML received them. For one corrupt CI cell:
+
+| channel | before | after |
+|---|---|---|
+| `cells_to_html` | `[-0.45, -0.06]` | `[-0.45, -0.06]` |
+| `flatten._cells_to_grid` (JSONL sidecar) | **`[20.45, 20.06]`** | `[-0.45, -0.06]` |
+| `Table["cells"][i]["text"]` | **`[20.45, 20.06]`** | `[-0.45, -0.06]` |
+| `Table["raw_text"]` | **`[20.45, 20.06]`** | `[-0.45, -0.06]` |
+
+`flatten` is production (`cli.py`, `render.py`), so a p-value that rendered correctly in the HTML
+table was simultaneously shipped corrupt to every structured consumer. **Nothing anywhere asserted
+that two channels agree on one input** — which is why it was invisible.
+
+Repairs are now a named, single-source `cell_cleaning.clean_cell_text()` applied at cell
+CONSTRUCTION (`camelot_extract`, `whitespace`), because the cleaning pipeline merges and splits
+cells and content↔position correspondence degrades as it runs. `_html_escape` still calls it, so
+grids that never went through construction keep their repairs; **idempotency verified over 9,369
+real corpus cells.** Pinned by `tests/test_table_cell_channels_agree.py` (6 tests).
+
+### `Table["confidence"]` accounts for how empty the capture is (register F1)
+
+Camelot exposes a purpose-built `Table.confidence = (accuracy/100) × (1 − whitespace/100)`;
+docpluck recomputed a worse score **under the same name** from accuracy alone, so a 95%-accurate
+but 80%-empty capture reported **0.95** where Camelot says **0.19**.
+
+Two decisions the finding did not anticipate, both measured:
+
+1. **Camelot's FORMULA on OUR grid, not Camelot's NUMBER.** `ct.whitespace` describes Camelot's raw
+   grid, which docpluck then trims. Over 591 tables from 40 papers, docpluck's shipped grid is
+   *cleaner* than Camelot's on 345 and dirtier on 47 (median whitespace 41.7% → 35.9%).
+2. **The accept gate is NOT re-gated.** Camelot suggests `>= 0.8`; measured over **1,751 accepted
+   tables from 78 papers across 60 publishers, that rejects 79%** of them (`>= 0.5` rejects 30%).
+   Academic tables are legitimately sparse — a correlation matrix leaves its upper triangle empty.
+   Whitespace is **reported, never gated**.
+
+⚠ **CONSUMER-VISIBLE.** A consumer holding an unchanged `confidence >= 0.8` filter goes from 1,642
+tables to 363 — a silent **78% loss** — because the number under their threshold changed meaning.
+`accuracy`, `whitespace` and `camelot_flavor` now ship alongside so any threshold is
+reconstructible and it is visible which half moved. Pinned by
+`tests/test_table_confidence_is_whitespace_aware.py` (8 tests).
+
+### The table schema stops contradicting its own declared types (register C4 / F7e)
+
+The whitespace fallback emitted `kind="whitespace"` / `rendering="structured"` — **both outside
+their declared `Literal` types and transposed relative to the Camelot path**, so a consumer
+branching on `kind == "structured"` got the opposite of what it asked for depending on which
+capture path ran. `raw_text` was `None` where the schema declares `str`. A type checker never saw
+any of it, because these are plain dict literals against a `TypedDict`.
+
+**Two tests had been WIDENED to accommodate the bug rather than catch it** (one accepted
+`kind in {structured, whitespace, isolated}`; another branched on `kind == "whitespace"`); both now
+assert the declared vocabulary. The capture path moved to a field that can carry it:
+`camelot_flavor` (`"stream"` / `"lattice"` / `None`), and `rendering` finally emits the declared
+`"lattice"` value instead of hardcoding `"whitespace"` for every Camelot capture — an unlabelled
+engine substitution that had made a lattice capture indistinguishable from a stream one.
+
+### New: `tools/diag/glyph_font_discontinuity_scan.py` — DIAGNOSTIC ONLY, not imported by the library
+
+Whether a purely TYPOGRAPHIC signal can identify the corruption classes `W0b`/`W0d`/`W0g` decide
+INFERENTIALLY. Four conditions, each added only after a real false positive forced it: a tiny
+whole-document font repertoire; the glyph **glued** to its neighbour (≤ 0.15 × size — the known
+positive abuts at −0.04pt, a word space is ~0.25); the neighbour **not the same family styled**;
+and the **same size and baseline**.
+
+**Base rates that make each condition necessary** (152 papers): a narrow repertoire alone fires on
+**72%**, digit-heavy narrow fonts on **9%** — either as a gate would repeat the `uni: no` mistake.
+Validated against known NEGATIVES, not only positives: TeX optical-size cuts (`CMR5`/`CMR6`, 86
+hits), a superscript face (`ntxsups`), an already-correct math face (`NewTXMI` emitting `𝛼`), and
+italic statistical symbols (`MyriadPro-LightIt`, 58 hits of italic *n*) are all excluded.
+**`uni` (ToUnicode) does not discriminate this class — for the third time**: the corrupt
+`AdvP586B` reports `uni: yes` while an unrelated paper's *body* font reports `uni: no`.
+
+### Found, measured, NOT repaired: `α` extracted as `a`, `=` extracted as `5`
+
+Validating the scan against a paper filed as a known NEGATIVE, the rasterized page refuted the
+label. `pdfextractor__aom__amj-1` prints *"processes (α = .93), we created a 4-item scale"* and the
+text layer delivers **`a5(.93)`** — `α` drawn by `AdvPS7DA6` (whole-document repertoire `D a b x`,
+the Adobe-Symbol Greek mapping) and `=` by `AdvOT463cc31e`. **A Cronbach's α ships today with both
+its name and its operator destroyed**, the same shape as the OMML deletion: an unlabelled number is
+structurally worse than a wrong one, because it cannot be challenged. Six corpus papers carry the
+font; `amj-1` alone has 568 glyphs from it.
+
+Deliberately **not** repaired in this release: one paper proves the shape exists and says nothing
+about prevalence, and the same font also draws legitimate raised footnote markers. Recorded as
+register **G6b** with its own decision pending.
+
+### Corrected: a measurement three documents assert that nothing reproduces
+
+The `64/68` vs `135/135` per-character font figure in `CLAUDE.md`, `docpluck-review/SKILL.md` and
+`font_risk_and_inference_scan.py` **is not reproducible from this repo**. Re-measured from primary
+source on the paper it names (`10.1177/19485506211056761` = `efendic_2022_affect` — the same
+document): `AdvTimes` 35,682 glyphs / 86 distinct; `AdvP586B` **124 glyphs / 3 distinct**
+(`'2'`×99, `'3'`×24, `'.'`×1); `AdvPSMP4` 24 / 1 (`'\'`). Per token, 9 leading-`2`s differ in font
+from the digits glued to them and 2 match, **with no overlap between the two font sets**.
+Rasterizing p5 confirms the page prints `[-0.96, -0.59]` where the text layer says `[20.96, 20.59]`.
+
+### A test was pinning the data loss v2.4.132 had just fixed
+
+`TestFigure3c2PrefixSuperset::test_drops_inline_when_block_caption_is_prefix` asserted
+`"…and the overhang" not in out` — it *required* the figure-caption suppressor to delete the only
+copy of the overhang text. v2.4.132 found that behaviour destroying real content on
+`10.1109/access.2025.3645087` (121 characters including a methods parameter present nowhere else)
+and added `_extend_block_caption()` so the surviving copy absorbs it. The test still demanded the
+old, lossy outcome, so the fix showed up as a failure.
+
+Renamed `test_dedups_inline_but_KEEPS_the_overhang` and rewritten to assert **both** halves: the
+overhang survives, AND exactly one copy of the caption remains. This is the project's own rule
+demonstrated on itself — **a test asserting an ABSENCE can be satisfied by data loss; pair every
+absence with a presence.**
+
+### Test suite and gates
+
+**2,569 passed, 147 skipped, 3 xfailed.** Ten failures in the full run: **one real** (the stale
+figure-caption test above, now fixed) and **nine the documented Camelot cumulative-load flake** —
+verified individually at 8/8, 28/28 and 7/7.
+
+**Render-deletion release gate: 26/26 papers, 0 losing content, 0 numeric lines deleted, 0 distinct
+tokens lost.** The gate did not raise, so the `_step(...)` call shape it scrapes is intact — which
+matters, because this gate certified "0 deletions" while instrumenting **0 of 53 steps** two
+releases ago. `ruff --select F` clean across `docpluck/ tools/ tests/ scripts/`.
+
+31 new tests across three files, each written against the unfixed code and **watched failing
+first**: the cross-channel tests fail 3/6 without construction-time repair; the confidence tests
+fail 3/8 against the accuracy-only formula; and the Risk A decoy was demonstrated on the verbatim
+pre-fix algorithm.
+
+### The completeness audit — the owner asked "are you sure?", and the answer was no
+
+Two independent read-only audits (Codex and Sonnet, frozen tree) were run against the prior
+session's own `CONFIRMED OPEN` list. **Six of its findings had not been touched by this release's
+work, and eight more defects were found that nobody had listed.** The shape of the miss matters:
+the execution run followed the handoff's step list faithfully, and *the step list did not include
+the handoff's own open-findings table*. A plan that omits a finding is indistinguishable, from
+inside the plan, from a plan that resolved it.
+
+**Fixed in this round:**
+
+- **A6 was deleting EXPONENTS and calling them footnotes.** `normalize_text("the value 10⁹",
+  academic, preserve_math_glyphs=True)` returned `"the value 10"` — a **billion-fold error in a
+  published number, booked as `footnotes_removed: 1`**. Root cause is a broken composition: A6's
+  left context was `[\d\]\)]` under the comment *"A5 already converted ² -> 2"*, and **A5 is skipped
+  when `preserve_math_glyphs=True`**. The inversion is the tell — a genuine footnote marker after a
+  word (`Smith et al.¹`) never matched at all, so the rule spared the case it was written for and
+  deleted the case `W0p`'s own docstring warns about. Left context is now `[\]\)]`: nothing
+  exponentiates a closing bracket, which is the only evidence A6 can claim. Known and written down
+  on 2026-08-13; unfixed until an audit reproduced it. 12 tests, 9 watched failing first.
+- **31 telemetry call sites, no production reader.** `get_fallback_counters()` was called only by a
+  test, so every silent substitution, dropped table and refused repair — *including the
+  ambiguous-pairing refusals added in this same release* — was write-only. `StructuredResult` now
+  carries a `fallbacks` dict of the per-document delta; `telemetry` gains `fallback_snapshot`,
+  `fallbacks_since` and `fallback_scope`.
+- **A table Camelot detected could vanish with no record.** Three `return None` paths were silent
+  while the exception paths beside them all recorded. Now instrumented — and immediately
+  informative: **8–26 tables per paper** are dropped by the table-likeness gate, previously
+  invisible.
+- **The OMML fix could silently revert to the defect it fixes.** `_inline_omml_runs`'s catch-all
+  `except` handed mammoth exactly the input it deletes equations from, with no signal.
+
+**Mis-mapped symbol fonts (register G1) — detected, not repaired, and that is the finding.** An AOM
+paper prints `(α = .93)` and docpluck delivers `a5(.93)`: the α drawn by a font whose entire
+document repertoire is `D a b x` (the Adobe-Symbol Greek mapping), the `=` by another narrow face.
+Measured prevalence **15 of 152 papers (10%)** — but inspection showed they are **not one class**
+(one is the already-handled β-as-`b`; another emits `(cid:2)(cid:3)¼` 416 times), so a blanket
+Latin→Greek rewrite would repair one and corrupt the others, which is exactly the v2.4.131 failure.
+`extract_layout.detect_symbol_font_corruption()` now identifies the font and
+`extract_pdf_structured` reports `symbol_font_greek_corruption_detected`, so the corruption reaches
+consumers instead of shipping in silence. The repair stays open, per class, each needing its own
+raster confirmation.
+
+**Still open and recorded** (register §H): O5 (the detached-dash typographic sub-case),
+O6 (the undetectable fully-dropped CI), O8 (W0j deciding inferentially), O10 (a repair citing
+another repair's output as evidence), O11's telemetry half, and four smaller items.
+
+### Known open (register §G6)
+
+Camelot per-cell geometry (`ct.cells`) and its round-trip identity guard; the `α`-as-`a` class;
+`W0p`'s still-positional pairing; pdftotext `stderr` and Camelot `warnings.warn` still discarded
+(confirmed live — *"No tables found in table area"* was emitted by **34 of 78** probed papers and
+reaches no docpluck telemetry); the shared `apply_glyph_repairs` registry; and the consumer outbox,
+which now also owes the `confidence` change.
+
+## [2.4.132] - 2026-08-15
+
+**An independent Fable 5 review found that the release gate certifying "0 deletions" was
+instrumenting NOTHING, and that the previous release's DOCX fix had started FABRICATING NUMBERS.**
+
+Owner's instruction, 2026-08-15: *"given the sensitivity and the scope I would like to bring in
+Fable 5 through Claude Code CLI to consult on all the decisions we've made… to help us figure out
+if we got anything wrong."* Three read-only consults via `claude --print --model claude-fable-5`
+(Claude Max, no API call), with the working tree frozen for the duration. **Every finding was
+reproduced locally before being acted on**; the reproductions are recorded in the tests. Full
+record: `docs/FINDINGS_2026-08-15_fable_consult_and_amended_plan.md` — **local-only**, matched by
+`.gitignore:45 FINDINGS_*` under the public-repo allowlist, so it does NOT ship in a clone. The
+substance that consumers and future readers need is reproduced in this entry on purpose; do not
+treat the pointer as retrievable from the remote.
+
+### The gate was blind (`tools/diag/render_deletion_scan.py`)
+
+`_chain_step_names()` matched `^\s*md = (\w+)\(` — correct until v2.4.130 rewrote the chain as
+`md = _step(_report, "name", fn, md)`. It then derived exactly
+`['_render_sections_to_markdown', '_step', '_rescue_title_from_layout']` and the instrumenting
+wrapper bailed on `_step`, whose first positional argument is the report and never a `str`.
+**Zero of 53 deleting steps were instrumented, and it reported "26/26 papers, 0 deletions."** That
+is this project's own rule — *a zero is a claim about the INSTRUMENT until you prove otherwise* —
+broken by the gate written to enforce it, in the same release. **Every render-deletion zero
+reported since that refactor is UNMEASURED.** The names now come from the `_step` call's own string
+literal, the scan intercepts `_step` itself, and it raises rather than reporting a clean corpus if
+the call shape changes again. Steps instrumented: **0 → 54**.
+
+### The v2.4.131 OMML fix was fabricating numbers — a REGRESSION
+
+```
+source: 'ratio = 1/2 of sample.'        v2.4.131 delivered: 'ratio = 12 of sample.'
+source: 'Effect size: (W-S)/S end.'     v2.4.131 delivered: 'Effect size:\nend.'
+```
+
+`b"".join(m:t)` is correct for a run of characters and catastrophic for a structured object. **The
+fraction case is worse than the deletion it replaced**: a deletion leaves nothing to trust, `12` is
+a plausible number a consumer will parse and publish, and it does not announce itself. Confirmed on
+real papers — `28_ImageMemorability.docx` span 9 became `Absent-PresentAbsent*100`, and
+`42_StressExposureTraining.docx`, **1 of the 4 OMML papers in the fix's own measurement**, still
+lost its defining equation to `m:oMathPara` (which mammoth also skips). `_linearize_omml` now walks
+the structure: constructs we can NAME emit their real operator (`m:f` → `/` with grouping, `m:d` →
+its delimiters, `m:rad` → `sqrt(…)`, sub/superscripts concatenated so DOCX and PDF agree); a
+construct we CANNOT name space-joins its parts — lossy, visibly so, and **incapable of
+manufacturing a number**. No operator is emitted for an empty operand.
+
+### The report and its guards
+
+- **`removed_lines` was blind to near-duplicate deletions.** Deleting `OR 1.31 (95% CI 1.20-1.44)`
+  while `OR 1.32 (95% CI 1.21-1.45)` survived reported `[]`. A 0.9-similar line carrying a
+  *different* statistic is a second measurement, not a surviving copy. A **rewrite** now proves
+  itself positionally (same difflib opcode — digits may change, that is what a repair IS); a
+  **dedup/reflow** must match on the digit signature.
+- **…and its first genuine run exposed two more instrument defects**, worth 84 of the 93 lines it
+  reported: it compared STRIPPED source lines against UNSTRIPPED candidates (indentation dropped an
+  ordinary W0d rewrite below the 0.9 cutoff — 26 false positives), and it could not see a REFLOW (a
+  line merged into a longer one scores far below any cutoff — 25 more). Both pinned by tests.
+- **A REAL deletion found: a figure-caption OVERHANG discarded by a "dedup".**
+  `10.1109/access.2025.3645087` Figure 5 — the inline caption run was **121 characters longer** than
+  the block caption it duplicated, and the tail *"All rounding method comparisons were conducted at
+  a time step of 20 PN time steps per unit time per 1 ODE time interval."* appeared **nowhere** in
+  the output. The step's own docstring promises *"an inline run that EXCEEDS the block caption is
+  left untouched so no caption text can be lost"*; the FIG-3c-2 branch discarded the difference by
+  design. `_extend_block_caption` now appends the overhang to the SURVIVING caption before the copy
+  is dropped, so the drop is a real deduplication — and the drop is skipped entirely if the survivor
+  cannot be located.
+- **One REAL deletion found: a numbered bibliography stripped as an author-affiliation block**
+  (`10.48550/arxiv.2406.11713`, 7 reference entries). `_AFFIL_CITATION_RE` exists precisely to stop
+  this — its comment says so — but **both its arms are APA-shaped**, so an IEEE entry
+  (`[21] P. Dhariwal and A. Nichol, …, arXiv:2105.05233, 2021.`) matched neither. Three structural
+  citation markers added: a bracketed reference number at line start, an arXiv identifier, a DOI.
+- **`_rescue_title_from_layout` is wrapped in `_step`** — it deletes, and was the one chain step
+  invisible to `RenderReport`.
+- **`_strip_phantom_camelot_tables` inspects `<th>` as well as `<td>`** — a Camelot mis-capture is
+  exactly what puts body content in a header cell.
+- **One statistical detector, not two.** `_suppress_inline_duplicate_figure_captions` carried a
+  private regex that knew `β`/`χ²`/`η²`/`R²` and not `M =`/`SD =`/`N =`/`r =`/percentages/`CI [`.
+  The integer-valued Greek case `χ2(1) = 4` matched **neither** half. Merged into
+  `_carries_statistical_content`.
+- **`report=` is the public spelling** of the telemetry parameter; `docs/SCOPE.md` had published a
+  consumer contract on the underscore-prefixed `_report=`. Both work.
+
+### Channel versions — settling the question v2.4.131 left open
+
+`RENDER_VERSION` (1.0.1) now exists and `RenderReport` carries it. **The rule: each CHANNEL versions
+its own contract** — `NORMALIZATION_VERSION` for `normalize_text`'s steps, `SECTIONING_VERSION` for
+`extract_sections`, `RENDER_VERSION` for the post-process chain, `__version__` for the package. A
+fix in `extract_docx.py` or `render.py` therefore moves `__version__` and **not**
+`NORMALIZATION_VERSION`. The question felt ambiguous only because the render channel was the one
+channel of three with no version of its own.
+
+### Stale claims corrected
+
+- **`CLAUDE.md`** still said `A3a` is *"STILL LOSSY… `185,178` into `185178` — pinned known-wrong."*
+  `A3a` was deleted in v2.4.130; re-measured, no `.replace(",", "")` survives in `docpluck/`.
+  Struck rather than deleted — **the second time in two days a stale measurement in that file was
+  cited as a live fact.**
+- **`docs/SCOPE.md`** told consumers the symbol conventions *"apply identically across all three"*
+  formats. `SYMBOL_CONTRACT.md` had been corrected to the opposite on 2026-08-14, and
+  `sections/__init__.py:144,159` return raw text in a field *named* `normalized_text`. The
+  correction had been made in the contract document and missed in the consumer-facing one.
+- **Step count** re-counted from source (54); the inventory of *deleting* steps said "six" and is
+  twelve.
+- **The consumer outbox's `numeric_locale` instructions** — it told ESCImate to read a field deleted
+  in v2.4.129. Corrected. (The outbox is still NOT ready to send; see the findings doc §3.)
+
+### The corpus gate, traced from vacuous to clean
+
+```
+before repair   26/26, 0 deletions   <- instrumented 0 of 53 steps; meaningless
+1st real run    11 papers, 93 lines  <- 84 were the INSTRUMENT (two more defects)
+2nd              3 papers,  9 lines  <- 7 were a REAL loss (numbered bibliography)
+3rd              2 papers,  2 lines  <- 1 furniture (a bare DOI); 1 a REAL loss
+final           26/26, 0 deletions   <- and this zero is LOAD-BEARING
+```
+
+Four instrument defects and two real data losses. **Neither loss was findable while the gate said
+zero**, and each triage round exposed the next instrument defect — stopping at "2 is close enough"
+would have left the in-place-extension gap in the field. The final zero is backed by a test that
+drives a real deletion through production's `_step` and asserts the gate catches it.
+
+### Tests
+
+`tests/` is lint-clean for the first time. Of the 7 F841s the handoff filed as cosmetic, **two were
+tests that asserted nothing and could never fail**, and one built a fixture it never exercised —
+all three given real assertions. New load-bearing tests cover the gate itself (*"nothing tested the
+instrument"*), OMML display math / fractions / unnameable structures, the near-duplicate deletion,
+the two instrument defects, the `<th>` guard, and the numbered-bibliography class.
+
+## [2.4.131] - 2026-08-15
+
+**The DOCX channel was deleting the NAME of a statistic — same defect class as v2.4.130's render
+deletion, found one day later by asking what the FILE already knows.**
+
+```
+28_ImageMemorability.docx says   F(1,86) = 48.50, p < .001, ηp2 = .361.
+docpluck delivered               F(1,86) = 48.50, p < .001, = .361.
+```
+
+A bare `= .361` cannot be attributed to any statistic by any consumer — **worse than a wrong
+number**, because a wrong number can be challenged and an unlabelled one is structurally
+unidentifiable.
+
+**Why it survived: an unmeasured claim in a docstring.** The module said OMML equations were
+"rare in social science papers where stats are written as plain text." Measured over 26 real
+papers: **4 (15%) contain OMML, ~45 non-empty spans, and EVERY ONE is `ηp2`, `χ2` or `ρ`** — the
+exact symbols this library exists to deliver. 8 of the 9 spans in the file above are `ηp2`. The
+claim was not optimistic, it was inverted. **An unmeasured "in practice this is rare" in a
+docstring is the same failure mode as an unmeasured rule** (L-027). The false sentence is now
+recorded in the docstring rather than deleted, because it is why nobody looked.
+
+`mammoth` has **no model of `m:oMath` at all** (grepped: zero references), so it was not degrading
+gracefully — it skipped unrecognised markup.
+
+**Fixed:** `_inline_omml_runs` rewrites each `m:oMath` into a plain `w:r`/`w:t` run carrying the
+equation's own `m:t` text **before mammoth sees the file**, so the symbol lands in exactly the
+position the equation occupied — position is the information at risk, since `= .361` only means
+something if its label precedes it. Conservative: a text-free equation (a pure graphic, a bare
+fraction bar) is untouched; a file with no equations is returned unchanged; any zip failure returns
+the original bytes.
+
+**And a bug in the fix itself, worth recording.** The first version early-exited on
+`b"<m:oMath" not in docx_bytes` — but a DOCX is a ZIP, so those bytes are COMPRESSED and the marker
+never appears. **The function was a silent no-op on every file in existence while looking correct**,
+which is precisely the "a capability nothing invokes is not shipped" failure. Caught by running it
+against the real paper instead of trusting that the code path existed.
+`tests/test_docx_omml_statistics_survive.py` pins it with a load-bearing check that disables the
+rewrite and asserts the defect returns.
+
+## [2.4.130] - 2026-08-14
+
+**The separation of duties, executed — and the biggest finding of the whole audit, which indicts the audit's own framing.** `NORMALIZATION_VERSION` 1.9.53 → **1.9.54**.
+
+### ⚠ BREAKING for consumers — three repair rules retired
+
+v2.4.129 queued four rules to retire "behind consumer notification". The project owner, who runs every consumer, **approved shipping first and notifying after**: *"we're doing the right thing to do, we'll notify them and tell them to fix things after we're done."* Three retire here (the fourth, `A3c`, went in v2.4.129).
+
+| rule | was | now | why |
+|---|---|---|---|
+| `A2` | `p = 484` → `p = .484` | `p = 484` | Repaired **the paper's** error. It had **no cited paper anywhere in its code**; asked for one, BOTH firing sites across 297 English papers turned out to be the author's, rasterized: `10.1177/0146167210380928` p13 prints `B = -0.28, SE = 0.31, p = 38.` and `10.1016/j.jesp.2016.11.001` p7 prints `t(186) = 3.90, p = 001`, each with correctly-dotted numbers on the same line. |
+| `W0n` | `p < 05` → `p < .05` | `p < 05` | Its premise — "a dotless threshold is provably corrupt" — is **false**. Deleted in **both** channels. |
+| `A3a` | `N = 1,182` → `1182` | `N = 1,182` | **Its purpose evaporated.** |
+
+**`W0n`: the single most important result of the audit.** The **same text shape has OPPOSITE OWNERS in two real English papers.** `10.1016/j.jesp.2009.12.011` p3 **prints** `p < 05` — the author dropped the period (6 of 7 `p <` sites on that page carry the dot; the `<`-to-digit advance is 2.00pt against 3.90pt at a dotted site on the same page; no `rect`/`curve`/`line` object in the gap, so no vector-painted dot; natively typeset, no images). `10.1177/0956797613482946` p6 **prints** `p < .05` and our OCR text layer lost it. A layout gate calibrated to separate them (advance ratio 0.51 vs 0.99) was built and **REFUTED**: Dong p6 is a **scan** whose char boxes come from an OCR engine rather than the typesetter, so the gate manufactures its own evidence for exactly the case it exists to catch. It is independently broken by justified-text stretch, mixed styles on one page, pages with no healthy site to calibrate against, and the fact that pdfplumber's `x0`/`x1` are glyph **bounding boxes**, not advances. **Under irreducible ambiguity the default is pass-through**, because pass-through is reversible for the consumer and a repair is not.
+
+**`A3a`: a rule guarding against something that no longer existed.** Its own comment said it strips commas *"so A3 sees the already-clean integer and leaves it alone"* — and `A3` was deleted in v2.4.129. Three further findings, none of which were needed to justify deletion but all worth recording:
+
+- It produced **1000× errors**. `10.1177/0956797620935584` Table S2 p24 (rasterized twice, independently) prints a `df- satterthwaite` column of `185,178  31,836  188,193` — a Satterthwaite df is **fractional by construction**, so that is 185.178 — and we delivered `185178  31836  188193`. The collision is **structural, not a tail case**: its discriminator ("every group after the first is exactly 3 digits") is satisfied *by construction* for any comma-locale number with a 3-digit integer part and 3-decimal precision, so an affected table collided on **every** qualifying row. The class has already produced wrong published numbers downstream — a consumer recorded `U = 55,890` read as `55.89`, publishing a rank-biserial of 0.99938 where the truth is 0.38275.
+- It made the library answer **one input three ways**: `standard` preserved the separator, `academic + preserve_math_glyphs` counted it without stripping, and `academic` stripped it.
+- **Its telemetry said the opposite of what it did**: step `A3a_thousands_separator_protect`, metric key `thousands_separators_preserved`, operation `.replace(",", "")`. A consumer reading `changes_made` saw "thousands_separators_preserved: 3" and would reasonably conclude nothing was lost. **A false all-clear is worse than silence** — silence invites a check, a false all-clear forecloses one.
+
+**Counter-evidence, stated rather than buried:** 137 `A3a` firing sites read individually across 65 papers were **137/137 correct** US counts. Being right is only a defence of a rewrite that is *needed*, and once `A3` was gone none was. `1,000` is clearly one thousand; rewriting it to `1000` repairs nothing and removes the only evidence a consumer would have that a table is European.
+
+Also removed: the numeric-tuple guard (`_in_numeric_tuple`, `_a3c_leading_zero_sub`, `_NUMERIC_RUN_RE`, `_THOUSANDS_GROUPED_RE`, `_VALUE_END_MARKERS`), which existed only to stop the retired rules mangling comma-separated runs. A guard left standing after its rules retire is dead code the next reader re-enables.
+
+### ⚠⚠ THE RENDER CHANNEL WAS DELETING PUBLISHED STATISTICS
+
+**This indicts the framing of the entire audit.** All 111 `normalize.py` transformations were classified and every numeric rule's firing sites counted across 297 English papers. **The same question was never asked of `render.py`** — the channel that reaches the user. Asked once, it answered immediately. Measured on the baseline corpus at v2.4.129:
+
+```
+10.1017/s1930297500009189   an ENTIRE published-results sentence deleted:
+    "…(r(6) = 0.94, p < .001, 95% CI [0.71, .99]); and … (r(6) = 0.99, p < .001,
+     95% CI [0.96, .99]). Hotelling's (1940) t indicated these correlations to be
+     different from each other (t(5) = 4.66, p = .006)."
+                                 -> _suppress_inline_duplicate_table_captions
+10.1001/jamanetworkopen.2023.48333   a hazard ratio and its CI deleted:  1.31 (1.20-1.44)
+                                 -> _strip_phantom_camelot_tables ("intentionally LOSSY")
+```
+
+Two correlations, a Hotelling's *t*, three *p*-values and two confidence intervals — the exact quantities docpluck exists to deliver — removed with **no count, no key in `changes_made`, no log line**, because `render_pdf_to_markdown()` chained **54** `md = fn(md)` calls and returned a bare `str`. (The inherited handoff said 41; the source said 54.)
+
+**Mechanisms, both specific:** `_is_orphan_cell_paragraph` had **no numeric guard at all** — it rejects prose by stopword density and sentence shape, and a statistical cell has neither, so `M = 4.52`, `SD = 1.13`, `N = 245`, `t(87) = 2.01` and `p < .001` were all classified droppable; worse, an English sentence carrying fewer than 3 of its 20 stopwords is itself "orphan"-shaped, so **adjacent real prose was swept out with the cells**. And `_suppress_inline_duplicate_table_captions` stops at "real prose" only for a line of ≥80 chars *ending* in `.!?` — but pdftotext **wraps** body text, so a genuine sentence spans several lines and no single line qualifies.
+
+**Fixed:**
+- `_carries_statistical_content` / `_run_carries_statistical_content` guard every deleting step. **Delete FURNITURE, never DATA**, all-or-nothing per run — a half-suppressed table is a new defect whose gaps nobody can see. The suppressors keep working on genuine label furniture.
+- **`RenderReport`** (opt-in, `_report=`) gives the channel telemetry for the first time: `steps_applied`, `steps_changed`, `lines_removed`, and `statistics_removed`, which must always be empty. It deliberately mirrors `NormalizationReport._track` so existing measurement tooling can see the render channel. Output is byte-identical with and without it.
+- **`tools/diag/render_deletion_scan.py`** — renders each corpus paper twice (once stopping before the chain) and attributes every deleted numeric line **to the step that deleted it**. Wired into `/docpluck-qa` check 3c and `/docpluck-review` rule 0g. Exit 1 gates a release.
+
+### New: `W0o` — the `<` operator that some fonts extract as the letter `b`
+
+**Found by writing a test for a claim in the handoff and watching it fail.** The 2026-08-14 handoff
+recorded, of `10.1016/j.jesp.2016.11.001` p7: *"That one is ours (`W0c` owns it) and stays."*
+Checked against the source, `recover_corrupted_lt_operator` (W0c) recovers `<`-as-**backslash**
+only, and **nothing anywhere handled `<`-as-`b`** — the claim had been copied forward unverified
+and read as settled, inside the very run whose purpose was to stop exactly that.
+
+Rasterized: page 4 **prints** `p < 0.001` in `BFDKFC+AdvTT94c8263f.I` — the same broken-ToUnicode
+AdvTT family behind `W0n`'s Dong case — and pdftotext yields `p b 0.001`. The page is correct and
+our extraction is not, so this is **ours** under the one exception to the separation of duties.
+
+```
+31 hits in 10.1016/j.jesp.2016.11.001 — every one a real `p < 0.001`
+ 0 hits across the 26-paper baseline corpus            (no false positives)
+17 legitimate `b` uses in the affected paper           (all untouched)
+```
+
+**31 published p-values that no `p\s*<` regex could match, in one paper** — a silent coverage
+loss, not a visible corruption. Note the denominator: the affected paper is **not** in the
+baseline corpus, so "0 in 26" measures the absence of false positives and says nothing about
+prevalence.
+
+**The signature is the OPERATOR SLOT, not "a `b` near a number".** Unlike a backslash, `b` is a
+real statistical symbol — the same paper carries 17 coefficients (`b = 2.73`, `b = -3.26`). A
+statistic always has an operator between its symbol and its value, and `b` is never an operator,
+so a bare `b` in that slot cannot be a coefficient. Wired into **all three channels**
+(`normalize_text`, table-cell cleaning, render post-process); only `<` is recovered, because no
+corpus evidence shows which glyph that font maps `>` to and inventing one would be a hypothetical.
+New scan: `tools/diag/b_for_lt_scan.py`.
+
+### Three more defects the render fix EXPOSED, all pre-existing
+
+The guard and the report immediately found things deletion had been hiding. Each is recorded
+because the mechanism generalises, not because the instance is large.
+
+**1. A regression test that was green because of DATA LOSS.**
+`test_efendic_table_point_estimates_recovered_via_ci` asserted `"21.34" not in md` — the corrupt
+form of `-1.34` — and its docstring concluded *"the CI-pairing recovery reaches the point estimate
+in either mode."* It did not. `_suppress_orphan_table_cell_text` was deleting the entire
+linearized table: corrupt estimates, correct CIs and all. The token was absent because the DATA
+was absent. Measured by disabling the new guard and re-rendering: **2,544 characters come back**,
+and `21.34` / `21.05` with them. **A test asserting an absence cannot distinguish *fixed* from
+*deleted*.** Now `LESSONS.md` L-033 and a `/docpluck-review` blocker. The test is re-fixtured to
+assert the data is present, and the residual corruption in the no-Camelot fallback is pinned as a
+KNOWN GAP — pdftotext linearizes that table column by column, so the estimates and their CIs land
+in different runs and `recover_minus_via_ci_pairing` structurally cannot pair them. The production
+path (Camelot on) recovers them correctly and is pinned separately.
+
+**2. `RenderReport` cried wolf, then under-reported — and its own scan disagreed with it.**
+The first `_track` asked only whether a removed line was a *substring* of some output line, so
+`recover_corrupted_minus_signs` rewriting `[20.21, 0.04]` into `[-0.21, 0.04]` was reported as
+**55 deleted statistics** on one paper — while `render_deletion_scan.py`, which used difflib,
+correctly reported none. Two implementations of one concept, disagreeing, in a field consumers are
+told to check. The decision now lives in one place, `render.removed_lines()`, and the scan imports
+it. `statistics_removed` on that paper: **55 → 0.**
+
+Then the corrected version had the OPPOSITE defect, which is worse. It inspected only difflib
+`delete` opcodes, and a step that rewrites one line while deleting its neighbours emits a single
+`replace` covering all of them — so `_suppress_orphan_table_cell_text` italicising a caption and
+dropping four orphan rows beneath it reported **zero** removals for four real ones. A **false
+negative in the field consumers are told to check** is the exact failure class this whole release
+is about. Both directions are now pinned by tests
+(`test_a_deletion_MERGED_WITH_A_REWRITE_is_still_reported`,
+`test_a_pure_REWRITE_is_never_reported_as_a_removal`), and the corpus gate was re-run under the
+stricter logic — the earlier "0 deletions across 26 papers" had been measured with the version
+that could miss this class.
+
+**3. A stale test left red by an unrelated change.**
+`test_extract_html.py::TestInlineElements::test_multiple_inline_elements` asserted that
+`<b>A</b><i>B</i><u>C</u>` should extract as spaced text. The `GLUED_INLINE_ELEMENTS` change
+deliberately inverted that — an inline element wrapping a run with zero visual gap is no longer
+padded, because padding turned `<i>&#951;</i><sup>2</sup><sub>p</sub>` into `eta2 p`, **which
+matches nothing downstream**. The sibling `span` test was updated; this one was left red. From the
+outside a stale assertion is indistinguishable from a regression, which is why it survived.
+Re-fixtured, with the `span` counter-case asserted in the same test so the deliberate asymmetry is
+visible.
+
+### Adversarial review of the new guard — 1 of 3 findings reproduced
+
+The deletion guard, `removed_lines`, and `W0o` were put to a second model with the instruction to
+find cases where each one is WRONG. Three findings came back; each was treated as a hypothesis and
+reproduced locally before acting, and **two did not survive that**:
+
+| finding | verdict |
+|---|---|
+| The guard misses a bare-integer table cell (`245`, `12`, `F(2, 42) = 5`) | **CONFIRMED — fixed** |
+| `removed_lines` reports a `p b 0.001` → `p < 0.001` rewrite as a removal | **REFUTED** — similarity 0.9375, above the 0.9 cutoff, correctly folded out |
+| `removed_lines` misses a deleted table row whose twin survives (`HR = 1.13` beside `HR = 1.31`) | **REFUTED** — similarity 0.857, below the cutoff, correctly reported |
+
+The confirmed one was a real data-loss path: a table of **counts** carries no decimal, no percent
+and no `label =` syntax, so `245` and `12` alone on their lines scored as furniture and stayed
+deletable — the exact orphan-cell shape the guard exists for, in the one flavour it could not see.
+`F(2, 42) = 5` was missed separately because the labelled-statistic arm required `SYMBOL =` and did
+not allow a bracket. Both are now recognised, and the furniture class is re-asserted in the same
+test file so the widening cannot quietly neuter the suppressors it guards.
+
+Recording the two refutations matters as much as the fix: a reviewer's assertion is a hypothesis,
+and acting on an unreproduced one would have loosened a correctness cutoff that is doing its job.
+
+**And the fix for the confirmed one immediately broke a sibling**, which is worth recording because
+it is the same shape as everything else in this release. Counting a bare integer as data is right
+for `_suppress_orphan_table_cell_text` — a COUNTS table is nothing but bare integers, and the
+linearized cells are the only surviving copy. It is wrong for `_strip_phantom_camelot_tables`,
+whose input is *already diagnosed* as a Camelot mis-capture, so a lone digit in it is wreckage
+rather than a measurement. `10.1525/collabra.90203` Table 7 — a degenerate prose grid whose only
+`<td>` numeral is `4` — stopped being stripped, and a **pre-existing regression test caught it**
+from four steps away. The two callers now differ explicitly
+(`_carries_statistical_content(..., bare_number_counts=False)`), with the reason at the call site.
+
+Two identical-looking situations, opposite correct answers, distinguished only by what the caller
+already knows about its input. That is the whole release in miniature.
+
+### Fixed along the way
+
+- `raster_site.py` crashed with `NotImplementedError` when `--out` was an absolute path.
+- `extract_columns.py` used `Counter` in an annotation without importing it (pre-existing F821).
+- `docs/SCOPE.md`, `docs/NORMALIZATION.md` and `CLAUDE.md` documented `NormalizationReport.numeric_locale` and `tools/diag/english_only_locale_scan.py`, **neither of which exists** — a consumer following that advice would get an `AttributeError`.
+- Two test fixtures written in **German** and one dependent on the deleted locale detector were re-fixtured in English (the English-only scope rule forbids reasoning about English-article behaviour from non-English input).
+
+### Tests
+
+91 red tests **re-fixtured, not deleted** — each keeps its corpus evidence and states why the expected answer inverted. Two files that pinned known-wrong behaviour (`A3a`'s 1000× error, the bilingual continental-decimal residuals) **inverted as their own headers instructed**. New: `tests/test_render_never_deletes_published_statistics.py`, including a test that **breaks the guard and asserts the defect returns** — a regression test that has never failed against the real defect is decoration.
+
+
+## [2.4.129] - 2026-08-14
+
+**The separation of duties: docpluck extracts and normalizes what is PRINTED — it does not fix the paper.** `NORMALIZATION_VERSION` 1.9.52 → **1.9.53**. A full inventory of all 111 transformations, three defect fixes, three new mechanical gates, and one severe defect found in the rule the audit had cleared.
+
+### The inventory
+
+`docs/INVENTORY_2026-08-14_notation_vs_repair.md` classifies every transformation as **NOTATION** (canonicalising a correctly-printed form), **REPAIR — ours** (our extraction lost a glyph the page prints), **REPAIR — the paper's** (the page prints the error), **FURNITURE**, or **STRUCTURE**. Four rules repair the *paper's* defects and are queued to retire behind consumer notification: `A2`, `A3`, `A3c`, `W0n`. Every verdict was decided by **rasterizing the page**, never by asking an extractor.
+
+Evidence debt is reported honestly rather than as one number: **5 steps cite a DOI, 44 cite a corpus nickname** (a real paper, non-compliant citation), **62 cite nothing**. Only the third is a delete candidate, and none were deleted on that basis alone.
+
+### The headline result — the same text shape has opposite owners
+
+```
+10.1016/j.jesp.2009.12.011 p3   the page PRINTS 'p < 05'    -> the AUTHOR dropped the period
+10.1177/0956797613482946   p6   the page PRINTS 'p < .05'   -> our OCR text layer lost it
+```
+
+Muraven's page carries the dot on 6 of its 7 `p <` sites, has no vector object in the gap, and is natively typeset. Dong's page 6 is a **scan with an OCR text layer** whose same pass renders `F(2, 93)` as `K2, 93)`. `W0n` is right on one and launders a copyediting error on the other, and **the text channel cannot tell them apart.**
+
+A calibrated layout-advance gate separating them (0.51 vs 0.99) was built and **refuted**: Dong's char boxes come from an OCR engine rather than the typesetter, so the gate manufactures its own evidence for exactly the case it was built to catch. Where ownership is undecidable, the safe default is pass-through — pass-through is reversible for the consumer, repair is not.
+
+### Fixed — three defects that remove corruption without removing coverage
+
+**The numeric-tuple guard now keys on the RUN, not on a bracket around it.** `A3c` read a URL path as a leading-zero decimal:
+
+```
+10.1177/0146167210380928 p13
+  'article/0,9171,1848755,00.html'  ->  'article/0.9171,1848755,00.html'   404s
+```
+
+That was `A3c`'s **only** firing in 297 English papers — 0 right, 1 wrong. The tuple/number distinction is now **positive** rather than another exclusion list: *a thousands-grouped number has every group after the first exactly three digits; anything else with 3+ comma-separated integers is a tuple or an identifier.* Covers ISBNs and unbracketed RGB triples for free.
+
+**`A3d` deleted.** 0 sites in 297 English papers, 0 in a prior 600-paper hunt. Its whole justification was the constructed string `p = ,025`, copied forward through four documents until it looked like consensus. Diverges from ESCImate shared-spec rule D1b; reported outbound.
+
+**`A4a` no longer fabricates a confidence interval.** It was turning a four-level section cross-reference into a statistic that is not in the paper:
+
+```
+10.3389/fpsyg.2023.1214699   prints '(3.2.2.1)'   ->  we emitted '(3.2, 2.1)'
+```
+
+Bounds in descending order — **the shape of a reversed CI, one of the exact classes our consumers are being asked to detect.** The old guard blocked three-component refs; a four-component one has decimals on both sides. It now requires interval context: CI wording *or* a decimal immediately before the bracket. A first draft required the wording alone and broke the rule's own target (`d=0.39[0.25.0.54]`, which carries no CI text) — caught by the existing suite.
+
+### Found and NOT fixed — pinned known-wrong
+
+**`A3a` produces 1000× errors on published statistics**, and it is the one rule in the family the audit had cleared as KEEP/NOTATION:
+
+```
+10.1177/0956797620935584  Table S2 p24, rasterized
+  'df- satterthwaite'   prints 185,178  31,836  188,193      we deliver 185178  31836  188193
+  t-ratios              print  -1,966   -7,799               we deliver -1966   -7799
+```
+
+A Satterthwaite df is **fractional by construction**. Not fixed here: `A3a` fires 984 times across 157 of 297 English papers, so narrowing it is a consumer coverage change belonging to the migration, and the discriminator that works is a **local-window** locale — the same table carries `0,355` and `0,050`, which prove its convention locally. Pinned in `tests/test_a3a_known_wrong_european_decimal_table.py`.
+
+**Two premises corrected as a result.** `A3c` is not "0 right" — its conversions in that table are correct. And *"396 English articles → 0 European-locale"* describes the **instrument**: every European marker `infer_numeric_locale` recognises is operator-gated, and a bare table cell has no operator, so a 130-cell comma-decimal table scores `european_markers=0`.
+
+### New mechanical gates
+
+- **`tools/diag/non_statistic_corpus_scan.py`** — harvests URLs, DOIs, ISBNs, IPs, version strings, dates, page ranges, file paths and statute citations **from real papers** and fails a release if a rule rewrites one. It folds out the changes docpluck is *entitled* to make (dash canonicalisation, invisible-character strips, ligature expansion), which is what makes its verdict trustworthy: **127 apparent defects became 1 real one**, and that one was the `A4` fabrication above.
+- **`tools/diag/repair_site_scan.py`** — per-rule paper and site counts over English articles, attributed by `NormalizationReport.steps_changed` rather than by a copy of the regex.
+- **`tools/diag/raster_site.py`** — DOI → page → cropped raster in one command, so *"rasterize and look"* is cheap enough to actually do.
+
+`/docpluck-review` gains three BLOCKER checks — **0d** REPAIR-or-NOTATION, **0e** which-real-paper, **0f** the identifier battery — and `/docpluck-qa` a check 3b wiring all three.
+
+### Also fixed, pre-existing and unrelated to any change under review
+
+Three tests still asserted symbol contract **v1.0** after v2.4.128 moved to v2.0 (`x` for `*`, `F1` for `F_1`, `R2` for `R_2`), so the suite was red at HEAD. Re-fixtured with their reason.
+
+`docs/SYMBOL_CONTRACT.md`'s claim that the contract *"applies identically across PDF, DOCX and HTML"* is **corrected**: `extract_sections` on DOCX/HTML never calls `normalize_text`, so its `normalized_text` field is a false claim and every statistic a DOCX/HTML section consumer reads arrives unnormalized. The fix is a factoring job — the contract's steps live inline beside furniture-stripping steps calibrated to pdftotext's line structure — and is tracked rather than attempted as a late edit to the hottest file in the library.
+
+
+## [2.4.128] - 2026-08-13
+
+**Four defects, three of them wrong numbers — every one found by asking of an existing enumeration: *what is not on this list?*** `NORMALIZATION_VERSION` 1.9.51 → **1.9.52**. Plus the document-level numeric locale, published because our own output makes it impossible to recompute.
+
+### A5 fused exponents into the numbers in front of them
+
+A superscript run directly after an ASCII digit is an **exponent**, and flattening it to a bare digit welded it onto the mantissa:
+
+```
+'leucocyte count (×10⁹/L)'      ->  'x109/L'     nine orders of magnitude, unrecoverable
+'∼5×10⁶ possible architectures' ->  '5x106'
+'130×10³ variations'            ->  '130x103'
+'p < .001¹'                     ->  '.0011'      a different p-value
+'N = 42³'                       ->  '423'        a different sample size
+```
+
+`docs/FINDINGS_2026-08-13` analysed these **exact tokens** when rejecting decision D4's "delete citation superscripts" option — *"deleting the 9 loses nine orders of magnitude"*. The reasoning was right and the decision was right, but it measured a **proposed** rule while the **shipped** one was already doing equivalent damage to the same tokens. The hazard was named; the existing behaviour was never tested against it.
+
+A superscript after a **letter** is a symbol suffix and still flattens, so `η²`/`χ²`/`ω²`/`R²adj` are untouched. After a **digit** it becomes caret notation — flat ASCII, unambiguous, and already what effectcheck's own normalizer produces internally. Stated residual: `N = 42³` may be a footnote marker rather than 42-cubed and the text channel cannot decide; `42^3` keeps both readings recoverable where `423` destroys them, the same principle A3 applies to an ambiguous comma.
+
+Compounding it: **`A6_footnote_removal` documents a behaviour it cannot perform.** Its comment gives `'p < .001¹' -> 'p < .001'` as its worked example, but its regex searches for a Unicode superscript that A5 has always already converted to ASCII — so in the academic path it can never match. A step that reports no work rather than failing is why the fusion went unnoticed for so long.
+
+### Three sibling guards against re-signing a number had drifted apart
+
+`_CORRUPT_NEG_TOKEN_RE`, `_PROSE_CODING_NEG_RE` and `_BARE_POS_TOKEN_RE` each refuse to treat an already-signed number as a dropped-minus candidate, and each had written the guard separately — hyphen-only, hyphen + U+2212, hyphen-only. Reproduced in the production path:
+
+```
+'B = −20.09, 95% CI [-0.21, 0.04]'  ->  'B = --0.09, ...'
+```
+
+Not merely wrong — `--0.09` is unparseable, so every consumer reads NA. W0d runs ~600 lines before S5 folds U+2212 to ASCII, so it sees the raw glyph; the shape needs the estimate to carry U+2212 while the CI carries ASCII, which is the same mixed-channel condition W0g/W0h/W0i already exist for. The comment above the pattern records that the **ASCII** case caused exactly this in v2.4.62 (`-2.68` → `--.68`); that fix covered the one dash form in front of it. All three now share `_ALREADY_SIGNED`.
+
+### Subscript letters were unmapped while subscript digits were mapped (decision D6a)
+
+U+2090–U+209C and U+1D62–U+1D6A passed through untouched, so partial eta-squared left normalization as `eta2` + a live U+209A. Measured end to end through the real consumer: effectcheck reports `effect_reported = 0.04`, status **PASS** for the flat form and `NA`, status **OK** for this one — a verified effect size downgraded to unverified by one character, with no warning emitted anywhere.
+
+Keyed on the Unicode **block**, not on the letters we happened to see. U+1D66–U+1D6A are Greek subscripts and take the Greek ASCII spelling A5 already uses for their base letters — a subscript beta is not the letter `b`.
+
+Frequency, measured over 250 papers drawn from article-finder: **0 PDF survivors** (publishers position subscripts typographically, so the codepoint never reaches the text channel) and **1 of 25 DOCX**. Latent on PDF, active on DOCX — and structurally invisible to a PDF-only corpus, which is why a DOCX regression fixture ships with the fix rather than only a unit test.
+
+### U+03D5 GREEK PHI SYMBOL was unmapped while U+03C6 was
+
+The phi **coefficient** flattened or survived depending only on which codepoint the publisher's font emitted — 39 occurrences across 3 of 250 papers, including a `95% CI for ϕ` table header, i.e. a real published effect size. Same shape as the subscript gap: a member of an already-mapped equivalence class left off the list.
+
+### NEW: the document-level numeric locale is published (decision D5)
+
+`NormalizationReport.numeric_locale` carries a verdict (`decisive_us` / `decisive_eu` / `conflict` / `none`), a confidence, and per-marker evidence counts.
+
+**Why it must come from us.** `N = 1,234` is 1234 in an English paper and 1.234 in a German one, and the conventions are mutually exclusive within one article — so one unambiguous token settles every ambiguous one. Our own normalization then *inverts* the evidence: the same document reads `decisive_eu` raw and `decisive_us` delivered, because `academic` has already turned every `d = 0,80` into `d = 0.80`. A consumer running this inference on our output — exactly what effectcheck does in production — is reading evidence we manufactured. Publishing the verdict is the only channel through which the fact survives.
+
+**Where it is computed** — after furniture-stripping and glyph recovery, before any rule touches a comma; the result records `computed_at` rather than leaving it implicit. This deliberately departs from the originally-planned pre-mutation snapshot: two design reviews independently rejected function entry and both reasons reproduced — entry text still carries running headers and reference furniture that vote, and W0n *creates* genuine US evidence after entry when `p < 05` becomes `p < .05`. The `_raw_page_numbers` precedent cuts the other way: page numbers need pre-mutation because later steps **delete** them; locale evidence needs post-recovery because later steps **repair** it.
+
+**The tensor-shape false positive is guarded first.** The `E4` marker fires on machine-learning shapes like `(70,64472)`, which produced the only `conflict` verdict in a 101-paper scan. Bracketed hits are excluded and the exclusion is *recorded* (`E4_bracketed_excluded`) rather than silent. Publishing a wrong locale is worse than publishing none: a populated field creates confidence a missing one does not.
+
+**A weak verdict never gates anything.** Both reviews flagged that `us=0, eu=1` yields `decisive_eu` on a single possibly-spurious marker. The verdict is still reported honestly, but confidence folds lopsidedness × volume — a lone marker scores 0.2 — and `is_gating` refuses below `LOCALE_MIN_GATING_CONFIDENCE`.
+
+**No separator behaviour is gated on the locale in this release.** The aggressive form — canonicalise completely under a `decisive_eu` verdict — was refuted *before* implementation by codex and an adversarial pass, and every break reproduced:
+
+```
+'chi2(2,42) = 5,10'          ->  'chi2(2.42) = 5.10'   a df pair fused into one fictional number
+'compared with controls.7,8' ->  'controls.7.8'        Vancouver citation run
+'Erik. T. Frank 1,2'         ->  'Frank 1.2'           affiliation markers
+'pp. 12,34'                  ->  'pp. 12.34'
+```
+
+6 of 8 realistic shapes corrupted, because European papers carry the same Vancouver and APA citation apparatus as English ones. The rule that survived: **the verdict may change how an already-structurally-identified value is interpreted; it may never decide whether a token is a value.**
+
+### Scope, stated: English-language articles only — and never learn about English from non-English
+
+New `docs/SCOPE.md`, a CLAUDE.md hard rule, and LESSONS.md L-023. docpluck handles **English-language science articles**; English-only caption and section patterns are correct-by-scope, not defects.
+
+The half that matters is the second one. A corpus-widening pass asked for "European-locale papers" found them where comma decimals actually live — SciELO and Turkish journals — and those articles are **bilingual**, carrying an English abstract over a native-language body. Verified by marker position: `'1,738 adult patients'` sits at 2% of one document (English abstract, a genuine thousands group) while its 13 European markers sit at 19–49% (Spanish body). Any document-level locale conclusion drawn from such a paper describes a shape docpluck does not serve, and generalising it to English articles is wrong in both directions.
+
+Also measured, and worth stating plainly: **language is not locale.** 15 of 18 Turkish papers read `decisive_us`, because they follow APA.
+
+Corpus acquisition must now state its language filter up front, and any scan reasoning about separators must report its language distribution and **print what it excluded** — a silent exclusion is how this was missed. Pattern: `tools/diag/english_only_locale_scan.py`.
+
+### One canonical symbol table, published as a contract
+
+New `docpluck/symbols.py`, `docs/SYMBOL_CONTRACT.md`, and public `symbol_contract()` / `explain_symbol()`. The **full Greek alphabet** is now transliterated — spelled out, never abbreviated: `chi` not `ch`, `rho` not `r`, `beta` not `b`, because the short forms collide with Latin statistical symbols that mean something else. Variant codepoints map to the same output as their base letter, so a statistic no longer flattens or survives depending on which glyph a publisher's font emitted.
+
+Greek capitals that are visually identical to Latin capitals (Α Β Ε Ζ Η Ι Κ Μ Ν Ο Ρ Τ Υ Χ) transliterate **only as standalone tokens** — `Β = .31` → `Beta = .31`, but `ANOVA` and `within-Ν` are untouched, because a broken font encoding must not be able to turn `ANOVA` into `AlphaNOVA`.
+
+Consumers should read `symbol_contract()` rather than hard-coding a copy; a hand-maintained copy is the same drift one layer out.
+
+### `<sup>`/`<sub>` were padded with spaces, so DOCX and HTML disagreed with PDF
+
+`extract_html._walk` padded every inline element with a space. That rule exists for a real bug — adjacent `<a>` tags merging into `ChanORCID` — but a superscript is *glued* to its base character:
+
+```
+Word doc, native superscript formatting   ->  'We found eta2 p = .04'   matches NOTHING
+the same statistic from a PDF             ->  'We found eta2p = .04'
+```
+
+This is the D6a defect arriving by a different door. The subscript-letter map fixes sources carrying Unicode subscript **codepoints** (1 of 25 DOCX files); Word's native superscript/subscript **formatting** — overwhelmingly the more common way the token is authored — never produces those codepoints, so a partial eta-squared in a DOCX manuscript still degraded from checked to silently unmatched. DOCX is affected because mammoth converts to HTML first.
+
+Fixed by naming a class: inline elements that wrap a run with zero visual gap (`sup`, `sub`, `i`, `b`, `em`, `strong`, …) are not padded. **`span` is deliberately excluded** — it has no consistent typographic meaning, and the `ChanORCID` bug is itself a span case. A pre-existing regression test caught the first attempt to include it.
+
+### One library had two Greek conventions, and they disagreed on 9 of 9 letters
+
+`extract.py::_recover_with_pdfplumber` is the fallback for PDFs whose fonts encode text in the Unicode SMP math-italic planes (pdftotext emits U+FFFD; pdfminer decodes them). It carried its own Greek-to-ASCII table, and its docstring said that table existed *"so downstream regex patterns work normally"*. It did the opposite:
+
+```
+codepoint                    extract.py    A5 (normalize)
+U+1D6FC MATH ITALIC ALPHA    'a'           'alpha'
+U+1D6FD MATH ITALIC BETA     'b'           'beta'
+U+1D702 MATH ITALIC ETA      'n'           'eta'
+U+1D70C MATH ITALIC RHO      'r'           (unmapped)
+U+1D712 MATH ITALIC CHI      'ch'          'chi'
+```
+
+Every disagreement is a silent failure downstream, and three are **collisions with a different statistic**:
+
+- `chi2(2) = 5.10` → `ch2(2) = 5.10` — effectcheck matches `chi2(`, so a chi-square test is never checked and nothing reports it;
+- `eta2` → `n2` — collides with **n**, the sample size;
+- `beta = -.02` → `b = -.02` — collides with **b**, the unstandardized coefficient, which is precisely the corruption **W0m** (v2.4.117) exists to detect and undo from layout font evidence. One path manufactured what another path repairs;
+- `rho = .31` → `r = .31` — collides with **r**, the correlation.
+
+The table is now module-level (`_SMP_GREEK_TO_ASCII`), spells the letters out, and shares a test with A5 that asserts the two **agree** rather than asserting fifteen constants twice. `test_mathitalic_greek_real_pdf.py` exercised this path and passed before and after the change — it never asserted the convention, which is why the divergence was invisible. Found by an adversarial disambiguation analysis and reproduced against the unfixed table before anything was changed.
+
+### A bracket-delimited numeric tuple is not a number
+
+Found in the corpus (`collabra.320`), destroyed by **two rules at once**:
+
+```
+'purple (128,0,128), orange (255,165,0)'  ->  'purple (128, 0.128), orange (255165, 0)'
+```
+
+A3a fused `255,165` into `255165`; A3c read the `0,128` as a leading-zero decimal. Those are published RGB **stimulus specifications** — a replication built from this text shows participants different colours.
+
+v2.4.127 added a bracket guard for exactly this class and it covered **pairs** — `(52,272)` an interquartile range, `t(1,197)` a df. A 3-tuple is the pair case with one more element, and it was not on the list. The guard now keys on "bracket-delimited comma-separated integer run" at any arity, which is what the pair was always an instance of. A bracket that opens a *phrase* (`(12,856 with immigrant backgrounds)`) still strips, and the labelled `N = (1,234,567)` count still strips.
+
+### A significance marker ends a value
+
+Found in the corpus (`1413-81232020259.16472020`):
+
+```
+'IC95% 0,92 - 0,95**'  ->  'IC95% 0.92 - 0,95**'
+```
+
+A published confidence interval with its lower bound converted and its upper bound not, purely because `*` was absent from A3c's terminator enumeration. Every consumer reads that as `[0.92, 0]` or fails to parse it.
+
+This is the real-world mechanism of the "mixed conversion" defect the 2026-08-13 handoff filed. The handoff attributed it to A3c being positionally ungated while A3 requires an operator; that asymmetry is real but the sites actually present in the corpus are this one. Significance and footnote markers (`*`, `†`, `‡`, `§`, `¶`, `#`) annotate a value — the number is complete before them by construction.
+
+### The premise behind gating on the locale is false — measured, and not shipped
+
+Decision D5's next step, and the option originally selected, was to gate A3a's thousands-strip on a `decisive_eu` verdict. **21 European-locale papers were acquired specifically to make that measurable** (the previous corpus had zero), and they refute it.
+
+All 21 measure `decisive_eu` with gating confidence. The falsifier the handoff asked for *passed* — 0 labelled `N =`/`df =` thousands sites in any of them. The generic sites broke the premise instead:
+
+```
+Turkish body      'chi2 ... 528,329 (p<0,001)'      is 528.329   A3a strips -> 528329  WRONG
+Turkish body      'toplam varyans %68,389'          is 68.389%   A3a strips -> 68389   WRONG
+English abstract  'from 1,738 adult patients'                    A3a strips -> 1738    RIGHT
+English abstract  'From 1,958 women included'                    A3a strips -> 1958    RIGHT
+```
+
+**Latin-American and Turkish journals publish bilingual abstracts.** The English abstract uses English number conventions while the native-language body uses continental ones — one article, two conventions, each correct in its own span. So "the two conventions are mutually exclusive within one article" — the foundation of D5 *and* of effectcheck's L1/L2/L3 machinery — is false for exactly the corpus the feature exists to serve. A document-level gate is wrong in both directions at once: suppressing the strip fixes the two body decimals and turns a cohort of 1,738 patients into 1.738 patients.
+
+Publishing the verdict stays right; *acting* on it as though it described every span uniformly does not. `NumericLocale`'s docstring now states the limit, and `tests/test_bilingual_locale_premise.py` pins the counterexample so the gate cannot be shipped later without confronting it.
+
+**Two known-wrong outputs are pinned rather than hidden:** `528,329` → `528329` and `%68,389` → `68389` are 1000× errors on published statistics, unfixed. The direction that would work is a locale inferred over a **local window** (line/sentence) rather than the document — `528,329` sits beside `p<0,001`, while `1,738 adult patients` has no European marker anywhere near it. Unbuilt and unmeasured; it needs its own review.
+
+### Diagnostics now ask the custodian for their corpus
+
+`tools/diag/_corpus.py` resolves the paper set through article-finder (`papers-with-view`, `corpus-query.py`) instead of globbing `PDFextractor/test-pdfs`, and every scan prints a `COVERAGE:` line naming what it measured. A denominator computed from the numerator can only ever report 100%; a glob that silently returns 40 files instead of 101 divides every count by the wrong N with nothing to show for it. New scans: `glyph_map_gap_scan.py` (which codepoints A5 leaves unmapped) and `locale_gate_blast_radius.py`.
+
+## [2.4.127] - 2026-08-12
+
+**The numeric-separator rules stopped guessing.** `NORMALIZATION_VERSION` 1.9.50 → **1.9.51**. Found by verifying a downstream's bug report instead of accepting it: ESCImate filed one divergence, and measuring it turned up a defect an order of magnitude larger pointing the other way.
+
+### A3 (decimal comma) discriminated with an exclusion list, and an exclusion list is never complete
+
+The rule keyed on a lookbehind saying what may *not* precede the number — a letter, a comma, a digit, `[`, `(`. Measured over the 101-PDF corpus it fired **29 times in 13 papers, and ~27 of those were not decimals at all**, every one of them a shape the list does not mention:
+
+```
+'compared with controls.7,8 However'  ->  'controls.7.8 However'   Vancouver citation superscripts
+'estimated to be up to ~25%6,28.'     ->  '...%6.28.'              superscripts after '%'
+'Erik. T. Frank 1,2 , Lucie Kesner 3' ->  'Frank 1.2 ,'            affiliation markers
+'Experiments 1,2 showed'              ->  'Experiments 1.2 showed' enumeration
+flattened ANOVA cells '9,57' '9,40'   ->  '9.57' '9.40'            df pairs
+```
+
+The lookbehind excludes a *comma*-preceded digit, which protects the interior of an affiliation run (`Wagner1,3,4`) — but the **first** element of such a run is space-preceded and was protected by nothing. The only two genuine European decimals in the whole corpus are leading-zero hazard ratios, which A3c converts on its own. The rule was ~2 right and ~27 wrong.
+
+**A3 now converts only in the VALUE POSITION** — an operator (`=`, `<`, `>`, `<=`, `>=`, `≤`, `≥`) immediately before the number. A positive structural signature instead of a growing denylist, and the same key ESCImate's shared spec uses for its own D1b rule. Digit bounds carry the rest: **1–2** digits after the comma (a thousands group is *exactly* three, so collision with A3a is impossible) and 1–4 before it, which also fixes the long-standing miss on `M = 12,34` and `t = 1234,56`.
+
+The trailing lookahead now admits a **list comma**, closing the divergence ESCImate filed on 2026-08-09: `t(28) = 2,21, d = 0,45` left `2,21` unconverted and a parser read **2**, a 10× error. Admitting `,` is safe *only* under the operator gate — ungated it would have converted **52 superscript runs across 16 of 101 papers and zero real decimals**, and an adversarial pass refuted the narrower "comma + space" variant too (`Studies 1,2, and 3 replicated` → `Studies 1.2, and 3`).
+
+The admitted list comma carries `(?!\d)`: a list comma in prose is followed by a space, a digit-run separator by a digit. Without that guard the rule fired on an `=`-coded categorical enumeration — `Group = 1,2,3` → `Group = 1.2,3` — a value *position* that is not a value. Found by an adversarial pass on the design, reproduced, pinned.
+
+**Three accepted costs, stated rather than implied:**
+
+1. A European decimal with **no operator** is left verbatim. The common case is prose (`The score was 123,4 on that scale`), but the class is broader: a bare flattened **table cell** has no operator either, so a continental `Estimate | 1,23` column is not converted. Zero instances in the 101-PDF corpus — an absence, not a proof.
+2. The operator does **not** prove "value" for a coding declaration: `Sex = 0,1 (0 = male, 1 = female)` still becomes `0.1`. Structurally identical to a real `d = 0,5`; undecidable without a vocabulary. Pre-existing and unchanged.
+3. `HR = 1,234` still reaches the consumer as `1234`. A3a resolves a 3-digit fraction toward thousands *before* A3 runs, so the ambiguity is not merely "left to the consumer" — the evidence is gone by the time they see it. That is the shared spec's agreed T1 default and `N = 1,182` depends on it, so it is **raised with ESCImate rather than changed unilaterally**.
+
+Preserving an ambiguous token is not the same as getting it wrong: the source form is intact and both readings remain recoverable, where a fused pair is irreversible.
+
+### A3a fused a bracket-delimited pair, destroying a published interquartile range
+
+```
+nat_comms_2:  'Median (Q1,Q3) ... 148 (52,272)'  ->  '148 (52272)'
+```
+
+while the same table's adjacent row `8 (4,14)` survived as `(4, 14)` — one table printing one IQR as a pair and the next as a single fictional number. A3a's only bracket guard was `(?<![A-Z][\(\[])`, which recognises a **single uppercase label** and nothing else.
+
+The guard is now the bracket **delimitation** rather than the label: a token that is the entire content of `(...)`/`[...]` is a pair, not a thousands-grouped integer. This also protects `t(1,197)`, which the `[A-Z]` lookbehind never covered and which ESCImate's SPEC rule T1 explicitly assigns to the consumer ("T1 deliberately protects all `X(…)` brackets, because deciding which are pairs requires knowing the test"). A bracket that opens a **phrase** still strips: `(12,856 with immigrant backgrounds)`.
+
+Consequence, stated rather than hidden: a lone bracketed count `(12,856)` now keeps its comma, and so does a bracketed **standard error** under a bare coefficient — `demography_2` Table 4 has 12 of them (`29,807` above `(19,718)`), so one table now spells the two differently. Accepted deliberately: nothing structural separates `(19,718)` from `(52,272)` — only the semantics of the column — and preserving a separator loses no digit while fusing a pair is irreversible.
+
+### New: A3d leading-comma decimal, and arm counts
+
+- **A3d** — `p = ,025` *is* `p = .025` in a continental paper, exactly as APA drops the leading zero. A3 requires a digit before the comma, so this matched nothing and the p-value was **silently dropped** while the same clause's `t` and `d` converted normally (ESCImate spec rule D1b). Guarded to 2–4 digits so an integer list after an operator (`x = ,1,2,3`) cannot match, and the operator class includes `≤`/`≥` — a first draft omitted them while accepting `<`/`>`, the same omission-in-a-sequence that produced the 1.9.50 bidi gap.
+- **Arm counts** — `1,234/5,678` stripped only the second count (`1,234/5678`), an asymmetric mangle of an `events/total` pair. Handled by a dedicated pattern requiring **both** sides to be thousands-grouped, *not* by adding `/` to the generic boundary class: a reviewer's counter-example `Directive 1,234/56/EU` was reproduced and would have regressed under that version.
+
+### A2 was "repairing" a number that had not finished
+
+Found while probing the A3 change, pre-existing since the rule was written:
+
+```
+'d = 12,5 was found'   ->  'd = .12,5 was found'
+'g = 45,2 units'       ->  'g = .45,2 units'
+```
+
+A2 restores a decimal point the PDF lost (`d = 12` → `d = .12`), and its terminator set admitted a **bare comma** — so it fired on a number whose integer part it could see but whose fraction it could not. The output is neither reading of the source (US `d = .12`, European `d = 12,5`) and no parser can recover it. `,` now carries the same `(?!\d)` guard `.` has had since v2.4.17; `d = 12, p = .03` still repairs, because there the comma is a list comma followed by a space.
+
+### Verification
+
+- **Shared conformance corpus** (ESCImate spec 1.4.0, 72 cases): **38 → 47 passing, 11 fixed, 0 regressions.** The two cases that stopped passing are principled divergences, both reported back: one is tagged **rule T2**, which their own spec says is *not* part of the shared contract; the other is the accepted prose-decimal cost — and their corpus carries the identical token shape `1,5` with the **opposite** expectation two cases apart (`items 1,5 and 7` must be preserved), which is undecidable without either a head-noun vocabulary or locale inference.
+- **44 new tests** (`tests/test_numeric_separator_value_position.py`), **all watched failing against the unfixed code first** (18 red on the first run), including invariants that no digit is invented or lost and that every case is idempotent.
+- **Corpus diff** against 2.4.126 across all 101 PDFs, both channels.
+- **Cross-model review before implementation, not after**, on the design rather than the diff. codex produced 8 findings: one refuted by reproduction (`Mdn 12,34` is *not* converted today, so nothing is lost), two changed the design (the arm-count pattern instead of a `/` boundary class, which would have regressed `Directive 1,234/56/EU`; A3d's digit bound), one named the `≤`/`≥` omission.
+- **An adversarial pass then broke the result twice**: it refuted our own narrower "comma + space" proposal, and after implementation it found the `Group = 1,2,3` regression above — a defect this release introduced and shipped fixed, with two further pre-existing costs it forced into the open (items 2 and 3 above).
+
+### Also
+
+- `tools/diag/a3_comma_lookahead_scan.py` and `tools/diag/a3a_df_bracket_guard_scan.py` — the two corpus measurements above, re-runnable.
+- The in-source comment on A3a's guard claimed `t(1,197)` and `chi2(2,42)` were blocked by it. Neither was. Corrected with the measured behaviour of each.
+- **New step name `A3d_leading_comma_decimal`** — the first change to the `steps_applied` / `steps_changed` vocabulary since 2.4.121 (49 → 50 names). A consumer that pins the set of step names will see one addition.
+
 ## [Unreleased] - 2026-08-07
 
 **984 KB of published article text left this repo, and the gate that needed it kept its full strength.** No library code changed — `docpluck/` is untouched, so there is no version bump and no output change.
