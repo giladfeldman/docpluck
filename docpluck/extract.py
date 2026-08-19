@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from .telemetry import record_fallback
+from .tempfiles import unlink_temp_pdf
 from .version import resolve_pdftotext_executable
 
 def extract_pdf(
@@ -246,7 +247,15 @@ def extract_pdf(
         return text, method
 
     finally:
-        os.unlink(tmp_path)
+        # CLEANUP IS BEST-EFFORT, AND IT IS RECORDED. A bare `os.unlink` here
+        # raised `PermissionError [WinError 32]` straight out of the library's
+        # PRIMARY TEXT ENTRY POINT whenever the temp file was momentarily locked
+        # — after the text had already been extracted successfully. The sibling
+        # camelot sites had been given exactly this guard in v2.4.134, under a
+        # comment reading "BOTH call sites, because a fix applied to one of two
+        # is not fixed"; there were five sites, and this was one of the three the
+        # sweep never looked at. See `docpluck/tempfiles.py`.
+        unlink_temp_pdf(tmp_path)
 
 
 def extract_pdf_file(path: Union[str, Path]) -> tuple[str, str]:
@@ -432,6 +441,71 @@ def _reading_order_agrees(pdftotext_text: str, pdfplumber_text: str) -> bool:
     return True
 
 
+# SMP math-italic Greek -> ASCII, spelled out to MATCH `normalize.py`'s A5 step.
+#
+# This table used to carry its own convention — single letters and digraphs
+# (`a`, `b`, `d`, `n`, `m`, `r`, `s`, `ph`, `ch`) — while A5, which defines this
+# library's Greek convention everywhere else, spells them out (`alpha`, `beta`,
+# `delta`, `eta`, `mu`, `sigma`, `phi`, `chi`). Two implementations of one rule
+# with no shared test, and they had diverged on 9 of 9 shared letters.
+#
+# Every disagreement was a silent failure downstream, and three were COLLISIONS
+# with a different statistic:
+#
+#     chi2(2) = 5.10  ->  'ch2(2)'  effectcheck matches `chi2(`; a chi-square
+#                                   test was therefore never checked, silently
+#     eta2            ->  'n2'      collides with n, the SAMPLE SIZE
+#     beta = -.02     ->  'b = -.02' collides with b, the UNSTANDARDIZED
+#                                   coefficient — the exact corruption W0m
+#                                   (v2.4.117) exists to detect and undo from
+#                                   layout font evidence. One path manufactured
+#                                   what another path repairs.
+#     rho = .31       ->  'r = .31' collides with r, the CORRELATION
+#
+# The function's own docstring said this map existed "so downstream regex
+# patterns work normally"; it did the opposite. Module-level and named so the
+# two tables can share a test (`tests/test_smp_greek_agrees_with_a5.py`) rather
+# than drifting again.
+# DERIVED from the canonical table in `docpluck.symbols`, never restated. The
+# SMP math-italic planes are the SAME letters at different codepoints, so the
+# mapping is computed by walking back to the plain letter and asking the one
+# table what it says. A hand-written second list is precisely what diverged.
+def _build_smp_greek() -> dict[str, str]:
+    from .symbols import GREEK_LOWER_TO_ASCII, GREEK_UPPER_TO_ASCII
+
+    # U+1D6E2 is MATHEMATICAL ITALIC CAPITAL ALPHA; U+1D6FC is the small alpha.
+    # Both blocks run in Greek alphabetical order, so an offset maps each to its
+    # plain counterpart (U+0391 capitals, U+03B1 smalls).
+    out: dict[str, str] = {}
+    for i in range(25):  # Alpha..Omega inclusive of the final-sigma slot
+        plain_upper = chr(0x0391 + i)
+        plain_lower = chr(0x03B1 + i)
+        if plain_upper in GREEK_UPPER_TO_ASCII:
+            out[chr(0x1D6E2 + i)] = GREEK_UPPER_TO_ASCII[plain_upper]
+        if plain_lower in GREEK_LOWER_TO_ASCII:
+            out[chr(0x1D6FC + i)] = GREEK_LOWER_TO_ASCII[plain_lower]
+    return out
+
+
+_SMP_GREEK_TO_ASCII = _build_smp_greek()
+
+
+def _smp_to_ascii_map() -> dict[str, str]:
+    """Full SMP math-italic -> ASCII map: Latin A-Z/a-z plus Greek.
+
+    Built here rather than inline so the Greek half is addressable by a test.
+    """
+    m: dict[str, str] = {}
+    # Math italic capitals A-Z: U+1D434-U+1D44D
+    for i, letter in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+        m[chr(0x1D434 + i)] = letter
+    # Math italic small a-z: U+1D44E-U+1D467
+    for i, letter in enumerate("abcdefghijklmnopqrstuvwxyz"):
+        m[chr(0x1D44E + i)] = letter
+    m.update(_SMP_GREEK_TO_ASCII)
+    return m
+
+
 def _recover_with_pdfplumber(pdf_path: str) -> Optional[str]:
     """Recover text using pdfplumber when pdftotext produces garbled output.
 
@@ -450,24 +524,7 @@ def _recover_with_pdfplumber(pdf_path: str) -> Optional[str]:
     try:
         import pdfplumber
 
-        smp_to_ascii: dict[str, str] = {}
-        # Math italic capitals A-Z: U+1D434–U+1D44D
-        for i, letter in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
-            smp_to_ascii[chr(0x1D434 + i)] = letter
-        # Math italic small a-z: U+1D44E–U+1D467
-        for i, letter in enumerate("abcdefghijklmnopqrstuvwxyz"):
-            smp_to_ascii[chr(0x1D44E + i)] = letter
-        # Math italic Greek (common in physics/biology papers)
-        greek = {
-            0x1D6E2: "A", 0x1D6E4: "G", 0x1D6E5: "D", 0x1D6F4: "S",
-            0x1D6F7: "Ph", 0x1D6F8: "Ch", 0x1D6F9: "Ps", 0x1D6FA: "O",
-            0x1D6FC: "a", 0x1D6FD: "b", 0x1D6FE: "g", 0x1D6FF: "d",
-            0x1D700: "e", 0x1D701: "z", 0x1D702: "n", 0x1D703: "th",
-            0x1D707: "m", 0x1D70B: "pi", 0x1D70C: "r", 0x1D70E: "s",
-            0x1D711: "ph", 0x1D712: "ch", 0x1D713: "ps",
-        }
-        for cp, repl in greek.items():
-            smp_to_ascii[chr(cp)] = repl
+        smp_to_ascii = _smp_to_ascii_map()
 
         pages_text = []
         with pdfplumber.open(pdf_path) as pdf:
