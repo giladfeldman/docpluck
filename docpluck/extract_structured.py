@@ -34,10 +34,11 @@ from .tables.captions import (
     find_caption_matches,
 )
 from .tables.render import cells_to_html
-from .telemetry import record_fallback
+from .tables.whitespace import grid_is_body_prose
+from .telemetry import fallback_scope, record_fallback
 
 
-TABLE_EXTRACTION_VERSION = "2.4.10" # v2.4.10 (whitespace grid-guard accuracy, 2026-08-04): TWO false-negative classes in the guard that decides whether a whitespace/char grid is a real DATA table. (a) _CAPTION_LABEL_RE was UNANCHORED, so a mid-sentence CROSS-REFERENCE in a footnote/prose cell ("…al. (2007) in Table 8.", "…in Figure 2. We summarized…") read as an absorbed caption and condemned the whole grid; anchored to ^\s* to match the discipline camelot_extract._CAPTION_ROW_PATTERN already documents (its comment notes anchoring is why an inline "see Table 2" does not match). (b) the clean-data-cell test matched a SINGLE numeric token, so every multi-token APA COMPOSITE was scored as non-data — `2.84 [1.89]` (mean [SD]), `3.47 [1.23] (170)` (mean [SD] (n)), `2.84 ± 1.89`, `0.42***` — and a descriptives table built from them scored clean_data_rows=0 and was discarded as prose. Replaced the shape regex with a NUMERIC-DOMINANCE test (_cell_is_clean_data: digit-bearing AND free of substantive words), which generalises to composites not yet seen instead of chasing each with another alternation; the prose side is unmoved, so absorbed body text is still rejected. 101-PDF guard-diff: 24 tables recover (up from 20 at v2.4.120), 0 regressed, 0 foreign-caption acceptances. # v2.4.9 (RC-T cycle 4 own-caption exemption, 2026-08-04): _whitespace_grid_is_clean rejected ANY grid containing a "Table N."/"Figure N." caption cell — the signature of a region that absorbed a NEIGHBOURING table's caption. But detect._region_for_caption builds every region as _union(caption_bbox, geom_bbox), so a caption-anchored region ALWAYS contains its OWN caption by construction (the region-driven Camelot pass needs it for pairing). The guard therefore condemned EVERY region grid: whitespace_cells returned 0 cells corpus-wide (19/19 chan_feldman+maier regions) and each table fell to the raw_text fallback, which truncates rows. The exemption is IDENTITY-based, not position-based: the anchoring caption's number is threaded from the region spec (extract_structured) / region.caption_match (whitespace) into the guard, and a caption cell is exempt ONLY when it names THAT exact number, sits within _OWN_CAPTION_MAX_ROW, and is the first such match — per-CELL, and opt-in (own_caption_number=None keeps the strict legacy behaviour for the auto-detect path). A position-only draft was written and REJECTED in cross-model review (codex, 2026-08-04); all three of its holes reproduced locally — a NEIGHBOUR's caption in a leading row blessed as own (publishing another table's data), (r,c) sort order picking the leftmost caption on side-by-side pages, and a whole-ROW exemption letting a second Table/Figure caption ride along. Guard-diff over the APA corpus: 13 tables recover (ip_feldman T1, jdm_.2023.15 T2/T3, korbmacher T7/9/10/12/14, maier T3/8/9/10/11 — 812 cells), 0 regressed, 0 foreign-caption acceptances. chan_feldman is NOT fixed here: its regions genuinely absorb 2-column body prose and fail the prose/clean-data guards on their own merits (the separate region prose-trim cycle); its xfail(strict) stays armed with the corrected diagnosis. # v2.4.8 (RC-T caption-tail walk, 2026-08-04 — the gated RC-T cycle, user-approved): _extract_table_body_text's body_start walk stepped break-to-break (preferring ) and inspected only a 40-char window, so a WRAPPED caption whose table body serializes column-by-column (no early blank line) overshot the caption's own terminator and SILENTLY DROPPED leading rows (chan_feldman T3 lost its first four rows: Sample size / Geographic origin / Gender / Ethnic group; chan T1 lost hypothesis row 1). Replaced by _caption_tail_body_start: a per-LINE walk with three structural rules — (1) WHOLE-line terminator test measured from the true line start, so a self-terminated caption ("Table 6. Study 2 descriptive statistics.") breaks immediately (the xiao_2021 T6 truncation the run-3 prototype regressed on); (2) a blank line ends an unterminated caption; (3) a real caption wraps at most _CAPTION_TAIL_MAX_LINES physical lines — beyond that the "tail" is table CONTENT, so body_start returns to just after the caption line (the amc_1 T3 bibliography-table truncation). Plus _skip_leading_nontable_junk (drops a leading figure caption or wrapped body-prose paragraph from a recovered head; bounded + terminated-only so a genuine table's first rows are never eaten) and _raw_text_is_page_furniture_only (suppresses a fallback that is ONLY a next-page running header + page marker — jama_open_1 T2 rendered nothing but a journal banner, article title, date and "8/13"). _line_is_body_prose gains a bibliography-row exemption (author-initials opener + year) so a collection table's reference rows are not read as prose. 101-PDF guard-diff: 333 captions recover leading rows, 0 truncations (the run-3 prototype had 2). # v2.4.7 (concurrent-session reconciliation, 2026-07-02 — AI-gold-verified): landed six in-flight table fixes onto the v2.4.6 greedy+rescue base (the global-assignment pairing refactor was REJECTED — it regressed chan_feldman T6 + reshuffled ~24 papers, the same net-harmful class as prior global attempts). (1) chandrashekar side-by-side de-interleave: a page with ≥2 captions straddling a whitespace gutter drives each caption's region to its OWN column (_detect_column_gutters/_assign_caption_columns/_label_x_midpoint/_column_table_bottom + isolated Camelot calls), rebuilding caption+body from that column — Table 4 17×2-merge → clean 9×2, both captions gold-exact. (2) efendic T1 categorical + T2 detect: unified detect.py aligned-row-run (contiguous column-aligned run, prose-robust) + widen-aware geometry (_detect_geometry_widen_aware picks the more-columnar of narrow/widened band) + contiguous-footnote-gap + whitespace _is_categorical_grid acceptance — T1 3×2→5×3, T2 0×0-stub→11×5. (3) efendic T3 running-header strip (_RUNNING_HEADER_PATTERNS gains 'Author et al. <page>') + T2-5 leading caption-tail-PROSE strip (context-guarded: only above a genuine multi-cell header) — grids start at the real header. (4) collabra_77859 T2↔T3: bare integers excluded from the caption-overlap tokenizer (_CAPTION_TOKEN_RE → [a-z]{3,}|\d+\.\d+) so a stray 'Table 2' digit stops manufacturing false overlap; region-driven capture then pins pairing deterministically (a reading-order tie-break was tried + REJECTED — it perturbed greedy visit order and regressed chan_feldman T6). (5) cog_emo T8 caption-marker hint: an absorbed 'Table N.' first row (_leading_table_caption_number) authoritatively pins a grid to caption N, beating degenerate token-overlap ties — T8 recovers its 17×6 intercorrelation matrix, T9 its 12×8. Full 101-PDF structured diff vs v2.4.6 (Camelot verified DETERMINISTIC on this host: two identical-code runs byte-identical), AI-gold-verified on the changed papers. # v2.4.6 (duplicate-starvation rescue, 2026-07-01 — AI-gold-verified, PAIRING change): _rescue_duplicate_starved_captions repairs the greedy mis-pairing where, on a page with ≥2 captions, Camelot emits a near-identical DUPLICATE fragment of one table and the greedy first-come loop hands that duplicate to a SECOND caption — starving (dropping) that caption's own real table. When ≥2 captions were assigned identical-raw_text tables, the best-overlap caption keeps it and each other caption is reassigned to the best UNASSIGNED same-page table that fits it at least as well as the duplicate. Fires ONLY on that signature — a whole-corpus dup_rescue-firing scan confirms it activates on bmc_med_3 alone; every other page keeps its greedy assignment byte-identical (so the corpus-wide token-overlap fixes verified in prior cycles are untouched). bmc_med_3 Table 3 recovers its real 11×6 "Comparisons of SCE" grid (AI-gold-verified vs the source page; was a second copy of Table 2's 29×5). A full order-independent GLOBAL matching also fixed it but reshuffled ~24 papers + regressed chan_feldman T6 (prose fragment promoted to a caption) — rejected; see LEARNINGS / memory project_docpluck_region_driven_camelot. Camelot run-to-run non-determinism (feedback_camelot_flake_cumulative_load) defeats naive before/after fingerprint diffing, so surgicality is proven at the CODE-PATH level (no dup_rescue → identical HEAD path), not by comparing flaky shapes. # v2.4.5 (region-driven capture, 2026-06-29 — AI-gold-verified, CAPTURE-PATH change): each table caption now drives Camelot stream with its OWN caption-anchored region as table_areas (extract_tables_camelot_by_region + _region_driven_capture), so a caption gets exactly its table by construction — recovers stacked / side-by-side multi-table-per-page cases blind pages="all" + token-overlap pairing could not separate (efendic Table 4+5 split, 12 papers' 0×0 stubs → real). Region tables are CANDIDATES: _pick_better_table keeps the structurally-richer of {region, auto-detect} per caption (region too-narrow bbox can't collapse a wide table; jama_open_1 stays 43×7). Content-plausibility guards on the region path (_cell_is_prose dominance + _CAPTION_LABEL_RE absorption) reject prose-as-grid / caption-absorbed fragments → honest 0×0 stubs (cog_emo Table 3/9). Caption page-fix (char_start past leading \n\n/\f) is the foundation. Full 101-PDF structured diff (27 changed/0 err) + 6-paper AI-gold canary (all FIX/PASS/NET-BETTER, no new regressions). Known documented hard cases (not regressions vs prior): cog_emo T8 Camelot under-segmentation, chandrashekar 2-col caption interleave, efendic T2 Camelot-invisible, bmc_med_3 duplicate-fragment pairing (FIXED in v2.4.6 by _rescue_duplicate_starved_captions; the dedupe + bbox-proximity + global-matching approaches were net-harmful and rejected — see LEARNINGS). # v2.4.4 (ESCIcheck handoff 2026-06-25 — flatten-only, AI-gold-verified): (DP-3) flatten._infer_anova_eta2_hint types a font-dropped η²p effect column by STRUCTURE — an unlabeled estimate column in an F-test/ANOVA results table (F + BF01/CI, no competing d/r/OR) is keyed `eta2`, range-guarded to [0,1]; the η²p glyph itself is unrecoverable (NotoSerif uni:no, OCR-tier). (DP-5b) flatten._inline_stat_field types a self-labeled cell (`r = .67`, `d = 0.32`) by its token even under a generic "Effect size" header. (DP-5a) cell_cleaning._is_fragment_cell recognizes a bracketed-CI close tail (`0.73]`) so a CI split across rows rejoins (`[0.59, 0.73]`) and the junk fragment row is dropped (cog_emo T8 14→10 rows). These three are flatten/cell-cleaning ONLY — no capture-path change, so caption→table pairing is byte-identical to v2.4.3. (DP-1/DP-2 capture recovery — the caption page-attribution fix — was prototyped but REVERTED: AI-gold canary verify showed it mis-pairs same-page-caption tables (efendic T4/T5, cog_emo T8/T9) and only half-fixes plos_med; it is queued as its own gated cycle with same-page disambiguation + region-quality gating. See an internal triage doc (2026-06-25).) # v2.4.3 (RC-T foundation): tables.whitespace gains a CHAR-LEVEL column-detection fallback (char_whitespace_cells) — when pdfplumber's word grouper glues a tight-kerned numeric row into one token so the word-gap detector finds < 2 columns, recover the grid from char x-gaps, voting on column-START edges (right-aligned data columns are left-edge-stable even when the label column is variable-width) and reinserting intra-cell word spacing from geometry. Fires ONLY as a fallback when the word path returns < 2 columns, so currently-correct tables are byte-unchanged (word path restored verbatim). Recovers ip_feldman Table 10's 7 regression rows in isolation. NOT yet wired to replace a degenerate MATCHED Camelot table (that extract_structured change + region prose-trim is the next gated cycle — see LEARNINGS 2026-06-25). # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
+TABLE_EXTRACTION_VERSION = "2.4.11" # v2.4.11 (three TEXT-LOSS defects closed, 2026-08-19): the three gold-verified defects that had been sitting behind xfail(strict) because a fix for each was attempted and REVERTED. (a) detect._bbox_of_caption_line grouped a page's chars by round(top) ACROSS THE WHOLE PAGE and returned min(x0)/max(x1), so on a two-column page the caption's y-row also held the neighbouring column's body line - chan_feldman_2025_cogemo p8 gave a 441.8pt caption bbox for a table occupying 214pt, the region swallowed that column's prose, and every grid guard then rejected the table "on its own merits". Five sessions read this as a guard-tuning problem; it is horizontal, not vertical. Clipped to the caption's COLUMN RUN (detect._column_runs), keyed on the page's own gutter: the caption's inter-word gaps top out at 3.1pt against a 10.5pt gutter - TYPOGRAPHIC evidence, a band the renderer emitted. Region words 266->107. (b) whitespace._cluster_into_rows measured the y-gap to the PREVIOUS WORD; words are sorted by (top, x0) so the running previous-top creeps in sub-threshold steps and an arbitrarily tall band collapses into one row. Measured over the 26-paper baseline with tools/diag/row_cluster_census.py: 30 of 60 caption-anchored regions smeared across 8 papers. THE 2026-08-04 REVERT'S COUNTER-EXAMPLE WAS ITSELF THE DEFECT - xiao Table 4's "94.4pt legitimately tall row" is the entire table body (stacked header, 5 product rows, 5 CI continuation lines, 75 words) and that table emitted cells=0; it is now 7 rows / 35 cells. Four geometric discriminators had been designed and rejected around a constraint that did not exist. (c) _pick_better_table arbitrated on SHAPE alone, so a Discussion paragraph Camelot structured as a 4x2 grid outranked and replaced maier Table 7's gold-exact 3x5 descriptives; candidates are now tested for prose dominance (whitespace.grid_is_body_prose) BEFORE arbitration. THE FIRST REMEDY RE-CREATED THE DEFECT: a continuation re-merge folded an indented single-baseline line back into the row above, passed 31 green tests, and the corpus guard-diff said 21 tables lost cells (-867) and 12 lost raw_text - each fold EXTENDED the row so the contiguity test could never fail (10.1111/jomf.13036 Table 6: rows labelled 1/2/3/4+ are indented past their group label, so all five folded into one 75pt row). Deleted, not tuned. Same guard-diff also caught grid_is_body_prose condemning a REAL 33x4 qualitative table (10.5465/amc.2022.0006 T4, 70 cells / 2,008 chars - closed with a header-row veto reusing cell_cleaning._is_header_like_row) and, worse, that guard DELETING rather than substituting when the fallback was empty; the rejection is now PROVISIONAL (the candidate is stashed and restored, recording table_prose_rejection_reverted_no_replacement). Gate: tools/diag/table_capture_guard_diff.py, --isolate <change> for attribution. See docs/OVERHAUL_REGISTER.md section J and LESSONS L-046/L-047. # v2.4.10 (whitespace grid-guard accuracy, 2026-08-04): TWO false-negative classes in the guard that decides whether a whitespace/char grid is a real DATA table. (a) _CAPTION_LABEL_RE was UNANCHORED, so a mid-sentence CROSS-REFERENCE in a footnote/prose cell ("…al. (2007) in Table 8.", "…in Figure 2. We summarized…") read as an absorbed caption and condemned the whole grid; anchored to ^\s* to match the discipline camelot_extract._CAPTION_ROW_PATTERN already documents (its comment notes anchoring is why an inline "see Table 2" does not match). (b) the clean-data-cell test matched a SINGLE numeric token, so every multi-token APA COMPOSITE was scored as non-data — `2.84 [1.89]` (mean [SD]), `3.47 [1.23] (170)` (mean [SD] (n)), `2.84 ± 1.89`, `0.42***` — and a descriptives table built from them scored clean_data_rows=0 and was discarded as prose. Replaced the shape regex with a NUMERIC-DOMINANCE test (_cell_is_clean_data: digit-bearing AND free of substantive words), which generalises to composites not yet seen instead of chasing each with another alternation; the prose side is unmoved, so absorbed body text is still rejected. 101-PDF guard-diff: 24 tables recover (up from 20 at v2.4.120), 0 regressed, 0 foreign-caption acceptances. # v2.4.9 (RC-T cycle 4 own-caption exemption, 2026-08-04): _whitespace_grid_is_clean rejected ANY grid containing a "Table N."/"Figure N." caption cell — the signature of a region that absorbed a NEIGHBOURING table's caption. But detect._region_for_caption builds every region as _union(caption_bbox, geom_bbox), so a caption-anchored region ALWAYS contains its OWN caption by construction (the region-driven Camelot pass needs it for pairing). The guard therefore condemned EVERY region grid: whitespace_cells returned 0 cells corpus-wide (19/19 chan_feldman+maier regions) and each table fell to the raw_text fallback, which truncates rows. The exemption is IDENTITY-based, not position-based: the anchoring caption's number is threaded from the region spec (extract_structured) / region.caption_match (whitespace) into the guard, and a caption cell is exempt ONLY when it names THAT exact number, sits within _OWN_CAPTION_MAX_ROW, and is the first such match — per-CELL, and opt-in (own_caption_number=None keeps the strict legacy behaviour for the auto-detect path). A position-only draft was written and REJECTED in cross-model review (codex, 2026-08-04); all three of its holes reproduced locally — a NEIGHBOUR's caption in a leading row blessed as own (publishing another table's data), (r,c) sort order picking the leftmost caption on side-by-side pages, and a whole-ROW exemption letting a second Table/Figure caption ride along. Guard-diff over the APA corpus: 13 tables recover (ip_feldman T1, jdm_.2023.15 T2/T3, korbmacher T7/9/10/12/14, maier T3/8/9/10/11 — 812 cells), 0 regressed, 0 foreign-caption acceptances. chan_feldman is NOT fixed here: its regions genuinely absorb 2-column body prose and fail the prose/clean-data guards on their own merits (the separate region prose-trim cycle); its xfail(strict) stays armed with the corrected diagnosis. # v2.4.8 (RC-T caption-tail walk, 2026-08-04 — the gated RC-T cycle, user-approved): _extract_table_body_text's body_start walk stepped break-to-break (preferring ) and inspected only a 40-char window, so a WRAPPED caption whose table body serializes column-by-column (no early blank line) overshot the caption's own terminator and SILENTLY DROPPED leading rows (chan_feldman T3 lost its first four rows: Sample size / Geographic origin / Gender / Ethnic group; chan T1 lost hypothesis row 1). Replaced by _caption_tail_body_start: a per-LINE walk with three structural rules — (1) WHOLE-line terminator test measured from the true line start, so a self-terminated caption ("Table 6. Study 2 descriptive statistics.") breaks immediately (the xiao_2021 T6 truncation the run-3 prototype regressed on); (2) a blank line ends an unterminated caption; (3) a real caption wraps at most _CAPTION_TAIL_MAX_LINES physical lines — beyond that the "tail" is table CONTENT, so body_start returns to just after the caption line (the amc_1 T3 bibliography-table truncation). Plus _skip_leading_nontable_junk (drops a leading figure caption or wrapped body-prose paragraph from a recovered head; bounded + terminated-only so a genuine table's first rows are never eaten) and _raw_text_is_page_furniture_only (suppresses a fallback that is ONLY a next-page running header + page marker — jama_open_1 T2 rendered nothing but a journal banner, article title, date and "8/13"). _line_is_body_prose gains a bibliography-row exemption (author-initials opener + year) so a collection table's reference rows are not read as prose. 101-PDF guard-diff: 333 captions recover leading rows, 0 truncations (the run-3 prototype had 2). # v2.4.7 (concurrent-session reconciliation, 2026-07-02 — AI-gold-verified): landed six in-flight table fixes onto the v2.4.6 greedy+rescue base (the global-assignment pairing refactor was REJECTED — it regressed chan_feldman T6 + reshuffled ~24 papers, the same net-harmful class as prior global attempts). (1) chandrashekar side-by-side de-interleave: a page with ≥2 captions straddling a whitespace gutter drives each caption's region to its OWN column (_detect_column_gutters/_assign_caption_columns/_label_x_midpoint/_column_table_bottom + isolated Camelot calls), rebuilding caption+body from that column — Table 4 17×2-merge → clean 9×2, both captions gold-exact. (2) efendic T1 categorical + T2 detect: unified detect.py aligned-row-run (contiguous column-aligned run, prose-robust) + widen-aware geometry (_detect_geometry_widen_aware picks the more-columnar of narrow/widened band) + contiguous-footnote-gap + whitespace _is_categorical_grid acceptance — T1 3×2→5×3, T2 0×0-stub→11×5. (3) efendic T3 running-header strip (_RUNNING_HEADER_PATTERNS gains 'Author et al. <page>') + T2-5 leading caption-tail-PROSE strip (context-guarded: only above a genuine multi-cell header) — grids start at the real header. (4) collabra_77859 T2↔T3: bare integers excluded from the caption-overlap tokenizer (_CAPTION_TOKEN_RE → [a-z]{3,}|\d+\.\d+) so a stray 'Table 2' digit stops manufacturing false overlap; region-driven capture then pins pairing deterministically (a reading-order tie-break was tried + REJECTED — it perturbed greedy visit order and regressed chan_feldman T6). (5) cog_emo T8 caption-marker hint: an absorbed 'Table N.' first row (_leading_table_caption_number) authoritatively pins a grid to caption N, beating degenerate token-overlap ties — T8 recovers its 17×6 intercorrelation matrix, T9 its 12×8. Full 101-PDF structured diff vs v2.4.6 (Camelot verified DETERMINISTIC on this host: two identical-code runs byte-identical), AI-gold-verified on the changed papers. # v2.4.6 (duplicate-starvation rescue, 2026-07-01 — AI-gold-verified, PAIRING change): _rescue_duplicate_starved_captions repairs the greedy mis-pairing where, on a page with ≥2 captions, Camelot emits a near-identical DUPLICATE fragment of one table and the greedy first-come loop hands that duplicate to a SECOND caption — starving (dropping) that caption's own real table. When ≥2 captions were assigned identical-raw_text tables, the best-overlap caption keeps it and each other caption is reassigned to the best UNASSIGNED same-page table that fits it at least as well as the duplicate. Fires ONLY on that signature — a whole-corpus dup_rescue-firing scan confirms it activates on bmc_med_3 alone; every other page keeps its greedy assignment byte-identical (so the corpus-wide token-overlap fixes verified in prior cycles are untouched). bmc_med_3 Table 3 recovers its real 11×6 "Comparisons of SCE" grid (AI-gold-verified vs the source page; was a second copy of Table 2's 29×5). A full order-independent GLOBAL matching also fixed it but reshuffled ~24 papers + regressed chan_feldman T6 (prose fragment promoted to a caption) — rejected; see LEARNINGS / memory project_docpluck_region_driven_camelot. Camelot run-to-run non-determinism (feedback_camelot_flake_cumulative_load) defeats naive before/after fingerprint diffing, so surgicality is proven at the CODE-PATH level (no dup_rescue → identical HEAD path), not by comparing flaky shapes. # v2.4.5 (region-driven capture, 2026-06-29 — AI-gold-verified, CAPTURE-PATH change): each table caption now drives Camelot stream with its OWN caption-anchored region as table_areas (extract_tables_camelot_by_region + _region_driven_capture), so a caption gets exactly its table by construction — recovers stacked / side-by-side multi-table-per-page cases blind pages="all" + token-overlap pairing could not separate (efendic Table 4+5 split, 12 papers' 0×0 stubs → real). Region tables are CANDIDATES: _pick_better_table keeps the structurally-richer of {region, auto-detect} per caption (region too-narrow bbox can't collapse a wide table; jama_open_1 stays 43×7). Content-plausibility guards on the region path (_cell_is_prose dominance + _CAPTION_LABEL_RE absorption) reject prose-as-grid / caption-absorbed fragments → honest 0×0 stubs (cog_emo Table 3/9). Caption page-fix (char_start past leading \n\n/\f) is the foundation. Full 101-PDF structured diff (27 changed/0 err) + 6-paper AI-gold canary (all FIX/PASS/NET-BETTER, no new regressions). Known documented hard cases (not regressions vs prior): cog_emo T8 Camelot under-segmentation, chandrashekar 2-col caption interleave, efendic T2 Camelot-invisible, bmc_med_3 duplicate-fragment pairing (FIXED in v2.4.6 by _rescue_duplicate_starved_captions; the dedupe + bbox-proximity + global-matching approaches were net-harmful and rejected — see LEARNINGS). # v2.4.4 (ESCIcheck handoff 2026-06-25 — flatten-only, AI-gold-verified): (DP-3) flatten._infer_anova_eta2_hint types a font-dropped η²p effect column by STRUCTURE — an unlabeled estimate column in an F-test/ANOVA results table (F + BF01/CI, no competing d/r/OR) is keyed `eta2`, range-guarded to [0,1]; the η²p glyph itself is unrecoverable (NotoSerif uni:no, OCR-tier). (DP-5b) flatten._inline_stat_field types a self-labeled cell (`r = .67`, `d = 0.32`) by its token even under a generic "Effect size" header. (DP-5a) cell_cleaning._is_fragment_cell recognizes a bracketed-CI close tail (`0.73]`) so a CI split across rows rejoins (`[0.59, 0.73]`) and the junk fragment row is dropped (cog_emo T8 14→10 rows). These three are flatten/cell-cleaning ONLY — no capture-path change, so caption→table pairing is byte-identical to v2.4.3. (DP-1/DP-2 capture recovery — the caption page-attribution fix — was prototyped but REVERTED: AI-gold canary verify showed it mis-pairs same-page-caption tables (efendic T4/T5, cog_emo T8/T9) and only half-fixes plos_med; it is queued as its own gated cycle with same-page disambiguation + region-quality gating. See an internal triage doc (2026-06-25).) # v2.4.3 (RC-T foundation): tables.whitespace gains a CHAR-LEVEL column-detection fallback (char_whitespace_cells) — when pdfplumber's word grouper glues a tight-kerned numeric row into one token so the word-gap detector finds < 2 columns, recover the grid from char x-gaps, voting on column-START edges (right-aligned data columns are left-edge-stable even when the label column is variable-width) and reinserting intra-cell word spacing from geometry. Fires ONLY as a fallback when the word path returns < 2 columns, so currently-correct tables are byte-unchanged (word path restored verbatim). Recovers ip_feldman Table 10's 7 regression rows in isolation. NOT yet wired to replace a degenerate MATCHED Camelot table (that extract_structured change + region prose-trim is the next gated cycle — see LEARNINGS 2026-06-25). # v2.4.2 (RC-T Layer-2): _extract_table_body_text now (a) Note-anchor — a table's "Note:" footnote is its last element, so trim body prose bled past it (chan_feldman T1/T3, efendic_2022 T5); and (b) degenerate-prose guard — suppress a raw_text fallback that STARTS mid-sentence with a lowercase multi-letter word AND is majority sentence-shaped prose, so render emits a clean caption-only table instead of an unstructured-table dump duplicating Results/Discussion prose (chan_feldman T9 was a verbatim ## Discussion duplicate). FP-safe (real cells start with header/label/number/single-letter marker, never a wrapped continuation); full-corpus 101-PDF guard-diff only trims+suppresses (grew=0 changed=0). # v2.4.1 (DP-2/DP-5): (DP-2) blank-header role recovery now types the unlabeled p-value (a bare `.XXX` after the test stat, no comparison op) and df (a bare integer/Welch-decimal between the stat and the d[CI] column) columns it previously skipped — collabra.77859 T3 fields gain p+df (tables.flatten._recover_blank_roles Pass 4.5). (DP-5) parallel-arm tables with a TWO-ROW header no longer drop their first data row, and a CENTERED super-header is aligned to its arm block instead of its visual-center column: (a) cell_cleaning._is_header_like_row counts APA value shapes (leading-dot decimal, bracketed CI, operator-prefixed p, N/A) as data via _DATA_VALUE_CELL_RE so a real first data row isn't read as a 3rd header row (collabra.90203 T10 recovered the Identifiable/Explicit-learning correlation); (b) tables.flatten._detect_column_groups re-derives arm boundaries from equal-width blocks of the data region (each must hold one super-label) so a centered super-label folded mid-span no longer swaps arm values (xiao_2021 T4 Original/Replication F) or pushes a stat column into the label region; (c) tables.flatten._classify_column reads a folded super-header cell's role from its sub-part (collabra.90203 T10 CI). Full-corpus cached-table flatten diff: no clean-table regression. # v2.4.0 (REQUEST_11): flatten now populates fields for NON-clinical result tables — (a) blank-header column-role recovery (tables.flatten._recover_blank_roles): assign a stat role to a header-stripped column from its data-token SHAPE (CI brackets, df1/df2 pair, estimate-adjacent-CI, p-with-operator) AND caption/footnote/all-header-rows vocabulary, never bare position; recovers collabra.77859 T5 (t/df/d/CI) + collabra.90203 T8/T9 (F/df/p/BF01/eta²p-as-est/CI). (b) packed parallel-arm split (tables.flatten._detect_packed_arms/_flatten_packed_arms): tables packing k≥2 arms into single cells ("Separate Joint" + space-joined values) emit one typed record per arm (group=arm) — collabra.77859 T3 Separate/Joint, xiao_2021 T7 Regret/Justifiability. (c) new BF01 role; validity guards drop r∉[-1,1] / non-monotone CI / non-int n / p∉[0,1]. (d) GENERAL L-004 fixes: _parse_number + _parse_ci_cell fold U+2212 MINUS (negative t/d/CI bounds in Camelot cells were dropped/sign-lost); _VALUE_GROUP_RE handles bracket-led CI groups. Default render + PROSECCO output byte-identical. # v2.3.0 (Tier-2, REQUEST_10): cross-flavor lattice-augmentation — recover data rows a lattice extraction vertically TRUNCATED by appending the rows a same-page, same-column-count stream table captured below the lattice bbox (camelot_extract._augment_lattice_with_stream_rows), gated on equal-col-count + bbox overlap + extends-below; PLUS numeric/parenthetical continuation merge (cell_cleaning._merge_continuation_rows) rejoining stream's stacked value/parenthetical cells. Fixes PROSECCO Table 2 R2-R6. v2.2.0: EC-T1 docpluck.tables.flatten — per-row FlattenedRow records (sentence + structured fields) for downstream stat-verification consumers (effectcheck/escimate/scimeto) + opt-in inline "rendered as text" block below each <table> via render_pdf_to_markdown(flatten_tables_inline=True). v2.1.5: cell-cleaning recovers CMEX10 extensible-bracket PUA glyphs (U+F8EE-F8FB). v2.1.4: cell-cleaning recovers Adobe-Symbol-font PUA glyphs (beta/chi/bullet as U+F0xx). v2.1.3: cell-cleaning recovers '<'-as-backslash glyph corruption. v2.1.2: cell-cleaning recovers descending-CI '2'-for-minus corruption. v2.1.1: cell-cleaning recovers (cid:0) corrupted minus signs + strips math-alphanumeric styling. v2.1.0: cell-cleaning pipeline ported from splice spike (multi-row header detection, continuation merging, leader-dot strip, mash-split, group separators, sig-marker attach)
 
 TableTextMode = Literal["raw", "placeholder"]
 
@@ -49,9 +50,63 @@ class StructuredResult(TypedDict):
     tables: list[Table]
     figures: list[Figure]
     table_extraction_version: str
+    # Fallback paths that fired for THIS document — `{}` when nothing unusual
+    # happened. Added v2.4.133 because the library had 31 `record_fallback`
+    # sites and no production reader: it recorded every silent substitution,
+    # dropped table and refused repair, and told nobody. Keys are stable event
+    # names (e.g. "camelot_table_below_accuracy_threshold",
+    # "w0h_ambiguous_pairing_refused"); values are counts.
+    #
+    # `{}` means "every detector ran and found nothing", NEVER "we did not
+    # look" — the detectors that cannot always run announce themselves with an
+    # explicit `*_not_run` event (see `symbol_font_scan_not_run`). This project
+    # has been burned three times by reading an instrument's silence as a clean
+    # result, so the two states are kept distinguishable in the artifact itself.
+    fallbacks: dict[str, int]
+    # The same events, with the SPECIFIC instance that fired them:
+    # `{"symbol_font_greek_corruption_detected": {"AdvPS7DA6": 13}}`. Kept as a
+    # separate field so `fallbacks` stays a flat `dict[str, int]` a consumer can
+    # threshold on. Before v2.4.133 `detail` was accepted by `record_fallback`
+    # and then dropped, so a consumer could not tell WHICH font a corruption
+    # report named — and an R8 false positive was indistinguishable from a real
+    # corruption.
+    fallback_details: dict[str, dict[str, int]]
 
 
 def extract_pdf_structured(
+    pdf_bytes: bytes,
+    *,
+    thorough: bool = False,
+    table_text_mode: TableTextMode = "raw",
+    max_input_bytes: int | None = None,
+    extract_timeout_seconds: int = 120,
+    _layout_doc=None,
+) -> StructuredResult:
+    """Extract text + structured tables + figures from a PDF.
+
+    Thin wrapper over :func:`_extract_pdf_structured` whose only job is to hold
+    the telemetry scope open across the whole extraction, including its early
+    returns. Doing it here rather than inside means no future `return` can be
+    added that forgets to attach `fallbacks` — the shape of the defect this
+    field was introduced to fix.
+
+    See :func:`_extract_pdf_structured` for the arguments and the result shape.
+    """
+    with fallback_scope() as fb:
+        result = _extract_pdf_structured(
+            pdf_bytes,
+            thorough=thorough,
+            table_text_mode=table_text_mode,
+            max_input_bytes=max_input_bytes,
+            extract_timeout_seconds=extract_timeout_seconds,
+            _layout_doc=_layout_doc,
+        )
+    result["fallbacks"] = dict(fb.counters)
+    result["fallback_details"] = fb.details
+    return result
+
+
+def _extract_pdf_structured(
     pdf_bytes: bytes,
     *,
     thorough: bool = False,
@@ -99,6 +154,10 @@ def extract_pdf_structured(
             "tables": [],
             "figures": [],
             "table_extraction_version": TABLE_EXTRACTION_VERSION,
+            # Filled in by the `extract_pdf_structured` wrapper, which holds the
+            # telemetry scope open across this early return too.
+            "fallbacks": {},
+            "fallback_details": {},
         }
 
     method_pieces = [base_method]
@@ -257,10 +316,47 @@ def extract_pdf_structured(
     # without a page-multiplicity special case (which over-forced region on
     # multi-caption pages whose tables auto-detect already separated cleanly —
     # bmc_med_3, ieee_access_8 — collapsing their columns).
+    #
+    # CONTENT PLAUSIBILITY, added v2.4.134. ``_pick_better_table`` arbitrates on
+    # SHAPE alone — column count, then populated-cell count — and never asks
+    # whether the winning grid is plausibly this caption's table at all. So a
+    # paragraph of Discussion prose that Camelot's auto-detect happened to
+    # structure as a 4x2 grid OUTRANKED, and replaced, the raw_text channel's
+    # gold-exact 3x5 descriptives for maier Table 7. Each candidate is now tested
+    # for prose dominance BEFORE arbitration, and a caption left with no plausible
+    # candidate is returned to the unmatched pool so the whitespace / raw_text
+    # fallback below can supply its real data. Rejections are RECORDED, because a
+    # candidate dropped silently is indistinguishable from one never captured.
+    #
+    # THE REJECTION IS PROVISIONAL. The candidate is STASHED, not discarded, and the
+    # fallback loop below restores it if the fallback turns out to produce nothing.
+    # A guard that substitutes nothing is not a guard, it is a deletion — measured on
+    # 10.5465/amc.2022.0006, whose Tables 1 and 4 were dropped to 0 cells AND 0
+    # raw_text by an unconditional rejection. Never trade content for emptiness.
     region_win = region_only = 0
+    # {id(cap): Table} — candidates rejected as body prose, kept so the fallback loop
+    # can put one back rather than emit an empty table.
+    prose_rejected: dict[int, Table] = {}
     for cap in table_captions:
         auto_td = auto_by_cap.get(id(cap))
         region_td = region_tables.get(id(cap))
+        for which, td in (("region", region_td), ("auto", auto_td)):
+            if td is None or not grid_is_body_prose(td.get("cells") or []):
+                continue
+            record_fallback(
+                "table_candidate_rejected_as_body_prose",
+                detail=f"{cap.label or '?'}:{which}",
+            )
+            stashed = prose_rejected.get(id(cap))
+            if stashed is None or _table_cell_count(td) > _table_cell_count(stashed):
+                prose_rejected[id(cap)] = td
+            if which == "region":
+                region_td = None
+            else:
+                auto_by_cap.pop(id(cap), None)
+                # Re-open the caption: auto-detect pairing had marked it used.
+                used_caption_ids.discard(id(cap))
+                auto_td = None
         if auto_td is None and region_td is None:
             continue
         best = _pick_better_table(region_td, auto_td)
@@ -347,25 +443,67 @@ def extract_pdf_structured(
                 "bbox": (0.0, 0.0, 0.0, 0.0),
                 "caption": cap_text,
                 "footnote": None,
-                "kind": "whitespace",
-                "rendering": "structured",
+                # SCHEMA VIOLATION FIXED v2.4.133 (register C4). This path used
+                # to emit `kind="whitespace"` / `rendering="structured"` — both
+                # outside their declared Literal types, and transposed relative
+                # to the Camelot path, so a consumer branching on
+                # `kind == "structured"` got the opposite of what it asked for
+                # depending on which capture path ran. A type checker never saw
+                # it because these are plain dict literals against a TypedDict.
+                # The capture path is now recorded where it belongs:
+                # `camelot_flavor=None` means "not a Camelot capture".
+                "kind": "structured",
+                "rendering": "whitespace",
                 "confidence": None,
+                "accuracy": None,
+                "whitespace": None,
+                "camelot_flavor": None,
                 "n_rows": n_rows,
                 "n_cols": n_cols,
                 "header_rows": 1 if any(c.get("is_header") for c in cells) else 0,
                 "cells": cells,
                 "html": cells_to_html(cells),
-                "raw_text": None,
+                # Declared `str`; `None` here broke every consumer that did
+                # `t["raw_text"].strip()` on a whitespace-path table.
+                "raw_text": "",
             })
             method_pieces.append("whitespace_cells")
-        else:
-            tables.append(
-                _isolated_table_from_caption(
-                    cap, rejoined, next_boundary_by_id.get(id(cap)),
-                    caption_override=sbs_caption,
-                    body_override=sbs_body,
+            # The provisional rejection guarantees only that SOMETHING replaces the
+            # rejected candidate, never that the replacement is as large. Usually
+            # smaller IS correct — 10.48550/arxiv.2406.11713 Table 5 goes 18 cells
+            # to 14 because the 18 were half body prose — so this does NOT flip the
+            # decision. It records it, because a shrink that nobody can see is the
+            # difference between a guard and a quiet deletion.
+            stashed = prose_rejected.get(id(cap))
+            if stashed is not None and _table_cell_count(stashed) > len(
+                [c for c in cells if (c.get("text") or "").strip()]
+            ):
+                record_fallback(
+                    "table_prose_replacement_smaller_than_candidate",
+                    detail=(
+                        f"{cap.label or '?'}:{_table_cell_count(stashed)}->"
+                        f"{len([c for c in cells if (c.get('text') or '').strip()])}"
+                    ),
                 )
+        else:
+            isolated = _isolated_table_from_caption(
+                cap, rejoined, next_boundary_by_id.get(id(cap)),
+                caption_override=sbs_caption,
+                body_override=sbs_body,
             )
+            # A prose-rejected candidate is only actually dropped once something
+            # replaces it. If the fallback carries no body text either, the
+            # rejection would be a pure deletion — put the candidate back and say
+            # so, rather than publishing an empty table under a real caption.
+            stashed = prose_rejected.get(id(cap))
+            if stashed is not None and not (isolated.get("raw_text") or "").strip():
+                record_fallback(
+                    "table_prose_rejection_reverted_no_replacement",
+                    detail=cap.label or "?",
+                )
+                tables.append(stashed)
+            else:
+                tables.append(isolated)
 
     # ---- Figures ----
     for cap in captions:
@@ -393,6 +531,49 @@ def extract_pdf_structured(
     for t in tables:
         t.pop("_caption_hint_number", None)
 
+    # MAKE THE MIS-MAPPED SYMBOL FONTS VISIBLE. A font whose whole-document
+    # repertoire is a handful of Latin letters that are all Symbol-Greek
+    # preimages is a symbol face being decoded as Latin — measured on
+    # `aom/amj-1`, whose page prints "(alpha = .93)" while the text layer says
+    # "a5(.93)". docpluck cannot safely REPAIR that yet (the 15 affected corpus
+    # papers are not one class; see extract_layout.detect_symbol_font_corruption),
+    # but shipping it SILENTLY is the thing this project keeps being burned by.
+    # Recorded per font so a consumer can see which document to distrust.
+    #
+    # AND IT MUST SAY WHEN IT DID NOT LOOK. `layout_doc` only materialises when
+    # region capture or the whitespace fallback happened to need it, so a
+    # captionless or Camelot-disabled document was never scanned at all — and
+    # reported the same empty `fallbacks` as a document that was scanned and
+    # found clean. That is the instrument-zero this project has been burned by
+    # three times (the retired locale detector's "396 English papers -> 0
+    # European", the A6 superscript check's "0 hits in 146 papers", and
+    # `repair_site_scan`'s "0 sites" against a corpus holding no known
+    # positive). So the scan is attempted unconditionally, and the two states
+    # are distinguishable in the artifact.
+    try:
+        from .extract_layout import detect_symbol_font_corruption, extract_pdf_layout
+        if layout_doc is None:
+            try:
+                layout_doc = extract_pdf_layout(pdf_bytes)
+                # The cost is recorded, not hidden: this is the one path where
+                # the scan pays for its own pdfplumber pass (a document with no
+                # table captions never needed layout otherwise). Recorded so the
+                # tradeoff is measurable rather than argued about.
+                record_fallback("symbol_font_scan_layout_materialized")
+            except Exception as exc:
+                # Could not obtain layout at all — say so rather than reporting
+                # a clean scan that never happened.
+                record_fallback("symbol_font_scan_not_run",
+                                detail=type(exc).__name__)
+                layout_doc = None
+        if layout_doc is not None:
+            for _font, _n in detect_symbol_font_corruption(layout_doc).items():
+                for _ in range(_n):
+                    record_fallback("symbol_font_greek_corruption_detected",
+                                    detail=_font)
+    except Exception as exc:   # never let a diagnostic break extraction
+        record_fallback("symbol_font_scan_exception", detail=type(exc).__name__)
+
     return {
         "text": text_out,
         "method": "+".join(method_pieces),
@@ -400,6 +581,11 @@ def extract_pdf_structured(
         "tables": tables,
         "figures": figures,
         "table_extraction_version": TABLE_EXTRACTION_VERSION,
+        # Which fallback paths fired for THIS document. Filled in by the
+        # `extract_pdf_structured` wrapper from the scope it holds open around
+        # this whole function.
+        "fallbacks": {},
+        "fallback_details": {},
     }
 
 
@@ -2147,6 +2333,9 @@ def _isolated_table_from_caption(
         "kind": "isolated",
         "rendering": "isolated",
         "confidence": None,
+        "accuracy": None,
+        "whitespace": None,
+        "camelot_flavor": None,
         "n_rows": None,
         "n_cols": None,
         "header_rows": None,

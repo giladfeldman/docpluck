@@ -22,6 +22,12 @@ from docpluck.extract_layout import LayoutDoc
 
 from . import Cell
 from .bbox_utils import chars_in_bbox, words_in_bbox
+from .cell_cleaning import (
+    _is_header_like_row,
+    clean_cell_text,
+    normalize_cell_whitespace,
+    repair_cells,
+)
 from .detect import CandidateRegion
 
 
@@ -32,6 +38,11 @@ COLUMN_GAP_PT: float = 5.0
 COLUMN_STABILITY_FRACTION: float = 0.6
 HEADER_HEIGHT_RATIO: float = 1.05
 BODY_HEIGHT_FALLBACK: float = 10.0
+
+# A row taller than this multiple of the row threshold is a SMEAR — the signature
+# that licenses anchor-relative re-clustering. Same factor the census defaults to
+# (`tools/diag/row_cluster_census.py --smear-factor`).
+_SMEAR_FACTOR: float = 2.0
 
 # Char-level fallback (RC-T, 2026-06-25): on tight-kerned PDFs pdfplumber's word
 # grouper glues a whole numeric row into ONE "word" (e.g. ip_feldman Table 10's
@@ -97,8 +108,12 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
                 "is_header": is_header,
                 "bbox": (x_left, row_top, x_right, row_bot),
             })
+    # Gates on RAW, repair on the way out — never the other order. See
+    # `_repaired_view`.
     cells = _trim_trailing_prose_rows(cells)
-    return cells if _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)) else []
+    if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
+        return []
+    return repair_cells(cells)
 
 
 def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
@@ -157,8 +172,12 @@ def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list
                 "is_header": is_header,
                 "bbox": (x_left, row_top, x_right, row_bot),
             })
+    # Gates on RAW, repair on the way out — never the other order. See
+    # `_repaired_view`.
     cells = _trim_trailing_prose_rows(cells)
-    return cells if _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)) else []
+    if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
+        return []
+    return repair_cells(cells)
 
 
 def _region_caption_number(region: CandidateRegion) -> int | None:
@@ -176,7 +195,62 @@ def _region_caption_number(region: CandidateRegion) -> int | None:
 
 
 def _cluster_into_rows(words: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    """Sort words by reading order, then split into rows on y-gap > median × 1.2."""
+    """Sort words by reading order, then split into rows on y-gap > median x 1.2.
+
+    The gap is measured to the PREVIOUS WORD. That is a known defect, it is still
+    here, and the reason is worth reading before anyone changes it again.
+
+    THE DEFECT. Words are sorted by ``(top, x0)``, so in a wrapped or staggered
+    block the running "previous top" creeps forward in sub-threshold steps and the
+    threshold is never crossed: an arbitrarily tall band collapses into ONE row,
+    which then fails every downstream grid guard on its own merits and the table is
+    dropped. Measured with ``python tools/diag/row_cluster_census.py`` over the
+    26-paper baseline: **30 of 60 caption-anchored regions smear, across 8 papers.**
+    Real, systematic, and not one paper's quirk.
+
+    THE 2026-08-04 REVERT'S PREMISE WAS FALSE, and that much IS now settled. It
+    justified reverting an anchor-relative fix with *"a real row can legitimately be
+    TALL: xiao Table 4's row 2 spans 94.4pt"*. Re-measured 2026-08-19: that row is
+    the ENTIRE table body — stacked header, five product rows, five CI continuation
+    lines, 75 words — and the table emitted ``cells=0``. Four geometric
+    discriminators had been designed and rejected around a constraint that did not
+    exist.
+
+    THE REAL BLOCKER, measured 2026-08-19 and NEW. Anchor-relative clustering was
+    implemented, closed the chain merge, recovered ``xiao`` Table 4 (0 -> 35 cells)
+    and ``chan_feldman``'s grids — and regressed ``efendic_2022_affect``. That paper
+    gets NO whitespace grid under this rule (0 cells, honest raw_text fallback);
+    under the anchor rule it gets a mis-segmented 3-column grid that separates each
+    corrupt ``2X.XX`` B-coefficient from the CI proving it negative, so
+    **11 published negative coefficients ship as positive numbers** (``21.09`` for
+    ``-1.09``) on the PRODUCTION path. By this project's ranking — rank defects by
+    whether the wrong output ANNOUNCES ITSELF — a sign-flipped regression
+    coefficient outranks a missing grid, so the anchor rule does not ship.
+
+    THREE CONTAINMENTS WERE TRIED AND ALL FAILED; do not re-try them blind:
+
+    1. **continuation re-merge** (fold an indented single-baseline line back into
+       the row above) — it CHAINED, re-creating the chain merge through its own
+       repair; corpus guard-diff showed 21 tables losing cells (-867);
+    2. **bounded fixed-point on ``recover_minus_via_ci_pairing``** — the hypothesis
+       was that a corrupt CI bracket had to be repaired before the estimate beside
+       it became reachable. It converges in 2 passes and fixed a different line; the
+       11 estimates were untouched, so the hypothesis was wrong;
+    3. **signature-keyed hybrid** (previous-word by default, anchor only where the
+       previous-word result actually smears) — ``efendic`` smears too, so the gate
+       does not separate the classes.
+
+    WHAT A REAL FIX NEEDS. Not a fifth clustering threshold. The anchor rule is
+    right about rows and wrong about COLUMNS: the grids it enables on ``efendic``
+    are under-segmented (3 columns for a 5-column table, one cell fusing two rows'
+    labels and values). The clustering change is therefore blocked on column
+    segmentation quality, i.e. on real per-cell geometry — register A1/G6a — or on a
+    grid-quality gate that can reject an under-segmented grid before it displaces a
+    correct raw_text fallback. Either way, gate the next attempt on
+    ``tests/test_minus_sign_recovery_real_pdf.py`` as well as the corpus guard-diff:
+    the guard-diff CANNOT see this defect, because it compares cell counts and
+    lengths and never values.
+    """
     if not words:
         return []
     sorted_words = sorted(words, key=lambda w: (w["top"], w["x0"]))
@@ -191,8 +265,7 @@ def _cluster_into_rows(words: list[dict[str, Any]]) -> list[list[dict[str, Any]]
     rows: list[list[dict[str, Any]]] = []
     current: list[dict[str, Any]] = [sorted_words[0]]
     for w in sorted_words[1:]:
-        prev_top = current[-1]["top"]
-        if w["top"] - prev_top > threshold:
+        if w["top"] - current[-1]["top"] > threshold:
             rows.append(current)
             current = [w]
         else:
@@ -365,9 +438,56 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _normalize_cell_text(text: str) -> str:
-    text = text.replace("­", "")    # soft hyphen
-    text = text.replace("−", "-")   # unicode minus → ASCII hyphen
-    return _WHITESPACE_RE.sub(" ", text).strip()
+    """Whitespace/soft-hyphen/minus canonicalisation only — NO glyph repair.
+
+    v2.4.133 added a ``clean_cell_text`` call here so the layout-derived channel
+    would stop shipping unrepaired cells to ``flatten`` / ``cells[].text`` /
+    ``raw_text``. The goal was right, the placement was not: both builders run
+    the structural gates (:func:`_trim_trailing_prose_rows`,
+    :func:`_whitespace_grid_is_clean`) on the cells built here, so repairing at
+    build silently changed what those gates judge — and one of their predicates
+    changes in the DELETING direction (see :func:`_repaired_view`). The repair
+    now happens at :func:`cell_cleaning.repair_cells`, after the gates and before the return,
+    so every channel still receives repaired text and no gate verdict moved.
+    """
+    return normalize_cell_whitespace(text)
+
+
+def _repaired_view(cells: list[Cell]) -> dict[tuple[int, int], str]:
+    """``{(r, c): repaired_text}`` for a gate that needs both forms of a cell.
+
+    ## Why a gate needs both, and why the rule is per-predicate
+
+    The structural gates run on RAW cells (see :func:`_normalize_cell_text`), but
+    some of their predicates should judge the text docpluck actually SHIPS, which
+    is the repaired form. Two independent reviews converged on splitting the
+    predicates by what a rejection COSTS:
+
+      * **content-deleting** — ``_row_is_prose`` / ``_cell_is_prose`` drive
+        :func:`_trim_trailing_prose_rows`, which cuts from the first sustained
+        prose row to the END of the grid. A repair must never flip one of these
+        INTO deleting, so a row is prose only when it is prose in BOTH forms.
+        The vector is real: the W0i class prints ``×`` as ``3``, so the raw
+        interaction label ``Direction 3 manipulated attribute`` carries a digit
+        and reads as data, while the repaired ``Direction × manipulated
+        attribute`` has no digit and reads as prose. Three such rows deleted
+        every row below them. Pinned by ``test_repair_never_deletes_a_row.py``.
+      * **validity** — ``_cell_is_garbled`` / ``_cell_is_clean_data`` /
+        ``_CAPTION_LABEL_RE`` decide whether the grid is publishable at all.
+        These judge the REPAIRED form, because that is what a consumer receives:
+        a cell whose only defect is a recoverable ``(cid:0)`` minus is a data
+        cell, and a repaired ``<.001`` is data where the raw ``\\.001`` was not.
+        Rejecting here costs a table docpluck could have published correctly,
+        never a row it silently deletes — the opposite trade, so the opposite
+        default. (``whitespace.py``'s own ``_OWN_CAPTION_MAX_ROW`` comment
+        states the ranking this follows: a visible missing table beats an
+        invisible wrong one.)
+
+    Keyed on ``(r, c)`` rather than list position on purpose:
+    :func:`_trim_trailing_prose_rows` FILTERS the cell list, so any parallel-list
+    scheme would drift out of alignment the moment it did its job.
+    """
+    return {(c["r"], c["c"]): clean_cell_text(c.get("text") or "") for c in cells}
 
 
 # --- prose-contamination guard + data-table quality gate (RC-T) -----------
@@ -385,9 +505,21 @@ def _normalize_cell_text(text: str) -> str:
 
 # A "statistical token" — any of these in a cell means the row carries data, not
 # prose. Numbers (incl. APA leading-dot + signed), comparison/equality ops, CI
-# brackets, and the bare single-letter stat/df markers academic tables use.
+# brackets, the interaction/multiplication operators, and the bare single-letter
+# stat/df markers academic tables use.
+#
+# THE OPERATOR CLASS MUST COVER THE NOTATION `clean_cell_text` EMITS. This
+# vocabulary is the evidence a row carries data, and the repair chain rewrites
+# corrupted glyphs INTO that notation: W0i turns `Direction 3 attribute` into
+# `Direction × attribute`, W0c/W0o turn `\.001` into `<.001`. When `×` was
+# missing here, the repair removed the row's only digit and the row flipped from
+# data to prose — so a correct repair became a deletion signal (register R4).
+# `<`, `≤` and `≥` were already covered; `×` and `·` were the gap. An `×` in an
+# academic table cell is an interaction term or a dimension ("2 × 2 design"),
+# never running prose, so this widens the data side without loosening the prose
+# side. See :func:`_repaired_view` for the structural half of the same fix.
 _STAT_TOKEN_RE = re.compile(
-    r"[-+−]?\d*\.?\d+|[<>=≤≥]|\[[^\]]*\]|\bp\b|\bt\b|\bF\b|\bd\b|\br\b|\bM\b|\bSD\b|\bdf\b|\bn\b|\bN\b",
+    r"[-+−]?\d*\.?\d+|[<>=≤≥×·]|\[[^\]]*\]|\bp\b|\bt\b|\bF\b|\bd\b|\br\b|\bM\b|\bSD\b|\bdf\b|\bn\b|\bN\b",
     re.IGNORECASE,
 )
 
@@ -554,14 +686,28 @@ def _trim_trailing_prose_rows(
     for c in cells:
         by_row[c["r"]].append(c)
     row_indices = sorted(by_row)
+    # BOTH FORMS, and prose only when BOTH agree. This predicate deletes rows —
+    # every row from the first sustained prose block to the end of the grid — so
+    # a glyph repair must not be able to flip it into deleting. See
+    # :func:`_repaired_view` for the measured vector (W0i's `×`-as-`3`).
+    rep = _repaired_view(cells)
+
+    def _rep_of(c: Cell) -> str:
+        return rep.get((c["r"], c["c"]), c.get("text") or "").strip()
+
     if allow_categorical:
         prose_flags = [
-            any(_cell_is_prose((c.get("text") or "").strip()) for c in by_row[r])
+            any(
+                _cell_is_prose((c.get("text") or "").strip())
+                and _cell_is_prose(_rep_of(c))
+                for c in by_row[r]
+            )
             for r in row_indices
         ]
     else:
         prose_flags = [
             _row_is_prose([(c.get("text") or "").strip() for c in by_row[r]])
+            and _row_is_prose([_rep_of(c) for c in by_row[r]])
             for r in row_indices
         ]
     # Find the first index that starts a run of >= _PROSE_RUN_MIN prose rows.
@@ -751,9 +897,19 @@ def _whitespace_grid_is_clean(
     """
     if not cells:
         return False
+    # VALIDITY predicates judge the REPAIRED form — the text every channel
+    # actually ships. A cell whose only defect is a recoverable `(cid:0)` minus
+    # is a data cell, and a repaired `<.001` is data where the raw `\.001` was
+    # not. See :func:`_repaired_view` for why this half of the rule is the
+    # opposite of the content-deleting half.
+    rep = _repaired_view(cells)
+
+    def _rep_of(c: Cell) -> str:
+        return rep.get((c["r"], c["c"]), c.get("text") or "")
+
     seen_own_caption = False
     for c in cells:
-        txt = c.get("text") or ""
+        txt = _rep_of(c)
         if _UNMAPPED_GLYPH_RE.search(txt):
             return False
         # A caption label inside a cell ⇒ the region absorbed an ADJACENT table's
@@ -792,13 +948,20 @@ def _whitespace_grid_is_clean(
     nonempty_rows = 0
     for row_cells in by_row.values():
         texts = [(c.get("text") or "").strip() for c in row_cells]
+        rep_texts = [_rep_of(c).strip() for c in row_cells]
         if any(t for t in texts):
             nonempty_rows += 1
-        if any(_cell_is_garbled(t) for t in texts):
+        # Validity → repaired form.
+        if any(_cell_is_garbled(t) for t in rep_texts):
             garbled_rows += 1
-        if any(_cell_is_clean_data(t) for t in texts if t):
+        if any(_cell_is_clean_data(t) for t in rep_texts if t):
             clean_data_rows += 1
-        if any(_cell_is_prose(t) for t in texts):
+        # Content-deleting (feeds the prose-contamination REJECT below) → both
+        # forms must agree before a row counts against the grid.
+        if any(
+            _cell_is_prose(t) and _cell_is_prose(rt)
+            for t, rt in zip(texts, rep_texts)
+        ):
             prose_cell_rows += 1
     total_rows = len(by_row)
     # Prose-contamination reject (region-driven false-positive guard, 2026-06-29):
@@ -820,4 +983,109 @@ def _whitespace_grid_is_clean(
     return clean_data_rows >= _MIN_CLEAN_DATA_ROWS and clean_data_rows > garbled_rows
 
 
-__all__ = ["whitespace_cells", "char_whitespace_cells"]
+# A grid is BODY PROSE when this fraction of its rows carry a genuine sentence
+# fragment. Expressed as the reciprocal so the test stays integer arithmetic, and
+# deliberately the SAME ratio `_whitespace_grid_is_clean`'s prose-contamination
+# reject already uses — one concept, one table. A rule stated twice with two
+# constants drifts, and the drift is silent.
+_PROSE_GRID_ROW_FRACTION: int = 3
+
+# How many leading rows may carry the grid's header. A table's column names sit at
+# the top; scanning further would let a mid-table group-separator label veto the
+# verdict for a grid that really is absorbed prose.
+_HEADER_SCAN_ROWS: int = 3
+
+# A header row must name at least this many columns to veto the prose verdict.
+_HEADER_MIN_NAMED_COLUMNS: int = 2
+
+
+def grid_is_body_prose(cells: list[Cell]) -> bool:
+    """True when a captured grid is running BODY PROSE, not a table.
+
+    The ONE content-plausibility question that is safe to ask of a grid from ANY
+    capture path, including Camelot's legacy auto-detect. It is deliberately much
+    narrower than :func:`_whitespace_grid_is_clean`, which ALSO rejects on unmapped
+    glyphs, absorbed foreign captions and too-few clean data rows: widening that
+    whole gate to the auto-detect path was tried on 2026-08-04 and rejected,
+    because it discarded legitimate-but-imperfect auto-detect grids (cog_emo
+    T5/T6/T7). Prose dominance is the sub-test those grids pass and a paragraph of
+    Discussion cannot.
+
+    Evidence: ``maier_2023_collabra`` (10.1525/collabra.77859 companion,
+    Table 7 "Perceived Impact (Extension): Descriptives") — the auto-detect path
+    hands that caption a 4x2 grid whose cells are the Discussion sentence
+    *"Following the analyses conducted in Study 1 of Small et al. (2007), we
+    carried out a 2 (Explicit Learning) x 2 (Identifiability) two-way ANOVA…"*,
+    and because ``_pick_better_table`` arbitrates on SHAPE alone that grid
+    replaces the raw_text channel's gold-exact 3x5 descriptives. The rendered
+    ``### Table 7`` then carries its caption and ZERO data values.
+
+    A grid rejected here is not deleted: the caller only acts on this verdict when a
+    replacement actually exists (see ``extract_structured``), because a rejection that
+    substitutes nothing is a deletion wearing a guard's name.
+
+    A HEADER-LIKE ROW VETOES THE VERDICT, and that half is not optional. Prose
+    dominance alone has a false positive on the qualitative review table — a real
+    table whose cells are legitimately long phrases. Measured on
+    ``10.5465/amc.2022.0006`` Table 4, "A Synthesis and Evaluation of the CSR
+    Literature": a 33x4 grid under the header ``Criteria | Synthesis and Evaluation |
+    Recommendations``, every data cell a sentence-length phrase, and prose dominance
+    alone condemned all 70 cells and 2,008 characters of it. A running paragraph
+    sliced into a grid has no header row — maier Table 7's four rows are a sentence, a
+    stray footnote digit ``4``, and two more sentence fragments — so the row that
+    names the columns is exactly the thing the two classes do not share. The
+    predicate is ``cell_cleaning._is_header_like_row``, reused rather than restated.
+    """
+    if not cells:
+        return False
+    by_row: dict[int, list[Cell]] = defaultdict(list)
+    for c in cells:
+        by_row[c["r"]].append(c)
+    if not by_row:
+        return False
+    for r in sorted(by_row)[:_HEADER_SCAN_ROWS]:
+        row = [
+            (c.get("text") or "")
+            for c in sorted(by_row[r], key=lambda c: c["c"])
+        ]
+        # A header NAMES COLUMNS, so it needs at least two of them. Without this,
+        # `_is_header_like_row` vetoes on a single short non-numeric cell, and both
+        # pre-release reviewers independently showed the same escape on 2026-08-19:
+        # prepending one row containing the single word `Overview` to an otherwise
+        # unambiguous three-row Discussion paragraph flips the verdict from True to
+        # False and waves the whole grid through. Column-splitting a paragraph
+        # routinely leaves ONE stray short cell in some row; it does not routinely
+        # leave two in the SAME row, because prose cells are long.
+        if sum(1 for t in row if t.strip()) < _HEADER_MIN_NAMED_COLUMNS:
+            continue
+        if _is_header_like_row(row):
+            return False
+    # A grid CARRYING REAL DATA is never body prose, however much prose it also
+    # absorbed. This rule exists to stop a paragraph that contains NO table data from
+    # wearing a caption (maier Table 7); it is not a cleanliness test, and using it as
+    # one destroys published numbers. Measured on 10.48550/arxiv.2406.11713 Table 1:
+    # a 12x7 grid whose rows 0-4 are Discussion prose AND whose rows 5+ are the real
+    # table (`Dataset | Scale factor f | Ouput size | FID`, `CIFAR-10 | 2 | 16x16x4 |
+    # 1.32`). Prose dominance alone condemned all 27 cells, and the raw_text fallback
+    # carried 61 of the 511 characters — the FID values were simply gone. Caught by
+    # tools/diag/table_capture_guard_diff.py AFTER the reviewers' round, which is
+    # precisely why the gate is re-run on the final tree rather than the reviewed one.
+    #
+    # `_MIN_CLEAN_DATA_ROWS` is reused, not restated: it is the same threshold
+    # `_whitespace_grid_is_clean` uses to decide a grid is a real DATA table.
+    clean_data_rows = sum(
+        1
+        for row in by_row.values()
+        if any(_cell_is_clean_data((c.get("text") or "").strip()) for c in row)
+    )
+    if clean_data_rows >= _MIN_CLEAN_DATA_ROWS:
+        return False
+    prose_rows = sum(
+        1
+        for row in by_row.values()
+        if any(_cell_is_prose((c.get("text") or "").strip()) for c in row)
+    )
+    return prose_rows * _PROSE_GRID_ROW_FRACTION >= len(by_row)
+
+
+__all__ = ["whitespace_cells", "char_whitespace_cells", "grid_is_body_prose"]
