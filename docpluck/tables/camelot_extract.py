@@ -21,6 +21,7 @@ import re
 
 from docpluck.tables import Cell, Table
 from docpluck.tables.cell_cleaning import repair_cells
+from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
 from docpluck.tables.render import cells_to_html
 from docpluck.telemetry import record_fallback
 from docpluck.tempfiles import unlink_temp_pdf
@@ -146,14 +147,29 @@ def _looks_like_running_header(row: list[str]) -> bool:
     return False
 
 
+def _keep_after_running_header_strip(rows: list[list[str]]) -> list[int]:
+    """Indices of the rows :func:`_strip_running_header_rows` keeps.
+
+    THE TRIMS RETURN INDICES BECAUSE THE GEOMETRY NEEDS THEM (trap T3). Camelot's
+    per-cell coordinates are indexed by its RAW dataframe row, and this function
+    and its two siblings run before cells are emitted -- so the `r` on an emitted
+    cell is not the `r` on `ct.cells`. Re-deriving the surviving indices with a
+    second implementation is the "one concept, two tables" defect that made a
+    chi-square leave the library as `chi2` or `ch2` depending on the path, so the
+    row-returning function below is a one-liner over this one: one implementation,
+    two views. Equivalence checked over 4,006 generated matrices.
+    """
+    lo, hi = 0, len(rows)
+    while lo < hi and _looks_like_running_header(rows[lo]):
+        lo += 1
+    while hi > lo and _looks_like_running_header(rows[hi - 1]):
+        hi -= 1
+    return list(range(lo, hi))
+
+
 def _strip_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
     """Drop rows at the top or bottom that look like page running headers/footers."""
-    out = list(rows)
-    while out and _looks_like_running_header(out[0]):
-        out.pop(0)
-    while out and _looks_like_running_header(out[-1]):
-        out.pop()
-    return out
+    return [rows[i] for i in _keep_after_running_header_strip(rows)]
 
 
 def _leading_table_caption_number(rows: list[list[str]]) -> int | None:
@@ -198,7 +214,18 @@ def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
     became grid row 0). Only a leading single-cell ``(YYYY)`` row qualifies, so a
     real header/data row is never removed.
     """
-    out: list[list[str]] = []
+    return [rows[i] for i in _keep_after_caption_first_row(rows)]
+
+
+def _keep_after_caption_first_row(rows: list[list[str]]) -> list[int]:
+    """Indices of the rows :func:`_drop_caption_first_row` keeps.
+
+    NOTE this trim can drop an INTERIOR row (a caption at index 1 while index 0
+    survives), so the surviving set is not a contiguous window and cannot be
+    reconstructed from a pair of offsets. See
+    :func:`_keep_after_running_header_strip` for why indices are needed at all.
+    """
+    keep: list[int] = []
     seen_caption = False
     started = False
     for i, row in enumerate(rows):
@@ -233,8 +260,8 @@ def _drop_caption_first_row(rows: list[list[str]]) -> list[list[str]]:
                 if has_multicell_below:
                     continue
         started = True
-        out.append(row)
-    return out
+        keep.append(i)
+    return keep
 
 
 # A "purely numeric" cell: starts with a number-like token (-?digits, optional
@@ -311,31 +338,36 @@ def _trim_prose_tail(rows: list[list[str]]) -> list[list[str]]:
     Then walk from the start forward; stop at the first run of ≥3 consecutive
     prose-like rows and trim there.
     """
+    return [rows[i] for i in _keep_after_prose_tail_trim(rows)]
+
+
+def _keep_after_prose_tail_trim(rows: list[list[str]]) -> list[int]:
+    """Indices of the rows :func:`_trim_prose_tail` keeps. See
+    :func:`_keep_after_running_header_strip`."""
     if not rows:
-        return rows
+        return []
     # Drop trailing empty/prose rows.
-    while rows and (not any(c for c in rows[-1]) or _row_looks_like_prose(rows[-1])):
-        rows = rows[:-1]
-    if not rows:
-        return rows
+    hi = len(rows)
+    while hi > 0 and (not any(c for c in rows[hi - 1]) or _row_looks_like_prose(rows[hi - 1])):
+        hi -= 1
+    if hi == 0:
+        return []
     # Forward scan: find first run of ≥3 consecutive prose rows.
-    n = len(rows)
     i = 0
-    while i < n:
+    while i < hi:
         # Skip non-prose rows
         if not _row_looks_like_prose(rows[i]):
             i += 1
             continue
         # Found a prose row — count run length
         j = i
-        while j < n and _row_looks_like_prose(rows[j]):
+        while j < hi and _row_looks_like_prose(rows[j]):
             j += 1
-        run_len = j - i
-        if run_len >= 3:
+        if j - i >= 3:
             # Trim everything from i onward
-            return rows[:i]
+            return list(range(0, i))
         i = j
-    return rows
+    return list(range(0, hi))
 
 if TYPE_CHECKING:
     pass
@@ -517,6 +549,7 @@ def _camelot_table_to_dict(
     label: str | None = None,
     allow_categorical: bool = False,
     own_caption_number: int | None = None,
+    layout=None,
 ) -> Table | None:
     """Convert one Camelot table object into a docpluck Table dict, applying the
     shared row-cleaning pipeline (running-header strip, caption-row drop, prose
@@ -571,15 +604,27 @@ def _camelot_table_to_dict(
         ]
         row_matrix.append(row_cells)
 
-    row_matrix = _strip_running_header_rows(row_matrix)
+    # EACH TRIM IS APPLIED TO THE ROWS AND TO THEIR ORIGIN INDICES TOGETHER.
+    # `keep_rows[r]` is the RAW Camelot dataframe row that surviving row `r` came
+    # from — the mapping per-cell geometry needs, because `ct.cells` is indexed by
+    # the raw grid and these trims run first (trap T3). Threading the indices
+    # THROUGH the trims, rather than recomputing them afterwards, is what makes
+    # drift impossible: there is no second implementation to disagree.
+    _k = _keep_after_running_header_strip(row_matrix)
+    row_matrix = [row_matrix[i] for i in _k]
+    keep_rows = list(_k)
     # Capture the table's own absorbed caption number BEFORE the caption row is
     # dropped — it is the most reliable identity signal for caption pairing
     # (see ``_leading_table_caption_number``).
     caption_hint = _leading_table_caption_number(row_matrix)
-    row_matrix = _drop_caption_first_row(row_matrix)
+    _k = _keep_after_caption_first_row(row_matrix)
+    row_matrix = [row_matrix[i] for i in _k]
+    keep_rows = [keep_rows[i] for i in _k]
     # Trim trailing prose rows (Camelot sometimes bundles a small real table at
     # the top of a 2-column page with body prose below).
-    row_matrix = _trim_prose_tail(row_matrix)
+    _k = _keep_after_prose_tail_trim(row_matrix)
+    row_matrix = [row_matrix[i] for i in _k]
+    keep_rows = [keep_rows[i] for i in _k]
     if not _is_table_like(row_matrix):
         record_fallback("camelot_table_failed_table_likeness_gate",
                         detail=f"{len(row_matrix)}rows")
@@ -609,11 +654,30 @@ def _camelot_table_to_dict(
     # cell gates below both see raw, and every emitted channel sees repaired.
     # `whitespace._repaired_view` documents the per-predicate rule; pinned by
     # `tests/test_repair_never_deletes_a_row.py`.
+    try:
+        page = int(ct.page)
+    except (AttributeError, ValueError, TypeError):
+        page = 1
+
+    # REAL PER-CELL GEOMETRY (register A1/G6a), or an explicit refusal. Camelot
+    # held these coordinates all along and this function shipped a zero literal
+    # for every cell. It is guarded rather than simply wired because all six known
+    # traps produce WRONG geometry rather than empty — see `cell_geometry`.
+    geometry, geometry_reason = camelot_cell_bboxes(ct, layout=layout, page=page)
+    if geometry is None:
+        # A REFUSAL IS A DECISION AND MUST LEAVE A TRACE. Silent zeros here would
+        # read exactly like "this document had no rotated pages".
+        record_fallback("camelot_cell_geometry_refused", detail=geometry_reason)
+
     cells: list[Cell] = []
     for r, row_cells in enumerate(row_matrix):
+        raw_r = keep_rows[r]
         for c, text in enumerate(row_cells):
             if not text:
                 continue
+            bbox = ZERO_BBOX
+            if geometry is not None and raw_r < len(geometry) and c < len(geometry[raw_r]):
+                bbox = geometry[raw_r][c]
             cells.append(
                 {
                     "r": r,
@@ -622,7 +686,7 @@ def _camelot_table_to_dict(
                     "colspan": 1,
                     "text": text,
                     "is_header": (r == 0),
-                    "bbox": (0.0, 0.0, 0.0, 0.0),
+                    "bbox": bbox,
                 }
             )
 
@@ -683,10 +747,6 @@ def _camelot_table_to_dict(
         if row_text:
             raw_row_texts.append(row_text)
 
-    try:
-        page = int(ct.page)
-    except (AttributeError, ValueError, TypeError):
-        page = 1
     try:
         cam_bbox = tuple(ct._bbox)
     except (AttributeError, TypeError):
@@ -766,6 +826,8 @@ def _camelot_table_to_dict(
         "cells": cells,
         "html": html,
         "raw_text": "\n".join(raw_row_texts),
+        # Whether `cells[].bbox` is real, and if not, why - never silent.
+        "cell_geometry": geometry_reason,
         # Internal-only pairing hint: the table's own absorbed caption number, if
         # any. Consumed + popped by ``extract_structured._find_caption_for_table``;
         # never surfaces in the public Table output.
@@ -777,6 +839,7 @@ def extract_tables_camelot(
     pdf_bytes: bytes,
     *,
     accuracy_threshold: float = 50.0,
+    layout=None,
 ) -> list[Table]:
     """Run Camelot stream on each page; return tables as docpluck Table dicts.
 
@@ -826,7 +889,8 @@ def extract_tables_camelot(
 
         out: list[Table] = []
         for idx, ct in enumerate(tables_obj):
-            td = _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold)
+            td = _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold,
+                                        layout=layout)
             if td is not None:
                 out.append(td)
         return out
@@ -868,6 +932,7 @@ def extract_tables_camelot_by_region(
     region_specs: list[dict],
     *,
     accuracy_threshold: float = 50.0,
+    layout=None,
 ) -> dict[str, Table]:
     """Region-driven Camelot capture: extract exactly one table per caption by
     handing Camelot the caption-anchored region as ``table_areas``.
@@ -939,6 +1004,7 @@ def extract_tables_camelot_by_region(
                 label=spec.get("label"),
                 allow_categorical=bool(spec.get("isolate")),
                 own_caption_number=spec.get("number"),
+                layout=layout,
             )
             if td is not None:
                 td["id"] = f"region_{spec['key']}"

@@ -1,5 +1,105 @@
 # Changelog
 
+## [2.4.135] - 2026-08-19
+
+**Per-cell table geometry, which Camelot has held all along and this library discarded for a
+`(0.0, 0.0, 0.0, 0.0)` literal on every cell. Register A1/G6a, open across two releases and the
+single item blocking three known defects.**
+
+It is one line to read `ct.cells[r][c]`. It took two releases to land because **every way of getting
+it wrong produces WRONG coordinates rather than empty ones**, and a wrong bbox is worse than no bbox:
+it answers, plausibly, and the answer is off by a page. Register §G4 named four such traps and
+deferred the work until the guard that makes them impossible could be built first. Building the guard
+found **two more traps §G4 never listed**, both live on real papers.
+
+### The six traps
+
+| | trap | how it was found |
+|---|---|---|
+| T1 | Camelot is bottom-up PDF space; `chars_in_bbox` is pdfplumber top-down | §G4 |
+| T2 | Camelot pages are 1-indexed; `LayoutDoc.pages` is 0-indexed | §G4 |
+| T3 | docpluck trims rows *before* emitting cells, so an emitted `r` is not Camelot's df row | §G4 |
+| T4 | the whitespace path carries a zero table bbox | §G4 |
+| T5 | **Camelot silently rotates a page whose TEXT is sideways** and reports coordinates in that rotated frame while pdfplumber reports the page unrotated | running the guard against the corpus |
+| T6 | **`_augment_lattice_with_stream_rows` concatenates rows onto `ct.df` and never touches `ct.cells`**, so an augmented table has more df rows than cell rows | reading the augmentation |
+
+T5, measured: `10.1001/jamanetworkopen.2023.39337` p8 reports `rotation='anticlockwise'`,
+`pdf_size=(792.0, 612.0)` and a table bbox reaching x=730.7 — off-page in pdfplumber's 612-wide
+frame — while pdfplumber reports `rotation == 0`. Also `10.1017/s0007123424000024` p6 (`clockwise`),
+whose converted boxes come out with a **negative** top. **2 of the 8 papers probed.**
+
+T6, measured: `10.1038/s41598-023-50423-7` ships `df=61x4` against `cells=20x4`. Zipping those by
+index would have given 41 rows of published data somebody else's rectangle.
+
+### The guard, and the measurement that set every constant in it
+
+Each cell's rectangle is converted to pdfplumber space, `chars_in_bbox` is asked what actually stands
+there, and the result is scored
+
+    containment = |multiset(recovered) & multiset(cell text)| / |cell text|
+
+Exact string equality is the **wrong** predicate, and the probe said so before the code was written:
+Camelot assigns a whole text object to ONE grid cell even when its glyphs spill past that cell's
+column edges, so `df.iloc[r, c]` is regularly a superset of what stands inside the rectangle.
+
+Per cell, over the render baseline: **86.3% score ≥ 0.95 under the correct transform, against 2.1%
+under T1, 1.5% under T2 and 1.5% under T3.** Per TABLE the separation is total — median pass fraction
+**0.98** correct, and **every one of 200 tables falls below 0.30 under each of the three traps**. The
+gate sits at 0.60, in a real gap: on the shipped corpus the lowest ACCEPTED table scores 0.70 and the
+two rejected score 0.55 and 0.53.
+
+**The verification is sampled; the geometry is not.** Every cell gets its rectangle (arithmetic,
+free); at most 40 are round-tripped, on a fixed stride. `chars_in_bbox` is O(chars-on-page) per call,
+so full verification costs 78.9 ms/table and grows with the grid — a 397-cell table pays 397 page
+scans, on the service's per-request path. The cap makes the cost independent of table size
+(40.0 ms/table) and **changed no verdict across 200 tables**. A stride, never a random draw: a gate
+whose answer moves between runs is not a gate.
+
+### What ships
+
+* `docpluck/tables/cell_geometry.py` — the lookup and its guard.
+* `Table["cell_geometry"]` — **new field, on every table from every path**, either
+  `"verified:<fraction>"` or the named refusal (`camelot_rotated_page:…`, `grid_shape_mismatch:…`,
+  `roundtrip_failed:…`, `no_layout`, `whitespace_native`, `no_cells`). Never absent and never silent:
+  a zero bbox with no reason is indistinguishable from a document that simply had no rotated pages,
+  which is the instrument-describing zero this project has been burned by three times.
+* Layout is resolved **before** the first Camelot call, so both capture paths get geometry and the
+  answer does not depend on whether the caller passed `_layout_doc`. This costs nothing — the
+  region path and the symbol-font scan each already materialised layout later in the same function.
+* The three row-trims each gained an index-returning sibling (`_keep_after_*`) and became one-liners
+  over it — **one implementation, two views**, so the raw-row mapping cannot drift from the trim.
+  Behaviour verified identical to the originals over **6,002 generated matrices**.
+
+**Measured on the shipped path** (`python tools/diag/cell_geometry_census.py`, 12 papers, 69 tables):
+**81.2% verified · 10.1% `no_cells` · 2.9% `roundtrip_failed` · 2.9% `grid_shape_mismatch` · 1.4%
+`camelot_rotated_page` · 1.4% `whitespace_native`**, and **5,206 of 5,686 cells (91.6%) now carry a
+real bbox where every one was `(0,0,0,0)` before**.
+
+### The change is provably content-neutral
+
+Reasoning said it had to be: the row trims are behaviour-identical (6,002 matrices) and the change
+only ADDS a bbox per cell and one field per table. But this project's rule is that a capture-path
+change is net-harmful until a corpus-wide before/after says otherwise, and "my reasoning says it is
+safe" is precisely the claim that rule exists to distrust.
+
+So every corpus paper was extracted under BOTH trees — `v2.4.134` from a git worktree and the
+shipping tree — in separate interpreters, comparing per table: cell count, total cell-text length,
+and `raw_text` length.
+
+**72 tables compared, 72 identical, 0 differing.**
+
+### What this unblocks, and what it does NOT do
+
+Register §J's two open text-loss defects and the fused-grid wrong-number class (§G6h) were all
+blocked on this and are still open — this release is the foundation, not the fix. What changes is
+that each now has the evidence it needs: whether a table under a caption is one column wide or full
+width (defect 3), whether a tall band is one row or several (defect 2), and whether the renderer put
+a gap where a cell has none (§G6h, which needs TYPOGRAPHIC evidence and could not have it before).
+
+**A verified bbox is the GRID RECTANGLE for that (row, column)** — not a promise that `cell["text"]`
+is exactly the text standing inside it. See the spill above. For a consumer proving what the renderer
+put on the page, the rectangle is the ground truth and the chars inside it are the evidence.
+
 ## [2.4.134] - 2026-08-15/16
 
 **Closing the defects v2.4.133 itself introduced, plus the register's §H backlog. The headline:
