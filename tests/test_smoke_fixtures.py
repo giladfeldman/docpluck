@@ -9,7 +9,7 @@ import pytest
 
 _HERE = Path(__file__).parent
 _MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_VIBE = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe"
+_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 
 
 def _entries():
@@ -90,22 +90,18 @@ def test_table_html_renders_when_structured(entry):
         if t["kind"] == "structured":
             assert t["html"] is not None
             assert "<table>" in t["html"]
-            assert t["confidence"] is not None
-            assert 0.0 <= t["confidence"] <= 1.0
             assert isinstance(t["cells"], list)
             assert len(t["cells"]) > 0
-        elif t["kind"] == "whitespace":
-            # The layout-channel column-gap fallback (fires when Camelot can't
-            # recover a caption-anchored lineless table — including when Camelot
-            # returns "no tables" under cumulative test-suite load). Emits a real
-            # grid (cells + HTML) but no Camelot confidence. This branch existed
-            # before but the test never accounted for the kind, so a Camelot
-            # load-flake on jama/ieee/chen fixtures mis-failed the `else`.
-            assert t["html"] is not None
-            assert "<table>" in t["html"]
-            assert t["confidence"] is None
-            assert isinstance(t["cells"], list)
-            assert len(t["cells"]) > 0
+            # v2.4.133: `kind` no longer encodes the capture path — it used to
+            # carry the out-of-type value "whitespace" for the layout-channel
+            # column-gap fallback (register C4). The engine is now recorded by
+            # `camelot_flavor`, and a path with no capture-quality signal
+            # reports None rather than inventing one.
+            if t["camelot_flavor"] is not None:
+                assert t["confidence"] is not None
+                assert 0.0 <= t["confidence"] <= 1.0
+            else:
+                assert t["confidence"] is None
         else:
             assert t["kind"] == "isolated"
             assert t["html"] is None

@@ -16,16 +16,23 @@ this is safe and general across Elsevier / ScienceDirect papers.
 from __future__ import annotations
 
 import os
+
 from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 
 from docpluck.render import render_pdf_to_markdown
 
 # Article-finder fulltext repository (the JESP CrossMark papers live here).
-REPO = Path.home() / "Dropbox" / "Vibe" / "ArticleRepository" / "fulltext"
+REPO = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe") / "ArticleRepository" / "fulltext"
 
 
 def _title_of(md: str) -> str:

@@ -1,6 +1,5 @@
 """CLI: `docpluck sections <file>` and `docpluck extract --sections=...`."""
 
-import io
 import json
 import os
 import subprocess

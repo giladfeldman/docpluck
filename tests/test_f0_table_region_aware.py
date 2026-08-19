@@ -9,7 +9,7 @@ import pytest
 
 _HERE = Path(__file__).parent
 _MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_VIBE = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe"
+_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 
 
 def _resolve_fixture(fixture_id: str) -> Path:

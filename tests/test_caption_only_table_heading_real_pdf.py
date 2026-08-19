@@ -19,20 +19,27 @@ every detected table is structurally visible.
 
 from __future__ import annotations
 
-import json
 import os
+
+import json
 import re
 from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 
 from docpluck.extract_structured import extract_pdf_structured
 from docpluck.render import render_pdf_to_markdown
 
 _REPO = Path(__file__).resolve().parents[1]
-_VIBE = Path.home() / "Dropbox" / "Vibe"
+_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 _MANIFEST = json.loads(
     (_REPO / "scripts" / "harness" / "corpus_manifest.json").read_text(encoding="utf-8")
 )

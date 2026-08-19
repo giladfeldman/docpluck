@@ -16,15 +16,22 @@ a university is never touched (verified by the unit FP tests + a corpus scan).
 from __future__ import annotations
 
 import os
+
 from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 
 from docpluck.render import _strip_body_affiliation_block, render_pdf_to_markdown
 
-REPO = Path.home() / "Dropbox" / "Vibe" / "ArticleRepository" / "fulltext"
+REPO = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe") / "ArticleRepository" / "fulltext"
 
 
 # ── Unit tests on the block strip ───────────────────────────────────────────

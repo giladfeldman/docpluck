@@ -198,7 +198,8 @@ def test_blank_bridge_does_not_absorb_post_reference_trailer():
 # Handoff fixtures live in the CitationGuard validation corpus, gitignored per
 # ``feedback_no_pdfs_in_repo``. Resolve from there; skip if absent on this box.
 _CG_VALIDATION = os.path.join(
-    os.path.expanduser("~"), "Dropbox", "Vibe", "MetaScienceTools",
+    os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe"),
+    "MetaScienceTools",
     "CitationGuard", "apps", "worker", "testpdfs", "validation",
 )
 _BJPS_1 = os.path.join(_CG_VALIDATION, "harvard", "bjps_1.pdf")

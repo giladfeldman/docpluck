@@ -9,7 +9,7 @@ import pytest
 
 _HERE = Path(__file__).parent
 _MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_VIBE = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe"
+_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 
 
 def _resolve_fixture(fixture_id: str) -> Path:
@@ -154,11 +154,20 @@ def test_trim_caption_keeps_minimum_post_label_content():
     from docpluck.figures.detect import _trim_caption_at_chart_data
     # 6-digit run lands right after the label — truncation would leave
     # just "Figure 1." (under 40-char sanity check) — return original.
-    long_cap = "Figure 5. " + "x" * 200 + " 1234567 stuff"  # >150 chars
     short_pre_label = "Figure 5. 1234567 chart data " + "y" * 200
     out = _trim_caption_at_chart_data(short_pre_label)
     # Sanity check fires; return original.
     assert out == short_pre_label
+
+    # The OTHER case the docstring describes — a digit run far AFTER the label,
+    # where truncation leaves plenty of content and is therefore allowed. This
+    # fixture was built and then never exercised (bound to `long_cap` and
+    # dropped), so the test named "keeps minimum post-label content" only ever
+    # checked the branch that returns the input unchanged. Restored 2026-08-15.
+    long_cap = "Figure 5. " + "x" * 200 + " 1234567 stuff"
+    out_long = _trim_caption_at_chart_data(long_cap)
+    assert out_long.startswith("Figure 5. "), "the label must survive trimming"
+    assert len(out_long) >= 40, "trimming must respect the minimum-content check"
 
 
 # v2.4.4: caption truncation extended to short-token tick runs (5+ short

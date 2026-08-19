@@ -17,7 +17,13 @@ import os
 
 import pytest
 
-os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
+# Camelot is not needed by this module's tests; skipping it keeps them fast.
+# Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
+# which executes during COLLECTION and was never undone, so importing this file
+# disabled Camelot for the WHOLE pytest process and every real-PDF table test
+# collected afterwards found no tables. `conftest._camelot_disabled_per_module`
+# reads this flag and restores the prior value when the module finishes.
+DISABLE_CAMELOT = True
 
 from docpluck.normalize import recover_times_interaction_glyph_in_prose as R
 from docpluck.normalize import (

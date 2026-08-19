@@ -459,9 +459,30 @@ def _render_cogemo() -> str:
     if not pdf_available("docpluck", *_REL):
         pytest.skip("fixture not available locally: chan_feldman_2025_cogemo.pdf")
     # Headings don't need Camelot — disable it to keep this fast.
+    #
+    # RESTORED IN A `finally`, and that is not a style point. This line used to
+    # set the variable and leave it set for the rest of the process, so EVERY
+    # real-PDF table test collected after this file ran with Camelot disabled and
+    # found no tables. That is the entire "Camelot tests flake under cumulative
+    # load" folklore — recorded in CLAUDE.md, in a memory, and in three handoffs,
+    # with the workaround "run each file separately". It was never load.
+    # Reproduced in 48 seconds on 2026-08-16 with two files:
+    #
+    #     pytest tests/test_major_section_heading_promotion.py \
+    #            tests/test_tables_superheader_alignment_real_pdf.py
+    #     -> 2 failed        (the same two that "flake" in a full run)
+    #
+    # and the same three files run alone are 43/43 green.
+    prior = os.environ.get("DOCPLUCK_DISABLE_CAMELOT")
     os.environ["DOCPLUCK_DISABLE_CAMELOT"] = "1"
-    pdf = Path(pdf_path("docpluck", *_REL))
-    return render_pdf_to_markdown(pdf.read_bytes())
+    try:
+        pdf = Path(pdf_path("docpluck", *_REL))
+        return render_pdf_to_markdown(pdf.read_bytes())
+    finally:
+        if prior is None:
+            os.environ.pop("DOCPLUCK_DISABLE_CAMELOT", None)
+        else:
+            os.environ["DOCPLUCK_DISABLE_CAMELOT"] = prior
 
 
 class TestCogEmoRealPdf:

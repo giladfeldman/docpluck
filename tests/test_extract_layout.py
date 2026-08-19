@@ -1,8 +1,6 @@
 """Layout-aware PDF extraction via pdfplumber."""
 
 import io
-import os
-import shutil
 
 import pytest
 
@@ -10,7 +8,7 @@ import pytest
 def _build_synthetic_pdf() -> bytes:
     """Build a 1-page PDF with a heading and body using reportlab (fallback)
     or skip if not available. We just need any valid PDF for the smoke test."""
-    rl = pytest.importorskip("reportlab")
+    pytest.importorskip("reportlab")  # the skip IS the effect; no binding needed
     from reportlab.pdfgen import canvas
     from reportlab.lib.pagesizes import letter
     buf = io.BytesIO()

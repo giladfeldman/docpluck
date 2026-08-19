@@ -9,7 +9,7 @@ import pytest
 
 _HERE = Path(__file__).parent
 _MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_VIBE = Path(os.path.expanduser("~")) / "Dropbox" / "Vibe"
+_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 
 
 def _resolve_fixture(fixture_id: str) -> Path:
@@ -87,17 +87,28 @@ def test_table_kinds_are_valid():
     data = _read("apa_chan_feldman_lineless")
     result = extract_pdf_structured(data)
     for t in result["tables"]:
-        # "whitespace" = the layout-channel column-gap fallback (fires when
-        # Camelot can't recover a caption-anchored lineless table, including a
-        # Camelot "no tables" under cumulative load); a real grid gated by the
-        # foundation's char-fallback. A valid kind alongside structured/isolated.
-        assert t["kind"] in {"structured", "whitespace", "isolated"}
-        assert t["rendering"] in {"lattice", "whitespace", "isolated", "structured"}
-        if t["kind"] in {"structured", "whitespace"}:
-            # whitespace grids carry no Camelot confidence; structured do.
-            if t["kind"] == "structured":
+        # THE DECLARED TYPES, not a union of every value ever observed.
+        #
+        # Until v2.4.133 this test asserted `kind in {structured, whitespace,
+        # isolated}` and `rendering in {lattice, whitespace, isolated,
+        # structured}` — i.e. it had been widened to ACCOMMODATE the bug rather
+        # than catch it. The layout-channel whitespace fallback emitted
+        # `kind="whitespace"` / `rendering="structured"`: both outside their
+        # declared Literals AND transposed relative to the Camelot path, so a
+        # consumer branching on `kind == "structured"` got the opposite of what
+        # it asked for depending on which capture path ran (register C4).
+        assert t["kind"] in {"structured", "isolated"}
+        assert t["rendering"] in {"lattice", "whitespace", "isolated"}
+        if t["kind"] == "structured":
+            # The engine is recorded by `camelot_flavor`, never by `kind`.
+            # A Camelot capture carries a capture-quality score; the
+            # layout-channel column-gap fallback has no such signal and says so
+            # with None rather than inventing one.
+            if t["camelot_flavor"] is not None:
                 assert t["confidence"] is not None
                 assert 0.0 <= t["confidence"] <= 1.0
+                assert t["accuracy"] is not None
+                assert t["whitespace"] is not None
             else:
                 assert t["confidence"] is None
             assert t["html"] is not None
@@ -108,7 +119,8 @@ def test_table_kinds_are_valid():
             assert t["confidence"] is None
             assert t["html"] is None
             assert t["cells"] == []
-            assert isinstance(t["raw_text"], str)
+        # Declared `str` on EVERY path — the whitespace path used to emit None.
+        assert isinstance(t["raw_text"], str)
 
 
 def test_table_ids_unique_and_sequential():
@@ -139,6 +151,7 @@ def test_table_required_fields_present():
     t = result["tables"][0]
     for key in ("id", "label", "page", "bbox", "caption", "footnote",
                 "kind", "rendering", "confidence",
+                "accuracy", "whitespace", "camelot_flavor",
                 "n_rows", "n_cols", "header_rows",
                 "cells", "html", "raw_text"):
         assert key in t

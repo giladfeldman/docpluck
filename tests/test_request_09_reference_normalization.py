@@ -25,8 +25,8 @@ from docpluck.normalize import normalize_text, NormalizationLevel
 from .conftest import requires_pdftotext
 
 PDF = os.path.join(
-    os.path.expanduser("~"),
-    "Dropbox", "Vibe", "MetaScienceTools", "ESCIcheckapp", "testpdfs",
+    os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe"),
+    "MetaScienceTools", "ESCIcheckapp", "testpdfs",
     "Li&Feldman-2025-RSOS-PCIRR-Revisiting-mental-accounting-Thaler1999-RRR-print.pdf",
 )
 

@@ -59,6 +59,11 @@ from .extract import extract_pdf, extract_pdf_file, count_pages
 from .extract_layout import extract_pdf_layout
 from .extract_docx import extract_docx
 from .extract_html import extract_html, html_to_text
+from .symbols import (
+    SYMBOL_CONTRACT_VERSION,
+    explain_symbol,
+    symbol_contract,
+)
 from .normalize import (
     NORMALIZATION_VERSION,
     normalize_text,
@@ -87,9 +92,9 @@ from .tables.flatten import (
 )
 from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
-from .render import render_pdf_to_markdown
+from .render import RenderReport, render_pdf_to_markdown
 
-__version__ = "2.4.126"
+__version__ = "2.4.134"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
@@ -106,6 +111,9 @@ __all__ = [
     "normalize_text",
     "NormalizationLevel",
     "NormalizationReport",
+    "symbol_contract",
+    "explain_symbol",
+    "SYMBOL_CONTRACT_VERSION",
     "NORMALIZATION_VERSION",
     # Quality
     "compute_quality_score",
@@ -140,4 +148,8 @@ __all__ = [
     "render_flattened_inline",
     # Markdown rendering (v2.2)
     "render_pdf_to_markdown",
+    # v2.4.130: opt-in telemetry for the markdown post-process chain.
+    # docs/SCOPE.md tells consumers to check `report.statistics_removed`,
+    # so it has to be importable from the package root.
+    "RenderReport",
 ]

@@ -20,6 +20,44 @@ from pathlib import Path
 # manifest stays portable across machines and future moves (the root moved off
 # ~/Dropbox/Vibe on 2026-08-03); never hardcode an absolute user path here.
 VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+
+
+def _out_root() -> Path:
+    """Where the harness writes its rendered output — OUTSIDE this repo.
+
+    **It used to be `<repo>/verify_out`, defined identically in three modules**
+    (`extract.py`, `checks.py`, `inspect.py` — one concept, three tables), and
+    it accumulated **347 MB of rendered publication text inside the working
+    tree**: title, authors, full body, for 181 documents. Gitignored, but the
+    custody rule is explicit that gitignoring is not containment —
+
+        "NO PAPER, PUBLICATION TEXT, GOLD, OR BASELINE LIVES IN THIS REPO —
+         article-finder is the sole custodian. Never commit or keep here ...
+         the extracted/rendered text of a publication (in ANY format) ...
+         **not even gitignored**."
+
+    Found 2026-08-15; the directory on disk was last written 2026-05-22, i.e. it
+    had been stale for three months and was regenerable from a newer library at
+    any time. Removed, and the default moved out of the tree so it cannot
+    silently rebuild there.
+
+    Resolution order:
+      1. ``DOCPLUCK_HARNESS_OUT``  — explicit override.
+      2. ``$VIBE_ROOT/_artifacts/docpluck-harness`` — beside the portfolio, not
+         inside a git repo.
+
+    Output worth KEEPING is registered with article-finder under
+    ``--artifact-class tool`` as ``<family>__<producer>@<version>``; an
+    unversioned baseline is overwritten by the next release, which turns any
+    gate comparing against it into a tautology. Everything here is scratch.
+    """
+    override = os.environ.get("DOCPLUCK_HARNESS_OUT")
+    if override:
+        return Path(override)
+    return VIBE / "_artifacts" / "docpluck-harness"
+
+
+OUT_ROOT = _out_root()
 if not VIBE.is_dir():
     raise FileNotFoundError(
         f"Vibe root not found at {VIBE} — set VIBE_ROOT. A missing root must "

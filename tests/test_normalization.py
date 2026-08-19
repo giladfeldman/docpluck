@@ -4,7 +4,6 @@ Covers every step (S0-S9, A1-A5) with edge cases from ESCIcheck, MetaESCI,
 MetaMisCitations, and PDFextractor LESSONS.md.
 """
 
-import pytest
 from docpluck.normalize import normalize_text, NormalizationLevel
 
 
@@ -781,48 +780,76 @@ class TestA1_StatLineBreaks:
 # ── A2: Dropped decimal repair ───────────────────────────────────────
 
 class TestA2_DroppedDecimal:
-    """From MetaESCI extraction report: 4.88% of results (5,908 out of 121,040)."""
+    """A2 is DELETED (v2.4.130). RE-FIXTURED, not removed.
 
-    def test_p_equals_484(self):
-        assert "p = .484" in norm("p = 484")
+    The original justification here was a MetaESCI extraction report: "4.88% of
+    results (5,908 out of 121,040)" carried a dropped decimal. That figure counts
+    how often the SHAPE appears; it never established that docpluck had caused it.
+    When the question was finally asked — which real paper, which page? — both of
+    A2's firing sites across 297 English papers turned out to be the PAPER's own
+    error, confirmed by rasterizing the page rather than by asking an extractor:
 
-    def test_p_equals_37(self):
-        assert "p = .37" in norm("p = 37")
+        10.1177/0146167210380928 p13   prints `B = -0.28, SE = 0.31, p = 38.`
+        10.1016/j.jesp.2016.11.001 p7  prints `t(186) = 3.90, p = 001, d = 0.6`
 
-    def test_p_equals_999(self):
-        assert "p = .999" in norm("p = 999")
+    Correctly-dotted numbers sit on the same line in both, so nothing was lost in
+    extraction. Repairing them LAUNDERS a published error into a meta-science
+    pipeline: the consumer validates a number the paper never printed, and the
+    author never learns. Flagging it is ESCImate's and Scimeto's role.
+    """
+
+    def test_p_equals_484_passes_through(self):
+        assert norm("p = 484").strip() == "p = 484"
+
+    def test_p_equals_37_passes_through(self):
+        assert norm("p = 37").strip() == "p = 37"
+
+    def test_p_equals_999_passes_through(self):
+        assert norm("p = 999").strip() == "p = 999"
 
     def test_does_not_change_small_value(self):
-        """p = 5 is NOT a dropped decimal (too small)."""
-        result = norm("p = 5")
-        assert "p = 5" in result  # unchanged (5 < 10, not > 1.0 && < 1000)
+        """Unchanged before and after the retirement."""
+        assert "p = 5" in norm("p = 5")
 
     def test_does_not_change_large_n(self):
-        """N = 484 should not be 'fixed' — it's a sample size."""
-        result = norm("N = 484")
-        assert "N = 484" in result  # A2 only matches p-values
+        """N = 484 is a sample size. Unchanged before and after."""
+        assert "N = 484" in norm("N = 484")
 
-    def test_combined_linebreak_and_dropped_decimal(self):
-        """From ESCIcheck: p = \\n484 — both A1 and A2 needed."""
+    def test_linebreak_is_still_rejoined_but_no_decimal_is_invented(self):
+        """A1 (line-break repair) is NOTATION and stays; A2 was REPAIR and went.
+
+        Kept as one test because the original conflated them, and separating
+        them is the whole point of the 2026-08-14 separation of duties.
+        """
         result = norm("p =\n484")
-        assert "p = .484" in result or "p =\n.484" in result
+        assert "p = 484" in result, "A1 must still rejoin the wrapped statistic"
+        assert ".484" not in result, "A2 is retired; no decimal may be invented"
 
 
-# ── A3: Decimal comma normalization ──────────────────────────────────
+# ── A3: DELETED (v2.4.129) — European decimals pass through ──────────
 
 class TestA3_DecimalComma:
-    def test_european_p_value(self):
-        assert "0.05" in norm("p = 0,05")
+    """A3 is DELETED. RE-FIXTURED, not removed.
 
-    def test_european_d_value(self):
-        assert "1.23" in norm("d = 1,23")
+    Measured over 297 English papers before removal: A3 fired 9 times in 2
+    papers and NOT ONCE correctly (8 corrupted mathematical constraints, 1
+    laundered an author's error). Scope directive 2026-08-14: docpluck serves
+    English papers in US numeric convention; European numbers pass through as
+    printed, because the source token stays intact and the consumer can then
+    decide — which it could not once we had converted.
+    """
 
-    def test_does_not_change_thousands(self):
-        """N = 1,234 is a thousands separator, not decimal."""
-        result = norm("N = 1,234")
-        # Pattern (\d),(\d{1,3}) matches 1-3 digits after comma
-        # 1,234 has 3 digits → ambiguous. Let's verify behavior.
-        # The regex will match this — this is a known limitation.
+    def test_european_p_value_passes_through(self):
+        assert norm("p = 0,05").strip() == "p = 0,05"
+
+    def test_european_d_value_passes_through(self):
+        assert norm("d = 1,23").strip() == "d = 1,23"
+
+    def test_thousands_separator_also_passes_through(self):
+        """The old test here asserted nothing — it ended in a comment saying
+        `1,234` was "a known limitation". It is no longer ambiguous OR limited:
+        A3a is deleted too, so the token is delivered exactly as printed."""
+        assert norm("N = 1,234").strip() == "N = 1,234"
 
 
 # ── A4: CI delimiter harmonization ───────────────────────────────────
@@ -843,7 +870,15 @@ class TestA4_CIDelimiter:
 
 class TestA5_MathSymbols:
     def test_multiplication(self):
-        assert "x" in norm("\u00D7")
+        # SYMBOL CONTRACT v2.0 (v2.4.128): `\u00D7` transliterates to `*`, not `x`.
+        # The letter `x` collides with a variable named x, which is exactly the
+        # class of collision the v2.0 rewrite existed to remove (`eta2`->`n2`,
+        # `beta`->`b`). Re-fixtured 2026-08-14 with its reason rather than
+        # deleted \u2014 this assertion was left asserting v1.0 when the contract
+        # changed, so the suite was red at HEAD for a reason unrelated to any
+        # change under review. See docs/SYMBOL_CONTRACT.md.
+        assert "*" in norm("\u00D7")
+        assert "x" not in norm("\u00D7")
 
     def test_less_equal(self):
         assert "<=" in norm("\u2264")
@@ -893,10 +928,16 @@ class TestA5_MathSymbols:
         assert "1" in norm("\u00B9")
 
     def test_subscript_1(self):
-        assert "F1" in norm("F\u2081")
+        # SYMBOL CONTRACT v2.0 (v2.4.128): a subscript RUN is joined to what
+        # precedes it with a single `_`, so `F\u2081` is `F_1`, not `F1`. Fusing them
+        # produced tokens that read as something else \u2014 `eta2\u209a` fused to `eta2p`
+        # collides with a p-value, and `M\u209a` is indistinguishable from a variable
+        # named Mp. Re-fixtured 2026-08-14 with its reason; this was left
+        # asserting v1.0 when the contract changed.
+        assert "F_1" in norm("F\u2081")
 
     def test_subscript_2(self):
-        assert "R2" in norm("R\u2082")
+        assert "R_2" in norm("R\u2082")
 
 
 # ── A6: Footnote marker removal ──────────────────────────────────────
@@ -936,7 +977,12 @@ class TestFullPipeline:
         assert "95% CI" in result              # A1: stat line break
         assert "[-0.78, -0.67]" in result      # S5 + A4: minus + delimiter
         assert "p < .001" in result            # A1: stat line break
-        assert ".484" in result                # A2: dropped decimal
+        # RE-FIXTURED 2026-08-14: this used to assert `.484` (A2 inventing a
+        # decimal). A2 is retired, so the value is delivered as printed. Every
+        # OTHER assertion in this passage is unchanged, which is the point:
+        # retiring the REPAIR rules left the NOTATION rules untouched.
+        assert "d = 484" in result             # A2 retired: no decimal invented
+        assert ".484" not in result
 
     def test_none_level_preserves_artifacts(self):
         raw = "signi\ufb01cant \u2212"
@@ -1084,97 +1130,129 @@ class TestA1_ColumnBleed:
 
 
 class TestA2_DroppedDecimalV2:
-    """Regression tests for the 2026-04-11 A2 widening fix.
+    """A2's 2026-04-11 WIDENING, now retired with the rule. RE-FIXTURED.
 
-    Before: A2 used `val > 1.0` which excluded `p = 01` (val=1.0).
-    After:  A2 uses `val >= 1.0` so `p = 01` → `p = .01`.
+    This class pinned a decision to make A2 fire on MORE inputs: `val > 1.0`
+    became `val >= 1.0` so that `p = 01` (val 1.0) would also be "repaired".
 
-    The `\\d{2,3}` prefix in the regex already prevents `p = 1` (single digit)
-    from matching, so widening the threshold is safe.
+    It is worth keeping as a record of how the rule grew, because the widening
+    is a small instance of the failure the whole 2026-08-14 audit is about: the
+    question asked was "does A2 reach every case of the shape?" and never "is
+    the shape ours to touch?". Nobody was wrong about the regex. The regex was
+    the wrong question.
+
+    Every POSITIVE case below now passes through; every NEGATIVE case below is
+    unchanged, because the negatives were about not corrupting correct text and
+    that obligation survives the retirement intact.
     """
 
-    def test_dropped_decimal_p_equals_01(self):
-        """p = 01 → p = .01 (val=1.0, used to be rejected)"""
-        result = norm("The effect was significant, p = 01.")
-        assert "p = .01" in result
+    def test_p_equals_01_passes_through(self):
+        assert "p = 01." in norm("The effect was significant, p = 01.")
 
-    def test_dropped_decimal_p_equals_10(self):
-        """p = 10 → p = .10 (val=10.0)"""
-        result = norm("Marginal effect, p = 10.")
-        assert "p = .10" in result
+    def test_p_equals_10_passes_through(self):
+        assert "p = 10." in norm("Marginal effect, p = 10.")
 
-    def test_dropped_decimal_p_equals_02(self):
-        """p = 02 → p = .02"""
-        result = norm("Significant effect, p = 02.")
-        assert "p = .02" in result
+    def test_p_equals_02_passes_through(self):
+        assert "p = 02." in norm("Significant effect, p = 02.")
 
     def test_single_digit_not_touched(self):
-        """p = 1 (single digit) must NOT be mangled."""
-        # The regex \d{2,3} requires 2-3 digits, so this should pass through
-        result = norm("p = 1 for the test.")
-        assert "p = .1" not in result
+        """Unchanged before and after the retirement."""
+        assert "p = .1" not in norm("p = 1 for the test.")
 
     def test_genuine_decimal_not_touched(self):
-        """p = 0.05 must NOT be changed."""
-        result = norm("The effect is p = 0.05 and d = 0.34.")
-        assert "p = 0.05" in result
+        """Unchanged before and after the retirement."""
+        assert "p = 0.05" in norm("The effect is p = 0.05 and d = 0.34.")
 
-    def test_p_equals_with_linebreak(self):
-        """p = 01\\nnext word → p = .01 next word (real PSPB pattern)"""
+    def test_linebreak_rejoined_without_inventing_a_decimal(self):
+        """A1 still rejoins the real PSPB wrap; A2 no longer adds a dot."""
         result = norm("beta = .11, p = 01\nbelieved that they lost status")
-        assert "p = .01" in result
+        assert "p = 01" in result
+        assert "p = .01" not in result
 
-    def test_effect_size_dropped_decimal_widened(self):
-        """d = 10 → d = .10 (val=10.0, widening applies)"""
-        result = norm("Cohen's d = 10 showed the effect.")
-        assert "d = .10" in result
+    def test_effect_size_passes_through(self):
+        assert "d = 10" in norm("Cohen's d = 10 showed the effect.")
+        assert "d = .10" not in norm("Cohen's d = 10 showed the effect.")
 
 
-# ── A3a: Thousands separator protection (ESCImate Request 1.1) ─────
+# ── A3a: DELETED (v2.4.130) — thousands separators are DELIVERED ────
 
 class TestA3a_ThousandsSeparator:
+    """A3a is DELETED. RE-FIXTURED, not removed.
+
+    Note what these test NAMES used to say against what they used to ASSERT:
+    `test_capital_N_thousands_preserved` asserted `"N = 1182" in result`. The
+    same inversion ran through the implementation — the step was named
+    `A3a_thousands_separator_protect` and its metric key was
+    `thousands_separators_preserved`, while the operation was
+    `.replace(",", "")`. A consumer reading `changes_made` saw
+    "thousands_separators_preserved: 2" and would reasonably conclude nothing
+    had been lost. **That is worse than no instrumentation: silence invites a
+    check, a false all-clear forecloses one.** The names are now true.
+
+    A3a existed solely to pre-empt A3, which was deleted in v2.4.129. With
+    nothing left to protect against, what remained was a default rewrite that
+    deleted a separator the paper printed — and produced 1000x errors wherever
+    a paper used comma decimals (10.1177/0956797620935584 Table S2: a
+    Satterthwaite df printed `185,178`, i.e. 185.178, delivered as `185178`).
+    """
+
     def test_capital_N_thousands_preserved(self):
         result = norm("Participants (N = 1,182) completed the survey")
-        assert "N = 1182" in result
+        assert "N = 1,182" in result
+        assert "N = 1182" not in result
         assert "N = 1.182" not in result
 
     def test_lowercase_n_thousands_preserved(self):
-        result = norm("Sample of n = 2,443 adults")
-        assert "n = 2443" in result
+        assert "n = 2,443" in norm("Sample of n = 2,443 adults")
 
     def test_N_with_six_digit_integer(self):
-        result = norm("A large cohort (N = 1,234,567) was analyzed.")
-        assert "N = 1234567" in result
+        assert "N = 1,234,567" in norm("A large cohort (N = 1,234,567) was analyzed.")
 
     def test_df_with_thousands_separator(self):
-        result = norm("The test produced t(df = 1,197) = 2.34")
-        assert "df = 1197" in result
+        assert "df = 1,197" in norm("The test produced t(df = 1,197) = 2.34")
 
     def test_sample_size_of_phrase(self):
         result = norm("A sample size of 2,443 was collected.")
-        assert "2443" in result
+        assert "2,443" in result
         assert "2.443" not in result
 
     def test_total_of_participants_phrase(self):
-        result = norm("A total of 1,850 participants enrolled.")
-        assert "1850" in result
+        assert "1,850" in norm("A total of 1,850 participants enrolled.")
 
-    def test_decimal_comma_still_works_outside_N_context(self):
-        """German-style decimal comma must still normalize to period."""
-        result = norm("Der Mittelwert = 0,73 war signifikant")
-        assert "0.73" in result
+    def test_decimal_comma_outside_N_context_also_passes_through(self):
+        """RE-FIXTURED TWICE OVER, and the SECOND reason matters more.
+
+        1. A3 is deleted, so a comma decimal is no longer converted.
+        2. **The original fixture was written in GERMAN** ("Der Mittelwert =
+           0,73 war signifikant"). docpluck's scope is ENGLISH-language
+           articles, and the standing rule is that we never learn about an
+           English-article problem from non-English input — the failure modes
+           differ in kind, and bilingual articles make any conclusion drawn
+           from them false for part of the document. Rewritten in English.
+        """
+        assert norm("The mean = 0,73 was significant").strip() == (
+            "The mean = 0,73 was significant"
+        )
 
     def test_standard_level_preserves_commas(self):
-        """Standard level never runs A3, so commas must be preserved as-is."""
-        result = norm("Participants (N = 1,182) completed the survey", "standard")
-        # Standard doesn't run A3a either (it's academic-only), but A3 also
-        # doesn't run, so commas pass through untouched
-        assert "N = 1,182" in result
+        """Unchanged — and it was the clue.
 
-    def test_report_tracks_thousands_count(self):
+        This test already documented that `standard` passes commas through. Once
+        A3 was deleted, `academic` differed from `standard` on this input for no
+        surviving reason, and the library answered one question three ways
+        (`standard`, `academic`, and `academic + preserve_math_glyphs` — which
+        counted matches without stripping). Now all three agree.
+        """
+        assert "N = 1,182" in norm("Participants (N = 1,182) completed the survey", "standard")
+
+    def test_academic_and_standard_now_AGREE(self):
+        src = "Participants (N = 1,182) and df was 185,178 here."
+        assert norm(src, "academic").strip() == norm(src, "standard").strip() == src
+
+    def test_no_step_named_A3a_is_tracked(self):
         _, report = norm_report("N = 1,182 and n = 2,443 were enrolled.")
-        assert report.changes_made.get("thousands_separators_preserved") == 2
-        assert "A3a_thousands_separator_protect" in report.steps_applied
+        assert "thousands_separators_preserved" not in report.changes_made
+        assert not any("A3a" in s for s in report.steps_applied), report.steps_applied
 
 
 # ── S5a: Context-aware U+FFFD recovery (ESCImate Request 1.2) ──────
@@ -1235,26 +1313,36 @@ class TestA3_BraunsteinLookbehind:
         # Either the comma stays OR there's a clean boundary; must NOT become "first1.3Boryana"
         assert "first1.3Boryana" not in result
 
-    def test_real_decimal_comma_still_converts(self):
-        result = norm("Der Mittelwert war 0,73 und signifikant")
-        assert "0.73" in result
+    def test_a_decimal_comma_no_longer_converts(self):
+        """RE-FIXTURED on both counts. A3 is deleted, AND the original fixture
+        was GERMAN ("Der Mittelwert war 0,73 und signifikant") — out of scope,
+        and the standing rule forbids reasoning about English-article behaviour
+        from non-English input. Rewritten in English."""
+        assert norm("The mean was 0,73 and significant").strip() == (
+            "The mean was 0,73 and significant"
+        )
 
     def test_decimal_comma_after_letter_blocked(self):
-        """Lookbehind blocks a-z and A-Z — "x2,3" is ambiguous so leave alone."""
-        result = norm("variable x2,3 was coded")
-        # The "2,3" after "x" is an affiliation-like pattern; don't corrupt it
-        assert "x2.3" not in result
+        """Unchanged — the affiliation shape was never to be corrupted, and it
+        still is not. This obligation outlives the rule it guarded."""
+        assert "x2.3" not in norm("variable x2,3 was coded")
 
     def test_multiple_affiliations_in_abstract(self):
+        """The affiliation half is UNCHANGED; only the decimal half inverted.
+
+        This is the clearest single illustration of what the retirement did and
+        did not do: docpluck still refuses to corrupt a citation-marker run,
+        because that is its own damage to avoid. It simply no longer volunteers
+        a reading of the author's `0,44`.
+        """
         result = norm(
             "Chan1,2, Feldman3, and Zhao1,2,4 conducted the meta-analysis; "
             "the effect was d = 0,44 across studies."
         )
-        # Affiliations preserved
         assert "Chan1,2" in result
         assert "Zhao1,2,4" in result
-        # Real decimal still converts
-        assert "d = 0.44" in result
+        assert "d = 0,44" in result
+        assert "d = 0.44" not in result
 
 
 class TestA3_StatBracketLookbehind:

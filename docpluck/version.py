@@ -346,6 +346,7 @@ def get_version_info() -> dict:
     Keys:
         version:                  PEP 440 library version (matches ``pyproject.toml``).
         normalize_version:        ``NORMALIZATION_VERSION`` from ``normalize.py``.
+        symbol_contract_version:  ``SYMBOL_CONTRACT_VERSION`` from ``symbols.py``.
         sectioning_version:       ``SECTIONING_VERSION`` from ``sections/``.
         table_extraction_version: ``TABLE_EXTRACTION_VERSION`` from ``extract_structured.py``.
         git_sha:                  Git SHA of the docpluck checkout, or ``"unknown"``.
@@ -378,6 +379,7 @@ def get_version_info() -> dict:
     """
     from . import __version__
     from .normalize import NORMALIZATION_VERSION
+    from .symbols import SYMBOL_CONTRACT_VERSION
     from .sections import SECTIONING_VERSION
     from .extract_structured import TABLE_EXTRACTION_VERSION
 
@@ -386,6 +388,11 @@ def get_version_info() -> dict:
     info = {
         "version": __version__,
         "normalize_version": NORMALIZATION_VERSION,
+        # The Greek / sub-superscript transliteration contract consumers
+        # build their patterns against (docs/SYMBOL_CONTRACT.md). Pinned
+        # here because a consumer that cannot see WHICH contract produced
+        # a token cannot tell a changed convention from a parse failure.
+        "symbol_contract_version": SYMBOL_CONTRACT_VERSION,
         "sectioning_version": SECTIONING_VERSION,
         "table_extraction_version": TABLE_EXTRACTION_VERSION,
         "git_sha": _resolve_git_sha(),
