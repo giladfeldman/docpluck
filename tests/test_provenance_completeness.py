@@ -27,12 +27,27 @@ import json
 import platform
 import re
 import sys
-import tomllib
 import unicodedata
 from dataclasses import fields
 from pathlib import Path
 
 import pytest
+
+# `tomllib` is 3.11+, but pyproject declares `requires-python = ">=3.10"` and the
+# CI matrix runs 3.10 — so this module failed to IMPORT there, and pytest counts
+# a collection error as an interrupted run. CI has been red on every push since
+# at least 2026-08-07 for this and one other reason, and nobody read it.
+#
+# Falling back to `tomli` (the 3.10 backport, same API) rather than skipping:
+# a skip here would be a coverage hole on the oldest interpreter we claim to
+# support, which is precisely where a provenance regression is most likely.
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    try:
+        import tomli as tomllib
+    except ModuleNotFoundError:  # pragma: no cover - only if dev extras missing
+        tomllib = None
 
 import docpluck
 from docpluck import get_version_info
@@ -121,6 +136,8 @@ class TestVersionInfoCompleteness:
         pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
         if not pyproject.exists():  # installed-wheel test run
             pytest.skip("pyproject.toml not available (not a source checkout)")
+        if tomllib is None:  # pragma: no cover
+            pytest.skip("neither tomllib (3.11+) nor the tomli backport is installed")
         cfg = tomllib.loads(pyproject.read_text(encoding="utf-8"))
         project = cfg["project"]
 
