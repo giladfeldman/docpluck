@@ -47,17 +47,46 @@ jobs:
           REQ=service/requirements.txt
           NEW_TAG="${{ steps.tag.outputs.tag }}"
           PIN="docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git@${NEW_TAG}"
-          # Idempotent: only commit if the file actually changes.
-          python -c "
+          # NEVER BUMP BACKWARDS.
+          #
+          # This job fires on ANY `v*.*.*` tag push, including a FORCE-push of
+          # an OLD tag. On 2026-08-20 a history purge force-pushed v2.4.134 and
+          # v2.4.135 together; both runs fired, the v2.4.134 run finished last,
+          # and production was silently pinned to the OLDER library. Nothing
+          # failed — the workflow did exactly what it was written to do, and
+          # `check_app_pin_sync.py` was the only thing that noticed.
+          #
+          # So compare against the pin already in the file and no-op when the
+          # incoming tag is not strictly newer. Re-pushing an old tag is now
+          # safe, and the ordering race between two near-simultaneous tag
+          # pushes is closed as a side effect.
+          python - "$REQ" "$NEW_TAG" <<'PYEOF'
           import re, sys
-          path = '$REQ'
+
+          path, new_tag = sys.argv[1], sys.argv[2]
           s = open(path).read()
-          new = re.sub(r'docpluck\[all\] @ git\+https://github\.com/giladfeldman/docpluck\.git@v?[0-9]+\.[0-9]+\.[0-9]+', '$PIN', s)
-          if new == s:
-              print('no change'); sys.exit(0)
-          open(path, 'w').write(new)
-          print('bumped')
-          "
+          rx = r'docpluck\[all\] @ git\+https://github\.com/giladfeldman/docpluck\.git@(v?[0-9]+\.[0-9]+\.[0-9]+)'
+          m = re.search(rx, s)
+          if not m:
+              sys.exit("FAIL: no docpluck pin found in " + path)
+
+          def ver(t):
+              return tuple(int(x) for x in t.lstrip("v").split("."))
+
+          current = m.group(1)
+          if ver(new_tag) < ver(current):
+              print(f"REFUSING to bump BACKWARDS: pin is {current}, tag is {new_tag}.")
+              print("This is a re-pushed old tag; production keeps the newer pin.")
+              sys.exit(0)
+          if ver(new_tag) == ver(current):
+              print(f"already pinned to {new_tag} — nothing to do")
+              sys.exit(0)
+
+          pin = ("docpluck[all] @ git+https://github.com/giladfeldman/"
+                 "docpluck.git@" + new_tag)
+          open(path, "w").write(re.sub(rx, pin, s))
+          print(f"bumped {current} -> {new_tag}")
+          PYEOF
 
       - name: Commit pin bump directly to master
         working-directory: app
