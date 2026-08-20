@@ -410,8 +410,7 @@ them, because:
   Cleaning main and the tags but leaving a PR ref is **PARTIAL**, not done.
 
 **Known accepted residue** (deliberate, re-stated every run so it stays conscious):
-`.github/workflows/bump-app-pin.yml` names the private app repo because it must
-push a pin bump there; `tests/test_metaesci_followups.py` and
+`tests/test_metaesci_followups.py` and
 `tests/test_request_09_reference_normalization.py` embed a downstream
 consumer's name in public test filenames.
 

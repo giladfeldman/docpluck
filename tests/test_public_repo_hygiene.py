@@ -176,8 +176,10 @@ ALLOWED_DIRECTORY_PREFIXES = (
     "tests/",             # its tests
     "scripts/",           # supporting tooling
     "tools/",             # diagnostics
-    ".github/workflows/", # CI
 )
+# NOTE: `.github/` is deliberately ABSENT. There is no CI in this repo — see
+# test_no_github_actions_workflows_exist below and the NO GITHUB ACTIONS rule
+# in CLAUDE.md.
 
 ALLOWED_ROOT_FILES = {
     "README.md",
@@ -250,3 +252,63 @@ def test_the_allowlist_names_only_files_that_exist():
         p for p in (ALLOWED_ROOT_FILES | ALLOWED_DOCS) if p not in tracked
     )
     assert not stale, f"allowlist entries for files that no longer exist: {stale}"
+
+
+# ── No GitHub Actions, ever ────────────────────────────────────────────────
+
+
+def test_no_github_actions_workflows_exist():
+    """Owner directive 2026-08-20: *"remove any references to github actions or
+    anything using it. I will never be paying to github to activate actions."*
+
+    All five workflows were deleted that day. This test is what stops the sixth
+    from arriving — the same reasoning as the allowlist above: a rule written
+    only in CLAUDE.md is followed when someone reads CLAUDE.md.
+
+    It is a cost decision AND a correctness one. The app repo's Actions were
+    already billing-blocked, so `verify-railway-deploy.yml` — the gate asserting
+    production matched the pin — had silently not run at all. And
+    `bump-app-pin.yml` downgraded production the same day by losing a race
+    between two runners whose finish order nobody controlled.
+
+    Watched RED before the deletion: it named all three library workflows.
+    """
+    workflows = sorted(
+        p.relative_to(REPO).as_posix()
+        for p in REPO.glob(".github/**/*")
+        if p.is_file()
+    )
+    assert not workflows, (
+        "GitHub Actions is not available to this portfolio and never will be. "
+        "Replacements are local and already wired — see the NO GITHUB ACTIONS "
+        "rule in CLAUDE.md for the mapping:\n  " + "\n  ".join(workflows)
+    )
+
+
+def test_no_tracked_file_assumes_a_workflow_exists():
+    """A dangling reference is a false map: it tells the next reader that some
+    automation is handling something, when nothing is."""
+    import re as _re
+
+    rx = _re.compile(
+        r"\.github/workflows|bump-app-pin\.yml|verify-railway-deploy\.yml"
+        r"|post-deploy-verify\.yml|actions/checkout|uses:\s*actions/"
+    )
+    # LESSONS.md and CLAUDE.md record what was deleted and why — that is the
+    # opposite of assuming it exists, and deleting the record would lose the
+    # reason. The hygiene test itself names the files it forbids.
+    allowed = {"LESSONS.md", "CLAUDE.md", "CHANGELOG.md",
+               "tests/test_public_repo_hygiene.py", "scripts/check_app_pin_sync.py"}
+    offenders = []
+    for path in _tracked_text_files():
+        rel = path.relative_to(REPO).as_posix()
+        if rel in allowed:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if rx.search(line):
+                offenders.append(f"{rel}:{lineno}")
+    assert not offenders, (
+        "these still point at a GitHub Actions workflow that no longer "
+        "exists:\n  " + "\n  ".join(offenders)
+    )
