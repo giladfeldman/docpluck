@@ -169,6 +169,18 @@ should know where they are:
   0.29% of 11,720, in 7 tables across 3 of 26 papers** — and that is a FLOOR, because two plain
   integers fused are indistinguishable from one six-digit number in text alone. The class is
   CONCENTRATED: one paper ships whole results tables of it.
+* **`cells[].bbox` IS REAL NOW — but only where `Table["cell_geometry"]` says so** (new in
+  v2.4.135). Every Camelot cell used to ship `(0.0, 0.0, 0.0, 0.0)`; they are now genuine
+  pdfplumber-space rectangles `(x0, top, x1, bottom)`, the same convention the whitespace path
+  already used. **Gate on the field**: trust the boxes when it starts with `verified` or equals
+  `whitespace_native`; on `camelot_rotated_page:…`, `grid_shape_mismatch:…`,
+  `roundtrip_failed:…` or `no_layout` the boxes are zeros because we refused rather than guess.
+  We refuse because every way of getting this wrong yields coordinates that are *plausible and off
+  by a page* — worse than none. Measured over 69 shipped tables: **81.2% verified, 5,206 of 5,686
+  cells (91.6%) carrying a real box**; re-run with `python tools/diag/cell_geometry_census.py`.
+  A verified bbox is the GRID RECTANGLE for that (row, column) — **not** a promise that
+  `cells[i]["text"]` is exactly the text standing inside it, because Camelot assigns a whole text
+  object to one grid cell even when its glyphs spill past that cell's column edges.
 * **`table_prose_replacement_smaller_than_candidate`** — a NEW key. When a candidate was rejected as
   body prose and the replacement carries fewer populated cells, we record it rather than refuse the
   swap: smaller is usually correct (a grid half-composed of body prose loses those cells). Treat it

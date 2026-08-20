@@ -135,7 +135,26 @@ for t in result["tables"]:
     print(f"  {t['label']} on page {t['page']} ({t['kind']}, confidence={t['confidence']})")
     if t["kind"] == "structured":
         print(f"    {t['n_rows']} rows × {t['n_cols']} cols")
+    # v2.4.135: is `cells[].bbox` real geometry, or why not?
+    print(f"    cell_geometry: {t['cell_geometry']}")
 ```
+
+**`cell_geometry` (new in v2.4.135)** tells you whether to trust `cells[].bbox`. Until v2.4.135
+every Camelot cell shipped `(0.0, 0.0, 0.0, 0.0)`; they are now real pdfplumber-space rectangles
+`(x0, top, x1, bottom)` — but only where this field says so.
+
+| value | `cells[].bbox` |
+|---|---|
+| `verified:<fraction>` | real — round-trip-checked against the page's own characters |
+| `whitespace_native` | real — built directly from pdfplumber words |
+| `no_cells` | there is no grid (caption-only / isolated table) |
+| anything else (`camelot_rotated_page:…`, `grid_shape_mismatch:…`, `roundtrip_failed:…`, `no_layout`) | zeros — we refused rather than guess |
+
+**Trust the boxes only on `verified` or `whitespace_native`.** Every way of getting this wrong
+produces coordinates that are plausible and off by a page, which is worse than none. Measured over
+69 shipped tables: 81.2% verified, 91.6% of cells carrying a real box. A verified bbox is the GRID
+RECTANGLE for that (row, column) — not a promise that `cells[i]["text"]` is exactly the text
+standing inside it.
 
 ### `fallbacks` — what the library silently did instead (read this)
 
