@@ -2109,3 +2109,127 @@ out to be deliberate v2.0 decisions with recorded reasons, not drift.
 
 **Detection:** `grep -rl "<retired-token>" <consumer-repo>` at retirement time; and a release gate
 step that runs each consumer's suite against the tag being shipped.
+
+---
+
+## L-052 — A page NUMBER is furniture; a page BOUNDARY is structure, and `\s` cannot tell them apart
+
+**2026-08-20.** F0 learned to strip a running footer that carries its page number
+(`Frontiers in Public Health 01 frontiersin.org`). Every unit test passed. On the
+real paper, **all 15 form feeds vanished from the output**, and with them the
+`\n\f\f\n` footnote-appendix marker — folding a **6,055-character appendix back
+into the body**, where a consumer reads it as running text.
+
+The new rule was not the bug. It only *exposed* one that had been latent for as
+long as the code existed:
+
+```python
+t = re.sub(r"^\s*\d{1,3}\s*$", "", t, flags=re.MULTILINE)   # strip page numbers
+```
+
+Under `re.MULTILINE` the whitespace class matches newlines **and the form feed**.
+While a running footer stood between the page number and the page break, the
+`\s*` could not reach the `\f`. Strip the footer, and the page number's own rule
+eats the page boundary next to it. Keyed on `[ \t]` now.
+
+**Three things worth carrying:**
+
+1. **A latent bug is held latent by something.** Ask what, before changing it.
+   The footer was load-bearing and nothing said so.
+2. **Deleting content changes what the NEXT rule sees.** The pipeline is 100+
+   sequential rewrites over one string; a step that removes text hands a
+   different document to everything downstream. Test the composition, not the step.
+3. **`\s` in a MULTILINE pattern is almost always wrong** when the text carries
+   page structure. Grep for it.
+
+**How it was caught:** not by the tests — they were green — but by extracting the
+same paper under a `git worktree` of the last tag and diffing per-field
+(`raw`/`FULL`/`body`/`appendix`/footnote count). The appendix going `6055 → 0`
+was visible in one line of that table and invisible everywhere else.
+
+---
+
+## L-053 — A normalised key COLLIDES, so only repetition may bless it, never position
+
+> **The rule this was learned on was REVERTED the same day** (see L-054); the digit-key
+> arm never shipped. The lesson stands on its own and is kept — it is about normalised
+> keys in general, and the next attempt at the channel-mismatch defect will need it.
+
+**2026-08-20.** The same change keyed running headers on a digit-collapsed form
+(`Frontiers in Public Health 01 …` → `Frontiers in Public Health # …`) so a footer
+carrying its page number would be comparable across pages.
+
+`FIGURE 1`, `FIGURE 2` and `FIGURE 3` also collapse to `FIGURE #`.
+
+The draft added a span's collapsed key to the strip set whenever the span was
+classified as header/footer — and that classification includes a purely
+**positional** arm (`span.y0 > body_y_max + 30`). So ONE figure label sitting
+above the body band condemned **every figure label in the document**. Measured:
+`FIGURE 1/2/3` each went **1 → 0** in the shipped output while the paper prints
+all three.
+
+**The rule: a lossy key may only be blessed by the evidence that made it lossy.**
+Collapsing digits throws information away, so the thing that licenses a
+digit-collapsed key must itself be digit-independent — here, that the key recurs
+on more than half the pages. **Position is what makes a line worth testing;
+repetition is what proves it is furniture.**
+
+Generalises past this rule: any time a comparison key is normalised (case-folded,
+whitespace-stripped, digit-collapsed, accent-stripped), ask what ELSE now maps to
+it, and require the license to come from outside the collapsed space.
+
+**Detection:** for every normalisation applied to a key, name two real strings
+that collide under it and check both survive.
+
+---
+
+## L-054 — "No statistical content removed" is not "no content removed"
+
+**2026-08-20.** A running-header fix added a CONTAINMENT arm: a text line is also
+furniture when its key is contained in a furniture key AND the line recurs at
+least the page threshold. It was needed because the two channels disagree about
+where a line ends — pdfplumber groups a footer into one span, pdftotext emits
+`frontiersin.org` on a line of its own — so whole-line equality matches neither.
+
+I measured it over 30 real papers before shipping. **868 furniture lines removed,
+47 flagged as carrying a published quantity, and all 47 were DOIs standing as
+page-edge lines — i.e. furniture. Zero risk.** I wrote that number into a handoff
+and moved on.
+
+Then the 26-paper baseline, diffed against a `git worktree` of HEAD:
+
+```
+10.5465/amle.2017.0488   'Rank'       19 -> 0     (deleted ENTIRELY)
+                         'Citations'  38 -> 11
+                         'Source'     43 -> 17
+10.1111/jomf.13036       'Cheng'      30 -> 3
+10.1098/rsos.140072      'status'     27 -> 18
+```
+
+Table column headers and row labels, deleted wholesale. The rule was reverted.
+
+**The safety metric could not see the failure it existed to catch.** It counted
+removed lines that `render._carries_statistical_content` recognises. `Rank` is
+not a statistic. `Citations` is not a statistic. So a change that deleted a
+table's entire header column scored **zero risk** on 30 papers.
+
+**The rule: when you measure whether a deletion is safe, measure removed
+CONTENT — every line — not removed lines of the one shape you were worried
+about.** A filter on the removal set is a filter on your own hypothesis, and the
+defect you did not hypothesise is exactly the one that ships.
+
+Two smaller things fell out of the same run, both worth keeping:
+
+- **A substring test is not a "split piece" test.** The mechanism being repaired
+  is pdftotext splitting one span into consecutive lines, so the legitimate
+  match is a PREFIX or SUFFIX of the furniture key, aligned at a word boundary —
+  not "appears somewhere inside". `Rank` is inside all sorts of things.
+- **A line MOVED is not a line DELETED.** The first version of the comparer
+  recorded body lines only, so 44 lines that moved into the footnote appendix
+  read as removals and sent me hunting a deletion that had not happened. Compare
+  the whole output, and keep body/appendix sizes beside it so a move is still
+  visible as a shift between them.
+
+**Detection:** for any change that deletes text, diff the FULL output of every
+corpus paper against a worktree of the last tag, list every removed line, and
+read them. If the list is too long to read, the change is too broad to ship.
