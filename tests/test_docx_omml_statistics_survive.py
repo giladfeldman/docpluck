@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+import os
 from pathlib import Path
 
 import pytest
@@ -45,10 +46,18 @@ pytest.importorskip("mammoth", reason="mammoth not installed (pip install docplu
 
 from docpluck.extract_docx import _inline_omml_runs, extract_docx
 
-_REAL = Path(
-    r"C:/Users/filin/Vibe/MetaScienceTools/CitationGuard/apps/worker/testpdfs"
-    r"/validation/docx/28_ImageMemorability.docx"
-)
+# NEVER hardcode the portfolio root — env override first, then the canonical
+# ~/Vibe location. This file previously embedded
+# an absolute `<home>/Vibe/MetaScienceTools/CitationGuard/...` path twice,
+# which is three
+# defects in one string: an absolute local user path in a PUBLIC repo, the name
+# and internal layout of a DIFFERENT private project, and a path that resolves
+# on exactly one machine — so everywhere else these tests SKIP SILENTLY and read
+# as green. Found by /docpluck-cleanup Section 0.3, 2026-08-20.
+_VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+_DOCX_CORPUS = _VIBE / "MetaScienceTools" / "CitationGuard" / "apps" / "worker" / "testpdfs" / "validation" / "docx"
+
+_REAL = _DOCX_CORPUS / "28_ImageMemorability.docx"
 
 
 def _docx_with_body(body_xml: str) -> bytes:
@@ -279,10 +288,7 @@ def test_an_empty_structure_emits_no_stray_operator():
     assert _inline_omml_runs(src) == src
 
 
-_REAL_DISPLAY = Path(
-    r"C:/Users/filin/Vibe/MetaScienceTools/CitationGuard/apps/worker/testpdfs"
-    r"/validation/docx/42_StressExposureTraining.docx"
-)
+_REAL_DISPLAY = _DOCX_CORPUS / "42_StressExposureTraining.docx"
 
 
 @pytest.mark.skipif(

@@ -64,6 +64,35 @@ CUSTOMER_UPDATE_*
 INBOX_*
 OUTBOX_*
 
+# --- Internal working registers and audits (added 2026-08-20) ---
+# 2026-08-20: `docs/OVERHAUL_REGISTER.md` (94 KB) and
+# `docs/INVENTORY_2026-08-14_notation_vs_repair.md` reached the PUBLIC remote
+# and sat there for a day. They are internal working documents — they quote the
+# owner's instructions verbatim, cite internal HANDOFF_/FINDINGS_/OUTBOX_ files,
+# and name other private projects. They slipped through because REGISTER and
+# INVENTORY were naming conventions NOBODY HAD THOUGHT OF YET, which is the
+# same failure as INBOX_/OUTBOX_ above and the same failure as 2026-08-06.
+#
+# Adding these prefixes does not fix the class. A denylist can only ever cover
+# the names already imagined. The ACTUAL guard is now
+# `tests/test_public_repo_hygiene.py::test_every_tracked_file_is_on_the_public_allowlist`,
+# which inverts the question — it asks what is ALLOWED to be public and fails on
+# anything else, whatever it is called, on every `pytest` run.
+INVENTORY_*
+docs/INVENTORY_*
+*_REGISTER.md
+REGISTER_*
+docs/REGISTER_*
+AUDIT_*
+docs/AUDIT_*
+POSTMORTEM_*
+RETRO_*
+WORKLOG_*
+PUNCHLIST_*
+BACKLOG_*
+CONSULT_*
+SESSION_*
+
 # --- Private benchmark suite (real-corpus results + hardcoded local paths) ---
 benchmarks/
 
