@@ -48,6 +48,38 @@ def main() -> int:
             f"docs/README.md must mention current normalization version {norm_version}"
         )
 
+    # EVERY pipeline version the docs advertise, not just the normalization one.
+    #
+    # `docs/README.md` documents the provenance block a consumer gets back, and it
+    # named `table_extraction_version: '2.4.10'` against a source value of 2.4.12.
+    # Nothing caught it, because this gate checked exactly one of the three
+    # versions in that block. A reader comparing the documented provenance against
+    # a real response would have found a mismatch with no way to tell which side
+    # was wrong -- and the documented one is the one that looks authoritative.
+    #
+    # Each entry is (source file, constant name, the key as the docs spell it).
+    for src_path, const, doc_key in (
+        ("docpluck/extract_structured.py", "TABLE_EXTRACTION_VERSION",
+         "table_extraction_version"),
+        ("docpluck/sections/__init__.py", "SECTIONING_VERSION", "sectioning_version"),
+    ):
+        try:
+            src = _read(src_path)
+        except FileNotFoundError:
+            raise AssertionError(f"{src_path} not found; {const} cannot be checked")
+        vm = re.search(const + r'\s*=\s*"([^"]+)"', src)
+        if not vm:
+            raise AssertionError(f"{const} not found in {src_path}")
+        version = vm.group(1)
+        # Only assert when the docs actually quote the key -- this gate reports
+        # DRIFT, and must not demand that every doc name every version.
+        dm = re.search(re.escape(doc_key) + r"'?\s*:\s*'([^']+)'", docs_readme)
+        if dm and dm.group(1) != version:
+            raise AssertionError(
+                f"docs/README.md says {doc_key} = {dm.group(1)!r} but "
+                f"{src_path} defines {const} = {version!r}"
+            )
+
     if "NORMALIZATION_VERSION" not in docs_normalization:
         raise AssertionError(
             "docs/NORMALIZATION.md must reference NORMALIZATION_VERSION as source of truth"
