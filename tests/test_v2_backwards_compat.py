@@ -179,6 +179,23 @@ def test_fixture_root_exists():
     data = _manifest()
     if not data.get("vibe_relative"):
         pytest.skip("manifest is not vibe-relative")
+
+    # A CI runner has no corpus BY DESIGN — the PDFs are closed-access and must
+    # never be committed (article-finder is their sole custodian). So absence
+    # there is the expected state, not a broken configuration, and asserting on
+    # it made this the last red test in CI once the two collection errors were
+    # fixed. An explicit VIBE_ROOT still means "I told you where it is" and is
+    # checked even on CI.
+    #
+    # The guard keeps its whole purpose: on a DEVELOPER machine, where the
+    # corpus is supposed to be present, a relocated portfolio still fails loudly
+    # instead of silently turning 12 snapshot tests into a green no-op.
+    if os.environ.get("CI") and not os.environ.get("VIBE_ROOT"):
+        pytest.skip(
+            "CI runner: the closed-access corpus is absent by design "
+            "(see the custody rule). Set VIBE_ROOT to assert it here."
+        )
+
     assert _VIBE.is_dir(), (
         f"corpus root {_VIBE} does not exist — every fixture would skip and the "
         "suite would report green. Set VIBE_ROOT, or check whether the portfolio "
