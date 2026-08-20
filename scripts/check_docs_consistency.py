@@ -11,12 +11,20 @@ def _read(rel_path: str) -> str:
     return (ROOT / rel_path).read_text(encoding="utf-8")
 
 
-def _extract_python_versions_from_workflow(text: str) -> list[str]:
-    m = re.search(r'python-version:\s*\[([^\]]+)\]', text)
+def _requires_python_floor(text: str) -> tuple[int, int]:
+    """The declared minimum interpreter, e.g. ``requires-python = ">=3.10"``.
+
+    This used to read the GitHub Actions test matrix. That workflow was deleted
+    on 2026-08-20 (the portfolio does not use GitHub Actions), which left this
+    script reading a file that no longer exists — so the check would have
+    crashed rather than passed, but it was ALSO the only thing pinning the
+    classifier list to reality. Repointed at `requires-python`, which is the
+    actual declaration and cannot silently disappear.
+    """
+    m = re.search(r'requires-python\s*=\s*"[><=~^]*(\d+)\.(\d+)"', text)
     if not m:
-        raise ValueError("Could not find python-version matrix in workflow")
-    raw = m.group(1)
-    return re.findall(r'"(\d+\.\d+)"', raw)
+        raise ValueError("Could not find requires-python in pyproject.toml")
+    return int(m.group(1)), int(m.group(2))
 
 
 def _extract_python_versions_from_pyproject(text: str) -> list[str]:
@@ -29,7 +37,6 @@ def main() -> int:
     docs_normalization = _read("docs/NORMALIZATION.md")
     docs_benchmarks = _read("docs/BENCHMARKS.md")
     pyproject = _read("pyproject.toml")
-    workflow = _read(".github/workflows/test.yml")
 
     m = re.search(r'NORMALIZATION_VERSION\s*=\s*"([^"]+)"', normalize_py)
     if not m:
@@ -46,16 +53,26 @@ def main() -> int:
             "docs/NORMALIZATION.md must reference NORMALIZATION_VERSION as source of truth"
         )
 
-    workflow_versions = _extract_python_versions_from_workflow(workflow)
     pyproject_versions = _extract_python_versions_from_pyproject(pyproject)
-    if sorted(workflow_versions) != sorted(pyproject_versions):
+    if not pyproject_versions:
+        raise AssertionError("pyproject.toml declares no Python version classifiers")
+
+    floor = _requires_python_floor(pyproject)
+    tuples = sorted(tuple(map(int, v.split("."))) for v in pyproject_versions)
+    if tuples[0] != floor:
         raise AssertionError(
-            "Python versions mismatch between workflow matrix and pyproject classifiers: "
-            f"workflow={workflow_versions}, pyproject={pyproject_versions}"
+            "the lowest Python classifier must equal requires-python: "
+            f"classifiers start at {tuples[0]}, requires-python says {floor}"
+        )
+    expected = [(floor[0], floor[1] + i) for i in range(len(tuples))]
+    if tuples != expected:
+        raise AssertionError(
+            "Python version classifiers must be a contiguous range from "
+            f"requires-python: got {pyproject_versions}"
         )
 
-    min_v = min(workflow_versions, key=lambda v: tuple(map(int, v.split("."))))
-    max_v = max(workflow_versions, key=lambda v: tuple(map(int, v.split("."))))
+    min_v = ".".join(map(str, tuples[0]))
+    max_v = ".".join(map(str, tuples[-1]))
     bench_range = f"Python {min_v}-{max_v}"
     if bench_range not in docs_benchmarks:
         raise AssertionError(

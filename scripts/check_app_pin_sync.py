@@ -7,11 +7,24 @@ The app (giladfeldman/docpluckapp) imports the library via a git pin in
     docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git@v<VERSION>
 
 That pin MUST always equal the latest *released* library tag, or production
-silently keeps running the old library. A ``bump-app-pin.yml`` workflow in the
-library repo auto-commits the bump on every ``v*.*.*`` tag push, but it is
-*best-effort*: a token expiry, an Actions outage, or a regex drift can let it
-miss silently. This script is the deterministic backstop that every
-docpluck-* skill (qa / review / deploy) runs to VERIFY the bump actually landed.
+silently keeps running the old library.
+
+**This script is now the ONLY mechanism that maintains the pin.** The
+``bump-app-pin.yml`` GitHub Actions workflow that used to do it was DELETED on
+2026-08-20 — the owner does not and will not pay for GitHub Actions, and the
+workflow had just proved its own fragility: a history purge force-pushed tags
+v2.4.134 and v2.4.135 together, both runs fired, the OLDER one finished one
+second later and won, and production was silently downgraded.
+
+So the bump is local, explicit and ordered:
+
+* ``--check`` (default) VERIFIES the pin — the gate every docpluck-* skill runs.
+* ``--fix`` PERFORMS the bump, commits it to the app repo, and refuses to move
+  the pin BACKWARDS. Run it after tagging a release.
+
+A local script beats a workflow here for the reason the incident showed: it runs
+in a known order, on demand, with the result visible immediately — rather than
+in a race between two runners whose finish order nobody controls.
 
 Authoritative source of truth for the app pin is docpluckapp **origin/master**
 (that is what Railway deploys), NOT the local working-tree file — a stale local
@@ -24,7 +37,9 @@ not determine (treat as FAIL in CI/skills, never as PASS).
 
 Usage::
 
-    python scripts/check_app_pin_sync.py            # normal gate
+    python scripts/check_app_pin_sync.py            # normal gate (verify only)
+    python scripts/check_app_pin_sync.py --fix     # bump + commit the app pin
+    python scripts/check_app_pin_sync.py --fix --push   # ...and push to master
     python scripts/check_app_pin_sync.py --app-repo /path/to/PDFextractor
     python scripts/check_app_pin_sync.py --allow-local-fallback   # offline dev
 """
@@ -84,9 +99,8 @@ def compare(latest_tag: str | None, app_pin: str | None, lib_version: str | None
     if app_pin != latest_tag:
         return False, (
             f"MISMATCH: app pin v{app_pin} != latest library tag v{latest_tag}. "
-            f"The bump-app-pin workflow did not land v{latest_tag} on docpluckapp "
-            f"origin/master. Recover by re-pushing the tag (re-fires the workflow) "
-            f"or hand-bump service/requirements.txt to @v{latest_tag} and push to master."
+            "Nothing bumps this automatically (there is no CI). Fix it with:\n"
+            "    python scripts/check_app_pin_sync.py --fix --push"
         )
 
     msg = f"in sync: app pin v{app_pin} == latest library tag v{latest_tag}"
@@ -168,6 +182,71 @@ def _app_pin(app_repo: Path, allow_local_fallback: bool) -> tuple[str | None, st
     return m.group(1), f"LOCAL WORKING TREE {local_file} (may be stale -- could not reach origin/master)"
 
 
+def apply_fix(app_repo: Path, latest_tag: str, current_pin: str | None, push: bool) -> int:
+    """Bump the app pin to ``latest_tag``, commit it, optionally push.
+
+    REFUSES TO MOVE THE PIN BACKWARDS. This is the guard the deleted
+    ``bump-app-pin.yml`` never had: on 2026-08-20 a history purge force-pushed
+    v2.4.134 and v2.4.135 together, both workflow runs fired, and the OLDER tag
+    finished one second later (14:56:57 vs 14:56:56) and won — silently
+    downgrading production. Nothing failed; only this script noticed.
+    """
+    req = app_repo / "service" / "requirements.txt"
+    if not req.exists():
+        print(f"FAIL: {req} not found")
+        return 2
+
+    if current_pin and _vtuple(latest_tag) < _vtuple(current_pin):
+        print(
+            f"REFUSING to bump BACKWARDS: pin is v{current_pin}, latest tag is "
+            f"v{latest_tag}. If you really mean to downgrade, edit the pin by hand "
+            "and say why in the commit message."
+        )
+        return 1
+    if current_pin and _vtuple(latest_tag) == _vtuple(current_pin):
+        print(f"already pinned to v{latest_tag} — nothing to do")
+        return 0
+
+    text = req.read_text(encoding="utf-8")
+    new_text, n = _PIN_RE.subn(
+        f"docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git@v{latest_tag}",
+        text,
+    )
+    if n == 0:
+        print(f"FAIL: no docpluck pin line found in {req}")
+        return 2
+    req.write_text(new_text, encoding="utf-8")
+    print(f"bumped v{current_pin or '?'} -> v{latest_tag} in {req}")
+
+    if _git(app_repo, "add", "service/requirements.txt") is None:
+        print("FAIL: git add failed")
+        return 2
+    msg = "\n".join(
+        [
+            f"pin: bump docpluck library to v{latest_tag}",
+            "",
+            "Applied by scripts/check_app_pin_sync.py --fix in the library repo.",
+            "This replaces the deleted bump-app-pin.yml GitHub Actions workflow —",
+            "the owner does not pay for Actions, and the workflow had no",
+            "newer-than-current guard, so a re-pushed old tag could (and did)",
+            "downgrade production.",
+        ]
+    )
+    if _git(app_repo, "commit", "-m", msg) is None:
+        print("FAIL: git commit failed (nothing staged?)")
+        return 2
+    print("committed to the app repo")
+
+    if push:
+        if _git(app_repo, "push", "origin", "HEAD:master") is None:
+            print("FAIL: git push failed — commit is local; push it yourself")
+            return 1
+        print("pushed to docpluckapp master (Railway will redeploy)")
+    else:
+        print("NOT pushed (use --push, or push from the app repo yourself)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -182,6 +261,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="If origin/master is unreachable, fall back to the local "
         "working-tree pin (offline dev only; prints a stale-clone warning).",
+    )
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Bump the app pin to the latest released tag and commit it. "
+        "Refuses to move the pin backwards.",
+    )
+    parser.add_argument(
+        "--push",
+        action="store_true",
+        help="With --fix, also push the app repo to origin/master.",
     )
     args = parser.parse_args(argv)
 
@@ -206,7 +296,15 @@ def main(argv: list[str] | None = None) -> int:
 
     ok, message = compare(latest_tag, app_pin, lib_version)
     print(("PASS: " if ok else "FAIL: ") + message)
-    return 0 if ok else 1
+
+    if ok or not args.fix:
+        return 0 if ok else 1
+
+    if not latest_tag:
+        print("FAIL: no released tag to bump to")
+        return 2
+    print()
+    return apply_fix(app_repo, latest_tag, app_pin, args.push)
 
 
 if __name__ == "__main__":
