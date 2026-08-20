@@ -1,5 +1,67 @@
 # Changelog
 
+## [Unreleased]
+
+### A page NUMBER is furniture; a page BOUNDARY is structure
+
+`_normalize_text` stripped standalone page numbers with
+`re.sub(r"^\s*\d{1,3}\s*$", "", t, flags=re.MULTILINE)`. Under `MULTILINE` the whitespace class
+matches **the form feed**, so the rule could consume the page boundary standing beside the number it
+was deleting. It had been wrong since it was written, held latent by a running footer sitting
+between the two — anything that stripped that footer took every form feed with it, and with them the
+`
+
+` marker that separates the footnote appendix, folding it back into the body where a
+consumer reads it as running text.
+
+**Two baseline papers were already in that state**: `10.1016/j.jesp.2021.104154` and
+`10.1016/j.joep.2020.102350` reported 15 and 18 footnotes through `report.footnote_texts` while the
+returned string carried no appendix at all. Nothing had noticed, because nothing compared the two.
+
+Measured over the 26-paper render baseline against a `git worktree` of the prior tree, extracted in
+separate interpreters and diffed per field:
+
+| metric | result |
+|---|---|
+| lines removed / added (full text) | **0 / 0** |
+| papers gaining page breaks | **16** (+1 to +17 each) |
+| footnote appendices restored | **2** (0 → 1,288 and 0 → 2,165 bytes) |
+| papers made worse on any metric | **0** |
+
+Shipped as the named `_strip_standalone_page_numbers()` so its test pins the SHIPPED rule rather than
+a retyped copy of the pattern. The form feed is **captured and restored**, not merely excluded from
+the class — a page number is often the first thing on a new page, so the line itself begins with the
+break, and excluding it stopped those lines matching at all (`'496'`..`'502'` reappeared in the body
+of `10.1016/j.jesp.2009.12.010`). `_drop()` keeps the same promise inside F0's strip loop, where the
+segment split attaches a separator to the line *before* it.
+
+`NORMALIZATION_VERSION` 1.9.56 → **1.9.57**. All three guards mutation-verified.
+
+### New: the FUSED-GRID detector (register G6h)
+
+`tools/diag/fused_cell_geometry_scan.py` — what v2.4.135's per-cell geometry unblocked. Keys on a
+char-level x-gap **inside a cell's own verified rectangle**, which is typographic evidence the
+renderer put a gap where the cell records none. Validated on the census's known positives before any
+count was quoted: `104594` fires at 15.15 em (136.4 pt) between `4` and `5`; `4.603.804.80` at
+12.22 em. **80 fused cells, 1.13% of 7,065 measured**, against the text-only census's 34 (0.29%).
+Threshold measured rather than chosen — 71,733 intra-cell gaps give p50=0.00, p90=0.00, p99=0.33 em.
+It **refuses** any cell whose recovered glyphs are not its own text (3,139 of 10,215) rather than
+folding them into the denominator. A measurement, not a repair.
+
+### Two reverts, recorded because the reasoning outlives the code
+
+- **A digit-normalised header key** detects a page-numbered running footer on 15 of 30 real PMC
+  papers — and changes **no output at all**, byte-identical with and without it, because the two
+  channels disagree about where a line ends. A detector with no consumer did not ship.
+- **A containment arm** would have been that consumer, and it **deletes table labels**:
+  `Rank` 19 → 0, `Citations` 38 → 11, `Source` 43 → 17, `Cheng` 30 → 3. A 30-paper safety scan had
+  reported *zero risk*, because it counted only removed lines that `_carries_statistical_content`
+  recognises — and `Rank` is not a statistic. See **LESSONS L-054**.
+
+The running-header channel-mismatch defect is therefore **still open**. Any replacement must match
+the *split pieces* of a furniture span (prefix/suffix at a word boundary, never "appears somewhere
+inside") and be measured on removed **content**, every line, not on removed statistics.
+
 ## [2.4.135] - 2026-08-19
 
 **Per-cell table geometry, which Camelot has held all along and this library discarded for a
