@@ -58,12 +58,32 @@ def _out_root() -> Path:
 
 
 OUT_ROOT = _out_root()
-if not VIBE.is_dir():
-    raise FileNotFoundError(
-        f"Vibe root not found at {VIBE} — set VIBE_ROOT. A missing root must "
-        "fail loudly: silently discovering 0 documents makes a broken run "
-        "look like a clean one."
-    )
+
+
+def require_corpus_root() -> None:
+    """Fail loudly when the portfolio root is missing.
+
+    A missing root must never be silent: discovering 0 documents makes a broken
+    run look like a clean one, which is how the 2026-08-03 move went unnoticed
+    for weeks.
+
+    MOVED off module scope 2026-08-20. It used to raise on IMPORT, which meant
+    `tests/test_harness_text_loss_reflow.py` — a pure-logic test of
+    `_fingerprint` and `check_text_loss` that touches no corpus — could not even
+    be COLLECTED on a machine without the corpus. pytest treats a collection
+    error as an interrupted run, so CI was red on every push since at least
+    2026-08-07 and nobody read it.
+
+    The guarantee is unchanged: every function that actually reaches for a
+    document calls this first, so a real run still fails loudly and
+    immediately. Only the import is now free.
+    """
+    if not VIBE.is_dir():
+        raise FileNotFoundError(
+            f"Vibe root not found at {VIBE} — set VIBE_ROOT. A missing root must "
+            "fail loudly: silently discovering 0 documents makes a broken run "
+            "look like a clean one."
+        )
 
 # (source, root-relative-to-VIBE, glob, format). Order is stable — it fixes the
 # manifest ordering so a regenerated manifest diffs cleanly.
@@ -88,6 +108,7 @@ def _slug(text: str) -> str:
 
 def discover() -> list[dict]:
     """Walk every source and return the document records, deterministically ordered."""
+    require_corpus_root()
     docs: list[dict] = []
     seen_ids: set[str] = set()
     for source, rel_root, pattern, fmt in SOURCES:
@@ -119,6 +140,7 @@ def discover() -> list[dict]:
 
 
 def build_manifest() -> dict:
+    require_corpus_root()
     docs = discover()
     by_fmt: dict[str, int] = {}
     for d in docs:
@@ -142,6 +164,7 @@ def load_manifest() -> dict:
 
 def resolve(doc: dict) -> Path:
     """Absolute path to a document record's source file."""
+    require_corpus_root()
     return VIBE / doc["rel_path"]
 
 
