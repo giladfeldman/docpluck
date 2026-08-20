@@ -2077,3 +2077,36 @@ claim is the defect.
 
 **Detection:** grep the diff for `both`, `all `, `every`, `the only`. Each occurrence is an
 enumeration somebody asserted without running.
+
+## L-051 — A release gate that only runs the library's own suite is blind to its consumers
+
+**2026-08-20.** `/ship` ran the docpluck library suite: **2840 passed, 0 failed**. It then ran the
+**docpluckapp service suite**, which imports the library through an editable install:
+**13 failed, 154 passed.**
+
+Every one of the 13 asserted a rule docpluck had deliberately retired — A2 (dropped-decimal repair,
+deleted v2.4.130), A3 (EU→US decimal comma, retired with the locale feature), and A5's v1.0 symbol
+conventions (`x` for `×`, `F1` for `F₁`). The library repo carries the same normalization suite and
+**its copy was updated as each rule retired**. The second copy was not, and nothing compares them.
+
+It had been red against a healthy library for three releases, and the app pin had just been bumped
+to `v2.4.135`, so the app's tests encoded a contract production no longer honoured.
+
+**Two failure modes, and the second is the expensive one:**
+
+1. The obvious one — the app's CI is broken.
+2. The one that costs months — **a suite that reports FAIL on a healthy tree trains everyone to
+   skim past failures.** That is precisely the mechanism behind L-044: the "Camelot cumulative-load
+   flake" survived as folklore because failures on a healthy tree had become normal.
+
+**The rule.** "One concept, one table" applies to TESTS. When a release retires a behaviour, grep
+for its assertions across **every repo that imports the library**, and run the CONSUMER's suite as
+part of the release gate. The library's own green suite is structurally blind to this class: each
+repo's tests are internally consistent, and the drift lives at the seam.
+
+**And when you fix them, do not weaken a test to match a bug.** Each inverted expectation here was
+checked against `docs/SYMBOL_CONTRACT.md` and `docs/SCOPE.md` first — `×`→`*` and `F₁`→`F_1` turned
+out to be deliberate v2.0 decisions with recorded reasons, not drift.
+
+**Detection:** `grep -rl "<retired-token>" <consumer-repo>` at retirement time; and a release gate
+step that runs each consumer's suite against the tag being shipped.
