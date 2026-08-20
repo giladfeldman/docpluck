@@ -373,6 +373,51 @@ def _body_y_band(page, body_size: float) -> tuple[float, float]:
     return y_min, y_max
 
 
+
+
+# Control characters that are NOT whitespace, and therefore survive `str.split()`.
+# pdftotext emits them inside real lines: PMC13137057's running header arrives as
+# ``chr(12) + 'Frey et al.' + chr(8)`` -- a form feed (whitespace, handled by split) and a
+# BACKSPACE (not whitespace) glued to the text. One stray BACKSPACE was enough to
+# make the line unequal to its layout-channel twin and so unstrippable.
+PAGE_BREAK = chr(12)  # pdftotext page separator (form feed)
+
+
+# A page NUMBER is furniture; a page BOUNDARY is structure. Exposed as a named
+# function rather than an inline `re.sub` so the test pins THIS rule instead of a
+# retyped copy of it -- a second definition of one rule is the drift this project
+# has a standing rule about.
+_PAGE_NUMBER_LINE_RE = re.compile(r"^(\f*)[ \t]*\d{1,3}[ \t]*$", re.MULTILINE)
+
+
+def _strip_standalone_page_numbers(t: str) -> str:
+    """Delete a line holding only a 1-3 digit page number, KEEPING any page break.
+
+    The leading form feed is CAPTURED and put back. It cannot simply be excluded
+    from the class: a page number is often the FIRST thing on a new page, so the
+    line itself begins with the break, and excluding it stopped those lines
+    matching at all (measured -- '496'..'502' reappeared in the body of
+    10.1016/j.jesp.2009.12.010). It cannot be left in the whitespace class
+    either, which is the original defect: the whitespace class matches the
+    form feed, so the rule consumed the page boundary next to the number it
+    was deleting. See LESSONS L-052.
+    """
+    return _PAGE_NUMBER_LINE_RE.sub(r"\1", t)
+
+_NONSPACE_CTRL_RE = re.compile(r"[\x00-\x08\x0e-\x1f\x7f]")
+
+
+def _key(s: str) -> str:
+    """Canonical comparison key for one line of text.
+
+    ONE definition, shared by the layout side (which builds the furniture keys)
+    and the text side (which matches lines against them). It used to be a closure
+    inside `_f0_strip_running_and_footnotes`; hoisting it is what makes the two
+    sides provably the same rule rather than two copies of it.
+    """
+    return " ".join(_NONSPACE_CTRL_RE.sub("", s).split())
+
+
 def _detect_repeating_lines(layout, *, position: str) -> set[str]:
     """Return text lines that appear at the top (or bottom) of >=50% of pages."""
     if len(layout.pages) < 2:
@@ -450,9 +495,6 @@ def _f0_strip_running_and_footnotes(
     # pdftotext body. Sourcing the body from pdftotext lifts the held-out PMC
     # token-F1 mean from ~0.745 (span rebuild) to ~0.77 (pdftotext + F0 strip),
     # on par with raw pdftotext — see an internal handoff doc (2026-06-13) and L-007.
-    def _key(s: str) -> str:
-        return " ".join(s.split())
-
     # A strip-key must be distinctive enough that a coincidental body line can't
     # collide with it under content matching: skip pure-numeric and very short
     # keys. Standalone page numbers / short banners are handled downstream by
@@ -463,6 +505,19 @@ def _f0_strip_running_and_footnotes(
 
     repeating_header_lines = _detect_repeating_lines(layout, position="top")
     repeating_footer_lines = _detect_repeating_lines(layout, position="bottom")
+    # NOTE ON THE DELETION GUARD (rule 0g). Every step that removes content is
+    # expected to consult `render._carries_statistical_content`. It is
+    # deliberately NOT consulted here, and the reason is measured rather than
+    # assumed: that predicate answers True for
+    # `Frey et al. 10.3389/fpubh.2025.1693310` because a DOI is a run of
+    # dot-separated numbers. A DOI is the commonest thing in a running header, so
+    # the guard would veto stripping headers F0 strips correctly TODAY -- it
+    # would be a regression, not a safety net.
+    #
+    # What replaces it is a stronger, typographic argument: a line only reaches
+    # these sets by being drawn at the extreme top or bottom of MORE THAN HALF
+    # the pages. A published statistic does not appear identically at y0=34 on
+    # thirteen consecutive pages. The repetition IS the evidence.
 
     header_footer_keys: set[str] = set()
     footnote_keys: set[str] = set()
@@ -516,6 +571,19 @@ def _f0_strip_running_and_footnotes(
     footnote_raw_texts: list[str] = []  # parallel to footnote_raw_spans
 
     segments = re.split(r"([\n\f])", raw_text)  # [content, sep, content, sep, ..., content]
+
+    # NOTE — a CONTAINMENT arm was written here and REVERTED. The two channels
+    # do not agree where a line ends (pdfplumber groups a footer into one span;
+    # pdftotext emits `frontiersin.org` on a line of its own), so a line whose
+    # key is CONTAINED in a furniture key and which also recurs at least the
+    # page threshold looked like a safe way to match the split pieces.
+    #
+    # It is NOT safe, and the corpus said so: `10.5465/amle.2017.0488` lost the
+    # table column header `Rank` ENTIRELY (19 occurrences -> 0), plus most of
+    # `Citations` (38 -> 11) and `Source` (43 -> 17); `10.1111/jomf.13036` lost
+    # `Cheng` (30 -> 3). A short repeated table label is a substring of all
+    # sorts of things. See LESSONS L-054.
+
     offset = 0
     for idx in range(0, len(segments), 2):
         content = segments[idx]
@@ -523,7 +591,25 @@ def _f0_strip_running_and_footnotes(
         consumed = len(content) + len(sep)
         stripped = content.strip()
         k = _key(stripped)
+
+        def _drop() -> None:
+            """Delete this line but KEEP a page break that followed it.
+
+            The segment split attaches the separator AFTER a line to that
+            line, so consuming a stripped line silently consumed its page
+            break too. A running footer is the LAST line on its page, so
+            stripping the footer deleted the boundary -- measured on
+            PMC13137057, all 15 form feeds disappeared from the output, which
+            destroyed the footnote-appendix marker downstream and folded a
+            6,055-char appendix back into the body. The furniture is
+            furniture; the page boundary is structure, and downstream steps
+            navigate by it. See LESSONS L-052.
+            """
+            if sep == PAGE_BREAK:
+                out_parts.append(sep)
+
         if k and _usable(k) and k in header_footer_keys:
+            _drop()
             offset += consumed
             continue
         if k and _usable(k) and k in footnote_keys:
@@ -5561,8 +5647,23 @@ def _normalize_text(
     if repeated:
         lines = [l for l in lines if l.strip() not in repeated]
         t = "\n".join(lines)
-    # Strip standalone page numbers — 1-3 digit unconditionally.
-    t = re.sub(r"^\s*\d{1,3}\s*$", "", t, flags=re.MULTILINE)
+    # Strip standalone page numbers - 1-3 digit unconditionally.
+    #
+    # The character class is [ TAB], NOT the whitespace class. Under
+    # re.MULTILINE the whitespace class matches newlines AND THE FORM FEED, so
+    # this rule could consume the PAGE BREAK standing next to the page number it
+    # was deleting. That stayed latent for as long as a running footer sat
+    # between the two; the moment F0 learned to strip that footer, all 15 form
+    # feeds vanished from PMC13137057's output and took the footnote-appendix
+    # marker with them, folding a 6,055-char appendix back into the body.
+    # A page NUMBER is furniture; a page BOUNDARY is structure, and downstream
+    # steps navigate by it.
+    # The leading form feed is CAPTURED and put back, not merely excluded from
+    # the class: a page number is often the FIRST thing on a new page, so the
+    # line itself begins with the break. Narrowing the class alone stopped
+    # matching those lines at all and let the numbers through -- measured,
+    # '496'..'502' reappeared in the body of 10.1016/j.jesp.2009.12.010.
+    t = _strip_standalone_page_numbers(t)
     # v2.4.3/v2.4.5: 4-digit page numbers (continuous-pagination journals like
     # PSPB where volume runs page numbers into the 1000s, e.g.
     # ``efendic_2022_affect`` with pages 1174-1185). Two patterns fire:
