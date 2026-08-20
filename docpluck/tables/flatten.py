@@ -34,7 +34,7 @@ sentinels (`<!-- docpluck:flattened-table id="T8" start -->` … ` end -->`).
 The two outputs share a single code path — the inline block is *generated
 from* the JSONL records, so they cannot drift relative to each other.
 
-ESCIcheck handoff source: `ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md`.
+Requested by the ESCIcheck team (internal handoff, 2026-05-25).
 Triage cluster: `an internal triage doc (2026-05-14)` → EC-T1.
 """
 
