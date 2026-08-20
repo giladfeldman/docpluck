@@ -414,6 +414,68 @@ elif quality["score"] < 50:
     print(f"Low quality ({quality['score']}) — verify manually")
 ```
 
+### `extract_sections(file_bytes, *, source_format=None, ...) → SectionedDocument`
+
+Identify a paper's structure — abstract, introduction, methods, results, discussion,
+references, and the endmatter around them. Works on PDF, DOCX and HTML.
+
+```python
+from docpluck import extract_sections, SectionLabel
+
+with open("paper.pdf", "rb") as f:
+    doc = extract_sections(f.read(), source_format="pdf")
+
+for section in doc.sections:
+    print(section.label, len(section.text))
+
+results = [s for s in doc.sections if s.label == SectionLabel.RESULTS]
+```
+
+Every character of the source belongs to exactly one section — the partition is total, so
+nothing is silently dropped. Unrecognised spans carry `SectionLabel.UNKNOWN` rather than
+being merged into a neighbour. Pipeline version: `SECTIONING_VERSION`.
+
+### `flatten_tables_for_paper(tables) → list[FlattenedRow]`
+
+Turn structured tables into one record per cell-with-a-statistic, in document order —
+suitable for direct JSONL emission. This is what the service exposes as
+`?flatten_tables_inline=true`; the library API is documented here so a direct consumer
+does not have to go through HTTP to reach it.
+
+```python
+from docpluck import extract_pdf_structured, flatten_tables_for_paper, render_flattened_inline
+
+with open("paper.pdf", "rb") as f:
+    result = extract_pdf_structured(f.read())
+
+rows = flatten_tables_for_paper(result.tables)
+for row in rows:
+    print(row)                        # one dict per flattened cell
+
+# Or render one table back into text for inline splicing:
+md = render_flattened_inline(rows, table_id="T1", label="Table 1")
+```
+
+`flatten_table` handles a single `Table` when you do not want the whole paper.
+Watch `report.fallbacks` for `flatten_dropped_*` keys — they mean a parsed statistic did
+not survive into the sidecar (see [`fallbacks`](#fallbacks--what-the-library-silently-did-instead-read-this)).
+
+### `symbol_contract() → dict` and `explain_symbol(char) → str`
+
+**If you parse docpluck's output, build your patterns from this rather than from samples.**
+`symbol_contract()` returns the authoritative, machine-readable mapping of every Greek
+letter and sub/superscript form docpluck emits at `normalize_level="academic"`.
+
+```python
+from docpluck import symbol_contract, explain_symbol, SYMBOL_CONTRACT_VERSION
+
+contract = symbol_contract()          # {'greek': {'χ': 'chi', 'η': 'eta', ...}, ...}
+explain_symbol("η")                   # 'eta'
+```
+
+Copying the tables into your own code is how two tools end up disagreeing about what
+`chi2` means. Ask the contract. Full prose reference: [SYMBOL_CONTRACT.md](./SYMBOL_CONTRACT.md).
+
 ---
 
 ## Integration Examples
@@ -484,7 +546,7 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.134',            # docpluck itself
+# {'version': '2.4.135',            # docpluck itself
 #  'git_sha': '…',
 #  'normalize_version': '1.9.56',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.4',   #   independently of the package version

@@ -256,7 +256,7 @@ CHANGELOG 2026-06-13 (v2.4.88).
 
 ### The recurring mistake
 
-Two mistakes, both surfaced 2026-06-18 by ESCImate `REQUEST_10`:
+Two mistakes, both surfaced 2026-06-18 by ESCImate a consumer request:
 
 1. **"Built ≠ reachable."** docpluck shipped `flatten_tables_for_paper` / `extract_pdf_structured` / `extract_sections` in v2.2.0 *for* the stat-verification consumers (the `flatten.py` docstring names effectcheck/escimate/scimeto) — but the hosted `/api/extract` endpoint those consumers call only ever returned `{text, metadata, normalization, quality}`. The capability sat unreachable for months. A feature added for a consumer must be exposed over the consumer's actual call surface (and documented in `API.md`) in the same effort, or it is invisible.
 
@@ -266,11 +266,11 @@ Two mistakes, both surfaced 2026-06-18 by ESCImate `REQUEST_10`:
 
 ### The rules
 
-1. **Expose-where-called.** Surfacing an already-built library capability is HTTP-layer + serializer work in the app repo; do it behind an opt-in, default-OFF param so existing callers are byte-identical, and document the param + response fields + default in `API.md`. (REQUEST_10 modes A/B; `REPLY_FROM_DOCPLUCK_v2.4.93.md`.)
+1. **Expose-where-called.** Surfacing an already-built library capability is HTTP-layer + serializer work in the app repo; do it behind an opt-in, default-OFF param so existing callers are byte-identical, and document the param + response fields + default in `API.md`. (a consumer request)
 2. **Ground table fixes in the rawest artifact.** Dump `extract_pdf_structured(pdf)["tables"]` first; if the target rows are absent, drop one level further and dump each Camelot flavor's raw `df` / `_bbox` / `rows`. The fix locus (flatten vs. flavor-selection vs. continuation-merge vs. region detection) is only knowable from that rawest view — a plausible mid-layer hypothesis (here, "orphaned labels") can be flatly wrong.
 3. **v2.4.93 flatten fixes** (combined `est_ci` columns, dash-sign CI, parallel ITT/PP groups) flatten every row Camelot captures. **v2.4.94 Tier-2** (cross-flavor lattice-augmentation + numeric-continuation merge) makes capture deliver the rows: PROSECCO R1–R6 now flatten sign-correct. Gated hard (equal-col-count + bbox overlap + extends-below; fragment-cell + column-aligned) so the 100-PDF / 2000-test corpus is regression-free.
 
-Cite: `docpluck/tables/camelot_extract.py::_augment_lattice_with_stream_rows` + `docpluck/tables/cell_cleaning.py::_merge_continuation_rows` (v2.4.94), `docpluck/tables/flatten.py` (v2.4.93), `tests/test_camelot_lattice_augment.py`, `tests/test_tables_cell_cleaning.py`, `tests/test_tables_flatten.py`, `REQUEST_10_TIER2_ORPHANED_LABEL_ROW_RECOVERY.md` (root cause corrected), CHANGELOG v2.4.93–v2.4.94.
+Cite: `docpluck/tables/camelot_extract.py::_augment_lattice_with_stream_rows` + `docpluck/tables/cell_cleaning.py::_merge_continuation_rows` (v2.4.94), `docpluck/tables/flatten.py` (v2.4.93), `tests/test_camelot_lattice_augment.py`, `tests/test_tables_cell_cleaning.py`, `tests/test_tables_flatten.py`, a consumer request (root cause corrected), CHANGELOG v2.4.93–v2.4.94.
 
 ---
 
@@ -362,7 +362,7 @@ same rewrite.
 them, because:
 
 1. **It scanned for known-bad filenames.** A denylist cannot catch a category
-   that should not exist — the next `HANDOFF_2026-09-01_*.md` is a new name the
+   that should not exist — the next an internal handoff is a new name the
    old rule never matched. The fix is an **allowlist**: assert every tracked
    path is on the list of what may be public, and treat anything else as a
    failure. Denylist thinking is why three cleanups reported "clean".
@@ -373,7 +373,7 @@ them, because:
    somewhere private; keep it out of the public repo. A rule written to prevent
    data loss silently authorized data exposure.
 3. **`.gitignore` had per-file entries**, added reactively one at a time
-   (`REQUESTS_FROM_ESCIMATE.md`, two specific spec paths). Each was correct and
+   (consumer requests, two specific spec paths). Each was correct and
    none generalized. Ignore rules must be **categorical**.
 
 **Rules:**
@@ -424,7 +424,7 @@ is absent, not error at collection).
 
 ## L-012 — Four ways this repo told the truth in a docstring and a lie in the call graph
 
-**Origin (2026-08-07, MetaESCI `INBOX_FROM_METAESCI_2026-08-07.md`).** MetaESCI ran
+**Origin (2026-08-07, MetaESCI a consumer's inbound note).** MetaESCI ran
 the **same** docpluck SHA (`a5c02ef`) against the **same** PDF
 (`10.1098/rsos.202336`) in April and in August: 49,091 vs 50,101 normalized
 characters, 9 vs 10 downstream effect rows. The system poppler binary had been
@@ -610,7 +610,7 @@ Cite: `docpluck/version.py`, `docpluck/batch.py`, `docpluck/normalize.py`
 (`NormalizationReport.to_dict`), `docpluck/sections/types.py`,
 `docpluck/sections/__init__.py`, `docpluck/sections/core.py`, `docpluck/cli.py`,
 `docpluck/render.py`, `tests/test_provenance_completeness.py`, CHANGELOG
-`[2.4.126]`, `REPLY_FROM_DOCPLUCK_v2.4.126.md`.
+`[2.4.126]`, our reply to the consumer.
 
 ---
 
@@ -778,7 +778,7 @@ Two conclusions were therefore unsafe, in opposite directions:
    **0.6.19**, three releases behind the separator rewrite it was being credited with. Measuring
    the version in the sibling repo's source tree would have told a flattering, false story.
 
-Cite: `docs/FINDINGS_2026-08-13_separator_ambiguity_matrix.md`, 2026-08-13.
+Cite: an internal findings note, 2026-08-13.
 
 ---
 
@@ -823,7 +823,7 @@ shape, forever.
 4. **Measure precision, recall AND abstention per signal before adopting it.** A signal that fires
    rarely but wrongly is worse than one that abstains often.
 
-Cite: `docpluck/extract_layout.py`, `docs/FINDINGS_2026-08-13_separator_ambiguity_matrix.md`,
+Cite: `docpluck/extract_layout.py`, an internal findings note,
 2026-08-13. Status: the superscript measurement above is verified; the corpus-wide precision and
 recall of each signal were still being measured when this was written — **treat the wider claims
 as UNVERIFIED until that report lands.**
@@ -874,7 +874,7 @@ hid `subheadings` until 2026-08-07.
 4. **A new report field is not delivered until every serializer emits it.** Grep for hand-rolled
    serializers in the same change.
 
-Cite: `docs/FINDINGS_2026-08-13_decisions_and_implications.md` Part 1.7 and 3.4,
+Cite: an internal findings note Part 1.7 and 3.4,
 `citelink/src/numericCitationDetector.ts:207`, 2026-08-13.
 
 ---
@@ -942,7 +942,7 @@ formats, or a whole defect class is structurally invisible.
    map of what the producer is expected to emit. Diff your output against it.
 
 Cite: `docpluck/normalize.py` (Greek/superscript transliteration tables),
-`effectcheck/R/parse.R:576`, `docs/FINDINGS_2026-08-13_decisions_and_implications.md` D6a,
+`effectcheck/R/parse.R:576`, an internal findings note D6a,
 2026-08-13.
 
 ---
@@ -982,8 +982,8 @@ ours.
 4. Corollary to L-015: "test the composition" includes testing the *consumer's internal
    inferences* against your output, not only the final numbers.
 
-Cite: `docs/FINDINGS_2026-08-13_decisions_and_implications.md` D5,
-`ESCIcheckapp/effectcheck/R/parse.R::infer_numeric_locale`, spec 1.4.0 rules L1-L3, 2026-08-13.
+Cite: an internal findings note D5,
+effectcheck's `infer_numeric_locale` (consumer-side), spec 1.4.0 rules L1-L3, 2026-08-13.
 
 ---
 
@@ -1017,8 +1017,8 @@ what article-finder can supply.
 4. **State the coverage gap in the finding.** "0 European papers" turns "we measured no impact"
    from a reassurance into a known blind spot.
 
-Cite: `HANDOFF_2026-08-13_locale_layout_and_downstream.md` §2,
-`docs/FINDINGS_2026-08-13_decisions_and_implications.md`, 2026-08-13.
+Cite: an internal handoff §2,
+an internal findings note, 2026-08-13.
 
 ---
 
@@ -1049,7 +1049,7 @@ one *praise* that was hiding a defect.
 4. **Say which of your own claims were wrong, in the artifact.** A corrected record is worth more
    than a clean-looking one; the next session inherits whichever you leave.
 
-Cite: `docs/FINDINGS_2026-08-13_decisions_and_implications.md` Part 4, 2026-08-13.
+Cite: an internal findings note Part 4, 2026-08-13.
 
 ---
 
@@ -1084,7 +1084,7 @@ was never stated as a contract, so no consumer chose a level deliberately.
 4. **Check what the consumers assume before changing the promise.** Two of them had already built
    on the undocumented behaviour in opposite directions.
 
-Cite: `HANDOFF_2026-08-13_locale_layout_and_downstream.md` §4,
+Cite: an internal handoff §4,
 `Scimeto/apps/worker/src/utils/statisticalExtractor.ts:55`, 2026-08-13.
 
 ---
@@ -1712,7 +1712,7 @@ library's source and list what else is on that object. Four places to look — a
 object; `stderr`; Python `warnings` (catching exceptions does NOT catch warnings); and quality/score
 fields the library already computes.
 
-Full inventory and status: `docs/OVERHAUL_REGISTER.md`.
+Full inventory and status: the internal overhaul register.
 
 ---
 
@@ -1933,7 +1933,7 @@ twelve.
 
 **2026-08-19.** Three gold-verified text-loss defects sat behind `xfail(strict)` markers because a
 fix for each had been attempted and reverted as net-harmful. The revert of the row-clustering fix
-was justified in `docs/FINDINGS_2026-08-04_row_cluster_chain_merge.md` by one sentence:
+was justified in an internal findings note by one sentence:
 
 > a real row can legitimately be TALL: xiao Table 4's row 2 spans **94.4pt** as a multi-line
 > stacked data block
