@@ -342,7 +342,7 @@ evidence for exactly the case it exists to catch. Under irreducible ambiguity th
   used to convert `d = 0,80` to `d = 0.80`, so a consumer inferring locale from our text was
   reading evidence we had manufactured.
 
-**See `docs/SCOPE.md`, `docs/INVENTORY_2026-08-14_notation_vs_repair.md`, and `LESSONS.md`
+**See `docs/SCOPE.md`, the internal notation-vs-repair inventory, and `LESSONS.md`
 L-026/L-029/L-031/L-032.**
 
 ---

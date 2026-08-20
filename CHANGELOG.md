@@ -421,7 +421,7 @@ an exact-equality check.
 Three gold-verified text-loss defects had been pinned as `xfail(strict)` because a fix for each was
 attempted and **reverted as net-harmful**. All three now XPASS and are plain asserts. Two of the
 reverts, and the first version of this release's own remedy, rested on claims nobody had
-re-measured. Full account in `docs/OVERHAUL_REGISTER.md` §J; the shape lessons are L-046 and L-047.
+re-measured. Full account in the internal overhaul register §J; the shape lessons are L-046 and L-047.
 
 **1. A caption's bbox spanned both text columns — DIAGNOSED, FIX REVERTED, STILL OPEN.**
 The paragraph below describes a fix that **does not ship**; see "Both capture-path fixes were
@@ -487,7 +487,7 @@ The same guard-diff found two further defects, both in remedies rather than in o
 
 Fable and Sonnet, one adversarial brief, frozen tree, run independently. **They converged on the
 same two findings** — which is what made them credible — and every finding was reproduced locally
-before being acted on. Full account in `docs/OVERHAUL_REGISTER.md` §J7.
+before being acted on. Full account in the internal overhaul register §J7.
 
 * **Pass 3 of `_bbox_of_caption_line` returned a bbox covering only the label.** The clip was
   "strictly non-regressive" for passes 1–2 only: pass 3 matches a loose SUBSTRING, so a run holding
@@ -619,7 +619,7 @@ wrong; one paper filed as a "known negative" turned out, on the rasterized page,
 corruption class; and a production defect that fabricates a minus sign on the wrong statistic was
 reproduced and fixed.**
 
-Work queue: `docs/OVERHAUL_REGISTER.md` (living backlog — **tracked**, ships in a clone). Full
+Work queue: the internal overhaul register. Full
 run record in its new §G.
 
 ### The layout-gated repairs stop assigning their evidence positionally (register C1 / F7f — "Risk A")
@@ -847,7 +847,7 @@ Fable 5 through Claude Code CLI to consult on all the decisions we've made… to
 if we got anything wrong."* Three read-only consults via `claude --print --model claude-fable-5`
 (Claude Max, no API call), with the working tree frozen for the duration. **Every finding was
 reproduced locally before being acted on**; the reproductions are recorded in the tests. Full
-record: `docs/FINDINGS_2026-08-15_fable_consult_and_amended_plan.md` — **local-only**, matched by
+record: an internal findings note — **local-only**, matched by
 `.gitignore:45 FINDINGS_*` under the public-repo allowlist, so it does NOT ship in a clone. The
 substance that consumers and future readers need is reproduced in this entry on purpose; do not
 treat the pointer as retrievable from the remote.
@@ -1186,7 +1186,7 @@ already knows about its input. That is the whole release in miniature.
 
 ### The inventory
 
-`docs/INVENTORY_2026-08-14_notation_vs_repair.md` classifies every transformation as **NOTATION** (canonicalising a correctly-printed form), **REPAIR — ours** (our extraction lost a glyph the page prints), **REPAIR — the paper's** (the page prints the error), **FURNITURE**, or **STRUCTURE**. Four rules repair the *paper's* defects and are queued to retire behind consumer notification: `A2`, `A3`, `A3c`, `W0n`. Every verdict was decided by **rasterizing the page**, never by asking an extractor.
+the internal notation-vs-repair inventory classifies every transformation as **NOTATION** (canonicalising a correctly-printed form), **REPAIR — ours** (our extraction lost a glyph the page prints), **REPAIR — the paper's** (the page prints the error), **FURNITURE**, or **STRUCTURE**. Four rules repair the *paper's* defects and are queued to retire behind consumer notification: `A2`, `A3`, `A3c`, `W0n`. Every verdict was decided by **rasterizing the page**, never by asking an extractor.
 
 Evidence debt is reported honestly rather than as one number: **5 steps cite a DOI, 44 cite a corpus nickname** (a real paper, non-compliant citation), **62 cite nothing**. Only the third is a delete candidate, and none were deleted on that basis alone.
 
@@ -1267,7 +1267,7 @@ A superscript run directly after an ASCII digit is an **exponent**, and flatteni
 'N = 42³'                       ->  '423'        a different sample size
 ```
 
-`docs/FINDINGS_2026-08-13` analysed these **exact tokens** when rejecting decision D4's "delete citation superscripts" option — *"deleting the 9 loses nine orders of magnitude"*. The reasoning was right and the decision was right, but it measured a **proposed** rule while the **shipped** one was already doing equivalent damage to the same tokens. The hazard was named; the existing behaviour was never tested against it.
+an internal findings note analysed these **exact tokens** when rejecting decision D4's "delete citation superscripts" option — *"deleting the 9 loses nine orders of magnitude"*. The reasoning was right and the decision was right, but it measured a **proposed** rule while the **shipped** one was already doing equivalent damage to the same tokens. The hazard was named; the existing behaviour was never tested against it.
 
 A superscript after a **letter** is a symbol suffix and still flattens, so `η²`/`χ²`/`ω²`/`R²adj` are untouched. After a **digit** it becomes caret notation — flat ASCII, unambiguous, and already what effectcheck's own normalizer produces internally. Stated residual: `N = 42³` may be a footnote marker rather than 42-cubed and the text channel cannot decide; `42^3` keeps both readings recoverable where `423` destroys them, the same principle A3 applies to an ambiguous comma.
 
@@ -1533,7 +1533,7 @@ Papers are now addressed by canonical key: `--paper 10.1177/19485506211056761`.
 
 ## [2.4.126] - 2026-08-07
 
-**Four surfaces claimed something the code did not do.** MetaESCI asks A-1/A-2 (`INBOX_FROM_METAESCI_2026-08-07.md`) opened on one of them; sweeping for the *class* found the other three. No normalization change, so `NORMALIZATION_VERSION` stays `1.9.50`, and default output is byte-identical.
+**Four surfaces claimed something the code did not do.** MetaESCI asks A-1/A-2 (a consumer's inbound note) opened on one of them; sweeping for the *class* found the other three. No normalization change, so `NORMALIZATION_VERSION` stays `1.9.50`, and default output is byte-identical.
 
 ### The incident that started it
 
@@ -1745,8 +1745,8 @@ Instrumenting every *compiled* pattern's `.sub()` — a module-level sweep misse
 This also permanently removes the flakiness from `test_regex_no_catastrophic_backtracking`, which prior handoffs had recorded as a load-sensitive perf test. It was a real, long-standing performance defect the whole time.
 
 **Also pinned, not fixed** — two real defects shipped as `xfail(strict)` with FINDINGS docs rather than left silent:
-- **`_cluster_into_rows` chain merge** (`docs/FINDINGS_2026-08-04_row_cluster_chain_merge.md`). The y-gap is measured to the *previous word* rather than the row's anchor, so wrapped/staggered cells chain-merge an arbitrarily tall band into one row (chan_feldman Table 3: 266 words at 47 distinct y-positions → 3 rows spanning 240pt). The anchor-relative fix was implemented and **reverted**: it broke 9 real-PDF tests because a real row can legitimately be tall (xiao Table 4 row 2 spans 94.4pt as a multi-line stacked block). The previous-word test under-splits; a naive anchor cap over-splits; neither rule alone is correct.
-- **maier Table 7 TEXT-LOSS** (`docs/FINDINGS_2026-08-04_pick_better_table_ignores_content.md`). `_pick_better_table` selects on structural shape alone and never checks content plausibility, so a 4×2 grid of Discussion prose replaces a 3×5 descriptives table whose data the raw_text channel captured gold-exact. Traced to the legacy auto-detect path, which never consults the content guard that would have caught it. Not fixed here: it is a pairing-class change, and this project's record is that global pairing changes are net-harmful without a guard-diff plus an AI-gold sweep.
+- **`_cluster_into_rows` chain merge** (an internal findings note). The y-gap is measured to the *previous word* rather than the row's anchor, so wrapped/staggered cells chain-merge an arbitrarily tall band into one row (chan_feldman Table 3: 266 words at 47 distinct y-positions → 3 rows spanning 240pt). The anchor-relative fix was implemented and **reverted**: it broke 9 real-PDF tests because a real row can legitimately be tall (xiao Table 4 row 2 spans 94.4pt as a multi-line stacked block). The previous-word test under-splits; a naive anchor cap over-splits; neither rule alone is correct.
+- **maier Table 7 TEXT-LOSS** (an internal findings note). `_pick_better_table` selects on structural shape alone and never checks content plausibility, so a 4×2 grid of Discussion prose replaces a 3×5 descriptives table whose data the raw_text channel captured gold-exact. Traced to the legacy auto-detect path, which never consults the content guard that would have caught it. Not fixed here: it is a pairing-class change, and this project's record is that global pairing changes are net-harmful without a guard-diff plus an AI-gold sweep.
 
 ## [2.4.120] — 2026-08-04
 
@@ -1841,7 +1841,7 @@ This also permanently removes the flakiness from `test_regex_no_catastrophic_bac
 
 **The fix (`recover_times_interaction_glyph_in_prose`).** The `3` is the single most dangerous glyph to touch in prose (a genuine ordinal/count), so W0k fires ONLY under a tight signature (ALL must hold): the line mentions `interaction` OR carries ≥2 `Word 3 Word` pairs; the `3` is not preceded by a reference word (Table/Model/Study/Figure/…); the right flank is not a plural COUNT noun (`3 studies`/`3 groups`/`3 conditions`); and at least one flank is Title-Case or an all-caps acronym (a predictor name — Direction, CMA, PMA). A 2-pass relaxation then recovers a lowercase-lowercase pair inside a line that already resolved a `×` (a confirmed interaction-term run — the flattened caption case). `ran 3 studies` / `and 3 groups` (all-lowercase flanks) are rejected. Wired into channel 1 (`normalize_text`, W0k after W0j) AND channel 3 (`render_pdf_to_markdown` post-process).
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic: 13 interaction-term `×` recovered across the two captions + the body parenthetical + single Title-Case pairs; the recovery is idempotent. A 21-case FP battery (incl. `Table 3 summarizes`, `Study 3`, `osf.io/pg3ae`, `We ran 3 studies with 3 conditions each`, `the interaction between age and 3 groups`, `participants (n = 3) in 2 waves`, `the top 3 items on 5 scales`) changes nothing; a wide 25-paper render scan finds no spurious `×`; the whole-corpus normalize-idempotency gate passes. (A reference word as the pair's LEFT FLANK — `Model 3 Relationship` — is now correctly treated as an ordinal; the full-suite idempotency gate caught this case that a single-pass FP battery missed, since a later reflow step can move `Model 3 …` into a 2-pair line.) 6 new tests (21 parametrized cases). **Two residual efendic cases remain (queued):** a line-WRAPPED interaction term (`… (Direction 3` / `Manipulated` split across physical lines) and the `2 × 2 × 3` design-notation shape (`… Low) 3 2 (…` — digit-flanked, spanning a long parenthetical). See `docs/FINDINGS_2026-07-03_efendic_glyph_in_prose_channel.md`.
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic: 13 interaction-term `×` recovered across the two captions + the body parenthetical + single Title-Case pairs; the recovery is idempotent. A 21-case FP battery (incl. `Table 3 summarizes`, `Study 3`, `osf.io/pg3ae`, `We ran 3 studies with 3 conditions each`, `the interaction between age and 3 groups`, `participants (n = 3) in 2 waves`, `the top 3 items on 5 scales`) changes nothing; a wide 25-paper render scan finds no spurious `×`; the whole-corpus normalize-idempotency gate passes. (A reference word as the pair's LEFT FLANK — `Model 3 Relationship` — is now correctly treated as an ordinal; the full-suite idempotency gate caught this case that a single-pass FP battery missed, since a later reflow step can move `Model 3 …` into a 2-pair line.) 6 new tests (21 parametrized cases). **Two residual efendic cases remain (queued):** a line-WRAPPED interaction term (`… (Direction 3` / `Manipulated` split across physical lines) and the `2 × 2 × 3` design-notation shape (`… Low) 3 2 (…` — digit-flanked, spanning a long parenthetical). See an internal findings note.
 
 ## [2.4.111] — 2026-07-04
 
@@ -1872,7 +1872,7 @@ This also permanently removes the flakiness from `test_regex_no_catastrophic_bac
 
 Wired into channel 1 (`normalize_text`, W0j after W0d) AND channel 3 (`render_pdf_to_markdown` post-process) per the 3-channel glyph discipline, so the corruption is caught whether the line reaches the reader as body text, a flattened italic table-`Note`, or a raw_text fallback.
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic: all three coding-note contrast codes and all three Mchange statistics now render with a minus; zero residual `20.5 =`/`Mchange = 2N.` corruption; the recovery is idempotent (running twice equals once). FP-validated: a 6-case adversarial battery (`mean age of M = 20.14 years`, `20.5% women`, ordinary `1 = control, 2 = treatment`, genuine `M = 2.84`, large numbers) changes nothing; a HEAD-vs-fix diff across 18 rendered corpus papers changes ONLY efendic (every other paper byte-identical). 5 new tests (2 real-PDF + 3 unit-contract incl. the mean-age FP guard). The remaining efendic findings — `×`-as-`3` in prose/caption, the Sage masthead + running-header leak, and two demoted subsection headings — are queued as their own cycles (`docs/FINDINGS_2026-07-03_efendic_glyph_in_prose_channel.md`).
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic: all three coding-note contrast codes and all three Mchange statistics now render with a minus; zero residual `20.5 =`/`Mchange = 2N.` corruption; the recovery is idempotent (running twice equals once). FP-validated: a 6-case adversarial battery (`mean age of M = 20.14 years`, `20.5% women`, ordinary `1 = control, 2 = treatment`, genuine `M = 2.84`, large numbers) changes nothing; a HEAD-vs-fix diff across 18 rendered corpus papers changes ONLY efendic (every other paper byte-identical). 5 new tests (2 real-PDF + 3 unit-contract incl. the mean-age FP guard). The remaining efendic findings — `×`-as-`3` in prose/caption, the Sage masthead + running-header leak, and two demoted subsection headings — are queued as their own cycles (an internal findings note).
 
 ## [2.4.108] — 2026-07-03
 
@@ -1908,7 +1908,7 @@ Wired into channel 1 (`normalize_text`, W0j after W0d) AND channel 3 (`render_pd
 
 **The fix (general, one-line-per-variant taxonomy additions).** `docpluck/sections/taxonomy.py` gains: `"declaration of conflicting interests"` / `"declaration of conflicting interest"` → `conflict_of_interest` (the Sage wording, distinct from the "declaration of competing interest" already covered); `"authorship declaration"` / `"authorship statement"` → `author_contributions`; and `"orcid ids"` → `author_note`. Because the heading-detection alternation is built directly from the taxonomy dict, these become recognized headings automatically. Only the **plural** "orcid ids" heading form is canonical — a bare/singular/inline `ORCID:` is deliberately excluded so a line-leading identifier (`ORCID: 0000-…`) is never false-promoted; the inline `(ORCID: …)` mentions inside the Acknowledgments paragraph stay body text.
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). ip_feldman Camelot-off render: all three headings now `## `; the inline Acknowledgments ORCID identifier preserved as body. 359 sections + heading + taxonomy tests pass (incl. new taxonomy-recognition + real-PDF ip_feldman tests); a corpus diff of the old vs new taxonomy over 14 papers confirms the only new `##` headings introduced are the intended back-matter sections. Remaining ip_feldman defects (wrapped-heading split C1, heading-level over-promotion C3, Table 10 empty) are queued as their own cycles. Triage: `docs/TRIAGE_2026-07-03_head_v2.4.101_assessment.md`.
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). ip_feldman Camelot-off render: all three headings now `## `; the inline Acknowledgments ORCID identifier preserved as body. 359 sections + heading + taxonomy tests pass (incl. new taxonomy-recognition + real-PDF ip_feldman tests); a corpus diff of the old vs new taxonomy over 14 papers confirms the only new `##` headings introduced are the intended back-matter sections. Remaining ip_feldman defects (wrapped-heading split C1, heading-level over-promotion C3, Table 10 empty) are queued as their own cycles. Triage: an internal triage.
 
 ## [2.4.104] — 2026-07-03
 
@@ -1918,7 +1918,7 @@ Wired into channel 1 (`normalize_text`, W0j after W0d) AND channel 3 (`render_pd
 
 **The fix (A3 guard).** In a `<td>` table row, `recover_dropped_minus_via_ci_pairing` no longer flips a bare-positive token when a signed-negative number (the already-recovered point estimate) precedes it in the same row — that earlier negative is the CI's estimate, so this token is a later variance column (SE/SD), which is non-negative and must not be flipped. The guard is scoped to `<td>` rows via the `B → SE → CI` column-order invariant; a prose line keeps the original behavior, so a genuinely-first dropped-minus estimate still recovers. The guard only ever *blocks* a flip (strictly more conservative), so it cannot introduce a new sign error.
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic Camelot-ON: every SE column value now renders positive (Intercept `0.06`/`0.10`/`0.15`, matching gold); genuine negative B-coefficients unaffected; the ar_apa canary (body-prose dropped-minus betas, not `<td>`) is byte-identical. 109 dropped-minus + minus-recovery + idempotence tests pass (incl. 4 new A3 tests); a corpus scan diffing the old vs new recovery over table rows across 14 papers confirms the guard changes only SE-column over-recoveries, never a genuine estimate flip. Known remaining efendic defect: the mid-Introduction author-affiliation leak (a METADATA-LEAK, queued). Triage: `docs/TRIAGE_2026-07-03_head_v2.4.101_assessment.md`.
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic Camelot-ON: every SE column value now renders positive (Intercept `0.06`/`0.10`/`0.15`, matching gold); genuine negative B-coefficients unaffected; the ar_apa canary (body-prose dropped-minus betas, not `<td>`) is byte-identical. 109 dropped-minus + minus-recovery + idempotence tests pass (incl. 4 new A3 tests); a corpus scan diffing the old vs new recovery over table rows across 14 papers confirms the guard changes only SE-column over-recoveries, never a genuine estimate flip. Known remaining efendic defect: the mid-Introduction author-affiliation leak (a METADATA-LEAK, queued). Triage: an internal triage.
 
 ## [2.4.103] — 2026-07-03
 
@@ -1926,7 +1926,7 @@ Wired into channel 1 (`normalize_text`, W0j after W0d) AND channel 3 (`render_pd
 
 **The fix (`recover_times_interaction_glyph`, W0i) is TABLE-CELL SCOPED — and deliberately so.** Unlike the minus / `<` recoveries, a bare `3` between two words is genuinely ambiguous in free prose: "Table 3 summarizes", "see Figure 3 and", the URL "osf.io/pg3ae" all contain a real `3` flanked by letters. So W0i is wired ONLY into `cell_cleaning._html_escape` (the Camelot table-cell channel) — never `normalize_text` or the whole-markdown render post-process. Inside a Camelot predictor cell, a `3` flanked by letters is unambiguously a corrupted `×` (a table predictor cell never contains a sentence boundary or a URL). Guards: the cell must carry a ≥3-letter word (skips numeric stat cells); a reference/enumeration word immediately before the `3` (Model/Study/Wave/Phase/Item/Table/…) keeps it a genuine ordinal; and the recovery reaches across a wrap break (`<br>` / cell-merge placeholder) so a 3-way interaction that wraps mid-cell (`PNMA × Direction<br>× Attribute`) recovers both operators.
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic Camelot-ON render: 22 corrupt `×`-as-`3` interaction cells → 0; genuine body-prose `Table 3` / `Figure 3` references preserved; independent Sonnet AI-gold re-verify confirms A2 resolved with 0 new regressions and the B-column minus (v2.4.102) still correct. **A whole-corpus FP scan ran `recover_times_interaction_glyph` against 16,884 Camelot cells across 18 non-efendic papers → 0 cells changed** (the recovery fires only on the corrupted interaction terms; the reference-word guard + letter-adjacency signature touch nothing else). A2 unit + real-PDF suite 10 pass; flatten 39; render_html + normalization + broad suites green. Known remaining efendic defects (A3 SE-column spurious minus, mid-Introduction affiliation leak) are queued as their own cycles. Triage: `docs/TRIAGE_2026-07-03_head_v2.4.101_assessment.md`.
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds, never pdftotext). efendic Camelot-ON render: 22 corrupt `×`-as-`3` interaction cells → 0; genuine body-prose `Table 3` / `Figure 3` references preserved; independent Sonnet AI-gold re-verify confirms A2 resolved with 0 new regressions and the B-column minus (v2.4.102) still correct. **A whole-corpus FP scan ran `recover_times_interaction_glyph` against 16,884 Camelot cells across 18 non-efendic papers → 0 cells changed** (the recovery fires only on the corrupted interaction terms; the reference-word guard + letter-adjacency signature touch nothing else). A2 unit + real-PDF suite 10 pass; flatten 39; render_html + normalization + broad suites green. Known remaining efendic defects (A3 SE-column spurious minus, mid-Introduction affiliation leak) are queued as their own cycles. Triage: an internal triage.
 
 ## [2.4.102] — 2026-07-03
 
@@ -1938,11 +1938,11 @@ Wired into channel 1 (`normalize_text`, W0j after W0d) AND channel 3 (`render_pd
 
 **Also fixed (pre-existing, leave-nothing-behind).** The independent-stat guard now runs for **every** bracket kind, not only labeled ones. A tight-spaced prose variant `M = 5.37, SD = 2.01, t(1827)=1.83, d = 0.09 [-1.86, 0.04]` is only 25 chars from `2.01` to the bracket — within the cap — so the gap check alone let `SD = 2.01` wrongly recover to `-.01`; the CI is `d`'s and `t`/`d` intervene, so it is now rejected.
 
-**Verification** (ground truth = AI multimodal read of the source PDF via article-finder `reading` golds, **never** pdftotext / Camelot). efendic rendered with Camelot ON: 27 corrupt B-cells → 0; genuine `2.56` preserved; the recovery is idempotent (the render post-process applies W0d, so a second pass is a no-op). Independent Sonnet AI-gold re-verify: A1 resolved, all B-column values in Tables 2–5 exact vs gold, **0 new regressions**. Full minus-recovery suite 22 pass (incl. 6 new — multiline-HTML-row recovery, genuine-positive-preserved, prose-strict-gap, independent-stat-across guard); adversarial over-recovery battery all pass; broad normalize/render/sections/heading suite **557 pass**; table flatten 39 pass; RC-T degenerate-table (Camelot) 8 pass; a deterministic `DISABLE_CAMELOT` body-text render diff of 8 corpus papers = **0 changed** (the change is surgical — only the Camelot HTML-table branch + the specific prose FP pattern are affected). Known remaining efendic defects are queued as their own cycles and are NOT touched by this fix: `×`-as-`3` in interaction-term names (no handler yet), SE-column spurious minus, mid-Introduction affiliation leak. Triage: `docs/TRIAGE_2026-07-03_head_v2.4.101_assessment.md`.
+**Verification** (ground truth = AI multimodal read of the source PDF via article-finder `reading` golds, **never** pdftotext / Camelot). efendic rendered with Camelot ON: 27 corrupt B-cells → 0; genuine `2.56` preserved; the recovery is idempotent (the render post-process applies W0d, so a second pass is a no-op). Independent Sonnet AI-gold re-verify: A1 resolved, all B-column values in Tables 2–5 exact vs gold, **0 new regressions**. Full minus-recovery suite 22 pass (incl. 6 new — multiline-HTML-row recovery, genuine-positive-preserved, prose-strict-gap, independent-stat-across guard); adversarial over-recovery battery all pass; broad normalize/render/sections/heading suite **557 pass**; table flatten 39 pass; RC-T degenerate-table (Camelot) 8 pass; a deterministic `DISABLE_CAMELOT` body-text render diff of 8 corpus papers = **0 changed** (the change is surgical — only the Camelot HTML-table branch + the specific prose FP pattern are affected). Known remaining efendic defects are queued as their own cycles and are NOT touched by this fix: `×`-as-`3` in interaction-term names (no handler yet), SE-column spurious minus, mid-Introduction affiliation leak. Triage: an internal triage.
 
 ## [2.4.101] — 2026-07-02
 
-**Concurrent-session reconciliation: six in-flight table-extraction fixes landed onto ONE verified release.** `TABLE_EXTRACTION_VERSION` → `2.4.7`, `NORMALIZATION_VERSION` → `1.9.36`. Roughly five overlapping Claude Code sessions had left the working tree and six sibling branches tangled around the region-driven table-capture path (see `docs/superpowers/handoffs/HANDOFF_2026-07-01_reconcile_concurrent_table_*.md`). This release serializes them onto the committed **v2.4.100 greedy `_find_caption_for_table` + `_rescue_duplicate_starved_captions`** base.
+**Concurrent-session reconciliation: six in-flight table-extraction fixes landed onto ONE verified release.** `TABLE_EXTRACTION_VERSION` → `2.4.7`, `NORMALIZATION_VERSION` → `1.9.36`. Roughly five overlapping Claude Code sessions had left the working tree and six sibling branches tangled around the region-driven table-capture path (see an internal handoff). This release serializes them onto the committed **v2.4.100 greedy `_find_caption_for_table` + `_rescue_duplicate_starved_captions`** base.
 
 **Pairing architecture decision — the global-assignment refactor was REJECTED.** One session had replaced greedy pairing with an order-independent global max-token-overlap assignment (`_assign_tables_to_captions_global` / `_best_assignment_for_page`). It was empirically confirmed to **regress `test_chan_feldman_t6_prose_not_in_any_table`** (a degenerate prose grid promoted into a table) and, per the v2.4.100 record, reshuffles ~24 papers — the same net-harmful class of change the 2026-06-25 triage and memory `project_docpluck_region_driven_camelot` already recorded. Greedy + narrow rescue is kept; the good ideas from the refactor (bare-digit token exclusion) were ported onto it.
 
@@ -1982,7 +1982,7 @@ Verification (ground truth = AI multimodal `reading`/`stats` golds via article-f
 
 ## [2.4.98] — 2026-06-25
 
-**ESCIcheck handoff defects (DOCPLUCK_HANDOFF_2026-06-25): η²p effect-typing, inline correlation r-typing, and bracketed-CI continuation merge — flatten/cell-cleaning only, AI-gold-verified.** `TABLE_EXTRACTION_VERSION` → `2.4.4`. Render-visible in the inline flattened-table blocks + `.tables.jsonl` sidecar `fields`. **No capture-path change** — caption→table pairing is byte-identical to v2.4.3. Grounded against the AI `reading`/`stats` golds (article-finder), not pdftotext, and confirmed by a 6-paper AI-gold canary verify. Triage: `docs/TRIAGE_2026-06-25_escicheck_handoff_defects.md`.
+**ESCIcheck handoff defects (an internal handoff): η²p effect-typing, inline correlation r-typing, and bracketed-CI continuation merge — flatten/cell-cleaning only, AI-gold-verified.** `TABLE_EXTRACTION_VERSION` → `2.4.4`. Render-visible in the inline flattened-table blocks + `.tables.jsonl` sidecar `fields`. **No capture-path change** — caption→table pairing is byte-identical to v2.4.3. Grounded against the AI `reading`/`stats` golds (article-finder), not pdftotext, and confirmed by a 6-paper AI-gold canary verify. Triage: an internal triage.
 
 - **DP-3 (table side) — type a font-dropped partial-η² effect column.** Many APA ANOVA tables report effect size as `η²p`, but the glyph lives in a font with no ToUnicode mapping (`pdffonts`: `uni:no`), so pdftotext AND pdfplumber both decode it as a space — the effect-size column header is blank and no "eta"/"η" token survives anywhere, so `tables.flatten._effect_key` fell back to the generic `est` key and the consumer got a nameless number. `flatten._infer_anova_eta2_hint` now types an unlabeled estimate column as `eta2` when the table is structurally an F-test/ANOVA results table (carries an `F` column + a `BF01` and/or CI column) and names NO competing effect (`d`/`dz`/`r`/`OR`/`g`); the value is range-guarded to η²'s domain `[0, 1]`. Keyed on the structural signature, never paper identity. `collabra.90203` Tables 8 & 9 now emit `eta2` matching the gold's `η²p` column (`.06, .00, .01, .04, …`). **The text-channel η²p (in body prose) is unrecoverable — OCR-tier won't-fix** (glyph identity absent from the PDF), as is DP-6 figure-inset text.
 
@@ -2009,7 +2009,7 @@ Verification: `tests/test_whitespace_char_fallback.py` (5 cases incl. real-PDF i
 
 ## [2.4.97] — 2026-06-22
 
-**Three table fixes shipped together (combined from two concurrent sessions): type the skipped p+df columns (DP-2), stop dropping / mis-binding two-header-row tables (DP-5), and stop the table raw_text fallback swallowing body prose (RC-T Layer-2).** `TABLE_EXTRACTION_VERSION` → `2.4.2`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change. DP-2/DP-5 are render-visible in the inline flattened-table blocks + the `.tables.jsonl` sidecar `fields` (the `<table>` HTML gains the previously-dropped data rows); RC-T Layer-2 is render-visible in the `unstructured-table` fallback blocks. DP-2/DP-5 filed in `ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-06-21.md`; RC-T Layer-2 per `docs/superpowers/specs/2026-06-21-rc-t-table-region-prose-contamination.md`.
+**Three table fixes shipped together (combined from two concurrent sessions): type the skipped p+df columns (DP-2), stop dropping / mis-binding two-header-row tables (DP-5), and stop the table raw_text fallback swallowing body prose (RC-T Layer-2).** `TABLE_EXTRACTION_VERSION` → `2.4.2`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change. DP-2/DP-5 are render-visible in the inline flattened-table blocks + the `.tables.jsonl` sidecar `fields` (the `<table>` HTML gains the previously-dropped data rows); RC-T Layer-2 is render-visible in the `unstructured-table` fallback blocks. DP-2/DP-5 filed in an internal handoff; RC-T Layer-2 per `docs/superpowers/specs/2026-06-21-rc-t-table-region-prose-contamination.md`.
 
 - **DP-2 — type the unlabeled p and df columns.** `tables.flatten._recover_blank_roles` recovered the leading test statistic and the `d [CI]` column of a header-stripped result table but left the bare p-value and df columns between them untyped, so `collabra.77859` Table 3 emitted `fields: {group, t, d, CI}` and dropped the `p` (`.551`) and `df` (`260.54`). A new Pass 4.5 types a still-blank column that is a bare `.XXX` with no comparison op as `p`, and a bare integer / Welch-decimal sitting between the test statistic and its `est/CI` column as `df` — keyed on data shape + position relative to the already-recovered roles, never bare position. The four Table-3 rows now carry `p` and `df`.
 
@@ -2019,7 +2019,7 @@ Verification: `tests/test_whitespace_char_fallback.py` (5 cases incl. real-PDF i
 
 Verification: new real-PDF + contract regression tests (`tests/test_tables_superheader_alignment_real_pdf.py`) — collabra.90203 T10 six-conditions/correct-arms + xiao T4 not-swapped (each FAILS at HEAD, PASSES after), plus `_is_header_like_row` / `_detect_column_groups` contract cases; `tests/test_tables_flatten_blank_header_recovery.py` extended for DP-2. A full-corpus (101-PDF) cached-table flatten diff confirms no clean-table regression — every changed table is a recovered row, a correct arm split, a recovered field, or a removed stat-less spurious row; already-garbage tables shuffle without a clean table regressing. Broad pytest green (real-PDF Camelot tests run serially per file — non-deterministic under cumulative load). RC-T Layer-2 adds `tests/test_rc_t_layer2_raw_text_real_pdf.py` (6 contract + 4 real-PDF: chan T1 Note-anchor, T9 suppress-no-duplication, T3 preserved) and an independent full-corpus 101-PDF guard-live-vs-bypassed raw_text diff (`grew=0 changed=0`; 4 trims + 8 prose-suppressions only). A 7-canary Sonnet AI-gold verify confirms every table this release touched is correct (chan T1/T3/T9, maier T10 six-conditions, xiao T4 arms) with no new TEXT-LOSS / HALLUCINATION.
 
-**Deferred (pre-existing, user decision 2026-06-22):** the remaining canary AI-verify FAILs are the architectural backlog, NOT regressions from this release — RC-T **Layer-1** table-data recovery (`table_areas`; e.g. plos_med Table 5's SAE rows, chan_feldman / chandrashekar under-extraction) and RC-1 two-column / sidebar column-interleave. Tracked in `docs/TRIAGE_2026-06-21_head_v2.4.95_assessment.md`; intentionally not addressed here.
+**Deferred (pre-existing, user decision 2026-06-22):** the remaining canary AI-verify FAILs are the architectural backlog, NOT regressions from this release — RC-T **Layer-1** table-data recovery (`table_areas`; e.g. plos_med Table 5's SAE rows, chan_feldman / chandrashekar under-extraction) and RC-1 two-column / sidebar column-interleave. Tracked in an internal triage; intentionally not addressed here.
 
 ## [2.4.96] — 2026-06-21
 
@@ -2035,7 +2035,7 @@ Verification: 8 new real-PDF regression tests (`tests/test_rc_t_degenerate_table
 
 ## [2.4.95] — 2026-06-20
 
-**Flatten now populates `fields` for non-clinical result tables (REQUEST_11).** `TABLE_EXTRACTION_VERSION` → `2.4.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change. v2.4.94 solved the clinical PROSECCO table (labelled headers); this closes the two reproducers whose `fields` still came back `{}` — header-stripped result tables and tables packing parallel arms into single cells.
+**Flatten now populates `fields` for non-clinical result tables (a consumer request).** `TABLE_EXTRACTION_VERSION` → `2.4.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change. v2.4.94 solved the clinical PROSECCO table (labelled headers); this closes the two reproducers whose `fields` still came back `{}` — header-stripped result tables and tables packing parallel arms into single cells.
 
 Grounded in `10.1525/collabra.77859` (Tables 3, 5) and `10.1525/collabra.90203` (Tables 8, 9, 10), both AI-gold-verified. Two cycles, each gated on a structural signature so ordinary tables stay byte-identical:
 
@@ -2047,7 +2047,7 @@ Two **general L-004 fixes** landed with Cycle B (Camelot cells are not run throu
 - `_parse_number` and `_parse_ci_cell` now fold U+2212 MINUS → ASCII hyphen, so a negative `t`/`d`/CI lower-bound is no longer dropped (number regex) or sign-flipped (`.search` skipping the non-ASCII sign). This surfaced real negative t-statistics that were previously dropped (e.g. `ip_feldman` Table 6 one-sample t-tests) — verbatim, header-typed, no fabrication.
 - `_VALUE_GROUP_RE` splits bracket-led CI groups (`"[−0.48, 0.15] [−0.20, 0.34]"`) so a packed CI column maps one interval per arm.
 
-Acceptance (consumer REQUEST_11 §3): #1 Table 5 + Table 3 arms ✓; #2 Tables 8/9/10 `F/p/eta²p/CI/BF01` + `r/n/CI/p` ✓; #3 sign-correct CIs + packed cells split ✓; #4 default call byte-identical + PROSECCO unchanged ✓ (verified by full before/after corpus diff: canary structural renders byte-identical, PROSECCO 6 stat rows untouched). `fields.effect_type` (§2.4, explicitly "not a blocker") is deferred — adding it would change PROSECCO's fields, conflicting with #4; available as an opt-in if wanted.
+Acceptance (consumer a consumer request §3): #1 Table 5 + Table 3 arms ✓; #2 Tables 8/9/10 `F/p/eta²p/CI/BF01` + `r/n/CI/p` ✓; #3 sign-correct CIs + packed cells split ✓; #4 default call byte-identical + PROSECCO unchanged ✓ (verified by full before/after corpus diff: canary structural renders byte-identical, PROSECCO 6 stat rows untouched). `fields.effect_type` (§2.4, explicitly "not a blocker") is deferred — adding it would change PROSECCO's fields, conflicting with #4; available as an opt-in if wanted.
 
 Two honest caveats surfaced (neither a flatten defect): (1) `collabra.90203` Table 10 "Joint/No-explicit" `r` reads `.59` in the PDF **text layer** (pdftotext and Camelot agree) vs `.63` in the AI-visual gold — a text-layer corruption, undetectable without OCR. (2) the `collabra.77859` Attractive/Affect table is labelled "Table 3" by docpluck (its caption) and the consumer, but "Table 2" by the AI gold — a pre-existing caption-number binding question, values all correct.
 
@@ -2055,7 +2055,7 @@ Verification: 16 new flatten tests (packed-arm split, value-group splitter, sing
 
 ## [2.4.94] — 2026-06-19
 
-**Cross-flavor lattice-augmentation — recover table rows a lattice extraction vertically truncated (REQUEST_10 Tier-2).** `TABLE_EXTRACTION_VERSION` → `2.3.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
+**Cross-flavor lattice-augmentation — recover table rows a lattice extraction vertically truncated (a consumer request).** `TABLE_EXTRACTION_VERSION` → `2.3.0`; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` change.
 
 Grounded in PROSECCO Table 2 (`10.1371/journal.pmed.1004323`). **Root cause (corrected after investigation):** the rows were not dropped by Camelot or by orphaned labels (the original Tier-2 hypothesis). Camelot **stream** captures the whole table but loses the column-header text and vertically splits each value from its `(percentage)`/CI-tail; Camelot **lattice** has clean headers but only the rows inside the ruled box (1 of 3 data rows); and `_pick_best_per_page` let lattice win the page, discarding the fuller stream table. So `flatten` (fixed in v2.4.93) never saw R2/R3/R5/R6.
 
@@ -2064,13 +2064,13 @@ Two general fixes, each gated on a structural signature:
 1. **Cross-flavor row augmentation** (`docpluck/tables/camelot_extract.py::_augment_lattice_with_stream_rows`): when a page is lattice-owned but a same-page **stream** table has the **same column count**, **overlaps** the lattice bbox, and **extends below** it, the stream rows whose vertical centre falls below the lattice bbox (the rows lattice missed) are appended onto the lattice frame. Result: lattice's clean headers + every data row. Gated hard so a table lattice captured in full — or an unrelated stream table — is never touched (the `jama_open_1` lattice-preference path is unaffected: it only runs for lattice-owned pages, and there lattice had only sub-2×2 artifacts).
 2. **Numeric/parenthetical continuation merge** (`docpluck/tables/cell_cleaning.py::_merge_continuation_rows`): rejoin a row whose every non-empty cell is a *fragment* (opens with `(` like `(87.8%)`, or a bare close-paren tail like `8.34)`) into the parent's same-column cells, when every fragment column is already populated in the parent. Joins inline (no space when the parent ends mid-token at a dash/open-paren) so `86` + `(87.8%)` → `86 (87.8%)` and `-1.01% (-10.36-` + `8.34)` → `-1.01% (-10.36-8.34)`. General improvement for any stacked value/parenthetical table; previously only multi-word prose wraps merged.
 
-Outcome: PROSECCO Table 2 now flattens to all six gold arm-records, sign-correct — R1 ITT −1.01% 95% CI [−10.36, 8.34] p=.09; R4 PP 0.06% [−9.53, 9.65] p=.06; R2 ITT adj. −1.83% [−11.2, 7.5]; R5 PP adj. 0.82% [−8.63, 10.28]; R3 ITT remnant 7.7 [−3.2, 18.5] p=.15; R6 PP remnant 8.4 [−3.1, 19.9] p=.14 — plus the table's size-distribution sub-rows as label-only rows. Closes REQUEST_10 acceptance #1.
+Outcome: PROSECCO Table 2 now flattens to all six gold arm-records, sign-correct — R1 ITT −1.01% 95% CI [−10.36, 8.34] p=.09; R4 PP 0.06% [−9.53, 9.65] p=.06; R2 ITT adj. −1.83% [−11.2, 7.5]; R5 PP adj. 0.82% [−8.63, 10.28]; R3 ITT remnant 7.7 [−3.2, 18.5] p=.15; R6 PP remnant 8.4 [−3.1, 19.9] p=.14 — plus the table's size-distribution sub-rows as label-only rows. Closes a consumer request acceptance #1.
 
 Verification: 9 new unit tests (5 augmentation + 4 continuation) + full library suite green, **zero regressions**; table-focused suites (flatten/cell-cleaning/table-detect) unchanged. (A residual `≤`-glyph corruption in PROSECCO's size-bin labels is a pre-existing pdftotext cell-glyph issue in non-statistical count rows, unrelated to this fix.)
 
 ## [2.4.93] — 2026-06-18
 
-**Table-flatten quality: combined estimate-and-CI columns, dash-sign CI disambiguation, and parallel-group (ITT/PP) rows.** Library `docpluck/tables/flatten.py` only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` / `TABLE_EXTRACTION_VERSION` change. Enables the HTTP exposure of the flattener over the hosted `/api/extract` (ESCImate `REQUEST_10_TABLE_FLATTEN_HTTP_EXPOSURE.md`, closing `REQUESTS_FROM_ESCIMATE.md` Request 4 — see `REPLY_FROM_DOCPLUCK_v2.4.93.md`).
+**Table-flatten quality: combined estimate-and-CI columns, dash-sign CI disambiguation, and parallel-group (ITT/PP) rows.** Library `docpluck/tables/flatten.py` only; no `NORMALIZATION_VERSION` / `SECTIONING_VERSION` / `TABLE_EXTRACTION_VERSION` change. Enables the HTTP exposure of the flattener over the hosted `/api/extract` (ESCImate a consumer request, closing consumer requests Request 4 — see our reply to the consumer).
 
 Grounded in the PROSECCO trial Table 2 (`10.1371/journal.pmed.1004323`). Three general fixes, each keyed on a STRUCTURAL SIGNATURE, never paper identity:
 
@@ -2080,7 +2080,7 @@ Grounded in the PROSECCO trial Table 2 (`10.1371/journal.pmed.1004323`). Three g
 
 New (additive, non-breaking) `FlattenedRow.fields` keys: `est` and `group`.
 
-Verification: 35 flatten unit tests (16 new) pass; existing 19 unchanged; cell-cleaning + table-detect suites green. On PROSECCO Table 2 the captured "Resection complete" row now flattens into two sign-correct arm records (ITT risk diff -1.01% 95% CI [-10.36, 8.34] p = 0.09; PP risk diff 0.06% 95% CI [-9.53, 9.65] p = 0.06). **Known limitation (queued, not fixed here):** Camelot captures only the first of Table 2's three conceptual data rows — the "adjusted" / "remnant" rows have orphaned labels and are dropped at the table-*extraction* layer, so gold rows R2/R3/R5/R6 remain unreachable until a separate orphaned-label row-recovery lands. Tracked in `LESSONS.md` (Tier-2) and `REPLY_FROM_DOCPLUCK_v2.4.93.md`.
+Verification: 35 flatten unit tests (16 new) pass; existing 19 unchanged; cell-cleaning + table-detect suites green. On PROSECCO Table 2 the captured "Resection complete" row now flattens into two sign-correct arm records (ITT risk diff -1.01% 95% CI [-10.36, 8.34] p = 0.09; PP risk diff 0.06% 95% CI [-9.53, 9.65] p = 0.06). **Known limitation (queued, not fixed here):** Camelot captures only the first of Table 2's three conceptual data rows — the "adjusted" / "remnant" rows have orphaned labels and are dropped at the table-*extraction* layer, so gold rows R2/R3/R5/R6 remain unreachable until a separate orphaned-label row-recovery lands. Tracked in `LESSONS.md` (Tier-2) and our reply to the consumer.
 
 ## [2.4.92] — 2026-06-18
 
@@ -2140,7 +2140,7 @@ Surfaced by `/docpluck-qa` (corpus render verifier, tag H) while validating v2.4
 
 **F0 sources the body from the text channel — strip header/footer/footnote lines from pdftotext, never rebuild the body from spans.** `NORMALIZATION_VERSION` 1.9.33 → 1.9.34.
 
-Follow-up #1 from `docs/HANDOFF_2026-06-13_sciencearena_grobid_liteparse.md` — the deeper, L-001-preferred fix for the residual the v2.4.86 word-gluing patch left behind.
+Follow-up #1 from an internal handoff — the deeper, L-001-preferred fix for the residual the v2.4.86 word-gluing patch left behind.
 
 **Root cause (architectural).** When `layout=` is supplied, the F0 step (`_f0_strip_running_and_footnotes`) was **rebuilding the entire body from `TextSpan.text`** and discarding the pdftotext `raw_text` the caller passed in (used only to locate footnote offsets). That rebuild-from-spans is what made *both* the v2.4.86 word-gluing (pdfplumber's char stream drops the inter-word space glyph) and the residual two-column interleaving (`_chars_to_spans` groups chars by y-coordinate only, so left+right columns at the same y merge into one span — e.g. `how www.cambridge.org/cns we can pay for it`) possible. It violates the documented text-channel/layout-channel split (CLAUDE.md, LESSONS L-001/L-007): the body must come from `extract_pdf` (pdftotext, which already infers spaces from the x-gap *and* serialises columns in reading order), and the layout channel should be used only to *identify* which lines are running headers/footers/footnotes.
 
@@ -2154,7 +2154,7 @@ New regression tests in `tests/test_normalize_f0_footnote_strip.py`: the F0 body
 
 **F0 layout body channel — reinsert inter-word spaces from the x-gap (stop gluing words on tight-kerned PDFs).** `NORMALIZATION_VERSION` 1.9.32 → 1.9.33.
 
-Surfaced by `docs/HANDOFF_2026-06-13_sciencearena_grobid_liteparse.md` (ScienceArena pdf-text-fidelity-v1 held-out PMC corpus): on ~16 of 30 real biomedical PDFs docpluck's `normalize_text(..., layout=...)` body scored token-F1 **≈ 0.00** against the JATS gold while raw pdftotext scored 0.7–0.9 — *with a normal character count*. Same characters, zero token overlap: the words were glued (`CNSSpectrums`, `Thebehavioralhealthcarecontinuuminthe`, `UnitedStates`).
+Surfaced by an internal handoff (ScienceArena pdf-text-fidelity-v1 held-out PMC corpus): on ~16 of 30 real biomedical PDFs docpluck's `normalize_text(..., layout=...)` body scored token-F1 **≈ 0.00** against the JATS gold while raw pdftotext scored 0.7–0.9 — *with a normal character count*. Same characters, zero token overlap: the words were glued (`CNSSpectrums`, `Thebehavioralhealthcarecontinuuminthe`, `UnitedStates`).
 
 **Root cause.** When `layout=` is supplied, the F0 step (`_f0_strip_running_and_footnotes`) rebuilds the body from `TextSpan.text`. Span text was built in `extract_layout._chars_to_spans` by `"".join(c["text"] for c in line)` — a naive character concatenation with **no x-gap handling** (the function's own docstring claimed x-gap splitting that was never implemented). pdfplumber's `chars` stream omits the inter-word space glyph on tight-kerned PDFs (Cambridge journals, many two-column layouts) — pdftotext infers those spaces from the horizontal gap, but the raw char stream does not carry them. So on those PDFs the entire layout body collapsed to space-ratio ~0.005 (vs ~0.13 for the same text via pdftotext), and any consumer using the layout body channel (the recommended body-fidelity path since v2.4.83) silently emitted unspaced text. This is the long-standing `feedback_pdfplumber_extract_words_unreliable` failure mode — "always carry a char-level absolute-x-gap fallback" — which had never been applied to span text.
 
@@ -2166,7 +2166,7 @@ New regression tests in `tests/test_extract_layout.py`: x-gap space insertion on
 
 **Harvard name-year reference splitting (D1) + page-break reference stitch & category-label running-header strip (D2).** `NORMALIZATION_VERSION` 1.9.31 → 1.9.32.
 
-Surfaced by `CitationGuard/docs/DOCPLUCK_HANDOFF_2026-06-12.md`.
+Surfaced by an internal handoff.
 
 **D1 — HIGH IMPACT — Harvard / Cambridge bibliographies collapsed into one paragraph.** R3 (the references-span continuation join) keeps each reference on its own logical line by breaking whenever a line *looks like a reference start*. That detection (`_looks_like_ref_start`) recognised Vancouver (`12. Surname`), IEEE (`[12] Surname`), and APA (`Surname, A.` — note the comma after the surname) — but **not** the Harvard / Cambridge name-year form `Surname A and Surname B (2020) …`, which has *no* comma between surname and initials. So on `bjps_1` (British Journal of Political Science, 109 entries) R3 treated every entry boundary as a mid-entry wrap and joined the **entire** reference section onto a single line. Downstream this made the consumer (citelink) parse 9 of 109 references (refs.f1 0.051).
 
@@ -2187,7 +2187,7 @@ New regression tests in `tests/test_harvard_refs_pagebreak_stitch.py`: Harvard r
 
 **R2 page-number scrub — general quantifier-head guard (stop deleting digits from reference titles).** `NORMALIZATION_VERSION` 1.9.30 → 1.9.31.
 
-Surfaced by `CitationGuard/docs/DOCPLUCK_HANDOFF_2026-06-10.md` (item 4): the `plos_med_1` reference "Clinimetric properties of **3** instruments measuring postoperative recovery…" rendered as "…properties of instruments measuring…" — the standalone "3" was silently deleted. Same class as the earlier Mayiwar "3"-drop. Root cause: R2 (the references-span page-number scrub) strips any digit whose value also appears as a standalone page-number line, when it sits between two lowercase words. "3" is page 3 of the PDF, so the legitimate quantifier "3 instruments" was stripped. The v2.4.17 body-noun allowlist (`years|participants|…`) is necessarily incomplete and never enumerated "instruments" — adding nouns one at a time is whack-a-mole.
+Surfaced by an internal handoff (item 4): the `plos_med_1` reference "Clinimetric properties of **3** instruments measuring postoperative recovery…" rendered as "…properties of instruments measuring…" — the standalone "3" was silently deleted. Same class as the earlier Mayiwar "3"-drop. Root cause: R2 (the references-span page-number scrub) strips any digit whose value also appears as a standalone page-number line, when it sits between two lowercase words. "3" is page 3 of the PDF, so the legitimate quantifier "3 instruments" was stripped. The v2.4.17 body-noun allowlist (`years|participants|…`) is necessarily incomplete and never enumerated "instruments" — adding nouns one at a time is whack-a-mole.
 
 The fix keys on a **closed class** instead: a genuine page-number leak ("psychological **41** science", "recovery **12** in a population") follows a *content* word, whereas a legitimate quantifier ("of **3** instruments", "the **5** factors", "and **3** in Vastfall") follows a *function* word (article / preposition / determiner — a finite closed set). `_r2_is_body_phrase` now also preserves a digit when the immediately-preceding token is in `_R2_QUANTIFIER_HEAD_WORDS`. The guard is purely **additive** — it only ever *preserves* a digit, never strips one — so it cannot make R2 delete anything it didn't already, honoring the correctness asymmetry (silently dropping a digit from a reference title, rule 0a, is far worse than leaving a stray page number). The body-noun list also gained the obvious research-countable nouns (`instruments|measures|scales|factors|experiments|datasets|tasks|…`) as belt-and-suspenders.
 
@@ -2250,7 +2250,7 @@ Both shapes are tight typographic signatures and are additionally gated by the e
 
 New regression tests: `tests/test_p0r_recurring_running_header_strip.py` (running-header shapes — contract positives + reference/body negatives, detection ≥3×, real-PDF on `j.jesp.2021.104154` Elsevier + `s41467-023-42320-4` Nature); `tests/test_normalize_metadata_leak_real_pdf.py` (corresponding-author — lowercase + shared-first-author contract, body-sentence negative, real-PDF on `collabra.37122`). New-paper fixtures resolve via the article-finder cache (I9-compliant, skip-if-missing). Gated against the 26-paper corpus baseline.
 
-Triage for the full sweep (incl. the dominant column-interleave architectural finding, RC-1) is in `docs/TRIAGE_2026-06-08_untested_corpus_sweep.md`.
+Triage for the full sweep (incl. the dominant column-interleave architectural finding, RC-1) is in an internal triage.
 
 ## [2.4.80] — 2026-06-07
 
@@ -2306,7 +2306,7 @@ Verification: `test_ip_feldman_top_of_doc_cleaned_real_pdf` PASS in isolation an
 
 ## [2.4.76] — 2026-05-25
 
-**§A R4 column-aware re-extraction LANDED — closes jama-open-1 D4 (Key Points sidebar missing).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25 (concurrent with EC-T1's bump). Closes the final defect of the 2026-05-25 Haiku-orchestration pretest jama-open-1 cluster (HANDOFF_2026-05-25_pretest-followups.md Issue 1 — 5 of 5 defects now closed).
+**§A R4 column-aware re-extraction LANDED — closes jama-open-1 D4 (Key Points sidebar missing).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25 (concurrent with EC-T1's bump). Closes the final defect of the 2026-05-25 Haiku-orchestration pretest jama-open-1 cluster (an internal handoff).
 
 Two-pronged detector + per-page pdftotext-crop re-extraction:
 
@@ -2345,7 +2345,7 @@ Verified to preserve R4 firing on jama_open_1 (D4 Key Points sidebar closure unc
 
 **Known residuals (v2.4.77+ follow-ups):** column-boundary line truncation on wide titles; `CONCLUSIONS AND RELEVANCE` split across columns becomes two fragments; orphan `(contin` from `(continued)` page markers. Cosmetic — the structural defect (sidebar missing / abstract interleaved) is closed. Full fix needs column-element detection (figures/title/page-spanning banners get rendered FROM the original pdftotext output, not the crops).
 
-**EC-T1: table-row flattening for downstream stat-verification consumers.** `TABLE_EXTRACTION_VERSION` 2.1.5 → 2.2.0. Closes the largest cluster from the ESCIcheck handoffs ([2026-05-24](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-24.md), [2026-05-25](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md)) — ~78 effectcheck rows across 6 canary papers blocked on bare table cells.
+**EC-T1: table-row flattening for downstream stat-verification consumers.** `TABLE_EXTRACTION_VERSION` 2.1.5 → 2.2.0. Closes the largest cluster from the ESCIcheck handoffs (2026-05-24, 2026-05-25) — ~78 effectcheck rows across 6 canary papers blocked on bare table cells.
 
 **New module: [`docpluck.tables.flatten`](docpluck/tables/flatten.py)**
 
@@ -2375,7 +2375,7 @@ Outstanding from the same handoffs:
 
 ## [2.4.75] — 2026-05-25
 
-**EC-T3: CI bracket middle-period → comma (ESCIcheck 2026-05-24 D2).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25. Closes one of the three defect clusters filed by escicheck-iterate against docpluck ([handoff](../ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-25.md), [triage EC-T3](docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md)).
+**EC-T3: CI bracket middle-period → comma (ESCIcheck 2026-05-24 D2).** `NORMALIZATION_VERSION` 1.9.24 → 1.9.25. Closes one of the three defect clusters filed by escicheck-iterate against docpluck (handoff, triage EC-T3).
 
 - **A4a CI period→comma** (`docpluck/normalize.py`, A4 block)
   - New sub-rule at the top of A4: `\[(\d+\.\d+)\s*\.\s*(\d+\.\d+)\]` → `[\1, \2]` (and analogous for parens). Each side must be `\d+\.\d+` (digits-dot-digits), which blocks false-positives on section refs like `[1.2.3]` (trailing token has no decimal).
@@ -2389,7 +2389,7 @@ Outstanding from the same handoff (queued in triage, not addressed in this relea
 
 ## [2.4.74] — 2026-05-25
 
-**jama-open-1 cluster (4 of 5 defects) + R1-perf threading + R3b widening.** `NORMALIZATION_VERSION` 1.9.23 → 1.9.24. Closes 4 of the 5 defects surfaced by the 2026-05-25 Haiku-orchestration pretest on `jama_open_1.pdf` ([handoff Issue 1](docs/HANDOFF_2026-05-25_pretest-followups.md)). Defect 4 (MISSING_SECTION / Key Points sidebar) is fundamentally a column-interleave problem (R4 territory) — left for the next cycle.
+**jama-open-1 cluster (4 of 5 defects) + R1-perf threading + R3b widening.** `NORMALIZATION_VERSION` 1.9.23 → 1.9.24. Closes 4 of the 5 defects surfaced by the 2026-05-25 Haiku-orchestration pretest on `jama_open_1.pdf` (handoff Issue 1). Defect 4 (MISSING_SECTION / Key Points sidebar) is fundamentally a column-interleave problem (R4 territory) — left for the next cycle.
 
 - **D1 RUNNING_HEADER_LEAK** (`docpluck/normalize.py`)
   - New `_WATERMARK_PATTERNS` entry: JAMA-style `Downloaded from <bare-domain> ... user on MM/DD/YYYY`. Previous pattern required `https?://` prefix + `DD Month YYYY` date — missed every JAMA Open paper.
@@ -2940,7 +2940,7 @@ Result on all 3 papers (verified by v2.4.32→v2.4.33 render diff — the *only*
 
 ## [2.4.32] — 2026-05-15
 
-**Cycle 15f-1 — table caption no longer absorbs linearized cell content (G4b).** The cycle-15f investigation of `docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md` G4 found that `extract_pdf_structured` table `caption` fields were 400 chars of linearized cell garbage (e.g. `amle_1` Table 1: `"Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 5 7 8 Yes Yes Yes ..."`). Root cause: `_extract_caption_text`'s paragraph-walk has no sentence terminator to stop at when a table title lacks a trailing period (common in AOM / management journals), so it walks straight through the pdftotext-linearized cell content until the 400-char hard cap.
+**Cycle 15f-1 — table caption no longer absorbs linearized cell content (G4b).** The cycle-15f investigation of an internal triage G4 found that `extract_pdf_structured` table `caption` fields were 400 chars of linearized cell garbage (e.g. `amle_1` Table 1: `"Table 1. Most Cited Sources in Organizational Behavior Textbooks Rank Academic Source Academic Rank 1 2 3 4 5 5 7 8 Yes Yes Yes ..."`). Root cause: `_extract_caption_text`'s paragraph-walk has no sentence terminator to stop at when a table title lacks a trailing period (common in AOM / management journals), so it walks straight through the pdftotext-linearized cell content until the 400-char hard cap.
 
 Fix in `docpluck/extract_structured.py` — new `_trim_table_caption_at_cell_region(region)`, applied for `cap.kind == "table"` before the snippet is flattened:
 - **Primary rule:** when the caption's first line already carries title text AND ends with a sentence terminator (`Table 6. Study 2 descriptive statistics.`), the title is complete — cut everything after it (trailing table notes belong in the `footnote` field, linearized cells are not caption text).
@@ -2981,7 +2981,7 @@ Side-fix: `tests/test_d5_normalization_audit.py::TestVersionBumps` updated to ac
 
 ## [2.4.29] — 2026-05-14
 
-**Source-glyph preservation in the render path** (Cycles 15a + 15b + 15c, bundled — all share root cause "rendered .md must preserve source PDF glyphs"). Established by the Phase-5d AI-gold audit (docs/TRIAGE_2026-05-14_phase_5d_gold_audit.md): the v2.4.28 render systematically transliterated Greek letters, math operators, superscripts/subscripts, comma-thousands separators, and decomposed combining-character names — silently corrupting meta-science content. The fix preserves all source glyphs in the rendered .md while keeping backward-compatible behavior for stat-extraction callers (D5 audit suite + downstream regex matching).
+**Source-glyph preservation in the render path** (Cycles 15a + 15b + 15c, bundled — all share root cause "rendered .md must preserve source PDF glyphs"). Established by the Phase-5d AI-gold audit (an internal triage): the v2.4.28 render systematically transliterated Greek letters, math operators, superscripts/subscripts, comma-thousands separators, and decomposed combining-character names — silently corrupting meta-science content. The fix preserves all source glyphs in the rendered .md while keeping backward-compatible behavior for stat-extraction callers (D5 audit suite + downstream regex matching).
 
 ### Cycle 15a — Greek letters + math operators + super/sub digits (G2/G7/G12/G21)
 
@@ -3018,7 +3018,7 @@ Added Unicode NFC normalization at the top of `normalize_text` plus a regex that
 
 Cycles 13 + 14 of the /docpluck-iterate resume run, bundled as one
 release (independent fixes, narrow blast radius). Closes
-HANDOFF_2026-05-14 deferred items D + G.
+an internal handoff deferred items D + G.
 
 ### Cycle 13 — amj_1 chart-data leak (item G, HIGH)
 
@@ -3085,8 +3085,7 @@ NORMALIZATION_VERSION bumped 1.8.8 → 1.8.9.
 
 ## [2.4.27] — 2026-05-14
 
-Cycle 12 of the /docpluck-iterate run (HANDOFF_2026-05-14 deferred
-item C). Table 6 of `xiao_2021_crsp.pdf` had spanning section-row
+Cycle 12 of the /docpluck-iterate run (an internal handoff). Table 6 of `xiao_2021_crsp.pdf` had spanning section-row
 labels (`Control (n = 339, 2 selected the decoy, 0.6%)`,
 `Regret-Salient (n = 331, ...)`) collapsed into the data cell above:
 
@@ -3127,8 +3126,7 @@ is treated as a spanning section-row label (and NOT merged) when:
 
 ## [2.4.26] — 2026-05-14
 
-Cycle 11 of the /docpluck-iterate run (HANDOFF_2026-05-14 deferred
-item B). The section detector in
+Cycle 11 of the /docpluck-iterate run (an internal handoff). The section detector in
 `docpluck/sections/annotators/text.py` Pass 3 rejects ALL-CAPS
 multi-word headings when pdftotext flattens paragraph breaks around
 them (no blank line before AND no blank line after). This breaks
@@ -3181,7 +3179,7 @@ Final fix: render-layer post-processor. Extended
 
 ## [2.4.25] — 2026-05-14
 
-Cycle 10 of the /docpluck-iterate run (resumed from HANDOFF_2026-05-14
+Cycle 10 of the /docpluck-iterate run (resumed from an internal handoff
 deferred item A). The handoff flagged "figure caption running-header
 trim incomplete" as the only ship-blocker — investigation revealed the
 v2.4.24 trim was added to `figures/detect.py::_full_caption_text`,
@@ -3902,7 +3900,7 @@ heuristic text-channel filter; a broad pattern but a separate change.
 ## [2.4.14] — 2026-05-13
 
 Table-rendering quality iteration after v2.4.13 restored Camelot on prod. Two
-defects from `docs/HANDOFF_2026-05-13_table_extraction_next_iteration.md` are
+defects from an internal handoff are
 addressed:
 
 ### Defect A — Isolated tables now appear inline in the Rendered view
@@ -4441,7 +4439,7 @@ Same-day follow-up to v2.4.0. Expanded testing to all 101 PDFs in the wider corp
 
 ## [2.4.0] — 2026-05-12
 
-Same-day follow-up. Closes the three real library bugs surfaced by the AI-Chrome visual verification pass on all 26 corpus papers documented in `docs/HANDOFF_2026-05-12_visual_verify_results.md`. The API-level `verify_corpus.py` was passing 26/26 throughout but couldn't see these — visual inspection in the workspace was needed.
+Same-day follow-up. Closes the three real library bugs surfaced by the AI-Chrome visual verification pass on all 26 corpus papers documented in an internal handoff. The API-level `verify_corpus.py` was passing 26/26 throughout but couldn't see these — visual inspection in the workspace was needed.
 
 ### Fixes
 
@@ -4470,7 +4468,7 @@ Same-day follow-up. Closes the three real library bugs surfaced by the AI-Chrome
 
 ## [2.3.1] — 2026-05-12
 
-Follow-up to v2.3.0. Closes the four remaining items from `docs/HANDOFF_2026-05-11_visual_review_findings.md` and wires the corpus verifier into the `/docpluck-qa` and `/docpluck-review` project skills so regressions get caught automatically.
+Follow-up to v2.3.0. Closes the four remaining items from an internal handoff and wires the corpus verifier into the `/docpluck-qa` and `/docpluck-review` project skills so regressions get caught automatically.
 
 ### Fixes
 
@@ -4508,7 +4506,7 @@ Follow-up to v2.3.0. Closes the four remaining items from `docs/HANDOFF_2026-05-
 
 ## [2.3.0] — 2026-05-11
 
-Ports the splice-spike's Section F (cell-cleaning) helpers into the library, per [`docs/HANDOFF_2026-05-11_visual_review_findings.md`](docs/HANDOFF_2026-05-11_visual_review_findings.md). v2.2.0 had explicitly deferred this; v2.3.0 lands it.
+Ports the splice-spike's Section F (cell-cleaning) helpers into the library, per an internal handoff. v2.2.0 had explicitly deferred this; v2.3.0 lands it.
 
 ### What's new
 
@@ -4545,7 +4543,7 @@ Ports the splice-spike's Section F (cell-cleaning) helpers into the library, per
 
 Spike: [`docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py) — Section F (lines 126–1013). Spike tests: [`test_splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/test_splice_spike.py).
 
-### Rendered-view bugs from `HANDOFF_2026-05-11_visual_review_findings.md` (status)
+### Rendered-view bugs from an internal handoff (status)
 
 - **Bug 1** (`<table>` not appearing in Rendered tab) — resolved by the v2.3.0 cleaning pipeline + the `_pick_best_per_page` lattice-artifact filter (item 6 below).
 - **Bug 2** (flattened table cells in body) — resolved as a consequence of Bug 1.
@@ -4659,7 +4657,7 @@ The spike's pdfplumber-internal table-cleaning helpers (`pdfplumber_table_to_mar
 
 ### Source
 
-Spike: [`docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py) — iter-23 through iter-34 (lines 2148–4165). Handoff plan: [`docs/HANDOFF_2026-05-11_PROMOTE_SPIKE_TO_LIBRARY.md`](docs/HANDOFF_2026-05-11_PROMOTE_SPIKE_TO_LIBRARY.md).
+Spike: [`docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py`](docs/superpowers/plans/spot-checks/splice-spike/splice_spike.py) — iter-23 through iter-34 (lines 2148–4165). Handoff plan: an internal handoff.
 
 ---
 
@@ -4967,7 +4965,7 @@ Corpus dry-run: 51 PDFs, 0 regressions, 46 changed.
 ### Added (MetaESCI D3/D5/D6/D7 follow-ups)
 
 Addresses the non-blocking items MetaESCI filed in
-`REQUESTS_FROM_METAESCI.md` ahead of the full 8,455-PDF batch. No
+consumer requests ahead of the full 8,455-PDF batch. No
 normalization semantics changed — `NORMALIZATION_VERSION` is still
 `"1.4.1"`, so outputs byte-identical against v1.4.1 except for the
 diagnostics changes below.
@@ -5025,7 +5023,7 @@ diagnostics changes below.
   exist as a single merged CSV in their `data/results/subset/` tree.
 - **D2** (one lost source per subset) — same.
 - **D4** (A4 CI harmonization regex audit) — read-only audit done; see
-  `REPLY_FROM_DOCPLUCK.md` for the preliminary hypothesis. No regex
+  our reply to the consumer for the preliminary hypothesis. No regex
   change until a real repro lands.
 
 ## [1.4.1] — 2026-04-11

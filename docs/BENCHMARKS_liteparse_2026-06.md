@@ -15,8 +15,8 @@ doesn't run. Conclusion up front:
 > and (c) liteparse's section score actually being a ScienceArena-authored regex that
 > overfits clean synthetic headings.
 
-Companion: `ScienceArena/HANDOFF_2026-06-12_sciencearena_accuracy.md` (the arena-side
-measurement fixes).
+The arena-side measurement fixes are recorded separately, in ScienceArena's own
+internal notes.
 
 ## What liteparse actually is (verified, not blog-derived)
 
