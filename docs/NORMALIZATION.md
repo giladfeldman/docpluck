@@ -239,6 +239,7 @@ documented here at summary level only.
 
 | Step | Purpose | Notes |
 |------|---------|-------|
+| C0 | Line-final BACKSPACE strip (furniture debris) | **v1.9.58.** Removes U+0008 where it stands at the END of a line — running-header debris pdftotext glues onto a real line (`10.3389/fvets.2025.1645266` p2 emits its header as form feed + `Abuna et al.` + BS). Runs **before F0** so the F0 comparison key (`_key`, which has discarded this character since v1.9.57) and the emitted text are ONE rule rather than two. **Deliberately one character wide:** over the 30-paper held-out PMC corpus all 33 U+0008 occurrences carry the identical context `'.'` + BS + newline and none carry the overstrike signature, while U+0002/03/04/07 in the same corpus are corrupted CONTENT glyphs (`Schri\x02macher` = "Schrittmacher") that deleting would destroy. Those are **counted**, not stripped — see `residual_control_chars` below. |
 | F0 | Layout-aware running-header / footer / footnote strip | Requires `LayoutDoc` from `extract_pdf_layout`; populates `report.footnote_spans` (raw char offsets) and `report.footnote_texts` (the captured footnote strings, parallel — v2.4.83). Stripped footnotes move to an appendix after a `\n\f\f\n` marker. Optional. |
 | H0 | Document-header banner-line strip | Runs only in the first 30 lines; curated `_HEADER_BANNER_PATTERNS`. v1.8.0. |
 | T0 | TOC dot-leader paragraph strip | Drops paragraphs containing `_{3,}` runs in the head zone (first ~100 lines). v1.8.0. |
@@ -246,7 +247,7 @@ documented here at summary level only.
 | P1 | Front-matter metadata-leak PARAGRAPH strip | **v2.4.16.** Drops orphan acknowledgments / license blocks / "previous version" notes / correspondence blocks that pdftotext inlines as standalone single-line paragraphs mid-Introduction. Position-gated to the first `max(8000, len(text)//6)` chars so the legitimate `## Acknowledgments` section at the end is preserved. |
 | W0 | Publisher-overlay watermark strip | "Downloaded from …", "Provided by …", "This article is protected by copyright", Royal Society OA footer, Elsevier copyright stamp, two-column running-header, equal-contribution footnote. v1.7.0–v2.3.1. |
 
-**Ordering:** F0 → H0 → T0 → P0 → P1 → W0 → S0 (unicode) → S1 …
+**Ordering:** C0 → F0 → H0 → T0 → P0 → P1 → W0 → S0 (unicode) → S1 …
 
 P1 runs AFTER P0 because P0 already handles single-line variants of the
 patterns P1 catches at paragraph level. The two are complementary:
@@ -497,6 +498,7 @@ extract_pdf()
     ↓
 normalize_text(text, NormalizationLevel.academic)
     ↓
+C0  Line-final BACKSPACE strip   ← pre-S0, before F0 (see the pre-S0 table)
 S0  SMP Mathematical Italic → ASCII
 S1  Encoding validation
 S2  Accent recombination
@@ -541,6 +543,26 @@ inference depended on.** A consumer running locale inference on our output was r
 had already converted. The inference, A2, A3, A3a, A3c, A3d and W0n are all gone, so the
 constraint no longer exists — and a consumer's own inference is now valid, because the separators
 it reads are the ones the paper printed.
+
+## Report field: `residual_control_chars` (new in v1.9.58)
+
+The count of C0 control characters **still present in the returned text** —
+i.e. the ones `C0` deliberately did NOT remove because they are corrupted
+*content* glyphs rather than furniture. Over the 30-paper held-out PMC corpus
+there are 49 such characters in 16 papers (`Schrimacher` = "Schrittmacher",
+`Noallsanitat` = "Notfall…", `A -B helices`).
+
+They are counted rather than deleted because docpluck **extracts and
+normalizes; it does not repair the paper** — and counted rather than left
+silent because a known limitation written down without a measurement is an
+unpaid debt, not a disclosure. A non-zero value is your signal that the text
+holds characters no downstream regex will match; recovering the underlying
+glyph is W0-family work that has not been done.
+
+The count describes the string it is returned **alongside**, on every code
+path including `NormalizationLevel.none`.
+
+---
 
 ## Report field: `numeric_locale` — DELETED (v2.4.129)
 

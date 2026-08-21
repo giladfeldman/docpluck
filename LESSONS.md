@@ -2233,3 +2233,58 @@ Two smaller things fell out of the same run, both worth keeping:
 **Detection:** for any change that deletes text, diff the FULL output of every
 corpus paper against a worktree of the last tag, list every removed line, and
 read them. If the list is too long to read, the change is too broad to ship.
+
+## L-055 — Cleaning a character in the key you COMPARE is not cleaning it in the string you SHIP
+
+**2026-08-21, `normalize.py` / `sections/annotators/text.py`, found by an external benchmark.**
+
+v1.9.57 (2026-08-20) diagnosed it correctly and fixed half of it. Its own comment says so:
+
+> pdftotext emits them inside real lines: PMC13137057's running header arrives as
+> `chr(12) + 'Frey et al.' + chr(8)` … **One stray BACKSPACE was enough to make the line unequal to
+> its layout-channel twin and so unstrippable.**
+
+The remedy was `_NONSPACE_CTRL_RE`, applied **inside `_key()`** — F0's comparison key. The
+character stayed in the emitted text. One day later, an unrelated rule in a different module landed
+on the same character: `_prior_paragraph_is_sentence_terminated` walks back over space/tab/newline
+and requires what it finds to be in `".!?/"`. On `10.3389/fvets.2025.1645266` the walk landed on the
+BACKSPACE, declared the previous paragraph unfinished, and discarded the heading
+`1 Introduction: …`. Because `partition_into_sections` fills every span to the *next* matched
+heading, `KEYWORDS` inherited **69,849 characters** — the entire article.
+
+**The rule.** When you decide a character is noise, decide it for the *output*, not only for the
+comparison. Every rule downstream is a second consumer of that character, and it will not have read
+your key function. If a character is not worth comparing on, say why it is still worth shipping.
+
+**Corollary — a `_key`-style normaliser is an inventory of what you already believe is noise.**
+Grep for one before writing a new strip; docpluck had the right character class for eleven months
+and applied it in exactly one place.
+
+## L-056 — Test the composition that ships, not each step on raw input
+
+**2026-08-21, same session, and it nearly shipped a false number into a CHANGELOG.**
+
+Having found L-055, the obvious probe was: take the normalized text, strip the control characters,
+re-run sectioning, re-score. It gave a clean, large answer — the body-label slice mean rose
+0.7681 → 0.7910 and the worst paper went 0.0761 → 0.7627. The number was written into the changelog.
+
+**The shipped pipeline does not do that.** C0 runs *before* H0, and once the BACKSPACE is gone H0
+can finally match the running-header line it was always meant to catch — and removes it. That
+leaves the **keyword list** adjacent to the heading, so the guard rejects on the `y` of
+"…stem cell therapy" instead of on the BACKSPACE, and the 69,849-character span survives untouched.
+The probe had stripped the character *after* H0 had already failed, so the header line was still
+standing and its terminating period rescued the guard. Same characters, same functions, different
+order, opposite result.
+
+**The rule.** A probe that applies your fix at a different point in the pipeline than the fix will
+occupy is measuring a different program. Run the real entry point end-to-end before you quote a
+number, and if you have already quoted it, mark it UNVERIFIED in place rather than leaving it to be
+read as measured.
+
+**What the real fix needed** was different evidence entirely: the heading carries a line-initial
+section number *and* a colon (`1 Introduction: <subtitle>`), both of them things the renderer
+actually emitted. And the discriminator had to be *both*, because the same paper carries
+`2 Literature search` two lines later — where `literature` resolves canonically to **references**,
+so a number-prefix-only escape would have opened a back-matter label in the middle of the article
+and handed the whole body to a DROP class. Measured blast radius of the shipped rule across 30
+papers: **it fires once**, and the near-miss is the only other candidate.

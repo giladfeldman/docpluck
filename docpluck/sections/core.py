@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .blocks import BlockHint
-from .boundaries import is_section_boundary
+# `is_section_boundary` is intentionally NOT imported: the boundary-truncation
+# pass it served was unreachable and was deleted 2026-08-21 (see the note in
+# `partition_into_sections`). The predicate itself is kept, tested, and unwired.
 from .taxonomy import (
     SectionLabel, Confidence, DetectedVia, lookup_canonical_label
 )
@@ -88,8 +90,13 @@ def partition_into_sections(
          offset 0, prepend an `unknown` span covering [0, first_marker).
       5. Coalesce ADJACENT spans with the same canonical label (skipped for
          `unknown` to preserve heading-derived span boundaries).
-      6. Boundary-aware truncation: scan each labeled span line-by-line
-         (skipping the heading line) and split at the first boundary line.
+      6. Attach unrecognized strong/markup hints to the span containing them
+         as `subheadings`, then run the two synthesis passes.
+
+    A seventh step — boundary-aware truncation — is described in the v1.6.0
+    spec and is NOT performed: it was disabled in v1.6.1 and its code was
+    unreachable from then until it was deleted on 2026-08-21. See the note at
+    its former site below.
     """
     markers: list[_Marker] = []
     unrecognized: list[BlockHint] = []
@@ -218,59 +225,27 @@ def partition_into_sections(
         else:
             coalesced.append(s)
 
-    # Boundary-aware truncation (spec §5.4): for each labeled span, scan its
-    # text line-by-line for a boundary pattern. Skip the first line of the
-    # span (the heading line) before scanning. If a boundary fires on any
-    # subsequent line, truncate the span at that line and emit a trailing
-    # `unknown` span covering the rest. Universal coverage is preserved.
+    # Boundary-aware truncation (spec §5.4) USED TO RUN HERE, and has been
+    # UNREACHABLE since v1.6.1.
     #
-    # v1.6.1: with strict canonical-only markers + clean normalized text, the
-    # boundary-aware truncation pass is no longer needed and is destructive on
-    # real APA papers (e.g., 'Corresponding Author:' inside Introduction would
-    # truncate intro at that line). Disabled by listing all canonical labels.
-    _NO_TRUNCATE = set(SectionLabel)
-    truncated: list[Section] = []
-    for s in coalesced:
-        if s.canonical_label in _NO_TRUNCATE:
-            truncated.append(s)
-            continue
-        offset = s.char_start
-        cut_at: int | None = None
-        for i, line in enumerate(s.text.splitlines(keepends=True)):
-            line_start = offset
-            offset += len(line)
-            # Skip the first line (it contains the heading itself).
-            if i == 0:
-                continue
-            if is_section_boundary(line):
-                cut_at = line_start
-                break
-        if cut_at is None:
-            truncated.append(s)
-            continue
-        # Emit truncated span + unknown tail.
-        truncated.append(Section(
-            label=s.label,
-            canonical_label=s.canonical_label,
-            text=s.text[: cut_at - s.char_start],
-            char_start=s.char_start,
-            char_end=cut_at,
-            pages=_pages_for(s.char_start, cut_at, page_offsets),
-            confidence=s.confidence,
-            detected_via=s.detected_via,
-            heading_text=s.heading_text,
-        ))
-        truncated.append(Section(
-            label="unknown",
-            canonical_label=SectionLabel.unknown,
-            text=s.text[cut_at - s.char_start:],
-            char_start=cut_at,
-            char_end=s.char_end,
-            pages=_pages_for(cut_at, s.char_end, page_offsets),
-            confidence=Confidence.low,
-            detected_via=DetectedVia.position_inferred,
-            heading_text=None,
-        ))
+    # The pass scanned each labelled span for a boundary line and split the span
+    # there. v1.6.1 disabled it — with strict canonical-only markers and clean
+    # normalized text it is destructive on real APA papers, where a
+    # 'Corresponding Author:' line inside the Introduction would truncate the
+    # Introduction at that line. But it was disabled by writing
+    # `_NO_TRUNCATE = set(SectionLabel)`, i.e. a set containing EVERY label, so
+    # the loop's first statement always `continue`d and ~45 lines of span-splitting
+    # code could never execute. Deleted 2026-08-21 rather than left standing:
+    # code that cannot run still gets read, maintained and reasoned about as
+    # though it does. `test_sections_boundary_truncation.py` pins the disabled
+    # behaviour and passes unchanged.
+    #
+    # `sections/boundaries.py::is_section_boundary` survives, tested, with **no
+    # production call site** — stated here rather than left to be discovered,
+    # because a module reachable only from its own test is not shipped. It is the
+    # natural predicate for the typed-region work, which is where it should be
+    # re-wired if it is wired at all.
+    truncated = coalesced
 
     # v1.6.1: attach unrecognized hints to the section that contains them.
     final: list[Section] = []
