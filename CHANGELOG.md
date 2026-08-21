@@ -28,6 +28,46 @@ separate interpreters and diffed per field:
 | footnote appendices restored | **2** (0 → 1,288 and 0 → 2,165 bytes) |
 | papers made worse on any metric | **0** |
 
+#### WHICH CONSUMERS SEE THIS — the table above is the LAYOUT path only
+
+Added 2026-08-21, after the release, because the entry as written implied the
+appendix restoration reaches everyone. It does not, and the split is sharp:
+
+| caller | passes `layout=`? | gets page-break fix | gets appendix restored |
+|---|---|---|---|
+| `batch.extract_to_dir` (`batch.py:355`) | **yes** | yes | **yes** |
+| `sections` (`sections/__init__.py:116`) | **yes** | yes | **yes** |
+| `service/app/main.py:532` `/extract` | **no** | yes | **no** |
+| `service/app/main.py:1007` `/analyze` | **no** | yes | **no** |
+
+`_f0_strip_running_and_footnotes` returns immediately without a `LayoutDoc`, and the
+footnote appendix is F0's product — so on the API path there is no appendix to
+restore, and never was.
+
+Re-measured on the same 26 papers through the **no-layout** path the service
+actually runs:
+
+| metric | no-layout (API) | with layout |
+|---|---|---|
+| papers changed | **12 / 26** | 16 / 26 |
+| page breaks restored | +1 … +17 | +1 … +17 |
+| footnote appendices restored | **0** | 2 |
+| lines removed / added | **0 / 0** | 0 / 0 |
+
+So the API path gains page boundaries and loses nothing; it gains no appendix.
+
+**AND THE LARGER FINDING THIS EXPOSED, which is pre-existing and not this
+release's doing:** because the service never computes a layout, **F0 has never run
+in production**, and neither has any layout-gated repair —
+`recover_dropped_minus_via_layout` (W0h), `recover_beta_via_layout` (W0m), or
+`recover_superscript_via_layout` (W0p). Every API consumer has been receiving text
+with running headers/footers intact and those three glyph repairs absent. This is
+the same defect `CLAUDE.md` records for `batch.py` (fixed in v2.4.128) — the
+service has the identical shape and nobody had checked it. Tracked in the handoff;
+NOT fixed here, because wiring a layout into the service is a performance and
+architecture decision, not a doc fix.
+
+
 Shipped as the named `_strip_standalone_page_numbers()` so its test pins the SHIPPED rule rather than
 a retyped copy of the pattern. The form feed is **captured and restored**, not merely excluded from
 the class — a page number is often the first thing on a new page, so the line itself begins with the
