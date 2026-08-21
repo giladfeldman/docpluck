@@ -344,8 +344,35 @@ def _prior_paragraph_is_sentence_terminated(text: str, line_start: int) -> bool:
     ``...Data curation;`` and ``acquisition; Preregistration...``, silently
     splitting authorship credit across two sections.
     """
+    # 2026-08-21: the walk skips PAGE BREAKS and non-whitespace CONTROL
+    # characters as well as ordinary blanks, because neither is evidence that a
+    # sentence was left unfinished.
+    #
+    # * ``\f`` — F0 deliberately KEEPS the page boundary (LESSONS L-052), so a
+    #   heading that is first on a page has a bare form feed before it. A page
+    #   boundary is a paragraph END, not a missing full stop. 2 sites in the
+    #   30-paper held-out PMC corpus.
+    # * ``_NONSPACE_CTRL_RE`` — pdftotext glues control characters onto real
+    #   lines; ``10.3389/fvets.2025.1645266`` p2 emits its running header as
+    #   ``Abuna et al.`` + U+0008. The period IS there; the BACKSPACE merely
+    #   stands after it. ``normalize._strip_furniture_controls`` now removes
+    #   that one shape upstream, but the DOCX / HTML / ``extract_sections(text=)``
+    #   paths never run ``normalize_text``, so the skip is what makes this guard
+    #   correct on every channel rather than on one.
+    #
+    # Skipping is NOT the same as returning True: after skipping, the character
+    # underneath must still be a real terminator. That is what keeps the guard's
+    # founding case — a column-wrapped CRediT list ending in ``;`` — rejected.
+    # Measured blast radius: 39 canonical headings are rejected across the 30
+    # papers, and exactly 3 of them are furniture-blocked. The other 36 (20 by a
+    # letter, 9 by a comma, 6 by ``;``/``)``/``:``/a digit) are unaffected.
+    from ...normalize import _NONSPACE_CTRL_RE
+
+    def _skippable(ch: str) -> bool:
+        return ch in " \t\n\f" or bool(_NONSPACE_CTRL_RE.match(ch))
+
     p = line_start - 1
-    while p > 0 and text[p] in " \t\n":
+    while p > 0 and _skippable(text[p]):
         p -= 1
     if p <= 0:
         return True  # start-of-text; nothing prior to corrupt
@@ -369,9 +396,70 @@ def _prior_paragraph_is_sentence_terminated(text: str, line_start: int) -> bool:
     # slash) as a paragraph terminator — same rationale as the ``://``
     # check above, defending against URLs that didn't include the scheme.
     q = p
-    while q > 0 and text[q] in "\"”’)]":
+    while q > 0 and (text[q] in "\"”’)]" or _NONSPACE_CTRL_RE.match(text[q])):
         q -= 1
     return text[q] in ".!?/"
+
+
+# A line-initial SECTION NUMBER: "1 ", "2.3 ", "1.4.1. ", "IV. ". Must occupy
+# the whole span between the line start and the canonical heading word, so an
+# arbitrary digit inside a sentence cannot qualify.
+_SECTION_NUMBER_PREFIX_ONLY = re.compile(r"^[ \t]*(?:\d+(?:\.\d+)*\.?|[IVX]+\.?)[ \t]+$")
+
+
+def _is_numbered_subtitle_heading(
+    text: str, line_start: int, heading_start: int, heading_end: int
+) -> bool:
+    """True for the ``1 Introduction: <subtitle>`` shape — a canonical heading
+    word carrying BOTH a line-initial section number AND a colon.
+
+    This is the only evidence left when the prior line is a structurally
+    complete block that does not end in a sentence terminator — a keyword list,
+    an author line, an affiliation. Both halves are TYPOGRAPHIC: the renderer
+    put a section number at the start of the line and a colon immediately after
+    the section word.
+
+    **Both halves are required, and the near-miss is why.** On
+    ``10.3389/fvets.2025.1645266`` (PMC13137375), ``1 Introduction: the need
+    for regenerative solutions in reproductive medicine`` is a real heading —
+    and two lines later ``2 Literature search`` carries the same number prefix
+    while ``literature`` resolves canonically to **references**. A
+    number-prefix-only escape would open a back-matter label in the middle of
+    the article and hand the whole body to a DROP class. The colon excludes it,
+    because a section word followed by a space is a phrase and a section word
+    followed by a colon is a title and its subtitle.
+
+    The colon alone is not sufficient either: without the section number there
+    is no typographic evidence that ``Results: we found…`` is a heading rather
+    than a sentence.
+
+    **Measured firing rate** (2026-08-21, the 30 held-out PubMed Central papers
+    of `pdf-text-fidelity-v1`): this escape admits **exactly one** heading —
+    `1 Introduction:` on PMC13137375 — and the near-miss above is the only
+    other candidate in the corpus. One paper proves the SHAPE EXISTS; the count
+    is what says the rule is narrow rather than merely defensible.
+
+    **Deliberately NOT wired into Pass 1b, and the argument is structural, not
+    a measurement.** Pass 1a's `_CANONICAL_PARA_HEADING` is `(?im)^[ \\t]*…`;
+    under `re.M` the `^` matches immediately after every newline, so every
+    line-initial position Pass 1b's `(?im)\\n[ \\t]*(?:\\n[ \\t]*)?…` can reach
+    is also reachable by Pass 1a — and Pass 1a runs first and records the offset
+    in `seen_offsets`. Pass 1b exists for a heading Pass 1a's a/b/c
+    disambiguators reject, not for a position Pass 1a cannot see. Adding the
+    escape to Pass 1b without an observed site would be surface with no input,
+    which is what rule 0e forbids. Stated here so the asymmetry reads as a
+    decision rather than an oversight; if a Pass-1b-only site is ever observed,
+    cite its DOI and page and wire it then.
+
+    Measured as well as argued (2026-08-21, same 30 papers): enumerating every
+    `_CANONICAL_AFTER_BLANK` match whose offset `_CANONICAL_PARA_HEADING` does
+    NOT also produce, and which carries both a section-number prefix and a
+    colon, yields **0 sites**.
+    """
+    prefix = text[line_start:heading_start]
+    if not _SECTION_NUMBER_PREFIX_ONLY.match(prefix):
+        return False
+    return text[heading_end:heading_end + 1] == ":"
 
 
 def annotate_text(text: str) -> list[BlockHint]:
@@ -468,7 +556,10 @@ def annotate_text(text: str) -> list[BlockHint]:
         # the continue ensures Pass 1b (which would otherwise re-admit
         # "Funding" via _CANONICAL_AFTER_BLANK) also respects the rejection.
         if preceded_by_blank and not (followed_by_capital or at_end_of_line):
-            if not _prior_paragraph_is_sentence_terminated(text, line_start):
+            if not (
+                _prior_paragraph_is_sentence_terminated(text, line_start)
+                or _is_numbered_subtitle_heading(text, line_start, start, heading_end)
+            ):
                 seen_offsets.add(start)
                 continue
 

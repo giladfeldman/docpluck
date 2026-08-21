@@ -546,10 +546,10 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.136',            # docpluck itself
+# {'version': '2.4.137',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.57',   # in-repo pipeline versions, bumped
-#  'sectioning_version': '1.2.4',   #   independently of the package version
+#  'normalize_version': '1.9.58',   # in-repo pipeline versions, bumped
+#  'sectioning_version': '1.2.5',   #   independently of the package version
 #  'table_extraction_version': '2.4.12',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database

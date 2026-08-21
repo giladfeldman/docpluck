@@ -203,8 +203,18 @@ These four skills span BOTH repos via absolute paths. Keep paths in sync if eith
 
 ## Key project docs (in `docs/`)
 
+These are the ONLY files under `docs/` that are public — the list is the
+allowlist in `/docpluck-cleanup` Section 0.1, and `tests/test_public_repo_hygiene.py`
+enforces it. Everything else under `docs/` is internal by default and gitignored.
+
 - `docs/README.md` — public-facing library README (renders on GitHub + PyPI).
 - `docs/BENCHMARKS.md` — extraction-quality benchmarks across 50 PDFs.
+- `docs/BENCHMARKS_liteparse_2026-06.md` — the liteparse comparison run (a dated RECORD, not a live claim).
 - `docs/NORMALIZATION.md` — pipeline step-by-step reference.
 - `docs/DESIGN.md` — architecture decisions.
-- `docs/superpowers/specs/` — design docs for individual features (e.g. Request 9 reference normalization).
+- `docs/SCOPE.md` — **consumer contract.** English-language articles, US numeric convention; EU numbers pass through as printed. Required by the scope rule to be stated here, on the website, and in every consumer report.
+- `docs/SYMBOL_CONTRACT.md` — **consumer contract.** "If you maintain a tool that parses docpluck's output, this page is your interface."
+
+`docs/superpowers/specs/` holds design docs for individual features. It is
+**internal and gitignored** — it was public until the 2026-08-06 purge, and this
+entry used to list it as though it were part of the public doc set.
