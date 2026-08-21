@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.4.136] - 2026-08-21
 
 ### A page NUMBER is furniture; a page BOUNDARY is structure
 
