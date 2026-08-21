@@ -58,10 +58,21 @@ def main() -> int:
     # was wrong -- and the documented one is the one that looks authoritative.
     #
     # Each entry is (source file, constant name, the key as the docs spell it).
+    # ENUMERATED, not asserted (hard rule 23). docs/README.md advertises six keys
+    # in its provenance block: version, normalize_version, sectioning_version,
+    # table_extraction_version, python_version, unicodedata_version.
+    #   - normalize_version is checked above.
+    #   - the three below are checked here.
+    #   - python_version / unicodedata_version are RUNTIME facts, not constants
+    #     this repo defines, so there is nothing to drift FROM; they are shown as
+    #     example values and deliberately not gated.
+    # `version` (the package) is included because it is the one that goes stale on
+    # every single release, and nothing was checking it.
     for src_path, const, doc_key in (
         ("docpluck/extract_structured.py", "TABLE_EXTRACTION_VERSION",
          "table_extraction_version"),
         ("docpluck/sections/__init__.py", "SECTIONING_VERSION", "sectioning_version"),
+        ("docpluck/__init__.py", "__version__", "version"),
     ):
         try:
             src = _read(src_path)
