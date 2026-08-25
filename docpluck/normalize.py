@@ -24,7 +24,7 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.58"  # v1.9.58 (2026-08-21): A RUNNING HEADER'S DEBRIS MUST NOT VETO THE HEADING AFTER IT. v1.9.57 recorded that ONE stray U+0008 BACKSPACE made a running header unequal to its layout-channel twin and therefore unstrippable, and fixed it -- inside the F0 COMPARISON KEY only (_NONSPACE_CTRL_RE, used solely by _key). The character stayed in the EMITTED text, where an unrelated rule then landed on it: sections/annotators/text.py::_prior_paragraph_is_sentence_terminated walks back over space/tab/newline and requires the character underneath to be in '.!?/'. On 10.3389/fvets.2025.1645266 (PMC13137375) p2 the header arrives as FORMFEED + 'Abuna et al.' + BACKSPACE, so the walk lands on the BACKSPACE, the guard says the prior paragraph is unfinished, and the heading '1 Introduction: the need for regenerative solutions in reproductive medicine' is never emitted. Because partition_into_sections fills each span to the NEXT matched heading, the preceding KEYWORDS span then swallowed 69,849 characters -- the whole article. NEW STEP C0 _strip_furniture_controls, run BEFORE F0 so the comparison key and the output are ONE rule rather than two. THE CLASS IS ONE CHARACTER WIDE, AND MEASURED: over the 30-paper held-out PMC corpus all 33 U+0008 occurrences carry the identical context PERIOD + BS + NEWLINE (trailing furniture) and ZERO carry the overstrike signature (x)BS(x), so no doubled letter can be manufactured -- a reviewer predicted exactly that regression and the corpus refuted it. THE OTHER 16 CONTROL CHARACTERS ARE NOT FURNITURE AND ARE NOT STRIPPED: they are corrupted content glyphs (Schri<02>macher = Schrittmacher; No<04>allsanitat = Notfall...; A<03> -B<03> helices), and deleting them would destroy text. They are COUNTED instead, in the new NormalizationReport.residual_control_chars, because a known limitation written down without a measurement is an unpaid debt rather than a disclosure -- 49 of them live in 16 of the 30 papers. Measured knock-on, pinned by a test: with the BACKSPACE gone, H0's banner strip can finally match the header line it was always meant to catch, so the with-BS and without-BS inputs converge. Arena effect (offline harness, 30 held-out PMC papers): the body-label slice mean rises 0.7681 -> 0.7910 and PMC13137375 alone goes 0.0761 -> 0.7627. See tests/test_furniture_control_chars.py.  # # v1.9.57 (2026-08-20): A PAGE NUMBER IS FURNITURE; A PAGE BOUNDARY IS STRUCTURE. The standalone-page-number strip was `^\s*\d{1,3}\s*$` under MULTILINE, and the whitespace class matches THE FORM FEED - so the rule could consume the page break standing beside the number it deleted. Wrong since it was written, held latent by a running footer sitting between the two; anything that stripped that footer took every form feed with it, and with them the `\n\f\f\n` marker separating the footnote appendix, folding it back into the body. TWO BASELINE PAPERS WERE ALREADY IN THAT STATE AT HEAD - 10.1016/j.jesp.2021.104154 and 10.1016/j.joep.2020.102350 report 15 and 18 footnotes through report.footnote_texts while the returned string carries no appendix at all. Measured over the 26-paper baseline against a git worktree of the prior tree, extracted in separate interpreters: 0 lines removed, 0 added; 16 papers gain page breaks (+1..+17); 2 appendices restored (0 -> 1,288 and 0 -> 2,165 bytes); 0 papers worse on any metric. Shipped as the named `_strip_standalone_page_numbers` so its test pins the SHIPPED rule, not a retyped pattern; the form feed is CAPTURED and restored rather than excluded, because a page number is often the first thing on a new page and excluding it stopped those lines matching at all. `_drop()` keeps the same promise inside F0's strip loop. See LESSONS L-052. # v1.9.56 (v2.4.134): THE EVIDENCE EACH REPAIR RESTS ON IS NOW DECLARED, AND ONE RULE STOPPED FABRICATING A SECOND MINUS SIGN. (1) `_ALREADY_SIGNED` is a ONE-CHARACTER lookbehind, so it refused `-0.38` and ACCEPTED `- 0.38`: on a DETACHED sign W0g read a bare-positive estimate, proved it negative from the CI, and emitted `d = - -0.38` - a double-signed effect size no paper printed. The comment above `_SIGNED_DASHES` records that `-2.68 -> --.68` already happened once and that "the fix then covered the one dash form in front of us"; it covered the ATTACHED form. Caught by the idempotency corpus gate, not by reading the rule. (2) W0q: `recover_dropped_minus_ci_upper_in_text` existed ONLY in the table channel, so a CI written in a results SENTENCE never met it - confirmed against the rasterized page of 10.1016/j.jesp.2021.104154 p13, which prints `d = -0.38, 95% CI [-0.58, -0.18]` while pdftotext detaches every minus. 3 brackets in 1 of 26 baseline papers, and the containment arithmetic repaired 0 of them (it had grabbed `S.D = 1.43` as the "estimate"). (3) That rule now splits TYPOGRAPHIC from INFERENTIAL: a DETACHED DASH is a glyph the renderer emitted and the comma proves it is a sign rather than a range separator, so group 5 - captured since the rule was written and never read (register O5) - finally decides. The containment arm is KEPT because chan_feldman_2025_cogemo Table 9 row 2bii has no dash and only the arithmetic recovers its published -0.33, but it is now DECLARED via `ci_upper_minus_inferred_from_containment`. (4) O10: `_recover_estimate_column_via_ci_column` treated any negative bound as proof of the 2-for-minus corruption - including bounds `recover_corrupted_minus_signs` had manufactured one line earlier. It now fires only on a bracket THIS pass actually repaired. (5) O8: W0j signature B is labelled INFERENTIAL in the code and records every firing; W0p records its positional pairing. (6) `NormalizationReport.fallbacks` - every `record_fallback` inside normalization was outside `extract_pdf_structured`'s window and therefore write-only, INCLUDING the ambiguous-pairing refusals added in v2.4.133 to make W0h/W0m observable. # v1.9.55 (v2.4.133): THE LAYOUT-GATED REPAIRS STOP ASSIGNING THEIR EVIDENCE POSITIONALLY. W0h/W0m proved "N glyphs of shape X are corrupt" in pdfplumber's stream and then rewrote the first N matching tokens in pdftotext's stream, document-wide with no page key - so a glyph proven on page 7 licensed flipping a token on page 2. REPRODUCED, not reasoned about: with a decoy `q = .428` prepended to the W0h source paper (ar_apa_j_jesp_2009_12_011), the old code flipped the DECOY and left the genuine coefficient corrupt - one number fabricated, one missed. Each evidence site now carries its own page and its own layout line text, and pairing REFUSES (recording `w0h_ambiguous_pairing_refused`) when the context cannot separate candidates, because pass-through is reversible for the consumer and a rewrite is not. Page-INDEX scoping was measured and rejected: by the time W0h runs the text holds 7 form feeds for a 12-page document, so aligning text page k to layout page k is an off-by-k that produces a confidently WRONG pairing rather than an empty one. W0m was the worse of the two - it counted beta glyphs and flipped the first N `b = <anything>` WITHOUT requiring the coefficient to match, so a beta proven on one page could relabel a genuine unstandardized `b` (a different statistic) elsewhere; the coefficient is now part of the identity. See tests/test_w0h_pairing_is_identity_based.py and docs/OVERHAUL_REGISTER.md G5. # v1.9.54 (v2.4.130): THE SEPARATION OF DUTIES, EXECUTED. Three rules that repaired the PAPER rather than canonicalising NOTATION are DELETED, together with the guard that existed only to serve them. A2 (dropped-decimal repair, `p = 38.` -> `p = .38.`) had NO CITED PAPER anywhere in its code; asked for one, BOTH of its firing sites across 297 English papers turned out to be the paper's own error, rasterized: 10.1177/0146167210380928 p13 prints `B = -0.28, SE = 0.31, p = 38.` and 10.1016/j.jesp.2016.11.001 p7 prints `t(186) = 3.90, p = 001`, each with correctly-dotted numbers on the same line. W0n (`p < 05` -> `p < .05`) is deleted in BOTH channels because its premise is false: the SAME shape has OPPOSITE OWNERS in two real English papers - 10.1016/j.jesp.2009.12.011 p3 PRINTS `p < 05` (the author dropped it; advance 2.00pt vs 3.90pt at a dotted site on the same page, no rect/curve/line in the gap) while 10.1177/0956797613482946 p6 PRINTS `p < .05` and our OCR text layer lost it. A calibrated layout-advance gate (0.51 vs 0.99) was built and REFUTED: Dong p6 is a SCAN whose char boxes come from an OCR engine, so the gate manufactures its own evidence for the exact case it exists to catch. Under irreducible ambiguity the default is PASS-THROUGH, because pass-through is reversible for the consumer and a repair is not. A3a (thousands strip) is deleted because ITS PURPOSE EVAPORATED: its own comment said it strips "so A3 sees the already-clean integer and leaves it alone", and A3 was deleted in v2.4.129. It also produced 1000x errors - 10.1177/0956797620935584 Table S2 p24 prints a Satterthwaite df of `185,178` (fractional by construction, i.e. 185.178) and we delivered `185178`; the collision is STRUCTURAL, since its discriminator is satisfied by construction for any comma-locale number with a 3-digit integer part and 3-decimal precision. It made the library answer one input THREE ways (standard preserved, academic+preserve_math_glyphs counted-but-preserved, academic stripped), and ITS TELEMETRY SAID THE OPPOSITE OF WHAT IT DID: step `A3a_thousands_separator_protect`, metric key `thousands_separators_preserved`, operation `.replace(",", "")` - a false all-clear, which is worse than silence because silence invites a check. ALSO IN THIS RELEASE, the biggest finding of the audit and one that indicts its own framing: THE RENDER CHANNEL DELETES PUBLISHED STATISTICS. The numeric rules were audited exhaustively; the same question was never asked of render.py, which is the channel that reaches the user. Measured on the baseline corpus, 10.1017/s1930297500009189 lost an ENTIRE published-results sentence (two correlations, a Hotelling's t, three p-values, two confidence intervals) to `_suppress_inline_duplicate_table_captions`, and 10.1001/jamanetworkopen.2023.48333 lost a hazard ratio `1.31 (1.20-1.44)` to `_strip_phantom_camelot_tables` - with NO count, NO key in changes_made and NO log line, because render_pdf_to_markdown() chained 54 `md = fn(md)` calls and returned a bare str. Fixed: `_carries_statistical_content` guards every deleting step (delete FURNITURE, never DATA, all-or-nothing per run), and an opt-in `RenderReport` gives the channel telemetry for the first time. See docs/SCOPE.md, LESSONS.md L-032, and tests/test_render_never_deletes_published_statistics.py.
+NORMALIZATION_VERSION = "1.9.59"  # v1.9.59 (2026-08-22): A PAGE NUMBER IS IN THE MARGIN; A BARE INTEGER IN THE BODY IS A VALUE. The standalone-page-number strip was one MULTILINE substitution with no page context, so it deleted EVERY line whose whole content was a 1-3 digit integer -- and pdftotext emits a narrow numeric table column as ONE CELL PER LINE. It was silently selective: `-4`, `0.5` and `1000` never matched, `0`, `4` and `999` always did. MEASURED on 10.1136/bmj-2024-080924 (BMJ) supplementary appendix Table S1 p6, row "Number of Advancement Maneuvers (attempt #2)": the paper prints a coefficient of `0` with `(-1.5 to 1.5)` and `p = 0.999`, and we delivered the interval and the p-value WITH NO ESTIMATE -- worse than a wrong number, because an interval attached to nothing cannot even be attributed. This is the real content of ESCImate `2026-08-09/DP-14`, which both sides had diagnosed as a "column-major dump"; the source text layer is row-major and complete, and this rule punched the holes. The gate is TYPOGRAPHIC: a page number is drawn in the margin, so it must be among the first or last 2 non-blank lines of its page. A SECOND gate strips a PAGINATION RUN wherever it sits -- `value - page_index` constant across >=3 distinct pages -- because a two-column PDF puts the number mid-stream in pdftotext reading order (10.1016/j.jesp.2009.12.010 prints `495` between "non-agree-" and "ment and the status quo"); a table column cannot satisfy that, its integers sit on ONE page. Corpus effect over the 26-paper baseline, old rule vs new: 1,228 bare-integer lines RETAINED, 1,104 still stripped, and the LINE COUNT is identical on all 26 papers -- the parity v1.9.57 was measured against. Site census: 345 margin vs 1,987 body-interior sites in 26/26 papers, 239 of them beside an interval or a p-value (tools/diag/page_number_strip_blast_radius.py --baseline). The step had NO count, NO changes_made key and NO log line; it now tracks P0_standalone_page_numbers / page_numbers_stripped. A first draft of the fix recomputed the margin band after each removal, which promoted the next line into it and erased a table column of `1 2 3 4 5` inward -- caught by its own test, not by reading. ALSO: NormalizationReport.changes_made now ACCUMULATES instead of overwriting (three rules write dropped_minus_signs_recovered and three write minus_signs_recovered, so only the last survived; filed by ESCImate 2026-08-21 §4, who had to publish upstream_sign_rewrites as a LOWER BOUND), and the new changes_made_by_step records every changed step INCLUDING length-neutral ones -- a `2`->`-` glyph substitution has a delta of zero, so the rules this metric exists for were the ones most likely to vanish from it. See tests/test_page_number_strip_never_deletes_data.py and tests/test_changes_made_accumulates.py. # v1.9.58 (2026-08-21): A RUNNING HEADER'S DEBRIS MUST NOT VETO THE HEADING AFTER IT. v1.9.57 recorded that ONE stray U+0008 BACKSPACE made a running header unequal to its layout-channel twin and therefore unstrippable, and fixed it -- inside the F0 COMPARISON KEY only (_NONSPACE_CTRL_RE, used solely by _key). The character stayed in the EMITTED text, where an unrelated rule then landed on it: sections/annotators/text.py::_prior_paragraph_is_sentence_terminated walks back over space/tab/newline and requires the character underneath to be in '.!?/'. On 10.3389/fvets.2025.1645266 (PMC13137375) p2 the header arrives as FORMFEED + 'Abuna et al.' + BACKSPACE, so the walk lands on the BACKSPACE, the guard says the prior paragraph is unfinished, and the heading '1 Introduction: the need for regenerative solutions in reproductive medicine' is never emitted. Because partition_into_sections fills each span to the NEXT matched heading, the preceding KEYWORDS span then swallowed 69,849 characters -- the whole article. NEW STEP C0 _strip_furniture_controls, run BEFORE F0 so the comparison key and the output are ONE rule rather than two. THE CLASS IS ONE CHARACTER WIDE, AND MEASURED: over the 30-paper held-out PMC corpus all 33 U+0008 occurrences carry the identical context PERIOD + BS + NEWLINE (trailing furniture) and ZERO carry the overstrike signature (x)BS(x), so no doubled letter can be manufactured -- a reviewer predicted exactly that regression and the corpus refuted it. THE OTHER 16 CONTROL CHARACTERS ARE NOT FURNITURE AND ARE NOT STRIPPED: they are corrupted content glyphs (Schri<02>macher = Schrittmacher; No<04>allsanitat = Notfall...; A<03> -B<03> helices), and deleting them would destroy text. They are COUNTED instead, in the new NormalizationReport.residual_control_chars, because a known limitation written down without a measurement is an unpaid debt rather than a disclosure -- 49 of them live in 16 of the 30 papers. Measured knock-on, pinned by a test: with the BACKSPACE gone, H0's banner strip can finally match the header line it was always meant to catch, so the with-BS and without-BS inputs converge. Arena effect (offline harness, 30 held-out PMC papers): the body-label slice mean rises 0.7681 -> 0.7910 and PMC13137375 alone goes 0.0761 -> 0.7627. See tests/test_furniture_control_chars.py.  # # v1.9.57 (2026-08-20): A PAGE NUMBER IS FURNITURE; A PAGE BOUNDARY IS STRUCTURE. The standalone-page-number strip was `^\s*\d{1,3}\s*$` under MULTILINE, and the whitespace class matches THE FORM FEED - so the rule could consume the page break standing beside the number it deleted. Wrong since it was written, held latent by a running footer sitting between the two; anything that stripped that footer took every form feed with it, and with them the `\n\f\f\n` marker separating the footnote appendix, folding it back into the body. TWO BASELINE PAPERS WERE ALREADY IN THAT STATE AT HEAD - 10.1016/j.jesp.2021.104154 and 10.1016/j.joep.2020.102350 report 15 and 18 footnotes through report.footnote_texts while the returned string carries no appendix at all. Measured over the 26-paper baseline against a git worktree of the prior tree, extracted in separate interpreters: 0 lines removed, 0 added; 16 papers gain page breaks (+1..+17); 2 appendices restored (0 -> 1,288 and 0 -> 2,165 bytes); 0 papers worse on any metric. Shipped as the named `_strip_standalone_page_numbers` so its test pins the SHIPPED rule, not a retyped pattern; the form feed is CAPTURED and restored rather than excluded, because a page number is often the first thing on a new page and excluding it stopped those lines matching at all. `_drop()` keeps the same promise inside F0's strip loop. See LESSONS L-052. # v1.9.56 (v2.4.134): THE EVIDENCE EACH REPAIR RESTS ON IS NOW DECLARED, AND ONE RULE STOPPED FABRICATING A SECOND MINUS SIGN. (1) `_ALREADY_SIGNED` is a ONE-CHARACTER lookbehind, so it refused `-0.38` and ACCEPTED `- 0.38`: on a DETACHED sign W0g read a bare-positive estimate, proved it negative from the CI, and emitted `d = - -0.38` - a double-signed effect size no paper printed. The comment above `_SIGNED_DASHES` records that `-2.68 -> --.68` already happened once and that "the fix then covered the one dash form in front of us"; it covered the ATTACHED form. Caught by the idempotency corpus gate, not by reading the rule. (2) W0q: `recover_dropped_minus_ci_upper_in_text` existed ONLY in the table channel, so a CI written in a results SENTENCE never met it - confirmed against the rasterized page of 10.1016/j.jesp.2021.104154 p13, which prints `d = -0.38, 95% CI [-0.58, -0.18]` while pdftotext detaches every minus. 3 brackets in 1 of 26 baseline papers, and the containment arithmetic repaired 0 of them (it had grabbed `S.D = 1.43` as the "estimate"). (3) That rule now splits TYPOGRAPHIC from INFERENTIAL: a DETACHED DASH is a glyph the renderer emitted and the comma proves it is a sign rather than a range separator, so group 5 - captured since the rule was written and never read (register O5) - finally decides. The containment arm is KEPT because chan_feldman_2025_cogemo Table 9 row 2bii has no dash and only the arithmetic recovers its published -0.33, but it is now DECLARED via `ci_upper_minus_inferred_from_containment`. (4) O10: `_recover_estimate_column_via_ci_column` treated any negative bound as proof of the 2-for-minus corruption - including bounds `recover_corrupted_minus_signs` had manufactured one line earlier. It now fires only on a bracket THIS pass actually repaired. (5) O8: W0j signature B is labelled INFERENTIAL in the code and records every firing; W0p records its positional pairing. (6) `NormalizationReport.fallbacks` - every `record_fallback` inside normalization was outside `extract_pdf_structured`'s window and therefore write-only, INCLUDING the ambiguous-pairing refusals added in v2.4.133 to make W0h/W0m observable. # v1.9.55 (v2.4.133): THE LAYOUT-GATED REPAIRS STOP ASSIGNING THEIR EVIDENCE POSITIONALLY. W0h/W0m proved "N glyphs of shape X are corrupt" in pdfplumber's stream and then rewrote the first N matching tokens in pdftotext's stream, document-wide with no page key - so a glyph proven on page 7 licensed flipping a token on page 2. REPRODUCED, not reasoned about: with a decoy `q = .428` prepended to the W0h source paper (ar_apa_j_jesp_2009_12_011), the old code flipped the DECOY and left the genuine coefficient corrupt - one number fabricated, one missed. Each evidence site now carries its own page and its own layout line text, and pairing REFUSES (recording `w0h_ambiguous_pairing_refused`) when the context cannot separate candidates, because pass-through is reversible for the consumer and a rewrite is not. Page-INDEX scoping was measured and rejected: by the time W0h runs the text holds 7 form feeds for a 12-page document, so aligning text page k to layout page k is an off-by-k that produces a confidently WRONG pairing rather than an empty one. W0m was the worse of the two - it counted beta glyphs and flipped the first N `b = <anything>` WITHOUT requiring the coefficient to match, so a beta proven on one page could relabel a genuine unstandardized `b` (a different statistic) elsewhere; the coefficient is now part of the identity. See tests/test_w0h_pairing_is_identity_based.py and docs/OVERHAUL_REGISTER.md G5. # v1.9.54 (v2.4.130): THE SEPARATION OF DUTIES, EXECUTED. Three rules that repaired the PAPER rather than canonicalising NOTATION are DELETED, together with the guard that existed only to serve them. A2 (dropped-decimal repair, `p = 38.` -> `p = .38.`) had NO CITED PAPER anywhere in its code; asked for one, BOTH of its firing sites across 297 English papers turned out to be the paper's own error, rasterized: 10.1177/0146167210380928 p13 prints `B = -0.28, SE = 0.31, p = 38.` and 10.1016/j.jesp.2016.11.001 p7 prints `t(186) = 3.90, p = 001`, each with correctly-dotted numbers on the same line. W0n (`p < 05` -> `p < .05`) is deleted in BOTH channels because its premise is false: the SAME shape has OPPOSITE OWNERS in two real English papers - 10.1016/j.jesp.2009.12.011 p3 PRINTS `p < 05` (the author dropped it; advance 2.00pt vs 3.90pt at a dotted site on the same page, no rect/curve/line in the gap) while 10.1177/0956797613482946 p6 PRINTS `p < .05` and our OCR text layer lost it. A calibrated layout-advance gate (0.51 vs 0.99) was built and REFUTED: Dong p6 is a SCAN whose char boxes come from an OCR engine, so the gate manufactures its own evidence for the exact case it exists to catch. Under irreducible ambiguity the default is PASS-THROUGH, because pass-through is reversible for the consumer and a repair is not. A3a (thousands strip) is deleted because ITS PURPOSE EVAPORATED: its own comment said it strips "so A3 sees the already-clean integer and leaves it alone", and A3 was deleted in v2.4.129. It also produced 1000x errors - 10.1177/0956797620935584 Table S2 p24 prints a Satterthwaite df of `185,178` (fractional by construction, i.e. 185.178) and we delivered `185178`; the collision is STRUCTURAL, since its discriminator is satisfied by construction for any comma-locale number with a 3-digit integer part and 3-decimal precision. It made the library answer one input THREE ways (standard preserved, academic+preserve_math_glyphs counted-but-preserved, academic stripped), and ITS TELEMETRY SAID THE OPPOSITE OF WHAT IT DID: step `A3a_thousands_separator_protect`, metric key `thousands_separators_preserved`, operation `.replace(",", "")` - a false all-clear, which is worse than silence because silence invites a check. ALSO IN THIS RELEASE, the biggest finding of the audit and one that indicts its own framing: THE RENDER CHANNEL DELETES PUBLISHED STATISTICS. The numeric rules were audited exhaustively; the same question was never asked of render.py, which is the channel that reaches the user. Measured on the baseline corpus, 10.1017/s1930297500009189 lost an ENTIRE published-results sentence (two correlations, a Hotelling's t, three p-values, two confidence intervals) to `_suppress_inline_duplicate_table_captions`, and 10.1001/jamanetworkopen.2023.48333 lost a hazard ratio `1.31 (1.20-1.44)` to `_strip_phantom_camelot_tables` - with NO count, NO key in changes_made and NO log line, because render_pdf_to_markdown() chained 54 `md = fn(md)` calls and returned a bare str. Fixed: `_carries_statistical_content` guards every deleting step (delete FURNITURE, never DATA, all-or-nothing per run), and an opt-in `RenderReport` gives the channel telemetry for the first time. See docs/SCOPE.md, LESSONS.md L-032, and tests/test_render_never_deletes_published_statistics.py.
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -387,22 +387,179 @@ PAGE_BREAK = chr(12)  # pdftotext page separator (form feed)
 # function rather than an inline `re.sub` so the test pins THIS rule instead of a
 # retyped copy of it -- a second definition of one rule is the drift this project
 # has a standing rule about.
-_PAGE_NUMBER_LINE_RE = re.compile(r"^(\f*)[ \t]*\d{1,3}[ \t]*$", re.MULTILINE)
+_PAGE_NUMBER_LINE_RE = re.compile(r"^(\f*)[ \t]*\d{1,3}[ \t]*$")
+
+# THERE IS NO MARGIN BAND, AND THAT IS A MEASUREMENT, NOT A SIMPLIFICATION.
+#
+# The obvious gate for "is this a page number?" is "is it at the top or bottom
+# of its page?", and it was implemented first. It is not idempotent. This step
+# runs inside a pipeline whose EARLIER steps also delete lines, so on a second
+# pass a page's non-blank set is different, the band slides inward, and a line
+# that was interior becomes marginal. Measured: with a band of 2,
+# `test_normalize_idempotent_jama_open_1` failed -- one of two adjacent `67`
+# table cells survived pass 1 and was deleted on pass 2. Narrowing to 1 fixed
+# that paper and left three others non-idempotent in the corpus gate
+# (`ar_royal_society_rsos_140081`, `ieee_access_5`, `nat_comms_5`). The
+# instability is inherent to any position-relative rule here, not a tuning
+# problem.
+#
+# So the band was measured for what it was worth, across the 26-paper baseline:
+# **9 strips out of 1,103.** The pagination-run gate below does everything else,
+# and it is position-independent and therefore idempotent by construction. Nine
+# cosmetic strips are not worth a rule whose output depends on how many times it
+# has run.
+#
+# (Note for anyone tempted to reintroduce it: `nonblank[-band:]` with band == 0
+# selects the WHOLE list, not the empty one. A probe written during this work
+# reported the band doing 100% of the stripping because of exactly that.)
+
+# H0's front-matter cap, hoisted from an inline literal so there is ONE
+# definition of the header zone rather than two.
+#
+# A SECOND GATE WAS BUILT HERE AND REMOVED, and the reason is worth keeping.
+# `10.15626/MP.2022.3108` (Meta-Psychology) prints its affiliation markers as
+# bare integers, each alone on a line directly above the affiliation it labels:
+#
+#     1
+#     Department of Psychology, Norwegian University of Science and Technology
+#     2
+#     Department of Psychology, University of Hong Kong, Hong Kong SAR
+#
+# Those are furniture, and an adjacency gate (bare integer + affiliation opener
+# on the next non-blank line) removed them cleanly. It was reverted because
+# removing them costs MORE than leaving them: with those lines blanked, the
+# renderer stops emitting the paper's `## Abstract` heading altogether. The
+# front-matter block's shape is load-bearing for abstract detection, and a rule
+# that trades three furniture lines for a missing section heading is a bad trade.
+#
+# `tests/test_abstract_zone_affiliation_remnant_real_pdf.py` records what this
+# exposed: that guard was passing by ACCIDENT. The affiliation line sits in the
+# abstract zone either way; deleting two unrelated marker lines pushed it past
+# the six-line window the assertion measures.
+_HEADER_ZONE_LINES = 30
+
+# A pagination run needs at least this many members. Three, matching the
+# threshold the 4-digit continuous-pagination rule below already uses -- one
+# concept, one number.
+_PAGINATION_MIN_RUN = 3
+
+# ...and consecutive members must be at least this many lines apart. A page of
+# an academic PDF is tens of lines; a table column's cells are adjacent. This is
+# the only thing separating `1 2 3` down a narrow cell from pages 1, 2, 3, and it
+# is deliberately generous: under-stripping leaves a stray page number a reader
+# can ignore, over-stripping deletes a published value that nothing can recover.
+_PAGINATION_MIN_LINE_GAP = 20
 
 
 def _strip_standalone_page_numbers(t: str) -> str:
-    """Delete a line holding only a 1-3 digit page number, KEEPING any page break.
+    """Blank a line holding only a page number, keeping the page break.
 
-    The leading form feed is CAPTURED and put back. It cannot simply be excluded
-    from the class: a page number is often the FIRST thing on a new page, so the
-    line itself begins with the break, and excluding it stopped those lines
-    matching at all (measured -- '496'..'502' reappeared in the body of
-    10.1016/j.jesp.2009.12.010). It cannot be left in the whitespace class
-    either, which is the original defect: the whitespace class matches the
-    form feed, so the rule consumed the page boundary next to the number it
-    was deleting. See LESSONS L-052.
+    A page NUMBER is furniture; a page BOUNDARY is structure (v1.9.57, L-052);
+    and -- v1.9.59 -- a bare integer in the BODY of a page is neither of those.
+    It is a VALUE.
+
+    The rule was a single MULTILINE substitution with no page context, so it
+    deleted every line whose whole content was a small integer. pdftotext emits a
+    narrow numeric table column as ONE CELL PER LINE, which is that shape exactly,
+    so the rule destroyed published estimates -- and destroyed them selectively,
+    since `-4`, `0.5` and `1000` do not match while `0`, `4` and `999` do.
+
+    MEASURED on `10.1136/bmj-2024-080924` (BMJ), supplementary appendix Table S1
+    p6: the row "Number of Advancement Maneuvers (attempt #2)" prints a
+    coefficient of `0` with interval `(-1.5 to 1.5)` and `p = 0.999`, and docpluck
+    delivered the interval and the p-value **with no estimate**. A confidence
+    interval attached to nothing is worse than a wrong number, because there is
+    nothing for a reader to challenge. Reported by ESCImate as `2026-08-09/DP-14`,
+    whose "column-major dump" diagnosis turned out to be this deletion.
+
+    ONE GATE, STRUCTURAL, never inferential -- nothing asks what the number ought
+    to be:
+
+    * a **pagination run** -- `value - page_index` constant across >= 3 distinct
+      pages. That is what pagination IS, and a table column cannot satisfy it,
+      because its integers sit on ONE page. It is also position-independent, and
+      therefore idempotent, which a margin test is not: see the note above
+      `_HEADER_ZONE_LINES` for why the obvious "top or bottom of the page" gate
+      was built, measured at 9 strips in 1,103, and removed.
+    Two other gates were built and removed, both measured rather than argued --
+    a page-margin band (9 strips in 1,103) and an affiliation-marker adjacency
+    rule (cost the renderer a `## Abstract` heading). See `_HEADER_ZONE_LINES`.
+
+    The matched line is BLANKED rather than removed, exactly as the previous
+    substitution did: v1.9.57's corpus measurement ("0 lines removed, 0 added")
+    depends on the line count being preserved, and downstream steps navigate by
+    line position. The form feed is no longer part of the pattern because the
+    caller now splits on it -- which is what makes "where on the page" askable at
+    all, and it keeps the boundary by construction rather than by capture-group.
+
+    RULE 0g -- this step DELETES, so it must answer the three questions:
+
+    1. *Could it delete a published quantity?* It DID, which is why the gate
+       exists. Site census over the 26-paper baseline: 345 margin sites against
+       1,987 body-interior ones across 26/26 papers, 239 of them in 17 papers
+       standing beside an interval or a p-value
+       (`python tools/diag/page_number_strip_blast_radius.py --baseline`).
+       Effect, measured THROUGH THE SHIPPED PIPELINE rather than by calling
+       this function on raw text -- the distinction is not cosmetic, see the
+       note above about form feeds: **1,159 page numbers stripped across the 26
+       papers, 1,100 bare-integer lines surviving to the output.** The old rule
+       removed roughly 2,330, i.e. both halves. Line count is preserved on every
+       paper -- the parity v1.9.57 was measured against.
+    2. *Does anything RECORD the deletion?* Yes -- the call site tracks step
+       `P0_standalone_page_numbers` with metric `page_numbers_stripped`.
+    3. *Is a "duplicate" really duplicated?* Not applicable; not a deduplication.
     """
-    return _PAGE_NUMBER_LINE_RE.sub(r"\1", t)
+    lines = t.split("\n")
+
+    # Every bare-integer line, by absolute line number.
+    candidates: list[tuple[int, int, str]] = []
+    for i, ln in enumerate(lines):
+        m = _PAGE_NUMBER_LINE_RE.fullmatch(ln)
+        if m:
+            # The leading form feed is CAPTURED and put back when the line is
+            # blanked. A page number is often the first thing on a new page, so
+            # the break shares its line -- excluding it from the class instead
+            # stopped those lines matching at all, and '496'..'502' reappeared in
+            # the body of 10.1016/j.jesp.2009.12.010. See LESSONS L-052.
+            candidates.append((i, int(ln.strip()), m.group(1)))
+    if len(candidates) < _PAGINATION_MIN_RUN:
+        return t
+
+    # THE RUN IS FOUND IN LINE SPACE, NOT PAGE SPACE, and that is the whole
+    # reason this works at all. The first implementation split on the form feed
+    # and required `value - page_index` to be constant. It was correct on the raw
+    # extraction and INERT where the rule actually runs: measured at the call
+    # site, `ieee_access_5` arrives with **1 form feed for 17 pages** and
+    # `nat_comms_5` the same, because earlier steps consume the boundaries. The
+    # gate stripped 0 lines on both. A measurement taken on the raw text said
+    # otherwise, which is the "test the composition that ships" trap exactly.
+    #
+    # What survives without page marks is the arithmetic: consecutive page
+    # numbers ascend by one, in reading order, separated by a whole page of
+    # text. So the run is a subsequence of candidates whose values are
+    # v, v+1, v+2, ... and whose line gaps are all at least
+    # `_PAGINATION_MIN_LINE_GAP`. A table column also ascends by one -- `1 2 3 4
+    # 5` down a narrow cell -- but its members are ADJACENT lines, so the gap
+    # requirement excludes it by construction. That is the discriminator; the
+    # value itself is never consulted.
+    paginated: set[int] = set()
+    for start in range(len(candidates)):
+        run = [candidates[start]]
+        for i, value, ff in candidates[start + 1:]:
+            prev_i, prev_v, _ = run[-1]
+            if value == prev_v + 1 and i - prev_i >= _PAGINATION_MIN_LINE_GAP:
+                run.append((i, value, ff))
+        if len(run) >= _PAGINATION_MIN_RUN:
+            paginated.update(i for i, _, _ in run)
+
+    if not paginated:
+        return t
+    # Delete the NUMBER, keep the BOUNDARY: each blanked line is replaced by the
+    # form feeds it carried, never by the empty string. L-052.
+    form_feeds = {i: ff for i, _value, ff in candidates}
+    for i in paginated:
+        lines[i] = form_feeds[i]
+    return "\n".join(lines)
 
 _NONSPACE_CTRL_RE = re.compile(r"[\x00-\x08\x0e-\x1f\x7f]")
 
@@ -1034,7 +1191,7 @@ def _strip_document_header_banners(text: str) -> str:
         return text
     lines = text.split("\n")
     header_end = len(lines)
-    cap = min(len(lines), 30)
+    cap = min(len(lines), _HEADER_ZONE_LINES)
     for idx in range(cap):
         if lines[idx].lstrip().startswith("##"):
             header_end = idx
@@ -2573,7 +2730,7 @@ _LOCALE_EUROPEAN_MARKERS = {
     # an ML tensor shape `(70,64472)` again. A guard that lives in the CALLER
     # is lost the moment the caller changes; a guard in the pattern cannot be.
     # (Reproduced 2026-08-14 by the very test written to pin this vocabulary.)
-    "E4_four_decimals": r"(?<![(\[])\d{1,3},\d{4,}",
+    "E4_four_decimals": r"(?<![(\[])\b\d{1,3},\d{4,}",
     "E5_sci_notation": r"\d,\d+[eE][-+]?\d",
 }
 _LOCALE_US_MARKERS = {
@@ -2645,7 +2802,23 @@ class NormalizationReport:
     version: str = NORMALIZATION_VERSION
     steps_applied: list[str] = field(default_factory=list)
     steps_changed: list[str] = field(default_factory=list)
+    # CHARACTER-LENGTH DELTA per metric, ACCUMULATED across every step that
+    # writes the key -- not an event count, and it never was. Three rules write
+    # `dropped_minus_signs_recovered` (W0g, W0q, W0h) and three write
+    # `minus_signs_recovered`; until v1.9.59 this was a plain assignment, so when
+    # two of them fired on one document only the last one's delta survived.
+    # effectcheck publishes it to users as `upstream_sign_rewrites` and had to
+    # document it as a LOWER BOUND. Filed by ESCImate 2026-08-21 §4, verified by
+    # reading this source rather than inferred from behaviour.
     changes_made: dict[str, int] = field(default_factory=dict)
+    # The per-RULE breakdown the same filing asked for second. It also closes the
+    # other half of that defect: a length-NEUTRAL change (a glyph substitution
+    # such as `2` -> `-`, which is precisely what the minus-recovery rules do)
+    # has a delta of zero and therefore never reached `changes_made` at all. A
+    # step appears here whenever it changed the text, with its own delta -- zero
+    # included, because "this rule rewrote your document" is the fact the
+    # consumer needs and a zero delta does not make it untrue.
+    changes_made_by_step: dict[str, int] = field(default_factory=dict)
     footnote_spans: tuple[tuple[int, int], ...] = ()  # pre-strip char offsets
     # v2.4.83: the captured footnote strings, parallel to footnote_spans
     # (footnote_texts[i] == raw_text[footnote_spans[i][0]:footnote_spans[i][1]]).
@@ -2697,9 +2870,16 @@ class NormalizationReport:
         self.steps_applied.append(step_code)
         if before != after:
             self.steps_changed.append(step_code)
-            diff = len(before) - len(after)
-            if diff != 0:
-                self.changes_made[metric_name] = abs(diff)
+            diff = abs(len(before) - len(after))
+            # ACCUMULATE. A plain assignment lost every earlier rule that wrote
+            # the same key -- see the field comment on `changes_made`.
+            if diff:
+                self.changes_made[metric_name] = self.changes_made.get(metric_name, 0) + diff
+            # Recorded even at diff == 0: a length-neutral substitution is still
+            # a rewrite of the consumer's document.
+            self.changes_made_by_step[step_code] = (
+                self.changes_made_by_step.get(step_code, 0) + diff
+            )
 
     def to_dict(self) -> dict:
         """JSON-ready view of the whole report, field-for-field.
@@ -5719,8 +5899,31 @@ def _normalize_text(
                 continue
             repeated.add(s)
     if repeated:
+        # RULE 0g. This deletes lines and, until 2026-08-22, did so with no
+        # count, no `changes_made` key and no log line -- an inline list
+        # comprehension inside `_normalize_text`, which is why an audit that
+        # wrapped every module-level function and every `_track` call found
+        # NOTHING while five lines went missing. The uninstrumented channel is
+        # where the deletions are.
+        #
+        # ⚠️ KNOWN DEFECT, OPEN: this step is NOT IDEMPOTENT, and the comment
+        # above already predicted it ("causing idempotence drift when pass 2 has
+        # a shorter input"). `min(gaps) >= 20` is a POSITION metric, so any
+        # earlier step that removes lines can move a repeated line across the
+        # threshold between passes. Measured on `ieee_access_5` (2026-08-22):
+        # `Performance metric` -- a repeated table COLUMN HEADER, not
+        # boilerplate -- survives pass 1 at 5 occurrences and is deleted 5-of-5
+        # on pass 2. `_looks_like_running_header_or_footer` is False for it, so
+        # P0r would never have taken it; this rule takes it on spacing alone.
+        # Deleting a column header loses the label that says what the numbers
+        # underneath it are. Tracked in `todo.md`; the fix needs a stability
+        # metric that survives line removal, not a threshold tweak.
+        before_repeat = t
         lines = [l for l in lines if l.strip() not in repeated]
         t = "\n".join(lines)
+        report._track(
+            "P0q_repeated_line_strip", before_repeat, t, "repeated_lines_stripped"
+        )
     # Strip standalone page numbers - 1-3 digit unconditionally.
     #
     # The character class is [ TAB], NOT the whitespace class. Under
@@ -5732,12 +5935,18 @@ def _normalize_text(
     # marker with them, folding a 6,055-char appendix back into the body.
     # A page NUMBER is furniture; a page BOUNDARY is structure, and downstream
     # steps navigate by it.
-    # The leading form feed is CAPTURED and put back, not merely excluded from
-    # the class: a page number is often the FIRST thing on a new page, so the
-    # line itself begins with the break. Narrowing the class alone stopped
-    # matching those lines at all and let the numbers through -- measured,
-    # '496'..'502' reappeared in the body of 10.1016/j.jesp.2009.12.010.
+    # The page boundary is preserved by CONSTRUCTION now: the step splits on the
+    # form feed, edits within each page, and rejoins. Narrowing the character
+    # class alone had stopped those lines matching at all and let the numbers
+    # through -- measured, '496'..'502' reappeared in the body of
+    # 10.1016/j.jesp.2009.12.010.
+    # v1.9.59: the step is MARGIN-SCOPED. Unscoped, it deleted a printed
+    # coefficient of `0` from 10.1136/bmj-2024-080924 Table S1 and left the
+    # interval and p-value behind it -- and it did so with no count at all,
+    # which is the half of the defect this `_track` closes.
+    before = t
     t = _strip_standalone_page_numbers(t)
+    report._track("P0_standalone_page_numbers", before, t, "page_numbers_stripped")
     # v2.4.3/v2.4.5: 4-digit page numbers (continuous-pagination journals like
     # PSPB where volume runs page numbers into the 1000s, e.g.
     # ``efendic_2022_affect`` with pages 1174-1185). Two patterns fire:

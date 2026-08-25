@@ -27,6 +27,18 @@ def norm_report(text: str, level: str = "academic"):
     return normalize_text(text, NormalizationLevel(level))
 
 
+def _page(marker: str = "body", n_lines: int = 25) -> str:
+    """A page's worth of text, for fixtures that need a real pagination run.
+
+    Since v1.9.59 a bare integer is stripped only as part of a run: three or
+    more consecutive values ascending by one, each at least
+    `normalize._PAGINATION_MIN_LINE_GAP` lines apart. That gap is the whole
+    discriminator between pages 1, 2, 3 and a table column reading `1 2 3` down
+    adjacent cells, so a three-line fixture cannot exercise the rule.
+    """
+    return "".join(f"{marker} line {i}\n" for i in range(n_lines))
+
+
 # ── D5 Bug Regression: the MetaESCI corruption cases ──────────────────
 
 
@@ -295,18 +307,44 @@ class TestA1_S9_Interaction:
         assert "p <" in result
 
     def test_page_number_not_near_stat_still_stripped(self):
-        """S9 still strips genuine page numbers unrelated to stats."""
-        result = norm("content here\n42\nmore content")
-        # 42 on its own line should be stripped by S9
-        lines = result.split("\n")
-        assert not any(l.strip() == "42" for l in lines)
+        """S9 strips a genuine page NUMBER — which now means a pagination RUN.
+
+        RE-FIXTURED 2026-08-22 (v1.9.59). This used to be
+        `norm("content here\\n42\\nmore content")` with `42` asserted gone: one
+        bare integer between two lines of prose, deleted on sight. That contract
+        was deleting published data — pdftotext emits a narrow numeric table
+        column as one cell per line, and on `10.1136/bmj-2024-080924` Table S1
+        the deleted cell was a printed coefficient of `0`, whose interval and
+        p-value we then shipped with no estimate.
+
+        A page number is now three or more consecutive values, ascending by one,
+        each a page of text apart. The A1/S9 ORDERING invariant this class exists
+        to pin is unchanged and still asserted by the other cases here.
+        """
+        doc = "".join(_page(f"content here {i}") + f"{42 + i}\n" for i in range(3))
+        lines = norm(doc).split("\n")
+        for n in (42, 43, 44):
+            assert not any(ln.strip() == str(n) for ln in lines)
 
     def test_stat_value_preserved_page_stripped(self):
-        """p-value safe, unrelated standalone number still stripped."""
-        result = norm("p = .034\n42\nNext paragraph")
+        """p-value safe, and a real pagination run still goes."""
+        doc = "p = .034\n" + "".join(
+            _page(f"Next paragraph {i}") + f"{42 + i}\n" for i in range(3)
+        )
+        result = norm(doc)
         assert ".034" in result
         lines = result.split("\n")
-        assert not any(l.strip() == "42" for l in lines)
+        for n in (42, 43, 44):
+            assert not any(ln.strip() == str(n) for ln in lines)
+
+    def test_a_lone_bare_integer_between_body_lines_survives(self):
+        """The other half of the same contract, asserted rather than implied.
+
+        `tests/test_page_number_strip_never_deletes_data.py` carries the real
+        paper; this pins the boundary here so the ordering class cannot drift
+        back to deleting values.
+        """
+        assert "42" in norm("content here\n42\nmore content")
 
     def test_standard_level_skips_a1(self):
         """Standard level does NOT run A1 — p =\\n42 stays broken."""
@@ -376,19 +414,39 @@ class TestS8_NoStatCorruption:
 
 
 class TestS9_PageNumberBoundary:
-    """S9 pattern: ^\\s*\\d{1,3}\\s*$ (MULTILINE) — strips standalone 1-3 digit lines."""
+    """S9 strips a PAGINATION RUN, not every standalone 1-3 digit line.
 
-    def test_strips_standalone_1(self):
-        lines = norm("text\n1\ntext").split("\n")
-        assert not any(l.strip() == "1" for l in lines)
+    RE-FIXTURED 2026-08-22 (v1.9.59). The pattern this class was written around,
+    ``^\\s*\\d{1,3}\\s*$`` under MULTILINE, matched a table cell as readily as a
+    page number — pdftotext emits a narrow numeric column as one cell per line —
+    and it deleted a printed coefficient of ``0`` from
+    ``10.1136/bmj-2024-080924`` Table S1, shipping its interval and p-value with
+    no estimate. Every case below that asserted a lone integer is deleted has
+    been inverted; the discriminator is now three or more consecutive values,
+    ascending by one, each a page of text apart, which a table column cannot
+    satisfy because its cells are adjacent lines.
+    """
 
-    def test_strips_standalone_42(self):
-        lines = norm("text\n42\ntext").split("\n")
-        assert not any(l.strip() == "42" for l in lines)
+    def test_strips_a_pagination_run(self):
+        doc = "".join(_page(f"text {i}") + f"{1 + i}\n" for i in range(3))
+        lines = norm(doc).split("\n")
+        for n in (1, 2, 3):
+            assert not any(l.strip() == str(n) for l in lines)
 
-    def test_strips_standalone_999(self):
-        lines = norm("text\n999\ntext").split("\n")
-        assert not any(l.strip() == "999" for l in lines)
+    def test_strips_a_high_valued_pagination_run(self):
+        doc = "".join(_page(f"text {i}") + f"{997 + i}\n" for i in range(3))
+        lines = norm(doc).split("\n")
+        for n in (997, 998, 999):
+            assert not any(l.strip() == str(n) for l in lines)
+
+    def test_preserves_a_lone_standalone_1(self):
+        assert "1" in norm("text\n1\ntext")
+
+    def test_preserves_a_lone_standalone_42(self):
+        assert "42" in norm("text\n42\ntext")
+
+    def test_preserves_a_lone_standalone_999(self):
+        assert "999" in norm("text\n999\ntext")
 
     def test_preserves_standalone_1000(self):
         """4+ digits are NOT page numbers."""
@@ -398,10 +456,9 @@ class TestS9_PageNumberBoundary:
         """Number with adjacent text is NOT standalone."""
         assert "42 items" in norm("text\n42 items\ntext")
 
-    def test_strips_with_whitespace(self):
-        """Leading/trailing whitespace still counts as standalone."""
-        lines = norm("text\n  42  \ntext").split("\n")
-        assert not any(l.strip() == "42" for l in lines)
+    def test_whitespace_padding_does_not_change_the_verdict(self):
+        """A padded lone integer is still a value, not furniture."""
+        assert "42" in norm("text\n  42  \ntext")
 
     def test_a1_protects_stat_from_stripping(self):
         """A1 joins p =\\n42 BEFORE S9 runs — so 42 isn't standalone anymore."""
@@ -820,14 +877,17 @@ class TestLine238_Line260_ModerateRisk:
         # 's' is not in [-\d.], so line 238 doesn't match
         assert "= some" not in result or "=\nsome" not in result
 
-    # Line 260: ^\s*\d{1,3}\s*$ (MULTILINE)
-    def test_260_strips_standalone_1(self):
-        lines = norm("text\n1\ntext").split("\n")
-        assert not any(l.strip() == "1" for l in lines)
+    # Line 260: a PAGINATION RUN, not `^\s*\d{1,3}\s*$` under MULTILINE.
+    # Re-fixtured 2026-08-22 — see `TestS9_PageNumberBoundary` for why the old
+    # contract was deleting published table cells.
+    def test_260_strips_a_pagination_run(self):
+        doc = "".join(_page(f"text {i}") + f"{1 + i}\n" for i in range(3))
+        lines = norm(doc).split("\n")
+        for n in (1, 2, 3):
+            assert not any(l.strip() == str(n) for l in lines)
 
-    def test_260_strips_standalone_999(self):
-        lines = norm("text\n999\ntext").split("\n")
-        assert not any(l.strip() == "999" for l in lines)
+    def test_260_preserves_a_lone_999(self):
+        assert "999" in norm("text\n999\ntext")
 
     def test_260_preserves_1000(self):
         assert "1000" in norm("text\n1000\ntext")

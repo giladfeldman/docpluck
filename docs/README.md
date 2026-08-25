@@ -546,9 +546,9 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.137',            # docpluck itself
+# {'version': '2.4.138',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.58',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.59',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
 #  'table_extraction_version': '2.4.12',
 #  'python_version': '3.14.5',      # the interpreter…
@@ -621,19 +621,35 @@ def extract_from_url(url: str) -> str:
 | Curly quotes | `"the "effect""` → `"the "effect""` |
 | Hyphenation | `"signi-\nficant"` → `"significant"` |
 | Repeated headers | Journal name repeated on every page → stripped |
-| Page numbers | Standalone `12` on its own line → stripped |
+| Page numbers | Standalone `12` in a page **margin** → stripped |
+
+> A bare integer in the **body** of a page is left alone. pdftotext emits a narrow
+> numeric table column as one cell per line, so a printed coefficient of `0` has
+> exactly the shape of a page number; only position on the page tells them apart.
 
 ### Academic normalization adds (`NormalizationLevel.academic`)
 
 | Artifact | Example (before → after) |
 |----------|--------------------------|
 | Stat line breaks | `"p =\n.001"` → `"p = .001"` |
-| Dropped decimals | `"p = 484"` → `"p = .484"` |
-| European decimals | `"p = 0,05"` → `"p = 0.05"` |
 | CI delimiters | `"[0.81; 1.92]"` → `"[0.81, 1.92]"` |
 | Greek letters | `"η² = 0.12"` → `"eta2 = 0.12"` |
 | Superscripts | `"r² = 0.54"` → `"r2 = 0.54"` |
 | Footnote markers | `"p < .001¹"` → `"p < .001"` |
+
+### What normalization deliberately does NOT do
+
+docpluck **extracts and canonicalises notation. It does not repair the paper.**
+Scope is **English-language articles written in US numeric convention** (`.` decimal,
+`,` thousands) — see [`SCOPE.md`](SCOPE.md) for the full consumer contract.
+
+| Input | Output | Why |
+|-------|--------|-----|
+| `"p = 0,05"` | `"p = 0,05"` | European decimals **pass through as printed**. Every EU→US conversion rule was deleted in v2.4.129/130: over 297 English papers they fired 10 times and *not once correctly*. The source token stays intact so a consumer can still decide; once converted it could not. |
+| `"N = 1,182"` | `"N = 1,182"` | The thousands separator is **preserved**. Stripping it turned a printed Satterthwaite df of `185,178` into `185178`, a 1000× error. |
+| `"p = 484"` | `"p = 484"` | An author's dropped decimal is **the author's**. Both firing sites across 297 papers were the paper's own error, confirmed by rasterizing the page. |
+| `"p < 05"` | `"p < 05"` | The same shape has opposite owners in two real papers; under irreducible ambiguity the default is pass-through, because pass-through is reversible for the consumer and a repair is not. |
+| `"[5.37, 4.66]"` | `"[5.37, 4.66]"` | A reversed interval is passed through verbatim. Flagging it belongs to a tool that holds the parsed statistic and has a UI to report it; docpluck holds text and has no channel to announce a guess. |
 
 ---
 

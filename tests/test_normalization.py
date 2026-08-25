@@ -610,9 +610,27 @@ class TestS9_HeaderFooter:
         )
 
     def test_page_numbers_stripped(self):
-        text = "content\n42\nmore content\n43\nstill more"
+        """A PAGINATION RUN goes; two adjacent bare integers do not.
+
+        RE-FIXTURED 2026-08-22 (v1.9.59). This was
+        `"content\\n42\\nmore content\\n43\\nstill more"` with `42` asserted
+        gone — five lines, two integers one line apart, which is the shape of a
+        table column, not of pagination. The old rule deleted both, and on
+        `10.1136/bmj-2024-080924` Table S1 that same rule deleted a printed
+        coefficient of `0` and left its interval and p-value attached to
+        nothing. A page number now needs three consecutive values, each a page
+        of text apart.
+        """
+        page = "".join(f"content line {i}\n" for i in range(25))
+        text = "".join(page + f"{42 + k}\n" for k in range(3))
         result = norm(text, "standard")
-        assert "\n42\n" not in result
+        for n in (42, 43, 44):
+            assert f"\n{n}\n" not in result
+
+    def test_two_adjacent_bare_integers_are_not_pagination(self):
+        """The counter-case, pinned: a table column is not a page-number run."""
+        result = norm("content\n42\nmore content\n43\nstill more", "standard")
+        assert "42" in result and "43" in result
 
     def test_4digit_page_numbers_stripped_when_recurring(self):
         """v2.4.3: Continuous-pagination journals (PSPB, JESP volume runs)

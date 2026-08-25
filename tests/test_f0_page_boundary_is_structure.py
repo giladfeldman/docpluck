@@ -49,23 +49,65 @@ from docpluck.normalize import (
 # rule it claims to pin drifted underneath it.
 
 
+def _page_body(n_lines: int = 25) -> str:
+    """A page's worth of text.
+
+    The pagination gate requires consecutive page numbers to be at least
+    `normalize._PAGINATION_MIN_LINE_GAP` lines apart — that gap is the only
+    thing separating pages 1, 2, 3 from a table column reading `1 2 3` down
+    adjacent cells. A fixture with two-line pages is not a document.
+    """
+    return "".join(f"body line {i}" + chr(10) for i in range(n_lines))
+
+
+def _run(numbers, *, at_head: bool) -> str:
+    """A document whose page numbers form a real pagination run."""
+    if at_head:
+        return "".join(f"{PAGE_BREAK}{n}" + chr(10) + _page_body() for n in numbers)
+    return "".join(f"{PAGE_BREAK}{_page_body()}{n}" + chr(10) for n in numbers)
+
+
 def test_a_page_number_alone_on_a_line_is_removed():
-    assert _strip_page_numbers("body\n  42  \nmore") == "body\n\nmore"
+    """A PAGINATION RUN goes; a lone bare integer between body lines stays.
+
+    UPDATED 2026-08-22 (v1.9.59). This assertion used to be
+    `_strip_page_numbers("body\\n  42  \\nmore") == "body\\n\\nmore"` — one
+    interior bare integer, deleted on sight. That is no longer the contract and
+    the change is deliberate: pdftotext emits a narrow numeric table column as
+    one cell per line, so `42` between two lines of anything is
+    indistinguishable from a published value — and on `10.1136/bmj-2024-080924`
+    Table S1 it WAS one (a printed coefficient of `0`, delivered as an interval
+    and a p-value with no estimate). The old expectation was a constructed
+    three-line string, never a shape observed in a paper.
+
+    A page number is now identified by the only signature that cannot be a table
+    column: `value - page_index` constant across ≥ 3 distinct pages. A
+    "top or bottom of the page" gate was also built, and removed — it is not
+    idempotent inside a pipeline whose other steps delete lines, and it was worth
+    9 strips in 1,103 across the baseline. See `normalize._HEADER_ZONE_LINES`.
+    """
+    out = _strip_page_numbers(_run((42, 43, 44), at_head=False))
+    assert "42" not in out and "43" not in out and "44" not in out
+    assert _strip_page_numbers("body\n  42  \nmore") == "body\n  42  \nmore"
 
 
 def test_a_page_number_does_not_take_the_page_break_with_it():
     """The whole defect, in one assertion."""
-    text = "body\n\n01\n\n\n" + PAGE_BREAK + "\n\nmore"
+    text = "".join(
+        f"{_page_body()}{n}" + chr(10) + chr(10) + PAGE_BREAK + chr(10) for n in (1, 2, 3)
+    )
     out = _strip_page_numbers(text)
-    assert PAGE_BREAK in out, repr(out)
-    assert "01" not in out, repr(out)
+    assert out.count(PAGE_BREAK) == 3, repr(out)
+    for n in (1, 2, 3):
+        assert f"\n{n}\n" not in out, repr(out)
 
 
 def test_a_page_number_that_STARTS_a_page_is_still_removed():
     """`\\x0c496` — the break and the number share a line. Keep one, drop the other."""
-    out = _strip_page_numbers("body\n" + PAGE_BREAK + "496\nmore")
-    assert PAGE_BREAK in out, repr(out)
-    assert "496" not in out, repr(out)
+    out = _strip_page_numbers(_run((496, 497, 498), at_head=True))
+    assert out.count(PAGE_BREAK) == 3, repr(out)
+    for n in (496, 497, 498):
+        assert str(n) not in out, repr(out)
 
 
 def test_an_inline_number_is_untouched():
