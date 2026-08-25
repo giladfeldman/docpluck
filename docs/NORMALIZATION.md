@@ -549,8 +549,8 @@ it reads are the ones the paper printed.
 The count of C0 control characters **still present in the returned text** —
 i.e. the ones `C0` deliberately did NOT remove because they are corrupted
 *content* glyphs rather than furniture. Over the 30-paper held-out PMC corpus
-there are 49 such characters in 16 papers (`Schrimacher` = "Schrittmacher",
-`Noallsanitat` = "Notfall…", `A -B helices`).
+there are 49 such characters in 16 papers (`Schri\x02macher` = "Schrittmacher",
+`No\x04allsanitat` = "Notfall…", `A\x03 -B\x03 helices`).
 
 They are counted rather than deleted because docpluck **extracts and
 normalizes; it does not repair the paper** — and counted rather than left

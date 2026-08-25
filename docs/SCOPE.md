@@ -61,7 +61,36 @@ it was written for.
 line and reversible; doing it in ours was irreversible and destroyed the only evidence that a table
 was European. That asymmetry is the whole argument.
 
-### ⚠ Where we ARE still lossy, and it is bigger than A3a ever was
+### ⚠ Before v2.4.138, the NORMALIZE channel deleted bare small-integer table cells
+
+**If you hold extractions produced before v2.4.138, they may be missing values, and nothing marks
+where.** The standalone-page-number strip matched **any** line whose entire content was a 1-3
+digit integer, anywhere on the page — and pdftotext emits a narrow numeric table column as one
+cell per line, so a printed count, event total, degrees-of-freedom or small whole-number
+coefficient had exactly that shape. It was silently selective: `-4`, `0.5` and `1000` never
+matched; `0`, `4` and `999` always did.
+
+Measured on `10.1136/bmj-2024-080924` (BMJ) supplementary appendix Table S1 p6, row *"Number of
+Advancement Maneuvers (attempt #2)"* — printed `0`, `(-1.5 to 1.5)`, `p = 0.999`, delivered as an
+interval and a p-value **with no estimate**. That is worse than a wrong number: a wrong number can
+be challenged; an interval attached to nothing cannot even be attributed.
+
+Corpus census, 26-paper baseline: 345 page-margin sites against **1,987 body-interior sites in
+26/26 papers, 239 of them in 17 papers standing beside an interval or a p-value**
+(`python tools/diag/page_number_strip_blast_radius.py --baseline`).
+
+**Fixed in v2.4.138.** A bare integer is now removed only as part of a **pagination run** —
+three or more consecutive values ascending by one, each at least a page of text apart, which a
+table column cannot satisfy because its cells are adjacent lines. Measured through the shipped
+pipeline: **1,159 page numbers stripped across the 26 papers, 1,100 bare-integer lines surviving
+to the output**, against roughly 2,330 removed by the old rule. Line count is unchanged on every
+paper, and the step is now counted as `page_numbers_stripped`; before, it had no telemetry at
+all.
+
+**The shape to look for in stored output:** an interval or a p-value whose estimate is absent.
+There is no marker to grep for — the line was blanked.
+
+### ⚠ Where we were ALSO lossy, in the render channel
 
 **The render channel deletes content, and until v2.4.130 it did so with no telemetry whatsoever.**
 `render_pdf_to_markdown()` chains 54 markdown post-processors — count it from the source with
