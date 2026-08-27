@@ -1,6 +1,204 @@
 # Changelog
 
-## [2.4.138] - 2026-08-22
+## [2.4.138] - 2026-08-27
+
+> ### ⛔ UNRELEASED, AND THE PAGE-GATE SECTION BELOW IS BLOCKED — DO NOT TAG
+>
+> A three-provider consult round on 2026-08-27 (sol/openai, sonnet/anthropic, grok/xai —
+> all three substantive; grok's `CHALLENGE_MISSED` was verified a false red) found the
+> repeated-line page gate unsafe, and **every finding was reproduced locally against the
+> shipped composition**, not accepted on a reviewer's word.
+>
+> **The claim below that the change loses ZERO lines of data is false.** Measured over a
+> strided 36-paper sample from the article repository, the working tree against a `git
+> worktree` at `047b4ca`, same raw text, separate interpreters: **net −4,763 characters,
+> 7 papers losing content.** On `10.1001/jamanetworkopen.2023.39337` the article title
+> `Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes` goes
+> from **13 occurrences to 0** — the paper is delivered with no title. Twelve of those are
+> running-header copies whose removal is correct; the thirteenth is the title block, and
+> taking it too is the all-or-nothing deletion rule 0g forbids.
+>
+> Worse, the gate's page map is wrong for the dominant real-world shape. `_page` is
+> incremented *after* the line is recorded, and pdftotext glues the form feed to the first
+> line of the new page — so that line is attributed to the previous page. A six-page
+> running header computes `max_per_page = 2` and is therefore **not** stripped: the gate
+> fails at its own purpose. Measured across 27 real papers, **376 of 403 form feeds (93.3%)
+> are glued to a line start**, where the off-by-one bites.
+>
+> Also still live and reproduced: A1's `\s`-based substitutions eat form feeds before the
+> gate runs (1 → 0), and the final `out = t.strip()` removes a trailing page boundary
+> (2 → 1) — the same L-052 class this release claimed to have closed at five sites.
+>
+> Full evidence, the five things that must change first, and what could NOT be established:
+> `docs/FINDINGS_2026-08-27_consult_v1960_page_gate_NOGO.md`.
+>
+> **The `git_state` fix in this file is independent of all of the above and is sound.**
+
+### A repeated line is furniture because of WHERE ON THE PAGE it sits — not how far apart it sits in the file
+
+The repeated-line strip decided with `min(gaps) >= 20` — the minimum **line-index** distance
+between consecutive occurrences, used as a proxy for *"appears once per page"*. The proxy is not
+stable under line removal, and the rule's own comment had predicted the failure it caused:
+*"causing idempotence drift when pass 2 has a shorter input."*
+
+**Measured on `ieee_access_5`.** `Performance metric` is a table **column header**. On pass 1 it
+appears nine times, at line positions
+
+```
+[521, 545, 582, 651, 682, 972, 978, 1032, 1040]
+                          ^^^^^^^^  ^^^^^^^^   two tight pairs -> min_gap 6 -> KEPT
+```
+
+Other steps then delete those four tail occurrences. Pass 2 sees five well-spaced ones, `min_gap`
+is 22, and **all five are deleted** — leaving a column of anonymous numbers with nothing saying
+what they measure. No threshold fixes this: min-gap over a *shrinking* occurrence set is not
+monotone, so every threshold has an input that crosses it.
+
+**The gate is now the page distribution.** A line's page is a property of the document; deleting
+other lines cannot move it. A line is furniture only if it occurs on **≥5 distinct pages** AND
+either at most **once per page** (a running header/footer) or **≥20 times** (a watermark that
+repeats within each page).
+
+Over the 21-paper strided sample, on the 33 lines the old rule stripped, the classes separate
+with **no overlap**:
+
+| class | signature | count |
+|---|---|---|
+| running header / footer | 5–21 pages, ≤1 per page | 16 |
+| watermark | on **every** page, 4–5 per page | 4 |
+| **table content** | 1–4 pages, 2–26 per page | **13** |
+
+All thirteen were being deleted: `Number of trained architectures`, the values
+`100`/`200`/`0.18`/`2`/`3`/`4`/`8`, `Total`, `Other`, `demography_3`'s 21 `***` significance
+markers (19 of them on **one** page, taken by the `count >= 20` path) and `maier_2023_collabra`'s
+26 `X` table marks (**all** on one page). So this was never only an idempotency bug.
+
+### The page boundaries had to come back first — five steps were destroying them
+
+A gate that asks *"which page?"* cannot run on text whose page breaks are gone, and they were.
+Five steps dropped a whole line with a bare `continue`, taking the form feed glued to it:
+
+| step | form feeds destroyed (21-paper sample) |
+|---|---|
+| `P0_page_footer_strip` | 113 |
+| `P0r_recurring_running_header_strip` | 74 |
+| `S9_header_footer_removal` | 9 |
+| `H0r_header_banner_restrip` | 1 |
+| `G5c2_split_numbered_heading_rejoin` | 1 |
+
+This is L-052's class, and its promise had already been made **three separate times in three
+local implementations** — `_strip_standalone_page_numbers`, `_recover_pagination_run`, and F0's
+inner `_drop()`. The sites that had *not* made it were the ones nobody had looked at. One shared
+`keep_page_break` / `page_break_residue` now defines it once.
+
+```
+form feeds   371 raw  ->   85 at HEAD (23%)  ->  290 (78%)
+papers left at ZERO page boundaries      11 of 21  ->  0 of 21
+```
+
+### Delete furniture, never data — the strip now actually consults the guard
+
+Rule 0g requires every deleting step to call `_carries_statistical_content`. This one never did,
+and with the page gate in place it had to: `j_health_soc_behav_1`'s figure note
+
+```
+Note: Whiskers indicate 95% confidence intervals. N = 136,739 (women = 68,993, men = 67,746). Data are from the
+```
+
+sits once under each of five figures on five different pages and is **indistinguishable from a
+running footer by position**. It is unmistakable by content. Its wrapped second line — the
+survey and the year range — is caught by letting the data-source-caption marker find a year
+anywhere inside a parenthesis group (`(Release 22, years 2001-2023)`), the same
+survey-plus-year-range shape that marker was written for; the old pattern missed it only because
+`Release 22, years ` stood between the paren and the year.
+
+**HEAD vs fix, 21-paper sample:** 34 furniture lines newly removed, 10 lines recovered, **zero
+lines of data lost**, corpus non-idempotency **1 -> 0**.
+
+### `changes_made` counts minus signs by contract, not by a whitespace coincidence
+
+**No published value was wrong.** That is said first because the first draft of this entry
+claimed one was. Measured over the 21-paper corpus, the sign-recovery family fires on **one**
+paper and reports `signs = 6, delta = 6`; **zero papers diverge**. What changes is that the
+agreement was a coincidence and is now a contract.
+
+`_track` filled `changes_made` with `abs(len(before) - len(after))`. For this family that is the
+**whitespace normalisation**, which equals the number of minus signs re-attached only when there
+is exactly one stray space per bound:
+
+| input bracket | delta | signs | |
+|---|---|---|---|
+| `[- 0.58, - 0.18]` | 2 | 2 | agrees — the observed shape |
+| `[- 0.58 , - 0.18]` | 3 | 2 | a space before the comma |
+| `[- 0.58,   - 0.18]` | 4 | 2 | extra spaces after it |
+
+All three brackets on `10.1016/j.jesp.2021.104154` — the paper W0q was built on — are the first
+shape, so its published **6 was right, by luck**. The last two rows are **arithmetic probes, not
+prevalence claims**: neither shape occurs in the corpus. That is precisely the point, because a
+latent divergence never announces itself.
+
+This is the closure ESCImate's 2026-08-22 notice asked for, in their words: *"exactness here
+rests on a property of the RULES, not of the metric ... nothing would fail."*
+
+**The unit is minus signs attached to a numeral**, uniform across W0g / W0q / W0h, because
+`upstream_sign_rewrites` is what a reader is shown. Not rule firings: one W0q firing repairs one
+bracket and can attach **two** signs, so a per-firing count reports 3 on that paper where the
+truth is 6 — that version was drafted first and is the mirror error. `_track` never **invents** a
+count: a call site supplies one, or the character delta stands unchanged.
+`changes_made_by_step` stays a character delta by design.
+
+### `eta` is not a substring of ordinary English
+
+`_EFFECT_TYPE_PATTERNS` ended its eta alternatives with a bare, unanchored `eta`, and
+`_effect_type_for` runs over the whole caption **and** footnote — so `Cardiom-eta-bolic`,
+`b-eta`, `th-eta` and `M-eta-analysis` each typed **every unlabeled estimate column in their
+table** as eta-squared. Reported by Scimeto against a JAMA Netw Open table captioned *"…
+Cardiometabolic Risk Factors"*: 19 rows emitted with an `eta2` field, **18 of them outside η²'s
+domain [0, 1]**, against **0** occurrences of any eta token in the extracted text. That is a
+fabrication — docpluck naming a statistic the paper does not report — and `beta coefficient` →
+partial eta-squared is the same defect relabelling a different statistic.
+
+The domain guard that should have caught it was gated on `eta2_inferred`, which is true only on
+the path that requires an F in the row; when the key came from the **caption** vocabulary — the
+weakest of the three evidence sources — the guard was skipped entirely. Both are fixed.
+
+### Tests
+
+- `tests/test_repeated_line_strip_is_page_scoped.py` — 10 tests, watched fail at `9504ad9`.
+- `tests/test_changes_made_is_an_exact_count.py` — 9 tests, watched fail with `assert 6 == 3`.
+- `tests/test_eta_is_not_a_substring.py` — 18 tests, watched fail 9-of-18.
+
+### `git_sha` alone is a false identity — the receipt now says whether the tree matches it
+
+Most of this portfolio consumes docpluck through `pip install -e`, which executes whatever sits in
+the working tree while `git rev-parse HEAD` reports the last commit. Every uncommitted edit
+therefore shipped under a SHA that did not contain it.
+
+Measured in this checkout while the work above was in progress: HEAD `9504ad9`, **twelve paths
+modified**, `normalize.py` among them — a file whose changes alter extraction output. A consumer
+on the editable install would have been running that normalization and recording
+`git_sha: 9504ad9` for it, and `dirty` appeared **zero times anywhere under `docpluck/`**.
+
+`get_version_info()` now returns **`git_state`** — `"clean"` / `"dirty"` / `"unknown"`, cached
+alongside `git_sha` so the two halves of one receipt cannot describe different moments. The
+vocabulary deliberately matches `PDFextractor/service/app/identity.py`, which had already had to
+solve this at the service boundary *because the library did not offer it*.
+
+Raised by CONDUCTOR #4. Additive — no field removed or renamed.
+
+### Scope note for consumers
+
+`normalize_text` output CHANGES in this release: more page boundaries survive, more running
+headers are removed, and table lines that were being deleted now survive. Extraction goldens may
+legitimately move. `changes_made["dropped_minus_signs_recovered"]` becomes an exact count of minus signs by
+contract rather than by coincidence — its VALUE is unchanged on every paper in the corpus.
+
+---
+
+*Everything below shipped in the same untagged 2.4.138, as normalization 1.9.59, committed
+2026-08-22 as `9504ad9`. Kept as its own section rather than merged, because it is a distinct
+defect with its own evidence — but it is not a separate release, and there is no 2.4.138 tag
+that contains only it.*
 
 ### A page number is in the margin; a bare integer in the body is a VALUE
 
@@ -150,6 +348,52 @@ repeated line across the threshold between passes. On `ieee_access_5` the line i
 one paper** and is being left red rather than ratcheted: the fix needs a metric that survives line
 removal, and tuning `>= 20` until the paper passes is how this class of defect survives. Tracked in
 `todo.md`.
+
+### `extract_to_dir()` raised `TypeError` on every call — the tripwire fired and nobody was watching
+
+`047b4ca` added `git_state` to `get_version_info()` and did not add the matching field to
+`ExtractionReport`. `extract_to_dir()` builds that report by **splatting** the version dict into
+the constructor, so the missing field is a `TypeError` at line 282 — before the per-file
+`try/except`, so the whole function raises rather than recording a per-file error:
+
+```
+TypeError: ExtractionReport.__init__() got an unexpected keyword argument 'git_state'.
+           Did you mean 'git_sha'?
+```
+
+**The splat is a deliberate tripwire and it worked exactly as its own docstring predicts** — *"a
+key added to `get_version_info()` without a matching field then raises `TypeError` on the first
+batch run, which is loud and immediate."* The alternative it rejects, assigning field by field,
+would have left `git_state` at `"unknown"` in every receipt: a receipt that looks complete and is
+not. The defect was not the design; it was committing without running the suite. Git hooks in this
+repo had been dark for 24 days (`core.hooksPath` pointed at the dead Dropbox path), so no gate ran
+on `047b4ca` at all.
+
+**Eleven test signals, one root cause** — every one an `extract_to_dir` caller:
+
+| where | signals |
+|---|---|
+| `test_provenance_completeness.py::TestWrittenReceiptAndSidecar` | 5 **errors** — the class fixture calls `extract_to_dir` and asserts `n_ok == 1`; an assert in a fixture is an ERROR, not a FAIL |
+| `test_provenance_completeness.py::TestReportProvenance` | 2 failures — the field-completeness assertions, which are the guard for exactly this |
+| `test_metaesci_followups.py::TestExtractToDir` | 2 failures |
+| `test_batch_scans_for_symbol_font_corruption.py` | 2 failures |
+
+**It was live for a downstream consumer, not merely pending a tag.** MetaESCI runs an *editable*
+install of this checkout — `importlib.util.find_spec('docpluck').origin` resolves to this working
+tree — and `src/03_process/extract_text.py:75` calls `extract_to_dir` directly with no
+`try/except`. Its whole text-extraction stage was crashing against this tree from the moment
+`047b4ca` landed. `047b4ca` is unpushed and untagged, so PyPI, the app pin and production were
+never affected; production continues to serve 1.9.58.
+
+`git_state` is now a field on `ExtractionReport`, spelled with a default because `git_sha` above it
+is positional. It reaches `to_dict()`, `write_receipt()` and the per-file `.json` sidecar — the
+sidecar and receipt were already built from `info` wholesale, so only the dataclass was missing.
+Verified against MetaESCI's own adapter, not only our tests: `extract_to_staging` returns
+`n_ok=1, n_failed=0` and carries `git_state`.
+
+**A SHA alone is not an identity.** A receipt reading `git_sha: 047b4ca` for a run against a tree
+with uncommitted edits names a commit whose code never ran, which is why `git_state` was added in
+the first place and why leaving it out of the receipt would have defeated its purpose.
 
 ### Also
 
