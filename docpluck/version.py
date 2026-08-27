@@ -127,6 +127,9 @@ def _resolve_git_sha() -> str:
 
     Returns ``"unknown"`` if docpluck was installed from a wheel, from PyPI,
     or from a directory that is not a git checkout. Never raises.
+
+    **A SHA ALONE IS NOT AN IDENTITY.** Read it with :func:`_resolve_git_state`
+    — see that function for why.
     """
     pkg_dir = Path(__file__).resolve().parent
     repo_root = pkg_dir.parent
@@ -139,6 +142,57 @@ def _resolve_git_sha() -> str:
         )
         if result.returncode == 0:
             return result.stdout.strip() or UNKNOWN
+    except Exception:
+        pass
+    return UNKNOWN
+
+
+@lru_cache(maxsize=1)
+def _resolve_git_state() -> str:
+    """``"clean"``, ``"dirty"``, or ``"unknown"`` for the docpluck checkout.
+
+    Cached exactly as :func:`_resolve_git_sha` is, and for a reason beyond
+    cost: the two are meant to be read as a PAIR, and a cached SHA beside a
+    freshly-probed state would let them describe different moments. A receipt
+    whose two halves disagree about when they were taken is worse than one that
+    is merely coarse. It also keeps the portfolio rule that a provenance value
+    must not change with WHEN you ask it.
+
+    **``git_sha`` on its own is a FALSE IDENTITY in an editable install, and
+    that is how most consumers in this portfolio run docpluck.** ``pip install
+    -e`` executes whatever is in the working tree; ``rev-parse HEAD`` reports
+    the last commit. Every uncommitted edit therefore ships under a SHA that
+    does not contain it, and two runs of materially different code are
+    indistinguishable in the receipt.
+
+    Not hypothetical. Measured 2026-08-27 in this very checkout: HEAD was
+    ``9504ad9`` while twelve paths were modified — including ``normalize.py``,
+    whose changes alter extraction output. A consumer running the editable
+    install would have been executing that normalization and recording
+    ``git_sha: 9504ad9`` for it, and nothing in the receipt could have told
+    anyone. `dirty` appeared ZERO times anywhere under ``docpluck/``.
+
+    The vocabulary deliberately mirrors ``PDFextractor``'s
+    ``service/app/identity.py``, which already had to solve this at the service
+    boundary because the library did not offer it. One concept, one table — a
+    second spelling of the same state is how two receipts come to disagree.
+    (The service's third value, ``stale``, is not reproduced here: it means the
+    on-disk version differs from the loaded one, which only the process that
+    imported the module can know.)
+
+    ``unknown`` when docpluck came from a wheel or PyPI — there is no tree to
+    be dirty. Never raises.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0:
+            return "dirty" if result.stdout.strip() else "clean"
     except Exception:
         pass
     return UNKNOWN
@@ -350,6 +404,12 @@ def get_version_info() -> dict:
         sectioning_version:       ``SECTIONING_VERSION`` from ``sections/``.
         table_extraction_version: ``TABLE_EXTRACTION_VERSION`` from ``extract_structured.py``.
         git_sha:                  Git SHA of the docpluck checkout, or ``"unknown"``.
+        git_state:                ``"clean"``, ``"dirty"`` or ``"unknown"``. **Read it
+                                  with ``git_sha``, never instead of it** — under an
+                                  editable install (how most of this portfolio consumes
+                                  docpluck) a dirty tree runs code the SHA does not
+                                  contain, so ``git_sha`` alone is a false identity.
+                                  See :func:`_resolve_git_state`.
         python_version:           Running interpreter, e.g. ``"3.14.5"``.
         unicodedata_version:      Unicode database backing ``unicodedata.normalize``,
                                   which ``normalize.py`` applies (NFC/NFKC).
@@ -396,6 +456,7 @@ def get_version_info() -> dict:
         "sectioning_version": SECTIONING_VERSION,
         "table_extraction_version": TABLE_EXTRACTION_VERSION,
         "git_sha": _resolve_git_sha(),
+        "git_state": _resolve_git_state(),
         "python_version": platform.python_version(),
         "unicodedata_version": unicodedata.unidata_version,
         "pdftotext_path": resolve_pdftotext_executable(),
