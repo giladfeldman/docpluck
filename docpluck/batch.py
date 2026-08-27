@@ -154,6 +154,15 @@ class ExtractionReport:
     # worse than none. `extract_to_dir` fills these by **splatting**
     # get_version_info(), so a key added there without a field here raises
     # TypeError on the first batch run instead of silently defaulting.
+    #: Whether the working tree the SHA names was CLEAN, DIRTY or unknown.
+    #: A SHA alone is not an identity: a receipt saying `git_sha: 047b4ca` for
+    #: a run against a tree with uncommitted edits names a commit whose code
+    #: never ran. Declared here because `get_version_info()` reports it, and
+    #: the splat below makes "reported but not received" a TypeError rather
+    #: than a silent `"unknown"`. It is spelled with a default, not as a
+    #: required field, because `git_sha` above it is positional and a new
+    #: required field would break every existing constructor call.
+    git_state: str = UNKNOWN
     #: The symbol transliteration contract consumers build their patterns
     #: against (docs/SYMBOL_CONTRACT.md). Without it a consumer cannot tell
     #: a CHANGED convention from a parse failure.
