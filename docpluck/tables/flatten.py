@@ -229,8 +229,34 @@ _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("cohens_d",            re.compile(r"\b(?:d\s*z|d|cohen)\b", re.I)),
     ("hedges_g",            re.compile(r"\b(?:g|hedges)\b", re.I)),
     ("pearson_r",           re.compile(r"^\s*r\b", re.I)),
-    ("eta_squared_partial", re.compile(r"η\s*²?\s*_?\s*p|η²p|eta.*p\b", re.I)),
-    ("eta_squared",         re.compile(r"η\s*²?|η2|eta", re.I)),
+    # `eta` IS A SUBSTRING OF ORDINARY ENGLISH. Until 2026-08-22 these two
+    # alternatives ended in a bare, unanchored `eta`, and `_effect_type_for` is
+    # run over the whole CAPTION AND FOOTNOTE (`_effect_type_for(vocab_all)`
+    # below) -- so "Cardiom-eta-bolic", "b-eta", "th-eta" and "M-eta-analysis"
+    # each typed EVERY unlabeled estimate column in their table as eta-squared.
+    # Measured by Scimeto on a JAMA Netw Open table captioned "...Cardiometabolic
+    # Risk Factors": 19 rows emitted with an `eta2` field, 18 of them outside
+    # eta-squared's domain [0, 1], against 0 occurrences of any eta token in the
+    # extracted text. That is a FABRICATION -- docpluck naming a statistic the
+    # paper does not report -- and `beta coefficient` -> partial eta-squared is
+    # the same defect relabelling a different statistic.
+    # The Latin spelling now requires that no LETTER precede or follow it, which
+    # still admits `eta2`, `eta 2`, `eta_p`, `eta squared`. The Greek forms need
+    # no such guard: they cannot occur inside an English word.
+    (
+        "eta_squared_partial",
+        re.compile(
+            r"η\s*[²2]?\s*[_\-]?\s*p(?![A-Za-z])"
+            r"|ηp\s*²"
+            r"|partial\s*[\-_]?\s*(?:η|eta)(?![A-Za-z])"
+            r"|(?<![A-Za-z])eta[\s\-_]*(?:squared?|sq|2)?[\s\-_]*(?:p(?![A-Za-z])|partial)",
+            re.I,
+        ),
+    ),
+    (
+        "eta_squared",
+        re.compile(r"η\s*²?|η2|(?<![A-Za-z])eta(?![A-Za-z])", re.I),
+    ),
     ("odds_ratio",          re.compile(r"\bOR\b|odds\s*ratio", re.I)),
     ("risk_difference",     re.compile(r"risk\s*diff", re.I)),
     ("mean_difference",     re.compile(r"mean\s*diff|\bMD\b|difference\s+in\s+means", re.I)),
@@ -1115,13 +1141,28 @@ def _flatten_one_row(
                 est = _to_signed_float(raw)
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
-                # When the η²p key was INFERRED (not named in the header), guard
-                # it to η²'s domain [0, 1] — a non-proportion estimate falls back
-                # to the generic `est` so a stray value is never mistyped as η²p.
+                # DOMAIN GUARD. Whenever the η²p key came from anywhere but the
+                # column header itself, hold it to η²'s domain [0, 1]: a
+                # proportion of variance cannot be negative and cannot exceed 1,
+                # so a value outside that range is definitionally not η². It
+                # falls back to the generic `est` — the value is still delivered,
+                # only the LABEL is refused, which is the conservative direction.
+                #
+                # `and eta2_inferred` was part of this condition until
+                # 2026-08-22, and it is why the guard could not fire on the case
+                # that needed it. `eta2_inferred` is True only on the
+                # `_infer_anova_eta2_hint` path, which requires an F in the row.
+                # When the key instead came from `effect_hint` — the CAPTION and
+                # footnote vocabulary, the weakest of the three evidence sources
+                # — the guard was skipped entirely. Measured by Scimeto on a JAMA
+                # Netw Open table (2026-08-21): 19 rows typed `eta2`, 18 of them
+                # outside [0, 1], from a column headed "mean change from baseline
+                # (95% CI)". The docstring promised "a stray non-proportion
+                # estimate is never mistyped"; the promise held only on the path
+                # the guard happened to be attached to.
                 if (
                     eff_key == "eta2"
                     and not _effect_type_for(header[ci])
-                    and eta2_inferred
                     and not (0.0 <= est <= 1.0)
                 ):
                     eff_key = "est"
@@ -1136,7 +1177,6 @@ def _flatten_one_row(
                 if (
                     eff_key == "eta2"
                     and not _effect_type_for(header[ci])
-                    and eta2_inferred
                     and not (0.0 <= est <= 1.0)
                 ):
                     eff_key = "est"
