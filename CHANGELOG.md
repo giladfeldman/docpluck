@@ -395,6 +395,28 @@ Verified against MetaESCI's own adapter, not only our tests: `extract_to_staging
 with uncommitted edits names a commit whose code never ran, which is why `git_state` was added in
 the first place and why leaving it out of the receipt would have defeated its purpose.
 
+**This break was predicted in writing, five days earlier, and read past.** The cross-project ask
+`2026-08-22T102300Z-docpluck-receipt-cannot-see-a-dirty-tree.json` — the very request that asked
+for a dirty-tree signal — says, verbatim:
+
+> `_provenance_kwargs()` SPLATS `get_version_info()` into `ExtractionReport`, deliberately, so that
+> a new key raises TypeError on the first batch run rather than defaulting silently. **Adding any
+> key therefore BREAKS every batch consumer until `ExtractionReport` gains the matching field in
+> the same release.**
+
+Its Option A prescribed the remedy exactly: *"…and the matching `ExtractionReport` fields in the
+same commit."* `047b4ca` implemented the key and not the field. **The guard was correct, was
+written down, and was walked past** — the producer's own tests pass by construction, so this class
+can only fail on the consumer side, which is this portfolio's founding failure shape rather than a
+new one.
+
+**Blast radius, swept and controlled rather than assumed.** Across the portfolio only two repos
+touch `extract_to_dir` / `ExtractionReport` / `get_version_info`: docpluck itself and **MetaESCI**
+(5 source files + 2 tests) — the sole consumer casualty. Explicitly **not** exposed, each with a
+two-sided control so the zero is a real zero: **CitationGuard** references docpluck in 5+ Python
+files but touches none of the three symbols and reaches the library over the HTTP `/extract`
+endpoint; the **PDFextractor service** references docpluck in 4 files and calls none of the three.
+
 ### Also
 
 - `docpluck/sections/types.py` imported `fields` but used `field`, making the whole library
