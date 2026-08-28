@@ -542,6 +542,151 @@ must exclude is the only other candidate in the corpus.
 Only two papers move at all: `PMC13137375` **+0.6881** and `PMC13137057` **+0.0012**. The recall
 floor — the property that makes docpluck worth fixing rather than replacing — is unchanged.
 
+> ### ⚠️ CHALLENGED 2026-08-28 — "papers regressed: 0" IS NOT CURRENTLY SUPPORTED
+>
+> A ScienceArena session (`sciencearena-6c`, relayed by CONDUCTOR #6) measured **`PMC13131283`
+> dropping 0.0306 on that arena's section metric** — a paper this row's "only two papers move
+> at all" does not contain. **`PMC13131283` IS in this population**: our own
+> `docs/REPLY_TO_SCIENCEARENA_2026-08-21.md:41` scores it 0.3714 → 0.9245.
+>
+> **The two measurements are probably not the same quantity, and that is a hypothesis, not a
+> defence.** The strongest hint is that their gain for `PMC13137375` is **+0.0403** where this
+> table reports **+0.6881** — an order of magnitude apart on one paper, which two scorers of
+> the same quantity should not produce. The metric behind this row is stated above it: 30
+> held-out papers, the arena's own scorer, variants `flat normalize_text` and `body-label slice
+> on the F0 text`.
+>
+> **Not resolved here, and deliberately not waved through.** Settling it means re-running the
+> arena harness for `PMC13131283` under 2.4.136 and 2.4.137 and reporting which variant moved.
+> Until someone does, **do not repeat "0 regressions"** — a consumer has now read it and
+> measured a regression, and the next one will too. A claim that survives by never being
+> re-measured is the shape this file has a standing rule about.
+>
+> ### ⛔ THE LATENCY HALF OF THIS BLOCK IS RETRACTED — 2026-08-28, I-0041
+>
+> **There was no table-latency regression in v2.4.137.** Not "the cause was misattributed" —
+> there was no effect. `extract_pdf_structured` timed in ISOLATION, back to back, same machine,
+> version asserted before each call: PMC13130256 0.91x, PMC13130281 1.09x, PMC13130289 1.13x,
+> PMC13138502 1.09x. **Median 1.09x against a claimed 2.4x–4.0x**, with `n_tables` identical
+> under both versions.
+>
+> **The mechanism: within a single 24-task arena run, latency GROWS WITH POSITION.** The
+> baseline ran first-half mean 12.1 s against second-half 30.5 s (2.52x, corr +0.38); the
+> comparison run was flat but uniformly high. A fast-starting run was paired task-by-task
+> against a uniformly slow one and the difference read as a property of the code.
+>
+> **THE RULE: never pair `latency_ms` across runs made at different times.** On this arena
+> `score` IS deterministic — 222 records, two independent runs, zero mismatches — and latency is
+> not. The confidence earned by one field was extended to the other because they share a record.
+>
+> **A second rule, from the instrument I suggested:** `cProfile` returned a flat 1.00x that
+> looked decisive and was uninterpretable — 60.8 s for a call the arena timed at 11.8 s, ~5x
+> overhead on a workload of millions of tiny calls. **An instrument whose overhead is comparable
+> to the effect cannot produce a trustworthy null.** What broke it open was the cheap control
+> nobody ran first: *does the effect reproduce outside the harness at all?* It does not.
+>
+> **NOT under suspicion, nothing to profile:** `_region_driven_capture`, `_pick_better_table`,
+> `extract_sections`, and the nine normalize functions cell-cleaning imports (9 of 9 byte-identical
+> between the tags by `ast.dump`, with a discriminating control).
+>
+> **What stands, independent of the phantom:** 2.4.137 changed no table or layout code
+> (`git log v2.4.136..v2.4.137 -- docpluck/extract_layout.py docpluck/tables/` is empty; control:
+> the same filter over v2.4.126..v2.4.137 returns 4 commits), and `camelot` is imported
+> FUNCTION-LOCALLY at extraction time — absent from `sys.modules` after `import docpluck.batch`.
+>
+> **THE SCORING CHALLENGE ABOVE IS NOT RETRACTED.** Scores are deterministic. 3 of 222 records
+> moved, all in section structure: `PMC13137375` +0.0403, `PMC13137057` +0.0303, and
+> **`PMC13131283` −0.0306** — so "papers regressed: 0" still does not hold, and that paper is
+> confirmed in-population. That is the finding that deserved the attention all along.
+>
+> ### RESOLVED 2026-08-28 — the −0.0306 IS REAL, AND IT IS NOT A QUALITY REGRESSION
+>
+> Settled the way the paragraph above demanded: the arena's own scorer, the arena's own gold,
+> both tags extracted in separate interpreters with `docpluck.__version__` asserted before each
+> call, from `git worktree` checkouts so neither reads the dirty tree.
+>
+> **The arena's numbers reproduce to every printed digit** — 2.4.136 `0.386364`, 2.4.137
+> `0.355769`, against its recorded `0.38636363636363635` and `0.3557692307692308`. Across all
+> 36 section records exactly 3 move, and they are the 3 reported. So the instrument is sound and
+> the movement is ours to explain.
+>
+> | quantity | v2.4.136 | v2.4.137 |
+> |---|---|---|
+> | `primary` = 0.5·label_f1 + 0.5·heading_f1 | 0.386364 | **0.355769** |
+> | `label_f1` | 0.500000 | 0.461538 |
+> | `heading_f1` | 0.272727 | 0.250000 |
+> | sections emitted | 17 | **19** |
+> | gold sections **missed** | **0** | **0** |
+> | extra sections | 10 | **12** |
+> | `normalized_text` | 115,556 chars | **byte-identical** |
+>
+> **Nothing was lost.** The text does not change, all 7 gold sections are still matched under
+> both tags, and all 17 sections of 2.4.136 survive with identical spans. The whole difference is
+> two ADDITIONAL boundaries inside the appendix block: `[38056,41238]` splits into
+> `[38056,39684]` + `[39684,41238]`, and `[42590,89912]` into `[42590,42718]` + `[42718,89912]`.
+>
+> **Both land on the first character of a heading the PDF actually prints**, established by
+> rasterizing the page rather than by asking a parser. `pdftoppm -png -r 105 -f 12 -l 12` shows
+> p12 opening with a bold **Appendix 2.** *Participant removal reasons and descriptive statistics
+> by group.*; p14 prints **Appendix 5B.** *Boxplot of average Environmental Identity (EID)
+> response scores across participant groups.* Offset 39684 is the `A` of the first, 42718 the `A`
+> of the second.
+>
+> **The mechanism is this release's headline fix, doing exactly what it was built to do.** Both
+> new headings are FIRST ON A PAGE, so a form feed stands between them and the prior sentence.
+> `_prior_paragraph_is_sentence_terminated` now skips `\f`; before, it halted ON the form feed,
+> found no terminator underneath and rejected the heading. Run the guard from each tag over the
+> same text, with controls:
+>
+> | printed heading | offset | preceding chars | @2.4.136 | @2.4.137 |
+> |---|---|---|---|---|
+> | `Appendix 1` | 38056 | `crises.\n\n` | True | True |
+> | `Appendix 2.` | 39684 | `answered.\n\n\f\n\n` | **False** | **True** |
+> | `Appendix 3.` | 40188 | `24-71\n21-77\n\n` | False | False |
+> | `Appendix 4.` | 41238 | `water. . .\n\n` | True | True |
+> | `Appendix 5` | 42590 | `nature.\n\n` | True | True |
+> | `Appendix 5A.` | 42602 | `\n\nAppendix 5\n\n` | False | False |
+> | `Appendix 5B.` | 42718 | `groups.\n\n\f\n\n` | **False** | **True** |
+>
+> The flip is confined to the two form-feed sites and the five controls do not move — including
+> the two headings still missed, which are missed for a different and correct reason (neither is
+> preceded by a sentence terminator: `Appendix 3` follows a table row, `Appendix 5A` follows the
+> bare `Appendix 5` line). 2.4.137 therefore recovers 4 of the 5 top-level appendices this paper
+> prints where 2.4.136 recovered 3 — `Appendix 2` had been swallowed into `Appendix 1`'s span,
+> so a consumer slicing the appendices was handed two of them merged into one.
+>
+> **Why a better answer scores worse: THE GOLD CONTAINS NO APPENDIX.** Its 7 sections are
+> `abstract`, four `other`, `discussion` and `conclusion`, ending at `Conclusions`; the JATS
+> `<back>` matter is absent, so there is no appendix, no references, no methods and no
+> acknowledgments in it. `primary` is a multiset F1 over labels and heading strings, so every
+> appendix docpluck correctly finds is scored as `section_extra`. 2.4.136 already carried 10 such
+> extras; 2.4.137 carries 12. The metric is measuring agreement with a `<body>`-only gold, not
+> extraction quality, on this paper.
+>
+> **What this does and does not license.** The wording "papers regressed: 0" is still wrong as
+> written and must not be repeated — on this arena's metric a paper's score did fall. What is now
+> established is that the fall is a precision penalty for two correct, typographically-evidenced
+> boundaries, not a loss of text, a lost gold section or a mislabelled one. No fix is warranted
+> and none is planned.
+>
+> **Regenerate it** (paths in ScienceArena; the PDF and JATS are held-out and live only there):
+> extract `arenas/pdf-text-fidelity-v1/task_sets/v1/_held_out/pmc/PMC13131283/paper.pdf` through
+> `docpluck.extract_sections(file_bytes=…)` under each tag, map labels through
+> `arenas/pdf-section-structure-v1/label_map.yaml`, rebuild the gold with
+> `framework.jats.parse_sections` on the sibling `jats.xml`, and score with
+> `arenas/pdf-section-structure-v1/scorer.py`.
+>
+> **Verification status — pass 1 only.** Primary source read directly (pages 12 and 14
+> rasterized with poppler) and every number above regenerated mechanically. Passes 2 and 3 of the
+> triple-AI rule have NOT been run on this conclusion.
+>
+> **A citation in this block does not resolve in a clone.**
+> `docs/REPLY_TO_SCIENCEARENA_2026-08-21.md`, cited above and below, is gitignored by
+> `.gitignore:55` (`REPLY_*`, cross-project correspondence, "never public") — deliberate, since
+> this repo is public. The figures it carries are restated here so this block stands alone. The
+> same applies to `docs/superpowers/` (`.gitignore:36`) and `todo.md` (`.gitignore:48`): a
+> handoff written to either persists on one machine only, and no clone will ever see it.
+
 For context, the arena's own experiment reached 0.7521 blind with a stated oracle *ceiling* of
 0.7922. See `docs/REPLY_TO_SCIENCEARENA_2026-08-21.md`, which also corrects their §3.2 per-label
 paper counts and records that the rest of their harness reproduces to four decimals.
