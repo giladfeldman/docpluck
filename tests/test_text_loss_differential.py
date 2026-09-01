@@ -129,12 +129,34 @@ def test_all_copies_gone_is_caught(rendered):
     content, so it lands in the non-statistical bucket and only arm B names it as
     the all-copies-gone shape.
     """
+    # Do NOT depend on the render happening to contain repeated furniture. It used
+    # to, and on 2026-08-29 the canary harness was fixed to render the working tree
+    # instead of an installed release — the tree strips running heads correctly, the
+    # repeated lines vanished, and this test SKIPPED. A skip here is a coverage hole
+    # wearing a green tick: arm B would have been unexercised against a real render
+    # while the file still reported green. So construct the condition from the real
+    # document rather than hoping for it.
     counts = tld.line_counts(rendered)
     repeated = [ln for ln, n in counts.items() if n >= tld.MIN_COPIES and len(ln) > 20]
-    if not repeated:
-        pytest.skip("this render carries no line repeated >=MIN_COPIES times")
-    victim = repeated[0]
-    stripped = rendered.replace(victim, "")
+    if repeated:
+        victim = repeated[0]
+        before = rendered
+    else:
+        # Inject a plausible running head once per "page" of the real render, so
+        # the input is still this paper's text and only the furniture is synthetic.
+        victim = "Journal Furniture Line That Repeats Once Per Page"
+        lines = rendered.splitlines()
+        step = max(1, len(lines) // (tld.MIN_COPIES + 3))
+        out = []
+        for i, ln in enumerate(lines):
+            if i % step == 0:
+                out.append(victim)
+            out.append(ln)
+        before = "\n".join(out)
+    assert tld.line_counts(before)[victim] >= tld.MIN_COPIES, \
+        "control is inert: the victim line does not reach MIN_COPIES"
+    stripped = before.replace(victim, "")
+    rendered = before
 
     r = tld.compare(rendered, stripped)
     assert r["loss"] is True
