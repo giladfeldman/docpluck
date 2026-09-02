@@ -1,6 +1,48 @@
 # Changelog
 
-## [Unreleased] - 2026-08-29 - normalization 1.9.62
+## [Unreleased] - 2026-08-29..09-02 - normalization 1.9.62-1.9.64
+
+### v1.9.64 — `changes_made` telemetry: the two keys the 2026-08-22 blocker was measured on are now honest
+
+The v1.9.63 `count=` work made the sign/dash/quote family exact and left the two keys the
+original blocker fixture (fleet ask `2026-08-22T114401Z`) actually measured — still wrong,
+in exactly the measured way: `page_numbers_stripped` published the CHARACTER delta (4
+two-digit page numbers reported 8; three-digit reported 12 — the digit-count multiplier),
+and `headers_removed` fired on documents containing **zero** headers, because the S9
+`_track` diffed against the `before` snapshot captured for P0 and republished P0's
+page-number characters under a second key.
+
+Fixed by observation only — the text output is byte-identical:
+
+- `page_numbers_stripped` is an exact occurrence count from both writing sites: P0 counts
+  the lines its helper blanked (line count preserved by construction; `zip(strict=True)`
+  turns any future violation of that invariant into a loud error, never a silent
+  undercount), and the S9 4-digit continuous-pagination blanking counts its own blanked
+  lines.
+- `headers_removed` is **retired**: its only writing site blanks 4-digit page numbers and
+  never removed a header, so its exact count now accumulates into `page_numbers_stripped`
+  (the kind of thing actually removed) and no site writes `headers_removed`. Absent reads
+  as 0 downstream, which is the true value. The step code `S9_header_footer_removal`
+  stays — `steps_applied` order is a compatibility surface.
+
+Pinned by `tests/test_page_number_telemetry_is_an_exact_count.py`, written RED against the
+unfixed tree first (6 failures, including `headers_removed: 16` for 4 four-digit numbers —
+the multiplier confirmed a third time), fixtures varying number count and digit width
+independently.
+
+### v1.9.63 also carries the S4/S5 exact-count work — under-described by its own commit
+
+Commit `eb3e84d` swept the shared index and its message describes the page gate and
+watermark arm only; it ALSO carries the `S4_quote_normalization` / `S5_dash_normalization`
+explicit `count=` change (a second stream, same file). What that part does: a
+length-neutral rewrite used to record NOTHING (key absent, which consumers read as 0) and a
+mixed rewrite recorded a wrong number (one en-dash plus two em-dashes normalised reported
+2, not 3). Measured old-vs-new over 21 real papers: output text byte-identical 21/21 —
+telemetry only — with 42 count corrections (`chen_2021_jesp` 2 → 192, `socius_3` 10 → 169),
+and `quotes_normalized` went from ABSENT on every paper in the library's history to real
+counts (S4 is length-neutral in all cases, so it had never reported once). Consumers of
+`upstream_sign_rewrites`-adjacent counts should cite the first TAGGED release carrying
+this — v2.4.138 — as the version where `changes_made` counts became exact.
 
 ### Release-acceptance measurements for the deletion class (2026-09-02)
 
