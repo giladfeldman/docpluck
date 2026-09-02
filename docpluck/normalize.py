@@ -10,6 +10,7 @@ Levels:
   academic - Standard + academic-specific statistical expression repair
 """
 
+import collections
 import re
 import unicodedata
 from dataclasses import asdict, dataclass, field
@@ -24,7 +25,14 @@ class NormalizationLevel(str, Enum):
     academic = "academic"
 
 
-NORMALIZATION_VERSION = "1.9.59"  # v1.9.59 (2026-08-22): A PAGE NUMBER IS IN THE MARGIN; A BARE INTEGER IN THE BODY IS A VALUE. The standalone-page-number strip was one MULTILINE substitution with no page context, so it deleted EVERY line whose whole content was a 1-3 digit integer -- and pdftotext emits a narrow numeric table column as ONE CELL PER LINE. It was silently selective: `-4`, `0.5` and `1000` never matched, `0`, `4` and `999` always did. MEASURED on 10.1136/bmj-2024-080924 (BMJ) supplementary appendix Table S1 p6, row "Number of Advancement Maneuvers (attempt #2)": the paper prints a coefficient of `0` with `(-1.5 to 1.5)` and `p = 0.999`, and we delivered the interval and the p-value WITH NO ESTIMATE -- worse than a wrong number, because an interval attached to nothing cannot even be attributed. This is the real content of ESCImate `2026-08-09/DP-14`, which both sides had diagnosed as a "column-major dump"; the source text layer is row-major and complete, and this rule punched the holes. The gate is TYPOGRAPHIC: a page number is drawn in the margin, so it must be among the first or last 2 non-blank lines of its page. A SECOND gate strips a PAGINATION RUN wherever it sits -- `value - page_index` constant across >=3 distinct pages -- because a two-column PDF puts the number mid-stream in pdftotext reading order (10.1016/j.jesp.2009.12.010 prints `495` between "non-agree-" and "ment and the status quo"); a table column cannot satisfy that, its integers sit on ONE page. Corpus effect over the 26-paper baseline, old rule vs new: 1,228 bare-integer lines RETAINED, 1,104 still stripped, and the LINE COUNT is identical on all 26 papers -- the parity v1.9.57 was measured against. Site census: 345 margin vs 1,987 body-interior sites in 26/26 papers, 239 of them beside an interval or a p-value (tools/diag/page_number_strip_blast_radius.py --baseline). The step had NO count, NO changes_made key and NO log line; it now tracks P0_standalone_page_numbers / page_numbers_stripped. A first draft of the fix recomputed the margin band after each removal, which promoted the next line into it and erased a table column of `1 2 3 4 5` inward -- caught by its own test, not by reading. ALSO: NormalizationReport.changes_made now ACCUMULATES instead of overwriting (three rules write dropped_minus_signs_recovered and three write minus_signs_recovered, so only the last survived; filed by ESCImate 2026-08-21 §4, who had to publish upstream_sign_rewrites as a LOWER BOUND), and the new changes_made_by_step records every changed step INCLUDING length-neutral ones -- a `2`->`-` glyph substitution has a delta of zero, so the rules this metric exists for were the ones most likely to vanish from it. See tests/test_page_number_strip_never_deletes_data.py and tests/test_changes_made_accumulates.py. # v1.9.58 (2026-08-21): A RUNNING HEADER'S DEBRIS MUST NOT VETO THE HEADING AFTER IT. v1.9.57 recorded that ONE stray U+0008 BACKSPACE made a running header unequal to its layout-channel twin and therefore unstrippable, and fixed it -- inside the F0 COMPARISON KEY only (_NONSPACE_CTRL_RE, used solely by _key). The character stayed in the EMITTED text, where an unrelated rule then landed on it: sections/annotators/text.py::_prior_paragraph_is_sentence_terminated walks back over space/tab/newline and requires the character underneath to be in '.!?/'. On 10.3389/fvets.2025.1645266 (PMC13137375) p2 the header arrives as FORMFEED + 'Abuna et al.' + BACKSPACE, so the walk lands on the BACKSPACE, the guard says the prior paragraph is unfinished, and the heading '1 Introduction: the need for regenerative solutions in reproductive medicine' is never emitted. Because partition_into_sections fills each span to the NEXT matched heading, the preceding KEYWORDS span then swallowed 69,849 characters -- the whole article. NEW STEP C0 _strip_furniture_controls, run BEFORE F0 so the comparison key and the output are ONE rule rather than two. THE CLASS IS ONE CHARACTER WIDE, AND MEASURED: over the 30-paper held-out PMC corpus all 33 U+0008 occurrences carry the identical context PERIOD + BS + NEWLINE (trailing furniture) and ZERO carry the overstrike signature (x)BS(x), so no doubled letter can be manufactured -- a reviewer predicted exactly that regression and the corpus refuted it. THE OTHER 16 CONTROL CHARACTERS ARE NOT FURNITURE AND ARE NOT STRIPPED: they are corrupted content glyphs (Schri<02>macher = Schrittmacher; No<04>allsanitat = Notfall...; A<03> -B<03> helices), and deleting them would destroy text. They are COUNTED instead, in the new NormalizationReport.residual_control_chars, because a known limitation written down without a measurement is an unpaid debt rather than a disclosure -- 49 of them live in 16 of the 30 papers. Measured knock-on, pinned by a test: with the BACKSPACE gone, H0's banner strip can finally match the header line it was always meant to catch, so the with-BS and without-BS inputs converge. Arena effect (offline harness, 30 held-out PMC papers): the body-label slice mean rises 0.7681 -> 0.7910 and PMC13137375 alone goes 0.0761 -> 0.7627. See tests/test_furniture_control_chars.py.  # # v1.9.57 (2026-08-20): A PAGE NUMBER IS FURNITURE; A PAGE BOUNDARY IS STRUCTURE. The standalone-page-number strip was `^\s*\d{1,3}\s*$` under MULTILINE, and the whitespace class matches THE FORM FEED - so the rule could consume the page break standing beside the number it deleted. Wrong since it was written, held latent by a running footer sitting between the two; anything that stripped that footer took every form feed with it, and with them the `\n\f\f\n` marker separating the footnote appendix, folding it back into the body. TWO BASELINE PAPERS WERE ALREADY IN THAT STATE AT HEAD - 10.1016/j.jesp.2021.104154 and 10.1016/j.joep.2020.102350 report 15 and 18 footnotes through report.footnote_texts while the returned string carries no appendix at all. Measured over the 26-paper baseline against a git worktree of the prior tree, extracted in separate interpreters: 0 lines removed, 0 added; 16 papers gain page breaks (+1..+17); 2 appendices restored (0 -> 1,288 and 0 -> 2,165 bytes); 0 papers worse on any metric. Shipped as the named `_strip_standalone_page_numbers` so its test pins the SHIPPED rule, not a retyped pattern; the form feed is CAPTURED and restored rather than excluded, because a page number is often the first thing on a new page and excluding it stopped those lines matching at all. `_drop()` keeps the same promise inside F0's strip loop. See LESSONS L-052. # v1.9.56 (v2.4.134): THE EVIDENCE EACH REPAIR RESTS ON IS NOW DECLARED, AND ONE RULE STOPPED FABRICATING A SECOND MINUS SIGN. (1) `_ALREADY_SIGNED` is a ONE-CHARACTER lookbehind, so it refused `-0.38` and ACCEPTED `- 0.38`: on a DETACHED sign W0g read a bare-positive estimate, proved it negative from the CI, and emitted `d = - -0.38` - a double-signed effect size no paper printed. The comment above `_SIGNED_DASHES` records that `-2.68 -> --.68` already happened once and that "the fix then covered the one dash form in front of us"; it covered the ATTACHED form. Caught by the idempotency corpus gate, not by reading the rule. (2) W0q: `recover_dropped_minus_ci_upper_in_text` existed ONLY in the table channel, so a CI written in a results SENTENCE never met it - confirmed against the rasterized page of 10.1016/j.jesp.2021.104154 p13, which prints `d = -0.38, 95% CI [-0.58, -0.18]` while pdftotext detaches every minus. 3 brackets in 1 of 26 baseline papers, and the containment arithmetic repaired 0 of them (it had grabbed `S.D = 1.43` as the "estimate"). (3) That rule now splits TYPOGRAPHIC from INFERENTIAL: a DETACHED DASH is a glyph the renderer emitted and the comma proves it is a sign rather than a range separator, so group 5 - captured since the rule was written and never read (register O5) - finally decides. The containment arm is KEPT because chan_feldman_2025_cogemo Table 9 row 2bii has no dash and only the arithmetic recovers its published -0.33, but it is now DECLARED via `ci_upper_minus_inferred_from_containment`. (4) O10: `_recover_estimate_column_via_ci_column` treated any negative bound as proof of the 2-for-minus corruption - including bounds `recover_corrupted_minus_signs` had manufactured one line earlier. It now fires only on a bracket THIS pass actually repaired. (5) O8: W0j signature B is labelled INFERENTIAL in the code and records every firing; W0p records its positional pairing. (6) `NormalizationReport.fallbacks` - every `record_fallback` inside normalization was outside `extract_pdf_structured`'s window and therefore write-only, INCLUDING the ambiguous-pairing refusals added in v2.4.133 to make W0h/W0m observable. # v1.9.55 (v2.4.133): THE LAYOUT-GATED REPAIRS STOP ASSIGNING THEIR EVIDENCE POSITIONALLY. W0h/W0m proved "N glyphs of shape X are corrupt" in pdfplumber's stream and then rewrote the first N matching tokens in pdftotext's stream, document-wide with no page key - so a glyph proven on page 7 licensed flipping a token on page 2. REPRODUCED, not reasoned about: with a decoy `q = .428` prepended to the W0h source paper (ar_apa_j_jesp_2009_12_011), the old code flipped the DECOY and left the genuine coefficient corrupt - one number fabricated, one missed. Each evidence site now carries its own page and its own layout line text, and pairing REFUSES (recording `w0h_ambiguous_pairing_refused`) when the context cannot separate candidates, because pass-through is reversible for the consumer and a rewrite is not. Page-INDEX scoping was measured and rejected: by the time W0h runs the text holds 7 form feeds for a 12-page document, so aligning text page k to layout page k is an off-by-k that produces a confidently WRONG pairing rather than an empty one. W0m was the worse of the two - it counted beta glyphs and flipped the first N `b = <anything>` WITHOUT requiring the coefficient to match, so a beta proven on one page could relabel a genuine unstandardized `b` (a different statistic) elsewhere; the coefficient is now part of the identity. See tests/test_w0h_pairing_is_identity_based.py and docs/OVERHAUL_REGISTER.md G5. # v1.9.54 (v2.4.130): THE SEPARATION OF DUTIES, EXECUTED. Three rules that repaired the PAPER rather than canonicalising NOTATION are DELETED, together with the guard that existed only to serve them. A2 (dropped-decimal repair, `p = 38.` -> `p = .38.`) had NO CITED PAPER anywhere in its code; asked for one, BOTH of its firing sites across 297 English papers turned out to be the paper's own error, rasterized: 10.1177/0146167210380928 p13 prints `B = -0.28, SE = 0.31, p = 38.` and 10.1016/j.jesp.2016.11.001 p7 prints `t(186) = 3.90, p = 001`, each with correctly-dotted numbers on the same line. W0n (`p < 05` -> `p < .05`) is deleted in BOTH channels because its premise is false: the SAME shape has OPPOSITE OWNERS in two real English papers - 10.1016/j.jesp.2009.12.011 p3 PRINTS `p < 05` (the author dropped it; advance 2.00pt vs 3.90pt at a dotted site on the same page, no rect/curve/line in the gap) while 10.1177/0956797613482946 p6 PRINTS `p < .05` and our OCR text layer lost it. A calibrated layout-advance gate (0.51 vs 0.99) was built and REFUTED: Dong p6 is a SCAN whose char boxes come from an OCR engine, so the gate manufactures its own evidence for the exact case it exists to catch. Under irreducible ambiguity the default is PASS-THROUGH, because pass-through is reversible for the consumer and a repair is not. A3a (thousands strip) is deleted because ITS PURPOSE EVAPORATED: its own comment said it strips "so A3 sees the already-clean integer and leaves it alone", and A3 was deleted in v2.4.129. It also produced 1000x errors - 10.1177/0956797620935584 Table S2 p24 prints a Satterthwaite df of `185,178` (fractional by construction, i.e. 185.178) and we delivered `185178`; the collision is STRUCTURAL, since its discriminator is satisfied by construction for any comma-locale number with a 3-digit integer part and 3-decimal precision. It made the library answer one input THREE ways (standard preserved, academic+preserve_math_glyphs counted-but-preserved, academic stripped), and ITS TELEMETRY SAID THE OPPOSITE OF WHAT IT DID: step `A3a_thousands_separator_protect`, metric key `thousands_separators_preserved`, operation `.replace(",", "")` - a false all-clear, which is worse than silence because silence invites a check. ALSO IN THIS RELEASE, the biggest finding of the audit and one that indicts its own framing: THE RENDER CHANNEL DELETES PUBLISHED STATISTICS. The numeric rules were audited exhaustively; the same question was never asked of render.py, which is the channel that reaches the user. Measured on the baseline corpus, 10.1017/s1930297500009189 lost an ENTIRE published-results sentence (two correlations, a Hotelling's t, three p-values, two confidence intervals) to `_suppress_inline_duplicate_table_captions`, and 10.1001/jamanetworkopen.2023.48333 lost a hazard ratio `1.31 (1.20-1.44)` to `_strip_phantom_camelot_tables` - with NO count, NO key in changes_made and NO log line, because render_pdf_to_markdown() chained 54 `md = fn(md)` calls and returned a bare str. Fixed: `_carries_statistical_content` guards every deleting step (delete FURNITURE, never DATA, all-or-nothing per run), and an opt-in `RenderReport` gives the channel telemetry for the first time. See docs/SCOPE.md, LESSONS.md L-032, and tests/test_render_never_deletes_published_statistics.py.
+NORMALIZATION_VERSION = "1.9.64"  # v1.9.64 (2026-09-02): `page_numbers_stripped` is an exact occurrence count and `headers_removed` is retired -- the two keys the 2026-08-22 telemetry blocker (ask 114401Z) was measured on were still CHARACTER DELTAS after the v1.9.63 sign/dash/quote `count=` work: two-digit page numbers reported 2x, three-digit 3x, and `headers_removed` fired on zero-header documents because the S9 `_track` reused the `before` snapshot captured for P0, republishing P0's page-number characters under a second key. P0 now counts the lines its helper blanked (line count preserved by construction; zip(strict=True) makes any future violation loud); the S9 4-digit blanking counts its own blanked lines and reports them under `page_numbers_stripped` -- the kind of thing it actually removes -- so `headers_removed`, which no site writes truthfully, is no longer written at all (absent reads as 0 downstream, which is the true value: this path never removed a header). Text output is byte-identical -- the change is observation only, pinned by tests/test_page_number_telemetry_is_an_exact_count.py, written red first. // v1.9.63 (2026-09-01): THE WATERMARK ARM'S "ACCEPTED RESIDUAL" WAS FOUR RED TESTS, AND THE SIGNAL THAT CLOSES IT IS NOT POSITIONAL. v1.9.62 reinstated the arm on page coverage and DOCUMENTED, in code and in a test named `test_the_residual_is_real_and_is_documented_not_denied`, that a table row label at >=90% page coverage would still be deduplicated -- reasoning that "at that coverage no POSITIONAL signal separates a table label from a watermark". The reasoning was true and beside the point: it only ever looked at position. The cost was not hypothetical -- it left FOUR tests red in `test_page_gate_never_deletes_the_last_copy.py`, the file whose entire purpose is to pin that this gate never deletes data, and the release was reported as verified with them red. They were found by a conductor fleet sweep, not by this stream. TWO TYPOGRAPHIC SIGNALS CLOSE IT. (1) NOT FOLLOWED BY ITS OWN VALUE: a table ROW LABEL is followed by the number it labels, so deleting it orphans that number -- the exact harm rule 0g names -- while an overlay is followed by whatever the page held. Measured: `Author Manuscript` is followed by a bare value on 0 of 220 (ieee_access_2), 2 of 92 (ieee_access_alt) and 2 of 112 (10.1525/collabra.19525) occurrences, against 5 of 5 for `Number of trained architectures` and 7 of 9 for `Performance metric` on the REAL ieee_access_5, and 20 of 20 for the adversarial spread-table fixture. Two orders of magnitude apart, so the 0.50 threshold sits in the gap rather than on an edge. Shipped as the named `_value_followed_fraction` so its test pins the SHIPPED rule rather than a retyped pattern. (2) MODAL COPIES PER PAGE >= 2: a watermark repeats WITHIN a page, which is the only reason this arm exists. The adversarial header-above-title prints the string twice on page 1 and ONCE on every page after, so its modal per-page count is 1 and its max_per_page of 2 comes from one page; the real watermarks are modal 4 on 100% of covered pages. A line whose typical page carries one copy is a RUNNING HEADER, and the once_per_page arm correctly declines it. Grok 4.6 (xai) named this shape on 2026-08-28 as a reason to delete the arm and was right that the arm reached it; it no longer does, and nothing is removed at all rather than all-but-one. PER-PAGE UNIFORMITY was measured as a candidate gate and REJECTED, and that finding stands: the synthetic worst case is uniform too (4 copies on 5 of 5 pages), so it separates nothing. AND THE TEST FIXTURE WAS WRONG, which is why nothing caught this sooner: `_paginated_doc` emits `marker / "" / "%0.3f" / ""`, a value directly under every copy -- the TABLE ROW LABEL shape. Two tests used it to assert the arm FIRES, so the file's entire positive direction was pinned on the shape the arm must refuse. It is kept for the negative tests, where "a row label must survive" is exactly what it should model, and a new `_overlay_doc` models a genuine overlay. Real-paper effect unchanged: ieee_access_2 still promotes `## V.: SUPPLEMENTARY INDEX`, still removes 219 of 220 watermark copies, and all 7 real table labels across ieee_access_5/6/10 keep every copy. See tests/test_watermark_arm_is_gated_on_page_coverage.py. # v1.9.62 (2026-08-29): THE WATERMARK ARM IS BACK, GATED ON PAGE COVERAGE RATHER THAN ON A RAW COUNT -- AND A ZERO MEASURED THE INSTRUMENT AGAIN. v1.9.61 deleted the `count >= 20` arm on a reproduced Grok 4.6 (xai) finding that it deduplicated TABLE CONTENT, and set the conditions for reinstating it: "a discriminator that encodes the measured shape (present on essentially every page), not a raw occurrence count -- and gather more than one positive first". Both are met and all three stated reasons for the deletion were RE-TESTED, none surviving. (1) WHAT THE DELETION COST, which is what forced the re-test and was not visible when it was taken: with no arm, ieee_access_2.pdf retains all 220 copies of "Author Manuscript", one of which sits between a paragraph and the heading `V.: SUPPLEMENTARY INDEX`, which is therefore never promoted. That is SECTION STRUCTURE reaching the sectioning consumers -- so the deletion note's asymmetry argument ("furniture that survives is VISIBLE and reversible") did not hold here: the loss was neither, and it was caught by a test, not by a consumer. (2) THE DISCRIMINATOR IS PAGE COVERAGE and the classes separate with no overlap. Measured over the 10 IEEE test PDFs plus 10.1525/collabra.19525: WATERMARKS at ratio 0.96-0.98, each exactly 4 copies on EVERY covered page (ieee_access_2 220x on 55/56; ieee_access_alt 92x on 23/24; collabra.19525 112x on 28/29), against TABLE CONTENT at ratio 0.06-0.22 (`Performance metric` 9x on 4/18; `Feature Categories` 7x on 3/18; 9 more, none above 0.22). (3) THE LABEL THAT CONDEMNED THE ARM IS IN THE SECOND BLOCK. `Number of trained architectures` occurs 5 times on 3 of 18 pages of the real paper -- ratio 0.17. The reproduction that deleted the arm was a SYNTHETIC document built to the reported shape; the shape is reachable and the paper is not an instance of it. Rebuilding it here took two attempts: the first fixture reported UNTOUCHED on all three trees INCLUDING one with the original arm restored, because S8_line_break_joining merged the label into the next line before the strip ran. A probe that does not reach the branch reports a clean run; asserting the arm FIRED is what caught it. (4) DENOMINATOR, measured separately from the shape: over 200 papers strided from the 9,888-PDF repository (198 extracted OK) this gate selects ZERO lines -- and that zero was checked against a KNOWN POSITIVE before being believed, the identical filter firing on 3 of 3 known watermark papers and 0 of the 8 other IEEE papers beside them. (5) THE RESIDUAL IS STATED, NOT ENGINEERED AROUND: a table label repeated several times per page across >=90% of a document would still be deduplicated. Built synthetically it DOES fire; it was not found in any of the 198 real papers. Accepted because at that coverage no POSITIONAL signal distinguishes it from a watermark -- that IS the definition of one -- and because the damage is bounded three ways: rule 0g spares the first copy in document order, `_carries_statistical_content` refuses anything carrying data, and every removal is named per line in `repeated_line_stripped:watermark_every_page`. Per-page UNIFORMITY was measured as an extra gate and REJECTED: the real watermarks are perfectly uniform, but so is the synthetic worst case, so it separates nothing the ratio has not. See tests/test_watermark_arm_is_gated_on_page_coverage.py, whose 14 cases were watched with the arm removed: the 3 real watermarks and both synthetic arm cases go RED while all 7 real table-content cases stay GREEN in both states. # v1.9.61 (2026-08-28): THE PAGE GATE DELETED AN ARTICLE TITLE, AND ITS PAGE MAP WAS WRONG FOR HALF OF ALL BOUNDARIES. v1.9.60 was blocked pre-tag by a three-provider consult (sol/openai, sonnet/anthropic, grok/xai); every finding below was reproduced locally before it was acted on, and one reviewer claim was reproduced and found WIDER than reported while another needed three attempts before the probe reached the branch under test. (1) PAGE ATTRIBUTION. `_page` was incremented AFTER the line was recorded, while pdftotext glues the page separator to the FIRST LINE OF THE NEW PAGE -- so the first line of page N was filed under page N-1, and the first line of a page is exactly where a running header sits. On a 6-page header the map came out [1,1,2,3,4,5], giving max_per_page 2 instead of 1, so the once-per-page arm did NOT fire and all six copies survived: the gate failed at its own purpose while staying live on footers and on table content, the two error directions it exists to separate. Measured over a 70-paper strided sample (tools/diag/form_feed_page_attribution_census.py): of 994 form feeds, 70 (7.0%) sit alone on their line and are HARMLESS -- strip() empties the line so nothing is recorded -- 415 (41.8%) are glued to a line outside the 15-120 candidate band and cost nothing, and 509 (51.2%) are glued to a RECORDED candidate and corrupt the map. An independent 36-paper sample gave 1122/2218 (50.6%). NOT 93% and not 100%: those figures answer "how many are glued" and "how many have nothing before them on their line", and only the 51.2% bounds the fix. (2) RULE 0g, ALL-OR-NOTHING. The strip took EVERY copy of a repeated line. On 10.1001/jamanetworkopen.2023.39337 the title "Effect of Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes" occurs 13 times -- twelve running headers and, on page 1, the TITLE BLOCK, which the text layer shows sitting between the article-type banner `Original Investigation | Nutrition, Obesity, and Exercise` and the subtitle `A Randomized Clinical Trial` plus the author list. All thirteen went and the paper shipped with NO TITLE, with nothing in `changes_made` naming it. The FIRST copy in document order now always survives: where a content instance exists it PRECEDES the furniture derived from it, where every copy is furniture the cost is one visible challengeable line, and document order is stable under line removal -- which also makes the step idempotent by construction, since pass 2 sees one occurrence and fails the count>=5 floor. A CLEVERER SURVIVOR RULE WAS BUILT AND REFUTED and is recorded so nobody rebuilds it: "furniture travels with furniture" (score each occurrence by how many neighbours are unique) TIES TWELVE occurrences on the JAMA title and cannot pick it, while on 10.1098/rsos.182237 it separates cleanly and picks a copy sitting in the REFERENCES section. Wrong in both directions at once. (3) FOUR MORE FORM-FEED EATERS, and then three more found by census. v1.9.60 fixed five line-dropping sites; these are SUBSTITUTION and STRIP sites its sweep could not reach. A1 spells every gap with the regex whitespace class, which matches U+000C: ALL SEVEN reachable patterns lose the boundary, not the one the findings doc demonstrated. A1 is now page-scoped BY CONSTRUCTION (split on the form feed, edit within each page, rejoin) rather than by a hand-narrowed class in ten places -- measured cost, 1 of 524 firings (0.2%) straddles a page break, and that one is a `p =` at the foot of one page joining its value at the head of the next, the shape a rejoin is least entitled to assume. The FINAL `out = t.strip()` ate a boundary on 70 of 70 papers, because pdftotext ends every document with one; four papers leave normalization with 2-3 form feeds and two sit at exactly 2, where losing one drops them below the `>= 2` paginated threshold and into the unstable line-index fallback this release exists to retire. T0 (_strip_toc_dot_leader_block) loses it at TWO sites, the dropped-paragraph `continue` and the leading-blank trim, since a form-feed-only paragraph strips to the empty string. P1 (_strip_frontmatter_metadata_leaks) loses it at its drop `continue`. F0's FOOTNOTE branch never called `_drop()` while the header/footer branch four lines above it does -- and a footnote is by definition the LAST content on its page, so the separator it consumed is a boundary more often than not. LateJoin and A4 keep their boundary through a new shared `keep_break_in_rejoin`, which re-emits it BEFORE the rejoined token: these sites CANNOT be page-scoped, because crossing the break is the whole point of them, and emitting the boundary INSIDE the statistic would hand consumers a token no paper printed. Corpus effect over the 70-paper sample: form feeds retained 393/994 (40%) at HEAD -> 829/994 (83%), and papers left at ZERO page boundaries 17 -> 0. The 160 still removed are ONE deliberate, documented site -- R3 collapses the page-break junction inside a bibliography so a reference entry split across a page rejoins -- and are left alone rather than swept in. (4) PER-LINE TELEMETRY. A character delta cannot say WHAT vanished; the title's disappearance was invisible in `changes_made`, and the differential that eventually caught it had to re-run two builds of the library over the same corpus. The strip now records `repeated_line_stripped:<arm>` per removed copy and `repeated_line_last_copy_kept` for the copy spared, both with the line text as the detail -- routed through the existing `record_fallback` channel that `normalize_text` already holds open and `batch.py` already copies onto ExtractionReport, because a NEW report field would need plumbing at every serialization layer and the last three telemetry fixes in this file each stopped one layer short of a consumer. THE `count >= 20` WATERMARK ARM WAS DELETED IN THIS VERSION -- and this sentence previously claimed the opposite ("WHAT DID NOT CHANGE ... nothing here licenses either keeping or removing it"), which was true of an earlier draft and stale by the time the code shipped. CORRECTED 2026-08-29; 1.9.61 was never released, so the record is amended rather than struck. The arm's zero across the 70-paper sample measured the INSTRUMENT: that corpus contains none of the three papers that exercise it. See v1.9.62. NEITHER GATE ANYONE WOULD REACH FOR CAN SEE THE TITLE DEFECT: the deletion is perfectly idempotent -- pass 1 and pass 2 byte-identical with the title absent from both -- and the canary's --quick paper is byte-identical under both versions, with none of its 8 configured papers showing the signature. Both run honestly and are blind. See tests/test_page_gate_never_deletes_the_last_copy.py, whose nine fixes were each reverted in isolation and watched RED. # v1.9.60 (2026-08-25): A REPEATED LINE IS FURNITURE BECAUSE OF WHERE IT SITS ON THE PAGE, NOT HOW FAR APART IT SITS IN THE FILE -- and `changes_made` now publishes a COUNT rather than a character delta. (1) THE REPEATED-LINE STRIP was gated on `min(gaps) >= 20`, the minimum LINE-INDEX distance between occurrences, as a proxy for "once per page". The proxy is not stable under line removal and its own comment predicted the failure ("causing idempotence drift when pass 2 has a shorter input"). MEASURED on ieee_access_5: the table column header `Performance metric` appears 9 times on pass 1 at [521, 545, 582, 651, 682, 972, 978, 1032, 1040] -- two tight pairs at the tail give min_gap 6, so it is KEPT; other steps then delete those four tail occurrences, so pass 2 sees five well-spaced ones, min_gap 22, and DELETES ALL FIVE, losing the label that says what the numbers underneath it are. No threshold fixes this: min-gap over a shrinking occurrence set is not monotone. The gate is now the PAGE DISTRIBUTION -- a line is furniture only if it occurs on >= 5 distinct pages AND either at most once per page (running header/footer) or >= 20 times (a watermark that repeats within each page). A line's page is a property of the document, so deleting other lines cannot move it. Over the 21-paper strided sample the two classes separate with NO OVERLAP: 16 running headers (5-21 pages, 1 per page) and 4 watermarks (on every page) against 13 lines of TABLE CONTENT the old rule was DELETING -- `Number of trained architectures`, the values 100/200/0.18/2/3/4/8, `Total`, `Other`, demography_3's 21 `***` significance markers (19 of them on ONE page, taken by the `count >= 20` path) and maier's 26 `X` marks (ALL on one page). So this was never only an idempotency bug. (2) THAT GATE NEEDED THE PAGE BOUNDARIES BACK, and five steps were destroying them: P0_page_footer_strip (113 form feeds over the sample), P0r_recurring_running_header_strip (74), S9_header_footer_removal (9), H0r and G5c2 (1 each), each dropping a whole line with a bare `continue` and taking the form feed glued to it. This is L-052's class, whose promise had been made three separate times in three LOCAL implementations -- and the sites that had not made it were the ones nobody had looked at. One shared `keep_page_break` / `page_break_residue` now defines it once. Corpus effect: 371 raw form feeds -> 85 (23%) at HEAD -> 290 (78%), and papers left at ZERO page boundaries 11 of 21 -> 0 of 21. (3) DELETE FURNITURE, NEVER DATA (rule 0g) is now actually consulted by the repeated-line strip, which never called `_carries_statistical_content`. It had to be: with the page gate in, `j_health_soc_behav_1`'s figure note `Note: Whiskers indicate 95% confidence intervals. N = 136,739 (women = 68,993, men = 67,746). Data are from the` sits once under each of five figures on five pages and is indistinguishable from a running footer BY POSITION. Its wrapped second line is caught by widening the data-source-caption marker so the year may sit anywhere inside the parenthesis group (`(Release 22, years 2001-2023)`), the same survey-plus-year-range shape that marker was written for. HEAD-vs-fix over the sample: 34 furniture lines newly removed, 10 lines recovered, ZERO lines of data lost, corpus non-idempotency 1 -> 0. (4) `NormalizationReport._track` takes an explicit `count=`, wired at W0g / W0q / W0h -- the three rules whose sum effectcheck publishes as `upstream_sign_rewrites`. NO PUBLISHED VALUE WAS WRONG, and this is stated plainly because the first draft of this entry claimed one was: measured over the 21-paper corpus the family fires on ONE paper reporting signs=6 delta=6, and ZERO papers diverge. What changes is that the agreement was a COINCIDENCE OF WHITESPACE and is now a contract. `changes_made` held `abs(len(before) - len(after))`, which for this family is the whitespace normalisation, and that equals the number of minus signs re-attached only when there is exactly one stray space per bound: `[- 0.58, - 0.18]` gives delta 2 / signs 2, but `[- 0.58 , - 0.18]` gives delta 3 / signs 2 and `[- 0.58,   - 0.18]` gives delta 4 / signs 2. Neither divergent shape occurs in the corpus -- they are arithmetic probes, not prevalence claims -- and that is the point, because a latent divergence never announces itself. This is exactly the closure ESCImate's 2026-08-22 notice asked for: "exactness here rests on a property of the RULES, not of the metric". THE UNIT IS MINUS SIGNS ATTACHED TO A NUMERAL, uniform across the three rules, because one W0q firing repairs one bracket and can attach TWO signs -- a per-firing count was drafted first and reports 3 on that paper where the truth is 6, the mirror error. `_track` never INVENTS a count: a call site supplies one or the character delta stands unchanged. `changes_made_by_step` stays a character delta by design. See tests/test_changes_made_is_an_exact_count.py and tests/test_repeated_line_strip_is_page_scoped.py. # v1.9.59 (2026-08-22): A PAGE NUMBER IS IN THE MARGIN; A BARE INTEGER IN THE BODY IS A VALUE. The standalone-page-number strip was one MULTILINE substitution with no page context, so it deleted EVERY line whose whole content was a 1-3 digit integer -- and pdftotext emits a narrow numeric table column as ONE CELL PER LINE. It was silently selective: `-4`, `0.5` and `1000` never matched, `0`, `4` and `999` always did. MEASURED on 10.1136/bmj-2024-080924 (BMJ) supplementary appendix Table S1 p6, row "Number of Advancement Maneuvers (attempt #2)": the paper prints a coefficient of `0` with `(-1.5 to 1.5)` and `p = 0.999`, and we delivered the interval and the p-value WITH NO ESTIMATE -- worse than a wrong number, because an interval attached to nothing cannot even be attributed. This is the real content of ESCImate `2026-08-09/DP-14`, which both sides had diagnosed as a "column-major dump"; the source text layer is row-major and complete, and this rule punched the holes. The gate is TYPOGRAPHIC: a page number is drawn in the margin, so it must be among the first or last 2 non-blank lines of its page. A SECOND gate strips a PAGINATION RUN wherever it sits -- `value - page_index` constant across >=3 distinct pages -- because a two-column PDF puts the number mid-stream in pdftotext reading order (10.1016/j.jesp.2009.12.010 prints `495` between "non-agree-" and "ment and the status quo"); a table column cannot satisfy that, its integers sit on ONE page. Corpus effect over the 26-paper baseline, old rule vs new: 1,228 bare-integer lines RETAINED, 1,104 still stripped, and the LINE COUNT is identical on all 26 papers -- the parity v1.9.57 was measured against. Site census: 345 margin vs 1,987 body-interior sites in 26/26 papers, 239 of them beside an interval or a p-value (tools/diag/page_number_strip_blast_radius.py --baseline). The step had NO count, NO changes_made key and NO log line; it now tracks P0_standalone_page_numbers / page_numbers_stripped. A first draft of the fix recomputed the margin band after each removal, which promoted the next line into it and erased a table column of `1 2 3 4 5` inward -- caught by its own test, not by reading. ALSO: NormalizationReport.changes_made now ACCUMULATES instead of overwriting (three rules write dropped_minus_signs_recovered and three write minus_signs_recovered, so only the last survived; filed by ESCImate 2026-08-21 §4, who had to publish upstream_sign_rewrites as a LOWER BOUND), and the new changes_made_by_step records every changed step INCLUDING length-neutral ones -- a `2`->`-` glyph substitution has a delta of zero, so the rules this metric exists for were the ones most likely to vanish from it. See tests/test_page_number_strip_never_deletes_data.py and tests/test_changes_made_accumulates.py. # v1.9.58 (2026-08-21): A RUNNING HEADER'S DEBRIS MUST NOT VETO THE HEADING AFTER IT. v1.9.57 recorded that ONE stray U+0008 BACKSPACE made a running header unequal to its layout-channel twin and therefore unstrippable, and fixed it -- inside the F0 COMPARISON KEY only (_NONSPACE_CTRL_RE, used solely by _key). The character stayed in the EMITTED text, where an unrelated rule then landed on it: sections/annotators/text.py::_prior_paragraph_is_sentence_terminated walks back over space/tab/newline and requires the character underneath to be in '.!?/'. On 10.3389/fvets.2025.1645266 (PMC13137375) p2 the header arrives as FORMFEED + 'Abuna et al.' + BACKSPACE, so the walk lands on the BACKSPACE, the guard says the prior paragraph is unfinished, and the heading '1 Introduction: the need for regenerative solutions in reproductive medicine' is never emitted. Because partition_into_sections fills each span to the NEXT matched heading, the preceding KEYWORDS span then swallowed 69,849 characters -- the whole article. NEW STEP C0 _strip_furniture_controls, run BEFORE F0 so the comparison key and the output are ONE rule rather than two. THE CLASS IS ONE CHARACTER WIDE, AND MEASURED: over the 30-paper held-out PMC corpus all 33 U+0008 occurrences carry the identical context PERIOD + BS + NEWLINE (trailing furniture) and ZERO carry the overstrike signature (x)BS(x), so no doubled letter can be manufactured -- a reviewer predicted exactly that regression and the corpus refuted it. THE OTHER 16 CONTROL CHARACTERS ARE NOT FURNITURE AND ARE NOT STRIPPED: they are corrupted content glyphs (Schri<02>macher = Schrittmacher; No<04>allsanitat = Notfall...; A<03> -B<03> helices), and deleting them would destroy text. They are COUNTED instead, in the new NormalizationReport.residual_control_chars, because a known limitation written down without a measurement is an unpaid debt rather than a disclosure -- 49 of them live in 16 of the 30 papers. Measured knock-on, pinned by a test: with the BACKSPACE gone, H0's banner strip can finally match the header line it was always meant to catch, so the with-BS and without-BS inputs converge. Arena effect (offline harness, 30 held-out PMC papers): the body-label slice mean rises 0.7681 -> 0.7910 and PMC13137375 alone goes 0.0761 -> 0.7627. See tests/test_furniture_control_chars.py.  # # v1.9.57 (2026-08-20): A PAGE NUMBER IS FURNITURE; A PAGE BOUNDARY IS STRUCTURE. The standalone-page-number strip was `^\s*\d{1,3}\s*$` under MULTILINE, and the whitespace class matches THE FORM FEED - so the rule could consume the page break standing beside the number it deleted. Wrong since it was written, held latent by a running footer sitting between the two; anything that stripped that footer took every form feed with it, and with them the `\n\f\f\n` marker separating the footnote appendix, folding it back into the body. TWO BASELINE PAPERS WERE ALREADY IN THAT STATE AT HEAD - 10.1016/j.jesp.2021.104154 and 10.1016/j.joep.2020.102350 report 15 and 18 footnotes through report.footnote_texts while the returned string carries no appendix at all. Measured over the 26-paper baseline against a git worktree of the prior tree, extracted in separate interpreters: 0 lines removed, 0 added; 16 papers gain page breaks (+1..+17); 2 appendices restored (0 -> 1,288 and 0 -> 2,165 bytes); 0 papers worse on any metric. Shipped as the named `_strip_standalone_page_numbers` so its test pins the SHIPPED rule, not a retyped pattern; the form feed is CAPTURED and restored rather than excluded, because a page number is often the first thing on a new page and excluding it stopped those lines matching at all. `_drop()` keeps the same promise inside F0's strip loop. See LESSONS L-052. # v1.9.56 (v2.4.134): THE EVIDENCE EACH REPAIR RESTS ON IS NOW DECLARED, AND ONE RULE STOPPED FABRICATING A SECOND MINUS SIGN. (1) `_ALREADY_SIGNED` is a ONE-CHARACTER lookbehind, so it refused `-0.38` and ACCEPTED `- 0.38`: on a DETACHED sign W0g read a bare-positive estimate, proved it negative from the CI, and emitted `d = - -0.38` - a double-signed effect size no paper printed. The comment above `_SIGNED_DASHES` records that `-2.68 -> --.68` already happened once and that "the fix then covered the one dash form in front of us"; it covered the ATTACHED form. Caught by the idempotency corpus gate, not by reading the rule. (2) W0q: `recover_dropped_minus_ci_upper_in_text` existed ONLY in the table channel, so a CI written in a results SENTENCE never met it - confirmed against the rasterized page of 10.1016/j.jesp.2021.104154 p13, which prints `d = -0.38, 95% CI [-0.58, -0.18]` while pdftotext detaches every minus. 3 brackets in 1 of 26 baseline papers, and the containment arithmetic repaired 0 of them (it had grabbed `S.D = 1.43` as the "estimate"). (3) That rule now splits TYPOGRAPHIC from INFERENTIAL: a DETACHED DASH is a glyph the renderer emitted and the comma proves it is a sign rather than a range separator, so group 5 - captured since the rule was written and never read (register O5) - finally decides. The containment arm is KEPT because chan_feldman_2025_cogemo Table 9 row 2bii has no dash and only the arithmetic recovers its published -0.33, but it is now DECLARED via `ci_upper_minus_inferred_from_containment`. (4) O10: `_recover_estimate_column_via_ci_column` treated any negative bound as proof of the 2-for-minus corruption - including bounds `recover_corrupted_minus_signs` had manufactured one line earlier. It now fires only on a bracket THIS pass actually repaired. (5) O8: W0j signature B is labelled INFERENTIAL in the code and records every firing; W0p records its positional pairing. (6) `NormalizationReport.fallbacks` - every `record_fallback` inside normalization was outside `extract_pdf_structured`'s window and therefore write-only, INCLUDING the ambiguous-pairing refusals added in v2.4.133 to make W0h/W0m observable. # v1.9.55 (v2.4.133): THE LAYOUT-GATED REPAIRS STOP ASSIGNING THEIR EVIDENCE POSITIONALLY. W0h/W0m proved "N glyphs of shape X are corrupt" in pdfplumber's stream and then rewrote the first N matching tokens in pdftotext's stream, document-wide with no page key - so a glyph proven on page 7 licensed flipping a token on page 2. REPRODUCED, not reasoned about: with a decoy `q = .428` prepended to the W0h source paper (ar_apa_j_jesp_2009_12_011), the old code flipped the DECOY and left the genuine coefficient corrupt - one number fabricated, one missed. Each evidence site now carries its own page and its own layout line text, and pairing REFUSES (recording `w0h_ambiguous_pairing_refused`) when the context cannot separate candidates, because pass-through is reversible for the consumer and a rewrite is not. Page-INDEX scoping was measured and rejected: by the time W0h runs the text holds 7 form feeds for a 12-page document, so aligning text page k to layout page k is an off-by-k that produces a confidently WRONG pairing rather than an empty one. W0m was the worse of the two - it counted beta glyphs and flipped the first N `b = <anything>` WITHOUT requiring the coefficient to match, so a beta proven on one page could relabel a genuine unstandardized `b` (a different statistic) elsewhere; the coefficient is now part of the identity. See tests/test_w0h_pairing_is_identity_based.py and docs/OVERHAUL_REGISTER.md G5. # v1.9.54 (v2.4.130): THE SEPARATION OF DUTIES, EXECUTED. Three rules that repaired the PAPER rather than canonicalising NOTATION are DELETED, together with the guard that existed only to serve them. A2 (dropped-decimal repair, `p = 38.` -> `p = .38.`) had NO CITED PAPER anywhere in its code; asked for one, BOTH of its firing sites across 297 English papers turned out to be the paper's own error, rasterized: 10.1177/0146167210380928 p13 prints `B = -0.28, SE = 0.31, p = 38.` and 10.1016/j.jesp.2016.11.001 p7 prints `t(186) = 3.90, p = 001`, each with correctly-dotted numbers on the same line. W0n (`p < 05` -> `p < .05`) is deleted in BOTH channels because its premise is false: the SAME shape has OPPOSITE OWNERS in two real English papers - 10.1016/j.jesp.2009.12.011 p3 PRINTS `p < 05` (the author dropped it; advance 2.00pt vs 3.90pt at a dotted site on the same page, no rect/curve/line in the gap) while 10.1177/0956797613482946 p6 PRINTS `p < .05` and our OCR text layer lost it. A calibrated layout-advance gate (0.51 vs 0.99) was built and REFUTED: Dong p6 is a SCAN whose char boxes come from an OCR engine, so the gate manufactures its own evidence for the exact case it exists to catch. Under irreducible ambiguity the default is PASS-THROUGH, because pass-through is reversible for the consumer and a repair is not. A3a (thousands strip) is deleted because ITS PURPOSE EVAPORATED: its own comment said it strips "so A3 sees the already-clean integer and leaves it alone", and A3 was deleted in v2.4.129. It also produced 1000x errors - 10.1177/0956797620935584 Table S2 p24 prints a Satterthwaite df of `185,178` (fractional by construction, i.e. 185.178) and we delivered `185178`; the collision is STRUCTURAL, since its discriminator is satisfied by construction for any comma-locale number with a 3-digit integer part and 3-decimal precision. It made the library answer one input THREE ways (standard preserved, academic+preserve_math_glyphs counted-but-preserved, academic stripped), and ITS TELEMETRY SAID THE OPPOSITE OF WHAT IT DID: step `A3a_thousands_separator_protect`, metric key `thousands_separators_preserved`, operation `.replace(",", "")` - a false all-clear, which is worse than silence because silence invites a check. ALSO IN THIS RELEASE, the biggest finding of the audit and one that indicts its own framing: THE RENDER CHANNEL DELETES PUBLISHED STATISTICS. The numeric rules were audited exhaustively; the same question was never asked of render.py, which is the channel that reaches the user. Measured on the baseline corpus, 10.1017/s1930297500009189 lost an ENTIRE published-results sentence (two correlations, a Hotelling's t, three p-values, two confidence intervals) to `_suppress_inline_duplicate_table_captions`, and 10.1001/jamanetworkopen.2023.48333 lost a hazard ratio `1.31 (1.20-1.44)` to `_strip_phantom_camelot_tables` - with NO count, NO key in changes_made and NO log line, because render_pdf_to_markdown() chained 54 `md = fn(md)` calls and returned a bare str. Fixed: `_carries_statistical_content` guards every deleting step (delete FURNITURE, never DATA, all-or-nothing per run), and an opt-in `RenderReport` gives the channel telemetry for the first time. See docs/SCOPE.md, LESSONS.md L-032, and tests/test_render_never_deletes_published_statistics.py.
+
+# The characters S4 and S5 rewrite, declared ONCE so the count and the
+# substitution cannot drift apart. Two copies of one character class is the
+# defect this project calls "one concept, one table".
+_S4_DOUBLE_QUOTE_RE = re.compile("[" + "".join(chr(c) for c in (0x201C, 0x201D, 0x201E, 0x201F, 0x2033, 0x2036)) + "]")
+_S4_SINGLE_QUOTE_RE = re.compile("[" + "".join(chr(c) for c in (0x2018, 0x2019, 0x201A, 0x201B, 0x2032, 0x2035)) + "]")
+_S5_DASH_CHARS = tuple(chr(c) for c in (0x2212, 0x2013, 0x2014, 0x2010, 0x2011))
 
 
 # ── Mathematical Alphanumeric Symbols de-styling (shared, v2.4.34) ──────────
@@ -381,6 +389,183 @@ def _body_y_band(page, body_size: float) -> tuple[float, float]:
 # BACKSPACE (not whitespace) glued to the text. One stray BACKSPACE was enough to
 # make the line unequal to its layout-channel twin and so unstrippable.
 PAGE_BREAK = chr(12)  # pdftotext page separator (form feed)
+
+
+def keep_page_break(line: str, out: list[str]) -> None:
+    """Delete a FURNITURE line but keep the page BOUNDARY it was carrying.
+
+    ONE CONCEPT, ONE TABLE. A running header, page footer, banner or repeated
+    boilerplate line is furniture and is removed; the form feed glued to it is
+    STRUCTURE, and downstream steps navigate by it — ``report.page_offsets``,
+    the ``\\n\\f\\f\\n`` footnote-appendix marker, sectioning, and (since 2026-08-25)
+    the repeated-line strip's own page-distribution gate all read it.
+
+    This promise was made three separate times in three local implementations —
+    ``_strip_standalone_page_numbers``'s blank-to-form-feed substitution,
+    ``_recover_pagination_run``'s ``lines[i] = form_feeds[i]``, and F0's inner
+    ``_drop()`` — and the sites that had NOT made it were the ones nobody had
+    looked at. Measured 2026-08-25 over a 21-paper sample: 371 form feeds in the
+    raw text, 85 in the output (23%), **11 of 21 papers left at ZERO page
+    boundaries**, attributable to five steps that drop a whole line with a bare
+    ``continue``. Two of the five destroy 113 and 74 respectively.
+
+    Emitting the form feed on its own line — rather than excluding such lines
+    from the rule — is deliberate and was measured in v1.9.57: furniture is
+    frequently the FIRST thing on a new page, so excluding form-feed-bearing
+    lines stops them matching at all and the furniture survives instead.
+
+    A line carrying two form feeds gives back two, because ``\\f\\f`` is itself a
+    marker rather than an accident. See LESSONS L-052.
+    """
+    residue = page_break_residue(line)
+    if residue:
+        out.append(residue)
+
+
+def page_break_residue(line: str) -> str:
+    """The page boundary ``line`` was carrying — ``""`` when it carried none.
+
+    The value form of :func:`keep_page_break`, for the sites that BLANK a line
+    in place (``lines[i] = ...``) instead of skipping it while building a list.
+    Both are one definition so the two cannot drift apart.
+    """
+    return PAGE_BREAK * line.count(PAGE_BREAK)
+
+
+def keep_break_in_rejoin(template: str):
+    """``re.sub`` replacement that REJOINS a token yet keeps its page boundary.
+
+    The third form of the same promise, for the sites that repair a statistic
+    SPLIT ACROSS A PAGE BREAK. Those cannot be page-scoped the way A1 is,
+    because crossing the break is the whole point of them: the late-join rules
+    exist precisely to reunite ``p =`` at the foot of one page with its value at
+    the head of the next, after the intervening running header has been
+    stripped. Forbidding the crossing would delete the repair along with the
+    defect.
+
+    So the boundary is RE-EMITTED IMMEDIATELY BEFORE the rejoined token rather
+    than inside it. Three placements were possible and only one is defensible:
+
+      * DROP it (what the code did) — the boundary is gone, and page offsets
+        are a live consumer contract, not a cosmetic;
+      * emit it BETWEEN the label and its value (``CI \\f2.046``) — that puts a
+        control character inside a published statistic, which is a worse defect
+        than the one being fixed and hands every consumer a token no paper
+        printed;
+      * emit it BEFORE the whole token (``\\fCI 2.046``) — the statistic stays
+        contiguous and the boundary survives, mis-attributed by the width of
+        one label. That error is bounded by a few characters; the other two are
+        unbounded.
+
+    MEASURED over a 70-paper strided sample: these sites account for 5 of the
+    994 form feeds (0.5%) — 4 at ``LateJoin_line_break_rejoin`` and 1 at
+    ``A4_ci_delimiter_harmonization``, the latter being a confidence interval
+    whose two bounds sit on different pages. Small, and the reason to fix it is
+    not the count: it is that a rule which silently deletes structure is the
+    class this release exists to close, and leaving two instances of it behind
+    because they are rare is how the other seven survived.
+    """
+
+    def _repl(m: "re.Match[str]") -> str:
+        return page_break_residue(m.group(0)) + m.expand(template)
+
+    return _repl
+
+
+# ── A1: rejoin a statistic split across a line break, WITHIN ONE PAGE ─────────
+#
+# THE SIXTH FORM-FEED EATER. v1.9.60 fixed five line-dropping sites; this one is
+# a SUBSTITUTION site and so was never reached by that sweep. Every pattern
+# below spells the gap between the two fragments as `\s`, and Python's `\s`
+# MATCHES U+000C — so a statistic split across a page boundary was rejoined by
+# swallowing the boundary. Same class as L-052 / v1.9.57, at the site nobody
+# had looked at, which is the recurring shape: the uninstrumented channel is
+# where the deletions are.
+#
+# MEASURED, 2026-08-28, on a 70-paper strided sample of the article repository:
+# ALL SEVEN reachable patterns lose the page boundary when one sits in the gap
+# (a control probe with no form feed and no joinable statistic is unchanged, so
+# the positive is real). The findings doc had demonstrated one of the seven.
+#
+# THE FIX IS PAGE-SCOPING BY CONSTRUCTION, not a widened character class —
+# the same construction `_strip_standalone_page_numbers` uses. Splitting on the
+# form feed and rejoining cannot lose a boundary no matter what the patterns
+# do, whereas a hand-narrowed `[ \t\n]` has to be got right in ten places and
+# stays right only until someone adds an eleventh.
+#
+# WHAT IT COSTS, MEASURED AT THE REAL CALL SITE — and the first figure quoted
+# here was measured at the wrong one. A raw-text count gave "1 of 524 firings
+# (0.2%)"; Sonnet 5 (anthropic) pointed out in the 2026-08-28 consult round
+# that A1 runs MID-PIPELINE, after P0r has removed the running headers, so a
+# raw-text count under-reports. Re-measured by intercepting the exact input the
+# shipped function receives, over the same 70 papers:
+#
+#     boundaries SAVED by page-scoping  :  3    (991 -> 994 surviving)
+#     cross-page joins FORGONE          : 10    (465 -> 455 made)
+#
+# So the honest trade is ten forgone rejoins for three preserved boundaries — a
+# worse ratio than the retracted 0.2%, and still the right way round, for a
+# reason the ratio itself does not show. A forgone join OMITS a merge: the text
+# of both fragments survives, and a consumer pattern spelling its gap with the
+# regex whitespace class matches across the retained newline and form feed
+# anyway. A consumed boundary is GONE, and page offsets are a consumer
+# contract. Omission is recoverable; deletion is not.
+#
+# QUOTE A NUMBER ONLY WITH THE COMMAND THAT REGENERATES IT: intercept
+# `_a1_stat_linebreak_repair`, run the corpus through `normalize_text`, and
+# compare the shipped function against one unscoped pass over the same input.
+# The retracted figure is left named above because it is the second time on
+# this stream that a number measured on RAW text was quoted as if it described
+# mid-pipeline behaviour.
+#
+# Named, module-level, and called from exactly one place so its test pins the
+# SHIPPED rule rather than a retyped copy of the patterns.
+def _a1_stat_linebreak_repair(text: str) -> str:
+    """Rejoin statistics broken across lines, without crossing a page break."""
+    pages = text.split(PAGE_BREAK)
+    out: list[str] = []
+    for t in pages:
+        # Basic stat line break: `p\n<`, `p\n=`, `p\n>` → `p <` etc.
+        t = re.sub(r"([pP])\s*\n\s*([=<>])", r"\1 \2", t)
+
+        # A1-extended (2026-04-11, v1.3.1): column-bleed BETWEEN `p` and the
+        # operator. Pattern observed in PSPB papers: `p\n\n01\n\n01\n\n= .28`
+        # where "01", "11" etc. are short column-bleed fragments on their own
+        # lines. Must run before the simple `p =\n digit` rule below, otherwise
+        # the first fragment gets interpreted as the value.
+        t = re.sub(
+            r"([pP])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([<=>])",
+            r"\1 \2",
+            t,
+        )
+        # Same pattern with column-bleed BETWEEN operator and value:
+        # `p =\n01\n11\n.28` → `p = .28`. Must run before the simple
+        # `p =\n digit` rule below to avoid eating the first fragment.
+        t = re.sub(
+            r"([pP]\s*[<=>])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([-.\d])",
+            r"\1 \2",
+            t,
+        )
+
+        # Simple: p =\n digit → p = digit (must run AFTER column-bleed rules)
+        t = re.sub(r"([pP]\s*[=<>])\s*\n\s*(\d)", r"\1 \2", t)
+        t = re.sub(r"(OR|CI|RR)\s*\n\s*(\d)", r"\1 \2", t)
+        t = re.sub(r"(95\s*%)\s*\n\s*(CI)", r"\1 \2", t)
+        t = re.sub(r"([=<>])\s*\n\s*([-\d.])", r"\1 \2", t)
+        # Column-boundary garbage: skip letter-starting text (1-20 chars) between
+        # p= and a valid p-value on the next line.  Two independent safety guards:
+        # Guard 1 — garbage must start with [a-zA-Z] (real stat content starts with
+        #   digits/dots, column-bleed garbage starts with word fragments).
+        # Guard 2 — next-line value must match 0?\.\d+ (valid p-value format;
+        #   rejects section numbers like 8.3, page numbers like 1024, footnotes).
+        # See MetaESCI D5 audit (2026-04-12): old [^\n]{1,20} ate real p-values.
+        t = re.sub(r"(p\s*[<=>]\s*)[a-zA-Z][^\n]{0,19}\n\s*(0?\.\d+)", r"\1\2", t)
+        # Rejoin test stat → p-value across line break: "t(23) = 2.34,\n p < .001"
+        t = re.sub(r"([,;])\s*\n\s*(p\s*[<=>])", r"\1 \2", t)
+        # Rejoin effect size → CI across line break: "d = 0.45,\n 95% CI"
+        t = re.sub(r"([,;])\s*\n\s*(\d+%\s*CI)", r"\1 \2", t)
+        out.append(t)
+    return PAGE_BREAK.join(out)
 
 
 # A page NUMBER is furniture; a page BOUNDARY is structure. Exposed as a named
@@ -826,6 +1011,14 @@ def _f0_strip_running_and_footnotes(
             footnote_raw_spans.append((start, end))
             footnote_raw_texts.append(stripped)
             footnote_chunks.append(stripped)
+            # THE FOOTNOTE BRANCH MUST CALL `_drop()` TOO. The header/footer
+            # branch four lines above does; this one did not, and a footnote is
+            # by definition the LAST content on its page, so the separator it
+            # consumed is a page boundary more often than not. This is the
+            # "a fix covers the case in front of it" shape: v1.9.57 fixed the
+            # branch it was looking at and left its neighbour, and the v1.9.60
+            # sweep counted this function as already done.
+            _drop()
             offset += consumed
             continue
         out_parts.append(content + sep)
@@ -1208,6 +1401,7 @@ def _strip_document_header_banners(text: str) -> str:
                 p.match(stripped) for p in _HEADER_BANNER_PATTERNS
             ):
                 dropped_any = True
+                keep_page_break(line, out_lines)
                 continue
         out_lines.append(line)
 
@@ -1283,14 +1477,38 @@ def _strip_toc_dot_leader_block(text: str) -> str:
     if not drop_idx:
         return text
 
+    # T0 IS A FORM-FEED EATER, at TWO sites, and both are reproduced rather
+    # than reasoned about (2026-08-28). It was flagged by two reviewers in the
+    # v1.9.60 consult and NOT reproduced at the time, so it is recorded here
+    # with the shapes that fire it:
+    #
+    #   (a) a page boundary sitting INSIDE a dropped TOC paragraph, taken by
+    #       the `continue` below;
+    #   (b) a paragraph that is ONLY a page boundary, taken by the leading
+    #       blank-paragraph trim underneath it, because `"\f".strip()` is `""`.
+    #
+    # Control: the same text with no TOC trigger returns byte-identical, so
+    # both positives are real rather than an artifact of the probe.
+    #
+    # A page NUMBER is furniture; a page BOUNDARY is structure. `page_break_residue`
+    # is the ONE definition of "the boundary this text was carrying" (L-052), so
+    # this site cannot drift from the other six.
     kept: list[str] = []
     for i in range(0, n, 2):
         if i in drop_idx:
+            residue = page_break_residue(parts[i])
+            if residue:
+                kept.append(residue)
             continue
         kept.append(parts[i])
 
+    # Trim leading blank paragraphs, but CARRY their boundaries forward rather
+    # than trimming them away with the whitespace they are embedded in.
+    _lead_residue = ""
     while kept and not kept[0].strip():
-        kept.pop(0)
+        _lead_residue += page_break_residue(kept.pop(0))
+    if _lead_residue:
+        kept.insert(0, _lead_residue)
     cleaned = "\n\n".join(kept)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned
@@ -1788,7 +2006,20 @@ _LABELED_NUMERIC_LINE_RE = re.compile(
 # Cycle 15 (v2.4.67) — parenthesized year / year-range. Used by S9 to
 # protect table source-attribution captions (`(2003-2023)`, `(2024)`)
 # from being false-stripped as running-header boilerplate.
-_LINE_HAS_YEAR_PARENS_RE = re.compile(r"\((?:19|20)\d{2}(?:\s*[-–]\s*(?:19|20)\d{2})?\)")
+# A parenthesised 4-digit year or year range — the data-source caption marker
+# ("… American Time Use Survey (2003-2023).").
+#
+# The year may sit anywhere INSIDE the parenthesis group rather than filling it.
+# Measured 2026-08-25 on `j_health_soc_behav_1`, whose figure note wraps onto a
+# second line reading `Household, Income and Labour Dynamics in Australia Survey
+# (Release 22, years 2001-2023). Full model results are in` — the same
+# survey-name-plus-year-range shape this marker was written for, and the old
+# pattern missed it purely because `Release 22, years ` stands between the paren
+# and the year. `[^()]` keeps the group flat so the scan cannot run away across
+# a whole line of prose.
+_LINE_HAS_YEAR_PARENS_RE = re.compile(
+    r"\([^()]{0,60}(?:19|20)\d{2}(?:\s*[-–]\s*(?:19|20)\d{2})?[^()]{0,60}\)"
+)
 
 
 def _is_numeric_only_line(line: str) -> bool:
@@ -1884,6 +2115,11 @@ def _strip_page_footer_lines(text: str) -> str:
     # True while walking the run of furniture lines that begins at a wrapped
     # CONTACT opener; reset by the first line that is kept.
     in_wrapped_contact = False
+    # Every `continue` below deletes a whole line, and until 2026-08-25 each one
+    # deleted the page boundary that line was carrying. This step alone destroyed
+    # 113 form feeds across a 21-paper sample — the largest of the five sites.
+    # `keep_page_break` is the single shared definition of "furniture goes, the
+    # boundary stays"; see its docstring and LESSONS L-052.
     for line in text.split("\n"):
         stripped = line.strip()
         if stripped and _WRAPPED_CONTACT_OPENER.match(stripped):
@@ -1894,18 +2130,25 @@ def _strip_page_footer_lines(text: str) -> str:
                 continue
             dropped_any = True
             in_wrapped_contact = True
+            keep_page_break(line, out_lines)
             continue
         if stripped and any(
             p.match(stripped) for p in _PAGE_FOOTER_LINE_PATTERNS
         ):
             dropped_any = True
+            keep_page_break(line, out_lines)
             continue
         if in_wrapped_contact:
             if not stripped:
-                # blank line inside the block — keep scanning, don't emit
+                # blank line inside the block — keep scanning, don't emit.
+                # A BLANK line can still carry the form feed: pdftotext puts the
+                # page separator on a line of its own more often than not, so
+                # this branch was silently the boundary-losing one.
+                keep_page_break(line, out_lines)
                 continue
             if _CONTACT_REGION_TAIL.match(stripped):
                 dropped_any = True
+                keep_page_break(line, out_lines)
                 continue
             # first real line after the block: the block is over
             in_wrapped_contact = False
@@ -2179,10 +2422,16 @@ def _strip_recurring_running_headers(text: str) -> str:
     # prefix-stripping (avoids "Smith" matching before "Smith and Jones").
     headers_by_len = sorted(headers, key=len, reverse=True)
     out_lines: list[str] = []
+    # `line.strip()` removes the form feed (it is whitespace), so `s` never
+    # shows it while `line` still carries it — which is exactly how this step
+    # destroyed 74 page boundaries across a 21-paper sample without anyone
+    # reading a rule that mentions page breaks. Both exits below now keep the
+    # boundary: the standalone drop, and the welded `stripped = ""` branches.
     for line in text.split("\n"):
         s = line.strip()
         if s in headers:
-            continue  # standalone occurrence — drop
+            keep_page_break(line, out_lines)
+            continue  # standalone occurrence — drop the furniture, keep the page
         # Welded case: the body line begins with the running header followed
         # by whitespace or punctuation. Strip the prefix so the body sentence
         # survives without the header injection.
@@ -2193,7 +2442,7 @@ def _strip_recurring_running_headers(text: str) -> str:
             # leading whitespace that pdftotext may have inserted.
             ls = stripped.lstrip()
             if ls == h:
-                stripped = ""
+                stripped = page_break_residue(line)
                 break
             if (
                 ls.startswith(h + " ")
@@ -2215,7 +2464,7 @@ def _strip_recurring_running_headers(text: str) -> str:
             # header AND is at least 30 chars (avoids false positives on
             # short shared prefixes).
             if len(ls) >= 30 and h.startswith(ls):
-                stripped = ""
+                stripped = page_break_residue(line)
                 break
         out_lines.append(stripped)
     cleaned = "\n".join(out_lines)
@@ -2463,6 +2712,15 @@ def _strip_frontmatter_metadata_leaks(text: str) -> str:
         )
         if matched:
             dropped = True
+            # P1 IS A FORM-FEED EATER — L-052's class, at a site the v1.9.60
+            # sweep did not reach. Reproduced 2026-08-28: a leak line matching
+            # `^\d{6,8}\s*$` with a page boundary glued to it goes 1 -> 0, while
+            # the same text with the leak line replaced by ordinary prose comes
+            # back byte-identical. The first probe here did NOT reproduce, for
+            # the instructive reason that its "leak" line matched no pattern and
+            # so never reached this branch — a probe that does not exercise the
+            # path under test reports a clean run and means nothing.
+            keep_page_break(line, out_lines)
             continue
         out_lines.append(line)
 
@@ -2616,6 +2874,14 @@ def _rejoin_split_numbered_headings(text: str) -> str:
                 # conventional ``N.N. Heading`` shape.
                 if not num.endswith("."):
                     num = num + "."
+                # Three lines are consumed here — the orphan number, the blanks
+                # between, and the heading — and `.strip()` drops a form feed on
+                # any of them. A split numbered heading is exactly what you get
+                # when a section starts at the top of a new page, so this is a
+                # likely place for one. Emit the boundary BEFORE the rejoined
+                # heading, which is where it stood.
+                for _c in [lines[i], *(lines[b] for b in blanks), lines[j]]:
+                    keep_page_break(_c, out)
                 out.append(f"{num} {lines[j].strip()}")
                 # Skip the blanks between and the consumed heading line.
                 i = j + 1
@@ -2860,7 +3126,45 @@ class NormalizationReport:
     # the coefficient the layout proved but the text could not place.
     fallback_details: dict[str, dict[str, int]] = field(default_factory=dict)
 
-    def _track(self, step_code: str, before: str, after: str, metric_name: str):
+    def _track(self, step_code: str, before: str, after: str, metric_name: str,
+               *, count: int | None = None):
+        """Record that ``step_code`` ran, and what it did to ``metric_name``.
+
+        ``count`` — NEVER INVENTED. When a call site can state how many times
+        its rule actually fired, it passes that number and it is what reaches
+        ``changes_made``. When it cannot, ``changes_made`` keeps the character
+        delta it has always held, under a key whose name says otherwise. There
+        is deliberately no third option where ``_track`` guesses: a default of
+        "one firing per rule" was written, measured, and WITHDRAWN, because on
+        the paper the sign-recovery family was built for it turns 3 real
+        rewrites into 1 while every contract test stays green.
+
+        The character delta is not a count, and where it LOOKS like one that is
+        a coincidence of whitespace. For the sign-recovery family the delta is
+        the WHITESPACE NORMALISATION, which equals the number of minus signs
+        re-attached only when there is exactly one stray space per bound.
+        Measured on `recover_dropped_minus_ci_upper_in_text`:
+
+            [- 0.58, - 0.18]     delta 2   signs 2   <- agrees
+            [- 0.58 , - 0.18]    delta 3   signs 2   <- a space before the comma
+            [- 0.58,   - 0.18]   delta 4   signs 2   <- extra spaces after it
+
+        All three brackets on 10.1016/j.jesp.2021.104154 are the FIRST shape, so
+        that document's published 6 was RIGHT -- by luck, not by contract. This
+        is precisely the risk ESCImate's 2026-08-22 notice named: exactness
+        "rests on a property of the RULES, not of the metric", and it asked for
+        an explicit `count=` so the guarantee is stated. It now is.
+
+        THE UNIT IS MINUS SIGNS ATTACHED TO A NUMERAL, uniform across W0g / W0q
+        / W0h -- not rule firings, because one W0q firing repairs one bracket
+        and can attach two signs. A per-firing count was drafted and reports 3
+        on that same paper, which is the mirror error and just as wrong.
+        Reproduce: tests/test_changes_made_is_an_exact_count.py.
+
+        ``changes_made_by_step`` deliberately stays a character delta on every
+        step — it is documented as one, it includes length-neutral rewrites at
+        zero, and no consumer reads it as an occurrence count.
+        """
         # ``steps_applied`` records every step that ran (kept for backward
         # compatibility with tests and diagnostics that want to see the full
         # pipeline order). ``steps_changed`` records only steps that actually
@@ -2873,7 +3177,16 @@ class NormalizationReport:
             diff = abs(len(before) - len(after))
             # ACCUMULATE. A plain assignment lost every earlier rule that wrote
             # the same key -- see the field comment on `changes_made`.
-            if diff:
+            #
+            # A WIRED count is authoritative even at zero delta: the glyph
+            # substitutions this metric exists for (`2` -> `-`) are exactly the
+            # length-neutral ones the `if diff:` guard used to drop to nothing.
+            if count is not None:
+                if count:
+                    self.changes_made[metric_name] = (
+                        self.changes_made.get(metric_name, 0) + count
+                    )
+            elif diff:
                 self.changes_made[metric_name] = self.changes_made.get(metric_name, 0) + diff
             # Recorded even at diff == 0: a length-neutral substitution is still
             # a rewrite of the consumer's document.
@@ -4057,12 +4370,38 @@ _BARE_POS_TOKEN_RE = re.compile(_ALREADY_SIGNED + r"(\d?\.\d+)\b")
 _SIGNED_NEG_NUM_RE = re.compile(r"[-−]\d*\.\d+")
 
 
-def _recover_dropped_minus_in_record(record: str) -> str:
+# A minus sign ATTACHED to a numeral — the thing the sign-recovery family
+# actually produces, and therefore the unit `dropped_minus_signs_recovered`
+# counts. ONE CONCEPT, ONE TABLE: W0g, W0q and W0h all count through this, so
+# the key cannot mean "signs" from one rule and "firings" from another.
+#
+# The unit is NOT "times the rule fired". W0q repairs one CI bracket per firing
+# and can re-attach TWO minus signs doing it — `[− 0.58, − 0.18]` is one bracket
+# and two signs. All three brackets on 10.1016/j.jesp.2021.104154 are of that
+# shape, which is why a per-firing count reports 3 there where the truth is 6.
+_ATTACHED_MINUS_RE = re.compile(r"[-−](?=[0-9.])")
+
+
+def _attached_minus_delta(before: str, after: str) -> int:
+    """How many minus signs this rewrite attached to a numeral."""
+    return len(_ATTACHED_MINUS_RE.findall(after)) - len(_ATTACHED_MINUS_RE.findall(before))
+
+
+def _recover_dropped_minus_in_record(record: str, _counter: list[int] | None = None) -> str:
     """Recover bare positive decimal tokens whose paired CI bracket proves
     the published value is negative (the minus glyph was dropped pre-emit).
 
     Conservative: only fires when the CI bracket [lo, hi] has lo < 0 AND the
     recovered -X.XX is inside the bracket AND the literal X.XX is outside.
+
+    ``_counter`` — an optional single-element list owned by the caller;
+    ``_counter[0]`` accumulates the number of MINUS SIGNS attached to a numeral,
+    the same unit W0q and W0h report (see :func:`_attached_minus_delta`). This
+    rule prepends exactly one ``-`` per rewrite, so here signs and firings
+    coincide — but the unit is signs, because W0q's do not. Threaded rather
+    than returned because this runs inside a ``re.sub`` callback, and defaulted
+    to ``None`` so the render and table-cell channels keep the plain ``str``
+    contract.
     """
     if "[" not in record:
         return record
@@ -4148,25 +4487,32 @@ def _recover_dropped_minus_in_record(record: str) -> str:
         # Strict requirement: recovered IN bracket, literal OUT. A bracket
         # containing both (ambiguous) is a no-flip.
         if in_recovered and not in_literal:
+            if _counter is not None:
+                _counter[0] += 1
             return "-" + frac_with_lead
         return m.group(0)
 
     return _BARE_POS_TOKEN_RE.sub(_sub, record)
 
 
-def recover_dropped_minus_via_ci_pairing(text: str) -> str:
+def recover_dropped_minus_via_ci_pairing(text: str, _counter: list[int] | None = None) -> str:
     """W0g (R5 / B7): recover bare positive decimal tokens whose CI proves
     them negative (dropped-minus class). Distinct from ``recover_minus_via_ci_pairing``
-    (W0d), which handles the '2'-for-U+2212 corruption class."""
+    (W0d), which handles the '2'-for-U+2212 corruption class.
+
+    ``_counter`` — optional single-element list; receives the EXACT number of
+    coefficients re-signed, so the pipeline never has to infer a count from a
+    character delta. Optional and defaulted so ``render.py``'s call site keeps
+    the plain ``str`` contract unchanged."""
     if not text or "[" not in text:
         return text
     text = _TABLE_ROW_RE.sub(
-        lambda m: _recover_dropped_minus_in_record(m.group(0)), text
+        lambda m: _recover_dropped_minus_in_record(m.group(0), _counter), text
     )
     out = []
     for line in text.split("\n"):
         if "[" in line:
-            out.append(_recover_dropped_minus_in_record(line))
+            out.append(_recover_dropped_minus_in_record(line, _counter))
         else:
             out.append(line)
     return "\n".join(out)
@@ -4430,12 +4776,17 @@ def recover_superscript_via_layout(text: str, layout) -> str:
     return text
 
 
-def recover_dropped_minus_via_layout(text: str, layout) -> str:
+def recover_dropped_minus_via_layout(text: str, layout, _counter: list[int] | None = None) -> str:
     """W0h (R5 / B7): recover dropped-minus coefficients that carry NO CI, using
     the layout channel's surviving ``(cid:N)`` minus glyph. Conservative: only
     flips coefficients the layout proves negative, only in the ``= <coef>``
     assignment slot, and only as many times as the layout found them. See the
     module comment above for the structural signature + the OCR-only limitation.
+
+    ``_counter`` — optional single-element list; receives the number of
+    coefficients actually re-signed, which is ``len(edits)`` and therefore
+    excludes every site this pass REFUSED as ambiguous. A refusal must not read
+    as a repair.
     """
     if not text or layout is None:
         return text
@@ -4496,6 +4847,8 @@ def recover_dropped_minus_via_layout(text: str, layout) -> str:
     # Apply right-to-left so earlier offsets stay valid.
     for start, end, replacement in sorted(edits, reverse=True):
         text = text[:start] + replacement + text[end:]
+    if _counter is not None:
+        _counter[0] += len(edits)
     return text
 
 
@@ -4830,7 +5183,7 @@ _CI_UPPER_DROPPED_RE = re.compile(
 )
 
 
-def recover_dropped_minus_ci_upper_in_text(text: str) -> str:
+def recover_dropped_minus_ci_upper_in_text(text: str, _counter: list[int] | None = None) -> str:
     """Recover a dropped/detached minus on a CI UPPER bound inside a self-
     contained ``<estimate> … [lo, hi]`` cell or clause (the table-cell and
     raw-text surfaces). For each estimate-anchored bracket, the estimate-
@@ -4919,7 +5272,25 @@ def recover_dropped_minus_ci_upper_in_text(text: str) -> str:
         lo_txt = re.sub(r"\s+", "", m.group(4))
         minus = "−" if lo_txt.startswith("−") else "-"
         new_bracket = f"[{lo_txt}, {minus}{m.group(7)}]"
-        return m.group(0).replace(m.group(3), new_bracket, 1)
+        _repaired = m.group(0).replace(m.group(3), new_bracket, 1)
+        # COUNT THE SIGNS, NOT THE FIRINGS — and not the character delta either.
+        # One bracket repaired can attach TWO minus signs (`[− 0.58, − 0.18]`),
+        # so a per-firing count under-reports; and the delta is the WHITESPACE
+        # normalisation, which only coincides with the sign count when there is
+        # exactly one stray space per bound. Measured — the coincidence breaks:
+        #
+        #   [- 0.58, - 0.18]     delta 2   signs 2   <- the common shape, agrees
+        #   [- 0.58 , - 0.18]    delta 3   signs 2   <- a space before the comma
+        #   [- 0.58,   - 0.18]   delta 4   signs 2   <- extra spaces after it
+        #
+        # effectcheck publishes this key as `upstream_sign_rewrites`, so the
+        # unit that matters to a reader is signs. It is now stated rather than
+        # emergent — which is exactly what ESCImate's 2026-08-22 notice asked
+        # for when it flagged that exactness "rests on a property of the RULES,
+        # not of the metric".
+        if _counter is not None:
+            _counter[0] += _attached_minus_delta(m.group(0), _repaired)
+        return _repaired
 
     return _CI_UPPER_DROPPED_RE.sub(_sub, text)
 
@@ -5299,6 +5670,53 @@ def normalize_text(
     return out, report
 
 
+#: A line that is nothing but a printed VALUE -- a number, possibly signed,
+#: bracketed, percentaged, or carrying significance asterisks. Deliberately
+#: narrow: it must contain a digit and nothing that is not part of a numeric
+#: presentation, so a sentence containing a number does not match.
+_VALUE_ONLY_LINE = re.compile(r"^[\[\(<>=+−-]*\s*\d[\d.,%*\s\]\)]*$")
+
+
+def _value_followed_fraction(lines: list[str], positions: list[int]) -> float:
+    """Share of a repeated line's occurrences immediately followed by a VALUE.
+
+    THE DISCRIMINATOR BETWEEN A TABLE ROW LABEL AND A PUBLISHER OVERLAY, and
+    it is TYPOGRAPHIC -- it reads what the renderer actually placed on the next
+    line, never what a number ought to be. A row label is followed by the
+    number it labels, so deleting the label orphans that number; rule 0g names
+    that exact harm ("delete FURNITURE, never DATA"). An overlay is followed by
+    whatever the page happened to hold.
+
+    Measured 2026-09-01 (`scratchpad/neighbour.py`), real documents first:
+
+        Author Manuscript   ieee_access_2       0 of 220   0.00
+        Author Manuscript   ieee_access_alt     2 of  92   0.02
+        Author Manuscript   collabra.19525      2 of 112   0.02
+        Number of trained architectures         5 of   5   1.00
+        Performance metric  ieee_access_5       7 of   9   0.78
+        adversarial spread table, 4 per page   20 of  20   1.00
+
+    Blank lines and a bare page break are skipped rather than counted, because
+    pdftotext puts both between a label and its value; the search stops at the
+    first line carrying content, so only the IMMEDIATE neighbour votes.
+
+    Returns 0.0 for an empty occurrence list -- a line with no occurrences
+    cannot be a row label, and the caller's other gates decide it.
+    """
+    if not positions:
+        return 0.0
+    hits = 0
+    for i in positions:
+        for j in range(i + 1, min(i + 3, len(lines))):
+            nxt = lines[j].strip().strip(PAGE_BREAK).strip()
+            if not nxt:
+                continue
+            if _VALUE_ONLY_LINE.match(nxt):
+                hits += 1
+            break
+    return hits / len(positions)
+
+
 def _normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -5517,9 +5935,18 @@ def _normalize_text(
     # the leading U+2212 on certain fonts, so `b = -.022` reaches us as
     # `b = .022`. Only fires when a same-record CI bracket mathematically
     # PROVES the sign-flip (negative-bound bracket contains -X.XX but not X.XX).
+    #
+    # COUNT= IS WIRED HERE, and on W0q and W0h below, because these three are
+    # the rules that feed effectcheck/ESCImate's published
+    # `upstream_sign_rewrites`. Until it was wired, `changes_made` held a
+    # CHARACTER DELTA under an occurrence-shaped name, and the two are not the
+    # same number: see `NormalizationReport._track` and
+    # tests/test_changes_made_is_an_exact_count.py.
     before = t
-    t = recover_dropped_minus_via_ci_pairing(t)
-    report._track("W0g_dropped_minus_ci_pairing", before, t, "dropped_minus_signs_recovered")
+    _w0g_n = [0]
+    t = recover_dropped_minus_via_ci_pairing(t, _w0g_n)
+    report._track("W0g_dropped_minus_ci_pairing", before, t,
+                  "dropped_minus_signs_recovered", count=_w0g_n[0])
 
     # ── W0q: reattach a DETACHED minus on a CI upper bound in BODY PROSE ──
     # AUDIT EVERY CHANNEL. `recover_dropped_minus_ci_upper_in_text` existed only
@@ -5542,8 +5969,10 @@ def _normalize_text(
     # arithmetic repaired 0 of the 3 (it had grabbed `S.D = 1.43` as the
     # "estimate" and the containment test failed on an unrelated number).
     before = t
-    t = recover_dropped_minus_ci_upper_in_text(t)
-    report._track("W0q_ci_upper_detached_minus", before, t, "dropped_minus_signs_recovered")
+    _w0q_n = [0]
+    t = recover_dropped_minus_ci_upper_in_text(t, _w0q_n)
+    report._track("W0q_ci_upper_detached_minus", before, t,
+                  "dropped_minus_signs_recovered", count=_w0q_n[0])
 
     # ── W0h (§A R5 / B7, 2026-06-15): recover DROPPED minus via LAYOUT ──
     # The residual W0g cannot reach: a coefficient with only a t/p value and NO
@@ -5552,8 +5981,10 @@ def _normalize_text(
     # dedicated `dropped_minus_layout` param so F0 stays off in the section path.
     if dropped_minus_layout is not None:
         before = t
-        t = recover_dropped_minus_via_layout(t, dropped_minus_layout)
-        report._track("W0h_dropped_minus_layout", before, t, "dropped_minus_signs_recovered")
+        _w0h_n = [0]
+        t = recover_dropped_minus_via_layout(t, dropped_minus_layout, _w0h_n)
+        report._track("W0h_dropped_minus_layout", before, t,
+                      "dropped_minus_signs_recovered", count=_w0h_n[0])
 
         # ── W0m (§A / GLYPH, 2026-07-04): recover a standardized β rendered as a
         # plain 'b'. Uses the SAME layout channel as W0h: the corrupted symbol is
@@ -5640,19 +6071,36 @@ def _normalize_text(
     report._track("S3_ligature_expansion", before, t, "ligatures_expanded")
 
     # S4: Quote normalization
+    #
+    # COUNT THE REWRITES; do not let `_track` infer them from the length delta.
+    # Every substitution here is one character for one character, so the delta is
+    # ALWAYS zero and `quotes_normalized` has never been reported AT ALL -- the
+    # key was absent, which a consumer reads as zero. See
+    # tests/test_changes_made_counts_length_neutral_rewrites.py.
     before = t
-    t = re.sub(r"[\u201C\u201D\u201E\u201F\u2033\u2036]", '"', t)
-    t = re.sub(r"[\u2018\u2019\u201A\u201B\u2032\u2035]", "'", t)
-    report._track("S4_quote_normalization", before, t, "quotes_normalized")
+    _n_quotes = len(_S4_DOUBLE_QUOTE_RE.findall(t)) + len(_S4_SINGLE_QUOTE_RE.findall(t))
+    t = _S4_DOUBLE_QUOTE_RE.sub(chr(34), t)
+    t = _S4_SINGLE_QUOTE_RE.sub(chr(39), t)
+    report._track("S4_quote_normalization", before, t, "quotes_normalized",
+                  count=_n_quotes)
 
     # S5: Dash and minus normalization
+    #
+    # COUNT THE REWRITES. Four of these five substitutions are one character for
+    # one character, so the length delta is zero and the key went ABSENT; only
+    # the em-dash expands (to "--") and contributes a delta. That made
+    # `dashes_normalized` not merely missing but WRONG on mixed input: one
+    # en-dash plus two em-dashes is three dashes normalised and the delta is 2.
+    # A plausible wrong count reaching a consumer is worse than no count.
     before = t
+    _n_dashes = sum(t.count(_ch) for _ch in _S5_DASH_CHARS)
     t = t.replace("\u2212", "-")   # Unicode MINUS SIGN (critical for stats)
     t = t.replace("\u2013", "-")   # en-dash
     t = t.replace("\u2014", "--")  # em-dash
     t = t.replace("\u2010", "-")   # Unicode hyphen
     t = t.replace("\u2011", "-")   # non-breaking hyphen
-    report._track("S5_dash_normalization", before, t, "dashes_normalized")
+    report._track("S5_dash_normalization", before, t, "dashes_normalized",
+                  count=_n_dashes)
 
     # S5a: Context-aware U+FFFD -> eta recovery (ESCImate Request 1.2)
     # pdftotext occasionally emits U+FFFD in place of Greek eta. The pdfplumber
@@ -5792,91 +6240,319 @@ def _normalize_text(
     # that got split from "p =\n484". S9 would strip them as page numbers.
     if level == NormalizationLevel.academic:
         before = t
-        # Basic stat line break: `p\n<`, `p\n=`, `p\n>` → `p <` etc.
-        t = re.sub(r"([pP])\s*\n\s*([=<>])", r"\1 \2", t)
-
-        # A1-extended (2026-04-11, v1.3.1): column-bleed BETWEEN `p` and the
-        # operator. Pattern observed in PSPB papers: `p\n\n01\n\n01\n\n= .28`
-        # where "01", "11" etc. are short column-bleed fragments on their own
-        # lines. Must run before the simple `p =\n digit` rule below, otherwise
-        # the first fragment gets interpreted as the value.
-        t = re.sub(
-            r"([pP])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([<=>])",
-            r"\1 \2",
-            t,
-        )
-        # Same pattern with column-bleed BETWEEN operator and value:
-        # `p =\n01\n11\n.28` → `p = .28`. Must run before the simple
-        # `p =\n digit` rule below to avoid eating the first fragment.
-        t = re.sub(
-            r"([pP]\s*[<=>])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([-.\d])",
-            r"\1 \2",
-            t,
-        )
-
-        # Simple: p =\n digit → p = digit (must run AFTER column-bleed rules)
-        t = re.sub(r"([pP]\s*[=<>])\s*\n\s*(\d)", r"\1 \2", t)
-        t = re.sub(r"(OR|CI|RR)\s*\n\s*(\d)", r"\1 \2", t)
-        t = re.sub(r"(95\s*%)\s*\n\s*(CI)", r"\1 \2", t)
-        t = re.sub(r"([=<>])\s*\n\s*([-\d.])", r"\1 \2", t)
-        # Column-boundary garbage: skip letter-starting text (1-20 chars) between
-        # p= and a valid p-value on the next line.  Two independent safety guards:
-        # Guard 1 — garbage must start with [a-zA-Z] (real stat content starts with
-        #   digits/dots, column-bleed garbage starts with word fragments).
-        # Guard 2 — next-line value must match 0?\.\d+ (valid p-value format;
-        #   rejects section numbers like 8.3, page numbers like 1024, footnotes).
-        # See MetaESCI D5 audit (2026-04-12): old [^\n]{1,20} ate real p-values.
-        t = re.sub(r"(p\s*[<=>]\s*)[a-zA-Z][^\n]{0,19}\n\s*(0?\.\d+)", r"\1\2", t)
-        # Rejoin test stat → p-value across line break: "t(23) = 2.34,\n p < .001"
-        t = re.sub(r"([,;])\s*\n\s*(p\s*[<=>])", r"\1 \2", t)
-        # Rejoin effect size → CI across line break: "d = 0.45,\n 95% CI"
-        t = re.sub(r"([,;])\s*\n\s*(\d+%\s*CI)", r"\1 \2", t)
+        t = _a1_stat_linebreak_repair(t)
         report._track("A1_stat_linebreak_repair", before, t, "stats_repaired")
 
     # S9: Header/footer removal
     before = t
     lines = t.split("\n")
     line_counts: dict[str, int] = {}
+    # WHICH PAGE each occurrence sits on. This is the stability metric the old
+    # line-index gate could not be: a line's page is a property of the DOCUMENT,
+    # not of how many lines happen to precede it, so removing lines cannot move
+    # it. `line_positions` is retained because the unpaginated fallback below
+    # still reads it — see the scoping comment there.
+    line_pages: dict[str, list[int]] = {}
     line_positions: dict[str, list[int]] = {}
+    _page = 1
     for idx, line in enumerate(lines):
+        # PAGE ATTRIBUTION — increment BEFORE recording, for a LEADING break.
+        #
+        # pdftotext glues the page separator to the FIRST LINE OF THE NEW PAGE,
+        # never to the last line of the old one; this module's own docstring
+        # records the shape (`chr(12) + 'Frey et al.' + chr(8)` for
+        # PMC13137057). Incrementing after the line was recorded therefore
+        # filed the first line of page N under page N−1 — and the first line
+        # of a page is exactly where a running header sits, so the gate was
+        # mis-attributing the very class it exists to identify.
+        #
+        # The visible consequence, measured on a 6-page running header:
+        # `line_pages` came out `[1, 1, 2, 3, 4, 5]`, giving `max_per_page = 2`
+        # instead of 1, so the once-per-page arm did NOT fire and all six
+        # copies survived. The gate failed at its own purpose while remaining
+        # live on footers and on table content — the two error directions the
+        # page gate was written to separate.
+        #
+        # SCOPE, measured over a 70-paper strided sample of the article
+        # repository (`tools/diag/form_feed_page_attribution_census.py`):
+        #
+        #     form feeds total                          994
+        #       alone on their line (HARMLESS)           70   7.0%
+        #       glued, line not a 15-120 candidate      415  41.8%
+        #       glued to a RECORDED candidate           509  51.2%   <- corrupts
+        #       after content on the line                 0   0.0%
+        #
+        # An independent 36-paper sample gave 1122/2218 (50.6%): two corpora,
+        # same conclusion. This is the dominant shape, not a corner case.
+        #
+        # A form feed ALONE on its line is harmless and must not be counted as
+        # a defect: `strip()` empties the line, so nothing is recorded and the
+        # increment lands cleanly before the next line either way. That is why
+        # the corrupting share (51.2%) is smaller than the glued share (93.0%)
+        # — the two figures answer different questions, and only the first
+        # bounds this fix.
+        #
+        # The split point is the first non-whitespace character. Everything
+        # before it already belongs to the NEW page; anything after it belongs
+        # after this line. The trailing arm is observed at 0.0% today and is
+        # kept because correctness should not depend on a measured zero.
+        _content_at = len(line) - len(line.lstrip())
+        _page += line.count(PAGE_BREAK, 0, _content_at)
         stripped = line.strip()
         if 15 <= len(stripped) <= 120:
             line_counts[stripped] = line_counts.get(stripped, 0) + 1
+            line_pages.setdefault(stripped, []).append(_page)
             line_positions.setdefault(stripped, []).append(idx)
-    # Cycle 14 (v2.4.66) — minimum-gap discriminator.
-    # A repeated line that appears ≥5 times is a candidate header/footer.
-    # The old rule stripped every candidate; this false-positives on
-    # TABLE ROW LABELS that repeat across columns of a regression table
-    # (socius-3 `Intend vs. Later` ×5, majumder `eta2p = .001, ⸸` ×9,
-    # collabra-rnr `Identifiability` ×5, social-forces-1 `Emotional
-    # neglect` ×5 — all cluster within a small region).
+        _page += line.count(PAGE_BREAK, _content_at)
+    # The document's page count, for the watermark arm's coverage ratio.
     #
-    # The MINIMUM GAP between consecutive occurrences cleanly separates
-    # the two classes:
-    #   - Table labels cluster in adjacent rows → min_gap ≤ 14 (range
-    #     3-14 across 4 corpus cases).
-    #   - Running headers appear once per page → min_gap ≥ 25 (range
-    #     25-100 across multiple corpus papers).
-    # Threshold at min_gap ≥ 20 separates the two with margin on both
-    # sides. The range-coverage approach was abandoned because doc length
-    # is too variable — short docs can have running-header range only
-    # 65-72% (below the natural 90% mark seen in long docs), causing
-    # idempotence drift when pass 2 has a shorter input.
+    # THIS IS N+1, NOT N, AND THAT IS LOAD-BEARING. pdftotext emits a form feed
+    # after the LAST page as well as between pages, so `_page` -- which starts
+    # at 1 and increments once per break -- ends one above the true page count.
+    # Measured 2026-08-29 against pdfplumber's page count: ieee_access_2 55 true
+    # / 55 form feeds / 56 here, ieee_access_alt 23/23/24, ieee_access_5
+    # 17/17/18. Delta +1 on all three.
+    #
+    # The consequence is a MINIMUM DOCUMENT LENGTH for the watermark arm, and
+    # it is worth having rather than correcting away. A line covering EVERY
+    # page scores n/(n+1), so it clears 0.90 only from 9 pages up:
+    #
+    #     5 pages -> 0.833 kept    9 pages -> 0.900 stripped
+    #     6 pages -> 0.857 kept   10 pages -> 0.909 stripped
+    #     8 pages -> 0.889 kept   55 pages -> 0.982 stripped
+    #
+    # That is exactly the residual the arm's own note accepts -- a table label
+    # spanning every page of a SHORT document -- and it removes it for anything
+    # under 9 pages. It is documented here rather than left as an accident,
+    # because an off-by-one that happens to be safe is one 'cleanup' away from
+    # not being. Pinned by
+    # tests/test_watermark_arm_is_gated_on_page_coverage.py::
+    # test_a_short_document_fully_covered_is_below_the_effective_floor.
+    #
+    # Erring low is the right direction anyway: a missed watermark leaves
+    # furniture, which is visible and reversible for a consumer; an extra
+    # deduplication is neither.
+    _total_pages = _page
+    # ── The discriminator: WHERE ON THE PAGE, not how far apart in the file ──
+    #
+    # A repeated line that appears ≥5 times is a candidate header/footer. The
+    # question is whether it is publisher furniture or table content.
+    #
+    # UNTIL 2026-08-25 the answer was `min(gaps) >= 20` — the minimum LINE-INDEX
+    # distance between consecutive occurrences, a proxy for "once per page". The
+    # proxy is not stable, and its own comment predicted the failure it caused
+    # ("causing idempotence drift when pass 2 has a shorter input"). MEASURED on
+    # ieee_access_5: the table column header `Performance metric` appears NINE
+    # times on pass 1 at positions [521, 545, 582, 651, 682, 972, 978, 1032,
+    # 1040] — two tight pairs at the tail give min_gap 6, so it is KEPT. Other
+    # steps then delete those four tail occurrences, so pass 2 sees five
+    # well-spaced ones, min_gap 22, and DELETES ALL FIVE. Deleting a column
+    # header loses the label that says what the numbers underneath it are, and
+    # no threshold fixes it: min-gap over a shrinking occurrence set is not
+    # monotone, so any threshold has an input that crosses it.
+    #
+    # The stable question is which PAGE each occurrence sits on. A line's page
+    # is a property of the document; deleting other lines cannot move it.
+    #
+    #   - A RUNNING HEADER / FOOTER sits at the same place on many pages, at
+    #     most ONCE per page.
+    #   - A WATERMARK (PMC's "Author Manuscript") repeats several times per page
+    #     but on EVERY page.
+    #   - TABLE CONTENT repeats WITHIN one page or a handful of pages.
+    #
+    # Measured over the 21-paper strided sample, on the 33 lines the old rule
+    # stripped, the two classes separate with no overlap:
+    #
+    #     16 running headers   pages 5-21, max 1 per page   -> strip
+    #      4 watermarks        on EVERY page (23-29), 4-5 per page -> strip
+    #     13 TABLE CONTENT     pages 1-4, 2-26 per page     -> the old rule
+    #                                                          DELETED THESE
+    #
+    # The thirteen include `Number of trained architectures` (a table row
+    # label), the values `100` / `200` / `0.18` / `2` / `3` / `4` / `8`,
+    # `Total`, `Other`, demography_3's `***` significance markers (21 of them,
+    # 19 on one page, taken by the `count >= 20` path) and maier's `X` marks (26
+    # of them, ALL ON ONE PAGE). So this was not only an idempotency bug: the
+    # rule was deleting published table content on pass 1 as well.
+    #
+    # Lowest-scoring true header: 5 distinct pages, max 1 per page.
+    # Highest-scoring false positive: 4 distinct pages, and ≥2 per page.
+    # The gate below sits in that gap, and requires BOTH conditions so that a
+    # single dimension cannot carry it.
+    #
+    # SCOPED TO PAGINATED TEXT, DELIBERATELY. The page gate can only run where
+    # the document says where its pages are, and `normalize_text` also serves
+    # channels that have no pages at all: DOCX and HTML carry no form feed, and
+    # a Word running header lives in `headerN.xml`, which never reaches the body
+    # text mammoth emits. On those inputs the page gate would be a silent no-op
+    # and every repeated line would survive.
+    #
+    # I could not measure that: this checkout has no DOCX or HTML corpus, so the
+    # blast radius on those channels is UNVERIFIED. Under that uncertainty the
+    # rule keeps its previous behaviour where it cannot see pages, rather than
+    # changing an untested channel on an argument. The line-index proxy remains
+    # what it always was there — including its instability, which is unchanged
+    # rather than newly introduced. To settle it, run the repeated-line strip
+    # over a real DOCX/HTML corpus and count how often it fires.
+    #
+    # `>= 2` form feeds, not `>= 1`: a single trailing page marker is a document
+    # end, not evidence that pages are being reported.
+    repeated_arm: dict[str, str] = {}
+    repeated_pages: dict[str, tuple[int, ...]] = {}
+    _MIN_PAGES_FOR_FURNITURE = 5
+    # Watermark arm: the share of the document's pages a line must cover.
+    # 0.90 sits in a measured gap, not at a round number -- see below.
+    _WATERMARK_MIN_COVERAGE = 0.90
+    # A row label is followed by its VALUE; an overlay is not. Measured
+    # 2026-09-01 -- watermarks 0.00 / 0.02 / 0.02, table row labels 0.78 /
+    # 1.00 / 1.00. 0.50 sits in the middle of that gap, not at either edge.
+    _WATERMARK_MAX_VALUE_FOLLOWED = 0.50
+    _paginated = sum(l.count(PAGE_BREAK) for l in lines) >= 2
     repeated: set[str] = set()
     for s, count in line_counts.items():
         if count < 5:
             continue
-        positions = line_positions[s]
-        gaps = [positions[i + 1] - positions[i] for i in range(len(positions) - 1)]
-        if not gaps:
-            continue
-        # Two paths qualify a repeated line as a header/footer:
-        #   - min_gap ≥ 20: cleanly-spaced running header (one per page).
-        #   - count ≥ 20: super-frequently-repeated watermark / sidebar /
-        #     PMC-style "Author Manuscript" boilerplate that repeats multiple
-        #     times per page (consecutive occurrences yield min_gap = 1).
-        # Both forms are publisher boilerplate, never body content.
-        if min(gaps) >= 20 or count >= 20:
+        pages = line_pages[s]
+        distinct_pages = len(set(pages))
+        max_per_page = max(collections.Counter(pages).values())
+        if _paginated:
+            if distinct_pages < _MIN_PAGES_FOR_FURNITURE:
+                # Confined to a few pages — table content, whatever its spacing.
+                continue
+            # TWO shapes qualify as furniture, and they are different objects:
+            #
+            #   1. AT MOST ONCE PER PAGE across >=5 pages -- a running header
+            #      or footer.
+            #   2. SEVERAL TIMES PER PAGE on ESSENTIALLY EVERY PAGE -- a
+            #      publisher watermark, e.g. PMC's "Author Manuscript".
+            #
+            # -- THE WATERMARK ARM: DELETED 2026-08-28, REINSTATED 2026-08-29 --
+            #
+            # It was deleted after Grok 4.6 (xai) showed the then-current form,
+            # a bare `count >= 20`, deduplicating TABLE CONTENT. That finding
+            # was real and it is reproduced here, not taken on trust
+            # (tests/test_watermark_arm_is_gated_on_page_coverage.py). The
+            # deletion note set the conditions for putting the arm back:
+            # "reinstate it with a discriminator that encodes the measured
+            # shape (present on essentially every page), not a raw occurrence
+            # count -- and gather more than one positive first." Both are met,
+            # and each of the three reasons for deleting it was re-tested.
+            #
+            # THE COST OF LEAVING IT OUT, which is what forced the re-test:
+            # `ieee_access_2.pdf` retained all 220 copies of "Author
+            # Manuscript", and one of them lands between a paragraph and the
+            # heading `V.: SUPPLEMENTARY INDEX`, which is therefore never
+            # promoted. That is SECTION STRUCTURE reaching the sectioning
+            # consumers, not cosmetic noise -- so the deletion note's
+            # asymmetry argument ("furniture that survives is VISIBLE and
+            # reversible") did not hold for this paper: the loss was neither.
+            #
+            # THE DISCRIMINATOR IS PAGE COVERAGE, and the two classes separate
+            # with a gap you can drive a bus through. Measured 2026-08-29 over
+            # the 10 IEEE test PDFs plus `10.1525/collabra.19525`
+            # (tools/diag/repeated_line_gate_census.py reports the same
+            # triple):
+            #
+            #     WATERMARKS  ratio 0.96 - 0.98,  uniform 1.00
+            #       ieee_access_2       220x on 55/56 pages, exactly 4 per page
+            #       ieee_access_alt      92x on 23/24 pages, exactly 4 per page
+            #       collabra.19525      112x on 28/29 pages, exactly 4 per page
+            #     TABLE CONTENT  ratio 0.06 - 0.22
+            #       'Performance metric'                9x on  4/18  ratio 0.22
+            #       'Number of trained architectures'   5x on  3/18  ratio 0.17
+            #       'Feature Categories'                7x on  3/18  ratio 0.17
+            #       ... 8 more, none above 0.22
+            #
+            # NOTE WHAT THAT SECOND BLOCK CONTAINS. `Number of trained
+            # architectures` is the very label used to reproduce the defect
+            # that deleted this arm. On the REAL paper it occurs 5 times on 3
+            # of 18 pages; the reproduction that condemned the arm was a
+            # SYNTHETIC document built to the reported shape. The shape is
+            # reachable and the paper is not an instance of it.
+            #
+            # DENOMINATOR, measured separately from the shape: over 200 papers
+            # strided from the 9,888-PDF article repository (198 extracted OK),
+            # this gate selects ZERO lines -- and that zero was checked against
+            # a KNOWN POSITIVE before being believed, because a zero is a claim
+            # about the instrument. The identical filter fires on 3 of 3 known
+            # watermark papers and on 0 of the 8 other IEEE papers beside them.
+            #
+            # THE RESIDUAL IS NOW CLOSED, NOT ACCEPTED -- corrected 2026-09-01.
+            #
+            # This comment previously said a table label repeated several times
+            # per page across >=90% of a document's pages "would still be
+            # deduplicated", and accepted that because "at >=90% page coverage
+            # no POSITIONAL signal distinguishes it from a watermark". The
+            # first half was true and left FOUR RED TESTS standing in
+            # `test_page_gate_never_deletes_the_last_copy.py`; the second half
+            # was wrong, because it only ever looked at POSITION. Two signals
+            # outside position separate every known case, and both are
+            # TYPOGRAPHIC -- what the renderer put on the page, not what the
+            # numbers ought to be.
+            #
+            # (1) MODAL COPIES PER PAGE >= 2. A watermark repeats WITHIN a
+            #     page; that is the entire reason this arm exists. The
+            #     adversarial header-above-title shape prints the string twice
+            #     on page 1 and ONCE on every page after, so its modal per-page
+            #     count is 1 and its `max_per_page` of 2 comes from a single
+            #     page. Measured: the three real watermarks are modal 4 on
+            #     100% of their covered pages; the title shapes are modal 1 at
+            #     both 19 and 25 pages, where `count >= 20` used to catch them.
+            #     A line whose typical page carries one copy is a RUNNING
+            #     HEADER, which is the `once_per_page` arm's business -- and
+            #     that arm correctly declines it, since `max_per_page` is 2.
+            #
+            # (2) NOT FOLLOWED BY ITS OWN VALUE. A table ROW LABEL is followed
+            #     by the number it labels; deleting it orphans that number,
+            #     which is the exact harm rule 0g names. An overlay is followed
+            #     by whatever the page happened to hold. Measured 2026-09-01
+            #     over real documents and the adversarial fixture:
+            #
+            #         Author Manuscript  ieee_access_2      0 of 220   0.00
+            #         Author Manuscript  ieee_access_alt    2 of  92   0.02
+            #         Author Manuscript  collabra.19525     2 of 112   0.02
+            #         Number of trained architectures        5 of   5   1.00
+            #         Performance metric                     7 of   9   0.78
+            #         ADV spread table (5 pages, 4/page)    20 of  20   1.00
+            #
+            #     Two orders of magnitude apart, so the 0.50 threshold is not
+            #     fitted to an edge.
+            #
+            # PER-PAGE UNIFORMITY was measured as a candidate gate and REJECTED,
+            # and that finding stands: the synthetic worst case is uniform too
+            # (4 copies on 5 of 5 pages), so it separates nothing. Recorded so
+            # nobody rebuilds it.
+            #
+            # The three bounds below still apply on top, none of them relied on
+            # alone: rule 0g leaves the first copy in document order,
+            # `_carries_statistical_content` refuses anything carrying data, and
+            # every removal is named per line in
+            # `repeated_line_stripped:watermark_every_page`.
+            _coverage = distinct_pages / max(_total_pages, 1)
+            if max_per_page == 1:
+                qualifies = True
+                _arm = "once_per_page"
+            else:
+                _per_page = collections.Counter(pages)
+                _modal = collections.Counter(_per_page.values()).most_common(1)[0][0]
+                qualifies = (
+                    count >= 20
+                    and _coverage >= _WATERMARK_MIN_COVERAGE
+                    and _modal >= 2
+                    and _value_followed_fraction(lines, line_positions[s])
+                    < _WATERMARK_MAX_VALUE_FOLLOWED
+                )
+                _arm = "watermark_every_page"
+        else:
+            # UNPAGINATED FALLBACK — the pre-2026-08-25 line-index proxy, kept
+            # verbatim so an unmeasured channel is not changed by this release.
+            positions = line_positions[s]
+            gaps = [positions[i + 1] - positions[i] for i in range(len(positions) - 1)]
+            if not gaps:
+                continue
+            qualifies = min(gaps) >= 20 or count >= 20
+            _arm = "unpaginated_line_index_proxy"
+        if qualifies:
             # Cycle 15 (v2.4.67) — caption/citation guard. Some table
             # source-attribution captions are repeated once per table and
             # land in the same min_gap≥20 distribution as a running header,
@@ -5897,7 +6573,25 @@ def _normalize_text(
                 continue
             if s.count(" ") >= 6 and s.rstrip().endswith((".", "!", "?")):
                 continue
+            #   (c) DELETE FURNITURE, NEVER DATA — rule 0g. A deleting step must
+            #       consult `_carries_statistical_content`, and this one never
+            #       did. Measured 2026-08-25 on `j_health_soc_behav_1`: the
+            #       figure note `Note: Whiskers indicate 95% confidence
+            #       intervals. N = 136,739 (women = 68,993, men = 67,746). Data
+            #       are from the` sits once under each of five figures on five
+            #       different pages — indistinguishable from a running footer by
+            #       POSITION, and unmistakable by CONTENT. Guard (b) cannot see
+            #       it because a WRAPPED note's first line ends mid-sentence and
+            #       so fails the terminal-punctuation test.
+            #       Lazy import: `render` imports from this module, so a
+            #       top-level import would be circular. Same pattern as
+            #       `_rejoin_split_numbered_headings`' taxonomy import.
+            from .render import _carries_statistical_content
+            if _carries_statistical_content(s):
+                continue
             repeated.add(s)
+            repeated_arm[s] = _arm
+            repeated_pages[s] = tuple(sorted(set(pages)))
     if repeated:
         # RULE 0g. This deletes lines and, until 2026-08-22, did so with no
         # count, no `changes_made` key and no log line -- an inline list
@@ -5919,8 +6613,115 @@ def _normalize_text(
         # underneath it are. Tracked in `todo.md`; the fix needs a stability
         # metric that survives line removal, not a threshold tweak.
         before_repeat = t
-        lines = [l for l in lines if l.strip() not in repeated]
+        # CAPTURE AND RESTORE THE PAGE BOUNDARY. A running header is FURNITURE;
+        # the form feed glued to it is STRUCTURE, and downstream steps navigate
+        # by it. The same promise `_strip_standalone_page_numbers` makes in
+        # v1.9.57, made here — this rule was the other half of the class and was
+        # missed because it removes whole lines rather than matching a pattern.
+        #
+        # Measured on ieee_access_5 (2026-08-25): 16 of its 17 form feeds arrive
+        # GLUED to a repeated running header, so stripping the header stripped
+        # the page break — 17 -> 0 on that paper, 371 -> 85 across a 21-paper
+        # sample, with 11 of 21 papers left at ZERO page boundaries.
+        #
+        # It is also the PREREQUISITE for the page-distribution gate above:
+        # that gate asks which PAGE each occurrence sits on, and a second
+        # normalization pass over text this rule had flattened would see one
+        # page and answer differently. Fixing the boundary is what makes the
+        # gate stable across passes. (Widening the `.strip()` class at the
+        # line-level strip sites does NOT work — measured: it changes the
+        # comparison key only, and the header still matches, still dies, and
+        # still takes the break with it.)
+        # ── RULE 0g, ALL-OR-NOTHING: NEVER DELETE THE LAST SURVIVING COPY ──
+        #
+        # Rule 0g says a deleting step "must refuse all-or-nothing per run" and
+        # that "deduplication is legitimate only when a copy demonstrably
+        # survives, otherwise it is a deletion wearing a dedup's name". This
+        # step took EVERY copy, and that is how it deleted an article title.
+        #
+        # MEASURED, `10.1001/jamanetworkopen.2023.39337` (JAMA Network Open,
+        # 2023) — "Effect of Time-Restricted Eating on Weight Loss in Adults
+        # With Type 2 Diabetes" occurs 13 times: twelve running headers, and
+        # the TITLE BLOCK at line 2 of page 1, which the raw text layer shows
+        # sitting between the article-type banner `Original Investigation |
+        # Nutrition, Obesity, and Exercise` and the subtitle `A Randomized
+        # Clinical Trial` plus the author list. The gate deleted all thirteen
+        # and the paper shipped with no title. Nothing in `changes_made` named
+        # it, so no consumer could have challenged it.
+        #
+        # WHICH COPY SURVIVES: the FIRST, in document order. Three reasons,
+        # in the order they matter:
+        #
+        #   1. Where the string has a content instance, that instance PRECEDES
+        #      the furniture derived from it — a title block is on page 1 and
+        #      the running head repeats it from page 1 or 2 onward. On the
+        #      JAMA paper the first occurrence IS the title block.
+        #   2. Where every copy is genuinely furniture, the choice is arbitrary
+        #      and its whole cost is one visible, challengeable line of
+        #      boilerplate. That asymmetry is the point: a stray running header
+        #      can be seen and argued with, a deleted title cannot.
+        #   3. Document order is STABLE under line removal, unlike the
+        #      `min(gaps)` proxy this gate replaced, and it keeps the step
+        #      idempotent by construction — pass 2 sees one occurrence, which
+        #      fails the `count >= 5` floor, so the rule cannot fire again.
+        #
+        # A CLEVERER DISCRIMINATOR WAS BUILT AND REFUTED, and it is recorded
+        # here so nobody rebuilds it. "Furniture travels with furniture" —
+        # score each occurrence by how many of its neighbouring lines are
+        # themselves unique, and keep the most content-like — sounds right and
+        # measures badly: on the JAMA title it ties TWELVE occurrences at 3/4
+        # and cannot pick the title, while on `10.1098/rsos.182237`'s genuine
+        # running footer it separates cleanly and picks a copy sitting in the
+        # REFERENCES section. It fails in both directions at once. The simple
+        # rule is not a compromise; it is the one that survived measurement.
+        _kept: list[str] = []
+        _survived: set[str] = set()
+        _removed_per_line: dict[str, int] = {}
+        for _l in lines:
+            _s = _l.strip()
+            if _s in repeated:
+                if _s not in _survived:
+                    # The first copy lives, form feed and all.
+                    _survived.add(_s)
+                    _kept.append(_l)
+                    continue
+                _removed_per_line[_s] = _removed_per_line.get(_s, 0) + 1
+                keep_page_break(_l, _kept)
+                continue
+            _kept.append(_l)
+        lines = _kept
         t = "\n".join(lines)
+        # ── PER-LINE TELEMETRY: name what vanished, or it cannot be challenged ──
+        #
+        # A character delta cannot say WHAT was deleted. That is not a
+        # theoretical complaint: this rule removed the article title of
+        # `10.1001/jamanetworkopen.2023.39337` in every copy, and `changes_made`
+        # recorded a number with no name attached, so no consumer -- and no
+        # reviewer reading the report -- could have found it. The differential
+        # that eventually caught it had to re-run two builds of the library over
+        # the same corpus. That is an unreasonable price for a fact the rule
+        # knew at the moment it acted.
+        #
+        # Routed through `record_fallback` rather than a new report field, on
+        # purpose: `normalize_text` already holds a `fallback_scope` open across
+        # the whole pipeline and `batch.py` already copies `fallbacks` /
+        # `fallback_details` onto `ExtractionReport`. A NEW field would need
+        # plumbing at every serialization layer, and the last three telemetry
+        # fixes in this file each stopped one layer short of a consumer. This
+        # one is wired the moment it is written.
+        #
+        # Two events, because rule 0g's all-or-nothing clause is a promise a
+        # consumer should be able to CHECK rather than trust:
+        #   `repeated_line_stripped:<arm>`  -- the copies taken, per line
+        #   `repeated_line_last_copy_kept`  -- the copy deliberately spared
+        # A line appearing in the first and absent from the second is the
+        # signature of the defect this release fixes, and it is now visible
+        # from a single document's report.
+        for _s, _n in _removed_per_line.items():
+            _event = f"repeated_line_stripped:{repeated_arm.get(_s, 'unknown')}"
+            for _ in range(_n):
+                record_fallback(_event, detail=_s[:120])
+            record_fallback("repeated_line_last_copy_kept", detail=_s[:120])
         report._track(
             "P0q_repeated_line_strip", before_repeat, t, "repeated_lines_stripped"
         )
@@ -5946,7 +6747,20 @@ def _normalize_text(
     # which is the half of the defect this `_track` closes.
     before = t
     t = _strip_standalone_page_numbers(t)
-    report._track("P0_standalone_page_numbers", before, t, "page_numbers_stripped")
+    # count = lines the helper blanked, one per page number. The helper BLANKS
+    # matched lines rather than removing them (line count preserved by
+    # construction — its docstring pins why), so a line-wise comparison is the
+    # exact occurrence count; strict= turns any future violation of that
+    # invariant into a loud error instead of a silent undercount. Without
+    # count= this key published the CHARACTER delta — two-digit page numbers
+    # reported 2x, three-digit 3x (ask 2026-08-22T114401Z, CORRECTION).
+    report._track(
+        "P0_standalone_page_numbers", before, t, "page_numbers_stripped",
+        count=sum(
+            1 for _b, _a in zip(before.split("\n"), t.split("\n"), strict=True)
+            if _b != _a
+        ),
+    )
     # v2.4.3/v2.4.5: 4-digit page numbers (continuous-pagination journals like
     # PSPB where volume runs page numbers into the 1000s, e.g.
     # ``efendic_2022_affect`` with pages 1174-1185). Two patterns fire:
@@ -5962,6 +6776,12 @@ def _normalize_text(
     #       monotonically increasing across the article. The conservative
     #       gates protect table cells (where 4-digit values would have
     #       larger spreads and irregular gaps).
+    # Re-captured here, NOT reused from the P0 track above: the S9 `_track`
+    # below used to diff against the snapshot taken before P0 ran, so P0's
+    # page-number characters were republished under a second key —
+    # `headers_removed` fired on documents containing zero headers (ask
+    # 2026-08-22T114401Z, founding fixture).
+    before = t
     four_digit_counts: dict[str, int] = {}
     for ln in t.split("\n"):
         s = ln.strip()
@@ -6031,6 +6851,7 @@ def _normalize_text(
     # table cell value sits in a VERTICAL BLOCK of other numeric values
     # (other table cells in the same column). So: keep the line if EITHER
     # its nearest non-blank neighbor above OR below is numeric-only.
+    four_digit_blanked = 0
     if strip_set:
         lines = t.split("\n")
         new_lines: list[str] = []
@@ -6044,9 +6865,22 @@ def _normalize_text(
                 # table papers from the non-idempotent set.)
                 new_lines.append(ln)
             else:
-                new_lines.append("")
+                # Blank the NUMBER, keep the BOUNDARY. A page number is very
+                # often the first or last thing on its page, so this branch was
+                # replacing a form-feed-bearing line with the empty string.
+                new_lines.append(page_break_residue(ln))
+                four_digit_blanked += 1
         t = "\n".join(new_lines)
-    report._track("S9_header_footer_removal", before, t, "headers_removed")
+    # Metric key: what this code blanks IS page numbers (the 4-digit
+    # continuous-pagination form), so its count accumulates into
+    # `page_numbers_stripped`. `headers_removed` was a misnomer this site
+    # inherited — no header-removal happens here, and no other site writes
+    # that key, so it is retired rather than kept exact-but-mislabelled.
+    # The step code stays: `steps_applied` order is a compatibility surface.
+    report._track(
+        "S9_header_footer_removal", before, t, "page_numbers_stripped",
+        count=four_digit_blanked,
+    )
 
     # Limit consecutive newlines
     t = re.sub(r"\n{3,}", "\n\n", t)
@@ -6490,9 +7324,11 @@ def _normalize_text(
         # evidence.
         _A4_SPACING_NEEDS_A_DECIMAL = r"(?=[^]\)]*\.\d)"
         t = re.sub(r"\[" + _A4_SPACING_NEEDS_A_DECIMAL +
-                   r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\]", r"[\1, \2]", t)
+                   r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\]",
+                   keep_break_in_rejoin(r"[\1, \2]"), t)
         t = re.sub(r"\(" + _A4_SPACING_NEEDS_A_DECIMAL +
-                   r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)", r"(\1, \2)", t)
+                   r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*\)",
+                   keep_break_in_rejoin(r"(\1, \2)"), t)
         report._track("A4_ci_delimiter_harmonization", before, t, "ci_delimiters_fixed")
 
         # A5: Math symbol and Greek letter normalization
@@ -6677,6 +7513,28 @@ def _normalize_text(
             # header label on the new page ("Article") is stripped upstream by
             # P0r (_CATEGORY_LABEL_HEADER); any that survives is handled by the
             # continuation join, but the year is recovered regardless.
+            # ⚠️ THIS IS A DELIBERATE PAGE-BOUNDARY REMOVAL, NOT AN L-052 EATER.
+            # It is flagged because a form-feed census WILL land here and it
+            # looks exactly like the nine accidental sites closed in v1.9.61.
+            #
+            # MEASURED 2026-08-28 over a 70-paper strided sample: of the 165
+            # form feeds still removed after those nine were fixed, **160 are
+            # these two lines** and 5 were the accidents. So this is now the
+            # single largest remaining boundary loss in the pipeline, and it is
+            # intentional: a bibliography entry straddling a page break must
+            # rejoin, and the cited case is real (nat_comms_2 ref 34's `(2008)`
+            # is orphaned otherwise).
+            #
+            # NOT SWEPT IN with the accidental sites, deliberately. Preserving
+            # the boundary here means threading it through R3's continuation
+            # join, `_pair_two_column_bibliography` and a `strip()`-based entry
+            # loop, any of which could regress a documented real-paper repair —
+            # so it is a scoped change with its own evidence, not a line to
+            # change while fixing something else. The cost is page offsets in
+            # the REFERENCES section, which is where statistics least often
+            # live; the benefit is entries that stay whole. If a consumer needs
+            # page offsets through the bibliography, THAT is the trigger to
+            # reopen this, and the number to beat is 160 of 994.
             refs_text = re.sub(r"[ \t]*\n[ \t\n]*\f[ \t]*", "\n", refs_text)
             refs_text = refs_text.replace("\f", "\n")
 
@@ -6845,8 +7703,8 @@ def _normalize_text(
         # those tokens (test_column_bleed_too_many_fragments_ignored is
         # unaffected — its input has no leading `,`/`;`).
         # Clears korbmacher (2 papers) from the non-idempotent set.
-        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=\d+%\s*CI)", r"\1 ", t)
-        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=p\s*[<=>])", r"\1 ", t)
+        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=\d+%\s*CI)", keep_break_in_rejoin(r"\1 "), t)
+        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=p\s*[<=>])", keep_break_in_rejoin(r"\1 "), t)
         # Cycle 13 (v2.4.65) — same shape, applied to `=/<>` → digit/dot
         # continuations. li-feldman-fox has `p =\n\n\x0cFox et al. (2005)...
         # \n\n38\n\n.25, OR = .96, 95%CI [.90, 1.03])` where A1's
@@ -6856,7 +7714,7 @@ def _normalize_text(
         # cleaned form. The lookahead `(?=[-\d.])` is the load-bearing
         # constraint — real paragraphs rarely START with a leading dot
         # or `-digit`.
-        t = re.sub(r"([=<>])\s*\n\s*\n\s*(?=[-.]?\d)", r"\1 ", t)
+        t = re.sub(r"([=<>])\s*\n\s*\n\s*(?=[-.]?\d)", keep_break_in_rejoin(r"\1 "), t)
         # Cycle 15 (v2.4.67) — cross-paragraph variant of the
         # (OR|CI|RR) → digit A1r join. Same JOIN-after-STRIP pattern as
         # cycles 12/13: A1 (single-newline form) runs BEFORE S9 strips
@@ -6879,7 +7737,7 @@ def _normalize_text(
         # in-text mentions of CIs preceding the bibliography start).
         t = re.sub(
             r"(OR|CI|RR|HR)\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))",
-            r"\1 ",
+            keep_break_in_rejoin(r"\1 "),
             t,
         )
     report._track("LateJoin_line_break_rejoin", before, t, "late_line_joins")
@@ -7020,7 +7878,61 @@ def _normalize_text(
         # Detector is signal-only; never block the pipeline if it fails.
         report.column_interleave_pages = ()
 
-    out = t.strip()
+    # THE FINAL STRIP IS THE SEVENTH FORM-FEED EATER, and it fires on EVERY
+    # PAPER. `str.strip()` treats U+000C as whitespace, and pdftotext ends every
+    # document with a trailing page separator — measured 2026-08-28 over a
+    # 70-paper strided sample, 70 of 70 raw extractions end with one and 0 of 70
+    # begin with one, so this single call was silently removing the last page
+    # boundary of every document the library has ever returned.
+    #
+    # WHY THAT IS NOT COSMETIC. The repeated-line gate above asks
+    # `sum(form feeds) >= 2` before it trusts the page map; below that it falls
+    # back to the line-index proxy it was written to replace, whose instability
+    # is the defect this whole release exists to remove. Over the same sample
+    # FOUR papers leave normalization with 2-3 form feeds and TWO of them
+    # (`10.1525/collabra.16745`, `10.15626/MP.2024.4210`) sit at exactly 2 — for
+    # those, losing this one boundary is the difference between the stable gate
+    # and the unstable one, on the second pass rather than the first. That is
+    # precisely the shape that makes a defect look like an idempotency bug.
+    #
+    # The page boundary is CAPTURED AND RESTORED rather than excluded from the
+    # strip class, for the reason v1.9.57 recorded at the page-number site:
+    # excluding it changes what the surrounding whitespace does, while capturing
+    # it preserves the count exactly and leaves every other character class
+    # `str.strip()` handles — Unicode spaces, U+001C-001F, U+0085 — untouched.
+    # `page_break_residue` is the one definition of "the boundary this text was
+    # carrying", so this site cannot drift from the other five.
+    _body = t.strip()
+    if _body:
+        _lead = t[: len(t) - len(t.lstrip())]
+        _trail = t[len(t.rstrip()) :]
+    else:
+        # All whitespace: counting both ends would double-count the same run.
+        _lead, _trail = t, ""
+    # ON ITS OWN LINE, never glued to content. The first version of this fix
+    # concatenated the residue directly and produced
+    # `'voxels. * p < .05, ** p < .01, *** p < .001.\f'` on
+    # `10.1016/j.jesp.2022.104282` — a control character welded to the end of a
+    # line of published statistics, where any consumer anchoring `.001$` now
+    # fails. That is a worse defect than the deleted boundary it replaced.
+    #
+    # Own-line is also what the SOURCE does: measured over 40 papers, 40 of 40
+    # trailing form feeds sit alone on their line in the raw pdftotext output
+    # and ZERO are glued to content. And it is what `keep_page_break` has
+    # always done at the other eight sites -- it appends the residue as its own
+    # list element, which becomes its own line on `"\n".join`. One concept, one
+    # table; this site was the odd one out for about an hour.
+    #
+    # Raised as UNVERIFIED by Sonnet 5 (anthropic) in the 2026-08-28 consult
+    # round -- "whether some consumer assumes the returned string never ends in
+    # a control char" -- and found real on measurement rather than by argument.
+    _lead_ff = page_break_residue(_lead)
+    _trail_ff = page_break_residue(_trail)
+    out = _body
+    if _lead_ff:
+        out = _lead_ff + "\n" + out
+    if _trail_ff:
+        out = out + "\n" + _trail_ff
     # Count what we are HANDING THE CONSUMER, not what arrived: the number must
     # describe the returned string, so a later step that introduces or removes a
     # control character cannot make this figure quietly wrong.

@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import time
@@ -118,13 +119,54 @@ def sha256_bytes(b: bytes) -> str:
 
 
 # --- render through docpluck HEAD -----------------------------------------
+#
+# THE REPO ROOT MUST GO ON sys.path FIRST, AND THE REASON IS A MEASURED DEFECT.
+# Python puts the SCRIPT'S OWN DIRECTORY at sys.path[0], not the cwd. This file
+# lives in tools/, so `py -3 tools/render_for_audit.py` put `tools/` first and
+# `import docpluck` fell through to site-packages — the INSTALLED RELEASE — while
+# the banner above says "render through docpluck HEAD" and canary-audit.sh
+# prints "rendering at HEAD (<sha>)".
+#
+# Measured 2026-08-29 on 10.1001/jamanetworkopen.2023.39337:
+#     installed 2.4.137  -> 10 stray running-head copies   59,991 chars
+#     working tree 2.4.138 ->  0 stray running-head copies  59,256 chars
+# The canary reported the release's defect as though it were the tree's, and the
+# tree's repair was invisible to it. Every canary verdict taken this way scored
+# the wrong artifact while naming the right sha.
+#
+# `python -c "import docpluck"` does NOT reproduce it — `-c` puts the cwd on the
+# path and resolves the tree. Only a SCRIPT FILE shows the difference, which is
+# why this survived: the obvious check measured a different thing.
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 try:
     import docpluck  # noqa: E402
     from docpluck.render import render_pdf_to_markdown  # noqa: E402
 except ImportError as e:
     print(
-        f"ERROR: cannot import docpluck. Is the library installed in the current Python env? {e}",
+        f"ERROR: cannot import docpluck from the repo at {_REPO_ROOT}: {e}",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+# Say WHICH docpluck answered, and refuse if it is not this tree. The version
+# alone is not enough — the run that exposed this logged "docpluck version:
+# 2.4.137" for weeks and nobody could tell that was site-packages rather than a
+# stale working tree. A gate that cannot name the artifact it scored is not a
+# gate. Set CANARY_ALLOW_INSTALLED_DOCPLUCK=1 to audit an installed release on
+# purpose; it is recorded in the receipt either way.
+_docpluck_path = str(Path(docpluck.__file__).resolve())
+_from_tree = _docpluck_path.startswith(str(Path(_REPO_ROOT).resolve()))
+if not _from_tree and os.environ.get("CANARY_ALLOW_INSTALLED_DOCPLUCK") != "1":
+    print(
+        "ERROR: docpluck resolved to " + _docpluck_path + "\n"
+        "       but this harness renders at HEAD and must import the working tree at\n"
+        "       " + _REPO_ROOT + "\n"
+        "       Scoring an installed release against a gold while reporting the repo's\n"
+        "       sha is a false green. Set CANARY_ALLOW_INSTALLED_DOCPLUCK=1 only if you\n"
+        "       genuinely mean to audit the installed package.",
         file=sys.stderr,
     )
     sys.exit(2)
@@ -137,6 +179,7 @@ except RuntimeError as e:
     sys.exit(1)
 
 _log(f"docpluck version: {docpluck.__version__}")
+_log(f"docpluck module:  {_docpluck_path}" + ("" if _from_tree else "   <-- NOT the working tree"))
 _log(f"PDF located via article-finder: {pdf_path}")
 
 pdf_bytes = pdf_path.read_bytes()
@@ -187,6 +230,8 @@ _log(f"rendered sha256: {rendered_sha}")
 manifest = {
     "key": args.key,
     "library_version": docpluck.__version__,
+        "library_path": _docpluck_path,
+        "library_from_working_tree": _from_tree,
     "pdf_path": str(pdf_path),
     "pdf_sha": pdf_sha,
     "expected_pdf_sha": expected_sha or "",

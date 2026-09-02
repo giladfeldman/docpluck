@@ -576,18 +576,46 @@ class TestP0_RunningHeaderFooterPatterns_v246:
 
 
 class TestS9_HeaderFooter:
-    def test_repeated_line_stripped(self):
-        # Realistic structure: header appears once per page across a multi-
-        # page article (each "page" has ~30 body lines between headers).
-        # Cycle 14 (v2.4.66) requires the repeated-line range to span
-        # ≥75% of the doc — distinguishes running headers (which DO span
-        # the whole doc) from table row labels (which cluster in a small
-        # region — see ``test_clustered_table_label_preserved`` below).
+    def test_repeated_line_deduplicated_leaving_exactly_one_copy(self):
+        """A repeated running header is DEDUPLICATED, never deleted outright.
+
+        ⚠️ THIS TEST USED TO ASSERT ``header not in result`` — TOTAL removal —
+        and that contract is the exact shape that shipped an article with no
+        title. **DO NOT "FIX" A FAILURE HERE BY RESTORING TOTAL DELETION.**
+
+        On `10.1001/jamanetworkopen.2023.39337` the title *"Effect of
+        Time-Restricted Eating on Weight Loss in Adults With Type 2 Diabetes"*
+        is ALSO the running head, so it occurs 13 times: twelve headers and the
+        page-1 title block. Under the old contract the strip took all thirteen
+        and the paper was delivered with no title, with nothing in
+        `changes_made` naming the line.
+
+        CLAUDE.md rule 0g: a step that removes content "must refuse
+        all-or-nothing per run", and "deduplication is legitimate only when a
+        copy demonstrably survives, otherwise it is a deletion wearing a
+        dedup's name". Since normalization 1.9.61 the FIRST copy in document
+        order always survives — chosen because where a content instance exists
+        it precedes the furniture derived from it, and because document order
+        is stable under line removal, which keeps the step idempotent by
+        construction (pass 2 sees one occurrence and fails the `count >= 5`
+        floor).
+
+        Contract rewritten 2026-08-28. Found red by docpluck-7d against 1.9.61;
+        the 6 -> 1 it reported is the repair working, not a regression.
+        """
         header = "Journal of Example Studies Vol. 1"
         page_body = "\n".join(f"Body line {i}." for i in range(30))
         text = "\n\n".join([f"{header}\n{page_body}"] * 6 + ["End matter line."])
         result = norm(text, "standard")
-        assert header not in result, "running header should be stripped"
+
+        assert result.count(header) == 1, (
+            "exactly one copy must survive — 0 is the all-or-nothing deletion "
+            "rule 0g forbids, 6 means the dedup did not fire at all"
+        )
+        surviving = [ln for ln in result.split("\n") if ln.strip()]
+        assert surviving[0].strip() == header, (
+            "the survivor must be the FIRST copy in document order"
+        )
         assert "Body line 5." in result, "body content should be preserved"
 
     def test_clustered_table_label_preserved(self):
