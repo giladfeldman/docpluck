@@ -60,6 +60,47 @@ _SIBLINGS = os.path.dirname(os.path.dirname(_HERE))  # parent of the docpluck re
 # every articlerepo/sibling-corpus test SKIP silently, which reads as green).
 _VIBE = os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe")
 
+
+def _sibling_repo(name: str, *parts: str) -> str:
+    """Locate a sibling project's corpus, wherever the portfolio keeps it.
+
+    THE SAME DEFECT AS THE DROPBOX MOVE, ONE DIRECTORY DEEPER. The comment above
+    warns that a hardcoded root makes sibling-corpus tests skip silently and "reads
+    as green" — and then this file hardcoded ``$VIBE/<name>``, while the portfolio
+    had since grouped its projects into ``MetaScienceProjects/`` and
+    ``MetaScienceTools/``. Measured 2026-08-27: ``$VIBE/MetaESCI`` and
+    ``$VIBE/MetaMisCitations`` do not exist; both live under
+    ``$VIBE/MetaScienceProjects/``.
+
+    **AND IT COSTS NOTHING TODAY — say so rather than imply otherwise.** Measured the
+    same day by counting `pdf_available(...)` / `pdf_path(...)` call sites per corpus
+    across `tests/*.py`: ``escicheck`` **0 files**, ``metaesci`` **0**,
+    ``metamiscitations`` **0**. All three are dead configuration, so these stale paths
+    were costing zero skips, and repairing them buys zero coverage back. A first draft
+    of this docstring claimed a corpus of "198 PDFs" had been invisible to the suite —
+    that number came from a RECURSIVE find (they are nested under `jdm/` and
+    `pci_rr/`), the non-recursive listing this file actually uses returns 0, and no
+    test wanted them either way. It is fixed because a latent wrong path becomes a
+    silent skip the moment someone writes the first test against it, not because
+    anything is being recovered.
+
+    **The live hole is a different corpus.** ``docpluck`` — used by **6 test files** —
+    points at the sibling ``PDFextractor/test-pdfs/``, which exists and holds **0
+    PDFs**, almost certainly because article custody moved to article-finder. That is
+    a policy question, not a path bug, and it is not silently patched here.
+
+    So the location is SEARCHED rather than asserted. A name genuinely not on this
+    machine (ESCIcheck, 2026-08-27) still returns a non-existent path and its tests
+    still skip — correct, and now the only reason they would.
+    """
+    for group in ("", "MetaScienceProjects", "MetaScienceTools"):
+        base = os.path.join(_VIBE, group, name) if group else os.path.join(_VIBE, name)
+        if os.path.isdir(base):
+            return os.path.join(base, *parts)
+    # Not found anywhere — return the canonical spelling so the skip reason still
+    # names a path a human can go and check.
+    return os.path.join(_VIBE, name, *parts)
+
 PDF_PATHS = {
     # docpluck's test corpus = sibling PDFextractor repo's test-pdfs/.
     "docpluck": os.path.join(_SIBLINGS, "PDFextractor", "test-pdfs"),
@@ -70,9 +111,9 @@ PDF_PATHS = {
     # Other-project corpora — if not under `_SIBLINGS`, dependent tests skip
     # gracefully (pdf_available returns False). Update to repo-relative once
     # the locations of these sibling repos are confirmed.
-    "escicheck": os.path.join(_VIBE, "ESCIcheck", "testpdfs", "Coded already"),
-    "metaesci": os.path.join(_VIBE, "MetaESCI", "data", "pdfs"),
-    "metamiscitations": os.path.join(_VIBE, "MetaMisCitations", "data", "pretest_a", "pdfs"),
+    "escicheck": _sibling_repo("ESCIcheck", "testpdfs", "Coded already"),
+    "metaesci": _sibling_repo("MetaESCI", "data", "pdfs"),
+    "metamiscitations": _sibling_repo("MetaMisCitations", "data", "pretest_a", "pdfs"),
 }
 
 

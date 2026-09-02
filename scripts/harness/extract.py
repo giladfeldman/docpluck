@@ -34,6 +34,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -79,7 +80,37 @@ def service_config() -> tuple[str, str]:
         or sv.get("INTERNAL_SERVICE_TOKEN")
         or fe.get("INTERNAL_SERVICE_TOKEN", "")
     )
-    return url.rstrip("/"), token
+    url = _require_local_extraction(url.rstrip("/"))
+    return url, token
+
+
+def _require_local_extraction(url: str) -> str:
+    """Refuse a non-loopback extraction service unless explicitly permitted.
+
+    service_config() resolves EXTRACTION_SERVICE_URL from the environment AND
+    from PDFextractor/frontend/.env.local -- which carries the PRODUCTION URL.
+    So this harness could reach the metered hosted service by default, with no
+    guard anywhere on the path.
+
+    Standing user directive: cross-testing is ALWAYS local unless the user
+    approves otherwise; hosted extractions are metered and the user pays
+    personally. Override with DOCPLUCK_ALLOW_REMOTE=1, deliberately loud.
+    """
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    if host in ("127.0.0.1", "localhost", "0.0.0.0", "::1"):
+        return url
+    if os.environ.get("DOCPLUCK_ALLOW_REMOTE") == "1":
+        print(f"[local-only] WARNING: extraction service is REMOTE ({url}). "
+              f"This is metered and costs money.", flush=True)
+        return url
+    raise RuntimeError(
+        f"EXTRACTION_SERVICE_URL resolves to {url!r}, which is NOT a local "
+        f"service. Cross-testing must run against a LOCAL extraction service "
+        f"(user directive); hosted calls are metered and the user pays "
+        f"personally. Start PDFextractor/start_app.bat (127.0.0.1:6117), or set "
+        f"DOCPLUCK_ALLOW_REMOTE=1 to override. Note the URL may come from "
+        f"PDFextractor/frontend/.env.local, not from your shell."
+    )
 
 
 def service_health(base_url: str) -> dict:
