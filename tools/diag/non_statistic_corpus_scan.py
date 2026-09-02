@@ -32,6 +32,26 @@ Run:  python tools/diag/non_statistic_corpus_scan.py [--sample N] [--seed S]
 
 from __future__ import annotations
 
+# --- repo-root import guard (do not remove) ---------------------------------
+# Python puts THIS SCRIPT'S OWN DIRECTORY on sys.path[0] -- never the current
+# working directory -- so a script under tools/ or scripts/ has no route to the
+# repo root and a bare ``import docpluck`` silently resolves to whatever copy is
+# INSTALLED.  Measured 2026-09-01: 16 of 34 importers here loaded site-packages
+# 2.4.137 while this tree was 2.4.138, including the 26-paper baseline gate --
+# so a fix could be verified all night against a library it had not touched.
+# Keyed on the pyproject.toml marker rather than a parents[N] count, so it
+# survives the file being moved.  Pinned by
+# tests/test_harness_scripts_import_the_working_tree.py.
+import sys as _sys
+from pathlib import Path as _Path
+
+for _root in _Path(__file__).resolve().parents:
+    if (_root / "pyproject.toml").is_file():
+        if str(_root) not in _sys.path:
+            _sys.path.insert(0, str(_root))
+        break
+# --- end repo-root import guard ---------------------------------------------
+
 import argparse
 import os
 import re
