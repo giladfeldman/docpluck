@@ -147,16 +147,24 @@ def _resolve_git_sha() -> str:
     return UNKNOWN
 
 
-@lru_cache(maxsize=1)
 def _resolve_git_state() -> str:
     """``"clean"``, ``"dirty"``, or ``"unknown"`` for the docpluck checkout.
 
-    Cached exactly as :func:`_resolve_git_sha` is, and for a reason beyond
-    cost: the two are meant to be read as a PAIR, and a cached SHA beside a
-    freshly-probed state would let them describe different moments. A receipt
-    whose two halves disagree about when they were taken is worse than one that
-    is merely coarse. It also keeps the portfolio rule that a provenance value
-    must not change with WHEN you ask it.
+    DELIBERATELY NOT CACHED, unlike :func:`_resolve_git_sha` — each value
+    lands on the side of the cache boundary that matches what it names. The
+    SHA names the identity this process loaded, which does not change for the
+    process lifetime, so it is frozen. The state names whether the tree still
+    matches that identity RIGHT NOW, which is a live fact about each receipt's
+    own moment — one ``git status --porcelain`` subprocess per receipt, not
+    per document (fleet ask 2026-08-22T102300Z amendment_1, which predicted in
+    writing that a state computed inside the cache "would pass its own test
+    and still report a frozen answer in production"). An earlier revision
+    cached it anyway, arguing the pair must describe one moment; measured
+    2026-09-02, that froze ``clean`` across a tree edit within one process —
+    the HTTP consumption mode exactly. A frozen SHA beside a live ``dirty``
+    says the one true thing a consumer needs: the tree no longer matches the
+    identity this process loaded.
+    (``tests/test_version_receipt_state_is_live.py`` pins both halves.)
 
     **``git_sha`` on its own is a FALSE IDENTITY in an editable install, and
     that is how most consumers in this portfolio run docpluck.** ``pip install

@@ -9,6 +9,25 @@ normalization 1.9.59) that an earlier plan would have tagged alone. The tag targ
 merge of `canary-gate-work` into `main`.
 
 
+### `git_state` is probed per receipt, not frozen at the process's first call
+
+Fleet ask `2026-08-22T102300Z` amendment_1 predicted this defect in writing before the
+feature existed: a dirty flag computed inside the cache "would pass its own test and still
+report a frozen answer in production." The shipped `_resolve_git_state` was `lru_cache`d
+anyway, arguing pair-coherence with the cached SHA. Measured 2026-09-02 in a single
+process: `clean` → tree edited → still `clean`. That is the HTTP consumption mode — a
+server process left running while the tree is edited reports `clean` forever, which is the
+false receipt the ask exists to prevent.
+
+The cache is removed from the STATE only (one `git status --porcelain` subprocess per
+receipt — the ask's own cost analysis). The SHA stays cached BY DESIGN: it names the
+identity the process loaded; its staleness class is handled at the app boundary
+(`X-Docpluck-Identity`'s `stale`), a decision recorded in the docstring. A frozen SHA
+beside a live `dirty` says the true thing: the tree no longer matches the identity this
+process loaded. Pinned by `tests/test_version_receipt_state_is_live.py`, written RED first
+(structural: no `cache_info`; behavioural: two receipts straddling an edit must disagree),
+then verified live — `dirty → dirty → clean` across real tree edits in one process.
+
 ### v1.9.64 — `changes_made` telemetry: the two keys the 2026-08-22 blocker was measured on are now honest
 
 The v1.9.63 `count=` work made the sign/dash/quote family exact and left the two keys the
