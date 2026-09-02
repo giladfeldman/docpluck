@@ -410,6 +410,24 @@ def get_version_info() -> dict:
                                   docpluck) a dirty tree runs code the SHA does not
                                   contain, so ``git_sha`` alone is a false identity.
                                   See :func:`_resolve_git_state`.
+
+                                  **AND THE MIRROR TRAP, WHICH IS THE EASIER ONE TO
+                                  WALK INTO: ``"unknown"`` IS THE CORRECT AND EXPECTED
+                                  VALUE FOR A PROPERLY RELEASED INSTALL.** A wheel, a
+                                  PyPI install and a ``git+https://…@vTAG`` install all
+                                  have no ``.git`` to interrogate, so both this key and
+                                  ``git_sha`` come back ``"unknown"``. A consumer gate
+                                  spelled ``git_state != "clean"`` therefore REFUSES
+                                  exactly the install it was built to require. Only the
+                                  explicit value ``"dirty"`` disqualifies.
+
+                                  Not hypothetical: measured 2026-08-28, a consumer
+                                  built that gate from a handoff written by this repo,
+                                  aimed it at a ``@v2.4.137`` install, and it refused.
+                                  For a released install the reproducible identity is
+                                  ``version`` plus the matching ``v*`` tag — the SHA is
+                                  recoverable from GitHub, and its absence here is a
+                                  property of wheels, not a gap in the receipt.
         python_version:           Running interpreter, e.g. ``"3.14.5"``.
         unicodedata_version:      Unicode database backing ``unicodedata.normalize``,
                                   which ``normalize.py`` applies (NFC/NFKC).

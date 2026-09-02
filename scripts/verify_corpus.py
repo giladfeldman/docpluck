@@ -56,6 +56,26 @@ Usage:
 """
 from __future__ import annotations
 
+# --- repo-root import guard (do not remove) ---------------------------------
+# Python puts THIS SCRIPT'S OWN DIRECTORY on sys.path[0] -- never the current
+# working directory -- so a script under tools/ or scripts/ has no route to the
+# repo root and a bare ``import docpluck`` silently resolves to whatever copy is
+# INSTALLED.  Measured 2026-09-01: 16 of 34 importers here loaded site-packages
+# 2.4.137 while this tree was 2.4.138, including the 26-paper baseline gate --
+# so a fix could be verified all night against a library it had not touched.
+# Keyed on the pyproject.toml marker rather than a parents[N] count, so it
+# survives the file being moved.  Pinned by
+# tests/test_harness_scripts_import_the_working_tree.py.
+import sys as _sys
+from pathlib import Path as _Path
+
+for _root in _Path(__file__).resolve().parents:
+    if (_root / "pyproject.toml").is_file():
+        if str(_root) not in _sys.path:
+            _sys.path.insert(0, str(_root))
+        break
+# --- end repo-root import guard ---------------------------------------------
+
 import argparse
 import hashlib
 import json
@@ -66,6 +86,19 @@ import sys
 import time
 from pathlib import Path
 from typing import Optional
+
+# This gate prints non-ASCII unconditionally (an em dash at the summary
+# header, an arrow on the --diff dump), and a Windows console defaults to
+# cp1252. Without this the script raises UnicodeEncodeError and exits 1 --
+# in a git hook, a scheduled task, a plain PowerShell window, or on a fresh
+# machine. Measured 2026-08-22, three arms: PYTHONIOENCODING cleared exits 1;
+# PYTHONIOENCODING=utf-8 exits 0 (the variable MASKS the bug, which is why
+# this was invisible); with these lines and the variable cleared, exits 0.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

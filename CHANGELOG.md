@@ -1,8 +1,328 @@
 # Changelog
 
+## [Unreleased] - 2026-08-29 - normalization 1.9.62
+
+### Release-acceptance measurements for the deletion class (2026-09-02)
+
+Measured on `test-pdfs/chicago-ad/jmf_1.pdf` (the PMC author-manuscript layout of
+`10.1111/jomf.13036`), occurrence counts over the whole normalized text — **not exact-line
+counts, which read 0 even on healthy output** because table regions reflow into long joined
+lines:
+
+| paper | target string | raw | v2.4.137 (production) | this tree (1.9.63) |
+|---|---|---|---|---|
+| jmf_1 | `Net wealth with` | 11 | **0 — deleted, and `changes_made` records nothing** | 11 |
+| jmf_1 | `equity (in $000)` | 11 | **0 — deleted silently** | 11 |
+| jmf_1 | `Family income` | 11 | 11 (reflowed; 0 exact lines) | 11 |
+| ieee_access_5 | `Number of trained architectures` | 5 | **0 — deleted silently** | 5 |
+| ieee_access_5 | `Performance metric` | 9 | 9 (reflowed) | 9 |
+
+So the shipped release silently destroys table row-label text on both probe papers (22 of 33
+occurrences on jmf_1; 5 of 5 of one label on ieee_access_5); the page-scoped gate in this
+tree deletes none of them (clustered table lines no longer qualify at all). Probes:
+`probe_jmf1_headers.py` / `probe_jmf1_v2437.py` / `probe_ieee5_both.py` (session scratchpad,
+2026-09-02); the v2.4.137 arms ran a `git archive` of the tag with the imported version
+asserted. Any post-deploy verification of this class must count occurrences, not exact lines.
+
+### The watermark arm is back, gated on page coverage rather than on a raw count
+
+`v1.9.61` deleted the repeated-line strip's `count >= 20` watermark arm after a reproduced
+Grok 4.6 (xai) finding that it deduplicated **table content**, and wrote the conditions for
+putting it back: *"reinstate it with a discriminator that encodes the measured shape (present
+on essentially every page), not a raw occurrence count — and gather more than one positive
+first."* Both are met. All three stated reasons were re-tested and none survived.
+
+**What the deletion cost, which is what forced the re-test.** With no arm, `ieee_access_2.pdf`
+retains all **220** copies of `Author Manuscript`, and one of them sits between a paragraph and
+the heading `V.: SUPPLEMENTARY INDEX`, which is therefore never promoted. That is **section
+structure** reaching the sectioning consumers — so the deletion note's asymmetry argument
+("furniture that survives is VISIBLE and reversible") did not hold for this paper: the loss was
+neither. It was caught by a test in our own suite, not by a consumer.
+
+**The discriminator is page coverage, and the classes separate with no overlap.** Measured over
+the 10 IEEE test PDFs plus `10.1525/collabra.19525`:
+
+| class | line | count | pages | per page | coverage |
+|---|---|---|---|---|---|
+| watermark | `Author Manuscript` (ieee_access_2) | 220 | 55/56 | exactly 4 | **0.98** |
+| watermark | `Author Manuscript` (ieee_access_alt) | 92 | 23/24 | exactly 4 | **0.96** |
+| watermark | `Author Manuscript` (collabra.19525) | 112 | 28/29 | exactly 4 | **0.97** |
+| table content | `Performance metric` | 9 | 4/18 | 1–4 | 0.22 |
+| table content | `Number of trained architectures` | 5 | 3/18 | 1–2 | **0.17** |
+| table content | 9 more | 5–8 | 1–3 | varies | ≤ 0.22 |
+
+**The label that condemned the arm is in the second block.** `Number of trained architectures`
+occurs 5 times on 3 of 18 pages of the real paper. The reproduction that deleted the arm was a
+**synthetic** document built to the reported shape — the shape is reachable, and the paper is
+not an instance of it. Rebuilding it took two attempts: the first fixture reported UNTOUCHED on
+all three trees **including one with the original arm restored**, because `S8_line_break_joining`
+merged the label into the next line before the strip ran. Asserting the arm actually FIRED is
+what caught it.
+
+**Denominator, measured separately from the shape.** Over 200 papers strided from the 9,888-PDF
+article repository (198 extracted OK) this gate selects **zero** lines — and that zero was
+checked against a known positive before being believed, the identical filter firing on **3 of 3**
+known watermark papers and **0 of the 8** other IEEE papers beside them.
+
+**The residual is stated, not engineered around.** A table label repeated several times per page
+across ≥90% of a document would still be deduplicated. Built synthetically it does fire; it was
+not found in any of the 198 real papers. It is accepted because at that coverage no *positional*
+signal distinguishes it from a watermark — that is the definition of one — and because the damage
+is bounded three ways: rule 0g spares the first copy in document order,
+`_carries_statistical_content` refuses anything carrying data, and every removal is named per line
+in `repeated_line_stripped:watermark_every_page`. Per-page **uniformity** was measured as an extra
+gate and rejected: the real watermarks are perfectly uniform, but so is the synthetic worst case.
+
+**An emergent page floor, found by checking the denominator rather than assuming it.**
+`_total_pages` counts **N+1** for an N-page document, because pdftotext emits a form feed after
+the last page as well as between pages — verified against pdfplumber: ieee_access_2 55 true / 56
+counted, ieee_access_alt 23/24, ieee_access_5 17/18. So a line covering *every* page scores
+`n/(n+1)` and clears 0.90 only from **9 pages up** (5 → 0.833, 8 → 0.889, 9 → 0.900, 55 → 0.982).
+That removes the residual above for any document under 9 pages. It is documented and pinned
+rather than corrected away — erring low is the right direction, since a missed watermark leaves
+furniture (visible, reversible) while an extra deduplication is neither — and an off-by-one that
+happens to be safe is one "cleanup" away from not being.
+
+The same check caught a fault in the test fixtures: the synthetic builder joined pages with form
+feeds and emitted no **trailing** one, making every synthetic document two pages shorter than it
+looked and silently inflating its coverage ratio. A synthetic fixture can only confirm your model
+of the input, and this one had the wrong model.
+
+`tests/test_watermark_arm_is_gated_on_page_coverage.py` — 15 cases, watched with the arm removed:
+the 3 real watermarks and both synthetic arm cases go **RED**, while all 7 real table-content
+cases and the page-floor case stay **GREEN in both states**.
+
+### Two obsolete all-or-nothing contracts rewritten, and a fixture recovered
+
+Both asserted TOTAL removal of a repeated line — the contract that delivered
+`10.1001/jamanetworkopen.2023.39337` with no title **in the blocked, never-tagged 2.4.138
+working-tree state** (v1.9.60's page gate; see the preserved blocking notice below).
+**CORRECTED 2026-09-02: no tagged release ever shipped the no-title render.** A render of
+actual `v2.4.137` source shows the title present; that release's real defect on this paper
+is ten stray running-title copies left in the body, which this work removes. The earlier
+wording here ("the contract that shipped … with no title") was repeated into two published
+review documents before a measurement refuted it — a live instance of the stale-claim
+class this changelog elsewhere documents. Neither contract was "fixed" by restoring deletion;
+both now assert that exactly one copy survives and that it is the first in document order, and
+both were watched RED against the pre-repair code.
+
+- `test_repeated_line_strip_is_observable.py` — also pins the exact per-line counts, and records
+  that `changes_made["repeated_lines_stripped"]` is a **character delta under a count-shaped
+  name** (165 = 5 × 33 on its fixture, not 5). The real counts live in the per-line telemetry.
+- `test_request_09_reference_normalization.py` — **all five tests in this file had been skipping
+  silently**: the fixture path pointed at `MetaScienceTools/ESCIcheckapp/testpdfs/`, which no
+  longer exists. Repointed at the article repository by DOI (`10.1098/rsos.250979`), which is what
+  the custody rule requires. The RSOS footer goes 40 copies in, 1 out.
+
+### Section goldens regenerated — the drift was the restored page boundary, not the sectioner
+
+`apa_single_study_pdf` and `apa_multi_study_pdf` drifted by **+2 characters on the last section's
+`char_end` only** (168→170, 220→222). Those two characters are `
+\f` — the trailing page
+boundary v1.9.61 stopped eating. Keeping the old goldens would leave them belonging to **no
+section**, so the new value is required by the universal-coverage invariant, not merely different.
+`SECTIONING_VERSION` stays **1.2.5**: the sectioner is unchanged, `sectioning_text_id` already
+moves with the text, and precedent `d274d07` regenerated these same two files for the same class
+without a bump. `html_real_headings` is byte-identical.
+
+`tests/test_sections_golden.py` gains `assert_universal_coverage`, which runs **even under
+`DOCPLUCK_REGEN_GOLDEN=1`** — a snapshot can always be refreshed until it is green, a property
+cannot — plus a test that watches the guard reject an orphaned tail.
+
+
+### The page gate deleted an article title, and its page map was wrong for half of all boundaries
+
+**This section RESOLVES the `2.4.138` blocking notice below.** All five scoped repairs are
+landed, four further form-feed sites were found by census and closed, and the differential
+that caught the original defect now reports zero. **The blocking notice is left in place,
+unedited, as the record of what was believed at the time.**
+
+Every reviewer finding was reproduced locally before it was acted on. Two are worth stating
+because they cut in opposite directions: **A1 was WORSE than reported** — all seven of its
+reachable patterns eat the page boundary, not the one demonstrated — while
+**`_strip_frontmatter_metadata_leaks` took three attempts to reproduce at all**, because the
+first two probes used a "leak" line that matched no pattern and so never reached the branch
+under test. A probe that does not exercise the path reports a clean run and means nothing.
+
+#### 1. Page attribution — fixed first, because everything else was measured against a wrong map
+
+`_page` was incremented **after** the line was recorded, while pdftotext glues the page
+separator to the **first line of the new page**. So the first line of page N was filed under
+page N−1 — and the first line of a page is exactly where a running header sits. On a six-page
+header the map came out `[1, 1, 2, 3, 4, 5]`, giving `max_per_page` 2 instead of 1, so the
+once-per-page arm did **not** fire and all six copies survived.
+
+Scope, over a 70-paper strided sample (`tools/diag/form_feed_page_attribution_census.py`):
+
+| form-feed placement | count | share | |
+|---|---:|---:|---|
+| alone on their line | 70 | 7.0% | **harmless** — `strip()` empties the line, nothing is recorded |
+| glued, line outside the 15–120 band | 415 | 41.8% | glued, but costs nothing |
+| **glued to a RECORDED candidate** | **509** | **51.2%** | **corrupts the map** |
+| after content on the line | 0 | 0.0% | |
+
+An independent 36-paper sample gave 1122/2218 (50.6%). **Not 93% and not 100%** — those
+figures answer *"how many are glued"* and *"how many have nothing before them on their line"*,
+and only the 51.2% bounds this fix.
+
+#### 2. Rule 0g, all-or-nothing — never delete the last surviving copy
+
+On `10.1001/jamanetworkopen.2023.39337` the title *"Effect of Time-Restricted Eating on Weight
+Loss in Adults With Type 2 Diabetes"* occurs 13 times: twelve running headers and, on page 1,
+the **title block**, which the text layer shows between the article-type banner `Original
+Investigation | Nutrition, Obesity, and Exercise` and the subtitle `A Randomized Clinical
+Trial` plus the author list. All thirteen went.
+
+**The first copy in document order now always survives.** Where a content instance exists it
+*precedes* the furniture derived from it; where every copy is furniture the whole cost is one
+visible, challengeable line of boilerplate; and document order is stable under line removal,
+which also makes the step idempotent by construction — pass 2 sees one occurrence and fails the
+`count >= 5` floor.
+
+**A cleverer survivor rule was built and REFUTED**, recorded so nobody rebuilds it. *"Furniture
+travels with furniture"* — score each occurrence by how many neighbouring lines are unique, keep
+the most content-like — **ties twelve occurrences** on the JAMA title and cannot pick it, and on
+`10.1098/rsos.182237`'s genuine running footer it separates cleanly and picks a copy sitting in
+the **references section**. Wrong in both directions at once.
+
+#### 3. Nine form-feed sites, not five
+
+v1.9.60 closed five *line-dropping* sites. These are substitution and strip sites its sweep
+could not reach:
+
+| site | what it did | fix |
+|---|---|---|
+| **A1** (7 patterns) | every gap spelled with the regex whitespace class, which matches U+000C | page-scoped by construction |
+| **final `t.strip()`** | ate a boundary on **70 of 70** papers | capture and restore |
+| **T0** `_strip_toc_dot_leader_block` | two sites: the dropped-paragraph `continue`, and the leading-blank trim | `page_break_residue` |
+| **P1** `_strip_frontmatter_metadata_leaks` | its drop `continue` | `keep_page_break` |
+| **F0** footnote branch | never called `_drop()`, while the header/footer branch four lines above does | `_drop()` |
+| **LateJoin**, **A4** | cross-paragraph patterns using the whitespace class | new shared `keep_break_in_rejoin` |
+
+A1 is page-scoped rather than hand-narrowed in ten places. **The cost figure first published
+here was measured at the wrong point and is retracted** — see §5. Measured at the real
+mid-pipeline call site: **3 boundaries saved, 10 cross-page joins forgone** over 70 papers.
+
+The final `strip()` matters more than it looks: four papers leave normalization with 2–3 form
+feeds and **two sit at exactly 2**, where losing one drops them below the `>= 2` paginated
+threshold and into the unstable line-index fallback this release exists to retire.
+
+**LateJoin and A4 cannot be page-scoped** — crossing the break is the whole point of them. Their
+boundary is re-emitted **before** the rejoined token, never inside it: a form feed between a
+label and its value would hand consumers a token no paper printed.
+
+**Corpus effect, 70 papers:** form feeds retained **393/994 (40%) → 834/994 (84%)**, and papers
+left at **zero** page boundaries **17 → 0**. The 160 still removed are one deliberate, documented
+site — R3 collapses the page-break junction inside a bibliography so a reference entry split
+across a page rejoins — and were left alone rather than swept in.
+
+#### 4. Per-line telemetry — a deletion that cannot be named cannot be challenged
+
+The title's disappearance was invisible in `changes_made`, and the differential that eventually
+caught it had to re-run two builds of the library over the same corpus. The strip now records
+`repeated_line_stripped:<arm>` per removed copy and `repeated_line_last_copy_kept` for the copy
+spared, both carrying the line text.
+
+Routed through the existing `record_fallback` channel that `normalize_text` already holds open
+and `batch.py` already copies onto `ExtractionReport` — **not** a new report field, because one
+would need plumbing at every serialization layer and the last three telemetry fixes in this file
+each stopped one layer short of a consumer.
+
+#### 5. The consult round — one seat found two real defects, and one of them used my own test
+
+Round: `Vibe/ResearchPlatforms/_scratch/docpluck-consult-20260828/round/`.
+**Honestly labelled: 2 seats / 2 providers, DEGRADED.** Sol (openai) never ran — a foreground
+wall-clock cap on this session, not a vendor outage or a defect. Grok returned narration on its
+first attempt (33,126 output tokens, 717 chars returned) and its review was recovered from the
+session it left behind.
+
+**Grok 4.6 (xai) — the `count >= 20` watermark arm is DELETED.** It was a second disjunct
+alongside `max_per_page == 1`, and it handed back the exact class the page gate was created to
+close. Both triggers reproduced before acting:
+
+| shape | `count` | `max_per_page` | `distinct_pages` | result |
+|---|---:|---:|---:|---|
+| table row label, 4×/page over 5 pages | 20 | 4 | 5 | **19 of 20 copies deleted** |
+| header-above-title, 19 pages | 20 | 2 | 19 | **19 of 20 copies deleted** |
+
+The label used to reproduce the first is `Number of trained architectures` — **one of the
+thirteen table lines the v1.9.60 entry itself lists as content the old rule was wrongly
+deleting.** The second used the fixture written earlier in this very release to prove that
+layout safe; that test's comment said reopening the hole would require the floor *lowered*
+below 20, and Grok observed the floor was already 20.
+
+**Deleted rather than tightened.** Its own comment claimed "on EVERY page" while the code
+required only `>= 5 distinct pages`, so a page-coverage ratio was the obvious repair. A
+390-paper sweep found exactly **one** paper exercising the arm — `10.1525/collabra.19525`,
+"Author Manuscript", 112 copies on 28 of 29 pages — and n=1 cannot calibrate a threshold. The
+arm fired **zero** times across the 70-paper differential corpus. So the trade is: keep it and
+a table row label can vanish invisibly, or drop it and a watermark survives in roughly 1 paper
+in 390. Furniture that survives is visible and reversible for a consumer; a deleted table label
+is neither.
+
+**Sonnet 5 (anthropic) — an UNVERIFIED item that turned out to be a defect this release had
+just introduced.** It could not settle "whether some consumer assumes the returned string never
+ends in a control char". Measured: the first version of the final-strip fix concatenated the
+boundary directly and produced, on `10.1016/j.jesp.2022.104282`, a last line of
+`'voxels. * p < .05, ** p < .01, *** p < .001.\f'` — **a control character welded onto a line of
+published statistics.** Raw pdftotext puts the trailing form feed on its own line in 40 of 40
+papers, and `keep_page_break` has always done the same at the other eight sites. Fixed.
+
+**Sonnet — the A1 cost figure was measured at the wrong point, and is retracted.** The
+"1 of 524 firings (0.2%)" above came from raw text, while A1 runs mid-pipeline after the
+running headers are gone. Re-measured by intercepting the exact input the shipped function
+receives, over the same 70 papers: **3 boundaries saved, 10 cross-page joins forgone.** A worse
+ratio, and still the right way round — a forgone join omits a merge while both fragments
+survive, and a consumer pattern spelling its gap with the regex whitespace class matches across
+the retained newline anyway; a consumed boundary is gone. Omission is recoverable, deletion is
+not.
+
+**Sonnet — "keep the FIRST copy has no structural guarantee": REFUTED, by the gate's own arm.**
+The predicted failure (a journal printing its running head above the title on page 1, so
+document order is `[header, title]`) puts the string twice on page 1, making `max_per_page` 2 —
+which disqualifies the line entirely. But Sonnet was right that every fixture used the
+favourable layout; the adversarial one is now a test, parametrized across the old `count >= 20`
+boundary where it genuinely failed.
+
+#### Still open, and stated rather than closed
+
+**Grok's second finding is reachable in code and unproven in the wild.** If the DATA copy never
+shares a page with a furniture copy — five masthead pages carrying the running head, then a
+title page with the head omitted — `max_per_page` stays 1, the once-per-page arm fires, and
+first-wins keeps a masthead copy while the title-block copy is removed. **Reproduced
+synthetically**; the string survives once, so what is lost is its POSITION, not its presence.
+**No real DOI exhibits it.** An attempt to bound its prevalence over the 70-paper corpus was
+inconclusive: the proxy (a later copy sitting in a more content-like slot than the first)
+flagged 10 of 56 stripped lines, and every one inspected was unambiguously furniture — running
+headers, TOC dot leaders, download stamps. So the proxy is too weak to bound the shape, and
+this project does not build rules on constructed cases. The check that would settle it: find a
+real paper whose title page omits the running head that precedes it.
+
+**The unpaginated fallback still carries `count >= 20`** (`min(gaps) >= 20 or count >= 20`),
+flagged by Grok. It is unchanged deliberately: that path serves DOCX and HTML, which carry no
+form feed, and this checkout has no DOCX/HTML corpus. Changing an unmeasured channel on an
+argument is what the surrounding comment already forbids.
+
+#### The two gates everyone reaches for are both blind to this
+
+- **Idempotency:** the deletion is *perfectly* idempotent — pass 1 and pass 2 byte-identical
+  with the title absent from both. The gate measures stability, not correctness.
+- **The canary:** its `--quick` paper is byte-identical under both versions, and none of its 8
+  configured papers shows the signature.
+
+Both run honestly and are blind. `tests/test_page_gate_never_deletes_the_last_copy.py` pins all
+nine fixes; each was reverted in isolation and watched **red** before being accepted.
+
+---
+
 ## [2.4.138] - 2026-08-27
 
 > ### ⛔ UNRELEASED, AND THE PAGE-GATE SECTION BELOW IS BLOCKED — DO NOT TAG
+>
+> **SUPERSEDED 2026-08-28 — see the Unreleased section above.** Left unedited as the record of
+> what was believed at the time. Two figures in it have since been retracted by their own
+> author: the −4,763-character framing (the discriminator is all-copies-gone, not bulk loss)
+> and the 93.3% (the figure that bounds the fix is 51.2%).
 >
 > A three-provider consult round on 2026-08-27 (sol/openai, sonnet/anthropic, grok/xai —
 > all three substantive; grok's `CHALLENGE_MISSED` was verified a false red) found the
