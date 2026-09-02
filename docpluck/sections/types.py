@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from typing import Literal
 
@@ -61,12 +61,72 @@ class Section:
         return out
 
 
+def sectioning_text_id(text: str, sectioning_version: str) -> str:
+    """Identify the buffer these offsets index, and the code that cut it.
+
+    Returned on every :class:`SectionedDocument` as ``sectioning_text_id``, so a
+    consumer that persists ``char_start``/``char_end`` can persist this beside
+    them and later prove the two still belong together. Asked for by
+    Scimeto/CitationGuard and ESCImate on 2026-08-21, both independently, after
+    27 of 27 of Scimeto's stored documents turned out to hold offsets into a
+    string they did not have.
+
+    Format — deliberately readable rather than one opaque digest, so a mismatch
+    says WHICH half moved::
+
+        dp1/<sectioning_version>/<first 16 bytes of sha256(text) as hex>
+
+    Reproduce it in any language; there is no docpluck-specific step::
+
+        python: hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+        node:   crypto.createHash("sha256").update(text, "utf8").digest("hex").slice(0, 32)
+
+    **Two versions are deliberately NOT in it, and the reasons are different.**
+
+    ``NORMALIZATION_VERSION`` is absent because it is already fully expressed by
+    the hash: normalization runs *upstream* of this buffer, so any change it
+    makes changes the bytes. Naming it here would also be a lie on two of three
+    formats — the DOCX and HTML branches reconstruct their text from markup and
+    never call ``normalize_text`` at all — and on the ``text=`` path, where the
+    caller normalized the string with a pipeline that may not be ours.
+
+    ``docpluck.__version__`` is absent because it bumps for **any** shipped
+    change, including releases that cannot touch a section boundary. Folding it
+    in would invalidate every stored offset on every release, which reads to a
+    consumer as "re-extract everything, always" and so trains them to ignore it.
+    ``SECTIONING_VERSION`` is the version that actually decides where the cuts
+    fall, and it is the one that moves when they do.
+
+    (This is narrower than the "hash of the buffer plus the version triple"
+    promised in ``OUTBOX_TO_CONSUMERS_2026-08-21_v2.4.137.md`` §3. The change,
+    and this reasoning, are stated in the reply that ships with it — a contract
+    quietly delivered smaller than announced is the defect, not the field.)
+    """
+    import hashlib
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+    return f"dp1/{sectioning_version}/{digest}"
+
+
 @dataclass(frozen=True)
 class SectionedDocument:
     sections: tuple[Section, ...]
     normalized_text: str
     sectioning_version: str
     source_format: Literal["pdf", "docx", "html"]
+
+    # DERIVED, never passed in (``init=False``). A caller-supplied id could
+    # disagree with the text beside it, which is the exact failure this field
+    # exists to detect — so it is computed from ``normalized_text`` at
+    # construction and cannot drift from it. Every construction site gets it
+    # for free, including ones written after this comment.
+    sectioning_text_id: str = field(init=False, default="")
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "sectioning_text_id",
+            sectioning_text_id(self.normalized_text, self.sectioning_version),
+        )
 
     #: The one field :meth:`to_dict` deliberately does not emit, and why.
     #: ``normalized_text`` is the whole document — megabytes on a long paper —

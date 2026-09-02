@@ -82,6 +82,7 @@ from .version import get_version_info
 from .sections import (
     extract_sections, SectionedDocument, Section,
     SectionLabel, Confidence, DetectedVia, SECTIONING_VERSION,
+    sectioning_text_id,
 )
 from .tables import Cell, Table
 from .tables.flatten import (
@@ -133,6 +134,7 @@ __all__ = [
     "Confidence",
     "DetectedVia",
     "SECTIONING_VERSION",
+    "sectioning_text_id",
     # Structured extraction (v2.0)
     "Cell",
     "Table",
