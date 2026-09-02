@@ -1,8 +1,8 @@
 # Changelog
 
-## [2.4.138] - 2026-08-27
+## [Unreleased] - normalization 1.9.60+ - NOT IN ANY RELEASE
 
-> ### ⚠️ SCOPE CORRECTED 2026-08-30 — THIS FINDING IS ABOUT 1.9.60, WHICH IS NOT IN THIS RELEASE
+> ### ⚠️ SCOPE CORRECTED 2026-08-30 — THIS FINDING IS ABOUT 1.9.60, WHICH HAS NEVER BEEN RELEASED
 >
 > A three-provider consult round on 2026-08-27 (sol/openai, sonnet/anthropic, grok/xai —
 > all three substantive; grok's `CHALLENGE_MISSED` was verified a false red) found the
@@ -40,7 +40,7 @@
 > The finding is real, three providers reproduced it, and the code it describes still has to be
 > fixed before it ever ships. What was wrong was its **target**. It measured *the working tree
 > of 2026-08-27* against a worktree at `047b4ca` — and `047b4ca` is `NORMALIZATION_VERSION
-> 1.9.59`, **which is what this release contains**. The block's own baseline is this release.
+> 1.9.59`, **which is what v2.4.138 contains**. The block's own baseline is v2.4.138 itself.
 > The gate it condemns is `1.9.60+`, which lives only in the uncommitted working tree.
 >
 > **The headline claim is refuted for the shipped code, by two sessions counting different
@@ -51,52 +51,52 @@
 > | measured on | occurrences (docpluck-7a) | whole-line (docpluck-39) |
 > |---|---|---|
 > | raw `extract_pdf` (control) | 13 | — |
-> | **1.9.59 — this release** | **13** at `standard` and `academic` | **11** |
+> | **1.9.59 — v2.4.138** | **13** at `standard` and `academic` | **11** |
 > | 1.9.58 — what production serves | — | **11** |
 > | 1.9.63 — uncommitted tree | — | **1** |
 >
 > The two counts differ because they count different units and neither is wrong. The
-> load-bearing fact is that **this release behaves identically to what production already
+> load-bearing fact is that **v2.4.138 behaves identically to what production already
 > serves**, so it cannot be shipping a paper with no title. The `1` in the uncommitted tree is
 > the surviving title block — the defect the block found, in the code that has it.
 >
 > **Mechanism, two-sided so a zero is not a broken grep** (`NORMALIZATION_VERSION` matches 38
 > times in both files):
 >
-> | signal | 1.9.59 (this release) | 1.9.63 (uncommitted) |
+> | signal | 1.9.59 (v2.4.138) | 1.9.63 (uncommitted) |
 > |---|---|---|
 > | `distinct_pages` / `max_per_page` / `_MIN_PAGES_FOR_FURNITURE` | 0 / 0 / 0 | 3 / 6 / 2 |
 > | `keep_page_break` / `page_break_residue` / `keep_break_in_rejoin` | 0 / 0 / 0 | 14 / 13 / 8 |
 > | `_carries_statistical_content` **called** | **no** (2 mentions, both in comments) | yes (import + call) |
 >
-> This release still uses the OLD line-index proxy. The rule the block condemns is not here.
+> v2.4.138 still uses the OLD line-index proxy. The rule the block condemns is not here.
 >
-> **AND THE SECTIONS BELOW DO NOT ALL DESCRIBE THIS RELEASE \u2014 THREE OF THE FOUR DESCRIBE
+> **THE THREE SECTIONS BELOW ARE NOT IN v2.4.138 — THEY, AND THIS BLOCK, DESCRIBE
 > UNCOMMITTED CODE.** Established by the signals above, not by reading the prose:
 >
-> | section below | in this release? |
+> | section | in v2.4.138? |
 > |---|---|
-> | *A repeated line is furniture because of WHERE ON THE PAGE it sits* | **NO** \u2014 1.9.60+ |
-> | *The page boundaries had to come back first* | **NO** \u2014 1.9.60+ |
-> | *Delete furniture, never data \u2014 the strip now actually consults the guard* | **NO** \u2014 1.9.60+ |
-> | *`changes_made` counts minus signs by contract* | **YES** \u2014 shipped in 1.9.59 |
+> | *A repeated line is furniture because of WHERE ON THE PAGE it sits* | **NO** — 1.9.60+ |
+> | *The page boundaries had to come back first* | **NO** — 1.9.60+ |
+> | *Delete furniture, never data — the strip now actually consults the guard* | **NO** — 1.9.60+ |
+> | *`changes_made` counts minus signs by contract* | **YES** — shipped in 1.9.59 |
 >
 > Read them as the design record for work in progress, not as notes for what you installed.
 >
 > **WHAT IS NOT REFUTED, AND MUST NOT BE READ AS A CLEAN BILL.** The block's other measurement
-> \u2014 **net \u22124,763 characters over a strided 36-paper sample, 7 papers losing content** \u2014 has
+> — **net −4,763 characters over a strided 36-paper sample, 7 papers losing content** — has
 > **not** been re-measured. Only the headline paper was. By the same polarity argument those
 > losses are very likely properties of the uncommitted tree too, **but that is inference, not
 > measurement**, and the page gate stays unsafe until someone counts them.
 >
 > **HOW BOTH OF US GOT IT WRONG, because the error is cheaper to read than to repeat.** A
 > session and the fleet conductor independently checked whether the **fix** was absent from
-> `main`, found it was, and each concluded the **defect** was present \u2014 halting the release.
+> `main`, found it was, and each concluded the **defect** was present — halting the release.
 > Those are different propositions and only the second licenses a stop. Neither of us asked the
 > question the block itself named: *render the paper and count*. One render refuted it.
 > **A warning names a subject and a remedy; confirming the remedy is missing is not confirming
-> the subject is there.** The block also carried its number (13 \u2192 0) without naming the commit
-> it was taken on, so it silently re-pointed at whatever tree the reader was standing on \u2014
+> the subject is there.** The block also carried its number (13 → 0) without naming the commit
+> it was taken on, so it silently re-pointed at whatever tree the reader was standing on —
 > **a measurement in a release note must name its tree.**
 
 ### A repeated line is furniture because of WHERE ON THE PAGE it sits — not how far apart it sits in the file
@@ -179,6 +179,8 @@ survey-plus-year-range shape that marker was written for; the old pattern missed
 
 **HEAD vs fix, 21-paper sample:** 34 furniture lines newly removed, 10 lines recovered, **zero
 lines of data lost**, corpus non-idempotency **1 -> 0**.
+
+## [2.4.138] - 2026-08-27
 
 ### `changes_made` counts minus signs by contract, not by a whitespace coincidence
 
