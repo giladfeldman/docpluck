@@ -6723,7 +6723,13 @@ def _normalize_text(
                 record_fallback(_event, detail=_s[:120])
             record_fallback("repeated_line_last_copy_kept", detail=_s[:120])
         report._track(
-            "P0q_repeated_line_strip", before_repeat, t, "repeated_lines_stripped"
+            "P0q_repeated_line_strip", before_repeat, t, "repeated_lines_stripped",
+            # The exact figure was already in hand for the per-line fallback
+            # events above; without count= this key published the CHARACTER
+            # delta (measured: 1287 reported for 39 removed lines — consult
+            # round CF3917B2B065, 2026-09-03), the class 9291fc3 closed for
+            # the page-number keys one step below.
+            count=sum(_removed_per_line.values()),
         )
     # Strip standalone page numbers - 1-3 digit unconditionally.
     #

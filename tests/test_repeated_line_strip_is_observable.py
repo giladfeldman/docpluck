@@ -78,25 +78,27 @@ def test_the_repeated_line_strip_deduplicates_and_counts_every_copy_it_took():
 
 
 def test_the_strip_reports_the_exact_number_of_copies_taken_and_spared():
-    """`changes_made` holds a CHARACTER DELTA under a count-shaped name.
+    """`changes_made["repeated_lines_stripped"]` is a TRUE COUNT of lines.
 
-    Measured 2026-08-29: on this 6-copy fixture `repeated_lines_stripped` is
-    **165**, which is 5 × len("Journal of Repeated Headers 2024\\n") — the five
-    deleted copies in characters, not the number 5. The name says "lines" and
-    the value counts characters, so a consumer reading it as a count is wrong
-    by a factor of the line length.
+    History, because this pin has now pointed both ways: the key was born in
+    v2.4.138 as a CHARACTER DELTA under a count-shaped name (measured
+    2026-08-29: 165 on this 6-copy fixture — five deleted copies in
+    characters), and this test pinned that mislabelling so it could not be
+    mistaken for a count. Consult round CF3917B2B065 (Grok + Fable,
+    2026-09-03) flagged it as the exact class 9291fc3 had just closed for the
+    page-number keys, with the true figure already in hand at the call site —
+    so the call site now passes ``count=sum(_removed_per_line.values())`` and
+    this pin flipped to assert the count. The key was a delta only inside the
+    v2.4.138 tag itself; consumers are told in the follow-up release note.
 
-    The exact counts DO exist, in the per-line telemetry v1.9.61 added, and
-    that is what a consumer should read. This test pins both facts so the
-    mislabelling cannot be mistaken for a count and the real counts cannot
-    silently disappear.
+    The per-line telemetry v1.9.61 added is unchanged and stays asserted below.
     """
     marker = "Journal of Repeated Headers 2024"
     out, report = normalize_text(_doc(marker), level=NormalizationLevel.academic)
 
-    assert report.changes_made["repeated_lines_stripped"] == 5 * (len(marker) + 1), (
-        "the key is a character delta; if this became a true count, update the "
-        "docstring above and tell consumers — the name has always implied one"
+    assert report.changes_made["repeated_lines_stripped"] == 5, (
+        "six copies, first kept: the count of removed LINES is 5; a character "
+        "delta here means the count= wiring regressed"
     )
 
     taken = {k: v for k, v in report.fallbacks.items()
