@@ -99,3 +99,25 @@ def test_the_telemetry_fix_does_not_touch_the_text():
     for pn in (10, 11, 12, 13):
         assert f"\n{pn}\n" not in f"\n{text}\n"
     assert text.count("Prose line") == 4 * 24
+
+
+def test_repeated_lines_stripped_counts_lines_not_characters():
+    """Consult round CF3917B2B065 (Grok + Fable, 2026-09-03): P0q published
+    ``repeated_lines_stripped`` as a character delta while ``_removed_per_line``
+    held the exact figure at the call site — Fable measured 1287 reported for 39
+    removed lines. Same class as the two keys fixed in 9291fc3, one step above.
+    """
+    header = "Journal of Measured Examples and Repeated Furniture Lines"
+    pages = []
+    for i in range(6):
+        body = "\n".join(
+            f"Body sentence {i}-{j} long enough to read as prose, not furniture."
+            for j in range(22)
+        )
+        pages.append(f"{header}\n{body}")
+    doc = "\n\f\n".join(pages)
+    cm = _changes_made(doc)
+    assert cm.get("repeated_lines_stripped") == 5, (
+        f"expected 5 (six copies, first kept), got "
+        f"{cm.get('repeated_lines_stripped')!r} — a character delta, not a count"
+    )
