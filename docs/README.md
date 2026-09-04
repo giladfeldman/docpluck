@@ -550,7 +550,7 @@ get_version_info()
 #  'git_sha': '…',
 #  'normalize_version': '1.9.64',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
-#  'table_extraction_version': '2.4.12',
+#  'table_extraction_version': '2.4.13',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs

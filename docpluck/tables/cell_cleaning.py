@@ -59,6 +59,153 @@ _SUP_OPEN = "\x00SUP\x00"  # placeholder swapped to <sup> after escaping
 _SUP_CLOSE = "\x00/SUP\x00"  # placeholder swapped to </sup> after escaping
 
 
+# ── W0r: the UNMAPPED-GLYPH MINUS, in BOTH representations (v2.4.139) ────────
+#
+# RASTER-VERIFIED, and it is OURS: the page is correct and our extraction is not,
+# so it falls under the ONE EXCEPTION to the separation-of-duties directive.
+# `10.1016/j.joep.2020.102350` p2 Table 1 PRINTS `Cramer's V = 0.067
+# [−0.108, 0.218]` — an interval that SPANS zero — and docpluck shipped
+# `<td>[\x00 0.108, 0.218]</td>`, which every consumer reads as one that
+# EXCLUDES zero. p4 Table 2 PRINTS the row `199  −1  −31  −30  213  14  31  17`
+# and docpluck shipped the three SIGNED values unsigned while the three unsigned
+# values in the same row survived — the row carries its own two-sided control.
+# Both pages were rasterized at 200dpi and read (2026-09-02).
+#
+# WHY THE REPAIR THAT ALREADY EXISTED COULD NOT FIRE. Until now this was a bare
+# `re.sub(r"\(cid:0\)\s*(?=\d)", "-", s)`, keyed on the seven-character literal
+# pdfminer.six emits for a glyph it cannot map. **Camelot 2.0.0 does not use
+# pdfminer.six.** It reads text through `playa.miner` (`camelot/utils.py`
+# imports `LAParams`/`LTChar` from `playa.miner`), and playa's `Font.decode`
+# falls back to an IDENTITY map — `((cid, chr(cid)) for cid in data)` — so the
+# same unmappable character code 0 arrives as a raw U+0000 instead. Measured on
+# the paper above, and the two readers disagree on the SAME file:
+#
+#     camelot.read_pdf(page 4, flavor="stream") : 21 cells carry \x00, 0 carry "(cid:0)"
+#     pdfplumber (pdfminer.six) whole document  :  0 chars are \x00, 31 are "(cid:0)"
+#
+# So the literal-keyed repair became a green-shaped no-op the day the table
+# backend changed, and nothing failed. Both spellings are recovered here for
+# exactly that reason: a repair keyed on one library's spelling of "I could not
+# decode this" is one dependency bump away from silently doing nothing.
+#
+# WHY BEFORE-A-DIGIT IS THE SIGNATURE. A NUL is never legitimate text, and the
+# glyph the code-0 slot draws in these AdvTT-family stat tables is U+2212 — the
+# same broken-ToUnicode font family behind W0b/W0h/W0m/W0o. `\x00 0.23` is the CI
+# bound -0.23; `\x00 31` is -31. This is TYPOGRAPHIC evidence (what the renderer
+# emitted for a specific character), never inferential: nothing here reasons
+# about what the number OUGHT to be. A NUL that is NOT before a digit is left
+# alone — its glyph is unknown, and inventing one is the hypothetical this
+# project forbids.
+#
+# PREVALENCE, MEASURED SEPARATELY FROM THE SHAPE, because one paper proves a
+# shape exists and says nothing about a rate (`tools/diag/unmapped_glyph_prevalence_scan.py`,
+# 200 papers sampled from the article repository via the custodian, 2026-09-02):
+#
+#     3 / 200 papers (1.5%) carry the repairable shape, 86 sites
+#     5 / 200 carry an unmapped glyph NOT before a digit (21 sites) — untouched here
+#     1 / 200 carries U+FFFD (11 sites) — a different marker, not handled by this rule
+#
+# So this is a real but uncommon publisher-font failure, unlike W0o's 10.5%.
+#
+# ── AND THE FALSE-POSITIVE CLASS THAT SWEEP FOUND, WHICH ONE PAPER COULD NOT ──
+#
+# **The code-0 slot is not a minus everywhere. It is whatever THAT font left
+# unmapped.** `10.1017/s1930297500007956` uses it for an EXTENSIBLE OPENING
+# PARENTHESIS, with code 1 as its closing partner. RASTERIZED at 170dpi and read:
+# p17 prints `y_i ~ Gaussian((μ1, μ2), [ … ]^-1)`, and playa yields
+# `Gaussian \x00\n(μ1, μ2) , … \x01`. On that paper's DECODED TEXT the ungated
+# rule fires 25 times and every one would MANUFACTURE a minus sign that is not on
+# the page — data loss turned into data fabrication. Rendering it with the repair
+# on and off gives byte-identical markdown, so on THAT paper none of the 25 reach
+# a `<td>`; the gate closes a fabrication possible BY CONSTRUCTION rather than one
+# observed shipping, and it is still required, because this is the single repair
+# chain behind `flatten`, `cells[].text`, `raw_text` and the rendered `<table>`
+# alike. Two independent discriminators separate the classes perfectly across
+# every affected paper in the sample:
+#
+#     paper                        C0 codes present    NUL->digit same line / across a newline
+#     10.1016/j.joep.2020.102350   {0x00: 31}                31 / 0     minus  (raster-verified)
+#     10.1016/j.jesp.2025.104750   {0x00: 46}                44 / 0     minus
+#     10.1016/j.jesp.2021.104226   {0x00: 17}                17 / 0     minus
+#     10.1017/s1930297500007956    {0x00: 33, 0x01: 33, …}    0 / 25    DELIMITER (raster-verified)
+#
+# The delimiter paper's NUL count is matched EXACTLY by a code-1 count — an
+# opening/closing pair — and not one of its sites sits on the same line as its
+# digits, because an extensible delimiter is its own layout element while a minus
+# is glued to its number. Both signals are typographic, and both are required:
+#   * a partner code rules the class out inside a CELL, where whitespace has been
+#     collapsed and the newline signal no longer exists;
+#   * the same-line requirement rules it out in any raw text, where a partner may
+#     have been split into a neighbouring cell.
+# Where either says this font's unmapped slots are being used for something other
+# than a minus, the text passes through untouched.
+#
+# THE TRAP, and why the repair is segment-scoped rather than one `re.sub`.
+# `\x00` is ALSO docpluck's own placeholder character (`_MERGE_SEPARATOR`,
+# `_SUP_OPEN`, `_SUP_CLOSE` above), and `clean_cell_text` runs a SECOND time
+# from `_html_escape`, by which point those placeholders are present. A folded
+# header puts a DIGIT immediately after a closing placeholder NUL —
+# `"Replication\x00BR\x0095% CI"` — so a naive `\x00\s*(?=\d)` would destroy the
+# fold AND inject a minus that was never printed, turning data loss into data
+# FABRICATION. Nor is a generic `\x00[^\x00]*\x00` "placeholder span" safe: on a
+# merged cell `"\x00 1" + _MERGE_SEPARATOR + "\x00 31"` it matches `"\x00 1\x00"`
+# and protects a real minus from repair. The placeholders are therefore matched
+# by their EXACT spellings, derived from the constants above so the two cannot
+# drift, and the repair runs only on the text BETWEEN them.
+_CELL_PLACEHOLDER_RE = re.compile(
+    "|".join(re.escape(p) for p in (_MERGE_SEPARATOR, _SUP_OPEN, _SUP_CLOSE))
+)
+# The marker, then SPACES OR TABS ONLY, then a digit. Deliberately not `\s*`:
+# `\s` matches a newline, and matching across one is exactly how the extensible
+# -delimiter class above gets mistaken for a minus.
+_UNMAPPED_MINUS_RE = re.compile(r"(?:\(cid:0\)|\x00)[ \t]*(?=\d)")
+# Evidence that THIS font's unmapped slots are carrying something other than a
+# minus: a second undecoded code point (the code-1 closing partner of an
+# extensible parenthesis, and any other C0 control the backend passed through),
+# or pdfminer's spelling of an unmapped code that is not 0. Tab, newline, form
+# feed and carriage return are legitimate layout characters and are excluded.
+_OTHER_UNMAPPED_SLOT_RE = re.compile(r"[\x01-\x08\x0b\x0e-\x1f]|\(cid:(?!0\))\d+\)")
+
+
+def recover_unmapped_glyph_minus(s: str) -> str:
+    """W0r: recover a minus sign the table backend could not map to Unicode.
+
+    ``"(cid:0) 31"`` (pdfminer.six) and ``"\\x00 31"`` (playa, via Camelot 2.0)
+    are the same defect wearing two spellings; both become ``-31``. Normalised
+    to ASCII hyphen per CLAUDE.md hard rule 4.
+
+    Passes the text through untouched when the marker is separated from its
+    digit by a newline, or when the text carries a SECOND undecoded slot — both
+    are the signature of a font using the code-0 slot for an extensible
+    parenthesis rather than a minus, which is raster-verified on
+    ``10.1017/s1930297500007956`` and would otherwise fabricate 25 minus signs
+    that are not on the page.
+
+    Never rewrites docpluck's own ``\\x00BR\\x00`` / ``\\x00SUP\\x00`` /
+    ``\\x00/SUP\\x00`` placeholders, which is why this is not a single
+    ``re.sub``: ``clean_cell_text`` runs again from :func:`_html_escape` after
+    those exist. Idempotent, as :func:`clean_cell_text` requires.
+    """
+    if not s or ("\x00" not in s and "(cid:0)" not in s):
+        return s
+    out: list[str] = []
+    pos = 0
+    for m in _CELL_PLACEHOLDER_RE.finditer(s):
+        out.append(s[pos:m.start()])
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(s[pos:])
+    # The guard is evaluated on the text BETWEEN the placeholders, never on the
+    # placeholders themselves — their own NULs are docpluck's, not the font's.
+    body = "".join(out[::2])
+    if _OTHER_UNMAPPED_SLOT_RE.search(body):
+        return s
+    return "".join(
+        _UNMAPPED_MINUS_RE.sub("-", part) if i % 2 == 0 else part
+        for i, part in enumerate(out)
+    )
+
+
 def clean_cell_text(s: str | None) -> str:
     """Every glyph repair a table cell needs — and NOTHING about HTML.
 
@@ -109,13 +256,12 @@ def clean_cell_text(s: str | None) -> str:
     # channel and bypass normalize_text's W0e step, so a Symbol-PUA glyph
     # would otherwise leak raw into rendered table HTML (v2.4.54).
     s = recover_pua_glyphs(s)
-    # Recover corrupted minus signs. pdfminer (Camelot's text layer) emits
-    # "(cid:0)" for a font glyph it cannot map to Unicode; in academic stat
-    # tables that unmapped glyph is the U+2212 minus, always printed directly
-    # before a number — "(cid:0) 0.23" is the CI bound -0.23, "(cid:0) 31" is
-    # -31. "(cid:0)" is never legitimate text, so recovering it before a digit
-    # is unambiguous. Normalised to ASCII hyphen (CLAUDE.md hard rule 4).
-    s = re.sub(r"\(cid:0\)\s*(?=\d)", "-", s)
+    # W0r: recover a minus the table backend could not map to Unicode. Camelot's
+    # text layer emits an unmappable glyph as "(cid:0)" (pdfminer.six) or as a
+    # raw "\x00" (playa, Camelot 2.0) — the same defect, two spellings, and
+    # keying on only the first made this a no-op for as long as Camelot 2.0 has
+    # been installed. Placeholder-safe by construction; see the rule above.
+    s = recover_unmapped_glyph_minus(s)
     # Recover '2'-for-U+2212 minus corruption in a CI cell — "[20.45, 20.06]"
     # is the descending (impossible) bracket for "[-0.45, -0.06]". Same
     # self-gating descending-bracket rule as normalize.py's W0b step; table
@@ -1072,6 +1218,8 @@ def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
 
 __all__ = [
     "cells_grid_to_html",
+    "clean_cell_text",
+    "recover_unmapped_glyph_minus",
     "_html_escape",
     "_merge_continuation_rows",
     "_strip_leader_dots",

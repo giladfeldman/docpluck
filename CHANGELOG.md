@@ -1,5 +1,54 @@
 # Changelog
 
+## [Unreleased] - table extraction 2.4.13
+
+### The `<td>` channel destroyed minus signs, because a dependency changed how it spells "I could not decode this"
+
+`cell_cleaning` had repaired an unmappable glyph for years, keyed on the literal `(cid:0)`
+that pdfminer.six emits. **Camelot 2.0.0 does not use pdfminer.six** — `camelot/utils.py`
+imports `LAParams`/`LTChar` from `playa.miner`, and playa's `Font.decode` falls back to an
+identity map, so the same character code 0 arrives as a raw `U+0000`. The repair became a
+green-shaped no-op the day the table backend changed, and nothing failed. Measured on one
+file: Camelot page 4 stream gives 21 cells carrying `U+0000` and 0 carrying `(cid:0)`;
+pdfplumber gives 0 and 31; pdftotext decodes all 31 correctly as U+2212. The page is intact
+and only the table channel loses them, so this is ours to repair.
+
+The harm is silent and it inverts a published result. `10.1016/j.joep.2020.102350` p2 Table
+1 prints `Cramer's V = 0.067 [-0.108, 0.218]` — an interval that SPANS zero — and docpluck
+shipped `<td>[<NUL> 0.108, 0.218]</td>`, which every consumer reads as one that EXCLUDES
+zero. p4 Table 2 prints `199 -1 -31 -30 213 14 31 17` and docpluck shipped the three signed
+values unsigned while the three unsigned values in the same row survived. Both pages were
+rasterized and read.
+
+`recover_unmapped_glyph_minus` (rule W0r) recovers BOTH spellings, because a repair keyed on
+one library's spelling is one dependency bump from silence again. It lives in
+`clean_cell_text`, so `flatten`, `cells[].text`, `raw_text` and the rendered `<table>` all
+give the same answer.
+
+**It is gated, and the gate is why the prevalence sweep was worth running.** The code-0 slot
+is not a minus everywhere — it is whatever that font left unmapped.
+`10.1017/s1930297500007956` uses it for an extensible opening parenthesis with code 1 as its
+closing partner (rasterized p17: `y_i ~ Gaussian((mu1, mu2), [...]^-1)`), where the ungated
+rule would fire 25 times and fabricate a minus every time. Two typographic discriminators
+separate the classes across every affected paper: a code-1 partner in the text, and whether
+the marker shares a line with its digits. U+FFFD is deliberately NOT covered — it lands in
+the OPERATOR slot, and on one rasterized page the same codepoint is both `<=` and `>=`.
+
+Measured before shipping. Prevalence at the source, 200 papers sampled through the custodian:
+3 (1.5%) carry the shape, 86 sites. In shipped output, the 26-paper render baseline under a
+two-arm guard diff (repair on vs monkeypatched off): 2 papers, 86 destroyed sites -> 0, with
+74 lines changing exactly as the rule predicts and 17 adjudicated as a fold-to-split that
+loses nothing. **Those two 86s are different measurements over disjoint paper sets and must
+not be quoted as one figure.** Tools: `tools/diag/unmapped_glyph_prevalence_scan.py`,
+`tools/diag/unmapped_minus_guard_diff.py`.
+
+Known and NOT fixed here: `whitespace._UNMAPPED_GLYPH_RE` still matches only `(cid:N)` and
+U+FFFD, while `camelot_extract.py:715` runs that gate on Camelot cells — so the gate cannot
+see the new spelling of the marker it promises to condemn. Widening it changes which grids
+are ACCEPTED, whose failure mode is text loss, so it gets its own measurement first:
+`tools/diag/unmapped_marker_gate_census.py`.
+
+
 ## [2.4.138] - 2026-09-02 - normalization 1.9.64
 
 One release, three strata, newest first: the 1.9.62-1.9.64 page-gate / watermark-arm /
