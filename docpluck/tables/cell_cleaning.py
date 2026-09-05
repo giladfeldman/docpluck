@@ -1132,6 +1132,7 @@ def cells_grid_to_html(
     *,
     clean=None,
     recover_ci_upper: bool = True,
+    declared_header_rows: int | None = None,
 ) -> str:
     """Render a 2-D cell grid as an HTML ``<table>`` block.
 
@@ -1198,6 +1199,15 @@ def cells_grid_to_html(
             n_header = k + 1
         else:
             break
+    # A header count the SOURCE FILE declares out-ranks the heuristic, downward
+    # only -- the same rule and the same direction as `flatten._clean_grid`.
+    # THIS SITE EXISTS BECAUSE THE REPAIR MUST REACH EVERY CHANNEL. Teaching only
+    # flatten to honour the declaration made `html` and `flattened_rows` report
+    # different header structure for one table: 21 of 122 custody tables,
+    # measured 2026-09-05. That is the same "one input, two answers" class the
+    # release review round already found once in this module.
+    if declared_header_rows and declared_header_rows >= 1:
+        n_header = min(n_header, declared_header_rows)
     if len(merged) - n_header < 1:
         n_header = 1
 

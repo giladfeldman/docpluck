@@ -439,8 +439,14 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
             # inferential CI repair off. Without both, `html` and
             # `cells[].text` disagree for one input -- measured, see
             # `cell_cleaning._html_escape`.
+            # `declared_header_rows` is passed here for the same reason
+            # `clean=` and `recover_ci_upper=` are: this channel must give the
+            # SAME answer as `flatten_table` for one input. `n_header` is the
+            # count mammoth read from `w:tblHeader`, so 0 means the author
+            # declared nothing and the heuristic keeps the decision.
             "html": cells_to_html(
-                cells, clean=clean_cell_text, recover_ci_upper=False
+                cells, clean=clean_cell_text, recover_ci_upper=False,
+                declared_header_rows=n_header or None,
             ),
             "raw_text": "\n".join("\t".join(r) for r in grid.rows),
             "cell_geometry": "no_layout:docx_states_no_page_geometry",
