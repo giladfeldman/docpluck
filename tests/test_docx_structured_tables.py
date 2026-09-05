@@ -838,3 +838,52 @@ def test_benchmark_truth_grid_reads_omml_like_the_shipped_path_does():
     assert "9.99" not in _tc_text(deleted), _tc_text(deleted)
     assert "1.23" in _tc_text(deleted), _tc_text(deleted)
     assert W  # referenced for symmetry with the namespace pair above
+
+
+def test_html_and_flattened_rows_agree_on_the_declared_header_count():
+    """One input, one answer. The `html` field and `flattened_rows` must not
+    disagree about how many rows are header.
+
+    `_clean_grid` (flatten) and `cells_grid_to_html` (the `html` field) run the
+    same cleaning pipeline in two places. Teaching only ONE of them to honour a
+    declared header count makes them disagree for the same table -- the exact
+    "one input, two answers" class the release review round already found once in
+    this module, where `cells[].text` and `html` cleaned differently. Measured
+    over the 19 custody DOCX at the moment the flatten fix landed alone: **21 of
+    122 tables** reported a different `<thead>` row count from their flattened
+    header count.
+
+    docpluck has three text channels and this project's rule is that a repair
+    reaches all of them or none.
+    """
+    from docpluck.tables.cell_cleaning import cells_grid_to_html
+
+    grid = [
+        ["Measure", "Group", "Pre", "Post", "Change", "p"],
+        ["Numeracy", "CG", "15.04 [13.93, 16.16]", "14.91 [13.33, 16.48]",
+         "-0.13 [-2.05, 1.79]", ".891"],
+        ["Numeracy", "PG", "14.32 [13.19, 15.45]", "22.09 [20.50, 23.67]",
+         "7.77 [5.85, 9.69]", "< .001"],
+        ["Numeracy", "EXG", "14.44 [13.31, 15.57]", "22.08 [20.49, 23.66]",
+         "7.63 [5.71, 9.55]", "< .001"],
+    ]
+
+    def thead_rows(html: str) -> int:
+        m = re.search(r"<thead>(.*?)</thead>", html, re.S)
+        return len(re.findall(r"<tr>", m.group(1))) if m else 0
+
+    # Control: with no declaration both channels agree on the (wrong) guess, so a
+    # disagreement below is the declaration and not some unrelated difference.
+    assert thead_rows(cells_grid_to_html(grid)) == len(_clean_grid(grid)[0])
+
+    hdr, body = _clean_grid(grid, declared_header_rows=1)
+    html = cells_grid_to_html(grid, declared_header_rows=1)
+    assert thead_rows(html) == len(hdr) == 1, (
+        f"html says {thead_rows(html)} header rows, flatten says {len(hdr)}"
+    )
+    assert "7.77 [5.85, 9.69]" in html
+    assert html.count("<tbody>") == 1
+    # The recovered rows must be BODY cells in the html too, not header cells.
+    tbody = re.search(r"<tbody>(.*?)</tbody>", html, re.S).group(1)
+    assert "7.77 [5.85, 9.69]" in tbody, "the PG arm is in <thead> instead of <tbody>"
+    assert len(body) == 3

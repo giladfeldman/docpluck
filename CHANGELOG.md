@@ -27,6 +27,14 @@ is used where it exists instead of making the shared guess riskier.
 `body` and can never introduce the deletion it exists to prevent. Verified both ways over the
 same 122 tables: **42 rows recovered, 0 rows lost.**
 
+**And it reaches BOTH channels, because a repair that reaches one is a new defect.**
+`_clean_grid` (flatten) and `cells_grid_to_html` (the `html` field) run the same pipeline in
+two places. With only flatten taught, **21 of those 122 tables reported a different `<thead>`
+row count from their flattened header count** -- the same "one input, two answers" class this
+module was fixed for once already, where `cells[].text` and `html` cleaned differently. Both
+now take the declaration, and the divergence is **0 of 122**, with both channels emitting a
+comparable header on all 122 so the zero is not an empty comparison.
+
 **PDF blast radius is zero by construction and was measured, not asserted.** `"markup"` is
 written at exactly one site (`docx_tables.py`); every PDF path writes `lattice` /
 `whitespace` / `isolated`. Run against 6 baseline papers from article-finder: **34 real PDF
