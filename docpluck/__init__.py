@@ -93,9 +93,14 @@ from .tables.flatten import (
 )
 from .figures import Figure
 from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extract_pdf_structured
+# DOCX tables (v2.4.139). Returns the SAME StructuredResult as the PDF path --
+# additive, nothing renamed -- so a consumer reading `tables[]` /
+# `flattened_rows[]` needs no second code path. Engine chosen by measurement:
+# docs/BENCHMARKS_docx_engines_2026-09.md.
+from .extract_docx_structured import extract_docx_structured
 from .render import RenderReport, render_pdf_to_markdown
 
-__version__ = "2.4.138"
+__version__ = "2.4.139"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
@@ -142,6 +147,7 @@ __all__ = [
     "TABLE_EXTRACTION_VERSION",
     "StructuredResult",
     "extract_pdf_structured",
+    "extract_docx_structured",
     # Table row flattening (v2.4.76, EC-T1) — canonical JSONL contract for
     # downstream stat-verification tools (effectcheck, escimate, scimeto).
     "FlattenedRow",

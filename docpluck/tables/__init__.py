@@ -12,7 +12,14 @@ from typing import Literal, Optional, TypedDict
 
 
 TableKind = Literal["structured", "isolated"]
-TableRendering = Literal["lattice", "whitespace", "isolated"]
+# "markup" (v2.4.139) is the DOCX path: the grid was READ from `w:tbl`, not
+# inferred from glyph positions. It is a new member of the union, never a
+# renaming of an existing one -- a PDF table's `rendering` is unchanged. Kept
+# distinct rather than reusing "lattice" because "lattice" names a Camelot
+# flavor, and labelling a markup read as a Camelot capture would be an
+# unlabelled engine substitution: a consumer thresholding on capture quality
+# would silently include tables that have none to report.
+TableRendering = Literal["lattice", "whitespace", "isolated", "markup"]
 
 
 class Cell(TypedDict):
