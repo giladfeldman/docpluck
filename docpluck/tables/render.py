@@ -29,7 +29,8 @@ from . import Cell
 from .cell_cleaning import cells_grid_to_html
 
 
-def cells_to_html(cells: list[Cell]) -> str:
+def cells_to_html(cells: list[Cell], *, clean=None,
+                  recover_ci_upper: bool = True) -> str:
     """Render a list of Cell to a single <table>...</table> HTML string.
 
     Empty input → empty string (no table to render).
@@ -55,7 +56,9 @@ def cells_to_html(cells: list[Cell]) -> str:
     for c in cells:
         grid[c["r"]][c["c"]] = c["text"] or ""
 
-    cleaned = cells_grid_to_html(grid)
+    cleaned = cells_grid_to_html(
+        grid, clean=clean, recover_ci_upper=recover_ci_upper
+    )
     if cleaned:
         return cleaned
 

@@ -44,10 +44,23 @@ def test_table_kind_literal_values():
 
 
 def test_table_rendering_literal_values():
+    """The vocabulary is pinned so a value cannot be added without a decision.
+
+    `"markup"` was added in v2.4.139 for the DOCX path, which READS the grid from
+    `w:tbl` instead of inferring it from glyph positions. It is a new member, not
+    a rename -- every PDF value is unchanged. It has to be distinct: reusing
+    `"lattice"` would name a Camelot flavor that did not run, and a consumer
+    thresholding on capture quality would then silently include tables that have
+    none to report.
+
+    This assertion was RED for one commit (`4901834`) because the Literal grew
+    and the pin did not. Caught by the release consult round, not by the suite,
+    which had not finished. That is what this pin is for -- leave it exhaustive.
+    """
     from docpluck.tables import TableRendering
     import typing
     args = typing.get_args(TableRendering)
-    assert set(args) == {"lattice", "whitespace", "isolated"}
+    assert set(args) == {"lattice", "whitespace", "isolated", "markup"}
 
 
 def test_figure_typed_dict_fields():

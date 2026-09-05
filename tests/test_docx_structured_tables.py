@@ -326,6 +326,152 @@ class TestCaptionRecovery:
         assert labels == ["Table 1", "Table 2"], labels
 
 
+class TestTheHtmlChannelAgreesWithTheCells:
+    """One input, one answer — across every field the same Table exposes.
+
+    Found 2026-09-05 by the Sol and Grok seats of the release consult round;
+    the Sonnet seat filed an explicit all-clear on this exact question, which
+    was a WRONG REJECT (it reasoned in plan mode and never ran the code).
+
+    `docx_tables` cleaned each cell with the DOCX chain at construction and then
+    handed the grid to `cells_to_html`, whose `_html_escape` re-cleaned it with
+    the **PDF** chain. So one DOCX cell produced two different values:
+
+        cells[].text / raw_text   [20.45, 20.06]      as the author typed it
+        html                      [-0.45, -0.06]      two minus signs invented
+
+    The module's own docstring named `[20.45, 20.06]` as the misfire it
+    prevented. It prevented it in the cells and not in the HTML — which is the
+    "no pretending" failure and the "one concept, one table" failure at once.
+
+    These tests assert the INVARIANT rather than the one string, because the
+    string was already covered and the invariant is what was actually broken.
+    """
+
+    def _html_cells(self, docx_bytes: bytes) -> list[str]:
+        html = extract_docx_structured(docx_bytes)["tables"][0]["html"]
+        return re.findall(r"<t[dh]>(.*?)</t[dh]>", html, re.S)
+
+    @pytest.mark.parametrize("value", [
+        "[20.45, 20.06]",   # a PDF '2'-for-U+2212 shape that a DOCX author really typed
+        r"\.001",           # a PDF '<'-as-backslash shape
+        "Direction 3 manipulated attribute",  # a PDF 'x'-as-'3' shape
+    ])
+    def test_html_reports_the_same_text_the_cells_do(self, value):
+        docx = _docx_with_cell(value)
+        cells = {c["text"] for t in extract_docx_structured(docx)["tables"]
+                 for c in t["cells"]}
+        assert value in cells, f"the cell channel already lost it: {cells}"
+        html_cells = {h.strip() for h in self._html_cells(docx)}
+        assert value in html_cells, (
+            f"html says {html_cells} but cells say {value!r}. One input, two "
+            "answers — a consumer reading `html` and one reading `cells` "
+            "disagree about what the paper printed."
+        )
+
+    def test_the_inferential_ci_repair_does_not_run_on_a_docx(self):
+        """`-.73` beside `[-0.78, 0.67]` must NOT become `[-0.78, -0.67]`.
+
+        That repair argues the interval must be negative because otherwise it
+        excludes the estimate. Inferential evidence is the consumer's to act on
+        (it holds the parsed statistic and has a UI); docpluck holds text and
+        has no channel to announce that it guessed. Justified on a PDF, where a
+        font really did drop the glyph — never on a DOCX, which carries real
+        Unicode. Raised by the Grok seat, 2026-09-05.
+        """
+        d = Document()
+        d.add_paragraph("Table 1. Correlations.")
+        t = d.add_table(rows=2, cols=3)
+        for c, text in enumerate(["Variable", "r", "95% CI"]):
+            t.cell(0, c).text = text
+        for c, text in enumerate(["Item 1", "-.73", "[-0.78, 0.67]"]):
+            t.cell(1, c).text = text
+        buf = io.BytesIO()
+        d.save(buf)
+        html = " ".join(self._html_cells(buf.getvalue()))
+        assert "[-0.78, 0.67]" in html, f"the interval was rewritten: {html}"
+        assert "-0.67" not in html, (
+            "a minus sign was manufactured on the CI upper bound; the document "
+            "does not contain it"
+        )
+
+
+class TestCaptionsAreNotStolenFromProse:
+    """A wrong caption is worse than no caption.
+
+    `flatten_table` reads caption vocabulary (`_effect_type_for`) to type an
+    unlabelled estimate column, so one stray word publishes a real number under
+    the wrong statistic's name. All three consult seats reproduced this
+    independently on 2026-09-05 — the strongest agreement in the round.
+    """
+
+    def _docx(self, before: list[str]) -> bytes:
+        d = Document()
+        for p in before:
+            d.add_paragraph(p)
+        t = d.add_table(rows=2, cols=2)
+        t.cell(0, 0).text = "Group"
+        t.cell(0, 1).text = "Estimate"
+        t.cell(1, 0).text = "Younger"
+        t.cell(1, 1).text = "0.42"
+        buf = io.BytesIO()
+        d.save(buf)
+        return buf.getvalue()
+
+    def test_an_apa_title_that_names_another_table_is_not_this_ones_title(self):
+        """The reproduced case: a `Table 4` label, then prose naming Table 3."""
+        res = extract_docx_structured(self._docx(
+            ["Table 4",
+             "Table 3 reports the partial eta-squared for each comparison."]
+        ))
+        t = res["tables"][0]
+        assert t["label"] == "Table 4"
+        assert "eta" not in (t["caption"] or "").lower(), (
+            f"prose naming another table became this one's title: {t['caption']!r}"
+        )
+        rows = flatten_tables_for_paper(res["tables"])
+        assert "eta2" not in rows[0]["fields"], (
+            f"a Cohen's d estimate was typed as eta-squared: {rows[0]['fields']}"
+        )
+
+    @pytest.mark.parametrize("prose", [
+        "cf. Table 2 for the full set of comparisons.",
+        "See Tables 2 and 3 for the partial eta-squared values.",
+        "The effect held across conditions (Table 2).",
+    ])
+    def test_prose_that_mentions_a_table_never_becomes_one(self, prose):
+        """These are the shapes the Grok seat raised — and the honest note is
+        that `_TABLE_REFERENCE_RE` is NOT what rejects them.
+
+        Mutation-checked 2026-09-05: with `_TABLE_REFERENCE_RE` reverted IN
+        MEMORY to its original narrow form (a short verb list plus a singular
+        `Table`), all three of these STILL return `label=None`. Two other
+        things reject them first — `_DOCX_TABLE_LABEL_RE` is `$`-anchored, so
+        a sentence is not a label paragraph, and `_NAMES_A_TABLE_RE` refuses
+        any intervening paragraph that names a table as a title. The widened
+        reference regex is belt-and-braces, **measured redundant on these
+        inputs**.
+
+        Recorded rather than quietly kept, because a guard nobody can show
+        biting is a claim, and a test that passes for a reason other than the
+        one it names is the wrong-reject class this project keeps finding.
+        What this test pins is the OUTCOME — prose never becomes a caption —
+        which is the property worth protecting whichever guard delivers it.
+        """
+        t = extract_docx_structured(self._docx([prose]))["tables"][0]
+        assert t["label"] is None and t["caption"] is None, (
+            f"{prose!r} became a caption: {t['caption']!r}"
+        )
+
+    def test_a_real_two_paragraph_apa_caption_still_works(self):
+        """Two-sided control: the guards must not have killed the feature."""
+        t = extract_docx_structured(self._docx(
+            ["Table 5", "Effect sizes by condition"]
+        ))["tables"][0]
+        assert t["label"] == "Table 5"
+        assert "Effect sizes by condition" in (t["caption"] or "")
+
+
 class TestMergedHeadersDoNotShiftColumns:
     def test_two_row_header_with_a_row_span_keeps_its_columns(self):
         res = extract_docx_structured(_docx_with_merged_header())

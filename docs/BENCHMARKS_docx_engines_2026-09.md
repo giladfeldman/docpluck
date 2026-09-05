@@ -126,9 +126,27 @@ at a run boundary. **Statistic-cell recall is 1.0000 with zero fabrications.**
 | **vs. docx2python** | must guess what is a table; leaks markup into cells |
 | **vs. PDF conversion** | not installable on the service, and 0.0077 recall when it does run |
 
-**Verified equal-best, not merely adequate.** If pandoc had won on statistic recall the
-answer would be different; it did not, so the incumbent wins on cost with no correctness
-concession.
+**Equal-best on what this harness measures — and that is narrower than it sounds.** If
+pandoc had won on statistic recall the answer would be different; it did not, so the
+incumbent wins on cost with no correctness concession *on the measured axes*.
+
+**What the harness does NOT measure, found 2026-09-05 by the consult round and reproduced:**
+
+- **OMML equations are invisible to the ground-truth reader.** `truth_tables._tc_text`
+  collects only `w:t`, so a cell whose content is an equation reads as empty in the truth
+  grid. The library's production path *does* recover it (`_inline_omml_runs`, v2.4.131), so
+  the harness scored a mammoth that behaves differently from the shipped one, and would
+  charge an OMML-preserving engine with *fabrication* for emitting `ηp2 = .04`. Those are
+  precisely the effect sizes this library exists to deliver.
+- **The greedy table matcher in `score()` can mis-assign** when two tables overlap in
+  content, depressing recall below the optimal assignment.
+- **The adapters are not the production grid.** The benchmark's mammoth adapter repeats a
+  `rowspan` cell's text down its span; `docx_tables._SpanGrid` stores `""`, matching OOXML.
+
+**None of these can have promoted mammoth over pandoc** — the OMML blind spot depresses
+truth symmetrically for every engine, and the two tie at 1.0000 statistic recall regardless
+— so the *choice* stands. What they undercut is the strength of the word "verified".
+Fixing them is the next thing to do to this harness.
 
 ## 5. What this measurement does NOT establish
 
@@ -139,8 +157,16 @@ concession.
 - **Tracked changes.** The truth reader excludes `w:delText`, so an engine emitting
   deleted text would be caught as fabrication. No engine did on this corpus — but only 5
   of the 55 censused documents carry `w:del` at all, and none of those 5 are in the
-  scored 16. **Unmeasured for the engines**; the DOCX path passes `--track-changes` /
-  equivalent explicitly rather than relying on a default.
+  scored 16, so this is **unmeasured for the engines**.
+
+  **Correction, 2026-09-05.** This bullet previously ended "the DOCX path passes
+  `--track-changes` / equivalent explicitly rather than relying on a default." That was
+  **false**: `grep -c track docpluck/tables/docx_tables.py` returns **0**. The behaviour
+  is correct — mammoth drops `w:delText` — but it is correct *by default*, not by an
+  explicit choice this library makes, and a default can change under us the way Camelot's
+  `(cid:0)` spelling did. Caught by the Sol seat of the release consult round. A test
+  pins the behaviour (`test_deleted_tracked_change_text_is_not_resurrected`); nothing pins
+  the *dependency's* default, which is the actual exposure.
 - **Multi-column body text.** Out of scope for this run, which measures tables.
 - **Rotated, nested, and split-across-page tables.** OOXML has no page model, so the
   page-boundary failures of the PDF path cannot occur; nested tables were normalised away
@@ -166,8 +192,17 @@ honest answer on a machine that cannot convert.
 
 ### Three instrument defects this design caught, in its own reader
 
-Recorded because each one would have produced a **confident wrong ranking**, and all
-three were found by the negative side rather than by inspection:
+Recorded because each one would have produced a **confident wrong ranking**.
+
+**Correction, 2026-09-05:** this paragraph used to say all three "were found by the
+negative side rather than by inspection." Two were — #1 and #2 both showed up as
+fabricated numbers. **#3 did not and could not**: sliding a header row sideways is a pure
+repositioning that leaves the document's numeric-token set unchanged, and
+`fabricated_numbers` is a set difference over the whole document, so it is blind to
+position by construction. #3 surfaced from the per-cell recall diff instead. Caught by the
+Sol seat. The distinction matters because it names a real gap in the metric, not just a
+wording slip: **this benchmark cannot see a value moved into the wrong column** unless the
+positional recall catches it.
 
 1. **The truth reader missed `w:sdt`**, reported 0 tables where the document has 2, and
    scored three correct engines as fabricating 37 numbers that were the paper's real
