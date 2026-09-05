@@ -208,9 +208,25 @@ _DOCX_TABLE_LABEL_RE = re.compile(
 )
 # A paragraph that merely REFERS to a table. Never a caption, whichever side of
 # the table it sits on -- the negative control for the matcher above.
+#
+# WIDENED 2026-09-05 after the release consult round. The first version keyed on a
+# short verb list plus a SINGULAR `\bTable\b`, and reproducibly promoted
+# `cf. Table 2`, `See Tables 2 and 3` (the plural defeats `\bTable\b`) and a
+# parenthetical `(Table 2)` to captions. Each then reached `flatten_table`'s
+# effect-type vocabulary and typed a Cohen's d column as partial eta-squared --
+# a real number published under the wrong statistic's name, which is worse than
+# losing it, because a wrong number is quotable and a missing one is not.
 _TABLE_REFERENCE_RE = re.compile(
-    r"\b(?:see|in|from|shown in|presented in|reported in|according to)\s+Table\b", re.I
+    r"(?:\b(?:see|cf\.?|in|from|shown\s+in|presented\s+in|reported\s+in|"
+    r"summari[sz]ed\s+in|listed\s+in|given\s+in|according\s+to)\s+Tables?\b"
+    r"|\(\s*Tables?\s+S?\d)",
+    re.I,
 )
+
+# A genuine APA table TITLE does not name a table number -- the label paragraph
+# above it does that. So a paragraph sitting between the label and the table that
+# names ANY table is prose, not this table's title.
+_NAMES_A_TABLE_RE = re.compile(r"\bTables?\s+S?\d", re.I)
 
 
 def _para_text(node) -> str:
@@ -245,7 +261,17 @@ def _scan_side(table_el, direction: str) -> tuple[Optional[str], Optional[str]]:
             # The title sits on the label's own paragraph, or -- APA 7, which
             # prints label and title as two paragraphs -- on the one between the
             # label and the table, already collected in `passed`.
-            title = m.group("rest") or (passed[0] if passed else None)
+            title = m.group("rest")
+            if title is None and passed:
+                # APA 7 prints label and title as two paragraphs, so the
+                # paragraph between the label and the table is usually the
+                # title. Accept it ONLY if it does not itself name a table:
+                # a `Table 4` label followed by "Table 3 reports the partial
+                # eta-squared for each comparison" otherwise produces a caption
+                # whose vocabulary types THIS table's Cohen's d column as
+                # eta-squared. Reproduced by all three consult seats, 2026-09-05.
+                if not _NAMES_A_TABLE_RE.search(passed[0]):
+                    title = passed[0]
             return label, f"{label}. {title}" if title else label
         passed.append(text)
     return None, None
@@ -326,15 +352,37 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
         record_fallback("docx_mammoth_conversion_message", detail=str(message)[:80])
 
     soup = BeautifulSoup(result.value, "html.parser")
-    # A nested table is reached through its parent; treating it as its own table
-    # would double-count its cells.
-    table_els = [t for t in soup.find_all("table") if t.find_parent("table") is None]
+    # EVERY table, nested ones included -- because a nested table is still a
+    # table and its rows are now scoped to their own element (below).
+    #
+    # The first version took top-level tables only. Combined with a RECURSIVE row
+    # scan that gave the worst of both: a nested table's rows were appended to its
+    # parent, misattributed and folded under a fused header. Scoping the rows
+    # fixed the fabrication and replaced it with a DELETION -- the nested table's
+    # data vanished entirely, because `_cell_text` does not descend into a nested
+    # table either. Trading a fabrication for a silent deletion is not a fix.
+    #
+    # So: scope the rows AND emit each table separately. Word's floating-table
+    # wrapper (a 1x1 table around a real one) is removed by the `< 2 rows` guard
+    # below rather than by a structural rule, which also covers wrappers this
+    # code has not seen.
+    table_els = list(soup.find_all("table"))
     caption_side = _caption_side(table_els)
     tables: list[Table] = []
 
     for idx, table_el in enumerate(table_els, start=1):
         grid = _SpanGrid()
+        # ROWS OF THIS TABLE ONLY. `find_all("tr")` is recursive, so a nested
+        # table's rows were being appended to its PARENT as if they were the
+        # parent's own -- measured 2026-09-05: a 2-row outer table containing a
+        # nested one reported `n_rows=4`, with the nested rows folded under a
+        # fused header cell `Accuracy.04Speed.07`, a token no document printed.
+        # The tables list is already filtered to top-level (above), so without
+        # this the nested values are counted twice AND misattributed. Raised by
+        # the Sol and Grok seats of the release consult round.
         for tr in table_el.find_all("tr"):
+            if tr.find_parent("table") is not table_el:
+                continue
             cells_in_row = tr.find_all(["td", "th"], recursive=False) or tr.find_all(["td", "th"])
             grid.add_row([
                 (clean_cell_text(_cell_text(c)),
@@ -387,7 +435,13 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
             "n_cols": n_cols,
             "header_rows": n_header or 1,
             "cells": cells,
-            "html": cells_to_html(cells),
+            # The SAME cleaning selection the cells were built with, and the
+            # inferential CI repair off. Without both, `html` and
+            # `cells[].text` disagree for one input -- measured, see
+            # `cell_cleaning._html_escape`.
+            "html": cells_to_html(
+                cells, clean=clean_cell_text, recover_ci_upper=False
+            ),
             "raw_text": "\n".join("\t".join(r) for r in grid.rows),
             "cell_geometry": "no_layout:docx_states_no_page_geometry",
         })

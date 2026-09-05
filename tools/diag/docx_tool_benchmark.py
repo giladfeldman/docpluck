@@ -59,6 +59,23 @@ import zipfile
 from pathlib import Path
 from typing import Callable, Optional
 
+# IMPORT THE WORKING TREE, NOT THE INSTALLED RELEASE.
+#
+# `python tools/diag/docx_tool_benchmark.py` puts `tools/diag` on `sys.path`, not
+# the repo root, so a bare `import docpluck` resolves to whatever is in
+# site-packages -- here a *different* released version. This script's
+# `word-pdf+docpluck` row calls `extract_pdf_structured`, so without this guard
+# that row measures the RELEASE while every other row measures this tree, and the
+# comparison silently stops being like-for-like.
+#
+# Caught by `tests/test_harness_scripts_import_the_working_tree.py`, which exists
+# because 16 harness scripts had this exact defect on 2026-09-02 and their numbers
+# described a version nobody was editing. The guard is cheap; the failure is
+# invisible.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 # A cell is "statistic-bearing" when it carries a number inside a table whose

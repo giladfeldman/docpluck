@@ -339,7 +339,7 @@ def repair_cells(cells: "list[Cell]") -> "list[Cell]":
     return cells
 
 
-def _html_escape(s: str | None) -> str:
+def _html_escape(s: str | None, clean=None) -> str:
     """Repair, then escape HTML special characters for safe inclusion in cell
     content, then convert merge-separator placeholders to ``<br>`` and
     superscript placeholders to ``<sup>``/``</sup>``.
@@ -349,8 +349,24 @@ def _html_escape(s: str | None) -> str:
     (the whitespace fallback, the isolated path, tests) still get repaired —
     removing the repairs from here would silently strip them from those paths.
     ``clean_cell_text`` is idempotent, so the double application is a no-op.
+
+    ``clean`` SELECTS the repair chain; it does not add a second one. Default is
+    the PDF chain, so every existing caller is byte-identical. The DOCX table
+    path passes its own, because **this function was silently applying the PDF
+    glyph repairs to DOCX cells** (v2.4.140): `docx_tables` cleaned each cell
+    with the DOCX chain at construction and then handed the grid to
+    ``cells_to_html``, which re-cleaned it here with the PDF chain. Measured:
+    a DOCX cell reading ``[20.45, 20.06]`` came back as ``cells[].text ==
+    "[20.45, 20.06]"`` and ``html == "[-0.45, -0.06]"`` — **two minus signs the
+    document does not contain, in one of the two fields, for one input.** That
+    is both the fabrication class this project ranks worst and the "one concept,
+    one table" failure: a library that answers one input two ways has no
+    contract. `docx_tables`'s own docstring claimed the PDF chain was excluded;
+    it was excluded from the cells and not from the HTML. Found 2026-09-05 by
+    the Sol and Grok seats of the release consult round (Sonnet missed it and
+    filed an explicit all-clear on the same question — a wrong reject).
     """
-    s = clean_cell_text(s)
+    s = (clean or clean_cell_text)(s)
     return (
         s.replace("&", "&amp;")
         .replace("<", "&lt;")
@@ -1111,7 +1127,12 @@ def _merge_significance_marker_rows(rows: list[list[str]]) -> list[list[str]]:
 # ---------------------------------------------------------------------------
 
 
-def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
+def cells_grid_to_html(
+    rows: Sequence[Sequence[str | None]],
+    *,
+    clean=None,
+    recover_ci_upper: bool = True,
+) -> str:
     """Render a 2-D cell grid as an HTML ``<table>`` block.
 
     Applies the full cleaning pipeline (merge continuations, strip leader
@@ -1191,7 +1212,7 @@ def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
     for hrow in header_rows:
         lines.append("    <tr>")
         for c in hrow:
-            lines.append(f"      <th>{_html_escape(c)}</th>")
+            lines.append(f"      <th>{_html_escape(c, clean)}</th>")
         lines.append("    </tr>")
     lines.append("  </thead>")
     lines.append("  <tbody>")
@@ -1199,16 +1220,26 @@ def cells_grid_to_html(rows: Sequence[Sequence[str | None]]) -> str:
         if _is_group_separator(row, n_cols):
             lines.append(
                 f'    <tr><td colspan="{n_cols}"><strong>'
-                f"{_html_escape(row[0])}</strong></td></tr>"
+                f"{_html_escape(row[0], clean)}</strong></td></tr>"
             )
             continue
         # Recover a dropped/detached minus on a CI upper bound when the row's
         # estimate and CI are in separate cells (region-driven grid). The
         # same-cell shape is handled inside _html_escape.
-        row = _recover_ci_upper_in_grid_row(row)
+        #
+        # OFF for markup formats. This repair decides INFERENTIALLY — it argues
+        # the interval must be negative because otherwise it excludes the
+        # estimate — and CLAUDE.md reserves inferential evidence for the
+        # consumer, which holds the parsed statistic and has a UI to flag it.
+        # It is justified on a PDF because a broken font really does drop the
+        # glyph; a DOCX carries real Unicode, so the same rewrite would
+        # manufacture a minus the author never typed. Measured 2026-09-05:
+        # `-.73 [-0.78, 0.67]` became `[-0.78, -0.67]` in the DOCX html channel.
+        if recover_ci_upper:
+            row = _recover_ci_upper_in_grid_row(row)
         lines.append("    <tr>")
         for c in row:
-            lines.append(f"      <td>{_html_escape(c)}</td>")
+            lines.append(f"      <td>{_html_escape(c, clean)}</td>")
         lines.append("    </tr>")
     lines.append("  </tbody>")
     lines.append("</table>")
