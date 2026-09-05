@@ -45,18 +45,22 @@ _CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "
 # by construction, so the caption-absorption guard was condemning every region grid).
 # maier now recovers 465 cells across 5 tables and is a REAL assert.
 #
-# chan_feldman was xfail(strict) until v2.4.134, for the SEPARATE region-over-capture
-# defect: its caption-anchored regions absorbed the neighbouring 2-column body prose,
-# so the grids failed the prose-contamination / clean-data-row guards on their own
-# merits. The cause turned out to be HORIZONTAL, not vertical.
-# ``detect._bbox_of_caption_line`` clustered chars by ``round(top)`` across the WHOLE
-# PAGE and then took min(x0)/max(x1), so on a two-column page the caption's y-row also
-# held the other column's body line and the caption bbox spanned both columns — 441.8pt
-# for a table that occupies 214pt. It is now clipped to the column run carrying the
-# caption (``detect._column_runs``), keyed on the page's own gutter: measured on p8 the
-# caption's median inter-word gap is 2.9pt against a 10.5pt gutter (regenerate:
-# `python tools/diag/caption_bbox_census.py`). Region words
-# 266 -> 107. No threshold was loosened, exactly as the retired marker demanded.
+# chan_feldman is xfail(strict) for the SEPARATE region-over-capture defect: its
+# caption-anchored regions absorb the neighbouring 2-column body prose, so the grids
+# fail the prose-contamination / clean-data-row guards on their own merits. The cause
+# is HORIZONTAL, not vertical: ``detect._bbox_of_caption_line`` clusters chars by
+# ``round(top)`` across the WHOLE PAGE and takes min(x0)/max(x1), so on a two-column
+# page the caption's y-row also holds the other column's body line and the caption bbox
+# spans both columns — 441.8pt for a table that occupies 214pt.
+#
+# CORRECTED 2026-09-04 (todo.md W-0023). This comment previously said the bbox "is now
+# clipped to the column run carrying the caption (``detect._column_runs``)" and pointed
+# at ``tools/diag/caption_bbox_census.py`` to regenerate the figure. NEITHER EXISTS.
+# The clip was written on 2026-08-19, cost ``ip_feldman`` Table 10 a stat column
+# (4 -> 3), and was REVERTED before v2.4.134 was tagged -- register J14; the function
+# and the census were deleted with it, and ``git log --all -S"def _column_runs"`` is
+# empty. What survives is the DIAGNOSIS above. BOTH halves of this defect -- the
+# horizontal caption bbox AND the row clustering -- are OPEN.
 B1_LIVE_FIXTURES = [
     ("maier_2023_collabra.pdf", 11, 50),      # min 50 cells (actual: 465 post-cycle-4)
     pytest.param(
@@ -64,16 +68,18 @@ B1_LIVE_FIXTURES = [
         marks=pytest.mark.xfail(
             strict=True,
             reason=(
-                "REAL TEXT-LOSS. The HORIZONTAL half is FIXED in v2.4.134 - the "
-                "caption bbox no longer spans both text columns (441.8pt -> 215.4pt, "
-                "region words 266 -> 107; regenerate with "
-                "tools/diag/caption_bbox_census.py). What remains is row CLUSTERING: "
-                "reaching >=50 cells here needs anchor-relative clustering, which "
-                "does not ship because it regresses efendic_2022_affect by 11 "
-                "sign-flipped B-coefficients. See whitespace._cluster_into_rows' "
-                "docstring for the measurement and the three failed containments. "
-                "Do NOT loosen the thresholds. strict=True: XPASSes when clustering "
-                "is fixed."
+                "REAL TEXT-LOSS, BOTH HALVES OPEN (corrected 2026-09-04, W-0023: an "
+                "earlier reason here said the horizontal half was FIXED in v2.4.134; "
+                "that clip was reverted before the tag, register J14). HORIZONTAL: "
+                "_bbox_of_caption_line spans both text columns (441.8pt for a 214pt "
+                "table) and the only clip tried cost ip_feldman Table 10 a stat "
+                "column -- same signature, opposite requirement, needs geometry. "
+                "VERTICAL: reaching >=50 cells here needs anchor-relative clustering, "
+                "which does not ship because it regresses efendic_2022_affect by 11 "
+                "sign-flipped B-coefficients (register J12). See "
+                "whitespace._cluster_into_rows' docstring for the measurement and the "
+                "three failed containments. Do NOT loosen the thresholds. "
+                "strict=True: XPASSes when both are fixed."
             ),
         ),
     ),
