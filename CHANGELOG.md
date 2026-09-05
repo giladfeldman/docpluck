@@ -2,6 +2,71 @@
 
 ## [Unreleased] - table extraction 2.4.13
 
+### A header count the DOCX DECLARES is no longer out-voted by a guess (2.4.140)
+
+`_clean_grid` re-derived the header-row count from cell length and numeric ratio even when
+the source document had **stated** it. Word records repeating header rows in
+`w:trPr/w:tblHeader`, and mammoth turns exactly that -- and nothing else -- into `<th>`, so
+on a `rendering="markup"` table `header_rows` is a fact the file declares, not an inference.
+
+Measured over the 19 DOCX in custody: **122 tables, 57 declaring a header count, and on 21
+of those the heuristic promoted real data rows out of the body.** 42 rows carrying published
+statistics reached no consumer at all -- e.g. `10.5281/zenodo.21911212` Table 10, a 26-row
+table that flattened to 23 rows, silently dropping the `Numeracy CG` and `Numeracy PG` arms
+along with `7.77 [5.85, 9.69]` and `p < .001`. This is the deletion class this project ranks
+worst: the values are present in `tables[].cells` and absent from `flattened_rows`, so the
+existing cell-level custody test could not see it.
+
+The cause is that `_DATA_VALUE_CELL_RE` FULL-matches a cell, so an ordinary APA `M [95% CI]`
+cell counts as neither data nor header and the row's numeric ratio falls under the 0.3 gate.
+Widening that regex would change the PDF path too, and it has already regressed in both
+directions once (DP-5). The declaration is evidence the PDF path simply does not have, so it
+is used where it exists instead of making the shared guess riskier.
+
+**Applied as a CEILING, never a floor**, so it can only move rows from `header_rows` into
+`body` and can never introduce the deletion it exists to prevent. Verified both ways over the
+same 122 tables: **42 rows recovered, 0 rows lost.**
+
+**PDF blast radius is zero by construction and was measured, not asserted.** `"markup"` is
+written at exactly one site (`docx_tables.py`); every PDF path writes `lattice` /
+`whitespace` / `isolated`. Run against 6 baseline papers from article-finder: **34 real PDF
+tables, 822 flattened rows, `_declared_header_rows` None on all 34, 0 tables whose cleaned
+body differs.**
+
+Two further defects the same review round left open are closed here:
+
+* **`confidence.score_table` / `clamp_confidence` fabricated a whitespace-style confidence
+  for `rendering="markup"`.** Both branched `lattice` / `else`, so the union member added in
+  2.4.140 landed in the whitespace arm and scored **0.65** -- a confidence in a measurement
+  nobody made. Latent only because the DOCX path hardcodes `None`; a latent fabrication is a
+  fabrication waiting for a caller. Both now return `None` for `markup`, the same answer
+  `extract_tables_docx` already documents, for the same reason: a DOCX table is STATED, not
+  captured.
+* **The benchmark harness could not see OMML.** `docx_tool_benchmark._tc_text` read `w:t`
+  only, so an equation cell was EMPTY in ground truth while the shipped path -- which runs
+  `_inline_omml_runs` before mammoth -- emits `ηp2 = .361`. The harness would have scored the
+  shipped engine as FABRICATING that value and penalised any OMML-preserving candidate. It
+  now calls the library's own `_linearize_omml` rather than re-joining `m:t` (one concept,
+  one table: a naive join is the very defect that function exists to prevent). Measured: **0
+  of 6,605 table cells in the 19 custody DOCX carry OMML** -- while 149 OMML elements do
+  exist in 3 of those documents, outside tables -- so the blind spot cannot have moved the
+  recorded engine ranking, and the ranking stands.
+
+**Two defects the round reported are ACCEPTED, not fixed, on measured prevalence.**
+
+* **`_SpanGrid` never ages a pending rowspan past a short row.** Real, reproducible
+  synthetically. Reachability from well-formed OOXML measured by running `_SpanGrid` over
+  mammoth's HTML for every DOCX on this machine: **619 documents, 3,019 tables, 41,942 rows,
+  0 occurrences.** The detector fires on a planted positive control and is silent on a normal
+  table, so the zero is about the corpus and not the instrument. No speculative fix.
+* **`w:gridBefore` is ignored**, so a row starting at grid column 2 would be placed from
+  column 0 and a value published under the wrong header. Reproduced through the shipped path
+  on a planted file. Census over the same 619 documents: **1 table of 3,019 carries
+  `gridBefore` at all, and it is UNIFORM across every row of that table** -- which shifts
+  header and data alike and preserves the binding. Tables carrying the destructive
+  NON-uniform shape: **0**, with a positive control confirming the detector sees
+  non-uniformity. A rule with no observed input is false-positive surface for no benefit.
+
 ### DOCX tables reach the consumer: `extract_docx_structured` (2.4.139)
 
 `extract_pdf_structured` was PDF-only, so `tables[]` and `flattened_rows[]` came back
