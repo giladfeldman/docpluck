@@ -2,6 +2,70 @@
 
 ## [Unreleased] - table extraction 2.4.13
 
+### DOCX tables reach the consumer: `extract_docx_structured` (2.4.139)
+
+`extract_pdf_structured` was PDF-only, so `tables[]` and `flattened_rows[]` came back
+**empty for every DOCX** and any downstream tool that verifies statistics from table rows
+received nothing at all for that entire input format. Meanwhile the DOCX had stated its
+grid exactly, in `w:tbl` -- the numbers were sitting in the file, fully structured, and
+docpluck was discarding them. Measured on one real paper (`10.7717/peerj.3580`): 13 tables,
+**141 flattened rows, every one carrying parsed statistical fields**, where the previous
+release delivered 0.
+
+**Additive. Nothing is renamed and no PDF behaviour changes.** `extract_docx_structured`
+returns the identical `StructuredResult`, so `flatten_tables_for_paper`, `cells_to_html`
+and every consumer of `tables[]` work unchanged and need no second code path. `docpluck
+extract <file.docx> --structured` now works instead of refusing. The one type change is
+additive too: `TableRendering` gains `"markup"` alongside `lattice` / `whitespace` /
+`isolated`.
+
+**The engine was chosen by measurement, not inherited.** `docs/DESIGN.md` §11 picked
+mammoth in 2026-05 for BODY TEXT, on soft-break fidelity, and was never re-asked about
+TABLES. Five candidates were scored over 16 English DOCX -- 5,091 truth cells, 3,908 of
+them statistic-bearing -- two-sided (recall AND fabrication) against the OOXML itself, with
+an instrument control: `docs/BENCHMARKS_docx_engines_2026-09.md`,
+`tools/diag/docx_tool_benchmark.py`.
+
+    pandoc              cell 1.0000  stat 1.0000  fabricated 0   (+~100 MB binary, GPL)
+    mammoth             cell 0.9998  stat 1.0000  fabricated 0   (already shipped)
+    docx2python         cell 0.9966  stat 0.9942  fabricated 1
+    python-docx         cell 0.9917  stat 0.9893  fabricated 0   (0.0 on 3.6% of docs)
+    Word -> PDF -> ours cell 0.0077  stat 0.0072  fabricated 1
+
+mammoth wins on the axis that matters at zero dependency cost. The two results that decided
+it are per-document, not pooled: **python-docx's `Document.tables` silently returns nothing
+for tables inside `w:sdt` content controls** -- measured at 2 of 55 real documents (3.6%),
+and content controls are what journal manuscript templates use -- and the PDF-conversion
+route re-infers from pixels a grid the DOCX had already stated (and cannot run at all in
+the Linux service image, which has neither Word nor LibreOffice).
+
+**The PDF glyph-repair chain is deliberately NOT applied to DOCX cells.**
+`cell_cleaning.clean_cell_text` recovers `(cid:0)`-for-minus, `2`-for-minus,
+`<`-as-backslash and `x`-as-`3` -- every one an artifact of a PDF font with a broken
+ToUnicode map. A DOCX carries real Unicode and has no such layer. Measured over the 13
+table-bearing DOCX in the corpus: **0 occurrences of `(cid:N)` or NUL, 0 math-alphanumeric
+styling, 0 ligatures**, so those repairs could only ever MISFIRE -- rewriting a
+`[20.45, 20.06]` an author really typed into a `[-0.45, -0.06]` the paper never printed.
+The same measurement found **78 occurrences of U+2212**, so the one mandatory repair (hard
+rule 4) is applied and the rest are not. `tables/docx_tables.clean_cell_text` composes the
+SAME helpers rather than restating them: one concept, one table.
+
+Caption recovery went **16.1% -> 67.8%** of 87 real tables, because the PDF path's
+`Table \d+` shape misses the two forms DOCX actually uses -- supplementary labels
+(`Table S1`) and APA 7's two-paragraph label/title. Captions are not decoration:
+`flatten_table` reads caption vocabulary to type an unlabelled effect column. Both negative
+controls are pinned by tests -- a paragraph that merely REFERS to a table never becomes its
+caption, and a caption paragraph between two tables is no longer claimed by both (that
+double-assignment put one label on two grids in 3 real documents).
+
+Fields with no DOCX meaning are honest rather than plausible: `page` is 0 (OOXML has no page
+model -- pagination is the renderer's), `bbox` is zero with `cell_geometry` stating why,
+`confidence` / `accuracy` / `whitespace` / `camelot_flavor` are `None` (a DOCX table is
+STATED, not captured, so there is no capture quality to report), and `figures` is `[]`
+because DOCX figure extraction is **not implemented** -- said in the docstring a caller
+reads, not left to look like a document without figures.
+
+
 ### The `<td>` channel destroyed minus signs, because a dependency changed how it spells "I could not decode this"
 
 `cell_cleaning` had repaired an unmappable glyph for years, keyed on the literal `(cid:0)`

@@ -52,16 +52,30 @@ def _cmd_extract(args: argparse.Namespace) -> int:
 
 
 def _cmd_extract_structured(args: argparse.Namespace, blob: bytes, fmt: str) -> int:
-    if fmt != "pdf":
-        sys.stderr.write("--structured is only supported for PDF inputs.\n")
-        return 2
-    from . import extract_pdf_structured
+    if fmt == "docx":
+        # v2.4.139. `--structured` refused DOCX outright, so the only way to see
+        # a DOCX's tables was to not have any -- and the DOCX had stated its grid
+        # exactly the whole time. Same StructuredResult as the PDF branch, so
+        # everything below this point is shared.
+        from . import extract_docx_structured
 
-    result = extract_pdf_structured(
-        blob,
-        thorough=bool(getattr(args, "thorough", False)),
-        table_text_mode=getattr(args, "text_mode", "raw"),
-    )
+        result = extract_docx_structured(blob)
+    elif fmt == "pdf":
+        from . import extract_pdf_structured
+
+        result = extract_pdf_structured(
+            blob,
+            thorough=bool(getattr(args, "thorough", False)),
+            table_text_mode=getattr(args, "text_mode", "raw"),
+        )
+    else:
+        # HTML tables are a real gap, but they are NOT covered by this change and
+        # are not going to be implied by it. Named, not silently empty.
+        sys.stderr.write(
+            "--structured supports PDF and DOCX. HTML structured extraction is "
+            "not implemented.\n"
+        )
+        return 2
 
     if getattr(args, "tables_only", False):
         result["figures"] = []
@@ -169,12 +183,12 @@ def main(argv: list[str] | None = None) -> int:
     extract.add_argument("--sections", default=None,
                          help="Comma-separated list of section labels to filter.")
     extract.add_argument("--structured", action="store_true",
-                         help="Emit JSON with tables and figures (PDF only).")
+                         help="Emit JSON with tables and figures (PDF and DOCX; figures PDF only).")
     extract.add_argument("--thorough", action="store_true",
-                         help="With --structured: scan every page for uncaptioned tables.")
+                         help="With --structured: scan every page for uncaptioned tables (PDF only).")
     extract.add_argument("--text-mode", default="raw", choices=("raw", "placeholder"),
                          dest="text_mode",
-                         help="With --structured: how to render table/figure regions in 'text'.")
+                         help="With --structured: how to render table/figure regions in 'text' (PDF only).")
     extract.add_argument("--tables-only", action="store_true",
                          dest="tables_only",
                          help="With --structured: omit figures from output.")
