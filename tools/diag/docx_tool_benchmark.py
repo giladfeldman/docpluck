@@ -77,6 +77,11 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+MATH = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
+
+# The library's OMML linearizer, imported (never re-implemented) so the truth grid
+# and the shipped path cannot disagree about what an equation cell says.
+from docpluck.extract_docx import _linearize_omml  # noqa: E402
 
 # A cell is "statistic-bearing" when it carries a number inside a table whose
 # vocabulary is statistical, or a number next to a statistical marker itself.
@@ -115,14 +120,36 @@ def _tc_text(tc) -> str:
     paras: list[str] = []
 
     def runs_of(node) -> str:
+        # OMML IS READ THROUGH THE LIBRARY'S OWN LINEARIZER, NOT A SECOND COPY.
+        #
+        # `m:t` lives in the math namespace, so a `w:t`-only reader returns an
+        # EMPTY cell where the document states `etap2 = .361`. That is not a
+        # missing feature in the instrument, it is a ground truth that disagrees
+        # with the shipped path: `extract_tables_docx` runs `_inline_omml_runs`
+        # before mammoth precisely because mammoth drops `m:oMath` silently. The
+        # harness would then score the shipped engine as FABRICATING the value,
+        # and would penalise any candidate that preserved it.
+        #
+        # Calling `_linearize_omml` rather than re-joining `m:t` here is the
+        # "one concept, one table" rule: a second implementation would drift, and
+        # a naive join is exactly the defect that function exists to prevent
+        # (`ratio = 1/2` linearised as `12`).
         buf: list[str] = []
-        for n in node.iter():
-            if n.tag == f"{W}delText":
-                continue
-            if n.tag == f"{W}t":
-                buf.append(n.text or "")
-            elif n.tag in (f"{W}tab", f"{W}br", f"{W}cr"):
-                buf.append(" ")
+
+        def walk(n) -> None:
+            for c in n:
+                if c.tag in (f"{MATH}oMath", f"{MATH}oMathPara"):
+                    buf.append(_linearize_omml(c))
+                    continue  # already consumed: do not also read its `m:t`
+                if c.tag == f"{W}delText":
+                    continue
+                if c.tag == f"{W}t":
+                    buf.append(c.text or "")
+                elif c.tag in (f"{W}tab", f"{W}br", f"{W}cr"):
+                    buf.append(" ")
+                walk(c)
+
+        walk(node)
         return "".join(buf)
 
     seen_para = False

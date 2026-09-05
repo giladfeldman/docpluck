@@ -27,8 +27,17 @@ ISOLATION_THRESHOLD: float = 0.4
 
 
 def score_table(cells: list[Cell], *, rendering: TableRendering) -> Optional[float]:
-    """Pre-clamp raw confidence. None for isolated."""
-    if rendering == "isolated":
+    """Pre-clamp raw confidence. None where there is no capture-quality signal.
+
+    `isolated` and `markup` both return None, for the same reason stated two
+    different ways: nothing was CAPTURED. An isolated table was not parsed into a
+    grid at all, and a `markup` table (DOCX) states its own grid in `w:tbl`, so
+    there is no parse whose quality could be scored. The `else` arm below is the
+    whitespace path and must not become a catch-all -- when `"markup"` joined
+    `TableRendering` in 2.4.140 it silently landed there and scored 0.65, a
+    confidence in a measurement nobody made.
+    """
+    if rendering in ("isolated", "markup"):
         return None
 
     if not cells:
@@ -54,7 +63,7 @@ def score_table(cells: list[Cell], *, rendering: TableRendering) -> Optional[flo
 
 def clamp_confidence(score: Optional[float], *, rendering: TableRendering) -> Optional[float]:
     """Apply per-rendering floor/ceiling to produce the user-facing confidence."""
-    if rendering == "isolated" or score is None:
+    if rendering in ("isolated", "markup") or score is None:
         return None
     if rendering == "lattice":
         floor, ceiling = 0.5, 0.95

@@ -39,6 +39,11 @@ from docpluck import (  # noqa: E402
     extract_pdf_structured,
     flatten_tables_for_paper,
 )
+from docpluck.tables.flatten import (  # noqa: E402
+    _cells_to_grid,
+    _clean_grid,
+    flatten_table,
+)
 
 
 # ── Fixture builders ────────────────────────────────────────────────────────
@@ -668,3 +673,168 @@ def test_real_docx_statistic_cells_survive_to_the_flattened_rows():
         "no custody DOCX had >=20 decimal table values -- this assertion ran "
         "against nothing, which is a false green, not a pass"
     )
+
+
+# ── A DECLARED header count is a fact the file states, not a guess to override ──
+
+
+def test_clean_grid_does_not_promote_past_a_declared_header_count():
+    """`_clean_grid` must not out-vote a header count the DOCX itself declares.
+
+    Word records repeating header rows in `w:trPr/w:tblHeader`; mammoth turns
+    exactly that into `<th>` (mammoth/body_xml.py:372) and nothing else, so a
+    non-zero `header_rows` on a `rendering="markup"` table is a STATED FACT.
+    `_is_header_like_row` re-derives it from cell length and numeric ratio and
+    silently promotes real data rows -- the deletion class this project ranks
+    worst, because the rows do not appear anywhere in `flattened_rows`.
+
+    Reproduced on a real document (see the custody test below); this unit pins
+    the mechanism. The shape is 10.5281/zenodo.21911212 Table 10: an APA
+    "M [95% CI]" row whose cells are values-with-intervals, which
+    `_DATA_VALUE_CELL_RE` does not full-match, so the row reads as header text.
+    """
+    grid = [
+        ["Measure", "Group", "Pre", "Post", "Change", "p"],
+        ["Numeracy", "CG", "15.04 [13.93, 16.16]", "14.91 [13.33, 16.48]",
+         "-0.13 [-2.05, 1.79]", ".891"],
+        ["Numeracy", "PG", "14.32 [13.19, 15.45]", "22.09 [20.50, 23.67]",
+         "7.77 [5.85, 9.69]", "< .001"],
+        ["Numeracy", "EXG", "14.44 [13.31, 15.57]", "22.08 [20.49, 23.66]",
+         "7.63 [5.71, 9.55]", "< .001"],
+    ]
+    # Without the declaration the heuristic eats the first two data rows.
+    _hdr_guessed, body_guessed = _clean_grid(grid)
+    assert len(body_guessed) == 1, (
+        "control: this grid must reproduce the over-promotion, otherwise the "
+        "assertion below passes for the wrong reason"
+    )
+
+    hdr, body = _clean_grid(grid, declared_header_rows=1)
+    assert len(hdr) == 1, f"declared 1 header row, got {len(hdr)}"
+    assert len(body) == 3, f"declared 1 header row, expected 3 body rows, got {len(body)}"
+    assert any("7.77 [5.85, 9.69]" in c for r in body for c in r), (
+        "the PG arm's change score and its interval must reach the body"
+    )
+
+
+def test_a_declared_header_count_is_a_ceiling_never_a_floor():
+    """The declaration may only KEEP rows as data, never promote more to header.
+
+    A ceiling can add body rows and can never remove one, so the change cannot
+    introduce the very deletion it exists to prevent. A document declaring 3
+    header rows on a grid the heuristic reads as 1 must still yield 1.
+    """
+    grid = [
+        ["Outcome", "t", "p"],
+        ["Acc", "2.10", ".04"],
+        ["Speed", "1.30", ".30"],
+    ]
+    hdr_plain, body_plain = _clean_grid(grid)
+    hdr_decl, body_decl = _clean_grid(grid, declared_header_rows=3)
+    assert (len(hdr_decl), len(body_decl)) == (len(hdr_plain), len(body_plain)), (
+        "a declaration LARGER than the heuristic must not promote extra rows"
+    )
+    assert len(body_decl) == 2
+
+
+@pytest.mark.skipif(not _custody_docx(), reason="no DOCX resolvable through article-finder")
+def test_real_docx_declared_header_rows_are_honoured_end_to_end():
+    """Measured over every custody DOCX: no table may flatten fewer body rows
+    than its own declared header count allows.
+
+    Before the fix this failed on 21 of 122 real tables, deleting 48 data rows
+    that carry published statistics -- e.g. 10.5281/zenodo.21911212 Table 10,
+    whose `Numeracy PG` row states `7.77 [5.85, 9.69]` and `p < .001` and which
+    reached no consumer at all.
+    """
+    from docpluck.tables.docx_tables import extract_tables_docx
+
+    checked = violations = 0
+    detail: list[str] = []
+    for key, path in _custody_docx():
+        try:
+            tables, _method = extract_tables_docx(path.read_bytes())
+        except Exception:
+            continue
+        for t in tables:
+            declared = int(t.get("header_rows") or 0)
+            # Only tables where the AUTHOR declared it: `header_rows` defaults
+            # to 1 when nothing was marked, and a default is not evidence.
+            if not any(c["is_header"] for c in t["cells"]):
+                continue
+            if declared < 1:
+                continue
+            checked += 1
+            rows = flatten_table(t)
+            grid = _cells_to_grid(t["cells"])
+            hdr, _body = _clean_grid(grid, declared_header_rows=declared)
+            if rows and len(hdr) > declared:
+                violations += 1
+                detail.append(f"{key} {t['id']}: declared={declared} used={len(hdr)}")
+    assert checked >= 20, (
+        f"only {checked} tables declared a header count -- this assertion ran "
+        "against too little to mean anything, which is a false green"
+    )
+    assert not violations, (
+        f"{violations}/{checked} tables over-promoted past their declared header "
+        f"count: {detail[:6]}"
+    )
+
+
+# ── The benchmark harness is a shipped component; its ground truth must not be
+#    blind to a construct the library deliberately handles ──────────────────
+
+
+def test_benchmark_truth_grid_reads_omml_like_the_shipped_path_does():
+    """`docx_tool_benchmark._tc_text` must see OMML, or it scores the wrong mammoth.
+
+    The shipped DOCX table path runs `_inline_omml_runs` before mammoth, because
+    `mammoth` has no model of `m:oMath` and silently drops it -- which deletes the
+    NAME of a statistic (`etap2`, `chi2`, `rho`). The harness's ground truth read
+    `w:t` only, so an equation cell was EMPTY in truth while production emitted
+    `etap2 = .361`. The harness would therefore charge the shipped engine with
+    FABRICATING that value, and would penalise any OMML-preserving candidate.
+
+    Measured 2026-09-05: 0 of 6,605 table cells in the 19 custody DOCX carry OMML
+    (149 OMML elements do exist, in 3 of those documents, outside tables), so the
+    blind spot cannot have moved the recorded engine ranking. It is fixed here
+    because the harness is re-usable and the next corpus may differ.
+    """
+    import xml.etree.ElementTree as ET
+    import sys as _sys
+
+    _sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "diag"))
+    from docx_tool_benchmark import _tc_text
+
+    M = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
+    W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    xml = (
+        '<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+        'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">'
+        "<w:p><m:oMath><m:r><m:t>ηp2 = .361</m:t></m:r></m:oMath></w:p></w:tc>"
+    )
+    tc = ET.fromstring(xml)
+    assert any(n.tag in (f"{M}oMath", f"{M}oMathPara") for n in tc.iter()), (
+        "control: the fixture must actually contain OMML"
+    )
+    got = _tc_text(tc).strip()
+    assert ".361" in got, (
+        f"truth grid lost the OMML cell entirely: {got!r}. The shipped path emits "
+        "'ηp2 = .361' for this cell, so the harness would score it as fabricated."
+    )
+
+    # NEGATIVE CONTROL: an ordinary w:t cell must be unchanged by the fix, and a
+    # w:delText cell must still be dropped (emitting it resurrects a retraction).
+    plain = ET.fromstring(
+        '<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p><w:r><w:t>.556</w:t></w:r></w:p><w:p><w:r><w:t>.390</w:t></w:r></w:p></w:tc>"
+    )
+    assert _tc_text(plain).strip() == ".556 .390", _tc_text(plain)
+    deleted = ET.fromstring(
+        '<w:tc xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:p><w:del><w:r><w:delText>9.99</w:delText></w:r></w:del>"
+        "<w:r><w:t>1.23</w:t></w:r></w:p></w:tc>"
+    )
+    assert "9.99" not in _tc_text(deleted), _tc_text(deleted)
+    assert "1.23" in _tc_text(deleted), _tc_text(deleted)
+    assert W  # referenced for symmetry with the namespace pair above

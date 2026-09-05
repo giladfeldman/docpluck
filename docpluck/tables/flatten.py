@@ -126,9 +126,36 @@ def _cells_to_grid(cells: list[Cell]) -> list[list[str]]:
     return grid
 
 
-def _clean_grid(grid: list[list[str]]) -> tuple[list[list[str]], list[list[str]]]:
+def _clean_grid(
+    grid: list[list[str]],
+    declared_header_rows: int | None = None,
+) -> tuple[list[list[str]], list[list[str]]]:
     """Run the same cleaning pipeline as `cells_grid_to_html` and split into
-    (header_rows, body_rows). Returns ([], []) when the table is too small."""
+    (header_rows, body_rows). Returns ([], []) when the table is too small.
+
+    `declared_header_rows` is a header count the SOURCE DOCUMENT states, not one
+    inferred here. Word records repeating header rows in `w:trPr/w:tblHeader`;
+    mammoth turns exactly that -- and nothing else -- into `<th>`
+    (mammoth/body_xml.py:372), so on a `rendering="markup"` table it is a fact
+    the file declares. A PDF declares nothing, so the PDF path passes `None` and
+    its behaviour is unchanged by construction.
+
+    It is applied as a CEILING and never a floor. A ceiling can only move rows
+    from `header_rows` into `body`, never the other way, so honouring it cannot
+    introduce the deletion it exists to prevent. Measured 2026-09-05 over the 19
+    DOCX in custody: 122 tables, 57 of which declare a header count, and on 21
+    of those `_is_header_like_row` out-voted the declaration and promoted 48
+    real data rows out of the body -- rows carrying published statistics that
+    then reached no consumer at all (e.g. 10.5281/zenodo.21911212 Table 10,
+    whose `Numeracy PG` row states `7.77 [5.85, 9.69]` and `p < .001`).
+
+    The cause is that `_DATA_VALUE_CELL_RE` full-matches a cell, so an ordinary
+    APA `M [95% CI]` cell counts as neither data nor header and the row's
+    numeric ratio falls under the 0.3 gate. Widening that regex would change the
+    PDF path too and has already regressed in both directions once (DP-5); the
+    declaration is evidence the PDF path simply does not have, so it is used
+    where it exists rather than making the shared guess riskier.
+    """
     if len(grid) < 2:
         return [], []
 
@@ -169,6 +196,9 @@ def _clean_grid(grid: list[list[str]]) -> tuple[list[list[str]], list[list[str]]
             n_header = k + 1
         else:
             break
+    # The document's own declaration out-ranks the heuristic, downward only.
+    if declared_header_rows and declared_header_rows >= 1:
+        n_header = min(n_header, declared_header_rows)
     if len(merged) - n_header < 1:
         n_header = 1
 
@@ -178,6 +208,25 @@ def _clean_grid(grid: list[list[str]]) -> tuple[list[list[str]], list[list[str]]
     header_rows = _fold_super_header_rows(header_rows)
     header_rows = _fold_suffix_continuation_columns(header_rows)
     return header_rows, body
+
+
+def _declared_header_rows(table: Table) -> int | None:
+    """The header-row count the SOURCE FILE states, or `None` when it states none.
+
+    Only `rendering="markup"` (the DOCX path) can declare this. `header_rows` is
+    written there as `n_header or 1`, so the value `1` is ambiguous on its own --
+    an author who marked row 0, or an author who marked nothing and got the
+    default. The `is_header` flags disambiguate it: the DOCX path sets them from
+    mammoth's `<th>`, which mammoth sets from `w:tblHeader` alone, so a table
+    with no `is_header` cell declared nothing and gets `None` here. Measured over
+    the 19 DOCX in custody: 57 of 122 tables declare, 65 do not.
+    """
+    if (table.get("rendering") or "") != "markup":
+        return None
+    if not any(c.get("is_header") for c in (table.get("cells") or ())):
+        return None
+    declared = int(table.get("header_rows") or 0)
+    return declared if declared >= 1 else None
 
 
 # ── Column-role classification ──────────────────────────────────────────────
@@ -1715,7 +1764,7 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
     if not cells:
         return []
     grid = _cells_to_grid(cells)
-    header_rows, body = _clean_grid(grid)
+    header_rows, body = _clean_grid(grid, _declared_header_rows(table))
     if not header_rows or not body:
         return []
 

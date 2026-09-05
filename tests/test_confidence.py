@@ -84,3 +84,34 @@ def test_clamp_confidence_isolated_returns_none():
     from docpluck.tables.confidence import clamp_confidence
     assert clamp_confidence(0.99, rendering="isolated") is None
     assert clamp_confidence(None, rendering="isolated") is None
+
+
+def test_markup_rendering_gets_no_fabricated_capture_confidence():
+    """A DOCX table is STATED, not captured -- there is no capture-quality signal.
+
+    `score_table`/`clamp_confidence` branch `lattice` / `else`, so the `"markup"`
+    member added to `TableRendering` in 2.4.140 fell into the whitespace arm and
+    would have been handed a 0.65-based score and a 0.4-0.85 clamp -- a confidence
+    in a measurement nobody made. The DOCX path hardcodes `confidence: None`, so
+    this was latent, and a latent fabrication is still a fabrication waiting for a
+    caller. `None` is the same answer `extract_tables_docx` already documents.
+    """
+    from docpluck.tables.confidence import clamp_confidence, score_table
+
+    cells = [
+        {"r": 0, "c": 0, "rowspan": 1, "colspan": 1, "text": "Outcome",
+         "is_header": True, "bbox": (0.0, 0.0, 0.0, 0.0)},
+        {"r": 0, "c": 1, "rowspan": 1, "colspan": 1, "text": "p",
+         "is_header": True, "bbox": (0.0, 0.0, 0.0, 0.0)},
+        {"r": 1, "c": 0, "rowspan": 1, "colspan": 1, "text": "Acc",
+         "is_header": False, "bbox": (0.0, 0.0, 0.0, 0.0)},
+        {"r": 1, "c": 1, "rowspan": 1, "colspan": 1, "text": ".04",
+         "is_header": False, "bbox": (0.0, 0.0, 0.0, 0.0)},
+    ]
+    # Control: the two capture paths still score, so a None below is the markup
+    # rule and not a broken function.
+    assert score_table(cells, rendering="lattice") is not None
+    assert score_table(cells, rendering="whitespace") is not None
+
+    assert score_table(cells, rendering="markup") is None
+    assert clamp_confidence(0.65, rendering="markup") is None
