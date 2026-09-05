@@ -48,15 +48,16 @@ TODO.md
 todo.md
 
 # --- Cross-project / cross-team correspondence (never public) ---
-# Requests from and replies to ESCImate, MetaESCI, Scimeto, CitationGuard,
-# and the private docpluckapp repo.
+# Requests to and replies from the sibling repositories this library is
+# developed alongside, not all of which are public. These files quote
+# internal cross-team coordination and must never be committed here.
 REQUEST_*
 REQUESTS_*
 REPLY_*
 REPLIES_*
 CUSTOMER_UPDATE_*
 # 2026-08-07: INBOX_*/OUTBOX_* were MISSING from this block, and
-# INBOX_FROM_METAESCI_2026-08-07.md was committed to this public repo across
+# an INBOX_* correspondence file was committed to this public repo across
 # two (fortunately unpushed) commits before it was caught. A denylist of
 # prefixes only covers the naming conventions someone thought of — see
 # LESSONS.md L-011 and the allowlist gate in /docpluck-cleanup Section 0,
