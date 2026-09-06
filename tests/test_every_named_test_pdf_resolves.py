@@ -109,8 +109,8 @@ def _named_pdfs() -> dict[str, list[str]]:
 
 # The biggest version of "a path silently matched nothing" is the corpus ROOT moving. A scanner
 # that only checks individual names would then report every path dead -- or, in a skip-based
-# suite, produce 101 clean skips, which is the portfolio rule about failing loudly on a missing
-# root, in miniature. Requested by docpluck-7e, 2026-09-05.
+# suite, produce 101 clean skips. Fail loudly on a missing root rather than reporting every
+# name under it as dead.
 _MIN_CORPUS_PDFS = 40  # the same floor `test_normalize_idempotent_corpus` uses
 
 
