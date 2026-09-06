@@ -283,7 +283,26 @@ def clean_cell_text(s: str | None) -> str:
     # runs in normalize_text or the whole-markdown post-process — only here,
     # where the cell is a Camelot predictor label. Self-guards a genuine ordinal
     # after a reference word (Model/Study/Wave/…). v2.4.103 / GLYPH.
-    s = recover_times_interaction_glyph(s)
+    # W0i's CALL SITE WAS HERE AND IS DELETED (2026-09-06), together with W0k's
+    # and W0l's in `normalize_text` and `render_pdf_to_markdown`.
+    #
+    # Its guards were genuinely better than W0k's -- a reference-word denylist
+    # keeps `Model 3`, `Study 3`, `Wave 3`, `Factor 3`, `Cluster 3`, `Grade 3`
+    # and `Phase 3` intact, all verified. **A denylist of ordinal nouns can never
+    # be complete**, and that is the objection: measured 2026-09-06, W0i rewrote
+    # `HapMap3 SNPs` -> `HapMap x SNPs` and `ASL TO3 Piedmont Region` ->
+    # `ASL TO x Piedmont Region` -- the same two real tokens W0k destroyed, in
+    # this channel instead.
+    #
+    # It also fails the same gate test for the same structural reason: the
+    # signature is `cell: str`, so it can never consult the rendered page, and a
+    # FILE LIE is never silently corrected (CLAUDE.md, THE THREE TIERS, user
+    # directive 2026-09-06). Keeping it wired while W0k is unwired would give one
+    # input two answers depending only on whether the text arrived as a body
+    # sentence or a table cell -- the three-channel defect in a new place.
+    #
+    # The definition is KEPT so the evidence survives. Pinned by
+    # tests/test_w0k_must_not_destroy_real_digits.py.
     # Recover a CI UPPER bound whose leading minus pdftotext/Camelot dropped or
     # detached into a stray en-dash — a same-cell "<estimate> ... [lo, hi]"
     # correlation cell ("−.73***\x00BR\x00[−0.78,  –  0.67] (−0.72)") where the

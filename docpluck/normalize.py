@@ -5908,20 +5908,42 @@ def _normalize_text(
     t = recover_prose_two_for_minus(t)
     report._track("W0j_prose_minus_recovery", before, t, "minus_signs_recovered")
 
-    # ── W0k: recover '×'-as-'3' in body-prose / flattened-caption interaction
-    # terms that the table-cell-scoped W0i cannot reach (efendic, 2026-07-04).
-    before = t
-    t = recover_times_interaction_glyph_in_prose(t)
-    report._track("W0k_prose_times_recovery", before, t, "times_glyphs_recovered")
-
-    # ── W0l: recover the two residual '×'-as-'3' prose shapes W0k's single-line
-    # word-pair regex cannot reach — factorial-design notation `<digit>(…) 3
-    # <digit>(…)` and a line-wrapped interaction term `<Pred> 3\n<Pred>`
-    # (efendic residuals, 2026-07-04).
-    before = t
-    t = recover_times_design_notation(t)
-    t = recover_times_wrapped_interaction(t)
-    report._track("W0l_prose_times_residuals", before, t, "times_glyphs_recovered")
+    # -- W0k's AND W0l's CALL SITES WERE HERE AND ARE DELETED (2026-09-06).
+    # `PNMA 3 Direction` now passes through exactly as the PDF declares it.
+    #
+    # THE CORRUPTION IS REAL AND THAT IS NOT THE POINT. On the paper these rules
+    # were built from, font `LGBBBB+AdvP586B` paints a multiplication sign and
+    # the page shows `PNMA (times) Direction`. Verified at the source, object 25:
+    #
+    #     /Differences : [46 /period, 50 /two, /three]
+    #     /ToUnicode   : bfrange <32> <33> <0032>
+    #
+    # BOTH DECLARE A DIGIT. The file is internally consistent and consistently
+    # wrong, so there is no metadata contradiction available to detect -- the
+    # only contradiction is between what the file DECLARES and what the page
+    # SHOWS. That makes it a FILE LIE under THE THREE TIERS (CLAUDE.md, user
+    # directive 2026-09-06), and a file lie is never silently corrected.
+    #
+    # These rules could not have been licensed for one even in principle: their
+    # signature is `text: str`, so they can never consult the rendered page.
+    # CHECK THE SIGNATURE BEFORE YOU CHECK THE LOGIC. Their only inputs were the
+    # neighbouring words, which fails the directive's gate test -- *if every
+    # surrounding word were replaced with garbage, would the same evidence still
+    # justify the output?*
+    #
+    # THE COST OF KEEPING THEM, measured over the 101-PDF corpus: W0k fired on 5
+    # papers and 4 of those firings destroyed a real published token.
+    # `HapMap3` -- the International HapMap Project Phase 3, a dataset NAME --
+    # became `HapMap x`; `ASL TO3`, an Italian health-authority ID in an author
+    # affiliation, became `ASL TO x`. A5 then maps the fabricated glyph to `*`.
+    # `changes_made` is a CHARACTER DELTA and so was blind exactly when the
+    # rewrite was length-neutral, which is why this ran from v2.4.112 to
+    # v2.4.140 unseen.
+    #
+    # The DEFINITIONS ARE KEPT, not deleted, so the evidence survives and nobody
+    # re-proposes them. Pinned by tests/test_w0k_must_not_destroy_real_digits.py.
+    # Detecting the font-layer inconsistency and FLAGGING the span is the
+    # supported successor; substituting a guess is not.
 
     # ── W0n's CALL SITE WAS HERE AND IS DELETED (v2.4.130, 2026-08-14).
     # `p < 05` now passes through as printed. The rule's premise — that a
