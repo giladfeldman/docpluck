@@ -476,7 +476,7 @@ def test_normalize_idempotent_demography_5_real_pdf():
     table cells with CI labels one paragraph above their numeric values.
     The cross-paragraph CI→digit A1r join makes the rendered .md idempotent.
     """
-    pdf = os.path.join(_TEST_PDFS, "chicago-ad", "demography-5.pdf")
+    pdf = os.path.join(_TEST_PDFS, "chicago-ad", "demography_5.pdf")
     if not os.path.isfile(pdf):
         pytest.skip("demography-5 test PDF not available")
     with open(pdf, "rb") as fh:
@@ -491,7 +491,7 @@ def test_normalize_idempotent_socius_4_real_pdf():
     captions (`Source: Authors' calculation, ... (2003-2023).`). The
     caption guard in S9 prevents S9 from stripping them.
     """
-    pdf = os.path.join(_TEST_PDFS, "asa", "socius-4.pdf")
+    pdf = os.path.join(_TEST_PDFS, "asa", "socius_4.pdf")
     if not os.path.isfile(pdf):
         pytest.skip("socius-4 test PDF not available")
     with open(pdf, "rb") as fh:
@@ -509,7 +509,7 @@ def test_normalize_idempotent_ieee_access_7_real_pdf():
     transliterates σ → sigma and the combining circumflex orphans onto
     the trailing `a`. The final NFC pass composes it idempotently.
     """
-    pdf = os.path.join(_TEST_PDFS, "ieee", "ieee-access-7.pdf")
+    pdf = os.path.join(_TEST_PDFS, "ieee", "ieee_access_7.pdf")
     if not os.path.isfile(pdf):
         pytest.skip("ieee-access-7 test PDF not available")
     with open(pdf, "rb") as fh:
@@ -525,7 +525,7 @@ def test_normalize_idempotent_nat_comms_2_real_pdf():
     extended `_is_in_numeric_block` now recognizes the labeled neighbor as
     numeric-block context, protecting the `1000` from S9 Pattern A.
     """
-    pdf = os.path.join(_TEST_PDFS, "nature", "nat-comms-2.pdf")
+    pdf = os.path.join(_TEST_PDFS, "nature", "nat_comms_2.pdf")
     if not os.path.isfile(pdf):
         pytest.skip("nat-comms-2 test PDF not available")
     with open(pdf, "rb") as fh:
@@ -541,17 +541,61 @@ def test_normalize_idempotent_corpus():
     pdfs = sorted(glob.glob(os.path.join(_TEST_PDFS, "*", "*.pdf")))
     if len(pdfs) < 40:
         pytest.skip("test-pdf corpus not available")
-    sample = pdfs[::5]  # deterministic strided sample
-    nonidem = []
+    # TWO BLIND SPOTS, both measured 2026-09-05, both closed here.
+    #
+    # (1) `pdfs[::5]` SAMPLED 21 OF 101 AND CONTAINED NONE OF THE POSITIVES. Measured over
+    #     the full corpus, SEVEN papers are non-idempotent -- efendic_2022_affect,
+    #     korbmacher_2022_kruger, am_sociol_rev_4, demography_5, bjps_7, nat_comms_3,
+    #     bmc_med_4 -- and the stride contained ZERO of them. So every "0 non-idempotent"
+    #     this gate ever reported was a true statement about 21 papers and a false one about
+    #     101. It was not approximately blind; it was completely blind.
+    #
+    #     WATCHLIST, NOT SAMPLE, and the wording is load-bearing. `pdfs[::5]` reading like
+    #     coverage is the whole defect; replacing it with a second thing that reads like
+    #     coverage would repeat that defect in a new place. The names below are the papers
+    #     we KNOW fail plus the papers this file has a per-paper test for. They are watched
+    #     because they are known, not because they represent anything.
+    #
+    # (2) A CRASH LOWERED THE RATCHET. `except Exception: continue` dropped a paper that
+    #     failed to extract or normalize -- and since the ratchet counts NON-IDEMPOTENT
+    #     papers, a regression that turned a paper into a crash made the number go DOWN and
+    #     the gate go greener. Crashes are now collected and asserted separately: a crash is
+    #     a defect, never a skip. (Measured 2026-09-05: 0 papers crash, so this arm is armed,
+    #     not active.)
+    _WATCHLIST = {
+        # known non-idempotent, full-corpus measurement 2026-09-05
+        "efendic_2022_affect.pdf", "korbmacher_2022_kruger.pdf", "am_sociol_rev_4.pdf",
+        "demography_5.pdf", "bjps_7.pdf", "nat_comms_3.pdf", "bmc_med_4.pdf",
+        # papers this file has a per-paper test for
+        "chan_feldman_2025_cogemo.pdf", "jama_open_1.pdf",
+        "socius_4.pdf", "ieee_access_7.pdf", "nat_comms_2.pdf",
+    }
+    by_name = {os.path.basename(p): p for p in pdfs}
+    # A watchlist name that resolves to nothing is a silent no-op -- the same defect as the
+    # six hyphenated filenames that made per-paper tests skip for weeks. Fail loudly instead.
+    missing = sorted(_WATCHLIST - set(by_name))
+    assert not missing, (
+        "watchlist names that resolve to no paper in the corpus: " + ", ".join(missing)
+        + " -- a name that matches nothing silently removes itself from this gate."
+    )
+    sample = sorted(set(pdfs[::5]) | {by_name[n] for n in _WATCHLIST})
+    nonidem, crashed = [], []
     for p in sample:
         try:
             with open(p, "rb") as fh:
                 raw, _ = extract_pdf(fh.read())
             n1, n2 = _norm_twice(raw)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - a crash is a defect, never a skip
+            crashed.append(f"{os.path.basename(p)}: {type(exc).__name__}: {exc}")
             continue
         if n1 != n2:
             nonidem.append(os.path.basename(p))
+
+    assert not crashed, (
+        "papers CRASHED during the idempotency sweep. Before 2026-09-05 these were silently "
+        "skipped, which made a crash LOWER the non-idempotency count and the gate read "
+        "greener:" + "".join(chr(10) + "  " + c for c in crashed)
+    )
     assert len(nonidem) <= _IDEMPOTENCY_RATCHET, (
         f"{len(nonidem)} non-idempotent papers (ratchet={_IDEMPOTENCY_RATCHET}); "
         f"a cycle increased the count — regression: {nonidem}"
