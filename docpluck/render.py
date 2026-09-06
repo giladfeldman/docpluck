@@ -6901,15 +6901,18 @@ def _render_pdf_to_markdown(
     # reach these. Third-channel completion of the channel-1 normalize W0k. Tight
     # signature (interaction-context + non-reference + non-count + ≥1 Title-Case/
     # acronym flank) — the `3` is the most dangerous prose glyph, FP-validated.
-    md = _step(_report, "recover_times_interaction_glyph_in_prose", recover_times_interaction_glyph_in_prose, md)
+    # W0k's THIRD-CHANNEL CALL SITE WAS HERE AND IS DELETED (2026-09-06),
+    # together with the channel-1 call in `normalize_text` and W0l's two calls
+    # below. Removing it from one channel and not the others is the defect this
+    # repo keeps rediscovering: a table cell and a body sentence would give
+    # different answers for one input. Full reasoning at the channel-1 site.
     # v2.4.116 (W0l): recover the two residual '×'-as-'3' prose shapes W0k can't
     # reach — factorial-design notation `<digit>(…) 3 <digit>(…) design` and a
     # line-wrapped interaction term `<Pred> 3\n<Pred>` (efendic residuals). Same
     # 3-channel discipline; also catches these shapes inside a flattened caption /
     # raw_text fallback that bypassed normalize_text. FP-validated (a 16-case
     # battery incl. range recodes, formulae, `Model 3\n…`, count wraps).
-    md = _step(_report, "recover_times_design_notation", recover_times_design_notation, md)
-    md = _step(_report, "recover_times_wrapped_interaction", recover_times_wrapped_interaction, md)
+    # W0l's THIRD-CHANNEL CALL SITES WERE HERE AND ARE DELETED (2026-09-06).
     # W0n's THIRD-CHANNEL CALL SITE WAS HERE AND IS DELETED (v2.4.130,
     # 2026-08-14), together with the channel-1 call in `normalize_text` and the
     # rule itself. `p < 05` now reaches the rendered .md as printed. Removing
