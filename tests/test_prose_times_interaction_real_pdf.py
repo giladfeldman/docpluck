@@ -219,21 +219,37 @@ def _load_efendic_pdf_bytes():
         return fh.read()
 
 
-def test_efendic_times_residuals_gone_end_to_end():
-    """Render efendic through the real library and confirm BOTH residual '×'-as-
-    '3' shapes are gone from the rendered .md. Fails at HEAD (v2.4.115), passes
-    with W0l (v2.4.116)."""
+def test_efendic_times_residuals_pass_through_as_the_file_declares_them():
+    """INVERTED 2026-09-07. This test used to assert that W0l RECOVERED both
+    residual shapes end to end. Gilad's THREE TIERS ruling (CLAUDE.md, user
+    directive 2026-09-06) removed W0k/W0l/W0i from every default path, so the
+    rendered .md must now carry what the PDF declares.
+
+    THE CORRUPTION IS STILL REAL — that is not what changed. Font
+    `LGBBBB+AdvP586B` paints a multiplication sign here; verified at object 25,
+    `/Differences [46 /period, 50 /two, /three]` and
+    `/ToUnicode bfrange <32> <33> <0032>`. BOTH declare a DIGIT, so the file is
+    internally consistent and consistently wrong and the only contradiction is
+    against the printed page. That is a FILE LIE, never silently corrected.
+
+    THE UNIT TESTS ABOVE STILL PASS AND MUST. They exercise the rule
+    DEFINITIONS, which are deliberately kept so the evidence survives; this one
+    exercises the SHIPPED PIPELINE, which no longer calls them. Keeping the old
+    assertion here would have pinned the wrong direction and made the ordered
+    outcome unreachable -- the same trap that was caught once already in
+    `tests/test_w0k_must_not_destroy_real_digits.py`.
+    """
     pdf = _load_efendic_pdf_bytes()
     from docpluck.render import render_pdf_to_markdown
 
     md = render_pdf_to_markdown(pdf)
-    # (A) factorial-design notation: the corrupted `) 3 2 (` / `) 3 3 (` must be
-    # gone; the recovered `×` between factor sizes must be present.
-    assert ") 3 2 (" not in md
-    assert ") 3 3 (" not in md
-    assert "× 2 (" in md or ") × 2 (" in md
-    # (B) line-wrapped interaction term: no `Direction 3` at a line end.
-    assert "Direction 3\n" not in md
-    # The corrected three-way interaction term is present (either same-line or
-    # wrap-joined) — the `Direction × Manipulated` pair is recovered.
-    assert "Direction × Manipulated" in md
+    assert md and len(md) > 5000, f"render returned {len(md or '')} chars -- vacuous"
+    # (A) factorial-design notation reaches the consumer as the file states it.
+    assert ") 3 2 (" in md or ") 3 3 (" in md, (
+        "the design-notation digits are gone from the render entirely -- a rule "
+        "is still rewriting them"
+    )
+    # (B) and no multiplication sign was substituted for a digit anywhere.
+    assert "Direction × Manipulated" not in md and "Direction * Manipulated" not in md, (
+        "a multiplication sign was substituted for the digit the file declares"
+    )
