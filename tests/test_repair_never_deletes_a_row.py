@@ -85,12 +85,24 @@ def _grid(rows: list[list[str]]) -> list[dict]:
 # waved through by `_is_categorical_grid`) but carries <6 alphabetic words (so it
 # is not a `_cell_is_prose` sentence fragment, which would reject the grid for a
 # different and legitimate reason).
+# RE-BASED 2026-09-07 ON A REPAIR THAT STILL SHIPS. This fixture used to carry
+# `Direction 3 manipulated ...`, repaired to `Direction x ...` by W0i. W0i was
+# removed from every default path under the THREE TIERS directive (CLAUDE.md,
+# user directive 2026-09-06), so that repair no longer fires and the fixture
+# would have made every assertion below VACUOUS -- the file's own
+# `test_repair_actually_fires_on_this_fixture` exists to catch exactly that, and
+# it did.
+#
+# The INVARIANT this file pins is unchanged and still worth pinning: a repair
+# must never turn a data row into prose, because the prose trim then DELETES it.
+# It is now carried by the unmapped-glyph minus recovery -- a CLASS A repair of a
+# marker that cannot legitimately occur, which the directive keeps.
 _INTERACTION_ROWS = [
     ["Predictor", "b", "SE"],
     ["Age", "0.12", "0.05"],
-    ["Direction 3 manipulated attributional outcome", "—", "—"],
-    ["Valence 3 counterfactual framing manipulation", "—", "—"],
-    ["Salience 3 presentation ordering counterbalance", "—", "—"],
+    ["Direction and manipulated attributional outcome", "(cid:0)0.42", "0.05"],
+    ["Valence and counterfactual framing manipulation", "(cid:0)0.31", "0.07"],
+    ["Salience and presentation ordering counterbalance", "(cid:0)0.18", "0.06"],
     ["Gender", "0.31", "0.09"],
 ]
 
@@ -98,8 +110,11 @@ _INTERACTION_ROWS = [
 def test_repair_actually_fires_on_this_fixture():
     """Known positive. Without this the rest of the file could pass on a fixture
     the repair never touches, which would make every assertion below vacuous."""
-    repaired = clean_cell_text("Direction 3 manipulated attribute")
-    assert repaired == "Direction × manipulated attribute"
+    repaired = clean_cell_text("(cid:0)0.42")
+    assert repaired == "-0.42", (
+        f"the known-positive repair no longer fires (got {repaired!r}); every "
+        "assertion in this file would be vacuous"
+    )
 
 
 def test_row_is_prose_is_not_flipped_by_a_repair():
@@ -159,13 +174,13 @@ def test_region_path_keeps_every_row_and_still_ships_repaired_text():
         f"{list(range(len(_INTERACTION_ROWS)))}"
     )
     texts = [c["text"] for c in td["cells"]]
-    assert "Direction × manipulated attributional outcome" in texts, (
+    assert "-0.42" in texts, (
         "cells shipped RAW — the v2.4.133 channel-agreement fix was lost"
     )
-    assert "Direction 3 manipulated attributional outcome" not in texts
+    assert "(cid:0)0.42" not in texts
     # raw_text is derived from the repaired cells, so the sidecar and the HTML
     # cannot disagree about the same table.
-    assert "×" in td["raw_text"] and "Direction 3" not in td["raw_text"]
+    assert "-0.42" in td["raw_text"] and "(cid:0)" not in td["raw_text"]
     assert "0.31" in td["raw_text"], "the row below the prose run was deleted"
 
 

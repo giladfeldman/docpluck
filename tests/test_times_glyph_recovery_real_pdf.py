@@ -214,34 +214,36 @@ def test_chan_feldman_range_bound_survives_with_camelot_on():
 # ── Real-PDF regression test (Camelot ON — the production path) ─────────────
 
 @requires_camelot
-def test_efendic_interaction_terms_recovered_with_camelot_on():
-    """Every efendic interaction-term predictor cell must render with '×', not
-    the corrupted '3', in the Camelot HTML-table channel (production default).
-    Genuine references in body prose ("Table 3 summarizes", "Figure 3 and") must
-    be untouched — the recovery is table-cell scoped."""
+def test_efendic_interaction_terms_pass_through_in_the_table_channel():
+    """INVERTED 2026-09-07. This used to assert W0i RECOVERED every interaction
+    cell as `×` in the Camelot table channel. Gilad's THREE TIERS ruling
+    (CLAUDE.md, user directive 2026-09-06) removed W0i from the table-cell path,
+    so those cells now carry what the PDF declares.
+
+    W0i's guards were genuinely better than W0k's -- a reference-word denylist
+    kept Model 3, Study 3, Wave 3, Factor 3, Cluster 3, Grade 3 and Phase 3
+    intact. A denylist of ordinal nouns can never be complete, and measured
+    2026-09-06 it destroyed `HapMap3 SNPs` -> `HapMap x SNPs` and
+    `ASL TO3 Piedmont Region` -> `ASL TO x Piedmont Region`. A consumer has since
+    confirmed the same damage in stored data: 10.1038/s41562-024-02076-3 holds
+    BOTH `HapMap3 SNPs.` and `HapMap *` in one file.
+
+    The unit tests above still pass and must -- they exercise the kept DEFINITION.
+    This one exercises the SHIPPED table channel, which no longer calls it.
+    """
     pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
     if not pdf.exists():
         pytest.skip(f"fixture missing: {pdf}")
     md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
-    # No table cell may still carry a corrupted '×'-as-'3' interaction term.
-    surviving = re.findall(r"<td[^>]*>[^<]*[A-Za-z]\s*3\s?[A-Za-z][^<]*</td>", md)
-    # Filter to genuinely interaction-shaped survivors (letters both sides, not a
-    # reference-word ordinal cell).
-    real = [
-        c
-        for c in surviving
-        if not re.search(
-            r"\b(?:Study|Model|Wave|Phase|Item|Table|Figure|Group|Level|Sample)\s*3",
-            c,
-        )
-    ]
-    assert not real, f"corrupted '×'-as-3 interaction cells survive: {real[:6]}"
-    # The canonical interaction terms must be present with '×'.
-    assert "Direction × manipulated attribute" in md
-    assert "Pleasure × Arousal" in md
-    # Body-prose genuine references must NOT have been corrupted to '×'.
-    assert "Table 3" in md  # "Table 3 summarizes" preserved
-    assert "Direction × manipulated attribute" in md and "Table × summarizes" not in md
+    assert md and len(md) > 5000, f"render returned {len(md or '')} chars -- vacuous"
+    # No multiplication sign may have been substituted for a printed digit.
+    assert "Direction × manipulated attribute" not in md, (
+        "the table channel is still rewriting a printed digit to a times sign"
+    )
+    assert "Direction * manipulated attribute" not in md
+    # CONTROL: genuine body-prose references were never touched and still are not.
+    assert "Table 3" in md
+    assert "Table × summarizes" not in md and "Table * summarizes" not in md
 
 
 @requires_camelot
