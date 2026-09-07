@@ -2,6 +2,64 @@
 
 ## [Unreleased] - table extraction 2.4.13
 
+### W0i, W0k and W0l are unwired: a FILE LIE is never silently corrected (2.4.140)
+
+Three rules rewrote a **printed digit `3`** into a multiplication sign, in body prose, in the
+rendered markdown and in table cells. They are removed from all three default paths. The
+affected text now reaches consumers **exactly as the PDF declares it**.
+
+**The corruption is real, and that is not the point.** On the paper these rules were built
+from, the typesetter switches to a subset symbol font and emits an ASCII byte as a glyph-slot
+index. Verified at the source, object 25:
+
+    LGBBBB+AdvP586B
+      /Differences : [46 /period, 50 /two, /three]
+      /ToUnicode   : bfrange <32> <33> <0032>
+
+**Both declare a DIGIT.** The file is internally consistent and consistently wrong, so there is
+no metadata contradiction available to detect — the only contradiction is between what the file
+DECLARES and what the page SHOWS. Under the THREE TIERS directive that is a **file lie**, and a
+file lie is never silently corrected: docpluck has no channel through which to announce that it
+guessed, and a silent repair launders a real defect into a meta-science pipeline. These rules
+could not have been licensed for one even in principle — their signatures are `text: str` /
+`cell: str`, so they can never consult the rendered page. **Check the signature before you check
+the logic.**
+
+**What keeping them cost**, measured over the 101-PDF corpus (101/101 read):
+
+    W0k  recover_times_interaction_glyph_in_prose   5 papers, 10 sites — 4 of 5 papers WRONG
+    W0l  recover_times_design_notation              1 paper,   2 sites
+         recover_times_wrapped_interaction          1 paper,   1 site
+
+    HapMap3 SNPs            -> HapMap × SNPs      the International HapMap Project Phase 3,
+                                                  a dataset NAME, not a number
+    ASL TO3 Piedmont Region -> ASL TO × Piedmont  an Italian health authority, in an
+                                                  author affiliation
+    of 3 Folds (x3), Supplementary Material 3     cross-validation folds; a cross-reference
+
+`A5` then maps `×` to `*`. **A consumer has confirmed the damage in stored data:**
+`10.1038/s41562-024-02076-3` holds **both** `HapMap3 SNPs.` and `HapMap *` in one file — so the
+stored text describes an analysis limited to a reference panel that does not exist, and a single
+clean site cannot clear a document.
+
+**Why it ran unseen from v2.4.112 to v2.4.140:** `changes_made` is a CHARACTER DELTA, so it was
+blind exactly when the rewrite was length-neutral — silent on the one CORRECT firing and loud on
+the fabrications, the opposite of useful. The corpus idempotency gate that should have caught it
+sampled every fifth paper and none of the failing ones were in the stride.
+
+**All three channels, because two of three is a new defect.** Leaving the table-cell rule wired
+would have given one input two answers depending only on whether the text arrived as a body
+sentence or a table cell. W0i's guards were genuinely better — a reference-word denylist keeps
+`Model 3`, `Study 3`, `Wave 3`, `Factor 3`, `Cluster 3`, `Grade 3`, `Phase 3` intact — but a
+denylist of ordinal nouns can never be complete, and it destroyed the same two real tokens.
+
+**The definitions are KEPT, not deleted.** A scope change: the evidence has to survive, or
+someone re-proposes these in six months.
+
+**Consumers: this is retrospective.** Grep stored extractions for ` * ` and ` × ` beside a
+capitalised word or acronym; the rule destroys SOME occurrences of a token and leaves others, so
+a single-site check cannot clear a document. Full before/after table in the consumer notice.
+
 ### A header count the DOCX DECLARES is no longer out-voted by a guess (2.4.140)
 
 `_clean_grid` re-derived the header-row count from cell length and numeric ratio even when
