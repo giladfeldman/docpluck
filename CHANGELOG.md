@@ -81,6 +81,27 @@ the logic.**
 stored text describes an analysis limited to a reference panel that does not exist, and a single
 clean site cannot clear a document.
 
+**CORRECTED 2026-09-08 by a consumer's own measurement, and the correction is worse news.** In
+*their* copy of that paper the token is destroyed at **every** occurrence — `HapMap3` count 0,
+`HapMap 3` count 0 — so **"both forms coexist" is NOT a general property.** A document can hold
+nothing to recover from, and re-extraction from the source PDF is then the only route.
+
+**A THIRD SHAPE, from a real paper rather than a constructed example:**
+`10.1073/pnas.2313604121` shipped `Deposited * December 2022.` for `Deposited 3 December 2022.`
+So the blast radius includes a **bare day-of-month digit with spaces on both sides**, not only
+alphanumeric identifiers glued to a word. Confirmed by re-extracting the custody PDF at 2.4.141,
+not by pattern-matching. Two grep traps follow from it: the intact form is `HapMap3` with **no
+space** (grepping `HapMap 3` returns 0 and reads as a failed fix), and a pattern anchored to
+"digit glued to a word" misses the standalone-digit class entirely.
+
+**And the reassuring half, measured rather than hoped.** Over one consumer's 30-file corpus,
+**no published statistic was corrupted**: a star sandwiched between digits is the unambiguous
+signature and it returned **0 sites in 30 files**, under a two-sided control (planted `12*4` and
+`0.6*9` caught; planted `0.695***` and `0.34**` ignored) with 1,094 asterisks counted to prove
+the files were read and **0** surviving `×` glyphs to prove the surface was complete. The damage
+class is identifiers, names and dates — not statistics. Measure your own corpus rather than
+inheriting that.
+
 **Why it ran unseen from v2.4.112 to v2.4.140:** `changes_made` is a CHARACTER DELTA, so it was
 blind exactly when the rewrite was length-neutral — silent on the one CORRECT firing and loud on
 the fabrications, the opposite of useful. The corpus idempotency gate that should have caught it
