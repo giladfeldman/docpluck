@@ -460,7 +460,7 @@ consumers, not bookkeeping:
 | W0e | Adobe-Symbol PUA codepoints | **TYPOGRAPHIC** | codepoint table |
 | W0g | dropped minus proven by a CI bracket | INFERENTIAL | |
 | W0h | dropped minus, proven by the layout's surviving `(cid:N)` | **TYPOGRAPHIC** | identity-based pairing since v2.4.133; REFUSES when context cannot separate candidates |
-| W0i / W0k / W0l | `×` extracted as `3` | **TYPOGRAPHIC** | the font mis-draws the multiply glyph; the token conditions only bound where it is trusted |
+| ~~W0i / W0k / W0l~~ | `×` extracted as `3` | **FILE LIE — REMOVED in 2.4.140/141** | Reclassified and UNWIRED from all three text channels. The classification above was wrong: the font's `/Differences` names the slot `/three` and its `/ToUnicode` maps it to U+0033, so the file is internally consistent and consistently wrong, and nothing the renderer emitted contradicts it — only the printed page does. Their signatures are `text: str` / `cell: str`, so they could never consult the page even in principle. Measured over 101 PDFs, W0k fired on 5 papers and **destroyed a real published token in 4 of them** (`HapMap3` -> `HapMap *`, `ASL TO3` -> `ASL TO *`). A printed `3` now reaches you verbatim. The definitions are kept and unwired so the evidence survives. |
 | W0j sig. A | `2`-for-minus in a contrast-coding note | INFERENTIAL, self-corroborating | the `+ X.X = <word>` twin on the same line is a second emitted token |
 | **W0j sig. B** | `Mchange = 20.14` | **INFERENTIAL** | keys on the variable NAME. `20.14` is not impossible in that slot, only implausible. Records `w0j_mstat_sign_inferred_from_variable_name` on every firing |
 | W0m | `β` extracted as `b`, proven by the layout font | **TYPOGRAPHIC** | the coefficient value is part of the identity |
@@ -515,7 +515,9 @@ S9  Header/footer removal
      deleted v2.4.129-130; numbers pass through exactly as printed]
 A3b Statistical df-bracket harmonization
 W0  glyph-recovery family (see the section above for each step's EVIDENCE class)
-    W0_watermark, W0b, W0c, W0o, W0d, W0j, W0k, W0l, W0g,
+    W0_watermark, W0b, W0c, W0o, W0d, W0j, W0g,
+    [W0i / W0k / W0l WERE HERE — unwired in 2.4.140/141 as a FILE LIE;
+     a printed digit 3 is never rewritten to a multiplication sign]
     W0q  ← new v2.4.134: detached CI-upper minus, body-prose channel
     W0h, W0m, W0p  (layout-gated — only when `layout=` is supplied)
     W0e
