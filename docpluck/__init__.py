@@ -100,7 +100,7 @@ from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extr
 from .extract_docx_structured import extract_docx_structured
 from .render import RenderReport, render_pdf_to_markdown
 
-__version__ = "2.4.140"
+__version__ = "2.4.141"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 
