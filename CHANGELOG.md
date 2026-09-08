@@ -1,6 +1,23 @@
 # Changelog
 
-## [Unreleased] - table extraction 2.4.13
+## [2.4.140] - 2026-09-08 - normalization 1.9.65 - table extraction 2.4.14
+
+*(2.4.139 was never tagged; its DOCX-tables work ships here.)*
+
+### Both pipeline versions bump, because both pipelines' output changed (2.4.140)
+
+`NORMALIZATION_VERSION` 1.9.64 -> **1.9.65** and `TABLE_EXTRACTION_VERSION` 2.4.13 -> **2.4.14**.
+
+Neither is cosmetic. Consumers store extracted text and tables keyed on these strings — one
+confirmed store is named `corpus-text__docpluck-norm@1.9.57.txt` — so leaving them unchanged
+would make output produced BEFORE and AFTER these fixes indistinguishable in a consumer's
+records. That matters most for exactly the two changes below, because both are retrospective:
+a consumer has to be able to tell which of its stored files predate them.
+
+Removing rewrites still changes output. `NORMALIZATION_VERSION` bumps for the W0i/W0k/W0l
+unwiring even though the release only takes rules away, and `TABLE_EXTRACTION_VERSION` bumps for
+the DOCX header ceiling even though PDF table output is byte-identical.
+
 
 ### W0i, W0k and W0l are unwired: a FILE LIE is never silently corrected (2.4.140)
 
