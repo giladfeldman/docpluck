@@ -546,7 +546,7 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.140',            # docpluck itself
+# {'version': '2.4.141',            # docpluck itself
 #  'git_sha': '…',
 #  'normalize_version': '1.9.65',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version

@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.4.141] - 2026-09-08 - normalization 1.9.65 - table extraction 2.4.14
+
+### Why this version exists at all: v2.4.140 was published one commit early
+
+**There is no code change between 2.4.140 and 2.4.141.** `v2.4.140` reached
+`github.com/giladfeldman/docpluck` pointing at `6db1ac5` — one commit before the two pipeline
+version strings were corrected. That tag therefore ships the W0i/W0k/W0l removal and the DOCX
+header ceiling while still DECLARING `normalization 1.9.64` and `table extraction 2.4.13`,
+which is precisely the condition the bump exists to prevent: a consumer storing text keyed on
+`docpluck-norm@1.9.64` cannot tell whether that file predates or postdates the fix, and the
+retrospective grep the consumer notice asks for is the only instrument they have.
+
+**The published tag was NOT force-moved.** This project was burned by exactly that on
+2026-08-20, when a history purge force-pushed two tags together and the older one finished
+one second later, silently downgrading production. Cutting a new version forward is the
+non-destructive repair; re-pointing a name that is already public is not.
+
+**Consumers: pin `v2.4.141`, not `v2.4.140`.** Everything in the 2.4.140 section below is in
+this release. If you have already installed `v2.4.140`, its behaviour is correct — only the
+two version strings it reports are stale, and that is exactly what makes it unsafe to store
+output under.
+
 ## [2.4.140] - 2026-09-08 - normalization 1.9.65 - table extraction 2.4.14
 
 *(2.4.139 was never tagged; its DOCX-tables work ships here.)*
