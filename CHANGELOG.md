@@ -94,6 +94,13 @@ until a local reproduction confirms it. Reproduced now, at the source:
       "...focusing on HapMap3 SNPs. Inclusion in the LD Score regression..."
       "...analysis was limited to HapMap3 SNPs with a minor allele frequency..."
 
+The consumer's own 1.9.57 store supplies the other half, which docpluck cannot see: at char
+60080 `HapMap3` INTACT and at char 60155 `HapMap *` DESTROYED — `HapMap3` = 1, `HapMap *` = 1 —
+**75 characters apart, in consecutive sentences.** So: 2 in the source, 1 destroyed before the
+fix, 0 after. Proximity is no protection, and because an intact sibling may sit nearby a
+consumer can SOMETIMES recover by scanning; re-extraction is the RELIABLE route, not the only
+one.
+
 Both occurrences are `HapMap3` in the source and the pre-fix pipeline destroyed exactly ONE, so
 the original claim holds and is now measured rather than relayed. **The rule runs both ways: a
 single clean site cannot clear a document, and a single destroyed site does not condemn one.**
