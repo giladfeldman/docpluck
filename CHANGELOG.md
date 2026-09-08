@@ -3040,7 +3040,7 @@ A2 restores a decimal point the PDF lost (`d = 12` → `d = .12`), and its termi
 - The in-source comment on A3a's guard claimed `t(1,197)` and `chi2(2,42)` were blocked by it. Neither was. Corrected with the measured behaviour of each.
 - **New step name `A3d_leading_comma_decimal`** — the first change to the `steps_applied` / `steps_changed` vocabulary since 2.4.121 (49 → 50 names). A consumer that pins the set of step names will see one addition.
 
-## [Unreleased] - 2026-08-07
+## [No version bump] - 2026-08-07
 
 **984 KB of published article text left this repo, and the gate that needed it kept its full strength.** No library code changed — `docpluck/` is untouched, so there is no version bump and no output change.
 

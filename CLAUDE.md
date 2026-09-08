@@ -316,6 +316,10 @@ enforces it. Everything else under `docs/` is internal by default and gitignored
 - `docs/README.md` — public-facing library README (renders on GitHub + PyPI).
 - `docs/BENCHMARKS.md` — extraction-quality benchmarks across 50 PDFs.
 - `docs/BENCHMARKS_liteparse_2026-06.md` — the liteparse comparison run (a dated RECORD, not a live claim).
+- `docs/BENCHMARKS_docx_engines_2026-09.md` — the DOCX engine comparison behind the 2.4.139
+  mammoth choice (a dated RECORD, not a live claim). It was tracked and public but absent
+  from this list, which is the human-readable half of the allowlist; the test passed only
+  because the machine half matches `BENCHMARKS*`.
 - `docs/NORMALIZATION.md` — pipeline step-by-step reference.
 - `docs/DESIGN.md` — architecture decisions.
 - `docs/SCOPE.md` — **consumer contract.** English-language articles, US numeric convention; EU numbers pass through as printed. Required by the scope rule to be stated here, on the website, and in every consumer report.

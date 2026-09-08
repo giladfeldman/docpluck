@@ -227,8 +227,14 @@ Every repair declares which kind of evidence it rests on:
 Two rule families sit on that line and the ruling is recorded here rather than left implicit
 (register O8):
 
-* **W0i / W0k / W0l** (`×` extracted as `3`) are **TYPOGRAPHIC**. The font genuinely mis-draws the
-  multiplication glyph; the surrounding-token conditions only bound where we trust it.
+* ~~**W0i / W0k / W0l** (`×` extracted as `3`) are **TYPOGRAPHIC**.~~ **WRONG, and REMOVED in
+  2.4.140/141.** They are a **FILE LIE**: the font declares that slot as a digit in BOTH
+  `/Differences` (`/three`) and `/ToUnicode` (U+0033), so the file is internally consistent and
+  consistently wrong, and the only contradiction is with the printed page — which a rule whose
+  signature is `text: str` can never consult. Measured over 101 PDFs, W0k fired on 5 papers and
+  **destroyed a real published token in 4 of them**. **A printed `3` now reaches you verbatim.**
+  If you hold extractions produced at `docpluck-norm@1.9.64` or earlier, some may contain a
+  destroyed token; anything at `1.9.65` or later cannot.
 * **W0j** (`_PROSE_MSTAT_CHANGE_RE`) is **INFERENTIAL** and is now labelled as such. It flips a
   sign keyed on a variable NAME (`Mchange`), and a name is not something the renderer emitted —
   `20.14` is not grammatically impossible in that slot, merely implausible. It is retained,
