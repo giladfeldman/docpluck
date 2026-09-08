@@ -94,9 +94,14 @@ until a local reproduction confirms it. Reproduced now, at the source:
       "...focusing on HapMap3 SNPs. Inclusion in the LD Score regression..."
       "...analysis was limited to HapMap3 SNPs with a minor allele frequency..."
 
-The consumer's own 1.9.57 store supplies the other half, which docpluck cannot see: at char
-60080 `HapMap3` INTACT and at char 60155 `HapMap *` DESTROYED — `HapMap3` = 1, `HapMap *` = 1 —
-**75 characters apart, in consecutive sentences.** So: 2 in the source, 1 destroyed before the
+The consumer's own 1.9.57 store supplies the other half, which docpluck cannot see: `HapMap3`
+INTACT once and `HapMap *` DESTROYED once — `HapMap3` = 1, `HapMap *` = 1 — **75 apart, in
+consecutive sentences.** Absolute file offsets are deliberately not recorded: they are specific
+to one store's text and do not transfer (the same two occurrences sit at 60080/60155 in one
+extraction and 60110/60185 in another), and byte and character offsets differ again within a
+single file. **The GAP is what transfers — 75 in characters AND in bytes, measured independently
+by both parties on two different extractions** — and the text between them is one sentence
+boundary: `HapMap3 SNPs. Inclusion in the LD Score regression analysis was limited to `. So: 2 in the source, 1 destroyed before the
 fix, 0 after. Proximity is no protection, and because an intact sibling may sit nearby a
 consumer can SOMETIMES recover by scanning; re-extraction is the RELIABLE route, not the only
 one.
