@@ -81,16 +81,35 @@ the logic.**
 stored text describes an analysis limited to a reference panel that does not exist, and a single
 clean site cannot clear a document.
 
-**CORRECTED 2026-09-08 by a consumer's own measurement, and the correction is worse news.** In
-*their* copy of that paper the token is destroyed at **every** occurrence — `HapMap3` count 0,
-`HapMap 3` count 0 — so **"both forms coexist" is NOT a general property.** A document can hold
-nothing to recover from, and re-extraction from the source PDF is then the only route.
+**RE-CORRECTED 2026-09-08 — the paragraph that stood here was WRONG and is withdrawn.** It said
+"both forms coexist" is not a general property, on a consumer's report that its copy held only
+the destroyed form. Its author withdrew it: they had verified with `grep -c 'HapMap 3'`, **with a
+space**, against an intact form that has none — so they searched for a string that cannot exist,
+got 0, and read that zero as a finding. **I published it without reproducing it, which is the
+error on this side**, and this project's own rule is that a reviewer's finding is a HYPOTHESIS
+until a local reproduction confirms it. Reproduced now, at the source:
+
+    10.1038/s41562-024-02076-3, re-extracted at normalization 1.9.65:
+      HapMap3 = 2      HapMap 3 = 0      HapMap * = 0
+      "...focusing on HapMap3 SNPs. Inclusion in the LD Score regression..."
+      "...analysis was limited to HapMap3 SNPs with a minor allele frequency..."
+
+Both occurrences are `HapMap3` in the source and the pre-fix pipeline destroyed exactly ONE, so
+the original claim holds and is now measured rather than relayed. **The rule runs both ways: a
+single clean site cannot clear a document, and a single destroyed site does not condemn one.**
+Count every occurrence.
+
+**The no-space grep trap is now demonstrated rather than predicted:** `HapMap 3` returns 0
+against a fully intact file, and that is exactly what manufactured the withdrawn report — in the
+same message that flagged the trap to others. Knowing a failure mode by name does not prevent it;
+only a control does. The statistics scan in that same run carried two-sided controls and held up.
+The claim that failed was a one-line verification grep, where nobody thinks to plant one.
 
 **A THIRD SHAPE, from a real paper rather than a constructed example:**
 `10.1073/pnas.2313604121` shipped `Deposited * December 2022.` for `Deposited 3 December 2022.`
 So the blast radius includes a **bare day-of-month digit with spaces on both sides**, not only
-alphanumeric identifiers glued to a word. Confirmed by re-extracting the custody PDF at 2.4.141,
-not by pattern-matching. Two grep traps follow from it: the intact form is `HapMap3` with **no
+alphanumeric identifiers glued to a word. **Verified here independently** by re-extracting the
+custody PDF at normalization 1.9.65: `Deposited 3` = 1, `Deposited *` = 0. Two grep traps follow from it: the intact form is `HapMap3` with **no
 space** (grepping `HapMap 3` returns 0 and reads as a failed fix), and a pattern anchored to
 "digit glued to a word" misses the standalone-digit class entirely.
 
