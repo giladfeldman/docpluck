@@ -46,6 +46,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -182,6 +183,40 @@ def _app_pin(app_repo: Path, allow_local_fallback: bool) -> tuple[str | None, st
     return m.group(1), f"LOCAL WORKING TREE {local_file} (may be stale -- could not reach origin/master)"
 
 
+def default_app_repo() -> Path | None:
+    """Locate the consumer application checkout STRUCTURALLY, never by name.
+
+    Resolved in ONE place and shared by this script's `main` and by the mirror
+    regression test, so a path convention cannot drift between two copies of it.
+
+    It looks for a sibling directory of this repo that holds a
+    ``service/requirements.txt`` carrying a docpluck pin -- a property of the
+    thing we need, not a directory name. That is deliberate on two counts. This
+    repo is PUBLIC, so a hardcoded sibling name would publish the private
+    consumer's layout; and a name is the more fragile key anyway, since renaming
+    or relocating the checkout would silently send this gate somewhere that does
+    not exist. ``$DOCPLUCK_APP_REPO`` overrides, and ``--app-repo`` beats both.
+
+    Returns None when nothing matches, so the caller can say so rather than
+    proceed against a path that is merely absent.
+    """
+    override = os.environ.get("DOCPLUCK_APP_REPO")
+    if override:
+        return Path(override).expanduser().resolve()
+
+    lib_repo = Path(__file__).resolve().parent.parent
+    for sibling in sorted(lib_repo.parent.iterdir()):
+        if sibling == lib_repo or not sibling.is_dir():
+            continue
+        req = sibling / "service" / "requirements.txt"
+        try:
+            if req.is_file() and _PIN_RE.search(req.read_text(encoding="utf-8")):
+                return sibling
+        except OSError:
+            continue
+    return None
+
+
 def apply_fix(app_repo: Path, latest_tag: str, current_pin: str | None, push: bool) -> int:
     """Bump the app pin to ``latest_tag``, commit it, optionally push.
 
@@ -218,12 +253,58 @@ def apply_fix(app_repo: Path, latest_tag: str, current_pin: str | None, push: bo
     req.write_text(new_text, encoding="utf-8")
     print(f"bumped v{current_pin or '?'} -> v{latest_tag} in {req}")
 
-    if _git(app_repo, "add", "service/requirements.txt") is None:
+    # THE MIRROR IS PART OF THE PIN, NOT A SEPARATE CHORE. `cd frontend &&
+    # vercel --prod` uploads ONLY frontend/, so that build cannot read
+    # ../service/requirements.txt and falls back to frontend/docpluck-pin.json;
+    # without it, it falls back further to the hand-maintained DOCPLUCK_VERSION
+    # env var -- the 50-day-stale failure the derivation was built to remove.
+    # Until 2026-09-08 this function staged requirements.txt ALONE, so every
+    # --fix run left the mirror behind and pushed a red master: that is exactly
+    # how 54c9a31 bumped to v2.4.138 and stranded the mirror at 2.4.137, a drift
+    # nobody noticed until a QA session went looking an hour before the 2.4.141
+    # release. Reported by the peer session and VERIFIED HERE at the
+    # source before acting on it.
+    #
+    # It calls the EXISTING generator rather than writing the JSON here: one
+    # concept, one implementation. A second copy of the mirror format in Python
+    # would drift from the Node one silently, which is the failure this repo's
+    # "ONE CONCEPT, ONE TABLE" rule exists to prevent.
+    #
+    # A missing `node` is a HARD FAILURE, never a skip. Skipping is precisely
+    # the current defect wearing a green tick, and the commit would then push a
+    # master whose own tests fail.
+    mirror_rel = "frontend/docpluck-pin.json"
+    gen = app_repo / "frontend" / "scripts" / "sync-docpluck-pin.mjs"
+    if not gen.exists():
+        print(f"FAIL: {gen} not found — cannot refresh {mirror_rel}")
+        return 2
+    try:
+        r = subprocess.run(
+            ["node", str(gen)],
+            cwd=str(app_repo / "frontend"),
+            capture_output=True, text=True,
+        )
+    except FileNotFoundError:
+        print(f"FAIL: `node` not on PATH — cannot refresh {mirror_rel}. The pin "
+              "and its mirror move together or not at all; requirements.txt has "
+              "been rewritten but NOTHING was committed.")
+        return 2
+    if r.returncode != 0:
+        print(f"FAIL: {gen.name} exited {r.returncode}: {(r.stderr or r.stdout).strip()}")
+        return 2
+    print((r.stdout or "").strip() or f"refreshed {mirror_rel}")
+
+    if _git(app_repo, "add", "service/requirements.txt", mirror_rel) is None:
         print("FAIL: git add failed")
         return 2
     msg = "\n".join(
         [
             f"pin: bump docpluck library to v{latest_tag}",
+            "",
+            "service/requirements.txt AND frontend/docpluck-pin.json, together --",
+            "a frontend-only `vercel --prod` build cannot read requirements.txt and",
+            "falls back to the mirror. Staging only requirements.txt is what left",
+            "the mirror at 2.4.137 against a v2.4.138 pin.",
             "",
             "Applied by scripts/check_app_pin_sync.py --fix in the library repo.",
             "This replaces the deleted bump-app-pin.yml GitHub Actions workflow —",
@@ -276,8 +357,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     lib_repo = Path(__file__).resolve().parent.parent
-    app_repo = args.app_repo or (lib_repo.parent / "PDFextractor")
+    app_repo = args.app_repo or default_app_repo()
 
+    if app_repo is None:
+        print("FAIL: no sibling checkout carries a service/requirements.txt with a "
+              "docpluck pin. Point at it with --app-repo or $DOCPLUCK_APP_REPO.")
+        return 2
     if not (app_repo / "service" / "requirements.txt").exists() and not (app_repo / ".git").exists():
         print(f"FAIL: app repo not found at {app_repo} (use --app-repo)")
         return 2
