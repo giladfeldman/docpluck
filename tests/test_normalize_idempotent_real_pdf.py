@@ -49,6 +49,15 @@ _TEST_PDFS = os.path.normpath(
 #   cycle 10 (CHARSUB)     -> 2 -> 2 (ip-feldman cleared corpus-wide but NOT
 #                                     in the strided slice — stride miss)
 #   cycle 11 (long-tail)   -> 2 -> ~0
+#   2026-09-08 (v2.4.142)  -> 5 -> 0, by fixing the CAUSES rather than the number:
+#       - W0g unwired: it paired a correlation's CI with a p-value and fired only on
+#         pass 2, so `korbmacher_2022_kruger` converged the moment it went.
+#       - G5c2 made idempotent by construction: it re-consumed its own output, gluing a
+#         stray `3.` onto the `6. References` it had just produced. That single shape was
+#         the whole of the remaining four -- `efendic_2022_affect`, `am_sociol_rev_4`,
+#         `nat_comms_3`, `bmc_med_4`.
+#     The owner was offered a named-defect list and a raise to 4, and chose to fix the
+#     cause before releasing 2.4.142.
 # Do NOT raise this number to make the test pass — a higher count is a
 # regression. Lower it (only) when a cycle genuinely fixes papers.
 _IDEMPOTENCY_RATCHET = 0
