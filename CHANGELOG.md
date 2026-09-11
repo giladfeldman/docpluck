@@ -1,5 +1,127 @@
 # Changelog
 
+## [2.4.142] - 2026-09-08 - normalization 1.9.66 - table extraction 2.4.14
+
+### W0g is unwired: a confidence interval does not tell you which statistic it belongs to
+
+`W0g_dropped_minus_ci_pairing` (`recover_dropped_minus_via_ci_pairing`) re-signed a bare
+positive decimal whenever a bracket in the same record made the arithmetic work. **It never
+checked which statistic the bracket described.** It is removed from both of its text channels
+-- `normalize_text` and the render markdown post-process. It was never in the table-cell path;
+that was verified by grep rather than assumed from this project's usual three-channel phrasing.
+
+**It published negative p-values and negative standard errors.** On `korbmacher_2022_kruger`
+the page prints, and pdftotext delivers verbatim:
+
+    r(223) = -0.13 (p = .0498, 95% CI [-0.26, -0.0002])
+
+The interval is `r`'s. W0g took the nearest bare positive decimal in the record -- the
+**p-value** -- and published `p = -.0498`. The same paper yields `p = -.05` from the second
+occurrence of the shape. A probability cannot be negative.
+
+**This was in the shipped output, not only in a re-normalization.** The render channel called
+W0g over markdown `normalize_text` had already normalized, so that call was itself a second
+pass, and W0g only matches once `S5_dash_normalization` has converted the en dashes pdftotext
+emits into ASCII hyphens. `render_pdf_to_markdown` therefore emitted both fabricated values on
+the **first render**. Every consumer of the rendered `.md` has been receiving them.
+
+**The wider measurement, confirmed against the rasterized page.** Over 250 papers (seed 820,
+9,834-PDF repository) W0g fired **12 times in 4 papers, and at least 7 of those 12 rewrote a
+quantity that is non-negative by definition**:
+
+| paper | before | after |
+|---|---|---|
+| `10.1525/collabra.118835` | `SE = 0.11` | `SE = -0.11` |
+| `10.1525/collabra.118835` | `p = .90` | `p = -.90` |
+| `10.1525/collabra.118835` | `SE = 0.59` | `SE = -0.59` |
+| `10.1016/j.jesp.2016.04.003` | `p = .05` | `p = -.05` |
+| `10.1016/j.jesp.2016.04.003` | `SE = .18` | `SE = -.18` |
+| `10.1016/j.jesp.2016.04.003` | `SE = .20` | `SE = -.20` |
+| `10.1177/01461672241284028` | `(.078)` | `(-.078)` |
+
+`10.1525/collabra.118835` p7 prints `(hedges' g = -.17, SE = 0.11, 95%CI = [-0.38, 0.04],
+p = .12)` -- a negative estimate with a positive standard error, the paper's consistent house
+style on that page. There was no corruption to repair; the minus on `g` is present and correct
+in the text layer. The remaining ~5 sites are plausible estimate repairs and do not rescue a
+rule that is wrong more often than it is right, on published numbers, in a channel with no way
+to announce that it guessed.
+
+**Why it goes rather than gets a guard.** THE THREE TIERS directive names **CI containment**
+verbatim as forbidden evidence, and W0g is CI containment by name. It fails the directive's gate
+test -- *if every surrounding word and number were replaced with random garbage, would the same
+evidence still justify the output?* No: its only inputs are the neighbouring tokens. And its
+signature is `text: str`, so it can never consult the rendered page. A "skip the token after
+`p =`" guard would fix one paper and not the class, because the rule cannot tell which statistic
+an interval describes -- that is a fact about the sentence, not about anything the renderer
+emitted. Deciding a published number is wrong, and saying so, is the consumers' role.
+
+**W0b, W0d, W0q, W0h and W0m are deliberately untouched.** A family verdict must be tested per
+member. The 2026-08-20 finding that condemned W0g proposed deleting W0b and W0d with it, on a
+measurement of 0 firings in that 250-paper sample; re-measured 2026-09-07 over the 101-paper
+local corpus they fire on `efendic_2022_affect` and recover **62 real minus signs correctly** --
+`r = 2.74 [20.92, 20.30]` back to `r = -.74 [-0.92, -0.30]`, an impossible correlation and a
+descending interval, repaired properly. Both zeros were honest about their own corpora; neither
+licensed a family-wide delete.
+
+**`NORMALIZATION_VERSION` 1.9.65 -> 1.9.66, and it must bump even though this release only takes
+a rewrite away.** Consumers store extracted text keyed on that string, so leaving it unchanged
+would make text produced before and after this fix indistinguishable in their store -- and the
+retrospective grep the consumer notice asks for is the only instrument they have.
+`TABLE_EXTRACTION_VERSION` stays at 2.4.14: no table-channel code changed.
+
+### G5c2 is idempotent by construction: a heading cannot have two numbers
+
+`G5c2_split_numbered_heading_rejoin` (`_rejoin_split_numbered_headings`) rejoins a section
+heading whose leading number pdftotext linearised onto its own line -- `6.` + `References` ->
+`6. References`. Correct, and it fires on pass 1. **Its own output was then eligible as its own
+input.** The existing "don't consume two stacked orphans" guard only recognised a BARE `^N.$`,
+and `lookup_canonical_label` strips a single leading number, so `6. References` still resolved
+to `SectionLabel.references` and still qualified as a target. A stray `3.` above it was glued on:
+
+    3.                          3. 6. References
+                          ->
+    6. References
+
+**This is not a cosmetic wrong prefix.** `lookup_canonical_label("6. References")` resolves;
+`lookup_canonical_label("3. 6. References")` returns `None`. The second pass destroys the
+heading's resolvability, so the section partitioner loses the section.
+
+**It was the entire remaining content of the corpus idempotency gate.** Measured 2026-09-08,
+all four still-non-idempotent papers are this one shape and nothing else, with
+`steps_changed == ['G5c2_split_numbered_heading_rejoin']` in every case:
+
+| paper | stray | real heading | produced |
+|---|---|---|---|
+| `efendic_2022_affect` | `3.` | `6. References` | `3. 6. References` |
+| `am_sociol_rev_4` | `1.`, `3.` | `2. Acknowledgments`, `4. Funding` | `1. 2. Acknowledgments`, `3. 4. Funding` |
+| `nat_comms_3` | `16.` | `17. Code availability` | `16. 17. Code availability` |
+| `bmc_med_4` | `8.`, `22.` | `9. Funding`, `23. References` | `8. 9. Funding`, `22. 23. References` |
+
+**Digit counts are IDENTICAL across all four papers**, which is exactly why a digit-delta check
+could never have found this. Look at WHAT moved, not how much.
+
+The guard refuses a target line that already carries its own leading number -- keyed on the
+structural signature `N. <text>`, never on a paper, publisher or heading word. Because that is
+precisely the shape this rule emits, its output can no longer be re-consumed as its input:
+idempotency by construction rather than by a fixed-point loop. Pinned by
+`tests/test_g5c2_must_not_stack_two_heading_numbers.py`, watched RED first, with a control that
+asserts the pass-1 rejoins the corpus needs are still produced -- so "make the rule a no-op" is
+not a way to make the file green.
+
+**Consumers should grep their stored output** for `p = -` and `SE = -` in docpluck text keyed to
+`docpluck-norm@1.9.65` or earlier. A negative p-value or standard error in that text is this
+defect, not the paper.
+
+The definition is kept and unwired, not deleted, so the evidence survives and nobody re-proposes
+it. Pinned by `tests/test_w0g_must_not_fabricate_a_negative_p_value.py`, watched RED first, and
+asserted through `normalize_text` and `render_pdf_to_markdown` rather than the raw function --
+a test that calls a deliberately-kept definition keeps failing after its call sites are gone,
+because it measures the definition rather than the product.
+
+Three unused imports of the already-retired W0k/W0l rules are also removed from `render.py`.
+They had sat there since `f169c3d`; an unused import of a retired rule reads, to the next person
+opening that file, as though the rule were still in the pipeline.
+
 ## [2.4.141] - 2026-09-08 - normalization 1.9.65 - table extraction 2.4.14
 
 ### Why this version exists at all: v2.4.140 was published one commit early

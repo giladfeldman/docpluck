@@ -450,12 +450,49 @@ def _scan():
 
 
 def test_the_gate_sees_the_whole_chain_not_three_names():
-    """A refactor of the call shape must turn this RED, not silently green."""
+    """A refactor of the call shape must turn this RED, not silently green.
+
+    THE ASSERTION IS AGREEMENT BETWEEN TWO DERIVATIONS, NOT A MAGIC NUMBER
+    (changed 2026-09-08). It used to read `len(names) >= 50`, and that floor could
+    only ever be wrong in one of two ways: too low to catch a real blinding, or
+    tripped by a DELIBERATE retirement. It was the second — retiring `W0g` took the
+    chain from 50 to 49 and turned this red, and "lower the floor by one" is the
+    move this project forbids, so the gate was made to express what it actually
+    means instead. `f169c3d` had already removed three steps without re-basing it,
+    which is how a fixed floor rots: it sat at exactly 50 against a chain of 50.
+
+    The two derivations are independent in the way that matters. The gate reads the
+    `_step` call's own string literal out of `render_pdf_to_markdown`'s source via
+    `inspect`; this test greps the whole module for the call shape. The 2026-08-15
+    failure was precisely a CALL-SHAPE change that the gate's regex stopped matching
+    while the calls were all still there — it saw 3 where 53 existed — and that
+    failure makes these two numbers disagree loudly instead of drifting quietly.
+    """
+    import re as _re
+    from pathlib import Path as _Path
+
     names = _scan()._chain_step_names()
-    assert len(names) >= 50, (
-        f"the gate can only see {len(names)} steps: {names}. It reports a clean "
-        "corpus when it instruments nothing — this is the exact defect of "
-        "2026-08-15."
+
+    src = _Path(__file__).resolve().parents[1] / "docpluck" / "render.py"
+    # `_step\(` and NOT `_step\(_report,`: one call site in the chain wraps its
+    # arguments onto the following line, so requiring `_report` on the same line
+    # undercounts by exactly one and manufactures a disagreement out of formatting.
+    call_sites = len(_re.findall(r"^\s*md = _step\(", src.read_text(encoding="utf-8"), _re.M))
+
+    # An absolute floor STILL, because both derivations could collapse together if
+    # `_step` itself were renamed, and two agreeing zeros must never read as a pass.
+    # It is deliberately far below the live count so an ordinary retirement does not
+    # trip it, and far above the 3 the 2026-08-15 defect produced.
+    assert call_sites >= 30, (
+        f"only {call_sites} `_step` call sites in render.py — the chain cannot have "
+        "shrunk this far legitimately; either the call shape changed or this test's "
+        "pattern is stale, and a zero here must never read as a clean corpus."
+    )
+    assert len(names) == call_sites, (
+        f"the gate sees {len(names)} steps but render.py has {call_sites} `_step` call "
+        f"sites. The gate instruments only what it can name, so a shortfall means it "
+        f"is silently skipping steps — the exact defect of 2026-08-15, where it saw 3 "
+        f"of 53 and reported '26/26 papers, 0 deletions'. Names seen: {names}"
     )
     assert "_step" not in names, "`_step` is the wrapper, not a step"
     assert "_rescue_title_from_layout" in names, (

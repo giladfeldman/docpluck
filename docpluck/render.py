@@ -42,15 +42,20 @@ from .normalize import (
     recover_corrupted_lt_operator,
     recover_lt_as_b_operator,
     recover_corrupted_minus_signs,
-    recover_dropped_minus_via_ci_pairing,
     recover_minus_via_ci_pairing,
     recover_fffd_comparison_operators,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
-    recover_times_design_notation,
-    recover_times_interaction_glyph_in_prose,
-    recover_times_wrapped_interaction,
 )
+# NOT IMPORTED, DELIBERATELY: `recover_dropped_minus_via_ci_pairing` (W0g, 2026-09-08)
+# and `recover_times_interaction_glyph_in_prose` / `recover_times_design_notation` /
+# `recover_times_wrapped_interaction` (W0k / W0l, 2026-09-06). Their call sites in this
+# module are deleted; the definitions are KEPT in `normalize.py` so the evidence
+# survives, and anything that genuinely wants one imports it from there. The three W0k/W0l
+# names sat here unused from `f169c3d` until this change -- an unused import of a
+# deliberately retired rule reads, to the next person opening this file, as though the
+# rule were still part of the render pipeline. Removing the name is what makes the
+# retirement legible.
 from .sections import extract_sections
 from .tables.flatten import (
     flatten_table,
@@ -6930,11 +6935,23 @@ def _render_pdf_to_markdown(
     # Rule-1 evidence, so a lone FFFD is only rewritten when this document's
     # unanimous mapping is known.
     md = _step(_report, "recover_fffd_comparison_operators", recover_fffd_comparison_operators, md)
-    # §A R5 / B7 (2026-05-23): recover DROPPED minus glyphs (pdftotext emits
-    # no glyph for U+2212 on certain fonts). Same 3-channel discipline as
-    # W0d above — body normalize covers body text; this final pass catches
-    # the table-cell / unstructured-table / raw_text fallback surfaces.
-    md = _step(_report, "recover_dropped_minus_via_ci_pairing", recover_dropped_minus_via_ci_pairing, md)
+    # W0g's SECOND-CHANNEL CALL SITE WAS HERE AND IS DELETED (2026-09-08),
+    # together with the channel-1 call in `normalize_text`. Removing it from one
+    # channel and not the other is the defect this repo keeps rediscovering: a
+    # body sentence and a flattened caption would give different answers for one
+    # input. (W0g was never wired into `tables/cell_cleaning.py`, so those two
+    # are ALL of its call sites -- verified by grep, not assumed from the
+    # three-channel phrasing this project usually needs.)
+    #
+    # THIS CALL SITE IS WHY THE DEFECT WAS IN THE SHIPPED OUTPUT. It ran W0g
+    # over markdown `normalize_text` had already normalized, so it was itself a
+    # SECOND pass, and W0g only matches once S5 has converted the en dashes
+    # pdftotext emits into ASCII hyphens. `render_pdf_to_markdown` on
+    # `korbmacher_2022_kruger` therefore published `p = -.0498` and `p = -.05`
+    # on the FIRST render -- negative probabilities, from a rule that paired a
+    # correlation's confidence interval with a p-value. Full reasoning at the
+    # channel-1 site; pinned by
+    # tests/test_w0g_must_not_fabricate_a_negative_p_value.py.
     # v2.4.44: final guarantee — decompose Latin typographic ligatures
     # (ﬁ->fi, ﬂ->fl, …) from the assembled markdown. normalize (body) and
     # cell_cleaning (table cells) cover their channels; this catches the

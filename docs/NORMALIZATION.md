@@ -458,7 +458,7 @@ consumers, not bookkeeping:
 | W0c / W0o | `<` as `\` or as `b` (`\.001`) | **TYPOGRAPHIC** | a literal backslash glued to a numeral is not text |
 | W0d | `2`-for-minus proven by point-estimate ∈ CI | INFERENTIAL | |
 | W0e | Adobe-Symbol PUA codepoints | **TYPOGRAPHIC** | codepoint table |
-| W0g | dropped minus proven by a CI bracket | INFERENTIAL | |
+| ~~W0g~~ | dropped minus "proven" by a CI bracket | **INFERENTIAL — REMOVED in 2.4.142** | UNWIRED from both of its text channels. It re-signed a bare positive decimal whenever a bracket in the same record made the arithmetic work, **without checking which statistic the bracket belonged to**. Measured over 250 papers it fired 12 times in 4, and **at least 7 of those 12 rewrote a quantity that is non-negative by definition** — `SE = 0.11` → `SE = -0.11`, `p = .05` → `p = -.05` — confirmed against the rasterized page. On `korbmacher_2022_kruger` the paper prints `r(223) = -0.13 (p = .0498, 95% CI [-0.26, -0.0002])`; the interval is `r`'s, and W0g published `p = -.0498`. THE THREE TIERS directive names CI containment as forbidden evidence, and its signature is `text: str`, so it could never consult the printed page. A bare positive decimal now reaches you exactly as printed. Definition kept and unwired so the evidence survives. |
 | W0h | dropped minus, proven by the layout's surviving `(cid:N)` | **TYPOGRAPHIC** | identity-based pairing since v2.4.133; REFUSES when context cannot separate candidates |
 | ~~W0i / W0k / W0l~~ | `×` extracted as `3` | **FILE LIE — REMOVED in 2.4.140/141** | Reclassified and UNWIRED from all three text channels. The classification above was wrong: the font's `/Differences` names the slot `/three` and its `/ToUnicode` maps it to U+0033, so the file is internally consistent and consistently wrong, and nothing the renderer emitted contradicts it — only the printed page does. Their signatures are `text: str` / `cell: str`, so they could never consult the page even in principle. Measured over 101 PDFs, W0k fired on 5 papers and **destroyed a real published token in 4 of them** (`HapMap3` -> `HapMap *`, `ASL TO3` -> `ASL TO *`). A printed `3` now reaches you verbatim. The definitions are kept and unwired so the evidence survives. |
 | W0j sig. A | `2`-for-minus in a contrast-coding note | INFERENTIAL, self-corroborating | the `+ X.X = <word>` twin on the same line is a second emitted token |
@@ -515,7 +515,10 @@ S9  Header/footer removal
      deleted v2.4.129-130; numbers pass through exactly as printed]
 A3b Statistical df-bracket harmonization
 W0  glyph-recovery family (see the section above for each step's EVIDENCE class)
-    W0_watermark, W0b, W0c, W0o, W0d, W0j, W0g,
+    W0_watermark, W0b, W0c, W0o, W0d, W0j,
+    [W0g WAS HERE — unwired in 2.4.142. It paired a CI with whatever bare
+     positive decimal made its arithmetic work, including p-values and
+     standard errors, which are non-negative by definition]
     [W0i / W0k / W0l WERE HERE — unwired in 2.4.140/141 as a FILE LIE;
      a printed digit 3 is never rewritten to a multiplication sign]
     W0q  ← new v2.4.134: detached CI-upper minus, body-prose channel
@@ -528,12 +531,13 @@ A6  Footnote marker removal
     normalized text + NormalizationReport
 ```
 
-**Ordering constraint (v2.4.134):** W0q runs immediately after W0g. It must run **after** the
-CI-pairing rules, because it rewrites the very bracket they read — repairing the bracket first
-would change what W0g adjudicates. It exposed a latent defect in exactly that seam: with the CI
-made parseable, W0g read the detached-minus ESTIMATE beside it as bare-positive and emitted
-`d = - -0.38`. `_already_carries_a_sign` closes that, and the idempotency corpus gate is what
-caught it.
+**Ordering constraint (v2.4.134), now HISTORICAL — recorded because it explains the seam.** W0q
+ran immediately after W0g, and had to run **after** the CI-pairing rules because it rewrites the
+very bracket they read. That seam exposed a latent defect: with the CI made parseable, W0g read
+the detached-minus ESTIMATE beside it as bare-positive and emitted `d = - -0.38`.
+`_already_carries_a_sign` closed that, and the idempotency corpus gate is what caught it. **W0g is
+unwired as of 2.4.142, so the constraint no longer binds anything** — W0q still runs where it did,
+and W0b/W0d, which remain, do not read the bracket W0q repairs.
 
 **Critical ordering constraint:** A1 must run before S9. If S9 runs first, standalone digits like `484` (from `p =\n484`) are stripped as page numbers before A1 can rejoin them.
 
