@@ -1,5 +1,114 @@
 # Changelog
 
+## [2.4.143] - 2026-09-12 - normalization 1.9.67 - table extraction 2.4.14
+
+### A DOI on its own continuation line is reference DATA, and three rules were deleting it
+
+When a reference's DOI wraps onto a line of its own -- a common reference-list
+layout -- docpluck deleted that line. The reference was delivered without its
+identifier. Nothing errored, nothing was logged, and no test went red.
+
+    Nosek, B. A., & Errington, T. M. (2020). What is replication? PLOS Biology, 18(3), e3000691.
+    https://doi.org/10/zzzzzzzzzz              <- this line was removed
+
+Three rules did it, and they are the whole of this release:
+
+| rule | scope | what it was for |
+|---|---|---|
+| P0 `^doi:\s*10\.\d{3,5}/\S+\s*$` | document-wide | per-page journal DOI footer |
+| P0 `^https?://(?:dx\.)?doi\.org/10\.\d{3,5}/\S+\s*$` | document-wide | same |
+| H0 banner pattern 0 (bare publisher URL) | first 30 lines | publisher landing page |
+
+**The justifying comment was false.** The two P0 patterns carried the sentence
+*"Distinct from in-text DOI mentions which never appear alone."* A reference
+whose DOI wraps **is** a DOI appearing alone -- and it is data.
+
+#### The arithmetic
+
+300 PDFs sampled `random.Random(20260912)` from a 10,049-PDF repository; 297
+English after the language filter (1 Spanish, 1 Portuguese, 1 bilingual
+excluded and reported rather than silently dropped):
+
+| | papers | firings |
+|---|---|---|
+| unique standalone DOI inside a References span -- **a destroyed identifier** | 117 of 297 (39.4%) | 649 |
+| genuine per-page journal footer -- correct | 2 | 27 |
+
+**27 / 676 = 4.0% accuracy.** That is the same arithmetic that condemned the
+EU-numeric conversion rules and `W0k`.
+
+Verified at the primary source rather than from the scan: `10.1525/collabra.138502`
+prints 133 DOIs and the academic render delivered **101**, losing all 32 of its
+standalone-DOI lines. Raw pdftotext line 2217 is
+`https://doi.org/10.1007/s11199-009-9664-y`, the wrapped tail of the entry
+ending `Sex Roles, 62(7-8), 520-531.` two lines above it.
+
+#### The genuine footer is still stripped
+
+A journal stamps its own DOI on **every** page, so that line **recurs**; a
+reference's wrapped DOI tail is unique. `P0r` already strips a line that repeats
+>= 3 times standalone, and `_BARE_DOI_IDENTIFIER_LINE` adds the shape there --
+verified firing on real papers (`10.1038/s41467-024-46784-w`, 19 standalone
+footer lines -> 0; `10.24425/mms.2021.137706`, 7 -> 0), so it is a live path and
+not a pattern that only its own test reaches.
+
+The line **content** is identical in the two cases, so content can never
+separate them. Recurrence can, and recurrence is what a running footer *is*.
+
+#### The header zone now has a content end-condition
+
+`H0`'s zone was a flat 30-line cap with no regard for what the lines contain, so
+on a short document -- a comment, an erratum, a letter, a two-page preprint
+cover -- it reaches the bibliography. Two end-conditions, each measured
+separately:
+
+1. **No line inside a References/Bibliography span is header furniture.** A
+   masthead and a bibliography are mutually exclusive regions.
+   `_find_references_spans` is the one definition of that region and this site
+   derives from it rather than carrying a second copy.
+2. **A DOI-identifier line introduced by a colon is the object of a sentence**,
+   so grammatically it cannot be a standalone banner. Front matter that prints
+   `All supplementary files can be accessed at OSF:` above
+   `https://doi.org/10.17605/OSF.IO/HA6KD` was losing the paper's materials
+   identifier. Measured both ways over the same 297 papers: of the 120
+   header-zone DOI lines carrying the article's **own** DOI, 1 has a colon
+   lead-in; of the 5 carrying a **different** identifier, 4 do. So the exemption
+   recovers 4 of 5 real identifiers and costs 1 of 120 furniture drops.
+
+A bare publisher landing page carries no DOI grammar and is still removed.
+
+#### Result
+
+Re-measured over the same 297 English papers after the fix: **649 reference-DOI
+losses -> 1.** The single residual is `10.24072/pci.rr.101017.rev11`, which
+prints a bioRxiv preprint URL with no colon lead-in. It is recorded rather than
+coded: one paper proves a shape exists and says nothing about how often it
+occurs, and a rule built for a single document is a mistake this project has
+made before.
+
+DOCX and HTML are unaffected and were checked rather than assumed -- those
+branches never call `normalize_text`, verified at the source and by probe.
+
+#### Why the normalization version bumps on a change that mostly removes rules
+
+Consumers store extracted text keyed on `NORMALIZATION_VERSION`. Leaving it at
+1.9.66 would make pre-fix and post-fix text indistinguishable in their store --
+and the pre-fix text is missing published identifiers.
+
+#### For consumers
+
+Text that previously arrived with a reference's DOI absent will now carry it.
+If you have stored extractions produced at normalization <= 1.9.66, a reference
+that reached you with no DOI may have had one: **re-extract before treating a
+missing DOI as evidence that the paper printed none.** This matters most where
+a missing DOI silently removes a reference from a coverage check rather than
+raising anything.
+
+Pinned by `tests/test_standalone_doi_line_is_reference_data.py`, which was proved
+red by re-inserting the two deleted patterns at runtime, and which carries
+three two-sided controls: an inline DOI still survives, a recurring page footer
+is still stripped, and a genuine publisher landing-page banner is still stripped.
+
 ## [2.4.142] - 2026-09-08 - normalization 1.9.66 - table extraction 2.4.14
 
 ### W0g is unwired: a confidence interval does not tell you which statistic it belongs to

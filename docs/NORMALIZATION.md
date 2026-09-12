@@ -241,9 +241,9 @@ documented here at summary level only.
 |------|---------|-------|
 | C0 | Line-final BACKSPACE strip (furniture debris) | **v1.9.58.** Removes U+0008 where it stands at the END of a line — running-header debris pdftotext glues onto a real line (`10.3389/fvets.2025.1645266` p2 emits its header as form feed + `Abuna et al.` + BS). Runs **before F0** so the F0 comparison key (`_key`, which has discarded this character since v1.9.57) and the emitted text are ONE rule rather than two. **Deliberately one character wide:** over the 30-paper held-out PMC corpus all 33 U+0008 occurrences carry the identical context `'.'` + BS + newline and none carry the overstrike signature, while U+0002/03/04/07 in the same corpus are corrupted CONTENT glyphs (`Schri\x02macher` = "Schrittmacher") that deleting would destroy. Those are **counted**, not stripped — see `residual_control_chars` below. |
 | F0 | Layout-aware running-header / footer / footnote strip | Requires `LayoutDoc` from `extract_pdf_layout`; populates `report.footnote_spans` (raw char offsets) and `report.footnote_texts` (the captured footnote strings, parallel — v2.4.83). Stripped footnotes move to an appendix after a `\n\f\f\n` marker. Optional. |
-| H0 | Document-header banner-line strip | Runs only in the first 30 lines; curated `_HEADER_BANNER_PATTERNS`. v1.8.0. |
+| H0 | Document-header banner-line strip | Curated `_HEADER_BANNER_PATTERNS`, first 30 lines, with **two content end-conditions** (v1.9.67): a line inside a References/Bibliography span is never header furniture (the 30-line cap is pure position and on a short document it reaches the bibliography), and a DOI-identifier line introduced by a colon-terminated lead-in is the object of a sentence rather than a banner. v1.8.0. |
 | T0 | TOC dot-leader paragraph strip | Drops paragraphs containing `_{3,}` runs in the head zone (first ~100 lines). v1.8.0. |
-| P0 | Page-footer / running-header LINE strip | Curated `_PAGE_FOOTER_LINE_PATTERNS` matching single complete lines. Includes `^Q. XIAO ET AL.$`, `^RECKELL et al.$`, `^CONTACT …$`, `^Department of …, University of <Place>, <Region>$`, `^Supplemental data for this article …$`, truncated `^Department of …, University of$`, JAMA/AOM/PMC footers, etc. v1.8.0 + v2.4.6 + v2.4.8 + v2.4.16. |
+| P0 | Page-footer / running-header LINE strip | Curated `_PAGE_FOOTER_LINE_PATTERNS` matching single complete lines. Includes `^Q. XIAO ET AL.$`, `^RECKELL et al.$`, `^CONTACT …$`, `^Department of …, University of <Place>, <Region>$`, `^Supplemental data for this article …$`, truncated `^Department of …, University of$`, JAMA/AOM/PMC footers, etc. v1.8.0 + v2.4.6 + v2.4.8 + v2.4.16. **The two standalone-DOI-line patterns were DELETED in v1.9.67** -- they fired document-wide at 4.0% accuracy (27 correct of 676 firings over 297 English papers), deleting 649 reference identifiers whose DOI had wrapped onto its own line. The genuine per-page DOI footer is now handled by P0r, which gates on >= 3 standalone repetitions. |
 | P1 | Front-matter metadata-leak PARAGRAPH strip | **v2.4.16.** Drops orphan acknowledgments / license blocks / "previous version" notes / correspondence blocks that pdftotext inlines as standalone single-line paragraphs mid-Introduction. Position-gated to the first `max(8000, len(text)//6)` chars so the legitimate `## Acknowledgments` section at the end is preserved. |
 | W0 | Publisher-overlay watermark strip | "Downloaded from …", "Provided by …", "This article is protected by copyright", Royal Society OA footer, Elsevier copyright stamp, two-column running-header, equal-contribution footnote. v1.7.0–v2.3.1. |
 
@@ -251,10 +251,19 @@ documented here at summary level only.
 
 P1 runs AFTER P0 because P0 already handles single-line variants of the
 patterns P1 catches at paragraph level. The two are complementary:
-P0 is globally safe (no position gate, matches full lines); P1 is
+P0 has NO position gate and matches full lines; P1 is
 position-gated and matches paragraph openings to catch multi-sentence
 acknowledgments / license blobs that pdftotext serialized on a single
 long physical line.
+
+This document previously called P0 "globally safe". **That was wrong, and the
+absence of a position gate is exactly why** (corrected v1.9.67): because P0
+fires anywhere, a curated pattern that is correct for a page footer is also
+applied to the reference list, and two of its DOI patterns were deleting a
+reference's identifier in 39.4% of English papers. A document-wide rule needs a
+signal that holds document-wide -- for a running footer that signal is
+REPETITION, which is what P0r uses -- not a shape that merely looks like
+furniture where you first noticed it.
 
 ---
 
