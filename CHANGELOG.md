@@ -1,6 +1,100 @@
 # Changelog
 
-## [2.4.143] - 2026-09-12 - normalization 1.9.67 - table extraction 2.4.14
+## [2.4.143] - 2026-09-12 - normalization 1.9.67 - table extraction 2.4.15
+
+### The table region was sized to the CAPTION, so published columns and rows were deleted
+
+Four defects in table-region detection. Each removed real printed data from the
+structured table with no error, no warning and no log line -- the failure mode a
+consumer cannot notice, because a dropped column looks exactly like a column the
+paper never had.
+
+**The clearest case.** `10.1001/jamanetworkopen.2023.39337` Table 3 is printed
+with seven columns -- `Variable` plus TRE / CR / Control, each at Baseline and
+6 mo. docpluck emitted two. Five of six data columns, plus the `Sodium, mg/d`
+and `Physical activity, steps/d` values of the one surviving column, appeared
+**zero times in the whole 59 KB render**. Not mis-parsed. Absent.
+
+| # | defect | consequence |
+|---|---|---|
+| a | `_horizontal_rules_in` required a rule to be entirely CONTAINED in the caption-width search band | the rules that establish the grid were invisible; furniture was not |
+| b | a rule drawn cell-by-cell arrives as one segment per column | only the segment under the caption was seen |
+| c | `_longest_aligned_run` compared column START edges only | the run severed where a right-aligned cell changed width |
+| d | a located region kept the MODAL body row's width | a column filled only in the header and one summary row fell outside it |
+
+**(a)** The search band is built at the caption's x-range, and a caption's width
+is unrelated to its table's. On page 9 the caption spans 141pt while each of
+Table 3's twenty horizontal rules spans 515pt, so `ln["x1"] <= x1 + 2` was
+`562.8 <= 191.1` -- false for every one. What survived were ten 10pt-wide row
+decorations, still enough to clear `LATTICE_MIN_HORIZONTAL_RULES`, so the
+lattice branch fired on furniture and produced a caption-width region. Camelot,
+handed a 141pt strip, correctly reported 2 columns. The filter is now keyed on
+x-OVERLAP, which is safe for a ruled line specifically because a rule does not
+cross a page's column gutter -- so a left-column table's rules still cannot
+reach a right-column table's.
+
+**(b)** On `ieee_access_2` page 55 the three header segments run 77.5->123.1,
+123.1->200.5 and 200.5->286.4 with the caption at 280.4->319.6, so overlap alone
+reached one segment of a three-column grid. Collinear end-to-end segments are
+merged before filtering; a rule drawn as a single span is returned unchanged.
+
+**(c)** `10.1371/journal.pmed.1004323` page 10, Table 3: the last two rows print
+bare counts where the rows above print percentages.
+
+    rows 1-9    x0 = 43.4 / ~276 / ~360     x1 = ragged / 309.6 / 394.2
+    fenylefrine x0 = 43.4 / 305.7 / 390.3   x1 = ragged / 309.5 / 394.2
+    ephedrine   x0 = 43.4 / 305.7 / 390.3   x1 = ragged / 309.5 / 394.2
+
+The right-aligned cells begin ~29pt further right -- past `_COLUMN_EDGE_TOL_PT`
+-- while **ending on exactly the same edge**. The run stopped early and
+`fenylefrine 0 3` / `ephedrine 0 2` were cut off. A column is now accepted when
+its START **or** its END edge holds, which is what a table actually is: a
+left-aligned label column beside right-aligned numeric ones. Widening the
+tolerance instead would approach the inter-column gutter and merge real columns.
+
+**(d)** The run locks onto the modal body shape, so a column populated only in
+the header and one summary row -- the ordinary shape of a results table stating
+its effect size once -- sits outside the region. Same paper: `Rel. risk (95% CI)
+1.19 (0.33-4.31)` and `P value 1.00` were outside the box Camelot was given, and
+Table 4 lost `0.79 (0.32-1.92)` and `0.60`. A located region is now widened to
+the full width of the rows it already contains that begin at its left edge.
+Gated OFF for the `caption_only` fallback, where no grid was found and widening
+is the documented cog_emo Table 8/9 regression.
+
+Table 4 of that paper also stops being a copy of Table 3. Its caption sat above
+the anesthetic-complications grid, so every surgical-reintervention row reached
+no structured table at all -- a caption over the wrong grid, which is worse than
+an empty one because nothing signals that the numbers belong elsewhere.
+
+#### The arithmetic
+
+40 PDFs sampled `random.Random(20260912)` from a 10,049-PDF repository; 25 carry
+at least one table caption (the denominator), 62 captioned regions between them.
+
+| | before | after |
+|---|---|---|
+| column-clipped regions | 43 | **34** |
+| papers improved / worsened | | **7 / 0** |
+| total overhang | 10,027 pt | 8,094 pt |
+
+That measures (a)+(b) only. The clip detector shares (d)'s left-edge criterion,
+so it cannot judge (d) and was not used to; (c) and (d) are evidenced by the
+rasterized page and by the regression tests instead.
+
+On the 6-paper canary set, 2 renders changed and 3 were **byte-identical**. A
+token census over both changed renders shows nothing was lost: pavlou gains 163
+token instances with **0** tokens reduced; plos_med gains 687 characters with
+**0** tokens vanished.
+
+One near-miss is worth recording. Fixing (d) first made `fenylefrine` and
+`ephedrine` disappear entirely -- they had existed in the document ONLY inside
+Table 4's accidental copy of Table 3, and correcting Table 4 took the copy with
+them. A fix that introduces a net data loss is not a fix; (c) is what closed it,
+and `test_table3_keeps_its_last_two_rows` pins it.
+
+Ground truth throughout is the rasterized page (`pdftoppm -r 130/150`), never
+another extractor.
+
 
 ### A DOI on its own continuation line is reference DATA, and three rules were deleting it
 
