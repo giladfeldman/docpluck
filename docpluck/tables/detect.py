@@ -119,6 +119,15 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
         geom_bbox = below_bbox
 
     full_bbox = _union(caption_bbox, geom_bbox)
+
+    # A GRID-located region must span the full width of the rows it already
+    # contains — see ``_widen_to_left_aligned_rows``. Gated on having actually
+    # located a grid: the ``caption_only`` fallback found none, so its band is a
+    # guess, and widening a guess is the documented cog_emo Table 8/9 regression
+    # (stacked tables, 8 columns collapsed to 2).
+    if signal != "caption_only":
+        full_bbox = _widen_to_left_aligned_rows(layout, page=cap.page, bbox=full_bbox)
+
     footnote = _detect_footnote_below(layout, page=cap.page, bbox=full_bbox)
     if footnote is not None:
         full_bbox = _union(full_bbox, footnote.bbox)
@@ -267,6 +276,67 @@ def _union(a: Bbox, b: Bbox) -> Bbox:
     return (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
 
 
+# A row "begins at the region's left edge" when its first word starts within
+# this many points of it. Wide enough to absorb an indented sub-row (a table's
+# indented breakdown labels sit ~7pt in), far below the distance to a
+# neighbouring text column's left edge on a two-column page (hundreds of points).
+_LEFT_EDGE_TOL_PT: float = 15.0
+
+
+def _widen_to_left_aligned_rows(layout: LayoutDoc, *, page: int, bbox: Bbox) -> Bbox:
+    """Extend ``bbox`` rightwards to cover the rows it ALREADY contains that begin
+    at its left edge. Only ever expands x1; x0 and the y-range are untouched.
+
+    WHY A LOCATED REGION CAN STILL BE TOO NARROW. ``_detect_geometry`` locates
+    the grid as the longest contiguous run of rows with the SAME word count and
+    aligned edges (``_longest_aligned_run`` requires rows of exactly ``width``
+    words). When a table's right-hand columns are populated on only the header
+    and one summary row — the ordinary shape of a results table whose relative
+    risk and p-value are stated once for the outcome and left blank on every
+    breakdown row — the MODAL body shape has fewer columns than the table does,
+    and the run's bbox stops short of them.
+
+    Measured on `10.1371/journal.pmed.1004323` page 10, Table 3::
+
+        y= 96  5 words  x 36.0 -> 574.0   ... Rel.risk(95%CI)  Pvalue     <- header
+        y=117  5 words  x 36.0 -> 573.1   ... 1.19(0.33-4.31)  1.00       <- summary
+        y=144  3 words  x 43.4 -> 394.2   desaturation 3/5(60.0%) 1/4(25.0%)
+        ... 10 more rows, all 3 words, all ending at x=394.2
+
+    The run locks onto the eleven 3-word rows, the region stops at x=394.2, and
+    the relative risk and its p-value — the pair a meta-analysis consumes — are
+    outside the box Camelot is given. The header row is the authoritative
+    statement of a table's column extent precisely because it is the one row
+    guaranteed to span every column; the modal body row is not.
+
+    WHY THE LEFT-EDGE TEST MAKES THIS SAFE. Only rows starting at the region's
+    own left edge can widen it, and on a genuine two-column page the
+    neighbouring text column starts hundreds of points to the right — so it can
+    never be pulled in. That is the ``ieee_access_7`` Table 3 regression which
+    blocks a blanket widen, and it is why ``_widen_to_content_x`` (which takes
+    ALL words in the band, at any x) needs the narrow/wide arbitration in
+    ``_detect_geometry_widen_aware`` while this does not.
+
+    Keyed on a layout invariant; paper-, font- and publisher-agnostic.
+    """
+    x0, top, x1, bottom = bbox
+    page_obj = layout.pages[page - 1]
+    rows: dict[float, list[dict]] = defaultdict(list)
+    for w in page_obj.words:
+        mid_y = (w["top"] + w["bottom"]) / 2
+        if top <= mid_y <= bottom:
+            bucket = round(mid_y / ROW_Y_BUCKET_PT) * ROW_Y_BUCKET_PT
+            rows[bucket].append(w)
+
+    widest = x1
+    for ws in rows.values():
+        first = min(ws, key=lambda w: w["x0"])
+        if abs(first["x0"] - x0) > _LEFT_EDGE_TOL_PT:
+            continue
+        widest = max(widest, max(w["x1"] for w in ws))
+    return (x0, top, widest, bottom)
+
+
 def _detect_geometry(layout: LayoutDoc, *, page: int, search_bbox: Bbox) -> tuple[GeometrySignal, Bbox] | None:
     """Returns (signal, geometry_bbox) if found, else None.
 
@@ -338,16 +408,90 @@ def _detect_geometry_widen_aware(
 
 
 def _horizontal_rules_in(page_obj, bbox: Bbox) -> list[dict]:
-    """Lines that are wider than tall and lie inside bbox (with small slack)."""
+    """Lines that are wider than tall, whose y sits in ``bbox`` and whose x-range
+    OVERLAPS it.
+
+    The x test is overlap, not containment, and that is the whole point. The
+    search band is built at the CAPTION's x-range (``_region_for_caption``),
+    and a caption's width is unrelated to its table's — so a containment test
+    (``x0 - 2 <= ln["x0"] and ln["x1"] <= x1 + 2``) is blind to exactly the
+    rules that establish the grid, and keeps only the narrow ones.
+
+    Measured on `10.1001/jamanetworkopen.2023.39337` page 9: the caption "Table
+    3. Dietary Intake and Physical Activity" spans 141pt while Table 3's twenty
+    horizontal rules each span x=47.9→562.8 (515pt). Containment rejected all
+    twenty (``562.8 <= 191.1`` is false) and kept ten 10pt-wide row
+    decorations at x=47.9→57.9 — still enough to clear
+    ``LATTICE_MIN_HORIZONTAL_RULES``, so the lattice branch fired and
+    ``_union_of_primitives`` over those decorations produced a region no wider
+    than the caption. Camelot, handed a 141pt strip, correctly reported 2
+    columns; five of six data columns were lost, and the dropped values
+    appeared NOWHERE in the rendered document.
+
+    Overlap is the safe widening test *for a ruled line specifically*, in a way
+    that word-extent widening is not: a rule does not cross a page's column
+    gutter, so a left-column table's rules still cannot reach a right-column
+    table's. That is why ``_widen_to_content_x`` (which scans WORDS) needs the
+    narrow/wide arbitration in ``_detect_geometry_widen_aware`` and this does
+    not. Keyed on a layout invariant; paper-, font- and publisher-agnostic.
+    """
     x0, top, x1, bottom = bbox
     out: list[dict] = []
+    for ln in _coalesced_horizontal_rules(page_obj):
+        if ln["x1"] >= x0 - 2 and ln["x0"] <= x1 + 2 and top - 2 <= ln["top"] <= bottom + 2:
+            out.append(dict(ln))
+    return out
+
+
+# A ruled line drawn CELL BY CELL arrives as one segment per column, not one
+# line. Segments within this much y of each other are the same ruled line, and
+# segments whose ends are within this much x of each other are one line drawn in
+# pieces. Both tolerances are sub-character-width, far below any real table's
+# inter-column gutter, so two side-by-side tables (separated by a gutter of tens
+# of points) are never merged into one rule.
+_RULE_SAME_Y_TOL_PT: float = 1.5
+_RULE_SEGMENT_GAP_TOL_PT: float = 3.0
+
+
+def _coalesced_horizontal_rules(page_obj) -> list[dict]:
+    """The page's horizontal rules, with per-cell segments merged into the single
+    ruled line they draw.
+
+    Why this is required for the overlap filter above to be correct: a segmented
+    rule only overlaps the caption band where the caption happens to sit. On
+    `ieee_access_2` page 55 the three header segments run x=77.5→123.1,
+    123.1→200.5 and 200.5→286.4 while the caption sits at x=280.4→319.6, so
+    overlap alone reaches ONLY the third segment and the region covers one
+    column of a three-column grid. Merged first, the line is x=77.5→286.4, it
+    overlaps the caption band, and the region covers the whole grid.
+
+    A rule drawn as one span (the common case — `jamanetworkopen.2023.39337`
+    page 9 draws each of its twenty rules as a single 515pt line) is returned
+    unchanged, so this is a no-op wherever segmentation is not in play.
+    """
+    segments: list[dict] = []
     for ln in page_obj.lines or ():
         width = ln["x1"] - ln["x0"]
         height = ln["bottom"] - ln["top"]
         if width > max(height, 0.5) * 5:
-            if x0 - 2 <= ln["x0"] and ln["x1"] <= x1 + 2 and top - 2 <= ln["top"] <= bottom + 2:
-                out.append(dict(ln))
-    return out
+            segments.append(dict(ln))
+    if not segments:
+        return []
+
+    merged: list[dict] = []
+    # Group by y first, then walk each group left-to-right joining touching ends.
+    for seg in sorted(segments, key=lambda s: (s["top"], s["x0"])):
+        for cur in reversed(merged):
+            if abs(cur["top"] - seg["top"]) > _RULE_SAME_Y_TOL_PT:
+                continue
+            if seg["x0"] <= cur["x1"] + _RULE_SEGMENT_GAP_TOL_PT:
+                cur["x0"] = min(cur["x0"], seg["x0"])
+                cur["x1"] = max(cur["x1"], seg["x1"])
+                cur["bottom"] = max(cur["bottom"], seg["bottom"])
+                break
+        else:
+            merged.append(seg)
+    return merged
 
 
 def _vertical_rules_in(page_obj, bbox: Bbox) -> list[dict]:
@@ -510,15 +654,20 @@ def _longest_aligned_run(
             continue
         run = [ordered[i]]
         col_sums = [w["x0"] for w in ordered[i][1]]
+        end_sums = [w["x1"] for w in ordered[i][1]]
         j = i + 1
         while j < n and len(ordered[j][1]) == width:
-            edges = [w["x0"] for w in ordered[j][1]]
-            ref_means = [s / len(run) for s in col_sums]
-            if not _edges_align(ref_means, edges):
+            starts = [w["x0"] for w in ordered[j][1]]
+            ends = [w["x1"] for w in ordered[j][1]]
+            k_run = len(run)
+            ref_starts = [s / k_run for s in col_sums]
+            ref_ends = [s / k_run for s in end_sums]
+            if not _edges_align(ref_starts, starts, ref_ends, ends):
                 break
             run.append(ordered[j])
-            for k, e in enumerate(edges):
-                col_sums[k] += e
+            for k in range(width):
+                col_sums[k] += starts[k]
+                end_sums[k] += ends[k]
             j += 1
         if best is None or len(run) > len(best):
             best = run
@@ -528,11 +677,45 @@ def _longest_aligned_run(
     return best
 
 
-def _edges_align(a: list[float], b: list[float]) -> bool:
-    """True if two equal-length column-start edge lists agree within tolerance."""
-    if len(a) != len(b):
+def _edges_align(
+    ref_starts: list[float],
+    starts: list[float],
+    ref_ends: list[float],
+    ends: list[float],
+) -> bool:
+    """True if every column agrees with the run on its START edge OR its END edge.
+
+    A column is aligned on whichever edge its content is set against, and a
+    scientific table uses BOTH conventions at once: the label column is
+    left-aligned (stable x0, ragged x1) while every numeric column is
+    right-aligned (stable x1, ragged x0). Testing x0 alone therefore severs a
+    run wherever a numeric cell's WIDTH changes materially — which is exactly
+    where a table stops reporting percentages and starts reporting bare counts.
+
+    Measured on `10.1371/journal.pmed.1004323` page 10, Table 3 — the eleven
+    body rows, per column::
+
+        rows 1-9    x0 = 43.4 / ~276 / ~360      x1 = ragged / 309.6 / 394.2
+        fenylefrine x0 = 43.4 /  305.7 / 390.3   x1 = ragged / 309.5 / 394.2
+        ephedrine   x0 = 43.4 /  305.7 / 390.3   x1 = ragged / 309.5 / 394.2
+
+    The last two rows print `0` and `3` where the rows above print
+    `3/5 (60.0%)`, so their right-aligned cells START ~29pt further right —
+    past ``_COLUMN_EDGE_TOL_PT`` — while ENDING on exactly the same edge. Under
+    the x0-only rule the run stopped at `medication given*:` and the region's
+    bottom cut both rows off: `fenylefrine 0 3` and `ephedrine 0 2` were lost.
+
+    Widening the tolerance instead would be the wrong fix — 29pt approaches the
+    inter-column gutter and would start merging genuinely distinct columns.
+    Reading the edge the column is actually set against costs nothing and is
+    keyed on a typographic invariant, not on any paper.
+    """
+    if not (len(ref_starts) == len(starts) == len(ref_ends) == len(ends)):
         return False
-    return all(abs(ea - eb) <= _COLUMN_EDGE_TOL_PT for ea, eb in zip(a, b))
+    return all(
+        abs(rs - s) <= _COLUMN_EDGE_TOL_PT or abs(re_ - e) <= _COLUMN_EDGE_TOL_PT
+        for rs, s, re_, e in zip(ref_starts, starts, ref_ends, ends)
+    )
 
 
 def _whitespace_columns_stable(layout: LayoutDoc, *, page: int, bbox: Bbox) -> bool:
