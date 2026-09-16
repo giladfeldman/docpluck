@@ -1469,12 +1469,30 @@ def _strip_document_header_banners(text: str) -> str:
     # introduced by a colon-terminated lead-in" -- never on a host, publisher
     # or journal name; a registry of identifier hosts would go stale silently.
     #
-    # KNOWN RESIDUAL, stated rather than patched: the 5th case
-    # (10.24072/pci.rr.101017.rev11, a PCI-RR recommendation document citing
-    # `https://www.biorxiv.org/content/10.1101/2025.03.18.643903v3`) has no
-    # colon lead-in and is still dropped. One paper proves the shape exists and
-    # says nothing about how often; a rule built for a single document is the
-    # mistake this project has made before, so it is recorded, not coded.
+    # KNOWN RESIDUAL, and CLOSED BY MEASUREMENT rather than left as a hunch:
+    # the 5th case (10.24072/pci.rr.101017.rev11, a PCI-RR recommendation
+    # document citing `https://www.biorxiv.org/content/10.1101/2025.03.18.643903v3`)
+    # has no colon lead-in and is still dropped.
+    #
+    # The obvious widening -- "exempt the identifier when the previous line does
+    # not end in sentence-terminal punctuation", i.e. when it CONTINUES a wrapped
+    # sentence -- was measured over the same 297 English papers before being
+    # rejected, two-sided, counting both what it would save and what it would
+    # cost. Of the header-zone identifier lines H0 drops with no colon lead-in:
+    #
+    #     OWN masthead DOI, previous line continues a sentence : 198
+    #     OWN masthead DOI, previous line ends a sentence      :  39
+    #     OTHER identifier, previous line continues a sentence :   0
+    #     OTHER identifier, previous line ends a sentence      :   1  <- the residual
+    #
+    # So the widening would recover ZERO identifiers and stop 198 correct
+    # furniture drops: it is not a weaker version of the colon rule, it is the
+    # wrong signal. The residual's own lead-in ("ver. 3, peer-reviewed and
+    # recommended by Peer Community in ...") ends in a period, so it sits on the
+    # same side of that line as the masthead cases and no punctuation signal can
+    # separate it. One paper proves a shape exists and says nothing about how
+    # often; a rule built for a single document is the mistake this project has
+    # made before. Recorded, not coded -- now with the count that says why.
     def _introduced_by_colon(idx: int) -> bool:
         if not _DOI_IDENTIFIER_IN_LINE.search(lines[idx]):
             return False
