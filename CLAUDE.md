@@ -64,6 +64,40 @@ by user directive 2026-05-14; re-affirmed 2026-05-15, 2026-05-17, and 2026-05-19
 doesn't matter pre-existing or not"). Full statement under "Critical hard
 rules" below; durable cross-session record in memory `feedback_fix_every_bug_found`.
 
+## ONE DIRECTORY. DO NOT CREATE A SECOND ONE.
+
+**User directive 2026-09-17:** *"there should be only one docpluck directory and it should include
+everything. do not create new directories."*
+
+Everything belonging to this project lives in this one checkout. **Do not create a sibling
+directory for any reason** — not to compare two commits, not to test a build at an older tag, not
+to hold "just the docs from revision X", and not as a scratch copy.
+
+**What happened, so the shape is recognisable.** Five sibling directories had accumulated beside
+this one: `docpluck-accf-docs`, `docpluck-e0b-docs`, `docpluck-head-sibling`, `docpluck-main-check`
+and `docpluck-v137-probe`. They were not stray copies and not forks — each was a `git worktree`, a
+second checkout of *this same repository* at an older commit, sharing this one's `.git`. That is
+why they looked like complete projects: they each had a `CHANGELOG.md`, a `docpluck/` package and
+a `docs/` folder, all frozen at whatever commit some past session was inspecting.
+
+They are the most dangerous kind of clutter, because **a stale worktree is indistinguishable from
+the real thing at a glance.** Open one by mistake and you read old documentation, run old code, or
+edit a file that will never be committed — and nothing warns you. All five were verified clean (no
+uncommitted work in any) before removal, and none held anything this checkout does not.
+
+**If you genuinely need a second checkout** — to build a real BEFORE arm for a measurement, which
+is the one case that justifies it — put it in the session scratchpad directory, never beside this
+repository, and remove it in the same run:
+
+```bash
+git worktree add "$SCRATCH/wt-<sha>" <sha>   # in the scratchpad, NOT a sibling
+git worktree remove --force "$SCRATCH/wt-<sha>"
+git worktree list        # must show only this checkout when you are done
+```
+
+**Standing check:** `git worktree list` is part of `/docpluck-cleanup`. Anything registered outside
+this directory and the scratchpad is reported, and removed once confirmed clean.
+
 ## ALL CORRESPONDENCE GOES IN `communications/` — NOWHERE ELSE
 
 **User directive 2026-09-17:** *"I'm seeing a lot of inbox/outbox etc. these should always all be
