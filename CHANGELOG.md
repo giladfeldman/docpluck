@@ -1,5 +1,218 @@
 # Changelog
 
+## [Unreleased] - one extraction per document
+
+**Version deliberately NOT bumped**, following the block below: `2.4.144` was
+already taken by the test-corpus work in this tree, and a second in-flight
+change tagging the same repo concurrently is not a thing to be clever about.
+Whoever ships next folds all three into one release and gives it a number.
+
+### The same upload was extracted, and re-extracted, and parsed four times
+
+A 72-page paper returned `HTTP 504` from `/api/analyze`. Part of why is that
+the endpoint ran the same work on the same bytes more than once. Measured by
+COUNTING CALLS rather than by reading the source - a counter wired only to the
+defining module reads zero on a graph that duplicates, because a
+`from X import y` binding is not updated by patching `X.y`, so the harness
+re-patches every importing module and shows a known-duplicated graph reporting
+2 before believing any 1.
+
+`/api/analyze` on `10.1001/jamanetworkopen.2023.48333`, 12 pages, 3 tables:
+
+| | before | after |
+|---|---|---|
+| `extract_pdf` | 2 | 1 |
+| `pdftotext` subprocesses | 6 | 3 |
+| `pdfplumber.open` | 6 | 3 |
+| full-document `extract_pdf_layout` | 2 | 1 |
+| page-subset `extract_pdf_layout` | 2 | 1 |
+| `camelot.read_pdf` | 5 | 5 |
+
+Separately, a bare `render_pdf_to_markdown(pdf_bytes)` called `extract_pdf`
+**twice** - once inside `extract_pdf_structured` and once inside
+`extract_sections`, with identical arguments on identical bytes. Measured from
+a clean checkout of `29acfb9`; it is 1 now.
+
+**No second-count is quoted here, deliberately.** Every latency figure produced
+for this incident came from a dirty tree, a contended machine or a cProfile run
+whose overhead was mistaken for wall time, and each was retracted. Call counts
+and single-run ratios survive that; absolute seconds do not. `camelot.read_pdf`
+is listed unchanged because it is the dominant stage and this change does not
+touch it - saying so is cheaper than letting a reader infer a speedup that was
+never measured.
+
+### What changed
+
+- `extract_pdf_structured(..., _raw_text=(text, method), _page_count=N)`
+  accepts an `extract_pdf` / `count_pages` result the caller already has.
+- `extract_sections(..., _raw_text=(text, method))` does the same, **PDF bytes
+  only**. Passing it with `text=` or with DOCX/HTML bytes RAISES rather than
+  being accepted and ignored - those branches reconstruct their text from
+  markup and never call `extract_pdf`, so the argument would have done nothing.
+  Same treatment `normalization_level` already gets one line above it.
+- `render_pdf_to_markdown` extracts once and hands the pair to both, lazily: a
+  render given both `_structured=` and `_sectioned=` still extracts nothing,
+  because neither callee would read it.
+- `max_input_bytes` is now enforced in `extract_pdf_structured` itself. It used
+  to live only inside the `extract_pdf` call that `_raw_text` skips, so a caller
+  passing precomputed text would have silently bypassed its own size cap - an
+  accept-precomputed parameter must not switch off a guard the skipped callee
+  was holding.
+
+`_layout_doc` needed no change at all. It has existed on both
+`extract_pdf_structured` (v2.4.73) and `render_pdf_to_markdown` (v2.4.74) and
+was simply never passed across the boundary between them - docpluck-review
+rule 35, an accept-precomputed parameter that exists and is not passed.
+
+### What was verified
+
+**Output identity, byte for byte, not a health metric.** A health metric can
+agree while one table cell differs, and a silently different cell is the exact
+failure this library exists to prevent. Each paper was run twice through the
+`/api/analyze` call graph - nothing shared, then everything shared - and the
+SHA-256 compared for: the rendered markdown, `structured["text"]`, every
+table's cells / html / caption, every figure caption, the `method` string and
+`page_count`. The bare-render path was compared the same way against the same
+render with the sharing stripped out of its two callees.
+
+Two-sided: a row where the shared arm did NOT reduce the parse count counts as
+a finding too, since that would mean the threading silently did nothing on that
+paper.
+
+### The one thing a caller has to get right
+
+`_raw_text` cannot be checked. Verifying that the pair really is `extract_pdf`
+over these same bytes with these same arguments would mean re-running the call
+the parameter exists to avoid. A caller that passes text from a *different*
+extraction gets structured output built over a string the function never saw -
+captions located in one buffer and sliced out of another. Hence the leading
+underscore, the contract stated in both docstrings, and the advice that a
+caller who cannot guarantee the identity should simply not pass it.
+
+### Still open after this change
+
+The service repo does not pass any of these yet, so **production still
+duplicates**. The pin on docpluck app `origin/master` is `v2.4.143`, which has
+no `_raw_text`, so the service change lands after this releases - and the
+`/analyze` handler is itself being rewritten in that repo right now for the
+stage-opt-in work. Naming it here rather than in a handoff footnote: the
+library half is inert until the caller threads it.
+
+## [Unreleased] — the column splice stopped reading pages it cannot act on
+
+**Version deliberately NOT bumped here.** `2.4.144` was in flight in this tree
+when this landed (another session's test-corpus work, which states the
+extraction pipeline is byte-for-byte unchanged — true of that change, not of
+this one). Whoever ships next folds this into one release and gives it a number;
+two sessions tagging the same repo concurrently is not a thing to be clever
+about.
+
+### `extract_pdf` parsed the whole document to correct a handful of pages
+
+`extract_pdf` runs two cheap text-only detectors over pdftotext's output, and if
+EITHER flags any page it calls `extract_pdf_layout(pdf_bytes)` — a full-document
+pdfplumber parse — then splices corrections into the flagged pages and no
+others. Geometry for every unflagged page was parsed and discarded.
+
+Measured 2026-09-17 on a 72-page RSOS paper (2.0 MB, 159,030 chars):
+
+| | |
+|---|---|
+| bare `pdftotext` | 1.03 s |
+| `extract_pdf_layout` over all 72 pages | 25.3 s |
+| the splice itself | 0.02 s |
+| pages flagged | 23 |
+| pages changed | **0** |
+
+Inside that 25.3 s, `p.chars` — the per-page content-stream parse — is **81.9%**;
+`extract_text` / `extract_words` / span clustering are 6.4 / 5.0 / 4.8% and are
+near-free because they reuse it. So the cost is per PAGE READ, and reading fewer
+pages is the only lever; pruning fields would save nothing.
+
+Why that paper changed nothing, established by per-page probe rather than by
+reading the config: of the 23 flagged pages, **18 have no histogram midline at
+all** (it is a single-column paper) and the remaining 5 fail the bilateral
+column gate. Every one returns `""`. That is DATA-dependent — it is not knowable
+in advance from any cheap signal — so the fix is not "skip the pass", it is
+"read only the pages the splice can act on".
+
+### What changed
+
+- `extract_pdf_layout(pdf_bytes, pages=[...])` takes optional 0-based page
+  indices. The returned `LayoutDoc` still has **one entry per PDF page at its
+  real index**, so `doc.pages[i]` keeps meaning page `i` for every caller;
+  unrequested pages are empty placeholders carrying only their real
+  width/height. Out-of-range indices are ignored, because callers derive page
+  numbers from pdftotext form feeds, which can exceed pdfplumber's page count
+  by one on a trailing feed.
+- `LayoutDoc.populated_pages` records which pages carry geometry. `None` means
+  "all of them" and is what every existing call returns, so nothing about the
+  default changed. It exists because a 72-page doc whose 49 unrequested pages
+  are silently empty is otherwise indistinguishable from a document whose pages
+  really are blank.
+- `extract_pdf` now asks for exactly the flagged pages.
+- `require_full_layout()` refuses a subset doc where a full one is meant.
+  `extract_pdf_structured` and `render_pdf_to_markdown` both accept a
+  precomputed `_layout_doc` and both sweep every page with it; handed a subset
+  they would report "no table on page 40" when page 40 was never read — silent,
+  plausible and wrong. Both now check at the boundary.
+
+### What was verified
+
+**Output identity, not shape.** `extract_pdf` was run over the 26-paper render
+corpus in three correction regimes (default, `DOCPLUCK_COLUMN_CORRECT_GENERAL`,
+`+_BANDED`) before and after, from two separate checkouts, comparing the SHA-256
+of the text and the exact `+column_corrected:<pages>` list. The two-sided
+control matters: **32 of those 78 runs, across 22 distinct papers, do produce a
+correction**, including one in the default regime — a comparison that never
+exercised the correction path would have been a green from an empty input.
+
+## [2.4.144] - 2026-09-17 - normalization 1.9.68 - table extraction 2.4.15
+
+Test infrastructure only. The extraction and normalization pipelines are
+byte-for-byte unchanged, which is why `NORMALIZATION_VERSION` does not move.
+
+### The test corpus resolves through the article custodian by DOI, not from a directory
+
+The suite read its 101 papers from a directory in a sibling project. Two things
+were wrong with that, and the second is the one that mattered.
+
+**Custody.** Published article PDFs live in exactly one place. Every one of the
+101 was already held there by content hash, so the directory bought nothing.
+
+**A missing paper SKIPPED.** `pdf.exists()` returned False, `pytest.skip` fired,
+and the run stayed green. Deleting that directory would have switched off the
+corpus-backed coverage of 73 test files without turning anything red. The
+consumer surface was 88 files in six different path shapes, and the gate meant to
+catch exactly this — `test_every_named_test_pdf_resolves.py` — scanned only two
+of the six, so roughly fifty files were invisible to it.
+
+**What is new.** `docpluck.testing` ships a resolver and a committed manifest
+mapping each corpus name to `{doi, held_at, sha256}`. It is a public module
+because the service's test suite imports the same one: two copies of a corpus
+resolver drift, and then the two suites disagree about what "the corpus" is
+without either going red.
+
+- A named paper that is not in custody now FAILS. 34 `skipif` decorators and 64
+  in-body skip guards were deleted for it.
+- The paper set for every corpus-wide sweep comes from the manifest, never a
+  glob. A glob takes its denominator from its own numerator: it reports 40/40 on
+  a corpus that has silently shrunk from 101.
+- The bytes are verified, not just the existence. Three of the 101 are SECONDARY
+  manifestations — the custodian holds two distinct files under one DOI and the
+  tests were calibrated against the second — so resolving by DOI alone would
+  hand the suite different bytes and shift layout assertions untraceably.
+
+**Control, run while both copies still existed:** all 101 papers are
+byte-identical between the old directory and what the manifest resolves to, so
+this changes nothing the tests read. The failure path is proven too: with
+`ARTICLE_REPOSITORY` pointed at a nonexistent path the corpus gate fails rather
+than skipping.
+
+Also fixed in passing: one fixture resolver that existed in ten pasted copies is
+now one function; a `conftest.py` docstring asserting the corpus "exists and
+holds 0 PDFs" (it held 101, and 73 files used it) is corrected.
+
 ## [2.4.143] - 2026-09-16 - normalization 1.9.68 - table extraction 2.4.15
 
 ### ONE CONCEPT, ONE TABLE: the two new DOI-identifier regexes disagreed with each other

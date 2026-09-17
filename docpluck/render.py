@@ -6698,7 +6698,9 @@ def _render_pdf_to_markdown(
         report = _report
     _report = report
     if _layout_doc is not None:
-        layout_doc = _layout_doc
+        # See extract_pdf_structured: a page-subset LayoutDoc sweeps wrong.
+        from .extract_layout import require_full_layout
+        layout_doc = require_full_layout(_layout_doc, who="render_pdf_to_markdown")
     else:
         try:
             from .extract_layout import extract_pdf_layout
@@ -6707,17 +6709,45 @@ def _render_pdf_to_markdown(
             layout_doc = None
 
     # 1. Structured extraction (text + Camelot tables + figures).
+    #
+    # ONE pdftotext run, not two. `extract_pdf_structured` and
+    # `extract_sections` below each called `extract_pdf(pdf_bytes)` with the
+    # same default arguments on the same bytes, so a bare
+    # `render_pdf_to_markdown(pdf_bytes)` spawned pdftotext twice and — on any
+    # document whose column detectors flag a page — ran the layout splice
+    # twice too. Measured 2026-09-17. Resolved by extracting once here and
+    # handing the pair to both; each accepts it under a stated
+    # same-bytes/same-arguments contract, which this call site satisfies by
+    # construction because it makes the call itself.
+    #
+    # Deliberately lazy: neither callee runs `extract_pdf` when the caller
+    # already supplied its result, so a render given BOTH `_structured=` and
+    # `_sectioned=` must not pay for an extraction nobody will read.
+    _shared_raw: tuple[str, str] | None = None
+
+    def _raw_pair() -> tuple[str, str]:
+        nonlocal _shared_raw
+        if _shared_raw is None:
+            from .extract import extract_pdf as _extract_pdf
+            _shared_raw = _extract_pdf(pdf_bytes)
+        return _shared_raw
+
     if _structured is not None:
         structured = _structured
     else:
-        structured = extract_pdf_structured(pdf_bytes, _layout_doc=layout_doc)
+        structured = extract_pdf_structured(
+            pdf_bytes, _layout_doc=layout_doc, _raw_text=_raw_pair()
+        )
     if structured["text"].startswith("ERROR:"):
         return structured["text"]
 
-    # 2. Section detection from the raw text. extract_sections internally
-    #    re-runs extract_pdf + normalize_text on the bytes — we let it do
-    #    that so the normalized_text it stores aligns with the section
-    #    char_offsets it produces.
+    # 2. Section detection from the raw text. extract_sections runs
+    #    normalize_text itself — we let it, so the normalized_text it stores
+    #    aligns with the section char_offsets it produces. It no longer
+    #    re-runs `extract_pdf`: it is handed the same pair
+    #    `extract_pdf_structured` was built over (2026-09-17). This comment
+    #    read "re-runs extract_pdf + normalize_text" and was the justification
+    #    for letting it; only the normalize half was ever the reason.
     if _sectioned is not None:
         sectioned = _sectioned
     else:
@@ -6737,6 +6767,9 @@ def _render_pdf_to_markdown(
             # already computed above so the section/normalize path can read the
             # surviving `(cid:N)` minus glyph without a 3rd pdfplumber pass.
             _dropped_minus_layout=layout_doc,
+            # Same pdftotext output `extract_pdf_structured` was built over,
+            # rather than a second identical run of it.
+            _raw_text=_raw_pair(),
         )
 
     # 3. Render sections + splice tables/figures.

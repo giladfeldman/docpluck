@@ -91,6 +91,8 @@ def extract_pdf_structured(
     max_input_bytes: int | None = None,
     extract_timeout_seconds: int = 120,
     _layout_doc=None,
+    _raw_text: tuple[str, str] | None = None,
+    _page_count: int | None = None,
 ) -> StructuredResult:
     """Extract text + structured tables + figures from a PDF.
 
@@ -110,6 +112,8 @@ def extract_pdf_structured(
             max_input_bytes=max_input_bytes,
             extract_timeout_seconds=extract_timeout_seconds,
             _layout_doc=_layout_doc,
+            _raw_text=_raw_text,
+            _page_count=_page_count,
         )
     result["fallbacks"] = dict(fb.counters)
     result["fallback_details"] = fb.details
@@ -124,6 +128,8 @@ def _extract_pdf_structured(
     max_input_bytes: int | None = None,
     extract_timeout_seconds: int = 120,
     _layout_doc=None,
+    _raw_text: tuple[str, str] | None = None,
+    _page_count: int | None = None,
 ) -> StructuredResult:
     """Extract text + structured tables + figures from a PDF.
 
@@ -138,6 +144,31 @@ def _extract_pdf_structured(
             ``len(pdf_bytes)`` exceeds it, a ValueError is raised.
         extract_timeout_seconds: Timeout passed to ``extract_pdf`` for the
             pdftotext subprocess. Default 120 seconds preserves prior behavior.
+        _raw_text: Optional pre-computed ``extract_pdf(pdf_bytes)`` result, as
+            the ``(text, method)`` pair that call returns. When provided, the
+            internal ``extract_pdf`` call is skipped — one pdftotext subprocess
+            and, on any document whose column detectors flag a page, one
+            pdfplumber parse.
+
+            **The caller's contract, and it is the whole risk of this
+            parameter.** The pair MUST be ``extract_pdf`` over the SAME
+            ``pdf_bytes`` with the SAME ``max_input_bytes`` and
+            ``extract_timeout_seconds``. Nothing here can check that without
+            re-running the call this exists to avoid, so a caller that passes
+            text from a *different* extraction gets structured output built
+            over a string this function never saw — table captions located in
+            one buffer and sliced out of another. That is the silently-wrong
+            cell this project exists to prevent, so the parameter is
+            underscored, and callers that cannot guarantee the identity should
+            simply not pass it.
+
+            Introduced 2026-09-17: ``/api/analyze`` ran ``extract_pdf`` for its
+            raw-text stage and then this function re-ran it, byte for byte, on
+            the same upload.
+        _page_count: Optional pre-computed ``count_pages(pdf_bytes)``. Same
+            contract, same bytes. On a compressed-stream PDF ``count_pages``
+            falls back to opening the document with pdfplumber, so the
+            duplicate is not free.
         _layout_doc: Optional pre-computed ``extract_pdf_layout(pdf_bytes)``
             result. When provided, the §A R1 whitespace_cells fallback path
             reuses it instead of re-extracting (saves one pdfplumber pass
@@ -149,12 +180,25 @@ def _extract_pdf_structured(
     Returns:
         StructuredResult dict.
     """
-    raw_text, base_method = extract_pdf(
-        pdf_bytes,
-        max_input_bytes=max_input_bytes,
-        pdftotext_timeout_seconds=extract_timeout_seconds,
-    )
-    page_count = count_pages(pdf_bytes)
+    if max_input_bytes is not None and len(pdf_bytes) > max_input_bytes:
+        # RAISED HERE, NOT ONLY INSIDE `extract_pdf`. When `_raw_text` is
+        # supplied the `extract_pdf` call below does not happen, and with it
+        # went the only enforcement of this cap — so a caller passing
+        # precomputed text would have silently bypassed its own size limit.
+        # An accept-precomputed parameter must not quietly disable a guard the
+        # skipped callee was holding.
+        raise ValueError(
+            f"PDF input exceeds max_input_bytes: {len(pdf_bytes)} > {max_input_bytes}"
+        )
+    if _raw_text is not None:
+        raw_text, base_method = _raw_text
+    else:
+        raw_text, base_method = extract_pdf(
+            pdf_bytes,
+            max_input_bytes=max_input_bytes,
+            pdftotext_timeout_seconds=extract_timeout_seconds,
+        )
+    page_count = count_pages(pdf_bytes) if _page_count is None else _page_count
 
     if raw_text.startswith("ERROR:"):
         return {
@@ -247,7 +291,11 @@ def _extract_pdf_structured(
     # few lines below for any document with table captions, and the symbol-font
     # scan at the end of this function materialises it for every document that
     # still lacks one. This moves that single pass EARLIER; it does not add one.
-    layout_doc = _layout_doc
+    # A page-SUBSET LayoutDoc (`extract_pdf_layout(pages=...)`) is
+    # refused here rather than used: every consumer below sweeps all pages, so a
+    # subset would report "no table on page 40" when page 40 was never read.
+    from .extract_layout import require_full_layout
+    layout_doc = require_full_layout(_layout_doc, who="extract_pdf_structured")
     if not camelot_disabled:
         if layout_doc is None:
             try:

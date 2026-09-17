@@ -35,6 +35,7 @@ def extract_sections(
     preserve_math_glyphs: bool = False,
     normalization_level: NormalizationLevel | None = None,
     _dropped_minus_layout=None,
+    _raw_text: tuple[str, str] | None = None,
 ) -> SectionedDocument:
     """Public entry point. Either pass `file_bytes` (with optional
     source_format hint) or pre-extracted `text` + required `source_format`.
@@ -56,6 +57,17 @@ def extract_sections(
             (v2.4.126 — the parameter previously existed one layer up, on
             ``render_pdf_to_markdown``, where it was accepted, documented as
             forwarded, and silently discarded.)
+        _raw_text: Optional pre-computed ``extract_pdf(file_bytes)`` result, as
+            the ``(text, method)`` pair. **PDF bytes only** — it is the only
+            branch that calls ``extract_pdf``, so passing it with ``text=`` or
+            with DOCX/HTML bytes raises rather than being ignored. The pair MUST
+            come from ``extract_pdf`` over these same bytes with default
+            arguments, which is exactly what this branch would have called;
+            nothing here can verify that without re-running the call the
+            parameter exists to avoid. Introduced 2026-09-17 so
+            ``render_pdf_to_markdown`` can run pdftotext once instead of twice
+            (``extract_pdf_structured`` and this function each ran it on the
+            same bytes).
     """
     level = (
         NormalizationLevel.academic
@@ -77,6 +89,19 @@ def extract_sections(
                 "the text yourself before calling, or omit the argument."
             )
 
+    def _reject_raw_text_for_markup(fmt: str, raw) -> None:
+        """Refuse ``_raw_text`` on a branch that never calls ``extract_pdf``.
+
+        Same reasoning as ``_reject_unusable_level`` directly above: the DOCX
+        and HTML branches reconstruct their text from markup, so a supplied
+        pair would be accepted and then have no effect at all.
+        """
+        if raw is not None:
+            raise ValueError(
+                f"_raw_text is not applicable to {fmt.upper()} input: only the "
+                "PDF branch runs extract_pdf. Omit the argument."
+            )
+
     if text is not None:
         if source_format is None:
             raise ValueError(
@@ -86,6 +111,11 @@ def extract_sections(
         # Caller-supplied text has already been through whatever pipeline the
         # caller chose; docpluck does not re-normalize it.
         _reject_unusable_level("extract_sections(text=...)")
+        if _raw_text is not None:
+            raise ValueError(
+                "_raw_text is not applicable to extract_sections(text=...): "
+                "that path runs no extraction. Pass one or the other."
+            )
         from .core import extract_sections_from_text
         return extract_sections_from_text(text, source_format=source_format)
 
@@ -112,7 +142,10 @@ def extract_sections(
         from .annotators.text import annotate_text
         from .core import partition_into_sections
 
-        raw_text, _method = extract_pdf(file_bytes)
+        if _raw_text is not None:
+            raw_text, _method = _raw_text
+        else:
+            raw_text, _method = extract_pdf(file_bytes)
         normalized, report = normalize_text(
             raw_text,
             level,
@@ -130,6 +163,8 @@ def extract_sections(
             sectioning_version=SECTIONING_VERSION,
             source_format="pdf",
         )
+
+    _reject_raw_text_for_markup(fmt, _raw_text)
 
     if fmt == "html":
         _reject_unusable_level("HTML input")
