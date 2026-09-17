@@ -110,8 +110,18 @@ arriving from a consumer, one going out, a reply, a feature request, a session-t
 write-up, an investigation note, a corpus work queue, and anything else of that shape whatever
 you decide to call it.
 
-One flat folder, deliberately. The filenames already carry their own prefix, so an alphabetical
-listing groups them without a directory tree, and there is no nested path to keep in sync.
+One flat folder, and the reason matters more than the tidiness argument. Subfolders were built
+first — one per correspondence type — and the public-repo pre-commit guard **blocked the commit**:
+one of those directory names is a path segment the guard treats as a leak signal wherever it
+appears in a tracked file, including in a `.gitignore` rule and in this very sentence, which is why
+the name is not spelled here. The narrow exemption the guard itself offers was correctly refused —
+weakening a security gate is the owner's call, not a passing session's. Renaming the directory to
+dodge a substring match was the other way out, and that is the shape this portfolio treats as a red
+flag: a workaround that makes one tool imitate another. Flattening removed the path entirely and
+costs nothing, because the filename prefixes already group an alphabetical listing.
+
+**So do not reintroduce subfolders.** It is not a style preference — it re-triggers a blocking gate,
+and reading this paragraph as mere tidiness is exactly how that would happen.
 
 `communications/` is gitignored **as a directory**, also deliberately. Every correspondence leak
 this repo has had came from a naming convention nobody had imagined yet — `INBOX_` in 2026-08-07,
