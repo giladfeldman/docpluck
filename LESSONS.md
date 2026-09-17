@@ -2288,3 +2288,42 @@ actually emitted. And the discriminator had to be *both*, because the same paper
 so a number-prefix-only escape would have opened a back-matter label in the middle of the article
 and handed the whole body to a DROP class. Measured blast radius of the shipped rule across 30
 papers: **it fires once**, and the near-miss is the only other candidate.
+
+---
+
+## L-057 — A "derive from it" comment is not a guarantee; the second definition still needs to be checked
+
+**2026-09-16, `/docpluck-review` of the v1.9.67 DOI-line fix, found before it reached a release.**
+
+`_DOI_IDENTIFIER_IN_LINE` was added with a comment reading *"A second copy of this concept WILL
+drift from this one, so derive from it rather than restating it."* Nine lines below its own file,
+in the same commit, `_BARE_DOI_IDENTIFIER_LINE` restated the DOI grammar independently anyway —
+`10\.\d{3,9}/\S+` and `10/[a-zA-Z0-9]+`, hand-typed a second time rather than imported. The
+warning correctly named the risk and then the very commit that wrote it walked past it, because
+nothing ever printed both regexes' verdict on the same input.
+
+**The rule this file already states (ONE CONCEPT, ONE TABLE) says how to verify a candidate: build
+an input that reaches both paths and print both outputs.** Doing that here found a real
+divergence in one try: `doi:10/gt3vmw` (a `doi:`-prefixed shortDOI) matched
+`_BARE_DOI_IDENTIFIER_LINE` and was missed by `_DOI_IDENTIFIER_IN_LINE`, which only recognised the
+short form after a `doi.org`/`dx.doi.org` URL prefix. Nobody had constructed that input before
+shipping — the warning comment was read as a promise the code had kept, not as a question still
+open.
+
+**The generalization.** A comment that predicts a failure mode is not evidence the failure mode
+was checked for — it is evidence someone thought about it, which is not the same thing. When a
+review encounters a "these two must stay in sync" comment sitting beside a *second* pattern
+literal, that is exactly the signal to run the two-sided probe, not to trust the comment as
+confirmation it already happened. Fixed same-session: both regexes now derive their DOI shapes
+from one shared `_DOI_FULL_FORM` / `_DOI_SHORT_FORM` pair (normalize.py v1.9.68).
+
+**AND THE SECOND HALF, which this lesson would be dangerous without: the divergence was found
+by a CONSTRUCTED string, so it is evidence about the CODE and says nothing about how often the
+shape occurs.** Measured before the fix shipped, over 200 PDFs (199 English; 1 Spanish excluded
+and reported) sampled seed 20260912: the newly-exempt shape occurs **0 lines in 0 papers**, while
+the same scan's control — any bare short-form `10/xxxx` — fires on **8 lines in 8 papers**, so the
+zero is a property of the corpus rather than of a broken search. The unification is therefore
+INERT on real documents. It was kept because it removes a duplicated grammar, NOT because a paper
+was losing a DOI to it, and a later reader must not cite L-057 as a corpus defect. Regenerate with
+`python tools/diag/doi_short_form_prevalence.py --sample 200 --seed 20260912` — the numbers are
+quoted here only because that command reproduces them.

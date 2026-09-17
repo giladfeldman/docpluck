@@ -1,6 +1,33 @@
 # Changelog
 
-## [2.4.143] - 2026-09-12 - normalization 1.9.67 - table extraction 2.4.15
+## [2.4.143] - 2026-09-16 - normalization 1.9.68 - table extraction 2.4.15
+
+### ONE CONCEPT, ONE TABLE: the two new DOI-identifier regexes disagreed with each other
+
+Found in code review of the v1.9.67 DOI fix below. `_DOI_IDENTIFIER_IN_LINE`
+(used by the H0 colon-lead-in exemption) and `_BARE_DOI_IDENTIFIER_LINE` (used
+by the P0r running-footer predicate) each independently restated the DOI
+grammar — exactly the drift the comment on the first one warned against — and
+disagreed on a `doi:`-prefixed short-form DOI (`doi:10/gt3vmw`): matched by
+`_BARE_DOI_IDENTIFIER_LINE`, missed by `_DOI_IDENTIFIER_IN_LINE`, which only
+recognised the short form after a `doi.org`/`dx.doi.org` URL prefix. Verified
+by printing both regexes' output on the same input, not inferred from reading.
+Both now derive from one shared `_DOI_FULL_FORM` / `_DOI_SHORT_FORM` pair.
+**THIS VERSION MUST BUMP** even though the change only widens one predicate:
+a `doi:`-prefixed short-form DOI on a colon-introduced header-zone line now
+survives where it previously did not, so consumer text keyed on this string
+changes for that narrow shape. **PREVALENCE, MEASURED rather than asserted** — a divergence found by a
+constructed string is evidence about the code, never about the corpus. Over
+200 PDFs (199 English; 1 Spanish excluded and reported) sampled seed 20260912
+from the article repository, the newly-exempt shape occurs **0 lines in 0
+papers**. The measurement is two-sided, so that zero is a property of the
+corpus and not of a broken search: the same scan's control — any bare
+short-form `10/xxxx` — fires on **8 lines in 8 papers**. So the change is
+INERT on real documents and is kept because it removes a duplicated grammar,
+not because the shape was observed. Regenerate with
+`python tools/diag/doi_short_form_prevalence.py --sample 200 --seed 20260912`.
+
+### Also in this release — the normalization 1.9.67 and table-extraction 2.4.15 work
 
 ### The table region was sized to the CAPTION, so published columns and rows were deleted
 

@@ -28,9 +28,33 @@ def _resolve_fixture(fixture_id: str) -> Path:
     pytest.skip(f"Fixture id not in manifest: {fixture_id}")
 
 
-def _run(*args: str, timeout: int = 120) -> subprocess.CompletedProcess:
+# Each test here spawns a REAL `python -m docpluck` subprocess against a real
+# PDF, so its wall time is a function of how loaded the machine is -- not of
+# whether the code is correct. Under `pytest -n auto` on 14 workers the whole
+# box is saturated and a 120s budget expires: measured 2026-09-16, the full
+# parallel suite reported `test_figures_only_omits_tables` and
+# `test_html_tables_to_writes_html_files` as FAILED on
+# `subprocess.TimeoutExpired`, and the same file run serially passed 7/7 in
+# 192s. That is a false RED in the release gate, which costs more than a false
+# green because it sends someone hunting a regression that does not exist.
+#
+# So the budget scales with the load, exactly as `test_benchmark_docx_html.py`
+# already does for its elapsed-time assertions. The SERIAL number is the real
+# gate and is deliberately left tight; the parallel one is load-tolerant. This
+# is a TIMEOUT, not an assertion -- a genuinely hung CLI still fails, it just
+# gets longer to prove it.
+_SUBPROCESS_TIMEOUT_S = 480 if os.environ.get("PYTEST_XDIST_WORKER") else 120
+
+
+def _run(*args: str, timeout: int | None = None) -> subprocess.CompletedProcess:
     cmd = [sys.executable, "-m", "docpluck", *args]
-    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=timeout)
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=_SUBPROCESS_TIMEOUT_S if timeout is None else timeout,
+    )
 
 
 def test_structured_flag_outputs_json():

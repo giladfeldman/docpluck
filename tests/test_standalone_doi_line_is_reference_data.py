@@ -285,3 +285,22 @@ def test_doi_identifier_definition_excludes_landing_pages() -> None:
     assert not N._DOI_IDENTIFIER_IN_LINE.search(
         "www.invented-publisher.com/inventedjournal"
     )
+
+
+def test_the_two_doi_regexes_agree_on_a_colon_prefixed_short_form() -> None:
+    """L-057 (2026-09-16, docpluck-review). ``_DOI_IDENTIFIER_IN_LINE`` and
+    ``_BARE_DOI_IDENTIFIER_LINE`` each carried their own DOI grammar and
+    disagreed on ``doi:10/gt3vmw`` -- a ``doi:``-prefixed shortDOI -- matched by
+    one and missed by the other, the exact class rule 0b (ONE CONCEPT, ONE
+    TABLE) exists to catch. Both now derive from the shared `_DOI_FULL_FORM` /
+    `_DOI_SHORT_FORM` pair; pin that they stay in agreement rather than trust
+    the comment that says they should."""
+    line = "doi:10/gt3vmw"
+    assert N._DOI_IDENTIFIER_IN_LINE.search(line), (
+        "regression: _DOI_IDENTIFIER_IN_LINE stopped recognising a "
+        "doi:-prefixed short-form DOI"
+    )
+    assert N._BARE_DOI_IDENTIFIER_LINE.match(line), (
+        "regression: _BARE_DOI_IDENTIFIER_LINE stopped recognising a "
+        "doi:-prefixed short-form DOI"
+    )
