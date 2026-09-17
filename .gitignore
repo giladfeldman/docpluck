@@ -47,6 +47,24 @@ TRIAGE_*
 TODO.md
 todo.md
 
+# --- Local convenience launcher (never public) ---
+# `start_app.bat` is a local shim that starts the application which wraps this
+# library. It assumes one machine's directory layout and names a repository that
+# is not public, so it must not reach the public remote. Added 2026-09-17 with
+# the file itself.
+start_app.bat
+
+# --- communications/ : the ONE home for all correspondence and handoffs ---
+# 2026-09-17, user directive: every correspondence document -- anything addressed
+# to another reader rather than to the library's users -- lives under
+# `communications/` and NOWHERE ELSE: not the repo root, not `docs/`.
+#
+# This rule is a DIRECTORY, deliberately, because every previous leak in this
+# file came from a prefix nobody had imagined yet (INBOX_ in 2026-08-07,
+# REGISTER/INVENTORY in 2026-08-20). A directory rule does not care what the
+# file is called, so a new naming convention cannot walk past it.
+communications/
+
 # --- Cross-project / cross-team correspondence (never public) ---
 # Requests to and replies from the sibling repositories this library is
 # developed alongside, not all of which are public. These files quote

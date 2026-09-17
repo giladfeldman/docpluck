@@ -1114,7 +1114,7 @@ nine fixes; each was reverted in isolation and watched **red** before being acce
 > (2 → 1) — the same L-052 class this release claimed to have closed at five sites.
 >
 > Full evidence, the five things that must change first, and what could NOT be established:
-> `docs/FINDINGS_2026-08-27_consult_v1960_page_gate_NOGO.md`.
+> `communications/FINDINGS_2026-08-27_consult_v1960_page_gate_NOGO.md`.
 >
 > **The `git_state` fix in this file is independent of all of the above and is sound.**
 >

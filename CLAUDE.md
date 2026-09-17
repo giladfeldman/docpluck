@@ -64,6 +64,36 @@ by user directive 2026-05-14; re-affirmed 2026-05-15, 2026-05-17, and 2026-05-19
 doesn't matter pre-existing or not"). Full statement under "Critical hard
 rules" below; durable cross-session record in memory `feedback_fix_every_bug_found`.
 
+## ALL CORRESPONDENCE GOES IN `communications/` — NOWHERE ELSE
+
+**User directive 2026-09-17:** *"I'm seeing a lot of inbox/outbox etc. these should always all be
+in a specific 'communications' subfolder, which should be gitignored... if someone writes/handsoff
+to docpluck they should always do so in the subdirectory."*
+
+**If you are writing a document addressed to someone — another project, a future session, the
+owner — it goes in `communications/`. Not the repo root, not `docs/`.** That covers a message
+arriving from a consumer, one going out, a reply, a feature request, a session-to-session
+write-up, an investigation note, a corpus work queue, and anything else of that shape whatever
+you decide to call it.
+
+One flat folder, deliberately. The filenames already carry their own prefix, so an alphabetical
+listing groups them without a directory tree, and there is no nested path to keep in sync.
+
+`communications/` is gitignored **as a directory**, also deliberately. Every correspondence leak
+this repo has had came from a naming convention nobody had imagined yet — `INBOX_` in 2026-08-07,
+`REGISTER`/`INVENTORY` in 2026-08-20 — and a prefix denylist can only cover the names already
+thought of. A directory rule does not care what the file is called. **So if you meet a new prefix,
+the fix is to move the file, never to add the prefix to `.gitignore` and leave it where it is.**
+
+`docs/` is for the public library documentation listed at the bottom of this file, plus internal
+design specs. It is not a correspondence folder, and 111 such files had accumulated there before
+this rule was written; they were moved on 2026-09-17, together with 38 in the repo root. Comments
+and docstrings that cited a moved file by its old path were repointed in the same pass and each
+target confirmed to exist — **if you add such a citation, cite the `communications/` path.**
+
+**Standing check in `/docpluck-cleanup` (Section 0.3b):** any correspondence-shaped file found
+outside `communications/` is moved there in the same run, and the run reports what it moved.
+
 ## Two-Repo Architecture
 
 Docpluck is split across **two repos** under `Vibe/MetaScienceTools/`:
@@ -115,7 +145,7 @@ The most common failure mode is assuming the auto-bump landed when it silently m
 
 ## Spike work queue (table-rendering iteration)
 
-> **The canonical work queue for the splice-spike is the most recent `docs/TRIAGE_<date>_corpus_assessment.md`.** Always read it first and pick the next iteration from its top-3 candidates. The handoff doc (`docs/HANDOFF_<date>_table_rendering_iteration_<N>.md`) is one input but goes stale across sessions; the triage is the *living* priority list, recomputed each broad-read of the corpus.
+> **The canonical work queue for the splice-spike is the most recent `communications/TRIAGE_<date>_corpus_assessment.md`.** Always read it first and pick the next iteration from its top-3 candidates. The handoff doc (`communications/HANDOFF_<date>_table_rendering_iteration_<N>.md`) is one input but goes stale across sessions; the triage is the *living* priority list, recomputed each broad-read of the corpus.
 
 **Iteration discipline (set 2026-05-10 after a long run of patches missed bigger structural issues):**
 
