@@ -2327,3 +2327,114 @@ INERT on real documents. It was kept because it removes a duplicated grammar, NO
 was losing a DOI to it, and a later reader must not cite L-057 as a corpus defect. Regenerate with
 `python tools/diag/doi_short_form_prevalence.py --sample 200 --seed 20260912` — the numbers are
 quoted here only because that command reproduces them.
+
+
+## L-058 - No gate reads a clock, so four parses of the same PDF shipped as a 504
+
+**2026-09-17, user-reported.** A 72-page paper (2.0 MB, 159,030 chars) returned
+`HTTP 504, code: timeout` from the workspace and the user lost everything - including the text
+that had finished 240 s earlier. Measured per stage at 2.4.143: raw text **65.9 s**, normalize
+4.1 s, quality 0.1 s, sections **0.1 s**, tables (Camelot) **213.9 s**, render 27.7 s =
+**312.0 s**, against `/api/analyze`'s `timeoutMs: 200_000`.
+
+**CORRECTED THE SAME DAY, before this entry was a day old — read every second-count below as
+CONTENDED, not as a property of the code.** This machine was running ~20 concurrent sessions. A
+peer measured the same file's `extract_pdf` at **19.7 s** where this entry says 65.9 s; another
+reported the same test suite taking **23, 43 and 54 minutes** for identical work. A paired,
+interleaved re-measure gave `pdftotext` 0.81 / 1.24 / 0.92 s against a full-document layout parse
+of 31.6 / 29.0 / 37.7 s - **ratio 23-41x**. And the "83.8 s" layout figure first quoted here came
+from a **cProfile run**, inflated by profiler overhead on ~50M calls; it was never wall time.
+**What survives contention is the CALL COUNTS and the ratios taken in one interleaved run.** This
+file's own L-057 says to quote a number only with the command that regenerates it; the same rule
+binds the units. Do not cite an absolute second-count from this entry.
+
+**AND THE VERSION LABEL IS UNVERIFIED TOO - do not cite these numbers as "2.4.143".** They were
+taken from a DIRTY tree: `docpluck/__init__.py` carries an uncommitted `__version__ = "2.4.144"`
+(origin/main says 2.4.143) and `extract.py` / `extract_layout.py` hold an in-flight page-subset
+change from a concurrent session. I did not record the tree state per measurement, so I cannot say
+which runs predate that change - one census line visibly reflects it. The CALL COUNTS are
+structural and hold; the seconds have neither a stable machine nor a pinned commit behind them.
+**Anything run from this tree today reports a version that exists in no tag and no commit** - a
+harness reading `__version__` for a receipt will record 2.4.144, which is not a release. Re-measure
+from a clean checkout at a named tag before treating any figure here as a property of a release.
+
+**Two findings. The second is the one that matters.**
+
+**(1) The raw-text stage costs 23-41x what the tool it wraps costs.** Bare `pdftotext` on that
+file is ~0.8-1.2 s; the rest is a full-document pdfplumber pass, run because
+`_detect_column_interleave_pages` flagged **23 of 72 pages** - and it produced **no change at
+all** (method came back plain `pdftotext_default`, `changed` empty).
+
+**And the REASON is not what this entry first said.** The first draft claimed the splice ran on a
+gate set "provably empty on entry". It did not: `all_pages` was 23 and the splice ran on all 23.
+Only `gutter_fallback_pages` was empty, and that set governs merely how aggressively the midline
+is detected. The real reason, from a per-page probe by the session that fixed it: **18 of the 23
+flagged pages have no histogram midline at all** - it is a single-column paper - **and the other 5
+fail the bilateral/fraction gate.** So the futility was DATA-DEPENDENT and not knowable in advance
+from cheap signals, which is why the fix shipped as a page-SUBSET parameter rather than as a
+skip-the-pass precondition. Field-level profiling of that pass: `p.chars` is **81.9%** of it, while
+`extract_text` / `extract_words` / spans are 6.4 / 5.0 / 4.8% and near-free because they reuse that
+parse - so page-scoping is worth ~`len(pages)/n_pages` and field pruning is worth nothing.
+
+**The meta-lesson, and it is why this correction is kept rather than edited away: I wrote a
+confident causal claim from a config read (`gutter_fallback_pages` is empty) without probing the
+23 pages themselves.** That is the same defect this file records over and over - a description
+mistaken for the thing it describes. The correct instrument was a per-page probe, and someone else
+ran it.
+
+**(2) The same bytes are parsed by pdfplumber FOUR times in one request - three of them
+redundant.** Counter harness over the exact `/analyze` sequence: `extract_pdf` **x2**, `pdftotext`
+subprocess **x2**, `extract_pdf_layout` / `pdfplumber.open` **x4**, `camelot.read_pdf` **x18**.
+**These counts are the finding and they do not move with machine load.**
+
+Standalone `render_pdf_to_markdown(bytes)` - what `/api/render` calls - re-does `extract_pdf` x2,
+layout x3 and `camelot.read_pdf` x18 by itself. Confirmed cause: with **both** `_structured=` and
+`_sectioned=` supplied, `render_pdf_to_markdown` still runs `extract_pdf_layout(pdf_bytes)`
+unconditionally at `render.py:6704`, because `_layout_doc` is a SEPARATE parameter that `/analyze`
+never passes. So splitting a request across the per-view endpoints trades one timeout for repeated
+cost, and each per-stage request also re-runs `extract_pdf` from scratch - raw text paid once per
+STAGE, not once per document.
+
+**Why it was built this way, honestly.** Three individually reasonable facts. Every public entry
+point takes `pdf_bytes`, which is a good API and means each function must parse the bytes itself.
+There is no cache and never was - `grep -rn "lru_cache\|@cache" docpluck/` returns only
+`version.py`, while six distinct `extract_pdf_layout(pdf_bytes)` call sites exist (`batch.py:330`,
+`extract.py:232`, `extract_structured.py:429,598,983`, `render.py:6705`,
+`sections/annotators/pdf.py:26`). And the fix mechanism ALREADY EXISTED: `_layout_doc`,
+`_structured` and `_sectioned` were each added by someone who noticed ONE duplicate - the service
+even documents its own instance, *"cuts the render step from ~30s to ~1s"*. `extract_pdf_structured`
+guards its three internal sites with `if layout_doc is None`, so within a single call the parse
+happens once. Nobody generalised it, so the duplication migrated to the boundaries BETWEEN
+functions, where no single author was looking. **This is BUILT-BUT-NOT-WIRED applied to cost.**
+
+**Why no review caught it, across 33 numbered rules plus the 8-rule operability family: the cost
+is invisible to every instrument this repo has.** Output byte-identical. No test red. No value
+wrong. Nothing deleted. No key added to `changes_made`. **The only symptom is a clock, and no gate
+read a clock.** Grepping this project's code-review gate for
+`perf|slow|redundant|cache|wasteful|twice|cost|latency|efficien` returned zero rules on the
+subject; every apparent hit was the word "computed" in an unrelated context.
+
+**Same shape as this file's other founding defects, one axis over.** "A green test on an
+unreachable path is not evidence of anything"; "AUDIT EVERY CHANNEL - the uninstrumented channel
+is where the deletions are". Here: **the unmeasured DIMENSION is where the waste is.**
+Instrumentation attracts audit and its absence repels it - `A3a` got measured because it populated
+`changes_made`, which is exactly backwards.
+
+**Fixed as process, not just as code.** The code-review gate gained a new rule family,
+**34-39 (WASTE)**, whose six rules are: no expensive primitive runs twice on the same input in one
+request (prove it with a COUNTER, never a grep); a function with an accept-precomputed parameter
+must be CALLED with it; work gated behind a cheap per-page detector must be SCOPED to the flagged
+pages; a conditional repair must pay for evidence in proportion to what it can act on; every stage
+reports its own duration in the response; and a user-facing timeout or estimate is justified
+against a MEASURED worst case stated with page counts. The generalising question, to ask of every
+diff: *what does this compute that something else in the same request already computed - and what
+reads the clock that would tell us?*
+
+**Regenerate before citing any number above.** Stage timings: wrap each library call in
+`time.perf_counter()`. Census: monkeypatch `subprocess.run`, `pdfplumber.open`,
+`camelot.read_pdf` and `docpluck.extract_layout.extract_pdf_layout` with counters **before**
+importing the docpluck modules that bind them by name, then patch the same names on
+`extract`, `extract_structured`, `render`, `extract_columns`, `sections` and
+`tables.camelot_extract` - a `from X import y` binding is not updated by patching `X.y`, so a
+harness that patches only the definition module reports zero and looks clean. Two-sided: show the
+harness reports >1 on a known-duplicated graph before believing a 1.
