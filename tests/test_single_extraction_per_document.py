@@ -292,3 +292,137 @@ def test_render_given_both_precomputed_results_extracts_nothing():
         c = _Counter(mp)
         render_pdf_to_markdown(pdf, _structured=st, _sectioned=doc)
         assert c.n == 0
+
+
+# -- the three remaining call sites found in the same pass --------------------
+
+def test_extract_pdf_with_sections_filter_extracts_once():
+    """`extract_pdf(blob, sections=[...])` re-ran the extraction it just made.
+
+    The `sections=` branch called `extract_sections(pdf_bytes)`, which calls
+    `extract_pdf` with these same default arguments - so the filtered form cost
+    two pdftotext runs where the unfiltered form costs one. Reachable from the
+    CLI (`docpluck extract --sections abstract`) and from any library consumer
+    using the filter.
+    """
+    # THROUGH THE MODULE, not through a name bound before the patch. A
+    # `from docpluck.extract import extract_pdf` at the top of this function
+    # captures the REAL function, so the outermost call would bypass the
+    # counter and the control would read 0 while looking like a saving. That
+    # is the same binding trap this module's docstring describes, and it
+    # caught itself here.
+    import docpluck.extract as _ex
+
+    pdf = _two_page_pdf()
+    with pytest.MonkeyPatch.context() as mp:
+        c = _Counter(mp)
+        _ex.extract_pdf(pdf)
+        assert c.n == 1, "control: the unfiltered form extracts once"
+    with pytest.MonkeyPatch.context() as mp:
+        c = _Counter(mp)
+        _ex.extract_pdf(pdf, sections=["abstract"])
+        assert c.n == 1
+
+    # The two-sided half, and it IS available here: dropping `_raw_text` on the
+    # way into extract_sections restores exactly the old behaviour, because
+    # extract_pdf's own call is unaffected by that wrapper.
+    with pytest.MonkeyPatch.context() as mp:
+        import docpluck.sections as _sec
+
+        real = _sec.extract_sections
+
+        def drop(b=None, **k):
+            k.pop("_raw_text", None)
+            return real(b, **k)
+
+        mp.setattr(_sec, "extract_sections", drop)
+        c = _Counter(mp)
+        _ex.extract_pdf(pdf, sections=["abstract"])
+        assert c.n == 2, "control: without sharing the filter costs two extractions"
+
+
+def test_extract_pdf_sections_filter_output_unchanged():
+    """The filtered text must be what the re-extracting version produced."""
+    import docpluck.sections as sec
+    from docpluck.extract import extract_pdf
+
+    pdf = require_corpus_pdf("apa/ziano_2021_joep.pdf").read_bytes()
+    shared, m1 = extract_pdf(pdf, sections=["abstract", "results"])
+
+    with pytest.MonkeyPatch.context() as mp:
+        real = sec.extract_sections
+
+        def drop(b=None, **k):
+            k.pop("_raw_text", None)
+            return real(b, **k)
+
+        mp.setattr(sec, "extract_sections", drop)
+        unshared, m2 = extract_pdf(pdf, sections=["abstract", "results"])
+
+    assert shared == unshared
+    assert m1 == m2
+
+
+def test_render_accepts_a_caller_supplied_pair():
+    """`_raw_text` on the render seeds the one extraction it would make."""
+    from docpluck.extract import extract_pdf
+    from docpluck.render import render_pdf_to_markdown
+
+    pdf = _two_page_pdf()
+    pair = extract_pdf(pdf)
+    with pytest.MonkeyPatch.context() as mp:
+        c = _Counter(mp)
+        render_pdf_to_markdown(pdf, _raw_text=pair)
+        assert c.n == 0, "the render must not extract when handed the pair"
+
+
+def test_render_output_identical_when_handed_the_pair():
+    from docpluck.extract import extract_pdf
+    from docpluck.render import render_pdf_to_markdown
+
+    pdf = require_corpus_pdf("apa/ziano_2021_joep.pdf").read_bytes()
+    assert render_pdf_to_markdown(pdf) == render_pdf_to_markdown(
+        pdf, _raw_text=extract_pdf(pdf)
+    )
+
+
+def test_cli_render_with_tables_jsonl_extracts_and_parses_once(tmp_path):
+    """The CLI's --tables-jsonl branch paid for two extractions and two parses.
+
+    Two-sided on BOTH counters: the plain render branch is the control, and it
+    is the SAME command with one flag removed.
+    """
+    import pdfplumber
+
+    from docpluck import cli
+
+    pdf = _two_page_pdf()
+    src = tmp_path / "paper.pdf"
+    src.write_bytes(pdf)
+
+    def run(argv):
+        opens = {"n": 0}
+        with pytest.MonkeyPatch.context() as mp:
+            real_open = pdfplumber.open
+
+            def counted_open(*a, **k):
+                opens["n"] += 1
+                return real_open(*a, **k)
+
+            mp.setattr(pdfplumber, "open", counted_open)
+            c = _Counter(mp)
+            cli.main(argv)
+            return c.n, opens["n"]
+
+    plain_extracts, plain_opens = run(["render", str(src)])
+    jsonl_extracts, jsonl_opens = run(
+        ["render", str(src), "--tables-jsonl", str(tmp_path / "t.jsonl")]
+    )
+
+    assert plain_extracts == 1
+    assert jsonl_extracts == 1, "the sidecar flag must not buy a second pdftotext"
+    assert jsonl_opens <= plain_opens, (
+        f"the sidecar flag must not buy extra pdfplumber parses "
+        f"({jsonl_opens} vs {plain_opens})"
+    )
+    assert (tmp_path / "t.jsonl").exists()

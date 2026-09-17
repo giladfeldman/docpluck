@@ -135,14 +135,28 @@ def _cmd_render(args: argparse.Namespace) -> int:
     tables_jsonl = getattr(args, "tables_jsonl", None)
 
     # If the user asked for a JSONL sidecar, run structured extraction once
-    # and pass it to render so we don't pay Camelot twice.
+    # and pass it to render so we don't pay Camelot twice. The pdftotext run and
+    # the pdfplumber parse are shared for the same reason (2026-09-17): without
+    # this, `extract_pdf_structured` and the render each made their own, so this
+    # branch cost two of each where one does.
     if tables_jsonl:
-        structured = extract_pdf_structured(blob)
+        from . import extract_pdf, extract_pdf_layout
+
+        raw = extract_pdf(blob)
+        try:
+            layout = extract_pdf_layout(blob)
+        except Exception:
+            # Both callees are None-tolerant and fall back to their own parse;
+            # a PDF pdfplumber cannot open must still render.
+            layout = None
+        structured = extract_pdf_structured(blob, _raw_text=raw, _layout_doc=layout)
         md = render_pdf_to_markdown(
             blob,
             normalization_level=level,
             flatten_tables_inline=flatten_inline,
             _structured=structured,
+            _layout_doc=layout,
+            _raw_text=raw,
         )
         records = flatten_tables_for_paper(structured["tables"])
         out_path = Path(tables_jsonl)

@@ -89,6 +89,37 @@ captions located in one buffer and sliced out of another. Hence the leading
 underscore, the contract stated in both docstrings, and the advice that a
 caller who cannot guarantee the identity should simply not pass it.
 
+### Three more call sites, found by asking the same question of the rest of the library
+
+The first pass fixed the `/api/analyze` graph. Asking "who else calls two of
+these entrypoints on the same bytes?" - a per-module count of `extract_pdf(`,
+`extract_sections(` and `extract_pdf_structured(` - found three more, all
+reachable without the service:
+
+- **`extract_pdf(blob, sections=[...])`** re-ran the extraction it had just
+  made. The `sections=` branch called `extract_sections(pdf_bytes)`, which calls
+  `extract_pdf` with the same default arguments, so the FILTERED form cost two
+  pdftotext runs where the unfiltered form costs one - and, on a document whose
+  column detectors flag a page, two layout splices. It now hands over the pair
+  it already holds, which is by construction what that second call would have
+  computed.
+- **`render_pdf_to_markdown` gains `_raw_text`**, so a caller that has already
+  extracted can seed the single extraction the render otherwise makes for
+  itself. Never read when both `_structured` and `_sectioned` are supplied.
+- **`docpluck render --tables-jsonl`** ran structured extraction and then a
+  render, each paying for its own pdftotext run and its own pdfplumber parse.
+  Its comment said it ran structured extraction once "so we don't pay Camelot
+  twice" - true of Camelot, and it was the other two nobody had counted. Both
+  are shared now, with the layout parse falling back to `None` (which both
+  callees tolerate) if pdfplumber cannot open the file.
+
+The test file's own control caught a defect IN THE TEST, which is the reason to
+write controls at all: `from docpluck.extract import extract_pdf` at the top of
+a test binds the real function, so the OUTERMOST call bypasses the counter and
+the control reads 0 - indistinguishable from a perfect saving. It is the same
+binding trap the module docstring warns about, sprung on the module itself. The
+tests call through `docpluck.extract` instead.
+
 ### Still open after this change
 
 The service repo does not pass any of these yet, so **production still

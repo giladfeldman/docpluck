@@ -6564,6 +6564,7 @@ def render_pdf_to_markdown(
     _structured: Optional[dict] = None,
     _sectioned=None,
     _layout_doc: Optional[LayoutDoc] = None,
+    _raw_text: Optional[tuple[str, str]] = None,
     report: Optional[RenderReport] = None,
     _report: Optional[RenderReport] = None,
 ) -> str:
@@ -6596,6 +6597,7 @@ def render_pdf_to_markdown(
             _structured=_structured,
             _sectioned=_sectioned,
             _layout_doc=_layout_doc,
+            _raw_text=_raw_text,
             report=_rep,
         )
     if _rep is not None:
@@ -6612,6 +6614,7 @@ def _render_pdf_to_markdown(
     _structured: Optional[dict] = None,
     _sectioned=None,
     _layout_doc: Optional[LayoutDoc] = None,
+    _raw_text: Optional[tuple[str, str]] = None,
     report: Optional[RenderReport] = None,
     _report: Optional[RenderReport] = None,
 ) -> str:
@@ -6675,6 +6678,14 @@ def _render_pdf_to_markdown(
         _layout_doc: Optional pre-computed ``extract_pdf_layout`` result
             for the title-rescue annotator. Pass to skip a third pdfplumber
             pass.
+        _raw_text: Optional pre-computed ``extract_pdf(pdf_bytes)`` result, as
+            the ``(text, method)`` pair. Seeds the single extraction this
+            function otherwise makes for itself, for a caller that has already
+            run it — the same same-bytes/same-arguments contract as the
+            identical parameter on ``extract_pdf_structured`` and
+            ``extract_sections``, and equally uncheckable here. Never read when
+            both ``_structured`` and ``_sectioned`` are supplied, because then
+            nothing downstream needs it.
 
     Returns:
         Markdown text suitable for direct ``.md`` output. Includes a ``# Title``
@@ -6723,7 +6734,7 @@ def _render_pdf_to_markdown(
     # Deliberately lazy: neither callee runs `extract_pdf` when the caller
     # already supplied its result, so a render given BOTH `_structured=` and
     # `_sectioned=` must not pay for an extraction nobody will read.
-    _shared_raw: tuple[str, str] | None = None
+    _shared_raw: tuple[str, str] | None = _raw_text
 
     def _raw_pair() -> tuple[str, str]:
         nonlocal _shared_raw

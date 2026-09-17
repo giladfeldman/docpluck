@@ -221,7 +221,17 @@ def extract_pdf(
             all_pages = sorted(set(flagged_pages) | set(inversion_pages))
             if all_pages:
                 from .extract_layout import extract_pdf_layout
-                layout_doc = extract_pdf_layout(pdf_bytes)
+                # ONLY the flagged pages. The splice below rewrites pages in
+                # `all_pages` and nothing else, so geometry for the other pages
+                # was always discarded — but it was still parsed. Measured
+                # 2026-09-17 on a 72-page RSOS paper with 23 flagged pages and
+                # no inversion pages: the full-document parse cost 25.3 s and
+                # changed nothing, against 1.0 s for the pdftotext call it was
+                # correcting. `extract_pdf_layout` keeps one entry per PDF page
+                # at its real index, so `page_idx` below still means page_idx.
+                layout_doc = extract_pdf_layout(
+                    pdf_bytes, pages=[p - 1 for p in all_pages]
+                )
                 changed: list[int] = []
                 banded_pages = sorted(all_pages) if banded_correct else []
                 corrected = splice_column_corrected_pages(
@@ -241,7 +251,14 @@ def extract_pdf(
 
         if sections is not None:
             from .sections import extract_sections
-            doc = extract_sections(pdf_bytes)
+            # The pair THIS call just produced, rather than a second identical
+            # run of it: `extract_sections(pdf_bytes)` calls `extract_pdf` with
+            # these same default arguments, so `extract_pdf(blob, sections=[...])`
+            # spawned pdftotext twice and — on a document whose column detectors
+            # flag a page — ran the layout splice twice. `text`/`method` here are
+            # exactly what this function returns when `sections` is None, i.e.
+            # exactly what that second call would have computed. (2026-09-17)
+            doc = extract_sections(pdf_bytes, _raw_text=(text, method))
             return doc.text_for(*sections), method
 
         return text, method

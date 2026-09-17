@@ -46,28 +46,71 @@ class LayoutDoc:
     pages: tuple[PageLayout, ...]
     raw_text: str
     page_offsets: tuple[int, ...]   # char offset of each page in raw_text
+    # Which page indices actually carry geometry. ``None`` means "every page"
+    # (the only state that existed before the page subset was added) and is
+    # what every full
+    # extraction returns. A tuple means this doc was built with
+    # ``extract_pdf_layout(..., pages=...)``, and the pages OUTSIDE it are
+    # PRESENT BUT EMPTY — correct ``width``/``height``, no spans, words, chars,
+    # lines, rects or curves, and no text in ``raw_text``.
+    #
+    # Recorded rather than left implicit because a 72-page LayoutDoc whose 49
+    # unrequested pages silently contain nothing is indistinguishable from a
+    # document whose pages really are blank, and a consumer reading it as the
+    # latter gets a wrong answer with no error. Check this field before treating
+    # an empty page as evidence about the PDF.
+    populated_pages: tuple[int, ...] | None = None
 
 
-def extract_pdf_layout(pdf_bytes: bytes) -> LayoutDoc:
+def extract_pdf_layout(
+    pdf_bytes: bytes,
+    *,
+    pages: Iterable[int] | None = None,
+) -> LayoutDoc:
     """Read a PDF with pdfplumber and return per-page layout + raw text.
 
-    `raw_text` joins per-page text with `\\f` separators (matching the
+    `raw_text` joins per-page text with `\f` separators (matching the
     pdftotext form-feed convention) so existing normalization page-detection
     keeps working. `page_offsets[i]` is the start offset of page i+1 in
     raw_text.
+
+    Args:
+        pages: optional 0-based page indices to populate. ``None`` (default)
+            populates every page and returns exactly what this function has
+            always returned. When a subset is given the returned doc still has
+            ONE ENTRY PER PDF PAGE at its real index — so ``doc.pages[i]`` keeps
+            meaning "page i" for every caller — but only the requested pages
+            carry geometry; the rest are empty placeholders, and
+            ``populated_pages`` records which is which. Indices outside
+            ``[0, n_pages)`` are ignored rather than raising: callers derive
+            page numbers from pdftotext's form feeds, which can disagree with
+            pdfplumber's page count by one on a trailing form feed.
+
+    Why the subset exists (measured 2026-09-17). ``extract_pdf`` runs this over
+    the WHOLE document whenever its cheap text-only detectors flag any page for
+    column correction, then corrects at most those pages. On a 72-page paper
+    with 23 flagged pages that was 25.3 s of pdfplumber for 23 pages' worth of
+    geometry, and ``p.chars`` — the per-page content-stream parse — is 81.9% of
+    it. Reading only the flagged pages is the same work for the splice at
+    roughly ``len(pages)/n_pages`` of the cost.
     """
     import pdfplumber  # type: ignore
     import io
 
-    pages: list[PageLayout] = []
+    wanted: set[int] | None = None if pages is None else {int(i) for i in pages}
+
+    out_pages: list[PageLayout] = []
     raw_chunks: list[str] = []
     offsets: list[int] = []
     cursor = 0
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for i, p in enumerate(pdf.pages):
-            spans = tuple(_chars_to_spans(p.chars or [], page_index=i))
-            page_text = p.extract_text() or ""
+            populate = wanted is None or i in wanted
+            # ``p.chars`` is the content-stream parse and everything else on the
+            # page reuses it, so it is the whole saving: a skipped page must read
+            # NOTHING but the page dict's own width/height.
+            page_text = (p.extract_text() or "") if populate else ""
             offsets.append(cursor)
             if i > 0:
                 # Form-feed page separator (matches pdftotext convention).
@@ -76,22 +119,66 @@ def extract_pdf_layout(pdf_bytes: bytes) -> LayoutDoc:
                 offsets[-1] = cursor  # adjust to point AFTER the form feed
             raw_chunks.append(page_text)
             cursor += len(page_text)
-            pages.append(PageLayout(
-                page_index=i,
-                width=float(p.width),
-                height=float(p.height),
-                spans=spans,
-                lines=tuple(p.lines or ()),
-                rects=tuple(p.rects or ()),
-                curves=tuple(p.curves or ()),
-                chars=tuple(p.chars or ()),
-                words=tuple(p.extract_words() or ()),
-            ))
+            if populate:
+                chars = p.chars or []
+                out_pages.append(PageLayout(
+                    page_index=i,
+                    width=float(p.width),
+                    height=float(p.height),
+                    spans=tuple(_chars_to_spans(chars, page_index=i)),
+                    lines=tuple(p.lines or ()),
+                    rects=tuple(p.rects or ()),
+                    curves=tuple(p.curves or ()),
+                    chars=tuple(chars),
+                    words=tuple(p.extract_words() or ()),
+                ))
+            else:
+                out_pages.append(PageLayout(
+                    page_index=i,
+                    width=float(p.width),
+                    height=float(p.height),
+                    spans=(),
+                ))
 
     return LayoutDoc(
-        pages=tuple(pages),
+        pages=tuple(out_pages),
         raw_text="".join(raw_chunks),
         page_offsets=tuple(offsets),
+        populated_pages=(
+            None if wanted is None
+            else tuple(sorted(i for i in wanted if 0 <= i < len(out_pages)))
+        ),
+    )
+
+
+class PartialLayoutError(ValueError):
+    """A page-subset LayoutDoc was handed to something that needs the whole document."""
+
+
+def require_full_layout(layout, *, who: str):
+    """Refuse a page-subset ``LayoutDoc`` where a full-document one is meant.
+
+    ``extract_pdf_layout(pages=...)`` returns a doc whose unrequested pages are
+    present but EMPTY. That is exactly right for the column splice, which reads
+    only the pages it asked for — and exactly wrong for table extraction, figure
+    detection or the symbol-font scan, each of which sweeps every page and would
+    report "no tables on page 40" when the truth is "page 40 was never read".
+
+    The failure would be silent and plausible, which is the worst combination
+    available, so the subset is refused at the boundary rather than trusted to
+    stay where it was built. Returns ``layout`` unchanged when it is safe, so
+    call sites can wrap in place.
+    """
+    if layout is None:
+        return None
+    populated = getattr(layout, "populated_pages", None)
+    if populated is None:
+        return layout
+    total = len(getattr(layout, "pages", ()) or ())
+    raise PartialLayoutError(
+        f"{who} needs a full-document LayoutDoc, but was given one covering "
+        f"{len(populated)} of {total} pages ({sorted(populated)[:8]}...). "
+        f"Call extract_pdf_layout(pdf_bytes) without `pages=` for this path."
     )
 
 
