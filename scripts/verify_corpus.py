@@ -601,8 +601,20 @@ def main() -> int:
     for k in ("PASS", "WARN", "FAIL", "NO_PDF", "NO_BASE", "PDF_DRIFT", "ERROR"):
         if summary[k]:
             print(f"  {k:10} {summary[k]:3} / {attempted}")
-    print(f"  {'COVERAGE':10} {verified:3} / {len(expected)} papers in the "
-          f"registered corpus were actually rendered and compared")
+    if args.paper:
+        # A single-paper run asserts NOTHING about coverage, and must not print
+        # a line that can be read as though it did. --paper deliberately skips
+        # the PARTIAL check below, so this run exits 0 on one paper out of the
+        # whole corpus -- which is exactly the "N of M, exit 0" shape the
+        # coverage floor above exists to refuse. It is correct here and
+        # dangerous to misread, so it is labelled rather than left to inference.
+        print(f"  {'COVERAGE':10} NOT ASSERTED -- single-paper run "
+              f"(--paper), {verified} of {len(expected)} rendered. Exit 0 here "
+              f"means this paper passed, NOT that the corpus did. Run without "
+              f"--paper for the corpus gate.")
+    else:
+        print(f"  {'COVERAGE':10} {verified:3} / {len(expected)} papers in the "
+              f"registered corpus were actually rendered and compared")
 
     if failures_by_tag:
         print()
