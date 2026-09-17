@@ -19,9 +19,22 @@ denominator, or it is not being checked.
 The three states are kept distinct, because conflating them is what let this
 gate sit dead for a week while its output read as normal:
 
+  denominator below the
+    family high-water mark  -> REFUSED, exit 1  (the denominator itself shrank)
   no papers resolvable      -> SKIP,    exit 0  (this machine has no corpus)
   some but not all resolved -> PARTIAL, exit 1  (the silent-coverage-loss bug)
   all resolved              -> per-paper PASS/WARN/FAIL, exit 0/1
+
+The first state was added 2026-09-17 and is checked BEFORE the other three,
+because it is the one they cannot see. `--latest` had resolved this family to a
+version a release re-baselined over six papers while an older version held
+twenty-six; the gate then resolved 6 of 6 and printed a clean PASS. PARTIAL
+compares what resolved against `_expected_papers(view)` -- the same registration
+it resolved -- so a denominator that shrinks with the numerator always reads as
+100%. Only the custodian sees the sibling versions, so it publishes the
+high-water mark on every `--latest` resolution (`LATEST-COVERAGE:` on stderr)
+and this gate asserts against it. The line's ABSENCE is a refusal too: a gate
+that cannot tell a full corpus from a shrunken one must not pass.
 
 For each paper:
   - Locate the PDF through article-finder by canonical key
@@ -85,7 +98,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 # This gate prints non-ASCII unconditionally (an em dash at the summary
 # header, an arrow on the --diff dump), and a Windows console defaults to
@@ -160,15 +173,78 @@ def _is_pinned(spec: str) -> bool:
     return parse_tool_view(spec) is not None
 
 
-def _resolve_baseline_view(spec: str) -> Optional[str]:
+class Resolution(NamedTuple):
+    """A resolved baseline view, with the coverage facts needed to judge it.
+
+    `papers` / `max_papers` come from the custodian's own `LATEST-COVERAGE:`
+    line, so this gate never recomputes a number article-finder already owns.
+    They are `None` for an explicitly pinned view, where no `--latest`
+    resolution happened and no coverage comparison was made — which is a
+    different state from "compared and found equal", and is reported as such.
+    """
+    view: str
+    pinned: bool
+    papers: Optional[int] = None
+    max_view: Optional[str] = None
+    max_papers: Optional[int] = None
+
+    @property
+    def shortfall(self) -> bool:
+        """True only when the custodian ACTUALLY compared and found us short."""
+        return (
+            self.papers is not None
+            and self.max_papers is not None
+            and self.max_papers > self.papers
+        )
+
+
+def _resolve_baseline_view(spec: str) -> Optional[Resolution]:
     """Resolve `<family>__<producer>` to its highest registered version."""
     if _is_pinned(spec):
-        return spec
+        return Resolution(view=spec, pinned=True)
     r = _af("ai-gold.py", "papers-with-view", spec, "--latest", "--keys-only")
+    _relay_custodian_warnings(r.stderr)
+    view = None
+    cov: dict[str, str] = {}
     for line in r.stderr.splitlines():
         if line.startswith("resolved --latest to view "):
-            return line.split("resolved --latest to view ", 1)[1].strip()
-    return None
+            view = line.split("resolved --latest to view ", 1)[1].strip()
+        elif line.startswith("LATEST-COVERAGE:"):
+            cov = dict(
+                tok.split("=", 1)
+                for tok in line[len("LATEST-COVERAGE:"):].split()
+                if "=" in tok
+            )
+    if view is None:
+        return None
+
+    def _int(k: str) -> Optional[int]:
+        try:
+            return int(cov[k])
+        except (KeyError, ValueError):
+            return None
+
+    return Resolution(
+        view=view,
+        pinned=False,
+        papers=_int("papers"),
+        max_view=cov.get("max_view"),
+        max_papers=_int("max_papers"),
+    )
+
+
+def _relay_custodian_warnings(stderr: str) -> None:
+    """Re-emit the custodian's WARNING lines instead of swallowing them.
+
+    `_af` captures stderr, so a warning from `ai-gold.py` reaches nobody
+    unless it is relayed. The one that matters here says `--latest` resolved
+    to a version covering FEWER papers than an older one — which is the only
+    way this gate can learn that its denominator shrank, since everything else
+    it checks is derived from the same registration it just resolved.
+    """
+    for line in stderr.splitlines():
+        if line.startswith("WARNING:"):
+            print(f"# custodian {line}", file=sys.stderr)
 
 
 def _expected_papers(view: str) -> list[str]:
@@ -385,8 +461,8 @@ def main() -> int:
         )
         return 0
 
-    view = _resolve_baseline_view(args.baseline_view)
-    if view is None:
+    res = _resolve_baseline_view(args.baseline_view)
+    if res is None:
         print(
             f"ERROR: no registered baseline matches {args.baseline_view!r}.\n"
             f"Register one with:\n"
@@ -395,6 +471,58 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+
+    view = res.view
+
+    # --- COVERAGE FLOOR ------------------------------------------------------
+    # Measured 2026-09-17: `--latest` resolved to a 6-paper view of a family
+    # whose previous release held 26, and this gate printed a clean 6/6 PASS.
+    # Every other check here is derived from the registration it just resolved,
+    # so the three-state SKIP/PARTIAL/full design could not fire -- from the
+    # gate's point of view the corpus really WAS six papers. A denominator that
+    # shrank is indistinguishable from a corpus that shrank, and the only party
+    # that can tell them apart is the custodian, which sees every sibling
+    # version. So the floor is ASSERTED here and COMPUTED there: one concept,
+    # one table.
+    #
+    # An explicitly pinned --baseline-view is a deliberate choice and is not
+    # failed -- but it is not silently blessed either. No comparison was made,
+    # and that is said out loud, because "not checked" must never read as
+    # "checked and fine".
+    def _err(*lines: str) -> None:
+        for ln in lines:
+            print(ln, file=sys.stderr)
+
+    if res.pinned:
+        _err(f"# coverage floor: NOT APPLIED -- {view} was pinned explicitly, "
+             f"so no --latest resolution happened and no sibling version was "
+             f"compared. The coverage reported below is against this pin only.")
+    elif res.papers is None or res.max_papers is None:
+        _err(f"ERROR: the custodian reported no coverage for {view}. This gate "
+             f"requires article-finder to emit a `LATEST-COVERAGE:` line on "
+             f"every --latest resolution; without it the gate cannot tell a "
+             f"full corpus from a silently shrunken one, and a gate that "
+             f"cannot tell must not pass.",
+             f"Update article-finder, or pin the view with --baseline-view and "
+             f"take responsibility for the denominator yourself.")
+        return 1
+    elif res.shortfall:
+        _err(f"COVERAGE FLOOR: refusing {view} -- it holds {res.papers} papers "
+             f"but {res.max_view} holds {res.max_papers}. A partial "
+             f"re-baseline makes this gate's denominator smaller than the "
+             f"corpus it is supposed to cover, and every count below would "
+             f"then read as a clean {res.papers}/{res.papers}.",
+             f"Two ways out:",
+             f"  1. carry the missing papers forward -- render them at the "
+             f"released tag and register them into {view}; or",
+             f"  2. run against the fuller view deliberately:",
+             f"       python scripts/verify_corpus.py --baseline-view "
+             f"{res.max_view}")
+        return 1
+    else:
+        _err(f"# coverage floor: OK -- {view} holds {res.papers} papers, the "
+             f"most of any version in its family.")
+    # --- end coverage floor --------------------------------------------------
 
     expected = _expected_papers(view)
     if not expected:
