@@ -1,7 +1,7 @@
 """What does the W0r unmapped-glyph-minus repair actually change, corpus-wide?
 
 Backlog row: todo.md W-0015.
-Findings:    docs/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md
+Findings:    communications/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md
 
 W0r (`cell_cleaning.recover_unmapped_glyph_minus`) recovers a minus the table backend
 could not map to Unicode, in BOTH of the spellings the two readers produce -- the

@@ -5571,7 +5571,7 @@ _GREEK_AMBIGUOUS_UPPER_RE = re.compile(
 #     '∼5×10⁶ possible'            ->   '5x106'
 #     'p < .001¹'                  ->   '.0011'       a different p-value
 #
-# `docs/FINDINGS_2026-08-13` examined these exact tokens when rejecting decision
+# `communications/FINDINGS_2026-08-13` examined these exact tokens when rejecting decision
 # D4's "delete citation superscripts" option — "deleting the 9 loses nine orders
 # of magnitude" — and the reasoning was right. But it measured a PROPOSED rule
 # while this SHIPPED one was already doing equivalent damage to the same tokens.

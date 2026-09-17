@@ -17,7 +17,7 @@ EXPONENT, and flattening fuses it into the mantissa. `×10⁹/L` becoming `x109/
 is a clinical lab value nine orders of magnitude wrong, and unrecoverable — no
 consumer can tell `109` from a fused `10⁹`.
 
-HOW IT HID. `docs/FINDINGS_2026-08-13` analysed exactly these tokens
+HOW IT HID. `communications/FINDINGS_2026-08-13` analysed exactly these tokens
 (`×10⁹/L`, `∼5×10⁶`, `130×10³`) as the reason decision D4 must NOT delete
 superscript digits from body text — "deleting the 9 loses nine orders of
 magnitude". The analysis was correct and the decision was right, but it examined

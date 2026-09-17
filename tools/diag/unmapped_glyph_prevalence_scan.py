@@ -1,7 +1,7 @@
 """How often does the table backend hand docpluck a glyph it could not decode?
 
 Backlog row: todo.md W-0015.
-Findings:    docs/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md
+Findings:    communications/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md
 
 W0r (`cell_cleaning.recover_unmapped_glyph_minus`) was justified from ONE paper --
 `10.1016/j.joep.2020.102350`, 22 destroyed minus signs, every one checked against the

@@ -1,7 +1,7 @@
 """What does the grid-validity gate actually SEE, now that the marker changed spelling?
 
 Backlog row: todo.md W-0015 (the correction section).
-Findings:    docs/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md
+Findings:    communications/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md
 
 `whitespace._whitespace_grid_is_clean` promises, in its own docstring, that "NO cell may
 carry an unmapped-glyph marker ((cid:N) / U+FFFD) -- one occurrence condemns the grid."

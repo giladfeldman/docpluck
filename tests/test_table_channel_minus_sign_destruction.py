@@ -30,7 +30,7 @@ after a closing placeholder NUL (``"Replication\x00BR\x0095% CI"``). A naive
 data loss turned into data FABRICATION. If the placeholder tests below go red, the fix
 was applied at the wrong layer.
 
-Full write-up: docs/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md (W-0015).
+Full write-up: communications/FINDINGS_2026-09-02_table_channel_destroys_minus_signs.md (W-0015).
 """
 
 from __future__ import annotations
