@@ -73,6 +73,8 @@ from docpluck.normalize import NormalizationLevel, normalize_text
 from docpluck.render import render_pdf_to_markdown
 from tests.conftest import pdf_available, pdf_path
 
+from docpluck.testing import require_corpus_pdf
+
 # `p` followed by any comparison operator and a NEGATIVE decimal. A p-value is a
 # probability: it cannot be negative, in any notation, at any precision.
 _NEGATIVE_P = re.compile(r"\bp\s*[=<>]\s*-\s*\.?\d")
@@ -81,13 +83,7 @@ _CORPUS, _PAPER = "apa", "korbmacher_2022_kruger.pdf"
 
 
 def _pdf_bytes() -> bytes:
-    if not pdf_available("docpluck", _CORPUS, _PAPER):
-        pytest.skip(
-            f"SKIPPED, NOT PASSED: {_CORPUS}/{_PAPER} absent from the local corpus. "
-            "Read a skip here as a check that did not run -- four sibling tests in "
-            "this suite skipped silently for weeks on a filename typo."
-        )
-    with open(pdf_path("docpluck", _CORPUS, _PAPER), "rb") as fh:
+    with open(require_corpus_pdf(f"{_CORPUS}/{_PAPER}"), "rb") as fh:
         return fh.read()
 
 

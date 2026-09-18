@@ -14,7 +14,6 @@ optional following space) immediately before a digit to an ASCII hyphen.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -29,7 +28,8 @@ DISABLE_CAMELOT = True
 from docpluck.render import render_pdf_to_markdown
 from docpluck.tables.cell_cleaning import _html_escape
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 # ── Unit tests on _html_escape (cell strings observed verbatim in the PDFs) ──
@@ -66,9 +66,7 @@ def test_plain_cell_untouched():
 
 @pytest.mark.parametrize("stem", ["ziano_2021_joep", "chen_2021_jesp"])
 def test_no_cid_marker_in_render(stem):
-    pdf = TEST_PDFS / "apa" / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leaks = re.findall(r"\(cid:\d+\)", md)
     assert not leaks, f"{stem}: unmapped-glyph (cid:N) markers leaked: {leaks[:5]}"

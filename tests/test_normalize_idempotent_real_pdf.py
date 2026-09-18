@@ -14,7 +14,6 @@ position gate) mechanisms. Cycles 8-10 take the JOIN / STRIP / CHARSUB buckets.
 that tightens toward 0 as each idempotency cycle lands. A cycle that *increases*
 the non-idempotent count fails it.
 """
-import glob
 import os
 import shutil
 
@@ -30,15 +29,14 @@ from docpluck.normalize import (
     recover_minus_via_ci_pairing,
 )
 
+from docpluck.testing import corpus_pdfs, require_corpus_pdf
+
 requires_pdftotext = pytest.mark.skipif(
     shutil.which("pdftotext") is None, reason="pdftotext not installed"
 )
 
 # PDFextractor is docpluck's sibling repo — derive the path from this file so
 # the test is robust to where the tree is checked out.
-_TEST_PDFS = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "PDFextractor", "test-pdfs")
-)
 
 # Honest corpus-wide gate. The ratchet is the count of still-non-idempotent
 # papers in the strided sample below. Each idempotency cycle lowers it:
@@ -75,9 +73,7 @@ def test_normalize_idempotent_chan_feldman():
     newline-broken compound (``repli``\\n``cations``) and an H0 banner line
     (a bare DOI URL) pushed past the 30-line header-zone cap by front-matter
     noise. normalize_text must converge in a single pass."""
-    pdf = os.path.join(_TEST_PDFS, "apa", "chan_feldman_2025_cogemo.pdf")
-    if not os.path.isfile(pdf):
-        pytest.skip("chan_feldman test PDF not available")
+    pdf = str(require_corpus_pdf("apa/chan_feldman_2025_cogemo.pdf"))
     with open(pdf, "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     n1, n2 = _norm_twice(raw)
@@ -393,9 +389,7 @@ def test_normalize_idempotent_jama_open_1():
     across two pdftotext lines — P0 (early) cannot match the anchored pattern
     on the two-row form; only the cycle-9 P0r re-strip catches it after
     LateJoin merges the rows."""
-    pdf = os.path.join(_TEST_PDFS, "ama", "jama_open_1.pdf")
-    if not os.path.isfile(pdf):
-        pytest.skip("jama_open_1 test PDF not available")
+    pdf = str(require_corpus_pdf("ama/jama_open_1.pdf"))
     with open(pdf, "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     n1, n2 = _norm_twice(raw)
@@ -485,9 +479,7 @@ def test_normalize_idempotent_demography_5_real_pdf():
     table cells with CI labels one paragraph above their numeric values.
     The cross-paragraph CI→digit A1r join makes the rendered .md idempotent.
     """
-    pdf = os.path.join(_TEST_PDFS, "chicago-ad", "demography_5.pdf")
-    if not os.path.isfile(pdf):
-        pytest.skip("demography-5 test PDF not available")
+    pdf = str(require_corpus_pdf("chicago-ad/demography_5.pdf"))
     with open(pdf, "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     n1, n2 = _norm_twice(raw)
@@ -500,9 +492,7 @@ def test_normalize_idempotent_socius_4_real_pdf():
     captions (`Source: Authors' calculation, ... (2003-2023).`). The
     caption guard in S9 prevents S9 from stripping them.
     """
-    pdf = os.path.join(_TEST_PDFS, "asa", "socius_4.pdf")
-    if not os.path.isfile(pdf):
-        pytest.skip("socius-4 test PDF not available")
+    pdf = str(require_corpus_pdf("asa/socius_4.pdf"))
     with open(pdf, "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     n1, n2 = _norm_twice(raw)
@@ -518,9 +508,7 @@ def test_normalize_idempotent_ieee_access_7_real_pdf():
     transliterates σ → sigma and the combining circumflex orphans onto
     the trailing `a`. The final NFC pass composes it idempotently.
     """
-    pdf = os.path.join(_TEST_PDFS, "ieee", "ieee_access_7.pdf")
-    if not os.path.isfile(pdf):
-        pytest.skip("ieee-access-7 test PDF not available")
+    pdf = str(require_corpus_pdf("ieee/ieee_access_7.pdf"))
     with open(pdf, "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     n1, n2 = _norm_twice(raw)
@@ -534,9 +522,7 @@ def test_normalize_idempotent_nat_comms_2_real_pdf():
     extended `_is_in_numeric_block` now recognizes the labeled neighbor as
     numeric-block context, protecting the `1000` from S9 Pattern A.
     """
-    pdf = os.path.join(_TEST_PDFS, "nature", "nat_comms_2.pdf")
-    if not os.path.isfile(pdf):
-        pytest.skip("nat-comms-2 test PDF not available")
+    pdf = str(require_corpus_pdf("nature/nat_comms_2.pdf"))
     with open(pdf, "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     n1, n2 = _norm_twice(raw)
@@ -547,9 +533,12 @@ def test_normalize_idempotent_nat_comms_2_real_pdf():
 def test_normalize_idempotent_corpus():
     """Honest corpus-wide gate — a strided sample of the test corpus must not
     exceed the known non-idempotent count (the ratchet)."""
-    pdfs = sorted(glob.glob(os.path.join(_TEST_PDFS, "*", "*.pdf")))
-    if len(pdfs) < 40:
-        pytest.skip("test-pdf corpus not available")
+    # The paper set comes from the custodian's committed manifest, never from a
+    # glob. A glob computes its denominator from its own numerator: it reports
+    # "40 of 40" on a corpus that has silently shrunk from 101, and the ratchet
+    # below is then compared against a number that no longer means what it did.
+    # `corpus_pdfs()` raises rather than returning a short list.
+    pdfs = [str(p) for p in corpus_pdfs()]
     # TWO BLIND SPOTS, both measured 2026-09-05, both closed here.
     #
     # (1) `pdfs[::5]` SAMPLED 21 OF 101 AND CONTAINED NONE OF THE POSITIVES. Measured over

@@ -14,7 +14,6 @@ sentence, never a bare "Surname et al." alone on its own line.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -29,7 +28,8 @@ DISABLE_CAMELOT = True
 from docpluck.normalize import normalize_text, NormalizationLevel
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def _normed(text: str) -> str:
@@ -70,9 +70,7 @@ def test_inline_citation_preserved(line):
 
 
 def test_efendic_running_header_stripped_real_pdf():
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     import re
     # No standalone "Efendić et al." running-header line survives.

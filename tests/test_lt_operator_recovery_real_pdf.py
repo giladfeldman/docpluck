@@ -17,9 +17,7 @@ by a digit or a '.'-prefixed decimal is unambiguously a corrupted '<'.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -32,7 +30,8 @@ DISABLE_CAMELOT = True
 from docpluck.normalize import recover_corrupted_lt_operator
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 _BS = "\\"
 
@@ -74,9 +73,7 @@ def test_idempotent():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_efendic_no_backslash_operator_in_render():
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # No literal backslash glued to a numeral may survive into the .md.
     residual = re.findall(r"\\\s?\.?\d", md)

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -14,8 +13,10 @@ from docpluck.extract_columns import (
 )
 from docpluck.extract_layout import extract_pdf_layout
 
+from docpluck.testing import require_corpus_pdf
 
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs"
+
+
 
 
 def test_detect_2col_midline_clean_two_columns():
@@ -133,7 +134,7 @@ def test_splice_column_corrected_pages_no_op_when_no_pages_flagged():
 def test_extract_page_text_columns_real_pdf_smoke(fixture_name: str):
     """Real-PDF smoke: column-aware extraction yields non-empty text on a
     known interleave-prone page of jama_open_1 (the abstract page)."""
-    pdf = _CORPUS / "ama" / fixture_name
+    pdf = require_corpus_pdf(f"ama/{fixture_name}")
     if not pdf.exists():
         pytest.skip(f"corpus fixture missing: {pdf}")
     layout = extract_pdf_layout(pdf.read_bytes())

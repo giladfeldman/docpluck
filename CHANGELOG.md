@@ -132,11 +132,12 @@ library half is inert until the caller threads it.
 ## [Unreleased] — the column splice stopped reading pages it cannot act on
 
 **Version deliberately NOT bumped here.** `2.4.144` was in flight in this tree
-when this landed (another session's test-corpus work, which states the
-extraction pipeline is byte-for-byte unchanged — true of that change, not of
-this one). Whoever ships next folds this into one release and gives it a number;
-two sessions tagging the same repo concurrently is not a thing to be clever
-about.
+when this landed. Whoever ships next folds this into one release and gives it a
+number; two sessions tagging the same repo concurrently is not a thing to be
+clever about. Note that 2.4.144's own entry says "the extraction and
+normalization pipelines are byte-for-byte unchanged" — true of the OUTPUT and of
+`NORMALIZATION_VERSION`, no longer true of the extraction pipeline CODE once this
+is folded in.
 
 ### `extract_pdf` parsed the whole document to correct a handful of pages
 
@@ -149,23 +150,31 @@ Measured 2026-09-17 on a 72-page RSOS paper (2.0 MB, 159,030 chars):
 
 | | |
 |---|---|
-| bare `pdftotext` | 1.03 s |
-| `extract_pdf_layout` over all 72 pages | 25.3 s |
-| the splice itself | 0.02 s |
-| pages flagged | 23 |
-| pages changed | **0** |
+| pages flagged | 23 of 72 |
+| pages actually changed | **0** |
+| share of the layout parse spent in `p.chars` | **81.9%** |
+| `extract_pdf`, paired against bare `pdftotext` | 30.1x before, 11.6x after |
+| `extract_pdf`, paired before vs after | **2.60x faster** |
 
-Inside that 25.3 s, `p.chars` — the per-page content-stream parse — is **81.9%**;
-`extract_text` / `extract_words` / span clustering are 6.4 / 5.0 / 4.8% and are
-near-free because they reuse it. So the cost is per PAGE READ, and reading fewer
-pages is the only lever; pruning fields would save nothing.
+**ABSOLUTE SECOND-COUNTS ARE NOT QUOTED HERE ON PURPOSE.** This machine's numbers
+for the identical call moved by a factor of three within one session under
+contention, and an earlier draft of this entry quoted 25.3 s for a parse nested
+inside a 20.9 s call — both honestly measured, hours apart, and mutually
+impossible. Every figure above is a RATIO or a SHARE, taken paired and
+interleaved (B/A/B/A, 4 pairs) so load lands on both arms equally. If you need
+absolutes, re-measure on the machine you care about.
+
+Inside the layout parse, `p.chars` — the per-page content-stream parse — is 81.9%
+of the time; `extract_text` / `extract_words` / span clustering are 6.4 / 5.0 /
+4.8% and are near-free because they reuse it. So the cost is per PAGE READ, and
+reading fewer pages is the only lever; pruning fields would save nothing.
 
 Why that paper changed nothing, established by per-page probe rather than by
 reading the config: of the 23 flagged pages, **18 have no histogram midline at
-all** (it is a single-column paper) and the remaining 5 fail the bilateral
-column gate. Every one returns `""`. That is DATA-dependent — it is not knowable
-in advance from any cheap signal — so the fix is not "skip the pass", it is
-"read only the pages the splice can act on".
+all** (it is a single-column paper) and the remaining 5 fail the bilateral column
+gate. Every one returns `""`. That is DATA-dependent — it is not knowable in
+advance from any cheap signal — so the fix is not "skip the pass", it is "read
+only the pages the splice can act on".
 
 ### What changed
 

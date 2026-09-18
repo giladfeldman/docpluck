@@ -6,12 +6,14 @@ import pytest
 
 from .conftest import requires_pdftotext, pdf_path
 
+from docpluck.testing import require_corpus_pdf
+
 pytest.importorskip("pdfplumber")
 
 
 @requires_pdftotext
 def test_li_feldman_rsos():
-    path = pdf_path("docpluck", "Li&Feldman-2025-RSOS-...-print.pdf")
+    path = require_corpus_pdf("Li&Feldman-2025-RSOS-...-print.pdf")
     if not path or not os.path.exists(path):
         pytest.skip("Li&Feldman RSOS PDF not available")
     from docpluck import extract_sections

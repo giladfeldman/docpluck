@@ -31,14 +31,14 @@ Real-PDF (rule 0d) + structural-signature general fix (rule 16).
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
 from docpluck.extract import extract_pdf
 from docpluck.extract_columns import _word_multiset
 
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
+from docpluck.testing import require_corpus_pdf
+
 
 # Two-column corpus papers whose general-interleave pages have a clean gutter
 # (so the flag corrects them) — both already exercised as iterate canaries.
@@ -59,9 +59,7 @@ def _corrected_pages(method: str) -> set[int]:
 def test_flag_off_is_legacy_byte_identical(stem: str, monkeypatch):
     """With the flag unset, the general path must NOT fire and extraction must
     be deterministic (the dark default cannot change v2.4.81 output)."""
-    pdf = _CORPUS / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     monkeypatch.delenv(_FLAG, raising=False)
     b = pdf.read_bytes()
     text_a, method_a = extract_pdf(b)
@@ -80,9 +78,7 @@ def test_flag_on_corrects_more_pages_preserving_words(stem: str, monkeypatch):
     legacy path, and the correction is a PURE REORDER — the substantial-word
     multiset of the whole document is identical to the flag-off extraction
     (rules 0a/0b: no text-loss, no hallucination)."""
-    pdf = _CORPUS / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     b = pdf.read_bytes()
 
     monkeypatch.delenv(_FLAG, raising=False)

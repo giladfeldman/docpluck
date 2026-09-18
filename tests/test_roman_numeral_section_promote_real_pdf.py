@@ -22,13 +22,8 @@ from pathlib import Path
 
 from docpluck.render import render_pdf_to_markdown
 
-IEEE_PDF = (
-    Path(__file__).parent.parent.parent
-    / "PDFextractor"
-    / "test-pdfs"
-    / "ieee"
-    / "ieee_access_2.pdf"
-)
+from docpluck.testing import require_corpus_pdf
+
 
 
 def _require_pdf(p: Path) -> None:
@@ -122,15 +117,7 @@ def test_synthetic_inline_colon_variant_promoted():
 def test_aom_amj_1_all_caps_promotion_still_works_no_regression():
     """Regression: amj_1's ALL-CAPS headings (THEORETICAL DEVELOPMENT, STUDY 1: ...)
     must still promote without being affected by the Roman-prefix code path."""
-    AOM_PDF = (
-        Path(__file__).parent.parent.parent
-        / "PDFextractor"
-        / "test-pdfs"
-        / "aom"
-        / "amj_1.pdf"
-    )
-    if not AOM_PDF.exists():
-        pytest.skip(f"Fixture not available: {AOM_PDF}")
+    AOM_PDF = require_corpus_pdf("aom/amj_1.pdf")
     md = render_pdf_to_markdown(AOM_PDF.read_bytes())
     # These are the headings cycle 11 (v2.4.26) promoted; they must still promote
     expected = [

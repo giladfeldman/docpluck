@@ -22,7 +22,6 @@ step H0b), which collapses such lines pre-sectioning so the recovered
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -37,7 +36,8 @@ DISABLE_CAMELOT = True
 from docpluck.normalize import _rejoin_letterspaced_lowercase_labels
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # A whole line that is >=4 single lowercase letters separated by single spaces.
 _LETTERSPACED_LINE_RE = re.compile(r"(?m)^(?:[a-z] ){3,}[a-z]$")
@@ -84,9 +84,7 @@ def test_ignores_short_runs():
 
 @pytest.mark.parametrize("stem", _ELSEVIER_2009)
 def test_no_letterspaced_lines_in_render(stem):
-    pdf = TEST_PDFS / "apa" / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leaks = _LETTERSPACED_LINE_RE.findall(md)
     assert not leaks, f"{stem}: letter-spaced label lines leaked into render: {leaks}"
@@ -94,9 +92,7 @@ def test_no_letterspaced_lines_in_render(stem):
 
 @pytest.mark.parametrize("stem", _ELSEVIER_2009)
 def test_abstract_heading_recovered(stem):
-    pdf = TEST_PDFS / "apa" / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "## Abstract" in md, (
         f"{stem}: Abstract heading not recovered after letter-spaced "

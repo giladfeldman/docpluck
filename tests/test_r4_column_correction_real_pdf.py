@@ -27,7 +27,6 @@ Haiku-orchestration pretest; the word-split it introduced is closed here.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -35,7 +34,7 @@ from docpluck.extract import extract_pdf
 from docpluck.render import render_pdf_to_markdown
 
 
-_PDF = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "ama" / "jama_open_1.pdf"
+
 
 
 @pytest.fixture(scope="module")

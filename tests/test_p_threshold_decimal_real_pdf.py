@@ -43,7 +43,6 @@ receives `p < 05` and must decide for itself. Accepted by the owner of every con
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -58,7 +57,8 @@ DISABLE_CAMELOT = True
 from docpluck.normalize import NormalizationLevel, normalize_text
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def _norm(text: str) -> str:
@@ -73,9 +73,7 @@ def test_the_paper_s_own_dotless_threshold_is_no_longer_laundered_real_pdf():
     would launder a published defect into a meta-science pipeline, where a consumer would
     then validate a number the paper never printed and the author would never learn.
     """
-    pdf = TEST_PDFS / "apa" / "ar_apa_j_jesp_2009_12_011.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ar_apa_j_jesp_2009_12_011.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "p < 05" in md, "the paper's own dotless threshold must survive verbatim"
     assert "p < .05 (see" not in md, "W0n is retired; this is the laundered form"

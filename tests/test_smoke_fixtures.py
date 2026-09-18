@@ -1,27 +1,8 @@
 """Per-fixture smoke assertions driven by MANIFEST.json."""
 
-import json
-import os
-from pathlib import Path
 
 import pytest
-
-
-_HERE = Path(__file__).parent
-_MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
-
-
-def _entries():
-    if not _MANIFEST.is_file():
-        return []
-    return json.loads(_MANIFEST.read_text(encoding="utf-8"))["fixtures"]
-
-
-def _resolve(entry: dict) -> Path:
-    data = json.loads(_MANIFEST.read_text(encoding="utf-8"))
-    base = _VIBE if data.get("vibe_relative") else Path("/")
-    return base / entry["source_path"]
+from tests.structured_fixtures import fixture_entries, resolve_fixture
 
 
 # Default tolerance for table/figure count comparisons.
@@ -35,11 +16,9 @@ def _resolve(entry: dict) -> Path:
 COUNT_TOLERANCE = 6
 
 
-@pytest.mark.parametrize("entry", _entries(), ids=lambda e: e.get("id", "?"))
+@pytest.mark.parametrize("entry", fixture_entries(), ids=lambda e: e.get("id", "?"))
 def test_table_count_within_tolerance(entry):
-    pdf = _resolve(entry)
-    if not pdf.is_file():
-        pytest.skip(f"Fixture not available: {entry['id']}")
+    pdf = resolve_fixture(entry["id"])
     from docpluck import extract_pdf_structured
     expected = entry["expected_tables"]
     result = extract_pdf_structured(pdf.read_bytes())
@@ -49,11 +28,9 @@ def test_table_count_within_tolerance(entry):
     )
 
 
-@pytest.mark.parametrize("entry", _entries(), ids=lambda e: e.get("id", "?"))
+@pytest.mark.parametrize("entry", fixture_entries(), ids=lambda e: e.get("id", "?"))
 def test_figure_count_within_tolerance(entry):
-    pdf = _resolve(entry)
-    if not pdf.is_file():
-        pytest.skip(f"Fixture not available: {entry['id']}")
+    pdf = resolve_fixture(entry["id"])
     from docpluck import extract_pdf_structured
     expected = entry["expected_figures"]
     result = extract_pdf_structured(pdf.read_bytes())
@@ -63,12 +40,10 @@ def test_figure_count_within_tolerance(entry):
     )
 
 
-@pytest.mark.parametrize("entry", _entries(), ids=lambda e: e.get("id", "?"))
+@pytest.mark.parametrize("entry", fixture_entries(), ids=lambda e: e.get("id", "?"))
 def test_extract_pdf_structured_does_not_raise(entry):
     """Hard guarantee: never raise on any fixture, regardless of extraction quality."""
-    pdf = _resolve(entry)
-    if not pdf.is_file():
-        pytest.skip(f"Fixture not available: {entry['id']}")
+    pdf = resolve_fixture(entry["id"])
     from docpluck import extract_pdf_structured
     # Should not raise
     result = extract_pdf_structured(pdf.read_bytes())
@@ -78,12 +53,10 @@ def test_extract_pdf_structured_does_not_raise(entry):
     assert isinstance(result["figures"], list)
 
 
-@pytest.mark.parametrize("entry", _entries(), ids=lambda e: e.get("id", "?"))
+@pytest.mark.parametrize("entry", fixture_entries(), ids=lambda e: e.get("id", "?"))
 def test_table_html_renders_when_structured(entry):
     """Every structured table must have non-empty HTML; isolated must have None."""
-    pdf = _resolve(entry)
-    if not pdf.is_file():
-        pytest.skip(f"Fixture not available: {entry['id']}")
+    pdf = resolve_fixture(entry["id"])
     from docpluck import extract_pdf_structured
     result = extract_pdf_structured(pdf.read_bytes())
     for t in result["tables"]:

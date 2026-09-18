@@ -27,7 +27,6 @@ for _root in _Path(__file__).resolve().parents:
             _sys.path.insert(0, str(_root))
         break
 # --- end repo-root import guard ---------------------------------------------
-import glob
 import os
 import sys
 
@@ -38,8 +37,13 @@ from docpluck.extract import extract_pdf
 from docpluck.extract_layout import extract_pdf_layout
 from docpluck.normalize import _layout_beta_coefficients, _BETA_COEF_SLOT_RE
 
-CORPUS = os.path.expanduser(r"~/Vibe/MetaScienceTools/PDFextractor/test-pdfs")
-pdfs = sorted(glob.glob(os.path.join(CORPUS, "**", "*.pdf"), recursive=True))
+# The paper set comes from the article custodian's committed manifest, never
+# from a directory glob: a glob's denominator is its own numerator, so a corpus
+# that has silently shrunk still reports 100% and every count below is divided
+# by the wrong N. `docpluck_corpus()` raises rather than returning a short list.
+from _corpus import docpluck_corpus  # noqa: E402
+
+pdfs = [str(p) for p in docpluck_corpus()]
 print(f"scanning {len(pdfs)} corpus PDFs for W0m layout-beta signals...\n", flush=True)
 
 hits = []

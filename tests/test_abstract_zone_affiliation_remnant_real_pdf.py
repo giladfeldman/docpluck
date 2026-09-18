@@ -16,9 +16,7 @@ MENTIONS a university mid-sentence is prose (not an affiliation line) and is kep
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -33,13 +31,12 @@ from docpluck.render import (
     render_pdf_to_markdown,
 )
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def test_chandrashekar_affiliation_not_in_abstract():
-    pdf = TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chandrashekar_2023_mp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     lines = md.split("\n")
     ai = next((i for i, ln in enumerate(lines) if ln.strip() == "## Abstract"), None)

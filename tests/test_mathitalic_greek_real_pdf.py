@@ -18,9 +18,7 @@ which bypasses S0).
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -33,7 +31,8 @@ DISABLE_CAMELOT = True
 from docpluck.normalize import destyle_math_alphanumeric
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # Any Mathematical Alphanumeric Symbol (styled Latin/Greek/digit).
 _MATH_ALNUM_RE = re.compile(r"[\U0001D400-\U0001D7FF]")
@@ -76,9 +75,7 @@ def test_plain_text_untouched():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_korbmacher_greek_recovered_not_transliterated():
-    pdf = TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/korbmacher_2022_kruger.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # The PDF prints H(2) = 237, p < .001, η² = 0.34 — Greek eta must survive.
     assert "η" in md, "Greek eta (η) not present — math-italic Greek lost"

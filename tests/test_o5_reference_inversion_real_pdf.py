@@ -33,7 +33,6 @@ Real-PDF (rule 0d) + structural-signature general fix (rule 16).
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -41,7 +40,8 @@ from docpluck.extract import extract_pdf
 from docpluck.extract_columns import _detect_reference_inversion_pages
 from docpluck.render import render_pdf_to_markdown
 
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
+from docpluck.testing import require_corpus_pdf
+
 
 # A reference-LIST entry at line start ("Surname, F. M.") — same shape the
 # detector keys on. Used here to count entries before/after the heading.
@@ -64,9 +64,7 @@ def _ref_entries_split(md: str) -> tuple[int, int]:
     [("chen_2021_jesp", 19), ("jamison_2020_jesp", 9)],
 )
 def test_o5_inversion_detected_and_corrected(stem: str, expect_page: int):
-    pdf = _CORPUS / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     b = pdf.read_bytes()
 
     text, method = extract_pdf(b)
@@ -93,9 +91,7 @@ def test_o5_inversion_detected_and_corrected(stem: str, expect_page: int):
 def test_o5_correction_preserves_all_reference_text(stem: str):
     """The reorder must not LOSE text: a sample of reference surnames known to
     have been stranded must be present in the corrected output (rule 0a)."""
-    pdf = _CORPUS / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # Surnames that appear in these papers' reference lists (stable anchors).
     anchors = {
@@ -109,7 +105,7 @@ def test_o5_correction_preserves_all_reference_text(stem: str):
 def test_o5_detector_is_selective():
     """The detector must NOT fire on a normally-ordered reference paper
     (heading THEN entries). Guards against the reorder churning correct papers."""
-    pdf = _CORPUS.parents[0] / "ama" / "jama_open_1.pdf"
+    pdf = require_corpus_pdf("ama/jama_open_1.pdf")
     if not pdf.exists():
         pytest.skip(f"corpus fixture missing: {pdf}")
     b = pdf.read_bytes()

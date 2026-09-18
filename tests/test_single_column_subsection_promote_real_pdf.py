@@ -33,7 +33,6 @@ precomputed from the raw text).
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -43,6 +42,8 @@ from docpluck.render import (
     render_pdf_to_markdown,
 )
 
+from docpluck.testing import require_corpus_pdf
+
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
 # which executes during COLLECTION and was never undone, so importing this file
@@ -51,7 +52,6 @@ from docpluck.render import (
 # reads this flag and restores the prior value when the module finishes.
 DISABLE_CAMELOT = True
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 def _headings(md: str) -> list[str]:
@@ -121,36 +121,39 @@ class TestSingleColRelaxationFragment:
 
 # ---- Real-PDF regression tests (rule 0d) ----------------------------------
 
-_AR_APA = TEST_PDFS / "apa" / "ar_apa_j_jesp_2009_12_011.pdf"
-_IP_FELDMAN = TEST_PDFS / "apa" / "ip_feldman_2025_pspb.pdf"
+# Bound at CALL time, not module scope, so a paper that is not in custody FAILS
+# here like it does everywhere else. These four tests kept their
+# `skipif(not ....exists())` through the 2026-09-17 repoint and were the last
+# sites where a present custodian plus an unresolvable paper still produced a
+# silent skip and a green run -- outcome 2 collapsed into outcome 1, against
+# this module's own contract in docpluck/testing/corpus.py.
+_AR_APA_NAME = "apa/ar_apa_j_jesp_2009_12_011.pdf"
+_IP_FELDMAN_NAME = "apa/ip_feldman_2025_pspb.pdf"
 
 
-@pytest.mark.skipif(not _AR_APA.exists(), reason="ar_apa_j_jesp_2009_12_011.pdf fixture not present")
 def test_ar_apa_single_column_promotes_glued_subsection_headings():
     """JESP single-column paper: the three glued Method subsection headings
     must promote to ``### `` (they rendered as body text before the
     single-column relaxation)."""
-    md = render_pdf_to_markdown(_AR_APA.read_bytes())
+    md = render_pdf_to_markdown(require_corpus_pdf(_AR_APA_NAME).read_bytes())
     headings = _headings(md)
     for h in ("### Overview", "### Practice instructions", "### Self-control assessment"):
         assert h in headings, f"missing {h!r} in {headings!r}"
 
 
-@pytest.mark.skipif(not _AR_APA.exists(), reason="ar_apa_j_jesp_2009_12_011.pdf fixture not present")
 def test_ar_apa_is_detected_single_column():
     from docpluck.extract import extract_pdf
 
-    raw, _ = extract_pdf(_AR_APA.read_bytes())
+    raw, _ = extract_pdf(require_corpus_pdf(_AR_APA_NAME).read_bytes())
     assert _raw_text_is_single_column(raw)
 
 
-@pytest.mark.skipif(not _IP_FELDMAN.exists(), reason="ip_feldman_2025_pspb.pdf fixture not present")
 def test_ip_feldman_two_column_does_not_over_promote_cell_labels():
     """PSPB two-column paper: the single-column relaxation must stay OFF so the
     narrow table-cell / measures-list labels do NOT get promoted to headings
     (the G5d trap). These three labels were the over-promotions that blocked
     the naive fix."""
-    md = render_pdf_to_markdown(_IP_FELDMAN.read_bytes())
+    md = render_pdf_to_markdown(require_corpus_pdf(_IP_FELDMAN_NAME).read_bytes())
     headings = _headings(md)
     for bad in ("### Others ratings", "### Address order effects"):
         assert bad not in headings, f"G5d over-promotion: {bad!r} present in {headings!r}"
@@ -161,9 +164,8 @@ def test_ip_feldman_two_column_does_not_over_promote_cell_labels():
     ), f"G5d over-promotion: 'Prevalence Estimation Error' heading in {headings!r}"
 
 
-@pytest.mark.skipif(not _IP_FELDMAN.exists(), reason="ip_feldman_2025_pspb.pdf fixture not present")
 def test_ip_feldman_is_detected_two_column():
     from docpluck.extract import extract_pdf
 
-    raw, _ = extract_pdf(_IP_FELDMAN.read_bytes())
+    raw, _ = extract_pdf(require_corpus_pdf(_IP_FELDMAN_NAME).read_bytes())
     assert not _raw_text_is_single_column(raw)

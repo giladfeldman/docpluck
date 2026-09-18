@@ -24,9 +24,7 @@ partitioner-level work (G5c-2) and is intentionally left untouched.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -41,7 +39,8 @@ from docpluck.render import (
     render_pdf_to_markdown,
 )
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # An orphan multi-level number line immediately followed by a generic
 # (non-numbered, non-Figure/Table) `##`/`###` heading.
@@ -125,9 +124,7 @@ def test_folds_multiple_independent_occurrences():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_orphan_multilevel_number_folded_in_render():
-    pdf = TEST_PDFS / "apa" / "jdm_m.2022.2.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/jdm_m.2022.2.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # The foldable case: `5.4.` immediately above the generic `## Discussion`.
     assert "### 5.4. Discussion" in md, "5.4. Discussion subsection not folded"

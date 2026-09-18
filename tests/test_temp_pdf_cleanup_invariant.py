@@ -46,8 +46,9 @@ from pathlib import Path
 
 import pytest
 
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
-_PDF = _CORPUS / "efendic_2022_affect.pdf"
+from docpluck.testing import corpus_pdf
+
+_PDF = corpus_pdf("apa/efendic_2022_affect.pdf")
 
 pytestmark = pytest.mark.skipif(not _PDF.is_file(), reason=f"fixture not available: {_PDF}")
 

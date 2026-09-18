@@ -23,7 +23,6 @@ this specific paper.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -32,10 +31,11 @@ from docpluck.tables.captions import find_caption_matches
 from docpluck.tables.detect import _region_for_caption
 from docpluck.tables.whitespace import whitespace_cells
 
+from docpluck.testing import require_corpus_pdf
 
-# Fixtures live in the (private) PDFextractor sibling repo; tests skip
-# gracefully when the corpus isn't mounted.
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
+
+# Fixtures resolve through the article custodian by DOI; a paper not in custody
+# FAILS rather than skipping, so an unreadable corpus cannot report a green run.
 
 # The two papers the R1 sweep confirmed should yield ≥1 cell post-repair:
 # chan_feldman (8 caps → 72 cells) and maier (11 caps → 100 cells).
@@ -95,9 +95,7 @@ def test_b1_whitespace_cells_wiring_live(filename: str, min_regions: int, min_ce
     `regions > 0` but `cells=0`, the whitespace_cells thresholds have shifted
     or _region_for_caption is yielding too-narrow bboxes.
     """
-    pdf = _CORPUS / filename
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{filename}")
 
     layout = extract_pdf_layout(pdf.read_bytes())
     caps = [c for c in find_caption_matches(layout.raw_text, list(layout.page_offsets)) if c.kind == "table"]

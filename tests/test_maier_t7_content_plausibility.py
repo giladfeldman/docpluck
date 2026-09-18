@@ -39,13 +39,13 @@ descriptives table and a paragraph of Discussion wearing its caption.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pytest
 
 from docpluck.extract_structured import extract_pdf_structured
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # Values straight from the AI gold (article-finder `reading` view) — the ground truth.
 # Row 1 of the grid; enough to prove the table's data reached the output at all.
@@ -59,9 +59,7 @@ _GOLD_T7_VALUES = ["3.47", "2.91", "2.94", "3.11"]
 )
 def test_maier_table7_keeps_its_data():
     """Table 7 must carry its own descriptives, not Discussion prose."""
-    pdf = TEST_PDFS / "apa" / "maier_2023_collabra.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/maier_2023_collabra.pdf")
 
     result = extract_pdf_structured(pdf.read_bytes())
     t7 = next((t for t in result["tables"] if t.get("label") == "Table 7"), None)
@@ -84,9 +82,7 @@ def test_maier_table7_data_is_recoverable_without_camelot():
     if this ever breaks, the underlying capture regressed and the diagnosis above
     no longer holds.
     """
-    pdf = TEST_PDFS / "apa" / "maier_2023_collabra.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/maier_2023_collabra.pdf")
 
     prior = os.environ.get("DOCPLUCK_DISABLE_CAMELOT")
     os.environ["DOCPLUCK_DISABLE_CAMELOT"] = "1"

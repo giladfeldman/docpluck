@@ -31,7 +31,6 @@ public library entry point on an actual PDF fixture.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -43,14 +42,13 @@ from docpluck.normalize import (
 )
 from docpluck.render import render_pdf_to_markdown
 
+from docpluck.testing import require_corpus_pdf
 
-_PDF_ROOT = Path(__file__).resolve().parents[1] / ".." / "PDFextractor" / "test-pdfs"
+
 
 
 def _maybe_render(rel: str) -> str:
-    pdf = (_PDF_ROOT / rel).resolve()
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available locally: {rel}")
+    pdf = require_corpus_pdf(rel)
     return render_pdf_to_markdown(pdf.read_bytes())
 
 

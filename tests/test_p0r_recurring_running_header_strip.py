@@ -24,20 +24,19 @@ from docpluck.normalize import (
 )
 from docpluck.render import render_pdf_to_markdown
 
+from docpluck.testing import require_corpus_pdf
 
-_PDF_ROOT = Path(__file__).resolve().parents[1] / ".." / "PDFextractor" / "test-pdfs"
+
 
 
 def _maybe_render(rel: str) -> str:
-    pdf = (_PDF_ROOT / rel).resolve()
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available locally: {rel}")
+    pdf = require_corpus_pdf(rel)
     return render_pdf_to_markdown(pdf.read_bytes())
 
 
 # v2.4.81 untested-corpus-sweep fixtures (Elsevier JESP 2021, Nature Comms 2023)
 # live in the shared article-finder repository (the I9 locator's data store),
-# not in PDFextractor/test-pdfs/. Resolve from there; skip if the cache isn't on
+# not in docpluck's own corpus manifest. Resolve from there; skip if the cache isn't on
 # this machine (manifest-with-skip pattern, per ``feedback_no_pdfs_in_repo``).
 _AF_FULLTEXT = Path(__file__).resolve().parents[3] / "ArticleRepository" / "fulltext"
 

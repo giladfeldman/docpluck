@@ -32,7 +32,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
+
+from docpluck.testing import require_corpus_pdf
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -182,9 +183,7 @@ def test_plos_med_1_no_fffd_real_pdf():
     """plos_med_1 (PROSECCO trial): pdftotext destroys the cmsy10 >= glyph to
     U+FFFD in 3 body-prose comparisons at v2.4.56. Drives the public render
     entry point; no replacement character may survive to the rendered .md."""
-    pdf = _META / "PDFextractor" / "test-pdfs" / "vancouver" / "plos_med_1.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("vancouver/plos_med_1.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert FFFD not in md, f"{md.count(FFFD)} replacement char(s) remain"
     # The three prose comparisons are recovered to the real >= operator.

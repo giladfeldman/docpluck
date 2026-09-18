@@ -23,15 +23,19 @@ import os
 from pathlib import Path
 
 import pytest
+from tests.structured_fixtures import (
+    fixture_entries,
+    load_manifest,
+    resolve_fixture as _resolve_fixture,
+)
 
 
-_HERE = Path(__file__).parent
-_MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_SNAPSHOT_DIR = _HERE / "snapshots"
+_SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 _CHECKSUMS = _SNAPSHOT_DIR / "checksums.json"
 
-# The portfolio root. Resolution order per the ~/Vibe/CLAUDE.md hard rule
-# ("Never hardcode the Vibe root — use VIBE_ROOT"): env var, then $HOME/Vibe.
+# Fixtures resolve through the article custodian (see tests/structured_fixtures),
+# so there is no portfolio path here to get wrong any more. The incident below is
+# kept because it is why a miss must FAIL rather than skip.
 #
 # 2026-08-07: this was hardcoded to `$HOME/Dropbox/Vibe`. The portfolio moved
 # OUT of Dropbox on 2026-08-03 (Dropbox syncing a live .git corrupts repos), so
@@ -39,22 +43,23 @@ _CHECKSUMS = _SNAPSHOT_DIR / "checksums.json"
 # SKIPPED** — silently, for four days. That is the precise failure the hard
 # rule warns about: "a discovery helper that returns empty when the root is
 # wrong makes a broken run look like a clean one".
-_VIBE = Path(os.environ.get("VIBE_ROOT") or (Path(os.path.expanduser("~")) / "Vibe"))
 
 
 def _manifest() -> dict:
-    if not _MANIFEST.is_file():
-        return {}
-    return json.loads(_MANIFEST.read_text(encoding="utf-8"))
+    return load_manifest()
 
 
 def _entries():
-    return _manifest().get("fixtures", [])
+    return fixture_entries()
 
 
 def _resolve(entry: dict) -> Path:
-    base = _VIBE if _manifest().get("vibe_relative") else Path("/")
-    return base / entry["source_path"]
+    """The fixture's PDF, from custody. A miss FAILS -- it used to skip.
+
+    That skip is the reason this file's own header records 12 tests passing
+    silently for four days after the portfolio root moved.
+    """
+    return _resolve_fixture(entry["id"])
 
 
 # The tool-artifact family article-finder holds these texts under. The version
@@ -168,38 +173,28 @@ def _explain_against_custodian(entry: dict, actual: str, out_dir: Path) -> list[
     ]
 
 
-def test_fixture_root_exists():
-    """Fail loudly when the corpus root is wrong, instead of skipping 12 tests.
+def test_the_fixture_corpus_is_in_custody():
+    """Fail loudly when the corpus cannot be resolved, instead of skipping 12 tests.
 
-    Without this, a relocated portfolio turns the whole snapshot suite into a
-    silent no-op and the run still reports green. A missing *individual* PDF is
-    a legitimate skip (not everyone has the closed-access corpus); a missing
-    *root* is a broken configuration and must be visible.
+    Rewritten 2026-09-17. The old version asserted a portfolio DIRECTORY existed
+    and carried a CI escape hatch, because the PDFs were closed-access and could
+    not be committed. Both are gone: the papers resolve through the article
+    custodian by DOI, so there is no directory to relocate, and per the owner's
+    2026-09-17 directive a corpus that is not there is a FAILURE rather than a
+    green no-op.
+
+    It checks every fixture, not merely a root, because "the root is there" was
+    never the claim anyone cared about.
     """
-    data = _manifest()
-    if not data.get("vibe_relative"):
-        pytest.skip("manifest is not vibe-relative")
-
-    # A CI runner has no corpus BY DESIGN — the PDFs are closed-access and must
-    # never be committed (article-finder is their sole custodian). So absence
-    # there is the expected state, not a broken configuration, and asserting on
-    # it made this the last red test in CI once the two collection errors were
-    # fixed. An explicit VIBE_ROOT still means "I told you where it is" and is
-    # checked even on CI.
-    #
-    # The guard keeps its whole purpose: on a DEVELOPER machine, where the
-    # corpus is supposed to be present, a relocated portfolio still fails loudly
-    # instead of silently turning 12 snapshot tests into a green no-op.
-    if os.environ.get("CI") and not os.environ.get("VIBE_ROOT"):
-        pytest.skip(
-            "CI runner: the closed-access corpus is absent by design "
-            "(see the custody rule). Set VIBE_ROOT to assert it here."
-        )
-
-    assert _VIBE.is_dir(), (
-        f"corpus root {_VIBE} does not exist — every fixture would skip and the "
-        "suite would report green. Set VIBE_ROOT, or check whether the portfolio "
-        "moved (it left ~/Dropbox/Vibe on 2026-08-03)."
+    missing = []
+    for entry in _entries():
+        try:
+            _resolve_fixture(entry["id"])
+        except AssertionError as exc:
+            missing.append(f"  {entry['id']}: {exc}")
+    assert not missing, (
+        "fixtures that do not resolve in custody -- each one would otherwise turn a "
+        "snapshot test into a silent no-op:\n" + "\n".join(missing)
     )
 
 

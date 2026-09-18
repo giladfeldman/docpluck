@@ -14,7 +14,6 @@ or is glued inline. Removing it rejoins the split body sentence.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -28,7 +27,8 @@ DISABLE_CAMELOT = True
 
 from docpluck.normalize import NormalizationLevel, normalize_text
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def _norm(text: str) -> str:
@@ -79,9 +79,7 @@ def test_plain_prose_untouched():
 def test_no_cambridge_boilerplate_in_render(stem):
     from docpluck.render import render_pdf_to_markdown
 
-    pdf = TEST_PDFS / "apa" / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "Published online by Cambridge University Press" not in md, (
         f"{stem}: Cambridge running footer leaked into render"

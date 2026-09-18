@@ -106,6 +106,8 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
+from scripts.harness.corpus import resolve as _harness_resolve
+
 VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
 _MANIFEST = Path(__file__).resolve().parents[2] / "scripts" / "harness" / "corpus_manifest.json"
 
@@ -300,7 +302,10 @@ def main() -> None:
     results = {}
     n_narrow = n_inline = 0
     for i, d in enumerate(docs):
-        path = VIBE / d["rel_path"]
+        # `resolve()` handles both record shapes: docpluck's own papers carry a
+        # `corpus_path` and come from the article custodian, everything else is
+        # still portfolio-relative. Reading `rel_path` directly missed the first.
+        path = _harness_resolve(d)
         if not path.is_file():
             print(f"[{i}] {d['id']}: MISSING")
             continue

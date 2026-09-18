@@ -37,6 +37,8 @@ from docpluck.render import render_pdf_to_markdown
 
 from .conftest import pdf_available, pdf_path, requires_pdftotext
 
+from docpluck.testing import require_corpus_pdf
+
 # Real-PDF Camelot extraction is non-deterministic under parallel xdist load
 # (10 concurrent Ghostscript/temp-dir subprocesses make Camelot intermittently
 # return no tables — the "tables present" FP-guards then false-fail). These
@@ -84,10 +86,8 @@ def ipf_md() -> str:
 
 @pytest.fixture(scope="module")
 def amp_md() -> str:
-    """amp_1 lives in the committed test-pdfs corpus (not the article repo)."""
-    if not pdf_available("docpluck", "aom", "amp_1.pdf"):
-        pytest.skip("corpus fixture missing: aom/amp_1.pdf")
-    return render_pdf_to_markdown(Path(pdf_path("docpluck", "aom", "amp_1.pdf")).read_bytes())
+    """amp_1 is one of docpluck's own corpus papers, resolved by DOI."""
+    return render_pdf_to_markdown(Path(require_corpus_pdf("aom/amp_1.pdf")).read_bytes())
 
 
 # ── the fix: garbage prose tables stripped (FAIL at HEAD, PASS after) ──────────

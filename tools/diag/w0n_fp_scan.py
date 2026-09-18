@@ -27,7 +27,6 @@ for _root in _Path(__file__).resolve().parents:
             _sys.path.insert(0, str(_root))
         break
 # --- end repo-root import guard ---------------------------------------------
-import glob
 import os
 import sys
 
@@ -37,11 +36,14 @@ os.environ.setdefault("DOCPLUCK_DISABLE_CAMELOT", "1")
 from docpluck.extract import extract_pdf
 from docpluck.normalize import recover_p_threshold_dropped_decimal
 
+# The paper set comes from the article custodian's committed manifest, never
+# from a directory glob: a glob's denominator is its own numerator, so a corpus
+# that has silently shrunk still reports 100% and every count below is divided
+# by the wrong N. `docpluck_corpus()` raises rather than returning a short list.
+from _corpus import docpluck_corpus  # noqa: E402
+
 _VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
-CORPUS = os.path.join(_VIBE_ROOT, "MetaScienceTools", "PDFextractor", "test-pdfs")
-if not os.path.isdir(CORPUS):
-    sys.exit(f"FATAL: corpus dir not found: {CORPUS} (set VIBE_ROOT?) — refusing to report a false CLEAN on 0 PDFs")
-pdfs = sorted(glob.glob(os.path.join(CORPUS, "**", "*.pdf"), recursive=True))
+pdfs = [str(p) for p in docpluck_corpus()]
 if not pdfs:
     sys.exit("FATAL: 0 PDFs in corpus — refusing to report a false CLEAN")
 print(f"scanning {len(pdfs)} corpus PDFs for W0n false positives...\n")

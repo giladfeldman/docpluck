@@ -4,28 +4,9 @@ import json
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
-
-
-_HERE = Path(__file__).parent
-_MANIFEST = _HERE / "fixtures" / "structured" / "MANIFEST.json"
-_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
-
-
-def _resolve_fixture(fixture_id: str) -> Path:
-    if not _MANIFEST.is_file():
-        pytest.skip("MANIFEST.json missing")
-    data = json.loads(_MANIFEST.read_text(encoding="utf-8"))
-    base = _VIBE if data.get("vibe_relative") else Path("/")
-    for entry in data["fixtures"]:
-        if entry["id"] == fixture_id:
-            path = base / entry["source_path"]
-            if not path.is_file():
-                pytest.skip(f"Fixture not available: {fixture_id} -> {path}")
-            return path
-    pytest.skip(f"Fixture id not in manifest: {fixture_id}")
+from tests.structured_fixtures import resolve_fixture as _resolve_fixture
 
 
 # Each test here spawns a REAL `python -m docpluck` subprocess against a real

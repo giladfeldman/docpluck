@@ -200,7 +200,7 @@ _EFENDIC_KEY = "10.1177/19485506211056761"
 
 def _load_efendic_pdf_bytes():
     """Locate efendic via article-finder's cache-check (rule I9 — never a direct
-    test-pdfs path). Skips if the corpus PDF is not present locally."""
+    corpus name). Fails if the paper is not in custody -- it used to skip."""
     import json
     import subprocess
 

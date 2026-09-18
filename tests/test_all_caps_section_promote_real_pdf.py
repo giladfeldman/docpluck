@@ -26,7 +26,6 @@ real-PDF fixtures, per CLAUDE.md hard rule 0d.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -35,6 +34,8 @@ from docpluck.render import (
     _is_safe_all_caps_promote,
     render_pdf_to_markdown,
 )
+
+from docpluck.testing import corpus_pdf
 
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
@@ -46,7 +47,6 @@ from docpluck.render import (
 DISABLE_CAMELOT = True
 
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 # ---- Contract tests (cheap, pure helpers) ---------------------------------
@@ -121,16 +121,11 @@ class TestIsSafeAllCapsPromote:
 def _headings(md: str) -> list[str]:
     return [m.group() for m in re.finditer(r"^#{1,6} .+", md, re.MULTILINE)]
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amj_1.pdf").exists(),
-    reason="amj_1.pdf fixture not present",
-)
 def test_amj_1_promotes_all_caps_headings():
     """amj_1.pdf has 4 ALL-CAPS major section headings that v2.4.25
     failed to promote because the section detector's strict
     blank-before/blank-after constraints rejected them."""
-    pdf = TEST_PDFS / "aom" / "amj_1.pdf"
+    pdf = corpus_pdf("aom/amj_1.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     headings = _headings(md)
     expected = [
@@ -142,25 +137,15 @@ def test_amj_1_promotes_all_caps_headings():
     for h in expected:
         assert h in headings, f"missing {h!r} in {headings!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amle_1.pdf").exists(),
-    reason="amle_1.pdf fixture not present",
-)
 def test_amle_1_promotes_all_caps_headings():
     """amle_1.pdf has several ALL-CAPS section headings (METHOD,
     RESULTS, DISCUSSION, etc.) that v2.4.25 left as inline bold."""
-    pdf = TEST_PDFS / "aom" / "amle_1.pdf"
+    pdf = corpus_pdf("aom/amle_1.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     headings = _headings(md)
     for h in ("## METHOD", "## RESULTS", "## DISCUSSION"):
         assert h in headings, f"missing {h!r} in {headings!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_access_2_promotes_all_caps_headings():
     """ieee_access_2.pdf has INTRODUCTION, METHODOLOGY, RESULTS,
     DISCUSSION AND CONCLUSION, etc. that v2.4.25 left as inline bold.
@@ -171,7 +156,7 @@ def test_ieee_access_2_promotes_all_caps_headings():
     Headings whose numeral isn't adjacent (e.g. III. before `## RESULTS` when
     the section partitioner placed III. far away) still appear as bare
     `## RESULTS`. Accept both forms."""
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     headings = _headings(md)
     # Accept either bare or Roman-prefixed form per cycle 15d
@@ -184,11 +169,6 @@ def test_ieee_access_2_promotes_all_caps_headings():
         found = any(o in headings for o in options)
         assert found, f"missing any of {options!r} in {headings!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "xiao_2021_crsp.pdf").exists(),
-    reason="xiao_2021_crsp.pdf fixture not present",
-)
 def test_xiao_no_false_positive_promotion():
     """xiao_2021_crsp.pdf uses Title Case for its section headings —
     the ALL-CAPS post-processor should NOT promote any line that isn't
@@ -201,7 +181,7 @@ def test_xiao_no_false_positive_promotion():
     heading (HALLUC-HEAD-3) — the bare label was over-promoted. Now only
     ABSTRACT remains as the ALL-CAPS h2 frontmatter label.
     """
-    pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
+    pdf = corpus_pdf("apa/xiao_2021_crsp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     headings = _headings(md)
     h2_caps = [h for h in headings if h.startswith("## ") and h[3:].isupper()]

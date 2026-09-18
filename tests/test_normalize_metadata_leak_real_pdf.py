@@ -2,7 +2,7 @@
 
 Per /docpluck-iterate skill rule 0d: every fix ships with at least one
 ``*_real_pdf`` test that exercises the public library entry point on an
-actual PDF fixture from ``../PDFextractor/test-pdfs/``.
+actual corpus paper, resolved from the article custodian by DOI.
 
 The PDF fixtures live OUTSIDE this repo (gitignored — closed-access journal
 content; see memory ``feedback_no_pdfs_in_repo``). Tests therefore use the
@@ -24,20 +24,20 @@ from docpluck.normalize import (
 )
 from docpluck.render import render_pdf_to_markdown
 
+from docpluck.testing import require_corpus_pdf
 
-_PDF_ROOT = Path(__file__).resolve().parents[1] / ".." / "PDFextractor" / "test-pdfs"
+
 
 
 def _maybe_render(rel: str) -> str:
     """Render a fixture PDF or skip if not present."""
-    pdf = (_PDF_ROOT / rel).resolve()
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available locally: {rel}")
+    pdf = require_corpus_pdf(rel)
     return render_pdf_to_markdown(pdf.read_bytes())
 
 
 # v2.4.81: untested-corpus-sweep fixtures (Collabra) live in the shared
-# article-finder repository (the I9 locator's data store), not in test-pdfs/.
+# article-finder repository under a DOI key, not in docpluck's own corpus
+# manifest. Resolved through the `articlerepo` helper rather than corpus_pdf.
 _AF_FULLTEXT = Path(__file__).resolve().parents[3] / "ArticleRepository" / "fulltext"
 
 

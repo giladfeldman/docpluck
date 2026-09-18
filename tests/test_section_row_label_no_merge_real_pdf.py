@@ -18,15 +18,14 @@ noun-phrase + ``(n = ...)`` parenthetical) to the merge gate.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
 
 from docpluck.render import render_pdf_to_markdown
 from docpluck.tables.cell_cleaning import _merge_continuation_rows
 
+from docpluck.testing import corpus_pdf
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+
 
 
 # ---- Contract tests ---------------------------------------------------------
@@ -94,16 +93,11 @@ def test_long_section_row_label_not_merged_due_to_length_cap():
 
 # ---- Real-PDF regression test (rule 0d) ------------------------------------
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "xiao_2021_crsp.pdf").exists(),
-    reason="xiao_2021_crsp.pdf fixture not present",
-)
 def test_xiao_table_6_no_section_row_leak_into_data_cells():
     """Cycle-9 handoff item C — xiao_2021_crsp Table 6 must NOT have
     a section-row label (``Regret-Salient (n = 331, ...)``) collapsed
     into the data cell above it (``112/172``)."""
-    pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
+    pdf = corpus_pdf("apa/xiao_2021_crsp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     idx = md.find("### Table 6")
     assert idx >= 0, "Table 6 not rendered"

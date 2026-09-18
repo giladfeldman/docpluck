@@ -2,7 +2,7 @@
 
 Every scan under ``tools/diag/`` used to compute its paper set with
 
-    glob(os.path.join(VIBE_ROOT, "MetaScienceTools/PDFextractor/test-pdfs", "**/*.pdf"))
+    glob(os.path.join(CORPUS_DIR, "**/*.pdf"))   # a sibling project directory
 
 which violates the custody hard rule (article-finder is the sole custodian of
 papers) and carries the coverage defect ``scripts/verify_corpus.py`` was rewired
@@ -30,6 +30,22 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+# IMPORT docpluck FROM THIS TREE, not from site-packages.
+#
+# Measured 2026-09-17: without this, `import docpluck` here resolved to
+# C:\...\site-packages\docpluck (the last RELEASED version), so every scan under
+# tools/diag/ measured the installed release while reporting as though it had
+# measured the working tree. That is the whole "a fix in the comparison key is not
+# a fix in the shipped string" family, one layer down.
+#
+# It bit this module immediately: `docpluck_corpus()` below imports
+# `docpluck.testing`, which exists only in the working tree until 2.4.144 ships.
+# Against site-packages it raised ImportError, so the corpus repoint was dead in
+# all nine scans that call it -- present in the source, unreachable in the run.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 ARTICLE_FINDER = Path(
     os.environ.get("ARTICLE_FINDER_HOME")
@@ -79,6 +95,13 @@ def baseline_corpus(limit: int | None = None) -> list[tuple[str, Path]]:
     """
     _require_article_finder()
     r = _af("ai-gold.py", "papers-with-view", DOCPLUCK_BASELINE_SPEC, "--latest", "--keys-only")
+    # `_af` captures stderr, so a custodian warning reaches nobody unless it is
+    # relayed. The one that matters says `--latest` resolved to a version
+    # covering FEWER papers than an older one — the only signal that this
+    # scan's denominator silently shrank.
+    for line in r.stderr.splitlines():
+        if line.startswith("WARNING:"):
+            print(f"# custodian {line}", file=sys.stderr)
     keys = sorted(k for k in (ln.strip() for ln in r.stdout.splitlines()) if k)
     if not keys:
         raise CorpusUnavailable(
@@ -169,3 +192,30 @@ def coverage_line() -> str:
         f"COVERAGE: {state} — {res}/{exp} papers resolved from article-finder "
         f"(custodian, not a directory listing)"
     )
+
+
+def docpluck_corpus() -> list[Path]:
+    """docpluck's own 101-paper corpus, from the custodian's committed manifest.
+
+    Added 2026-09-17 with the corpus repoint. Every scan under this directory
+    used to build its paper set with
+
+        glob(os.path.join(CORPUS_DIR, "**/*.pdf"))   # a sibling project directory
+
+    which is the defect this module's own header describes: a denominator
+    computed from the numerator. A glob that quietly returns 40 files instead of
+    101 prints "scanning 40 corpus PDFs" and divides every blast-radius number
+    below it by the wrong N, with nothing to read that says so.
+
+    The manifest is committed, so it cannot shrink without a diff, and a paper it
+    names that is not in custody raises rather than being dropped.
+    """
+    from docpluck.testing.corpus import CorpusPaperMissing, corpus_pdfs
+
+    try:
+        return corpus_pdfs()
+    except CorpusPaperMissing as exc:
+        raise CorpusUnavailable(
+            f"FATAL: the docpluck corpus is not fully in custody -- {exc}. "
+            "Refusing to report a result computed from a short corpus."
+        ) from exc

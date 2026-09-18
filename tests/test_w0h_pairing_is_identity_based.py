@@ -41,16 +41,16 @@ challenge. Guessing invents a number that looks published.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
 from docpluck import normalize as N
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import corpus_pdf
+
 # The W0h source paper: three coefficients whose dropped U+2212 survives in the
 # layout channel as an unmapped `(cid:N)` glyph.
-W0H_PDF = TEST_PDFS / "apa" / "ar_apa_j_jesp_2009_12_011.pdf"
+W0H_PDF = corpus_pdf("apa/ar_apa_j_jesp_2009_12_011.pdf")
 
 pytestmark = pytest.mark.skipif(
     not W0H_PDF.is_file(), reason=f"fixture not available: {W0H_PDF}"

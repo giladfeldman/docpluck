@@ -33,7 +33,6 @@ public library entry point on an actual PDF fixture.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -41,14 +40,13 @@ from docpluck.sections import extract_sections
 from docpluck.sections.core import _is_metadata_label_line
 from docpluck.sections.taxonomy import SectionLabel
 
+from docpluck.testing import require_corpus_pdf
 
-_PDF_ROOT = Path(__file__).resolve().parents[1] / ".." / "PDFextractor" / "test-pdfs"
+
 
 
 def _sections(rel: str):
-    pdf = (_PDF_ROOT / rel).resolve()
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available locally: {rel}")
+    pdf = require_corpus_pdf(rel)
     res = extract_sections(pdf.read_bytes())
     if isinstance(res, tuple):
         res = res[0]

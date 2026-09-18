@@ -38,6 +38,8 @@ from docpluck.extract import extract_pdf_file
 from docpluck.normalize import NormalizationLevel, normalize_text
 from .conftest import pdf_available, pdf_path, requires_pdftotext
 
+from docpluck.testing import require_corpus_pdf
+
 PAGE_BREAK = chr(12)
 
 # The watermark line both real positives carry. Not a coincidence: it is what
@@ -82,9 +84,14 @@ def test_a_publisher_watermark_is_deduplicated_to_one_copy(corpus, parts, copies
     as a floor, because it depends on the local pdftotext build. What is
     asserted exactly is the OUTPUT: rule 0g requires that exactly one survive.
     """
-    if not pdf_available(corpus, *parts):
-        pytest.skip("fixture not present: " + pdf_path(corpus, *parts))
-    raw, _engine = extract_pdf_file(pdf_path(corpus, *parts))
+    if corpus == "docpluck":
+        # docpluck's own papers resolve through the custodian and FAIL when a
+        # paper is not held. Only the OTHER projects' corpora may skip.
+        raw, _engine = extract_pdf_file(str(require_corpus_pdf("/".join(parts))))
+    else:
+        if not pdf_available(corpus, *parts):
+            pytest.skip("fixture not present: " + pdf_path(corpus, *parts))
+        raw, _engine = extract_pdf_file(pdf_path(corpus, *parts))
     assert len(raw) > 10_000, "extraction produced too little text to trust"
 
     raw_lines = sum(1 for ln in raw.split("\n") if ln.strip() == WATERMARK)
@@ -138,9 +145,7 @@ def test_real_table_content_keeps_every_copy(pdf, label):
     All seven sit at page coverage <= 0.22, far below the 0.90 gate. Measured
     2026-08-29: raw count == normalized count for every one.
     """
-    if not pdf_available("docpluck", "ieee", pdf):
-        pytest.skip("fixture not present: " + pdf_path("docpluck", "ieee", pdf))
-    raw, _engine = extract_pdf_file(pdf_path("docpluck", "ieee", pdf))
+    raw, _engine = extract_pdf_file(str(require_corpus_pdf(f"ieee/{pdf}")))
     assert len(raw) > 10_000
     n_raw = raw.count(label)
     assert n_raw >= 5, "fixture no longer carries %r (%d copies)" % (label, n_raw)

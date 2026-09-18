@@ -19,9 +19,7 @@ An ascending CI / a plausible correlation is never touched.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -38,7 +36,8 @@ from docpluck.normalize import (
 )
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # A corrupt `2`-for-minus CI is one whose literal bounds DESCEND — impossible
 # for a real interval, so the leading `2`s are mis-mapped minus signs
@@ -202,9 +201,7 @@ def test_ci_pairing_leaves_token_outside_any_ci():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_efendic_no_corrupt_minus_in_render():
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     bad_cis = _corrupt_descending_cis(md)
     assert not bad_cis, f"corrupt (descending '2'-prefixed) CIs remain: {bad_cis[:5]}"
@@ -247,9 +244,7 @@ def test_efendic_table_point_estimates_in_the_DISABLE_CAMELOT_fallback():
     ⚠ KNOWN GAP, newly VISIBLE rather than newly created: column-run pairing for
     the no-Camelot fallback. Deletion was hiding it.
     """
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # Mediation estimate recovered in body prose (confirmed vs AI gold) — this
     # one has its CI on the same line, so the pairing reaches it.
@@ -272,9 +267,7 @@ def test_efendic_table_estimates_recovered_with_camelot_on():
     '2X.XX' estimate also carries its CI in the same row, so all are
     structurally recoverable. The genuine positive (2.56 in [2.42, 2.69]) stays.
     """
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON (production default)
     # No corrupt '2X.XX' B-column estimate cell may survive whose row carries a
     # CI it must lie inside.
@@ -356,9 +349,7 @@ def test_efendic_se_columns_all_positive_with_camelot_on():
     render positive — a standard error is non-negative. Before the A3 guard the
     dropped-minus recovery flipped SE cells that fell inside the B estimate's CI
     (e.g. Intercept SE 0.06 → -0.06)."""
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
     # In each 5-column regression row (pred | B | SE | CI | p), the SE (3rd cell,
     # 2nd numeric) must not be a bare negative decimal.

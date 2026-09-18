@@ -26,7 +26,6 @@ can't itself anchor a cluster.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -38,6 +37,8 @@ from docpluck.extract_structured import (
     extract_pdf_structured,
 )
 
+from docpluck.testing import corpus_pdf
+
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -46,7 +47,6 @@ from docpluck.extract_structured import (
 # collected afterwards found no tables. `conftest._camelot_disabled_per_module`
 # reads this flag and restores the prior value when the module finishes.
 DISABLE_CAMELOT = True
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 # ---- Contract tests ---------------------------------------------------------
@@ -140,11 +140,6 @@ class TestFindChartDataCluster:
 
 # ---- Real-PDF regression tests (rule 0d) -----------------------------------
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amj_1.pdf").exists(),
-    reason="amj_1.pdf fixture not present",
-)
 def test_amj_1_figure_captions_no_chart_data_leak():
     """Every amj_1 figure caption must end cleanly without flow-chart
     nodes, axis-tick labels, or body prose.
@@ -157,7 +152,7 @@ def test_amj_1_figure_captions_no_chart_data_leak():
     the chart-data-leak coverage stay active without the test failing
     on the orthogonal glyph defect.
     """
-    pdf = TEST_PDFS / "aom" / "amj_1.pdf"
+    pdf = corpus_pdf("aom/amj_1.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     expected = {
         "Figure 2": "Regression Slopes for the Interaction of Negative Feedback and the Direction of Feedback Flow on Creativity (Study 1)",
@@ -181,11 +176,6 @@ def test_amj_1_figure_captions_no_chart_data_leak():
                 f"{label} caption still contains {forbidden!r}: {cap!r}"
             )
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amj_1.pdf").exists(),
-    reason="amj_1.pdf fixture not present",
-)
 @pytest.mark.xfail(
     reason="pdftotext glyph collapse: chart-embedded text for Figure 7 "
     "renders 'Meta-Processes' (AI-gold truth) as 'MetaProcesses' (hyphen "
@@ -203,7 +193,7 @@ def test_amj_1_figure_7_meta_processes_preserved():
     this test starts passing automatically and the xfail becomes a signal
     to remove the marker.
     """
-    pdf = TEST_PDFS / "aom" / "amj_1.pdf"
+    pdf = corpus_pdf("aom/amj_1.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     captions = {f["label"]: f["caption"] for f in result["figures"]}
     cap = captions.get("Figure 7", "")
@@ -211,29 +201,19 @@ def test_amj_1_figure_7_meta_processes_preserved():
         "Meta-Processes (Study 2)" in cap
     ), f"Figure 7: expected AI-gold 'Meta-Processes (Study 2)' in caption, got {cap!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "xiao_2021_crsp.pdf").exists(),
-    reason="xiao_2021_crsp.pdf fixture not present",
-)
 def test_xiao_no_chart_data_false_positive_trim():
     """xiao_2021_crsp captions have legit short text — the v2.4.28
     chart-data signatures must not over-trim them."""
-    pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
+    pdf = corpus_pdf("apa/xiao_2021_crsp.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     captions = {f["label"]: f["caption"] for f in result["figures"]}
     assert captions["Figure 2"] == "Figure 2. Study 1 interaction plots."
     assert captions["Figure 3"] == "Figure 3. Target choice rate by condition."
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_no_chart_data_false_positive_trim():
     """ieee_access_2 captions contain legit numerical references
     (β = 0.1, γ = 0.5, etc.) — must not be incorrectly trimmed."""
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     captions = {f["label"]: f["caption"] for f in result["figures"]}
     # Figure 15 has β = 0.1, γ = 0.5, δ = 0.001 — explicit numeric values

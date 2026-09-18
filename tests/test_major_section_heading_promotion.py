@@ -44,6 +44,8 @@ from docpluck.render import (
     render_pdf_to_markdown,
 )
 
+from docpluck.testing import require_corpus_pdf
+
 try:
     from tests.conftest import pdf_available, pdf_path
 except Exception:  # pragma: no cover - direct-invocation fallback
@@ -452,12 +454,10 @@ class TestMajorSectionIdempotent:
 # ── Real-PDF regression (drives the public render entry point) ─────────────
 
 
-_REL = ("apa", "chan_feldman_2025_cogemo.pdf")
+_REL = "apa/chan_feldman_2025_cogemo.pdf"
 
 
 def _render_cogemo() -> str:
-    if not pdf_available("docpluck", *_REL):
-        pytest.skip("fixture not available locally: chan_feldman_2025_cogemo.pdf")
     # Headings don't need Camelot — disable it to keep this fast.
     #
     # RESTORED IN A `finally`, and that is not a style point. This line used to
@@ -476,7 +476,7 @@ def _render_cogemo() -> str:
     prior = os.environ.get("DOCPLUCK_DISABLE_CAMELOT")
     os.environ["DOCPLUCK_DISABLE_CAMELOT"] = "1"
     try:
-        pdf = Path(pdf_path("docpluck", *_REL))
+        pdf = require_corpus_pdf(_REL)
         return render_pdf_to_markdown(pdf.read_bytes())
     finally:
         if prior is None:

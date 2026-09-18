@@ -23,15 +23,15 @@ ground-truth hard rule.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 from docpluck.extract_structured import (
     _is_table_header_like_short_line,
     _trim_table_caption_at_cell_region,
     extract_pdf_structured,
 )
+
+from docpluck.testing import corpus_pdf
 
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
@@ -42,7 +42,6 @@ from docpluck.extract_structured import (
 # reads this flag and restores the prior value when the module finishes.
 DISABLE_CAMELOT = True
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 # ---- Contract tests (pure helpers) ----------------------------------------
@@ -117,15 +116,10 @@ class TestTrimTableCaptionAtCellRegion:
 
 # ---- Real-PDF regression tests (rule 0d) ----------------------------------
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amle_1.pdf").exists(),
-    reason="amle_1.pdf fixture not present",
-)
 def test_amle_1_table_captions_not_cell_garbage():
     """Every amle_1 table caption used to be 400 chars of linearized
     cell content. After the fix each caption is a clean title."""
-    pdf = TEST_PDFS / "aom" / "amle_1.pdf"
+    pdf = corpus_pdf("aom/amle_1.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     caps = {t["label"]: (t.get("caption") or "") for t in result["tables"]}
     assert len(caps) == 13, caps.keys()
@@ -148,15 +142,10 @@ def test_amle_1_table_captions_not_cell_garbage():
         if label != "Table 13":
             assert len(cap) < 200, f"{label} caption too long ({len(cap)}): {cap!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "xiao_2021_crsp.pdf").exists(),
-    reason="xiao_2021_crsp.pdf fixture not present",
-)
 def test_xiao_table_captions_stop_at_title():
     """xiao tables have period-terminated titles on the caption line;
     the caption must stop at the period, not absorb column headers."""
-    pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
+    pdf = corpus_pdf("apa/xiao_2021_crsp.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     caps = {t["label"]: (t.get("caption") or "") for t in result["tables"]}
     assert caps["Table 1"] == (
@@ -169,14 +158,9 @@ def test_xiao_table_captions_stop_at_title():
     assert "Item B" not in caps["Table 1"], caps["Table 1"]
     assert "Product category" not in caps.get("Table 3", ""), caps.get("Table 3")
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amj_1.pdf").exists(),
-    reason="amj_1.pdf fixture not present",
-)
 def test_amj_1_table_captions_clean():
     """amj_1 table captions are clean titles (no cell absorption)."""
-    pdf = TEST_PDFS / "aom" / "amj_1.pdf"
+    pdf = corpus_pdf("aom/amj_1.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     caps = {t["label"]: (t.get("caption") or "") for t in result["tables"]}
     assert caps["Table 2"] == (
@@ -185,11 +169,6 @@ def test_amj_1_table_captions_clean():
     for label, cap in caps.items():
         assert len(cap) < 200, f"{label} caption too long ({len(cap)}): {cap!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "maier_2023_collabra.pdf").exists(),
-    reason="maier_2023_collabra.pdf fixture not present",
-)
 def test_maier_apa_titlecase_captions_cut_at_title():
     """B4 (2026-05-22): maier table titles are APA-Title-Case with NO
     terminal period ("Table 6. Aggregated Feelings: Descriptives").  The
@@ -198,7 +177,7 @@ def test_maier_apa_titlecase_captions_cut_at_title():
     intermediate rule cuts at ``nonblank[1]`` when line 0 is multi-word
     (≥4 tokens) and the next 3 nonblank lines are all
     ``_is_table_header_like_short_line`` — so column headers don't leak."""
-    pdf = TEST_PDFS / "apa" / "maier_2023_collabra.pdf"
+    pdf = corpus_pdf("apa/maier_2023_collabra.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     caps = {t["label"]: (t.get("caption") or "") for t in result["tables"]}
     # Table 6 — "Aggregated Feelings: Descriptives" must not leak

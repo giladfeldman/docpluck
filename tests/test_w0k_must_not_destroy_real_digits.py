@@ -46,17 +46,13 @@ from docpluck.extract import extract_pdf
 from docpluck.normalize import NormalizationLevel, normalize_text
 from tests.conftest import pdf_available, pdf_path
 
+from docpluck.testing import require_corpus_pdf
+
 TIMES = "\u00d7"
 
 
 def _normalized(corpus_dir: str, name: str) -> str:
-    if not pdf_available("docpluck", corpus_dir, name):
-        pytest.skip(
-            f"SKIPPED, NOT PASSED: {corpus_dir}/{name} absent from the local corpus. "
-            "Four sibling tests in this suite skipped silently for weeks on a filename typo; "
-            "read a skip here as a check that did not run."
-        )
-    with open(pdf_path("docpluck", corpus_dir, name), "rb") as fh:
+    with open(require_corpus_pdf(f"{corpus_dir}/{name}"), "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     assert raw and len(raw) > 5000, f"{name}: extraction returned {len(raw or '')} chars -- vacuous"
     out, _report = normalize_text(raw, NormalizationLevel.academic)

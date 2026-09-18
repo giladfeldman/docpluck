@@ -14,15 +14,15 @@ real-PDF case exercises the public entry point on the actual fixture.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
 from docpluck.normalize import NormalizationLevel, normalize_text
 from docpluck.render import render_pdf_to_markdown
 
+from docpluck.testing import corpus_pdf
 
-_PDF_ROOT = Path(__file__).resolve().parents[1] / ".." / "PDFextractor" / "test-pdfs"
+
 
 
 def _norm(text: str) -> str:
@@ -78,7 +78,7 @@ def test_chan_feldman_soft_hyphen_cleared_real_pdf():
     citationguard handoff measured 151 U+00AD in pymupdf and 6 space-broken
     words surviving docpluck's old bare-strip. After the S6 join: zero
     U+00AD, zero space-broken residuals, whole words recovered."""
-    pdf = (_PDF_ROOT / "apa" / "chan_feldman_2025_cogemo.pdf").resolve()
+    pdf = (corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")).resolve()
     if not pdf.is_file():
         # fixture also lives under the cogemo stem in some trees
         alt = list(_PDF_ROOT.rglob("chan_feldman_2025_cogemo.pdf"))

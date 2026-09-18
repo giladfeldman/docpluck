@@ -23,14 +23,13 @@ Real-PDF (rule 0d) + structural-signature general fix (rule 16).
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
 from docpluck.render import render_pdf_to_markdown
 
 
-_PDF = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "ama" / "jama_open_1.pdf"
+
 
 
 @pytest.fixture(scope="module")

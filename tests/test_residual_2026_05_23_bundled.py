@@ -8,9 +8,7 @@ outside this repo per memory ``feedback_no_pdfs_in_repo``.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 from docpluck.normalize import (
     NORMALIZATION_VERSION,
@@ -32,14 +30,13 @@ from docpluck.render import (
 )
 from docpluck.extract_structured import _is_citation_cell, _is_table_header_like_short_line
 
+from docpluck.testing import require_corpus_pdf
 
-_PDF_ROOT = Path(__file__).resolve().parents[1] / ".." / "PDFextractor" / "test-pdfs"
+
 
 
 def _maybe_render(rel: str) -> str:
-    pdf = (_PDF_ROOT / rel).resolve()
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available locally: {rel}")
+    pdf = require_corpus_pdf(rel)
     return render_pdf_to_markdown(pdf.read_bytes())
 
 

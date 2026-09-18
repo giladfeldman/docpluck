@@ -92,6 +92,8 @@ from docpluck.normalize import NormalizationLevel, normalize_text
 from docpluck.sections.taxonomy import lookup_canonical_label
 from tests.conftest import pdf_available, pdf_path
 
+from docpluck.testing import require_corpus_pdf
+
 # `N. M. Heading` -- two numbers stacked on ONE line. No section heading in any numbering
 # convention carries two independent numbers separated by a space.
 #
@@ -161,12 +163,7 @@ def _norm_twice(corpus: str, name: str) -> tuple[str, str]:
     # Cached: three tests x four papers is twelve extract-plus-two-normalize runs of the
     # same four PDFs, and each is seconds. The cache is keyed on the inputs and the
     # pipeline is pure, so this changes timing only.
-    if not pdf_available("docpluck", corpus, name):
-        pytest.skip(
-            f"SKIPPED, NOT PASSED: {corpus}/{name} absent from the local corpus. "
-            "Read a skip here as a check that did not run."
-        )
-    with open(pdf_path("docpluck", corpus, name), "rb") as fh:
+    with open(require_corpus_pdf(f"{corpus}/{name}"), "rb") as fh:
         raw, _ = extract_pdf(fh.read())
     assert raw and len(raw) > 20000, f"{name}: extraction returned {len(raw or '')} chars -- vacuous"
     once, _ = normalize_text(raw, NormalizationLevel.academic)

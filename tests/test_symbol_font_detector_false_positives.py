@@ -38,7 +38,6 @@ everything.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -49,7 +48,8 @@ from docpluck.extract_layout import (
     strip_font_subset_prefix,
 )
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 class _FakePage:
@@ -146,9 +146,7 @@ def test_a_font_drawing_non_ascii_is_never_reported():
     ],
 )
 def test_known_positives_still_fire(relpath, expect_font):
-    pdf = TEST_PDFS / relpath
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available: {pdf}")
+    pdf = require_corpus_pdf(relpath)
     from docpluck.extract_layout import extract_pdf_layout
 
     found = detect_symbol_font_corruption(extract_pdf_layout(pdf.read_bytes()))
@@ -165,9 +163,7 @@ def test_known_positives_still_fire(relpath, expect_font):
     ],
 )
 def test_known_negatives_are_silent(relpath):
-    pdf = TEST_PDFS / relpath
-    if not pdf.is_file():
-        pytest.skip(f"fixture not available: {pdf}")
+    pdf = require_corpus_pdf(relpath)
     from docpluck.extract_layout import extract_pdf_layout
 
     found = detect_symbol_font_corruption(extract_pdf_layout(pdf.read_bytes()))

@@ -19,9 +19,7 @@ two of these need to match for the strip to fire, so the whole Sage masthead zon
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -33,7 +31,8 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import _looks_like_masthead_hard_marker, render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def test_sage_masthead_markers_detected():
@@ -59,9 +58,7 @@ def test_non_masthead_lines_not_marked():
 def test_efendic_masthead_stripped():
     """efendic renders H1 immediately followed by `## Abstract` — no Sage
     masthead furniture in between."""
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # The masthead lines must be gone from the H1→Abstract zone.
     assert "Social Psychological and\nPersonality Science" not in md

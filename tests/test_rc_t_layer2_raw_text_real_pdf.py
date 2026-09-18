@@ -39,6 +39,8 @@ from docpluck.render import render_pdf_to_markdown
 
 from .conftest import pdf_available, pdf_path, requires_pdftotext
 
+from docpluck.testing import require_corpus_pdf
+
 _skip_under_xdist = pytest.mark.skipif(
     bool(os.environ.get("PYTEST_XDIST_WORKER")),
     reason="real-PDF Camelot extraction is non-deterministic under parallel "
@@ -209,7 +211,7 @@ def test_amc1_t3_bibliography_table_not_truncated_real_pdf():
     from docpluck.tables.captions import find_caption_matches
     import docpluck.extract_structured as ES
 
-    pdf = pdf_path("docpluck", "aom", "amc_1.pdf")
+    pdf = require_corpus_pdf("aom/amc_1.pdf")
     if not os.path.isfile(pdf):
         pytest.skip(f"fixture missing: {pdf}")
     raw = extract_pdf(Path(pdf).read_bytes())[0]
@@ -240,7 +242,7 @@ def test_xiao_t6_selfterminated_caption_not_truncated_real_pdf():
     from docpluck.tables.captions import find_caption_matches
     import docpluck.extract_structured as ES
 
-    pdf = pdf_path("docpluck", "apa", "xiao_2021_crsp.pdf")
+    pdf = require_corpus_pdf("apa/xiao_2021_crsp.pdf")
     if not os.path.isfile(pdf):
         pytest.skip(f"fixture missing: {pdf}")
     raw = extract_pdf(Path(pdf).read_bytes())[0]
@@ -299,7 +301,7 @@ def test_jama_open_1_t2_furniture_not_dumped_real_pdf():
     """jama_open_1 Table 2's caption sits at a page foot; its raw_text fallback
     was the next page's banner/title/date/page-number with no table content.
     The rendered .md must not carry that furniture as an unstructured-table."""
-    pdf = pdf_path("docpluck", "ama", "jama_open_1.pdf")
+    pdf = require_corpus_pdf("ama/jama_open_1.pdf")
     if not os.path.isfile(pdf):
         pytest.skip(f"fixture missing: {pdf}")
     md = render_pdf_to_markdown(Path(pdf).read_bytes())
@@ -317,7 +319,7 @@ def test_plos_med_t2_ge_glyph_recovered_in_table_rows_real_pdf():
     """plos_med Table 2's remnant-size rows reach the .md via the raw_text
     fallback (channel 3), which bypasses normalize_text — the cmsy10 `≥` must
     still be recovered there, not left as U+FFFD mojibake."""
-    pdf = pdf_path("docpluck", "vancouver", "plos_med_1.pdf")
+    pdf = require_corpus_pdf("vancouver/plos_med_1.pdf")
     if not os.path.isfile(pdf):
         pytest.skip(f"fixture missing: {pdf}")
     md = render_pdf_to_markdown(Path(pdf).read_bytes())

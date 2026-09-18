@@ -20,7 +20,6 @@ body-only fix left raw ligature glyphs in tables and captions.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -36,7 +35,8 @@ from docpluck.extract import extract_pdf
 from docpluck.normalize import NormalizationLevel, decompose_ligatures, normalize_text
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 _LIGATURE_RE = re.compile("[ﬀ-ﬆ]")
 
@@ -95,9 +95,7 @@ def test_s3_step_tracks_ligature_expansion():
 
 def test_s3_tracks_ligatures_on_real_pdf():
     """Real-PDF version of the S3-tracking regression."""
-    pdf = TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/korbmacher_2022_kruger.pdf")
     raw, _method = extract_pdf(pdf.read_bytes())
     if not _LIGATURE_RE.search(raw):
         pytest.skip("fixture's raw extraction carries no ligature glyphs")
@@ -108,9 +106,7 @@ def test_s3_tracks_ligatures_on_real_pdf():
 # ── Real-PDF regression test (all channels) ─────────────────────────────
 
 def test_jdm_m_2022_2_no_ligature_glyphs():
-    pdf = TEST_PDFS / "apa" / "jdm_m.2022.2.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/jdm_m.2022.2.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leftover = _LIGATURE_RE.findall(md)
     assert not leftover, f"ligature glyphs remain: {leftover[:10]}"
@@ -119,9 +115,7 @@ def test_jdm_m_2022_2_no_ligature_glyphs():
 
 
 def test_korbmacher_no_ligature_glyphs():
-    pdf = TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/korbmacher_2022_kruger.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leftover = _LIGATURE_RE.findall(md)
     assert not leftover, f"ligature glyphs remain: {leftover[:10]}"

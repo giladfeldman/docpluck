@@ -1,8 +1,9 @@
 """End-to-end corpus smoke test for v2.3.0.
 
-Skips cleanly when the spike-output baselines or test PDFs are not on
-disk (so the suite passes on CI / fresh clones without the sister app
-repo). When the corpus IS available, runs ``render_pdf_to_markdown``
+Papers resolve through the article custodian by DOI, and a paper that is not
+held FAILS -- this file used to search a sibling directory with ``rglob`` and
+skip when it found nothing, so a vanished corpus reported three clean passes.
+Runs ``render_pdf_to_markdown``
 against a handful of representative papers and asserts the health
 metrics produced by ``scripts/verify_corpus.py``.
 
@@ -28,22 +29,18 @@ from pathlib import Path
 
 import pytest
 
+from docpluck.testing import require_corpus_pdf
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-APP_PDFS = REPO_ROOT.parent / "PDFextractor" / "test-pdfs"
 
 REPRESENTATIVE_PAPERS = [
-    # (basename, min_section_count, min_table_html_count, max_figs_above_abstract)
-    ("efendic_2022_affect", 8, 1, 0),
-    ("jama_open_1", 8, 2, 0),
-    ("korbmacher_2022_kruger", 6, 0, 0),  # tables go to appendix; 0 in body is fine
+    # (corpus name, min_section_count, min_table_html_count, max_figs_above_abstract)
+    ("apa/efendic_2022_affect.pdf", 8, 1, 0),
+    ("ama/jama_open_1.pdf", 8, 2, 0),
+    # tables go to appendix; 0 in body is fine
+    ("apa/korbmacher_2022_kruger.pdf", 6, 0, 0),
 ]
-
-
-def _find_pdf(name: str):
-    for p in APP_PDFS.rglob(f"{name}.pdf"):
-        return p
-    return None
 
 
 _TITLE_RE = re.compile(r"^#\s+", re.MULTILINE)
@@ -58,9 +55,7 @@ _TABLE_HEADING_RE = re.compile(r"^###\s+Table\s+\d+", re.MULTILINE | re.IGNORECA
 )
 def test_corpus_paper_renders(name, min_sections, min_table_html, max_figs_above_abstract):
     """Smoke-test render quality on a representative paper."""
-    pdf_path = _find_pdf(name)
-    if pdf_path is None:
-        pytest.skip(f"PDF not on disk: {name}.pdf")
+    pdf_path = require_corpus_pdf(name)
 
     from docpluck import render_pdf_to_markdown
     md = render_pdf_to_markdown(pdf_path.read_bytes())
@@ -105,10 +100,8 @@ def test_corpus_paper_renders(name, min_sections, min_table_html, max_figs_above
     )
 
 
-def test_corpus_papers_exist_or_skip_cleanly():
-    """If APP_PDFS isn't on disk, the parametrized test above skips
-    individually. This sanity-check confirms the path resolves to either
-    a real directory or no-test."""
-    if not APP_PDFS.exists():
-        pytest.skip(f"sister test-pdfs directory not on disk: {APP_PDFS}")
-    assert APP_PDFS.is_dir()
+def test_the_representative_papers_are_all_in_custody():
+    """Each named paper resolves. Replaces a check that the sibling DIRECTORY
+    existed -- which said nothing about whether the three papers were in it."""
+    for name, *_ in REPRESENTATIVE_PAPERS:
+        require_corpus_pdf(name)

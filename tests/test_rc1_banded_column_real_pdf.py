@@ -18,7 +18,6 @@ from __future__ import annotations
 import os
 import re
 from collections import Counter
-from pathlib import Path
 
 import pytest
 
@@ -30,6 +29,8 @@ from docpluck.extract_columns import (
     _segment_bands,
     extract_page_text_banded,
 )
+
+from docpluck.testing import corpus_pdf
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -59,7 +60,6 @@ def _camelot_disabled_for_this_module():
     else:
         os.environ["DOCPLUCK_DISABLE_CAMELOT"] = prior
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 def _w(text: str, x0: float, x1: float, top: float, size: float = 10.0) -> dict:
@@ -152,7 +152,7 @@ def test_segment_bands_single_2col_band_for_clean_page():
 # ── real-PDF: word-preservation + ship-dark default ──────────────────────────
 
 def _chan() -> bytes | None:
-    pdf = TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf"
+    pdf = corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")
     return pdf.read_bytes() if pdf.exists() else None
 
 

@@ -45,6 +45,8 @@ from __future__ import annotations
 
 import pytest
 
+from docpluck.testing import require_corpus_pdf
+
 from docpluck.tables.whitespace import _cluster_into_rows
 
 
@@ -181,17 +183,13 @@ def test_xiao_table4_recovers_its_published_rows_real_pdf():
     findings doc recorded this same row as the *legitimately tall* case that
     justified reverting the anchor fix; it is the defect.
     """
-    from pathlib import Path
 
     from docpluck.extract_layout import extract_pdf_layout
     from docpluck.tables.captions import find_caption_matches
     from docpluck.tables.detect import _region_for_caption
     from docpluck.tables.whitespace import whitespace_cells
 
-    corpus = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
-    pdf = corpus / "xiao_2021_crsp.pdf"
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/xiao_2021_crsp.pdf")
 
     layout = extract_pdf_layout(pdf.read_bytes())
     cap = next(

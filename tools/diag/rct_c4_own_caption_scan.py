@@ -47,6 +47,8 @@ from docpluck.tables.captions import find_caption_matches
 from docpluck.tables.detect import _region_for_caption
 import docpluck.tables.whitespace as ws
 
+from _corpus import docpluck_corpus  # noqa: E402
+
 
 def _old_guard(cells, *, allow_categorical: bool = False) -> bool:
     """The PRE-cycle-4 guard: ANY caption label anywhere condemns the grid.
@@ -116,10 +118,23 @@ _NUM_RE = re.compile(r"\b(?:Table|TABLE)\s+(\d+)\s*[.:]")
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--corpus", default="../PDFextractor/test-pdfs")
+    ap.add_argument(
+        "--corpus",
+        default=None,
+        help="a directory to scan INSTEAD of docpluck's own corpus (ad-hoc use only)",
+    )
     args = ap.parse_args()
 
-    pdfs = sorted(glob.glob(os.path.join(args.corpus, "**", "*.pdf"), recursive=True))
+    # Default: the custodian's committed manifest, not a glob. The old default was
+    # a relative path into a sibling project -- so running this from anywhere but
+    # one specific directory scanned 0 PDFs and printed "scanning 0 PDFs" as
+    # though that were a result.
+    if args.corpus:
+        pdfs = sorted(glob.glob(os.path.join(args.corpus, "**", "*.pdf"), recursive=True))
+        if not pdfs:
+            raise SystemExit(f"FATAL: --corpus {args.corpus} matched 0 PDFs")
+    else:
+        pdfs = [str(x) for x in docpluck_corpus()]
     if args.limit:
         pdfs = pdfs[: args.limit]
     print(f"scanning {len(pdfs)} PDFs")

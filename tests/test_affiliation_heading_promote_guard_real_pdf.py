@@ -27,13 +27,13 @@ full render), not the mechanism.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
 from docpluck.render import _looks_like_affiliation_line, render_pdf_to_markdown
 
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
+from docpluck.testing import require_corpus_pdf
+
 
 # An affiliation grammar matcher used only to FLAG a heading as suspicious in the
 # invariant test — independent of the library's own regex so the test does not
@@ -47,9 +47,7 @@ _AFFIL_HEADING_PROBE = re.compile(
 def test_chandrashekar_no_affiliation_heading_real_pdf():
     """chandrashekar_2023_mp must not promote its stray "Department of
     Philosophy, Lake Forest College" affiliation to a ``### `` heading."""
-    pdf = _CORPUS / "chandrashekar_2023_mp.pdf"
-    if not pdf.exists():
-        pytest.skip(f"corpus fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chandrashekar_2023_mp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
 
     # Specific regression: the exact hallucinated heading is gone.

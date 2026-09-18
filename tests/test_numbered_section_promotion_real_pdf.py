@@ -18,9 +18,7 @@ test.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -32,7 +30,8 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import _promote_numbered_section_headings, render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 # ── Unit tests on _promote_numbered_section_headings ────────────────────
@@ -87,9 +86,7 @@ def test_terminal_punctuation_not_promoted():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_jdm_m_2022_2_single_level_sections_promoted():
-    pdf = TEST_PDFS / "apa" / "jdm_m.2022.2.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/jdm_m.2022.2.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     for heading in ("## 2. Omission neglect", "## 3. Choice deferral", "## 5. Study 1"):
         assert heading in md, f"missing promoted section heading: {heading}"
@@ -98,9 +95,7 @@ def test_jdm_m_2022_2_single_level_sections_promoted():
 def test_chandrashekar_exclusion_list_not_promoted():
     """The exclusion-criteria enumerated list (1.-6.) must NOT be promoted to
     `## N.` headings — it is a list, not a section sequence."""
-    pdf = TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chandrashekar_2023_mp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "## 1. Subjects indicating" not in md
     assert "## 4. Have seen or done the survey" not in md

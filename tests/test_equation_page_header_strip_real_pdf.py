@@ -20,9 +20,10 @@ re-introduce it.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
+
+from docpluck.testing import corpus_pdf, require_corpus_pdf
 
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
@@ -34,7 +35,6 @@ import pytest
 DISABLE_CAMELOT = True
 
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 # Captures the exact failure mode from G16: ``Page <N>`` immediately
@@ -49,16 +49,11 @@ _PAGE_NEAR_EQNUM_RE = re.compile(
     re.MULTILINE,
 )
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_access_2_no_page_header_near_equation_numbers():
     """G16 regression — ieee_access_2.pdf had ``Page 4`` fused with eq ``(2)``."""
     from docpluck.render import render_pdf_to_markdown
 
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     hits = _PAGE_NEAR_EQNUM_RE.findall(md)
     assert not hits, (
@@ -79,9 +74,7 @@ def test_ieee_access_2_no_page_header_near_equation_numbers():
 )
 def test_ieee_engineering_corpus_no_page_header_near_equation_numbers(pdf_stem):
     """Corpus-level G16 invariant across the IEEE engineering papers."""
-    pdf = TEST_PDFS / "ieee" / f"{pdf_stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"{pdf_stem}.pdf fixture not present")
+    pdf = require_corpus_pdf(f"ieee/{pdf_stem}.pdf")
     from docpluck.render import render_pdf_to_markdown
     md = render_pdf_to_markdown(pdf.read_bytes())
     hits = _PAGE_NEAR_EQNUM_RE.findall(md)

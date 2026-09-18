@@ -6,9 +6,7 @@ Ported from an internal design doc
 """
 
 import re
-from pathlib import Path
 
-import pytest
 
 from docpluck.render import (
     _dedupe_h2_sections,
@@ -27,6 +25,8 @@ from docpluck.render import (
     _strip_duplicate_title_occurrences,
     _dedupe_label_in_table_figure_caption,
 )
+
+from docpluck.testing import corpus_pdf
 
 
 # ── v2.4.83: de-dup the table/figure label between heading and caption ──────
@@ -1132,13 +1132,7 @@ def test_render_module_importable():
     assert callable(render_pdf_to_markdown)
 
 
-_TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
-
-@pytest.mark.skipif(
-    not (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").exists(),
-    reason="chan_feldman_2025_cogemo.pdf fixture not present",
-)
 def test_chan_feldman_figure_captions_not_double_emitted():
     """FIG-3c real-PDF: chan_feldman's figure captions are linearized by
     pdftotext into the body text AND spliced as ``### Figure N`` blocks.
@@ -1146,7 +1140,7 @@ def test_chan_feldman_figure_captions_not_double_emitted():
     from docpluck import render_pdf_to_markdown
 
     md = render_pdf_to_markdown(
-        (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").read_bytes()
+        (corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")).read_bytes()
     )
     # Figure 1's caption text must not be double-emitted.
     assert md.count("Empathy model of forgiveness reconstructed from") == 1, (
@@ -1157,11 +1151,6 @@ def test_chan_feldman_figure_captions_not_double_emitted():
         "Figure 7 caption double-emitted"
     )
 
-
-@pytest.mark.skipif(
-    not (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").exists(),
-    reason="chan_feldman_2025_cogemo.pdf fixture not present",
-)
 def test_chan_feldman_no_credit_role_methodology_heading():
     """HALLUC-HEAD-1 real-PDF: chan_feldman's CRediT contributor-roles
     block lists the role ``Methodology``, which the partitioner promoted
@@ -1170,7 +1159,7 @@ def test_chan_feldman_no_credit_role_methodology_heading():
     from docpluck import render_pdf_to_markdown
 
     md = render_pdf_to_markdown(
-        (_TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").read_bytes()
+        (corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")).read_bytes()
     )
     assert not re.search(r"^#{2,4} Methodology\s*$", md, re.M), (
         "CRediT role 'Methodology' rendered as a section heading"

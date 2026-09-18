@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import hashlib
 import json
 import os
 import re
@@ -87,8 +88,11 @@ def require_corpus_root() -> None:
 
 # (source, root-relative-to-VIBE, glob, format). Order is stable — it fixes the
 # manifest ordering so a regenerated manifest diffs cleanly.
+# NOTE: the `corpus` source is NOT here. Its 101 papers come from the
+# article custodian's committed manifest (`docpluck.testing.corpus_manifest`),
+# injected by `discover()` below, because a glob computes its denominator from
+# its own numerator -- it reports 40/40 on a corpus that has silently shrunk.
 SOURCES: list[tuple[str, str, str, str]] = [
-    ("pdfextractor", "MetaScienceTools/PDFextractor/test-pdfs", "**/*.pdf", "pdf"),
     ("escicheck", "MetaScienceTools/ESCIcheckapp/testpdfs", "*.pdf", "pdf"),
     ("docxtests", "MetaScienceTools/ESCIcheckapp/docxtests", "*.docx", "docx"),
     ("fulltext-html", "ArticleRepository/fulltext", "*.html", "html"),
@@ -98,6 +102,14 @@ SOURCES: list[tuple[str, str, str, str]] = [
 _EXCLUDE_STEMS = {"oclc_page"}
 
 _MANIFEST_PATH = Path(__file__).with_name("corpus_manifest.json")
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def _slug(text: str) -> str:
@@ -111,6 +123,26 @@ def discover() -> list[dict]:
     require_corpus_root()
     docs: list[dict] = []
     seen_ids: set[str] = set()
+    # The docpluck corpus, from the custodian. Ordered by corpus name so the
+    # manifest diffs cleanly, and keyed the same way the glob used to key it so
+    # existing document ids are unchanged.
+    from docpluck.testing.corpus import MANIFEST as _CORPUS
+
+    for rel in sorted(_CORPUS):
+        sub, _, stem = rel.rpartition("/")
+        stem = stem[:-4] if stem.endswith(".pdf") else stem
+        parts = ["corpus"] + ([sub] if sub else []) + [stem]
+        doc_id = "__".join(_slug(x) for x in parts)
+        seen_ids.add(doc_id)
+        docs.append(
+            {
+                "id": doc_id,
+                "source": "corpus",
+                "format": "pdf",
+                "corpus_path": rel,
+                "doi": _CORPUS[rel]["doi"],
+            }
+        )
     for source, rel_root, pattern, fmt in SOURCES:
         root = VIBE / rel_root
         if not root.is_dir():
@@ -118,24 +150,32 @@ def discover() -> list[dict]:
         for path in sorted(root.glob(pattern), key=lambda p: str(p).lower()):
             if not path.is_file() or path.stem in _EXCLUDE_STEMS:
                 continue
-            # doc id = source + publisher-subdir (if any) + filename stem.
-            sub = path.parent.relative_to(root).as_posix()
-            parts = [source] + ([sub] if sub != "." else []) + [path.stem]
-            doc_id = "__".join(_slug(p) for p in parts)
+            # NEITHER THE PATH NOR THE FILENAME MAY REACH THE COMMITTED MANIFEST.
+            #
+            # This repo is PUBLIC. Until 2026-09-17 this loop wrote a `rel_path`
+            # (an internal portfolio path naming another project) and derived the
+            # document `id` by slugifying the FILENAME. For the docx source those
+            # filenames are in-progress replication manuscripts carrying co-author
+            # names, so the committed manifest published the titles of unsubmitted
+            # papers -- in the id as well as the path, which is why dropping only
+            # the path would not have fixed it. Measured on origin/main the same
+            # day: 76 occurrences of the internal project name, live and public.
+            #
+            # Both are replaced by the file's sha256, which identifies the document
+            # and discloses nothing. `resolve()` rediscovers the local file by hash,
+            # so the harness still works without the manifest carrying a path.
+            #
+            # The PDF source above is exempt because it does not go through here at
+            # all: those 101 are named by DOI through the article custodian.
+            sha = _sha256(path)
+            doc_id = f"{_slug(source)}__{sha[:16]}"
             n = 2
             base = doc_id
-            while doc_id in seen_ids:  # uniqueness guard
+            while doc_id in seen_ids:
                 doc_id = f"{base}-{n}"
                 n += 1
             seen_ids.add(doc_id)
-            docs.append(
-                {
-                    "id": doc_id,
-                    "source": source,
-                    "format": fmt,
-                    "rel_path": path.relative_to(VIBE).as_posix(),
-                }
-            )
+            docs.append({"id": doc_id, "source": source, "format": fmt, "sha256": sha})
     return docs
 
 
@@ -148,7 +188,6 @@ def build_manifest() -> dict:
     return {
         "version": 1,
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
-        "vibe_root": "~/Vibe",
         "counts": {"total": len(docs), "by_format": by_fmt},
         "documents": docs,
     }
@@ -163,8 +202,35 @@ def load_manifest() -> dict:
 
 
 def resolve(doc: dict) -> Path:
-    """Absolute path to a document record's source file."""
+    """Absolute path to a document record's source file.
+
+    A record carrying ``corpus_path`` is one of docpluck's own papers and
+    resolves through the article custodian by DOI; ``rel_path`` is the older
+    portfolio-relative form, still used by the other sources.
+    """
     require_corpus_root()
+    if "corpus_path" in doc:
+        from docpluck.testing.corpus import corpus_pdf
+
+        return corpus_pdf(doc["corpus_path"])
+    if "sha256" in doc:
+        # Rediscover the local file by CONTENT. The manifest deliberately carries
+        # no path for these (see discover()), so this walks the source roots and
+        # matches the hash. Raises rather than returning a path that is not there.
+        for source, rel_root, pattern, _fmt in SOURCES:
+            if source != doc["source"]:
+                continue
+            root = VIBE / rel_root
+            if not root.is_dir():
+                continue
+            for path in sorted(root.glob(pattern), key=lambda p: str(p).lower()):
+                if path.is_file() and _sha256(path) == doc["sha256"]:
+                    return path
+        raise FileNotFoundError(
+            f"{doc['id']}: no file under source {doc['source']!r} hashes to "
+            f"{doc['sha256'][:16]}.... The document has been moved, renamed or "
+            "changed; regenerate the manifest rather than guessing which file it was."
+        )
     return VIBE / doc["rel_path"]
 
 

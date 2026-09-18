@@ -20,11 +20,12 @@ from docpluck.render import render_pdf_to_markdown
 from docpluck.normalize import normalize_text, NormalizationLevel
 from docpluck.sections import extract_sections
 
+from docpluck.testing import corpus_pdf
+
 
 # Fixture paths
-APP_REPO = Path(__file__).parent.parent.parent / "PDFextractor" / "test-pdfs"
-IEEE_PDF = APP_REPO / "ieee" / "ieee_access_2.pdf"
-XIAO_PDF = APP_REPO / "apa" / "xiao_2021_crsp.pdf"
+IEEE_PDF = corpus_pdf("ieee/ieee_access_2.pdf")
+XIAO_PDF = corpus_pdf("apa/xiao_2021_crsp.pdf")
 
 
 def _require_pdf(p: Path) -> None:
@@ -147,7 +148,7 @@ def test_extract_sections_default_still_transliterates():
 # ───────────────────────────────────────────────────────────────────────────
 
 
-AMLE_PDF = APP_REPO / "aom" / "amle_1.pdf"
+AMLE_PDF = corpus_pdf("aom/amle_1.pdf")
 
 
 def test_render_preserves_comma_thousands_in_body_prose():

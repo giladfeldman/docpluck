@@ -252,17 +252,28 @@ def test_phantom_stripper_still_drops_a_genuinely_empty_phantom():
 _HOTELLING = "10.1017__s1930297500009189.pdf"
 
 
-@pytest.mark.skipif(
-    not pdf_available("articlerepo", _HOTELLING),
-    reason=f"custodian has no {_HOTELLING}",
-)
 def test_hotelling_sentence_survives_the_whole_chain_real_pdf():
     """10.1017/s1930297500009189 — present before the chain, and now after it.
 
     Measured at v2.4.129: `r(6) = 0.94` before=1 after=0, `4.66` before=1
     after=0, `p = .006` before=1 after=0.
     """
+    # NO SKIP. This paper is the KNOWN POSITIVE for silent render deletion --
+    # the one document that can prove this gate still fires. It used to carry
+    # `skipif(not pdf_available("articlerepo", ...))`, so a custodian that had
+    # lost it would leave the gate running, passing, and unable to fail for the
+    # reason it exists: a denominator that excludes every known positive.
+    #
+    # It is deliberately NOT in docpluck's own corpus manifest -- checked by
+    # content hash 2026-09-17, it has never been in that corpus -- so it resolves
+    # through the article repository directly. Being out of that manifest is a
+    # decision, not a dropout.
     pdf = Path(pdf_path("articlerepo", _HOTELLING))
+    assert pdf.is_file(), (
+        f"the custodian does not hold {_HOTELLING}, the known positive for the "
+        "silent-render-deletion class. Without it this gate cannot fail, so it "
+        f"must not pass either. Looked for: {pdf}"
+    )
     md = R.render_pdf_to_markdown(pdf.read_bytes())
     for tok in ("r(6) = 0.94", "4.66", "p = .006"):
         assert tok in md, tok

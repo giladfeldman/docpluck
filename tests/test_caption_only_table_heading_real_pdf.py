@@ -25,7 +25,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -45,16 +44,24 @@ _MANIFEST = json.loads(
 )
 _BY_ID = {d["id"]: d for d in _MANIFEST["documents"]}
 
+from scripts.harness.corpus import resolve as _harness_resolve  # noqa: E402
+
 _TABLE_HEADING_RE = re.compile(r"^#{2,4}\s+Table\b", re.M)
 
 
 def _assert_every_table_has_a_heading(doc_id: str):
+    """Both skips here were removed 2026-09-17.
+
+    A doc id absent from the manifest and a fixture absent from disk are exactly
+    the two things this test exists to notice; skipping on either reported a pass
+    for a paper it never opened.
+    """
     doc = _BY_ID.get(doc_id)
-    if doc is None:
-        pytest.skip(f"doc id not in manifest: {doc_id}")
-    pdf = _VIBE / doc["rel_path"]
-    if not pdf.is_file():
-        pytest.skip(f"fixture missing: {pdf}")
+    assert doc is not None, (
+        f"doc id {doc_id!r} is not in scripts/harness/corpus_manifest.json. "
+        "Regenerate it with `python -m scripts.harness.corpus --write`."
+    )
+    pdf = _harness_resolve(doc)
     data = pdf.read_bytes()
     md = render_pdf_to_markdown(data)
     n_headings = len(_TABLE_HEADING_RE.findall(md))

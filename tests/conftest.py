@@ -84,10 +84,17 @@ def _sibling_repo(name: str, *parts: str) -> str:
     silent skip the moment someone writes the first test against it, not because
     anything is being recovered.
 
-    **The live hole is a different corpus.** ``docpluck`` — used by **6 test files** —
-    points at the sibling ``PDFextractor/test-pdfs/``, which exists and holds **0
-    PDFs**, almost certainly because article custody moved to article-finder. That is
-    a policy question, not a path bug, and it is not silently patched here.
+    **A paragraph here used to say the docpluck corpus "exists and holds 0 PDFs".
+    That was measured wrong and then read as current for three weeks.** The sibling
+    directory held **101** PDFs the whole time, and 73 test files — not 6 — resolved
+    papers through it. Anyone acting on the old sentence would have concluded the
+    corpus tests were already dead and deleted the directory outright, switching off
+    all 73 files' coverage without turning anything red.
+
+    The corpus itself is gone from here as of 2026-09-17: papers resolve through the
+    article custodian by DOI, via ``docpluck.testing.corpus``. Nothing in this file
+    points at it any more. The lesson is left in place because the failure was not the
+    wrong number, it was quoting a measurement with no command behind it.
 
     So the location is SEARCHED rather than asserted. A name genuinely not on this
     machine (ESCIcheck, 2026-08-27) still returns a non-existent path and its tests
@@ -101,9 +108,12 @@ def _sibling_repo(name: str, *parts: str) -> str:
     # names a path a human can go and check.
     return os.path.join(_VIBE, name, *parts)
 
+# NOTE: there is no "docpluck" key here any more. docpluck's own corpus resolves
+# through the article custodian by DOI -- `docpluck.testing.corpus.corpus_pdf` --
+# not through a directory, and a paper it cannot find FAILS rather than skipping.
+# The keys below are OTHER projects' corpora, which genuinely may be absent from a
+# given machine; for those a skip is the honest answer.
 PDF_PATHS = {
-    # docpluck's test corpus = sibling PDFextractor repo's test-pdfs/.
-    "docpluck": os.path.join(_SIBLINGS, "PDFextractor", "test-pdfs"),
     # The shared article repository (article-finder cache). Closed-access PDFs
     # named by canonical DOI key (e.g. "10.1525__collabra.90203.pdf"). Tests
     # that key on a specific paper skip gracefully when the repo isn't present.
@@ -118,11 +128,30 @@ PDF_PATHS = {
 
 
 def pdf_path(corpus: str, *parts: str) -> str:
-    """Return path to a test PDF, or empty string if not available."""
-    base = PDF_PATHS.get(corpus, "")
-    if not base:
-        return ""
-    return os.path.join(base, *parts)
+    """Return path to a test PDF in one of the OTHER projects' corpora.
+
+    AN UNKNOWN CORPUS NAME RAISES. It used to return "", which made
+    `pdf_available` return False and every caller skip -- so deleting a key from
+    PDF_PATHS silently converted every call site into a permanent no-op with
+    nothing to read. That is not hypothetical: removing the "docpluck" key on
+    2026-09-17 left 8 files calling `pdf_available("docpluck", ...)`, and the W0k
+    and W0g science guards -- the rules that were destroying real published
+    digits and turning `p = .05` into `p = -.05` -- skipped with the message
+    "absent from the local corpus" for papers that were in custody the whole time.
+
+    A MISSING FILE still returns its path, so callers can skip on a corpus this
+    machine genuinely does not have. A MISSING KEY is a programming error and
+    says so.
+    """
+    if corpus not in PDF_PATHS:
+        raise KeyError(
+            f"unknown corpus {corpus!r}. Known: {sorted(PDF_PATHS)}. "
+            "docpluck's OWN corpus is not here any more -- it resolves through "
+            "the article custodian via `docpluck.testing.require_corpus_pdf"
+            '("<subdir>/<file>.pdf")`, which fails loudly when a paper is not '
+            "held. Returning an empty string here would make this call skip."
+        )
+    return os.path.join(PDF_PATHS[corpus], *parts)
 
 
 def pdf_available(corpus: str, *parts: str) -> bool:

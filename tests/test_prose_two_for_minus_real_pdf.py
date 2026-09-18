@@ -18,9 +18,7 @@ genuine "mean age of M = 20.14" is NEVER flipped (bare M, no difference subscrip
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -32,15 +30,14 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def test_efendic_prose_coding_note_and_mchange_recovered():
     """The coding-note contrast codes and Mchange statistics render with a minus,
     not a corrupted leading '2'."""
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # Coding note: contrast codes recovered.
     assert "direction: -0.5 = low, + 0.5 = high" in md
@@ -60,9 +57,7 @@ def test_prose_minus_idempotent_on_efendic():
     """Running the recovery twice equals running it once (no double-flip)."""
     from docpluck.normalize import recover_prose_two_for_minus
 
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert recover_prose_two_for_minus(md) == md  # already recovered → no change
 

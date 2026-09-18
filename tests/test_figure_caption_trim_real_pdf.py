@@ -23,9 +23,7 @@ PDF fixtures, per CLAUDE.md hard rule 0d.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
 
 from docpluck.extract_structured import (
     _accumulated_is_label_only,
@@ -48,7 +46,6 @@ from docpluck.extract_structured import (
 DISABLE_CAMELOT = True
 
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 # ---- Contract tests (cheap, pure helpers) ---------------------------------
@@ -220,16 +217,11 @@ class TestTrimCaptionAtBodyProseBoundary:
 
 # ---- Real-PDF regression tests (rule 0d) ----------------------------------
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "xiao_2021_crsp.pdf").exists(),
-    reason="xiao_2021_crsp.pdf fixture not present",
-)
 def test_xiao_figure_2_no_body_prose_absorption():
     """Cycle-9 handoff item A ship-blocker: xiao Figure 2 caption must
     NOT absorb the inline body section heading "Exploratory analysis"
     and the body-prose run that follows it."""
-    pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
+    pdf = corpus_pdf("apa/xiao_2021_crsp.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     figs = {f["label"]: f["caption"] for f in result["figures"]}
     assert "Figure 2" in figs
@@ -240,14 +232,9 @@ def test_xiao_figure_2_no_body_prose_absorption():
     assert "Exploratory analysis" not in cap
     assert "XIAO" not in cap
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "xiao_2021_crsp.pdf").exists(),
-    reason="xiao_2021_crsp.pdf fixture not present",
-)
 def test_xiao_figure_3_no_body_prose_absorption():
     """xiao Figure 3 — same root cause as Figure 2."""
-    pdf = TEST_PDFS / "apa" / "xiao_2021_crsp.pdf"
+    pdf = corpus_pdf("apa/xiao_2021_crsp.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     figs = {f["label"]: f["caption"] for f in result["figures"]}
     assert "Figure 3" in figs
@@ -256,15 +243,10 @@ def test_xiao_figure_3_no_body_prose_absorption():
     assert "Choice regret" not in cap
     assert "Connolly" not in cap
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_access_no_pmc_footer_on_captions():
     """Every figure caption in ieee_access_2.pdf used to end with
     'IEEE Access. Author manuscript; available in PMC ...'."""
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     offenders = [
         f["label"] for f in result["figures"]
@@ -273,15 +255,10 @@ def test_ieee_access_no_pmc_footer_on_captions():
     ]
     assert offenders == [], f"PMC footer in: {offenders}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_access_no_duplicate_uppercase_label():
     """Every ieee_access_2 figure used to render as
     'Figure N. FIGURE N. <caption>'."""
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     offenders = [
         f["label"] for f in result["figures"]
@@ -289,15 +266,10 @@ def test_ieee_access_no_duplicate_uppercase_label():
     ]
     assert offenders == [], f"Duplicate uppercase label in: {offenders}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "aom" / "amj_1.pdf").exists(),
-    reason="amj_1.pdf fixture not present",
-)
 def test_amj_1_no_duplicate_uppercase_label():
     """Every amj_1 figure used to render as
     'Figure N. FIGURE N <caption>' (no period after FIGURE N)."""
-    pdf = TEST_PDFS / "aom" / "amj_1.pdf"
+    pdf = corpus_pdf("aom/amj_1.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     offenders = [
         f["label"] for f in result["figures"]
@@ -373,11 +345,6 @@ class TestStripLeadingPmcRunningHeader:
         snippet = "Figure 6. The authors edit the Author Manuscript before submission."
         assert _strip_leading_pmc_running_header(snippet) == snippet
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_access_no_label_only_placeholder_captions():
     """Cycle 15n regression: at v2.4.30 every ieee_access_2 figure
     caption other than Figure 9 rendered as ``Figure N. FIGURE N.`` —
@@ -386,7 +353,7 @@ def test_ieee_access_no_label_only_placeholder_captions():
     line because the label ends in ``.``. Fix: keep walking past that
     break when the accumulated text is label-only.
     """
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     placeholders = [
         f["label"]
@@ -399,18 +366,13 @@ def test_ieee_access_no_label_only_placeholder_captions():
     figs = {f["label"]: f["caption"] for f in result["figures"]}
     assert figs.get("Figure 1") == "Figure 1. Petri nets model formalism elements."
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "ieee" / "ieee_access_2.pdf").exists(),
-    reason="ieee_access_2.pdf fixture not present",
-)
 def test_ieee_access_no_inline_pmc_running_header():
     """Cycle 15n sibling defect: 27/37 ieee_access_2 figure captions had
     a leading ``Author Manuscript`` PMC running header between the
     label and the description (pdftotext interleaved it across the
     blank line that separates the ALL-CAPS label from the description).
     """
-    pdf = TEST_PDFS / "ieee" / "ieee_access_2.pdf"
+    pdf = corpus_pdf("ieee/ieee_access_2.pdf")
     result = extract_pdf_structured(pdf.read_bytes())
     offenders = [
         f["label"]
@@ -466,11 +428,6 @@ class TestTrimOverflowingFigureCaption:
         # a sub-cap caption (returns it unchanged via the terminator walk).
         assert _trim_overflowing_figure_caption(cap) == cap
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "jdm_m.2022.2.pdf").exists(),
-    reason="jdm_m.2022.2.pdf fixture not present",
-)
 def test_jdm_m_2022_2_figure_captions_not_truncated():
     """v2.4.47 regression: jdm_m.2022.2 Figure 1 / Figure 3 captions were
     truncated mid-word with ``…`` after absorbing following body prose
@@ -478,7 +435,7 @@ def test_jdm_m_2022_2_figure_captions_not_truncated():
     ``(N = 61) performed …`` body sentence). They must now end cleanly on
     the real caption's sentence terminator, matching the AI gold.
     """
-    pdf = TEST_PDFS / "apa" / "jdm_m.2022.2.pdf"
+    pdf = corpus_pdf("apa/jdm_m.2022.2.pdf")
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(pdf.read_bytes())["figures"]
@@ -498,10 +455,6 @@ def test_jdm_m_2022_2_figure_captions_not_truncated():
     assert figs.get("Figure 4", "").endswith("(Study 3; N = 238).")
 
 
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa").exists(),
-    reason="apa test-pdf corpus not present",
-)
 def test_apa_corpus_no_ellipsis_truncated_figure_captions():
     """Structural invariant: no figure caption in the APA corpus may end
     with ``…`` (ellipsis-truncated mid-word — v2.4.47), and any caption
@@ -516,7 +469,7 @@ def test_apa_corpus_no_ellipsis_truncated_figure_captions():
     """
     ellipsis_offenders = []
     runaway_offenders = []
-    for pdf in sorted((TEST_PDFS / "apa").glob("*.pdf")):
+    for pdf in corpus_pdfs("apa"):
         for f in extract_pdf_structured(pdf.read_bytes())["figures"]:
             cap = (f.get("caption") or "").rstrip()
             if cap.endswith("…"):
@@ -540,6 +493,8 @@ def test_apa_corpus_no_ellipsis_truncated_figure_captions():
 
 
 from docpluck.extract_structured import _caption_is_complete_without_terminator
+
+from docpluck.testing import corpus_pdf
 
 
 class TestCaptionCompleteWithoutTerminator:
@@ -568,11 +523,6 @@ class TestCaptionCompleteWithoutTerminator:
             "Figure 4. The Interaction", "Figure 4"
         )
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").exists(),
-    reason="efendic_2022_affect.pdf fixture not present",
-)
 def test_efendic_figure_captions_stop_at_titlecase_title():
     """v2.4.48 regression: efendic Figures 4/5 are APA period-less
     Title-Case figure titles; the walk used to sail past the `\n\n`
@@ -581,7 +531,7 @@ def test_efendic_figure_captions_stop_at_titlecase_title():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").read_bytes()
+            (corpus_pdf("apa/efendic_2022_affect.pdf")).read_bytes()
         )["figures"]
     }
     f4 = figs.get("Figure 4", "")
@@ -592,11 +542,6 @@ def test_efendic_figure_captions_stop_at_titlecase_title():
     assert f5.endswith("as a Function of Risk/Benefit Manipulations"), f5
     assert "Table S41" not in f5, f"body prose absorbed: {f5!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").exists(),
-    reason="chandrashekar_2023_mp.pdf fixture not present",
-)
 def test_chandrashekar_figure_captions_stop_at_significance_legend():
     """v2.4.48 regression: chandrashekar Figures 1/3 captions end with a
     significance legend (`*** p < .001`); the walk used to sail past the
@@ -606,7 +551,7 @@ def test_chandrashekar_figure_captions_stop_at_significance_legend():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").read_bytes()
+            (corpus_pdf("apa/chandrashekar_2023_mp.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")
@@ -620,11 +565,6 @@ def test_chandrashekar_figure_captions_stop_at_significance_legend():
 
 # ---- FIG-3a (v2.4.49): lowercase-initial body-prose boundary --------------
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").exists(),
-    reason="chandrashekar_2023_mp.pdf fixture not present",
-)
 def test_chandrashekar_figure_4_5_no_lowercase_body_prose():
     """FIG-3a: chandrashekar Figure 4 absorbed a wrapped citation
     fragment (``and Linos, 2022).``) and Figure 5 absorbed a body
@@ -634,7 +574,7 @@ def test_chandrashekar_figure_4_5_no_lowercase_body_prose():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "chandrashekar_2023_mp.pdf").read_bytes()
+            (corpus_pdf("apa/chandrashekar_2023_mp.pdf")).read_bytes()
         )["figures"]
     }
     f4 = figs.get("Figure 4", "")
@@ -646,11 +586,6 @@ def test_chandrashekar_figure_4_5_no_lowercase_body_prose():
     assert "Given the other" not in f5, f"body prose absorbed: {f5!r}"
     assert f5.rstrip().endswith("logarithmic scale."), f5
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "jdm_.2023.16.pdf").exists(),
-    reason="jdm_.2023.16.pdf fixture not present",
-)
 def test_jdm16_figure_1_no_lowercase_body_prose():
     """FIG-3a (also-affected): jdm_.2023.16 Figure 1 absorbed the
     Participants body sentence ``included in the analysis ranged from
@@ -658,18 +593,13 @@ def test_jdm16_figure_1_no_lowercase_body_prose():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "jdm_.2023.16.pdf").read_bytes()
+            (corpus_pdf("apa/jdm_.2023.16.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")
     assert "ranged from 18 to 78" not in f1, f"body prose absorbed: {f1!r}"
     assert "target nodes." in f1, f1
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "jdm_m.2022.3.pdf").exists(),
-    reason="jdm_m.2022.3.pdf fixture not present",
-)
 def test_jdm_m_2022_3_figures_no_lowercase_body_prose():
     """FIG-3a (also-affected): jdm_m.2022.3 Figures 1/2 absorbed the
     Results body prose (``interaction between scenario and PES scores
@@ -677,7 +607,7 @@ def test_jdm_m_2022_3_figures_no_lowercase_body_prose():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "jdm_m.2022.3.pdf").read_bytes()
+            (corpus_pdf("apa/jdm_m.2022.3.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")
@@ -688,11 +618,6 @@ def test_jdm_m_2022_3_figures_no_lowercase_body_prose():
     assert "exhibiting larger causal illusion" not in f2, f"absorbed: {f2!r}"
     assert f2.rstrip().endswith("task."), f2
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").exists(),
-    reason="efendic_2022_affect.pdf fixture not present",
-)
 def test_efendic_figure_1_note_label_kept():
     """FIG-3a false-positive guard: efendic Figure 1's caption note
     ``Note. t-values …`` starts lowercase after ``Note.`` — the note
@@ -700,18 +625,13 @@ def test_efendic_figure_1_note_label_kept():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").read_bytes()
+            (corpus_pdf("apa/efendic_2022_affect.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")
     assert "Note." in f1, f1
     assert "t-values" in f1, f"note content trimmed away: {f1!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").exists(),
-    reason="efendic_2022_affect.pdf fixture not present",
-)
 def test_efendic_figure_1_long_note_kept_whole():
     """FIG-4: efendic Figure 1's caption is a label + a long ``Note.``
     that legitimately exceeds 400 chars (~498). The paragraph-walk stops
@@ -722,7 +642,7 @@ def test_efendic_figure_1_long_note_kept_whole():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "efendic_2022_affect.pdf").read_bytes()
+            (corpus_pdf("apa/efendic_2022_affect.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")
@@ -733,11 +653,6 @@ def test_efendic_figure_1_long_note_kept_whole():
     assert f1.rstrip().endswith("benefits decrease."), f1
     assert "…" not in f1, f"caption ellipsis-truncated: {f1!r}"
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf").exists(),
-    reason="korbmacher_2022_kruger.pdf fixture not present",
-)
 def test_korbmacher_figure_1_significance_legend_kept():
     """FIG-3a false-positive guard: korbmacher Figure 1's caption ends
     with a significance legend (``ns p>.05, ∗ p<.05 …``) that starts
@@ -745,7 +660,7 @@ def test_korbmacher_figure_1_significance_legend_kept():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "korbmacher_2022_kruger.pdf").read_bytes()
+            (corpus_pdf("apa/korbmacher_2022_kruger.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")
@@ -754,11 +669,6 @@ def test_korbmacher_figure_1_significance_legend_kept():
 
 # ---- FIG-3b (v2.4.50): caption-anchor in-text-reference dedup -------------
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").exists(),
-    reason="chan_feldman_2025_cogemo.pdf fixture not present",
-)
 def test_chan_feldman_figure_10_uses_real_caption_not_body_reference():
     """FIG-3b: chan_feldman has two "Figure 10." anchors — a body-text
     reference (`… we summarised the effects in Figure 10.`) that
@@ -769,7 +679,7 @@ def test_chan_feldman_figure_10_uses_real_caption_not_body_reference():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf").read_bytes()
+            (corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")).read_bytes()
         )["figures"]
     }
     f10 = figs.get("Figure 10", "")
@@ -778,11 +688,6 @@ def test_chan_feldman_figure_10_uses_real_caption_not_body_reference():
         f"body prose rendered as caption: {f10!r}"
     )
 
-
-@pytest.mark.skipif(
-    not (TEST_PDFS / "apa" / "maier_2023_collabra.pdf").exists(),
-    reason="maier_2023_collabra.pdf fixture not present",
-)
 def test_maier_figure_1_uses_real_caption_not_body_reference():
     """FIG-3b (also-affected): maier Figure 1's real caption is
     `Footprint of Publication Bias in Lee and Freely (2016)`; a body
@@ -791,7 +696,7 @@ def test_maier_figure_1_uses_real_caption_not_body_reference():
     figs = {
         f["label"]: (f["caption"] or "")
         for f in extract_pdf_structured(
-            (TEST_PDFS / "apa" / "maier_2023_collabra.pdf").read_bytes()
+            (corpus_pdf("apa/maier_2023_collabra.pdf")).read_bytes()
         )["figures"]
     }
     f1 = figs.get("Figure 1", "")

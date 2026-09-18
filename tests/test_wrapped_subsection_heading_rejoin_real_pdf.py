@@ -25,9 +25,7 @@ broad-read + canary set with ZERO prose-merges.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -39,7 +37,8 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # The four wrapped Results-subsection headings, each as it appears in the gold
 # (`reading` view) — one `### ` heading per title.
@@ -62,9 +61,7 @@ _STRANDED_FRAGMENTS = (
 
 def test_ip_feldman_wrapped_subsection_headings_rejoined():
     """Each wrapped Results-subsection title renders as ONE `### ` heading."""
-    pdf = TEST_PDFS / "apa" / "ip_feldman_2025_pspb.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     for heading in _WRAPPED_HEADINGS:
         assert f"### {heading}" in md, f"{heading!r} not rendered as a single ### heading"
@@ -73,9 +70,7 @@ def test_ip_feldman_wrapped_subsection_headings_rejoined():
 def test_ip_feldman_no_stranded_wrap_fragments():
     """No wrapped-heading tail survives as a stranded body line or an
     over-promoted `## ` heading."""
-    pdf = TEST_PDFS / "apa" / "ip_feldman_2025_pspb.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     for frag in _STRANDED_FRAGMENTS:
         assert frag not in md, f"stranded/over-promoted fragment survived: {frag!r}"

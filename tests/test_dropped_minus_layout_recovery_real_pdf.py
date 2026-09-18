@@ -28,9 +28,7 @@ This test therefore asserts the 3 recoverable flips + the genuinely-positive
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -43,7 +41,6 @@ DISABLE_CAMELOT = True
 from docpluck.extract_layout import LayoutDoc, PageLayout
 from docpluck.normalize import recover_dropped_minus_via_layout
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
 
 
 # ── Unit tests on recover_dropped_minus_via_layout (synthetic layout) ────────
@@ -123,6 +120,8 @@ def test_layout_no_layout_is_noop():
 
 from docpluck.normalize import recover_beta_via_layout
 
+from docpluck.testing import require_corpus_pdf
+
 
 def _beta_char(x: float, *, top: float = 100.0, size: float = 8.0) -> dict:
     """A 'b' drawn in the math-symbol font (the mis-rendered β)."""
@@ -169,9 +168,7 @@ def test_beta_no_layout_is_noop():
 # ── Real-PDF regression test ─────────────────────────────────────────────────
 
 def test_ar_apa_betas_sign_recovered_in_render():
-    pdf = TEST_PDFS / "apa" / "ar_apa_j_jesp_2009_12_011.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ar_apa_j_jesp_2009_12_011.pdf")
     from docpluck.render import render_pdf_to_markdown
     md = render_pdf_to_markdown(pdf.read_bytes())
     # W0h: the three layout-recoverable negatives must read negative.

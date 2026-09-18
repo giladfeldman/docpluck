@@ -18,9 +18,7 @@ actually a duplicate of the same title.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -32,15 +30,14 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def test_ip_feldman_results_subsection_demoted_to_h3():
     """The over-promoted Results subsection renders `### `, and its siblings +
     the following `## Discussion` are unchanged."""
-    pdf = TEST_PDFS / "apa" / "ip_feldman_2025_pspb.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # The target is now a subsection.
     assert "### Prevalence Estimates Associations with WellBeing" in md

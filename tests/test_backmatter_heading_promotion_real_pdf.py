@@ -19,9 +19,7 @@ to avoid false-matching a line-leading identifier.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -33,15 +31,14 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 def test_ip_feldman_backmatter_headings_promoted():
     """The three previously-demoted back-matter headings must render as `##`,
     not as plain body text."""
-    pdf = TEST_PDFS / "apa" / "ip_feldman_2025_pspb.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     for heading in (
         "Authorship Declaration",
@@ -56,9 +53,7 @@ def test_ip_feldman_backmatter_headings_promoted():
 def test_ip_feldman_inline_orcid_not_promoted():
     """An inline "(ORCID: 0000-…)" mention inside the Acknowledgments paragraph
     must stay body text — only the standalone "ORCID iDs" heading is promoted."""
-    pdf = TEST_PDFS / "apa" / "ip_feldman_2025_pspb.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # The inline identifier line must not have become a heading.
     assert "## ORCID: 0000" not in md

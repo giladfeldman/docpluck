@@ -26,9 +26,7 @@ guard mis-rejected real headings. Long descriptive headings now promote.
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -40,7 +38,8 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import _promote_numbered_subsection_headings, render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 # ── Unit tests on _promote_numbered_subsection_headings ─────────────────
@@ -89,9 +88,7 @@ def test_long_descriptive_title_promoted():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_jdm_m_2022_2_numbered_subsections_promoted():
-    pdf = TEST_PDFS / "apa" / "jdm_m.2022.2.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/jdm_m.2022.2.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # Trailing-dot subsection headings must render as `###`, not body text.
     for heading in (
@@ -106,9 +103,7 @@ def test_jdm_m_2022_2_numbered_subsections_promoted():
 
 
 def test_chen_2021_colon_subsections_promoted():
-    pdf = TEST_PDFS / "apa" / "chen_2021_jesp.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chen_2021_jesp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "### 6.1.1. Replication: Retrospective hindsight bias" in md
     assert "### 6.2.4. Replication evaluation: Very close replication" in md
@@ -118,9 +113,7 @@ def test_jdm_2023_16_long_descriptive_subsections_promoted():
     """G5b (cycle 13): long descriptive multi-level numbered subsection
     headings — previously demoted to body text by the lowercase-run guard —
     now render as `###` headings."""
-    pdf = TEST_PDFS / "apa" / "jdm_.2023.16.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/jdm_.2023.16.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     for heading in (
         "### 2.4.2.2. Inference of planning strategies and strategy types",

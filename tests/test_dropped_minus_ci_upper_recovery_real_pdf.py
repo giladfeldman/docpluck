@@ -42,7 +42,6 @@ negating the positive bound would EXCLUDE the estimate and the flip is refused.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pytest
 
@@ -54,7 +53,8 @@ from docpluck.tables.cell_cleaning import (
 )
 from docpluck.tables.flatten import flatten_table, recover_dropped_minus_ci_upper
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 # ── Unit tests on recover_dropped_minus_ci_upper (synthetic, no Camelot) ─────
@@ -201,9 +201,7 @@ def test_chan_feldman_hypothesis_table_ci_upper_signs_recovered():
     hard-coded label, so a future pairing change surfaces as a real failure here
     instead of silently re-passing against whichever table happens to be labelled 8.
     """
-    pdf = TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")
 
     result = extract_pdf_structured(pdf.read_bytes())
     hypothesis_table = None

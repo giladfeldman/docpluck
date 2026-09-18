@@ -29,6 +29,8 @@ from pathlib import Path
 
 import pytest
 
+from docpluck.testing import require_corpus_pdf
+
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
 # which executes during COLLECTION and was never undone, so importing this file
@@ -191,9 +193,7 @@ def test_ieee_access_10_no_pua_real_pdf():
     """ieee_access_10: a matrix typeset with CMEX10 extensible square brackets
     reaches the rendered .md as U+F8EE-F8FB PUA codepoints at v2.4.55. Drives
     the public render entry; no PUA codepoint may survive."""
-    pdf = _META / "PDFextractor" / "test-pdfs" / "ieee" / "ieee_access_10.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("ieee/ieee_access_10.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leftover = _PUA_RE.findall(md)
     assert not leftover, (

@@ -26,7 +26,6 @@ live in the private article repository and this repo may never hold a paper.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -35,8 +34,9 @@ from docpluck.tables import cell_geometry
 from docpluck.tables.bbox_utils import chars_in_bbox
 from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
 
-_CORPUS = Path(__file__).resolve().parents[2] / "PDFextractor" / "test-pdfs" / "apa"
-_PDF = _CORPUS / "efendic_2022_affect.pdf"
+from docpluck.testing import corpus_pdf
+
+_PDF = corpus_pdf("apa/efendic_2022_affect.pdf")
 
 pytestmark = pytest.mark.skipif(not _PDF.is_file(), reason=f"fixture not available: {_PDF}")
 

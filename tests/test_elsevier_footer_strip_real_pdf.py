@@ -20,9 +20,7 @@ wraps across several lines; a one-line strip would shred it).
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -35,7 +33,8 @@ DISABLE_CAMELOT = True
 from docpluck.normalize import NormalizationLevel, normalize_text
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 # ── Contract tests on the W0 watermark strip ────────────────────────────
@@ -89,9 +88,7 @@ def test_keeps_body_year_range():
 # ── Real-PDF regression test ────────────────────────────────────────────
 
 def test_ar_apa_011_elsevier_footer_stripped():
-    pdf = TEST_PDFS / "apa" / "ar_apa_j_jesp_2009_12_011.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/ar_apa_j_jesp_2009_12_011.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "E-mail address: muraven" not in md
     assert "0022-1031/$ - see front matter" not in md
@@ -101,8 +98,6 @@ def test_ar_apa_011_elsevier_footer_stripped():
 
 
 def test_chen_2021_elsevier_issn_line_stripped():
-    pdf = TEST_PDFS / "apa" / "chen_2021_jesp.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chen_2021_jesp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert "0022-1031/" not in md

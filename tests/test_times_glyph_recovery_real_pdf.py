@@ -19,8 +19,6 @@ ordinal after a reference word (Model/Study/Wave/…).
 from __future__ import annotations
 
 import os
-import re
-from pathlib import Path
 
 import pytest
 
@@ -37,7 +35,8 @@ requires_camelot = pytest.mark.skipif(
 from docpluck.normalize import recover_times_interaction_glyph
 from docpluck.render import render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 
 # ── Unit tests on recover_times_interaction_glyph (cell-scoped) ─────────────
@@ -203,9 +202,7 @@ def test_chan_feldman_range_bound_survives_with_camelot_on():
     chan_feldman's Table-2 note must render the true lower bound `from 3 to 15`;
     `from × to 15` anywhere in the document is the defect.
     """
-    pdf = TEST_PDFS / "apa" / "chan_feldman_2025_cogemo.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
     assert "from × to" not in md, "range lower bound wrongly ×-converted in a table cell"
     assert "ranged from 3 to 15" in md, "the true scale bound 3 is missing from the render"
@@ -231,9 +228,7 @@ def test_efendic_interaction_terms_pass_through_in_the_table_channel():
     The unit tests above still pass and must -- they exercise the kept DEFINITION.
     This one exercises the SHIPPED table channel, which no longer calls it.
     """
-    pdf = TEST_PDFS / "apa" / "efendic_2022_affect.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/efendic_2022_affect.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
     assert md and len(md) > 5000, f"render returned {len(md or '')} chars -- vacuous"
     # No multiplication sign may have been substituted for a printed digit.
@@ -253,9 +248,7 @@ def test_maier_hypothesis_labels_not_corrupted_with_camelot_on():
     Regression for the false positive the cycle-2 canary-coverage render caught:
     the first W0i cut turned "H3a: Explicit …" into "H × a: Explicit …". The
     whitespace-on-at-least-one-side requirement now excludes glued labels."""
-    pdf = TEST_PDFS / "apa" / "maier_2023_collabra.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf("apa/maier_2023_collabra.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())  # Camelot ON
     assert "H × a" not in md and "H × b" not in md, "hypothesis label H3a/H3b wrongly ×-converted"
     # The genuine factorial-design "× 3 (" notation (× followed by the number 3,

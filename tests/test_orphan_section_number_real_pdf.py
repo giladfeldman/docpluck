@@ -18,7 +18,6 @@ it: `## Introduction` → `## 1. Introduction`.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -32,7 +31,8 @@ DISABLE_CAMELOT = True
 
 from docpluck.render import _fold_orphan_arabic_numerals_into_headings, render_pdf_to_markdown
 
-TEST_PDFS = Path(__file__).resolve().parents[1].parent / "PDFextractor" / "test-pdfs"
+from docpluck.testing import require_corpus_pdf
+
 
 # A bare 1-2 digit line (optional dot) immediately followed by a `## ` heading.
 _ORPHAN_BEFORE_HEADING_RE = re.compile(r"(?m)^\d{1,2}\.?[ \t]*\n(?:[ \t]*\n)+## ")
@@ -84,9 +84,7 @@ def test_folds_multiple_independent_occurrences():
 
 @pytest.mark.parametrize("stem", ["korbmacher_2022_kruger", "jdm_.2023.15"])
 def test_no_orphan_number_before_heading_in_render(stem):
-    pdf = TEST_PDFS / "apa" / f"{stem}.pdf"
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leak = _ORPHAN_BEFORE_HEADING_RE.search(md)
     assert leak is None, (
