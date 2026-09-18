@@ -87,10 +87,17 @@ def _named() -> dict[str, list[str]]:
         if f.name == Path(__file__).name:
             continue
         text = f.read_text(encoding="utf-8", errors="replace")
+        lines = text.splitlines()
         for m in _CORPUS_CALL.finditer(text):
-            name = m.group(1)
             lineno = text.count("\n", 0, m.start()) + 1
-            found.setdefault(name, []).append(f"{f.name}:{lineno}")
+            # A COMMENT IS NOT A CALL. A retirement note showing the correct form
+            # made this gate demand that the placeholder in the example be a real
+            # paper -- the kind of false positive that gets a gate switched off,
+            # which the gate this replaced warned about in as many words. Only
+            # executable lines assert that a paper is in the corpus.
+            if lines[lineno - 1].lstrip().startswith("#"):
+                continue
+            found.setdefault(m.group(1), []).append(f"{f.name}:{lineno}")
     return found
 
 

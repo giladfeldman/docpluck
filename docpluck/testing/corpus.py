@@ -27,6 +27,15 @@ numerator: it reports ``40/40`` on a corpus that has silently shrunk from 101,
 and every blast-radius number downstream is quietly divided by the wrong N. A
 committed manifest cannot shrink without a diff.
 
+NOT THE SAME SET AS THE HARNESS MANIFEST
+----------------------------------------
+``scripts/harness/corpus_manifest.json`` holds 135 documents; this one holds 102.
+That is deliberate. This is the PAPER corpus, resolved by DOI: the 101 corpus
+PDFs plus the render-baseline paper. The harness manifest additionally carries 25
+DOCX and 9 HTML documents, which are not papers with DOIs and most of which are
+not in custody. Two numbers that look like they should match, and do not, are
+worth a sentence in both files rather than a puzzled reader in six months.
+
 THE THREE OUTCOMES, KEPT APART ON PURPOSE
 -----------------------------------------
 1. **The repository is not on this machine at all.** The library is public and

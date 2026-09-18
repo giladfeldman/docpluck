@@ -250,6 +250,25 @@ def verify_against_custody(manifest: dict[str, dict[str, str]]) -> list[str]:
     return bad
 
 
+def _existing_count(out: str) -> int | None:
+    """How many papers the manifest being REPLACED holds, or None if there is none.
+
+    Read by parsing rather than importing: the target may be any path (``--out``),
+    and importing the installed package would count a different file from the one
+    about to be overwritten.
+    """
+    p = Path(out)
+    if not p.is_file():
+        return None
+    try:
+        ns: dict = {}
+        exec(compile(p.read_text(encoding="utf-8"), str(p), "exec"), ns)  # noqa: S102
+        m = ns.get("MANIFEST")
+        return len(m) if isinstance(m, dict) else None
+    except Exception:
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -265,6 +284,17 @@ def main() -> int:
     )
     ap.add_argument("--out", default=str(Path(__file__).with_name("corpus_manifest.py")))
     ap.add_argument("--check", action="store_true", help="verify only; write nothing")
+    ap.add_argument(
+        "--allow-shrink",
+        action="store_true",
+        help="permit writing a manifest with FEWER papers than the one being replaced",
+    )
+    ap.add_argument(
+        "--expect",
+        type=int,
+        metavar="N",
+        help="refuse to write unless the new manifest holds exactly N papers",
+    )
     args = ap.parse_args()
 
     if not args.paths and not args.from_view:
@@ -292,11 +322,43 @@ def main() -> int:
     if bad:
         print("FATAL: custody verification failed:", *bad, sep="\n  ")
         return 1
+    # REFUSE TO SHRINK THE CORPUS SILENTLY.
+    #
+    # This module's docstring says the manifest is committed because "a
+    # denominator recomputed at read time cannot ever report that something went
+    # missing". Without the check below the GENERATOR had exactly that defect one
+    # layer up: it built, verified custody, wrote, and reported success, with
+    # nothing comparing the new count to the old.
+    #
+    # Not theoretical. Once the source directory is deleted, `--from-view` alone
+    # is the only way to run this tool -- and the view holds 28 papers where the
+    # manifest holds 102, so the first legitimate regeneration after the deletion
+    # would have written a 28-entry manifest over a 102-entry one and exited 0.
+    # The file's own header forbids hand-editing, so the obvious recovery was
+    # closed at the same moment.
+    previous = _existing_count(args.out)
+    if args.expect is not None and len(manifest) != args.expect:
+        print(
+            f"FATAL: --expect {args.expect} but resolved {len(manifest)} papers. "
+            "Refusing to write."
+        )
+        return 1
+    if previous is not None and len(manifest) < previous and not args.allow_shrink:
+        print(
+            f"FATAL: this would write {len(manifest)} papers over a manifest that "
+            f"holds {previous} -- {previous - len(manifest)} dropped, silently, and "
+            "the corpus denominator shrinks with no diff anyone reads. If the "
+            "corpus really is smaller now, say so with --allow-shrink (or pin the "
+            "number with --expect)."
+        )
+        return 1
+
     if args.check:
-        print("check only -- nothing written")
+        delta = "" if previous is None else f" (currently {previous})"
+        print(f"check only -- nothing written; would write {len(manifest)}{delta}")
         return 0
     Path(args.out).write_text(render(manifest), encoding="utf-8", newline="\n")
-    print(f"wrote {args.out}")
+    print(f"wrote {args.out} ({len(manifest)} papers)")
     return 0
 
 

@@ -251,6 +251,11 @@ MANIFEST: dict[str, dict[str, str]] = {
         "held_at": 'fulltext/10.1177__23780231251327540.pdf',
         "sha256": 'ffde293ce0efeab04df4bc4c021b56b09ffc44198a94c2fbd04d8756e09447b7',
     },
+    'baseline/10.1017__s1930297500009189.pdf': {
+        "doi": '10.1017/s1930297500009189',
+        "held_at": 'fulltext/10.1017__s1930297500009189.pdf',
+        "sha256": '75428b330449a549cd4c83b62010a2925c5f59741f3b6aee86c8a2f27d863246',
+    },
     'chicago-ad/demography_1.pdf': {
         "doi": '10.1215/00703370-10924116',
         "held_at": 'fulltext/10.1215__00703370-10924116.pdf',

@@ -1,5 +1,13 @@
 """Corpus discovery for the docpluck verification harness.
 
+NOT THE SAME SET AS ``docpluck/testing/corpus_manifest.py``, deliberately, and
+the next reader will assume it is. This manifest is the HARNESS corpus: the 101
+corpus PDFs plus 25 DOCX and 9 HTML documents from other sources, 135 in all.
+``docpluck.testing``'s manifest is the PAPER corpus the test suite resolves BY
+DOI -- the same 101 PDFs plus the render-baseline paper, 102 -- and the DOCX and
+HTML are absent from it because they are not papers with DOIs and most are not in
+custody at all.
+
 Discovers every test document (PDF / DOCX / HTML) across the sibling repos and
 emits a committed ``corpus_manifest.json``. The manifest stores Vibe-relative
 paths only — no document bytes are committed (the repo is public; see
