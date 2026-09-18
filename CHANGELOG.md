@@ -1,11 +1,22 @@
 # Changelog
 
-## [Unreleased] - one extraction per document
+## [2.4.144] - 2026-09-18 - normalization 1.9.68 - table extraction 2.4.15
 
-**Version deliberately NOT bumped**, following the block below: `2.4.144` was
-already taken by the test-corpus work in this tree, and a second in-flight
-change tagging the same repo concurrently is not a thing to be clever about.
-Whoever ships next folds all three into one release and gives it a number.
+Three streams landed together: the test corpus moved onto the article custodian,
+and two independent changes stopped the same PDF being parsed more times than
+anything could use.
+
+**The rendered OUTPUT is byte-for-byte unchanged, and that was measured rather
+than assumed** -- which is why `NORMALIZATION_VERSION` does not move. The
+extraction pipeline CODE did change.
+
+That distinction is spelled out because an earlier draft of this entry read
+"Test infrastructure only. The extraction and normalization pipelines are
+byte-for-byte unchanged." It was true while the release was test-infrastructure
+only, and became false the moment the two performance streams were folded in.
+Two separate sessions caught it before the tag. It is corrected here in the open
+rather than quietly rewritten, because the failure mode worth remembering is a
+release note that stays behind its own contents.
 
 ### The same upload was extracted, and re-extracted, and parsed four times
 
@@ -129,16 +140,6 @@ no `_raw_text`, so the service change lands after this releases - and the
 stage-opt-in work. Naming it here rather than in a handoff footnote: the
 library half is inert until the caller threads it.
 
-## [Unreleased] — the column splice stopped reading pages it cannot act on
-
-**Version deliberately NOT bumped here.** `2.4.144` was in flight in this tree
-when this landed. Whoever ships next folds this into one release and gives it a
-number; two sessions tagging the same repo concurrently is not a thing to be
-clever about. Note that 2.4.144's own entry says "the extraction and
-normalization pipelines are byte-for-byte unchanged" — true of the OUTPUT and of
-`NORMALIZATION_VERSION`, no longer true of the extraction pipeline CODE once this
-is folded in.
-
 ### `extract_pdf` parsed the whole document to correct a handful of pages
 
 `extract_pdf` runs two cheap text-only detectors over pdftotext's output, and if
@@ -206,11 +207,6 @@ of the text and the exact `+column_corrected:<pages>` list. The two-sided
 control matters: **32 of those 78 runs, across 22 distinct papers, do produce a
 correction**, including one in the default regime — a comparison that never
 exercised the correction path would have been a green from an empty input.
-
-## [2.4.144] - 2026-09-17 - normalization 1.9.68 - table extraction 2.4.15
-
-Test infrastructure only. The extraction and normalization pipelines are
-byte-for-byte unchanged, which is why `NORMALIZATION_VERSION` does not move.
 
 ### The test corpus resolves through the article custodian by DOI, not from a directory
 
