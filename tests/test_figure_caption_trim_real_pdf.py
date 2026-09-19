@@ -494,7 +494,8 @@ def test_apa_corpus_no_ellipsis_truncated_figure_captions():
 
 from docpluck.extract_structured import _caption_is_complete_without_terminator
 
-from docpluck.testing import corpus_pdf
+from docpluck.testing import corpus_pdf, corpus_pdfs
+
 
 
 class TestCaptionCompleteWithoutTerminator:

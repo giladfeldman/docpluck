@@ -28,15 +28,17 @@ import pytest
 
 from docpluck.render import render_pdf_to_markdown
 
+from docpluck.testing import require_corpus_pdf
+
 
 
 
 
 @pytest.fixture(scope="module")
 def rendered_md() -> str:
-    if not _PDF.exists():
-        pytest.skip(f"corpus fixture missing: {_PDF}")
-    return render_pdf_to_markdown(_PDF.read_bytes())
+    return render_pdf_to_markdown(
+        require_corpus_pdf("ama/jama_open_1.pdf").read_bytes()
+    )
 
 
 def test_d1_downloaded_jamanetwork_footer_stripped(rendered_md: str):

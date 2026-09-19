@@ -15,12 +15,11 @@ real-PDF case exercises the public entry point on the actual fixture.
 from __future__ import annotations
 
 
-import pytest
 
 from docpluck.normalize import NormalizationLevel, normalize_text
 from docpluck.render import render_pdf_to_markdown
 
-from docpluck.testing import corpus_pdf
+from docpluck.testing import require_corpus_pdf
 
 
 
@@ -78,13 +77,11 @@ def test_chan_feldman_soft_hyphen_cleared_real_pdf():
     citationguard handoff measured 151 U+00AD in pymupdf and 6 space-broken
     words surviving docpluck's old bare-strip. After the S6 join: zero
     U+00AD, zero space-broken residuals, whole words recovered."""
-    pdf = (corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")).resolve()
-    if not pdf.is_file():
-        # fixture also lives under the cogemo stem in some trees
-        alt = list(_PDF_ROOT.rglob("chan_feldman_2025_cogemo.pdf"))
-        if not alt:
-            pytest.skip("fixture chan_feldman_2025_cogemo.pdf not available locally")
-        pdf = alt[0]
+    # The "also lives under the cogemo stem in some trees" rglob fallback is gone
+    # with the directory it searched. There is exactly one copy now, named by DOI
+    # in custody, and a miss FAILS instead of falling back to whatever a recursive
+    # search happened to turn up.
+    pdf = require_corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     assert md.count("­") == 0, "soft hyphens survived to rendered output"
     for broken in ("com mitment", "pro motion", "altru ism", "relation ship"):

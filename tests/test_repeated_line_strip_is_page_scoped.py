@@ -61,7 +61,6 @@ Written 2026-08-25 against the unfixed code and watched fail.
 
 from __future__ import annotations
 
-import pytest
 
 from docpluck.extract import extract_pdf
 from docpluck.normalize import (
@@ -72,14 +71,18 @@ from docpluck.normalize import (
     page_break_residue,
 )
 
-from .conftest import pdf_available, pdf_path
+from docpluck.testing import require_corpus_pdf
 
-_IEEE5 = ("docpluck", "ieee", "ieee_access_5.pdf")
-_JHSB = ("docpluck", "asa", "j_health_soc_behav_1.pdf")
+# Resolved through the article custodian, never a local corpus directory.
+# corpus_pdf() is safe at module scope (it never raises); require_corpus_pdf()
+# is used in the bodies so a paper the manifest claims but cannot deliver
+# fails loudly instead of skipping.
+_IEEE5 = "ieee/ieee_access_5.pdf"
+_JHSB = "asa/j_health_soc_behav_1.pdf"
 
 
-def _normalized(parts) -> str:
-    raw, _method = extract_pdf(open(pdf_path(*parts), "rb").read())
+def _normalized(rel: str) -> str:
+    raw, _method = extract_pdf(require_corpus_pdf(rel).read_bytes())
     assert len(raw) > 10_000, (
         "extraction returned almost nothing — assert the input before the "
         "output, or an empty corpus reads as a clean result"
@@ -113,7 +116,6 @@ def test_a_double_form_feed_survives_intact():
 # The defect: a table column header deleted on the second pass
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(not pdf_available(*_IEEE5), reason="test corpus not available")
 def test_a_repeated_table_column_header_is_not_deleted():
     """`Performance metric` labels a column; deleting it orphans the numbers."""
     text = _normalized(_IEEE5)
@@ -123,16 +125,14 @@ def test_a_repeated_table_column_header_is_not_deleted():
     )
 
 
-@pytest.mark.skipif(not pdf_available(*_IEEE5), reason="test corpus not available")
 def test_a_repeated_table_row_label_is_not_deleted():
     text = _normalized(_IEEE5)
     assert "Number of trained architectures" in text
 
 
-@pytest.mark.skipif(not pdf_available(*_IEEE5), reason="test corpus not available")
 def test_normalization_reaches_a_fixed_point_on_ieee_access_5():
     """The corpus idempotency ratchet was at 1, and this paper was the 1."""
-    raw, _ = extract_pdf(open(pdf_path(*_IEEE5), "rb").read())
+    raw, _ = extract_pdf(require_corpus_pdf(_IEEE5).read_bytes())
     L = NormalizationLevel("academic")
     once, _ = normalize_text(raw, L)
     twice, _ = normalize_text(once, L)
@@ -142,7 +142,6 @@ def test_normalization_reaches_a_fixed_point_on_ieee_access_5():
     )
 
 
-@pytest.mark.skipif(not pdf_available(*_IEEE5), reason="test corpus not available")
 def test_the_genuine_running_header_is_still_removed():
     """The other side of the gate. Without this, "keeps more" is not a fix.
 
@@ -156,10 +155,9 @@ def test_the_genuine_running_header_is_still_removed():
     )
 
 
-@pytest.mark.skipif(not pdf_available(*_IEEE5), reason="test corpus not available")
 def test_page_boundaries_survive_furniture_removal():
     """16 of this paper's 17 form feeds arrive glued to a repeated header."""
-    raw, _ = extract_pdf(open(pdf_path(*_IEEE5), "rb").read())
+    raw, _ = extract_pdf(require_corpus_pdf(_IEEE5).read_bytes())
     text, _ = normalize_text(raw, NormalizationLevel("academic"))
     raw_breaks = raw.count(PAGE_BREAK)
     kept = text.count(PAGE_BREAK)
@@ -175,7 +173,6 @@ def test_page_boundaries_survive_furniture_removal():
 # Rule 0g: delete furniture, never data
 # ---------------------------------------------------------------------------
 
-@pytest.mark.skipif(not pdf_available(*_JHSB), reason="test corpus not available")
 def test_a_figure_note_carrying_a_sample_size_is_never_furniture():
     """Five figures, five pages, once each — a running footer by POSITION only.
 
@@ -190,7 +187,6 @@ def test_a_figure_note_carrying_a_sample_size_is_never_furniture():
     )
 
 
-@pytest.mark.skipif(not pdf_available(*_JHSB), reason="test corpus not available")
 def test_a_wrapped_data_source_caption_survives_with_its_second_line():
     """The note wraps; its second line carries the survey and the year range.
 

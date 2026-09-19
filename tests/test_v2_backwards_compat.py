@@ -281,7 +281,7 @@ def test_extract_pdf_byte_identical(entry, request):
         )
 
     if request.config.getoption("--snapshot-explain"):
-        out_dir = _HERE.parent / "tmp" / "snapshots"
+        out_dir = Path(__file__).resolve().parents[1] / "tmp" / "snapshots"
         out_dir.mkdir(parents=True, exist_ok=True)
         dump = out_dir / f"{entry['id']}.actual.txt"
         dump.write_text(text, encoding="utf-8")

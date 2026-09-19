@@ -2438,3 +2438,55 @@ importing the docpluck modules that bind them by name, then patch the same names
 `tables.camelot_extract` - a `from X import y` binding is not updated by patching `X.y`, so a
 harness that patches only the definition module reports zero and looks clean. Two-sided: show the
 harness reports >1 on a known-duplicated graph before believing a 1.
+
+
+## L-059 - The gate matched the harness, not the corpus, and reported the corpus missing
+
+**2026-09-17, during the article-custody repoint.** `test_normalize_idempotent_corpus`
+carries a WATCHLIST of twelve papers - the seven measured non-idempotent plus the five
+with per-paper tests - and a deliberate two-sided guard on it:
+
+    missing = sorted(_WATCHLIST - set(by_name))
+    assert not missing, "watchlist names that resolve to no paper in the corpus: ..."
+
+That guard exists because six hyphenated filenames once made per-paper tests skip for
+weeks. It is the right guard. It then fired on ALL TWELVE names at once, and every one
+of the twelve was in custody the whole time.
+
+**The cause is one line of the instrument, not the corpus.** `by_name` was built as
+`{os.path.basename(p): p for p in pdfs}`. Before the repoint a corpus path ended in
+`efendic_2022_affect.pdf`, so the basename WAS the watchlist key. After it, a resolved
+path is the custodian's DOI-derived filename - `10.1001__jamanetworkopen.2023.39337.pdf`
+- so no basename could ever match a watchlist entry. The set difference was total, and
+the assertion message said "resolve to no paper in the corpus", which is a claim about
+the corpus and was false.
+
+**Why this is worth its own entry rather than a line in the repoint's changelog.** A
+green that means nothing is the failure this file catalogues most often. This is its
+mirror: a RED that means nothing, and it is more expensive, because a red is believed.
+Twelve names failing at once should have read as "the lookup is broken", not "twelve
+papers vanished" - a total failure of a set intersection almost never means the set
+emptied. The fix was to key on the corpus NAME (`corpus_names()`), which is the thing
+the watchlist was always written against.
+
+**The rule: when a guard fires on EVERY member of its input, suspect the instrument
+before the input.** Partial failure is evidence about the data; total failure is usually
+evidence about the join. Check what the two sides are actually being matched on, and
+print one of each before believing the difference.
+
+**Corollaries from the same run, all the same shape:**
+
+- Nine `tools/diag/` scans imported `docpluck` from site-packages rather than this
+  tree, so anything they ever reported described the last RELEASED version. It surfaced
+  only because the new `docpluck.testing` does not exist in 2.4.141 and raised - a
+  louder symptom than the silent wrong-version measurement it had been doing all along.
+  **Print `docpluck.__file__`, not just `__version__`, in anything that measures.**
+- A `sys.path` prepend added to fix exactly that landed BELOW the import it was meant
+  to precede. The file looked right and the fix was inert. Only re-running the gate
+  caught it: **a fix applied in the wrong place is detected by its own verification and
+  by nothing else.**
+- A peer diagnosed a failing extraction test as a secondary-manifestation swap, on the
+  strength of two trees agreeing. Two trees agreeing says nothing about WHICH bytes were
+  read. One sha256 settled it - identical, so no swap - and the real cause was a test
+  asserting a recovery that cannot fire on that paper. **An error message's own
+  suggested fix is the anticipation of whoever wrote it, not a finding.**

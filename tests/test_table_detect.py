@@ -1,9 +1,8 @@
 """Table region detection — caption anchor + geometry → CandidateRegion list."""
 
-import json
 
 import pytest
-from tests.structured_fixtures import resolve_fixture as _resolve_fixture
+from tests.structured_fixtures import load_manifest, resolve_fixture as _resolve_fixture
 
 
 def _layout(fixture_id: str):
@@ -72,7 +71,7 @@ def test_candidate_region_dataclass_shape():
 def test_returns_empty_when_no_caption_matches():
     """A caption-free fixture should yield zero regions in default mode."""
     # Use a manifest fixture that has expected_tables=0
-    manifest_data = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+    manifest_data = load_manifest()
     fixture_id = None
     for e in manifest_data["fixtures"]:
         if e.get("expected_tables") == 0:

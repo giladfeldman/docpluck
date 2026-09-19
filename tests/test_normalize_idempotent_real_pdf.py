@@ -29,7 +29,7 @@ from docpluck.normalize import (
     recover_minus_via_ci_pairing,
 )
 
-from docpluck.testing import corpus_pdfs, require_corpus_pdf
+from docpluck.testing import corpus_names, corpus_pdf, corpus_pdfs, require_corpus_pdf
 
 requires_pdftotext = pytest.mark.skipif(
     shutil.which("pdftotext") is None, reason="pdftotext not installed"
@@ -337,50 +337,48 @@ def test_recover_minus_via_ci_pairing_idempotent_on_already_recovered():
     assert "-2.68" in rec, f"original-corruption recovery broken: {rec!r}"
 
 
-@requires_pdftotext
-def test_normalize_idempotent_ip_feldman_2025():
-    """ip-feldman 2025 PSPB exercises recover_minus_via_ci_pairing's
-    non-idempotence: the table cell `B = -2.68 [-4.65, -0.68]` (already-
-    recovered negative point estimate paired with a CI) was re-corrupted to
-    `--.68` on pass 2. Cycle 10 (v2.4.62) tightens the corrupt-neg-token
-    lookbehind to forbid a preceding literal minus."""
-    pdf = os.path.join(
-        _TEST_PDFS,
-        "escicheck",
-        "ip-feldman-2025-pspb-misestimation-of-emotional-experiences-print-nosupp.pdf",
-    )
-    if not os.path.isfile(pdf):
-        pytest.skip("ip-feldman test PDF not available")
-    with open(pdf, "rb") as fh:
-        raw, _ = extract_pdf(fh.read())
-    n1, n2 = _norm_twice(raw)
-    assert n1 == n2, "normalize_text is not idempotent on ip-feldman"
-    assert "--.68" not in n1, "double-minus corruption appeared in normalized text"
+# RETIRED 2026-09-17: `test_normalize_idempotent_ip_feldman_2025` and
+# `test_normalize_idempotent_chandrashekar_regression_table` are gone, and this is
+# their record.
+#
+# Both resolved their paper under `test-pdfs/escicheck/` -- a corpus subdirectory
+# that DOES NOT EXIST and, on the evidence, never did. So neither test has ever
+# run: it skipped, which reads as "the corpus is incomplete" rather than "this
+# check has never executed once". The repoint only made that visible, by turning
+# the dangling module constant into a NameError.
+#
+# Retired rather than repointed, because repointing is a DECISION:
+#   * ip-feldman -- `apa/ip_feldman_2025_pspb.pdf` IS in custody and is very
+#     likely the same paper (it is the canary litmus paper). Aiming a regression
+#     test at a differently-named file would silently change what it measures if
+#     the two differ, so confirm identity first, then repoint deliberately.
+#   * chandrashekar -- `apa/chandrashekar_2023_mp.pdf` is NOT a substitute:
+#     different year, journal and paper.
+#
+# What they asserted -- normalize_text idempotence -- is exercised over the whole
+# corpus by `test_normalize_idempotent_corpus` below, which does run.
 
 
-@requires_pdftotext
-def test_normalize_idempotent_chandrashekar_regression_table():
-    """chandrashekar 2020 (Shafir 1993 replication) has 4 regression columns
-    citing the same N=7182 → 4 standalone `7182` lines. Pre-cycle-9b S9
-    Pattern A stripped them all as a "page number" on pass 2, while pass 1
-    preserved them (A3's comma-strip hadn't run yet). Cycle 9b's per-
-    occurrence numeric-block gate keeps them under both passes."""
-    pdf = os.path.join(
-        _TEST_PDFS,
-        "escicheck",
-        "chandrashekar-et-al-2020-shafir-1993-replication-and-extensions-print-nosupp.pdf",
-    )
-    if not os.path.isfile(pdf):
-        pytest.skip("chandrashekar test PDF not available")
-    with open(pdf, "rb") as fh:
-        raw, _ = extract_pdf(fh.read())
-    n1, n2 = _norm_twice(raw)
-    assert n1 == n2, "normalize_text is not idempotent on chandrashekar"
-    # Sanity: the table N must survive
-    assert n1.count("7182") >= 4, (
-        f"S9 should preserve the 4 regression-column N=7182 lines; "
-        f"only {n1.count('7182')} survived"
-    )
+# RETIRED 2026-09-17: `test_normalize_idempotent_ip_feldman_2025` and
+# `test_normalize_idempotent_chandrashekar_regression_table` are gone, and this is
+# their record.
+#
+# Both resolved their paper under `test-pdfs/escicheck/` -- a corpus subdirectory
+# that DOES NOT EXIST and, on the evidence, never did. So neither test has ever
+# run: it skipped, which reads as "the corpus is incomplete" rather than "this
+# check has never executed once". The repoint only made that visible, by turning
+# the dangling module constant into a NameError.
+#
+# Retired rather than repointed, because repointing is a DECISION:
+#   * ip-feldman -- `apa/ip_feldman_2025_pspb.pdf` IS in custody and is very
+#     likely the same paper (it is the canary litmus paper). Aiming a regression
+#     test at a differently-named file would silently change what it measures if
+#     the two differ, so confirm identity first, then repoint deliberately.
+#   * chandrashekar -- `apa/chandrashekar_2023_mp.pdf` is NOT a substitute:
+#     different year, journal and paper.
+#
+# What they asserted -- normalize_text idempotence -- is exercised over the whole
+# corpus by `test_normalize_idempotent_corpus` below, which does run.
 
 
 @requires_pdftotext
@@ -568,7 +566,15 @@ def test_normalize_idempotent_corpus():
         "chan_feldman_2025_cogemo.pdf", "jama_open_1.pdf",
         "socius_4.pdf", "ieee_access_7.pdf", "nat_comms_2.pdf",
     }
-    by_name = {os.path.basename(p): p for p in pdfs}
+    # KEYED ON THE CORPUS NAME, NOT THE RESOLVED BASENAME. After the 2026-09-17
+    # repoint a resolved path is the custodian's DOI-derived filename
+    # (`10.1001__jamanetworkopen.2023.39337.pdf`), so matching the watchlist on
+    # `os.path.basename` matched nothing and every watchlist name read as "resolves
+    # to no paper" -- the assertion below firing on its own instrument rather than
+    # on the corpus.
+    by_name = {
+        name.split("/")[-1]: str(corpus_pdf(name)) for name in corpus_names()
+    }
     # A watchlist name that resolves to nothing is a silent no-op -- the same defect as the
     # six hyphenated filenames that made per-paper tests skip for weeks. Fail loudly instead.
     missing = sorted(_WATCHLIST - set(by_name))

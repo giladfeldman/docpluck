@@ -1,9 +1,8 @@
 """Figure region detection — caption + bbox metadata only."""
 
-import json
 
 import pytest
-from tests.structured_fixtures import resolve_fixture as _resolve_fixture
+from tests.structured_fixtures import load_manifest, resolve_fixture as _resolve_fixture
 
 
 def _layout(fixture_id: str):
@@ -34,7 +33,7 @@ def test_figure_only_fixture_finds_figures():
 def test_no_figures_returns_empty_or_only_real_figures():
     """A negative-case fixture should yield zero or only well-formed figures."""
     # Use any fixture with expected_figures==0; if not available, skip.
-    manifest_data = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+    manifest_data = load_manifest()
     fixture_id = None
     for e in manifest_data["fixtures"]:
         if e.get("expected_figures") == 0:

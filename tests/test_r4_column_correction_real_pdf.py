@@ -33,15 +33,15 @@ import pytest
 from docpluck.extract import extract_pdf
 from docpluck.render import render_pdf_to_markdown
 
+from docpluck.testing import require_corpus_pdf
+
 
 
 
 
 @pytest.fixture(scope="module")
 def jama_pdf_bytes() -> bytes:
-    if not _PDF.exists():
-        pytest.skip(f"corpus fixture missing: {_PDF}")
-    return _PDF.read_bytes()
+    return require_corpus_pdf("ama/jama_open_1.pdf").read_bytes()
 
 
 def test_r4_jama_abstract_word_integrity(jama_pdf_bytes: bytes):

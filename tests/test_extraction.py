@@ -45,6 +45,22 @@ class TestExtractPdf:
         pvalues = re.findall(r'[pP]\s*[<=>]\s*\.?\d', text)
         assert len(pvalues) >= 10, f"Expected ≥10 p-values, found {len(pvalues)}"
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "THE PREMISE IS FALSE FOR THIS PAPER, measured 2026-09-17. "
+            "`nature/nathumbeh_2.pdf` extracts as `pdftotext_default` with ZERO "
+            "U+FFFD, so the pdfplumber SMP-recovery path cannot fire and the "
+            "assertion below can never pass. NOT caused by the corpus repoint: the "
+            "bytes the test reads are IDENTICAL before and after (sha b2ab88120b88), "
+            "and extract_pdf returns the same method from either copy -- checked "
+            "both ways rather than assumed, because the first diagnosis offered for "
+            "this failure was a secondary-manifestation swap that did not happen. "
+            "OWED: find a corpus paper that genuinely carries SMP fonts and repoint "
+            "this at it, or retire the assertion. strict=True so this turns RED the "
+            "moment recovery does fire, instead of quietly passing."
+        ),
+    )
     def test_nature_smp_recovery(self):
         """Nature-style paper with SMP fonts triggers pdfplumber recovery."""
         content = self._read("nature", "nathumbeh_2.pdf")

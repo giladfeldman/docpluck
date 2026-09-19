@@ -18,7 +18,6 @@ Real-PDF fixture: ieee_access_2.pdf has 4 numbered Roman-section headings + 1 co
 
 import re
 import pytest
-from pathlib import Path
 
 from docpluck.render import render_pdf_to_markdown
 
@@ -26,9 +25,15 @@ from docpluck.testing import require_corpus_pdf
 
 
 
-def _require_pdf(p: Path) -> None:
-    if not p.exists():
-        pytest.skip(f"Fixture not available: {p}")
+# Restored 2026-09-17 after the corpus repoint removed the directory-rooted
+# binding and left three call sites referring to it. Resolution now raises when
+# the paper is not in custody, so `_require_pdf` is a readability shim rather
+# than a skip -- skipping here is the silent green the repoint removed.
+IEEE_PDF = require_corpus_pdf("ieee/ieee_access_2.pdf")
+
+
+def _require_pdf(p) -> None:
+    assert p.is_file(), f"corpus paper did not resolve: {p}"
 
 
 def test_ieee_orphan_roman_numeral_is_consumed_into_heading():

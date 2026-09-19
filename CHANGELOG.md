@@ -245,6 +245,25 @@ this changes nothing the tests read. The failure path is proven too: with
 `ARTICLE_REPOSITORY` pointed at a nonexistent path the corpus gate fails rather
 than skipping.
 
+### The harness manifest was publishing document TITLES, and the ids were the leak too
+
+Found while repointing the same file, and worth stating separately because the
+commit reads as a prefix rename and it is not.
+
+`scripts/harness/corpus_manifest.json` is committed, and this repository is
+public. Each non-PDF entry carried a `rel_path` — an internal directory path —
+and, less visibly, an `id` that was a SLUG OF THE FILENAME. For one of the
+sources those filenames are in-progress replication manuscripts with co-author
+names in them, so the committed manifest published the titles of unsubmitted
+papers. Dropping the path alone would not have fixed it: the id carried the same
+disclosure with less to grep for, which is worse.
+
+Both are gone. Every non-PDF entry is now `{id, source, format, sha256}` with
+`id = <source>__<first 16 hex of sha256>`, and `resolve()` rediscovers the local
+file by hashing rather than by storing a path. **A content hash is the right key
+here for a reason that generalises: it is not possible to accidentally put a
+person's name in one.** Do not "restore" the old ids — they were the leak.
+
 Also fixed in passing: one fixture resolver that existed in ten pasted copies is
 now one function; a `conftest.py` docstring asserting the corpus "exists and
 holds 0 PDFs" (it held 101, and 73 files used it) is corrected.

@@ -106,6 +106,17 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
+# IMPORT docpluck FROM THIS TREE, not from site-packages.
+#
+# Without this, `import docpluck` here resolves to the last RELEASED version in
+# site-packages, so anything this script measures describes that release rather
+# than the working tree -- a fix in the comparison key is not a fix in the
+# shipped string, one layer down. `tests/test_harness_scripts_import_the_working_tree.py`
+# asserts it.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 from scripts.harness.corpus import resolve as _harness_resolve
 
 VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
@@ -139,7 +150,6 @@ from docpluck.extract_layout import (  # noqa: E402
     fonts_are_same_family as _same_family,
     strip_font_subset_prefix as strip_subset,
 )
-
 
 def font_repertoires(pages) -> dict[str, Counter]:
     """Whole-document character census, per font."""

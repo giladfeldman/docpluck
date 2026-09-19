@@ -23,7 +23,20 @@ import hashlib
 import json
 import os
 import re
+import sys
 from pathlib import Path
+
+# IMPORT docpluck FROM THIS TREE, not from site-packages.
+#
+# Without this, `import docpluck` here resolves to the last RELEASED version in
+# site-packages, so anything this script measures describes that release rather
+# than the working tree -- a fix in the comparison key is not a fix in the
+# shipped string, one layer down. `tests/test_harness_scripts_import_the_working_tree.py`
+# asserts it.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 
 # All corpora live under the Vibe portfolio root. Resolved via VIBE_ROOT so the
 # manifest stays portable across machines and future moves (the root moved off
@@ -151,9 +164,23 @@ def discover() -> list[dict]:
                 "doi": _CORPUS[rel]["doi"],
             }
         )
+    missing_roots: list[str] = []
     for source, rel_root, pattern, fmt in SOURCES:
         root = VIBE / rel_root
         if not root.is_dir():
+            # ANNOUNCE THE SHRINK. This was a bare `continue`, so a declared
+            # source whose root had gone missing removed its documents from the
+            # manifest without a word -- measured 2026-09-18: the `escicheck`
+            # root does not exist on this machine and 51 PDFs left the corpus
+            # silently (180 -> 135 documents). A denominator that quietly gets
+            # smaller reports the same 100%% on less work, which is the exact
+            # failure this generator was rewritten to remove.
+            missing_roots.append(f'{source} -> {root}')
+            print(
+                f'WARNING: source {source!r} root is missing: {root} -- '
+                f'its documents are NOT in this manifest',
+                file=sys.stderr,
+            )
             continue
         for path in sorted(root.glob(pattern), key=lambda p: str(p).lower()):
             if not path.is_file() or path.stem in _EXCLUDE_STEMS:
