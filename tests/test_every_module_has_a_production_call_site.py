@@ -112,13 +112,51 @@ def test_the_importer_census_can_see_a_wired_module():
         )
 
 
+def _is_executable_entrypoint(path: Path) -> bool:
+    """True when the module is RUN rather than imported: `python -m <module>`.
+
+    The orphan test already exempted modules literally named `__main__`, which is
+    the same property approximated by a filename. `docpluck/testing/regenerate.py`
+    has no importer BY DESIGN -- it is the corpus-manifest generator, invoked as
+    `python -m docpluck.testing.regenerate`, and both `corpus_manifest.py`'s header
+    and `test_corpus_manifest.py`'s failure message tell a maintainer to run it.
+
+    MEASURED TWO-SIDED 2026-09-18 before this exemption was added: exactly two
+    modules under `docpluck/` carry a `__main__` guard (`cli`, `testing.regenerate`)
+    and NOT ONE of the five `_KNOWN_ORPHANS` does -- so this cannot launder a real
+    orphan into looking wired. `test_the_known_orphans_are_still_orphans` is the
+    standing control on that claim.
+    """
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        return False
+    for node in tree.body:
+        if not isinstance(node, ast.If):
+            continue
+        test = node.test
+        if (
+            isinstance(test, ast.Compare)
+            and isinstance(test.left, ast.Name)
+            and test.left.id == "__name__"
+            and any(
+                isinstance(c, ast.Constant) and c.value == "__main__"
+                for c in test.comparators
+            )
+        ):
+            return True
+    return False
+
+
 def test_no_new_module_is_imported_only_by_its_own_test():
     """RED FIRST 2026-09-05 with an empty allowlist: five modules failed."""
     hits = _production_importers()
     orphans = {
         m
         for m, importers in hits.items()
-        if not importers and not m.endswith(".__main__")
+        if not importers
+        and not m.endswith(".__main__")
+        and not _is_executable_entrypoint(_REPO / (m.replace(".", "/") + ".py"))
     }
     new = sorted(orphans - set(_KNOWN_ORPHANS))
     assert not new, (

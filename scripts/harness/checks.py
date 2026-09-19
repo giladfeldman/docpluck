@@ -395,12 +395,23 @@ def diff_baseline(matrix: dict) -> dict:
             still_failing.append(key)
         elif verdict == "pass" and prior == "fail":
             fixed.append(key)
+    # PROVE THE ZERO. A regression needs `prior == "pass"`, so a baseline that
+    # shares no keys with the current matrix can only ever report
+    # "0 REGRESSIONS" -- a number that is then unconditional, and is the
+    # headline this gate is read by. Measured 2026-09-18: the corpus repoint
+    # re-keyed every document id from its former per-source prefixes into a
+    # single namespace, leaving baseline 180 docs, manifest 135, OVERLAP 0.
+    # An unusable baseline is a FAILURE, never a clean run.
+    joinable = len(set(cur) & set(base))
     return {
         "regressions": sorted(regressions),
         "new_fails": sorted(new_fails),
         "fixed": sorted(fixed),
         "still_failing": sorted(still_failing),
         "has_baseline": bool(baseline),
+        "joinable_cells": joinable,
+        "baseline_docs": len({k[0] for k in base}),
+        "current_docs": len({k[0] for k in cur}),
     }
 
 
@@ -438,6 +449,18 @@ def main() -> int:
     if not diff["has_baseline"]:
         print("no baseline yet — run with --update-baseline once the corpus is verified clean")
         return 0
+    if cur_cells := len(flat):
+        if diff["joinable_cells"] == 0:
+            print(
+                "\nBASELINE UNUSABLE: the committed baseline shares 0 "
+                f"(doc x level x check) cells with this run "
+                f"({diff['baseline_docs']} baseline docs vs "
+                f"{diff['current_docs']} current docs, {cur_cells} current cells). "
+                "Every document id was re-keyed, so `prior` is None everywhere and "
+                "'0 REGRESSIONS' below would be unconditional rather than measured. "
+                "Re-baseline with --update-baseline on a corpus verified clean."
+            )
+            return 1
     print(f"\nvs baseline: {len(diff['regressions'])} REGRESSIONS, "
           f"{len(diff['new_fails'])} new fails, {len(diff['fixed'])} fixed, "
           f"{len(diff['still_failing'])} still failing")
