@@ -157,7 +157,10 @@ def main() -> int:
         print("no paper produced a measurement -- this is UNBOUNDED, not clean")
         return 2
 
-    print(f"{'paper':<44} {'pdfinfo':>7} {'raw \\f':>7} {'kept':>5}  {'lost':>5}")
+    # Bound outside the f-string: a backslash in an f-string expression is
+    # a SyntaxError before 3.12, and pyproject declares requires-python >=3.10.
+    raw_ff_label = "raw \f"
+    print(f"{'paper':<44} {'pdfinfo':>7} {raw_ff_label:>7} {'kept':>5}  {'lost':>5}")
     for key, pages, raw_ff, keep_ff in sorted(rows, key=lambda r: r[3] - r[2]):
         pg = str(pages) if pages is not None else "?"
         print(f"{key[:44]:<44} {pg:>7} {raw_ff:>7} {keep_ff:>5}  {raw_ff - keep_ff:>5}")

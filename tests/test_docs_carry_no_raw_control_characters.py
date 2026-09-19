@@ -138,7 +138,11 @@ def test_no_markdown_file_has_a_nul_in_gits_binary_detection_window():
             continue
         head = path.read_bytes()[:GIT_BINARY_WINDOW]
         if b"\x00" in head:
-            offenders.append(f"{path.relative_to(REPO)} (NUL at byte {head.find(b'\x00')})")
+            # The offset is computed BEFORE the f-string: a backslash inside an
+            # f-string expression is a SyntaxError on 3.10 and 3.11, and this
+            # project declares requires-python = ">=3.10".
+            nul_at = head.find(b"\x00")
+            offenders.append(f"{path.relative_to(REPO)} (NUL at byte {nul_at})")
     assert not offenders, (
         "git treats these as BINARY -- no diff, no blame, no line-level review, "
         f"and the whole file re-stored on every commit: {offenders}"
