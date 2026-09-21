@@ -912,9 +912,33 @@ def extract_page_text_banded(layout_doc, page_index: int,
     import subprocess
     import tempfile
 
-    def _crop(tmp_path: str, x: float, y: float, w: float, h: float) -> str:
+    def _crop(tmp_path: str, x: float, y: float, w: float, h: float) -> str | None:
+        """One band's pdftotext crop. ``None`` means the crop DID NOT RUN.
+
+        That third return value is the whole point, and it is the fix for a
+        measured defect. This used to return ``""`` for three situations that
+        mean different things: a genuinely blank region, a ``pdftotext`` that
+        exited non-zero, and a ``subprocess.run`` that raised -- which under
+        machine load is the ``timeout=30`` expiring. The caller joined the
+        parts, so an expired band vanished and the page came back SHORT with
+        every surviving word still in the right order. That is
+        indistinguishable from a real word loss:
+        ``test_banded_reextraction_is_word_preserving_real_pdf`` failed with
+        ``{'and': 17} != {'and': 19}`` on 2026-09-17 during a run that took
+        1:00:06 for work that takes 46 s on a quiet machine, and passed on
+        both trees afterwards. Machine load became a correctness-shaped
+        failure, which is the most expensive kind of flake: it accuses the
+        code under test.
+
+        In production the splice's word-multiset guard refused the short page,
+        so no wrong text ever shipped -- but the correction was then dropped
+        with NO signal of any kind, which is the silent-capability-loss shape
+        every other fallback in this module exists to prevent. A failed crop
+        is now recorded and abandons the page rather than being averaged into
+        it. Gated by ``tests/test_banded_crop_failure_is_not_silent.py``.
+        """
         if w <= 1 or h <= 1:
-            return ""
+            return ""  # degenerate region, not a failure: nothing to read
         pa = str(page_index + 1)  # pdftotext is 1-indexed
         try:
             proc = subprocess.run(
@@ -923,10 +947,15 @@ def extract_page_text_banded(layout_doc, page_index: int,
                  "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
                 capture_output=True, timeout=30, encoding="utf-8", errors="replace",
             )
-        except Exception:
-            return ""
+        except subprocess.TimeoutExpired:
+            record_fallback("banded_crop_timeout", detail=f"p{pa}")
+            return None
+        except Exception as exc:
+            record_fallback("banded_crop_exception", detail=type(exc).__name__)
+            return None
         if proc.returncode != 0:
-            return ""
+            record_fallback("banded_crop_nonzero_exit", detail=str(proc.returncode))
+            return None
         return (proc.stdout or "").rstrip("\f").strip()
 
     tmp_path = ""
@@ -935,6 +964,9 @@ def extract_page_text_banded(layout_doc, page_index: int,
             tmp.write(pdf_bytes)
             tmp_path = tmp.name
         parts: list[str] = []
+        # A crop that did not run abandons the whole page (see `_crop`): a
+        # page assembled from SOME of its bands is a word loss wearing a
+        # reorder's clothes, and the splice can only refuse what it can see.
         for i, (fw, _yt, _yb, bwords) in enumerate(bands):
             top, bot = cuts[i], cuts[i + 1]
             h = bot - top
@@ -953,11 +985,16 @@ def extract_page_text_banded(layout_doc, page_index: int,
                         and not straddles):
                     lt = _crop(tmp_path, 0, top, gx, h)
                     rt = _crop(tmp_path, gx, top, page_width - gx, h)
+                    if lt is None or rt is None:
+                        return ""
                     if lt.strip() and rt.strip():
                         parts.append((lt + "\n" + rt).strip())
                         did_2col = True
             if not did_2col:
-                parts.append(_crop(tmp_path, 0, top, page_width, h))
+                whole = _crop(tmp_path, 0, top, page_width, h)
+                if whole is None:
+                    return ""
+                parts.append(whole)
     finally:
         # `unlink_temp_pdf` is a no-op on a falsy path, so the `if tmp_path`
         # guard this replaces lives in one place now rather than at each site.
