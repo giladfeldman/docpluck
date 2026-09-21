@@ -27,7 +27,10 @@ from typing import Literal, Optional, TypedDict
 from .extract import extract_pdf, count_pages
 from .figures import Figure
 from .tables import Cell, Table
-from .tables.camelot_extract import extract_tables_camelot
+from .tables.camelot_extract import (
+    CAMELOT_UNAVAILABLE_EVENTS,
+    extract_tables_camelot,
+)
 from .tables.captions import (
     CaptionMatch,
     caption_anchor_is_in_text_reference,
@@ -308,9 +311,23 @@ def _extract_pdf_structured(
                                 detail=type(exc).__name__)
                 layout_doc = None
         try:
-            camelot_tables = extract_tables_camelot(pdf_bytes, layout=layout_doc)
+            # The nested scope exists to tell "Camelot ran and found nothing"
+            # apart from "Camelot could not run". `extract_tables_camelot`
+            # returns [] for BOTH -- it catches its own ImportError and both
+            # per-flavor exceptions -- so the `except` below never fires for the
+            # second case and the method string said nothing at all. Nested
+            # scopes also propagate to the enclosing one, so `fallbacks` still
+            # carries these events to the consumer.
+            with fallback_scope() as _camelot_fb:
+                camelot_tables = extract_tables_camelot(pdf_bytes, layout=layout_doc)
             if camelot_tables:
                 method_pieces.append("camelot_stream")
+            else:
+                unavailable = sorted(
+                    CAMELOT_UNAVAILABLE_EVENTS & _camelot_fb.counters.keys()
+                )
+                if unavailable:
+                    method_pieces.append("camelot_failed:" + ",".join(unavailable))
         except Exception as exc:
             exc_name = type(exc).__name__
             method_pieces.append(f"camelot_failed:{exc_name}")

@@ -854,6 +854,11 @@ def extract_tables_camelot(
     try:
         import camelot
     except ImportError:
+        # RECORD IT. This returned [] in silence, so a machine where Camelot is
+        # not installed reported "this paper has no tables" for every paper --
+        # byte-indistinguishable from the truth, because `camelot_stream` is
+        # only APPENDED on success and no caller asserts on its absence.
+        record_fallback("camelot_not_installed")
         return []
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
@@ -885,6 +890,14 @@ def extract_tables_camelot(
         except Exception as exc:
             record_fallback("camelot_lattice_exception", detail=type(exc).__name__)
             lattice_tables = []
+        if not stream_tables and not lattice_tables:
+            # BOTH parsers failed, and this function then returns [] the same way
+            # a table-less paper does. `extract_structured` wraps this call in
+            # `except Exception` -> `camelot_failed:` -- which never fires here,
+            # because nothing propagated. So the total loss of the table channel
+            # reached the method string as silence. It is named now, and
+            # `CAMELOT_UNAVAILABLE_EVENTS` is the one place that names it.
+            record_fallback("camelot_all_flavors_failed")
         tables_obj = _pick_best_per_page(stream_tables, lattice_tables)
 
         out: list[Table] = []
@@ -963,6 +976,7 @@ def extract_tables_camelot_by_region(
     try:
         import camelot
     except ImportError:
+        record_fallback("camelot_not_installed")
         return {}
     if not region_specs:
         return {}
@@ -1153,4 +1167,18 @@ def merge_camelot_with_docpluck(
     return out
 
 
-__all__ = ["extract_tables_camelot", "merge_camelot_with_docpluck"]
+# The events that mean "Camelot could not run AT ALL", as opposed to "Camelot
+# ran and this paper has no tables". ONE definition: `extract_structured` turns
+# these into a method-string token, and a second copy of the vocabulary would
+# drift from the producer silently -- the failure mode the Greek-table incident
+# is named for.
+CAMELOT_UNAVAILABLE_EVENTS = frozenset({
+    "camelot_not_installed",
+    "camelot_all_flavors_failed",
+})
+
+__all__ = [
+    "extract_tables_camelot",
+    "merge_camelot_with_docpluck",
+    "CAMELOT_UNAVAILABLE_EVENTS",
+]

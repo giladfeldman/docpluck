@@ -32,7 +32,7 @@ from typing import List, Optional
 
 from .extract_layout import LayoutDoc
 from .extract_structured import extract_pdf_structured
-from .telemetry import fallback_scope
+from .telemetry import fallback_scope, record_fallback
 from .normalize import (
     NormalizationLevel,
     _looks_like_running_header_or_footer,
@@ -6716,7 +6716,15 @@ def _render_pdf_to_markdown(
         try:
             from .extract_layout import extract_pdf_layout
             layout_doc = extract_pdf_layout(pdf_bytes)
-        except Exception:
+        except Exception as exc:
+            # RECORD IT. This is the render channel -- the one that produces the
+            # user-visible .md -- and losing layout here disables every
+            # layout-gated step downstream at once (cell geometry, the title
+            # rescue, the layout-proven glyph repairs). It recorded nothing,
+            # which is the exact shape of this file's own L-032 finding: the
+            # UNINSTRUMENTED channel is where the losses hide, because
+            # instrumentation is what attracts an audit.
+            record_fallback("render_layout_unavailable", detail=type(exc).__name__)
             layout_doc = None
 
     # 1. Structured extraction (text + Camelot tables + figures).

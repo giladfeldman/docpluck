@@ -8151,8 +8151,13 @@ def _normalize_text(
             report.column_interleave_pages = _detect_column_interleave_pages(
                 t, report.page_offsets
             )
-    except Exception:
-        # Detector is signal-only; never block the pipeline if it fails.
+    except Exception as exc:
+        # Detector is signal-only; never block the pipeline if it fails. But an
+        # empty tuple is what "no interleaved pages" looks like too, so a
+        # consumer reading `column_interleave_pages` could not tell a clean
+        # document from a detector that crashed. Record the difference.
+        record_fallback("column_interleave_detector_exception",
+                        detail=type(exc).__name__)
         report.column_interleave_pages = ()
 
     # THE FINAL STRIP IS THE SEVENTH FORM-FEED EATER, and it fires on EVERY
