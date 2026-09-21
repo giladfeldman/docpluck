@@ -33,6 +33,8 @@ from docpluck.normalize import (
     _looks_like_running_header_or_footer,
     normalize_text,
 )
+from docpluck.testing import require_corpus_pdf
+
 from .conftest import requires_pdftotext
 
 
@@ -195,21 +197,24 @@ def test_blank_bridge_does_not_absorb_post_reference_trailer():
 
 # ── Real-PDF regression (manifest-with-skip) ───────────────────────────────
 
-# Handoff fixtures live in the CitationGuard validation corpus, gitignored per
-# ``feedback_no_pdfs_in_repo``. Resolve from there; skip if absent on this box.
-_CG_VALIDATION = os.path.join(
-    os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe"),
-    "MetaScienceTools",
-    "CitationGuard", "apps", "worker", "testpdfs", "validation",
-)
-_BJPS_1 = os.path.join(_CG_VALIDATION, "harvard", "bjps_1.pdf")
-_NAT_COMMS_2 = os.path.join(_CG_VALIDATION, "nature", "nat_comms_2.pdf")
+# Both papers are in the article repository's manifest. They USED TO be
+# resolved by hand-building a path into a sibling project's test directory,
+# which meant these two real-PDF regressions SKIPPED on this machine -- and a
+# skip is indistinguishable from a pass in a summary line. Measured 2026-09-21:
+# `harvard/bjps_1.pdf` and `nature/nat_comms_2.pdf` are both in the manifest
+# and both on disk, so nothing was missing; the resolver was simply looking in
+# the wrong place. It was also a custody violation: papers are referenced
+# through the manifest, never by a path that reaches into another project.
+#
+# `require_corpus_pdf`, not `corpus_pdf`: a paper a test claims to exercise and
+# cannot read is a FAILURE, never a skip.
+_BJPS_1_KEY = "harvard/bjps_1.pdf"
+_NAT_COMMS_2_KEY = "nature/nat_comms_2.pdf"
 
 
 @requires_pdftotext
-@pytest.mark.skipif(not os.path.isfile(_BJPS_1), reason="bjps_1 fixture absent")
 def test_bjps_1_harvard_bibliography_splits_one_per_line():
-    raw, _ = extract_pdf_file(_BJPS_1)
+    raw, _ = extract_pdf_file(str(require_corpus_pdf(_BJPS_1_KEY)))
     out, _ = normalize_text(raw, NormalizationLevel.academic)
     idx = out.rfind("\nReferences")
     assert idx != -1
@@ -223,9 +228,8 @@ def test_bjps_1_harvard_bibliography_splits_one_per_line():
 
 
 @requires_pdftotext
-@pytest.mark.skipif(not os.path.isfile(_NAT_COMMS_2), reason="nat_comms_2 absent")
 def test_nat_comms_2_ref34_carries_year_no_article_header():
-    raw, _ = extract_pdf_file(_NAT_COMMS_2)
+    raw, _ = extract_pdf_file(str(require_corpus_pdf(_NAT_COMMS_2_KEY)))
     out, _ = normalize_text(raw, NormalizationLevel.academic)
     j = out.find("Kroenke")
     assert j != -1

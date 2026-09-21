@@ -20,7 +20,7 @@ from docpluck.render import render_pdf_to_markdown
 from docpluck.normalize import normalize_text, NormalizationLevel
 from docpluck.sections import extract_sections
 
-from docpluck.testing import corpus_pdf
+from docpluck.testing import CorpusPaperMissing, corpus_pdf
 
 
 # Fixture paths
@@ -29,8 +29,16 @@ XIAO_PDF = corpus_pdf("apa/xiao_2021_crsp.pdf")
 
 
 def _require_pdf(p: Path) -> None:
+    """A fixture this file claims to exercise and cannot read is a FAILURE.
+
+    This used to ``pytest.skip``, which reads as a pass in a summary line -- so
+    the Greek-glyph preservation regressions could stop being covered entirely
+    without anything changing colour. (The OTHER skip in this file, the one
+    about pdftotext dropping a superscript upstream, is a genuine
+    scope-of-the-instrument skip and stays.)
+    """
     if not p.exists():
-        pytest.skip(f"Fixture not available: {p}")
+        raise CorpusPaperMissing(f"fixture not readable: {p}")
 
 
 def test_render_preserves_beta_glyph_in_body():

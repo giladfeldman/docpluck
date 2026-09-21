@@ -30,7 +30,7 @@ from docpluck.extract_columns import (
     extract_page_text_banded,
 )
 
-from docpluck.testing import corpus_pdf
+from docpluck.testing import require_corpus_pdf
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -151,9 +151,12 @@ def test_segment_bands_single_2col_band_for_clean_page():
 
 # ── real-PDF: word-preservation + ship-dark default ──────────────────────────
 
-def _chan() -> bytes | None:
-    pdf = corpus_pdf("apa/chan_feldman_2025_cogemo.pdf")
-    return pdf.read_bytes() if pdf.exists() else None
+def _chan() -> bytes:
+    # require_, not corpus_pdf: these are the banded-column regressions, and a
+    # paper they claim to exercise but cannot read is a FAILURE, never a skip.
+    # The `-> bytes | None` + `pytest.skip` form this replaces meant the whole
+    # capability could stop being covered without the summary line changing.
+    return require_corpus_pdf("apa/chan_feldman_2025_cogemo.pdf").read_bytes()
 
 
 def _subst_words(text: str) -> Counter:
@@ -165,8 +168,6 @@ def test_banded_reextraction_is_word_preserving_real_pdf():
     pure reorder: the substantial-word multiset is unchanged (rules 0a/0b)."""
     from docpluck.extract_layout import extract_pdf_layout
     data = _chan()
-    if data is None:
-        pytest.skip("fixture missing: chan_feldman_2025_cogemo.pdf")
     text, _ = extract_pdf(data)  # flag off here -> plain pdftotext
     ff = [0] + [i + 1 for i, ch in enumerate(text) if ch == "\f"]
     layout = extract_pdf_layout(data)
@@ -184,8 +185,6 @@ def test_banded_flag_is_ship_dark_off_by_default_real_pdf():
     """With the flag unset the banded fallback must NOT fire — the legacy output
     is preserved. Turning it on corrects strictly more pages."""
     data = _chan()
-    if data is None:
-        pytest.skip("fixture missing: chan_feldman_2025_cogemo.pdf")
 
     def corrected_pages(method: str) -> set[int]:
         for part in method.split("+"):
