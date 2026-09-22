@@ -2,7 +2,7 @@
 jama-open-1 defect cluster regression tests (v2.4.74, 2026-05-25).
 
 Five defects surfaced by the Haiku-orchestration pretest on
-jama_open_1.pdf (`HANDOFF_2026-05-25_pretest-followups.md` Issue 1).
+jama_open_1.pdf (2026-05-25 pretest follow-ups, Issue 1).
 This file covers four of five (defect 4 / MISSING_SECTION / Key Points
 sidebar is left for R4 column-aware re-extraction):
 

@@ -13,7 +13,7 @@ This is not hypothetical and it is not old. Measured 2026-08-14, at HEAD:
         .../article/0.9171,1848755,00.html          a different URL. It 404s.
 
 That defect survived QA and code review because **nothing ever asked the
-question this scan asks.** (`HANDOFF_2026-08-13c` PHASE C: "The A3c URL
+question this scan asks.** (an internal 2026-08-13 review, PHASE C: "The A3c URL
 corruption should have been caught by QA or code-review, and was not.")
 
 METHOD, and why it is shaped this way. Tokens are harvested FROM REAL PAPERS,

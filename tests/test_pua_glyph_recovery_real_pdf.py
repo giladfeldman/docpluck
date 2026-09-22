@@ -24,6 +24,7 @@ Private-Use glyph is invisible and does not survive copy/paste.
 
 from __future__ import annotations
 
+import sys
 import re
 from pathlib import Path
 
@@ -47,10 +48,15 @@ from docpluck.normalize import (
 from docpluck.render import render_pdf_to_markdown
 from docpluck.tables.cell_cleaning import _html_escape
 
-# Vibe/MetaScienceTools -- the docpluck repo's grandparent.
+# the portfolio root -- this repo's grandparent directory.
 _META = Path(__file__).resolve().parents[2]
-_ESCICHECK_PDFS = _META / "ESCIcheckapp" / "testpdfs"
-_DOCX_TESTS = _META / "ESCIcheckapp" / "docxtests"
+# Resolved from machine-local config (see conftest.local_corpus): these live in
+# a PRIVATE sibling whose layout this PUBLIC repo does not publish.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _local_corpora import local_corpus  # noqa: E402
+
+_ESCICHECK_PDFS = Path(local_corpus("escicheck_pdfs") or _META / "__absent__")
+_DOCX_TESTS = Path(local_corpus("docx_tests") or _META / "__absent__")
 
 # Symbol-font PUA block -- none of these may survive to a user-facing view.
 _SYMBOL_PUA_RE = re.compile("[" + chr(0xF020) + "-" + chr(0xF0FF) + "]")

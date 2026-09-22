@@ -1,6 +1,6 @@
 """Regression test for G16 — Page-header leak inside equation regions.
 
-The TRIAGE_2026-05-14_phase_5d_gold_audit (Tier S2 / G16) observed that
+The 2026-05-14 Phase-5d AI-gold audit (Tier S2 / G16) observed that
 ieee_access_2.pdf rendered equation ``(2)`` as ``Page 4 (2)`` — the
 ``Page 4`` running-header line from pdftotext was fused with the
 equation number directly below it.

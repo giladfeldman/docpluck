@@ -19,7 +19,7 @@ The `PDFextractor` service had already had to solve this at its own boundary
 rather than a second spelling — one concept, one table, or the two receipts
 eventually disagree.
 
-Raised by CONDUCTOR #4 (2026-08-27) alongside the `flatten.py` eta fabrication,
+Raised by a fleet coordination review (2026-08-27) alongside the `flatten.py` eta fabrication,
 on the grounds that an output-changing fix landing in an unnameable tree is the
 part that makes a fabrication untraceable. Verified before implementing:
 `grep -c dirty docpluck/**/*.py` was 0.

@@ -49,7 +49,7 @@ ScienceArena lives locally; it already ships in-process adapters for both tools 
 Re-run in the arena `.venv` with `docpluck` installed editable from this repo
 (**v2.4.84**) and `liteparse` **2.0.8**. Two extra real-paper probes use the same
 scorers against AI-multimodal-read gold (ground-truth-is-AI rule), scripts in
-`ResearchPlatforms/_scratch/{apa_section_bench,pmc_text_bench}.py`.
+an internal scratch directory (`apa_section_bench.py`, `pmc_text_bench.py`).
 
 ## Results
 

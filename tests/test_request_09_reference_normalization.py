@@ -30,7 +30,7 @@ from .conftest import requires_pdftotext
 # (CLAUDE.md, user directive 2026-08-07) — "reference articles by DOI, never
 # by a local path. A path is a copy waiting to happen."
 #
-# This resolved to `MetaScienceTools/ESCIcheckapp/testpdfs/` until 2026-08-29.
+# This resolved to a sibling project's test-PDF directory until 2026-08-29.
 # That project-local copy is gone, so `requires_fixture` matched and ALL FIVE
 # tests here SKIPPED SILENTLY — a coverage hole wearing a green tick, and the
 # reason the obsolete contract below outlived the release that invalidated it.

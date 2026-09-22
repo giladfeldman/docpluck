@@ -1,7 +1,7 @@
 """Super-header alignment + first-data-row recovery for parallel-arm tables (DP-2/DP-5).
 
 Two coupled defects in the flatten pipeline, both surfaced by the ESCImate
-iterate handoff (`ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-06-21.md` DP-5):
+iterate cycle (a consumer's 2026-06-21 report, DP-5):
 
 1. **First data row swallowed as a header row.** `cell_cleaning._is_header_like_row`
    counted a cell as "data" only via the bare ``_NUMERIC_CELL_RE`` — which misses

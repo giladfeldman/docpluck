@@ -115,6 +115,6 @@
     "negative_no_tables_no_figures — no fixture currently in the corpus",
     "uncaptioned_table — no fixture currently in the corpus"
   ],
-  "custodian": "article-finder (~/.claude/skills/article-finder). Each fixture's canonical key is its DOI; the PDF and the pinned extract_pdf() text both live in the shared ArticleRepository, never in this repo.",
+  "custodian": "article-finder (~/.claude/skills/article-finder). Each fixture's canonical key is its DOI; the PDF and the pinned extract_pdf() text both live in the shared article repository, never in this repo.",
   "resolution": "corpus_path is a name in docpluck.testing.corpus_manifest.MANIFEST, resolved through article-finder by DOI. It replaced source_path (a portfolio-relative directory path) on 2026-09-17: the directory it pointed at was a custody violation, and a fixture whose path stopped resolving used to SKIP, so the suite reported success having checked nothing."
 }

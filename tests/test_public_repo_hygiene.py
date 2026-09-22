@@ -1,7 +1,7 @@
 """This repo is PUBLIC. Assert it, on every test run.
 
 Found by /docpluck-cleanup on 2026-08-20: `tests/test_docx_omml_statistics_survive.py`
-carried an absolute `<home>/Vibe/MetaScienceTools/CitationGuard/...` path, twice.
+carried an absolute path into a sibling project's directory, twice.
 That is three defects braided into one string literal:
 
   1. an absolute local user path in a PUBLIC repo — the exact class the

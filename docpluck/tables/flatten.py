@@ -7,7 +7,7 @@ Why: docpluck emits academic results tables as `<table>` HTML. Each `<td>`
 carries just the cell value (`3.93`) while the column header (`t-value`) and
 the row label (`Importance`) live in separate cells. A sentence-oriented
 parser scanning the markdown text sees a bare `3.93` and can't bind it to a
-test. ESCIcheck filed this in `DOCPLUCK_HANDOFF_2026-05-24.md` (D1 cluster) —
+test. A consumer filed this on 2026-05-24 (D1 cluster) —
 ~78 effectcheck rows blocked across 6 canary papers (collabra_90203,
 collabra_57785, lee_feldman_rsos_250908, imada_collabra_32572,
 brick_collabra_23443, majumder_jdm_2024_31).

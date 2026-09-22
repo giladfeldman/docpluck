@@ -5960,7 +5960,7 @@ def _normalize_text(
     Unicode→ASCII conversion). Default False preserves backward-compatible
     behavior for callers that depend on ASCII-form stat tokens (D5 audit
     suite, statistical pattern matching). Established 2026-05-14 from the
-    Phase-5d AI-gold audit (TRIAGE_2026-05-14_phase_5d_gold_audit.md G2/G7/G12/G21).
+    Phase-5d AI-gold audit, 2026-05-14 (findings G2/G7/G12/G21).
 
     When `dropped_minus_layout` is provided (a LayoutDoc), the W0h step recovers
     dropped-minus coefficients that have NO confidence interval (so W0g cannot

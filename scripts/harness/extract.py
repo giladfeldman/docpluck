@@ -52,7 +52,19 @@ OUT_ROOT = corpus.OUT_ROOT
 # The local FastAPI extraction service. The service URL + internal token live
 # in the app repo's env files; read them so the harness never hard-codes a
 # secret and tracks whatever the app is actually configured with.
-_APP_REPO = corpus.VIBE / "MetaScienceTools" / "PDFextractor"
+# Located STRUCTURALLY, never by name -- this repo is PUBLIC and a hardcoded
+# sibling name publishes the private consumer's layout. `default_app_repo()` in
+# `scripts/check_app_pin_sync.py` already solves exactly this (it looks for a
+# sibling holding a `service/requirements.txt` with a docpluck pin) and is the
+# single definition of that convention; duplicating it here is how two copies
+# drift. $DOCPLUCK_APP_REPO overrides.
+def _app_repo() -> Path | None:
+    try:
+        from scripts.check_app_pin_sync import default_app_repo
+    except ImportError:  # invoked outside the package -- fall back to the env var
+        override = os.environ.get("DOCPLUCK_APP_REPO")
+        return Path(override).expanduser().resolve() if override else None
+    return default_app_repo()
 
 
 def _read_env(path: Path) -> dict[str, str]:
@@ -70,8 +82,9 @@ def _read_env(path: Path) -> dict[str, str]:
 
 def service_config() -> tuple[str, str]:
     """(base_url, internal_token) for the local extraction service."""
-    fe = _read_env(_APP_REPO / "frontend" / ".env.local")
-    sv = _read_env(_APP_REPO / "service" / ".env")
+    app = _app_repo()
+    fe = _read_env(app / "frontend" / ".env.local") if app else {}
+    sv = _read_env(app / "service" / ".env") if app else {}
     url = os.environ.get("EXTRACTION_SERVICE_URL") or fe.get(
         "EXTRACTION_SERVICE_URL", "http://localhost:6117"
     )

@@ -38,6 +38,7 @@ from __future__ import annotations
 import io
 import zipfile
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,15 +48,19 @@ pytest.importorskip("mammoth", reason="mammoth not installed (pip install docplu
 from docpluck.extract_docx import _inline_omml_runs, extract_docx
 
 # NEVER hardcode the portfolio root — env override first, then the canonical
-# ~/Vibe location. This file previously embedded
-# an absolute `<home>/Vibe/MetaScienceTools/CitationGuard/...` path twice,
+# conventional portfolio-root location. This file previously embedded
+# an absolute path into a sibling project's directory, twice,
 # which is three
 # defects in one string: an absolute local user path in a PUBLIC repo, the name
 # and internal layout of a DIFFERENT private project, and a path that resolves
 # on exactly one machine — so everywhere else these tests SKIP SILENTLY and read
 # as green. Found by /docpluck-cleanup Section 0.3, 2026-08-20.
 _VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
-_DOCX_CORPUS = _VIBE / "MetaScienceTools" / "CitationGuard" / "apps" / "worker" / "testpdfs" / "validation" / "docx"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _local_corpora import local_corpus  # noqa: E402
+
+# A PRIVATE sibling's internal corpus layout -- machine-local, never published.
+_DOCX_CORPUS = Path(local_corpus("docx_validation") or _VIBE / "__absent__")
 
 _REAL = _DOCX_CORPUS / "28_ImageMemorability.docx"
 

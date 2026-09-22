@@ -227,7 +227,7 @@ def _dedupe_h2_sections(text: str) -> str:
 _COMPOUND_HEADING_TAILS: list[tuple[str, str]] = [
     ("CONCLUSIONS", "AND RELEVANCE"),
     # Additional JAMA structured-abstract heads — per
-    # HANDOFF_2026-05-11_PROMOTE_SPIKE_TO_LIBRARY.md §B, the spike only saw
+    # the 2026-05-11 spike-promotion review §B, the spike only saw
     # CONCLUSIONS-AND-RELEVANCE in the wild but the library should be
     # defensive against the rest of the JAMA set.
     ("OBJECTIVE", "IMPORTANCE"),

@@ -1,4 +1,4 @@
-"""Tests for v2.3.1 follow-up fixes from `HANDOFF_2026-05-11`."""
+"""Tests for v2.3.1 follow-up fixes from the 2026-05-11 spike-promotion review."""
 
 from __future__ import annotations
 

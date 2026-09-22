@@ -2,8 +2,8 @@
 Regression tests for `docpluck.tables.flatten` (EC-T1 — table-row flattening).
 
 Fixtures synthesize the 6 canary table shapes from the ESCIcheck handoffs
-(`ESCIcheckapp/docs/DOCPLUCK_HANDOFF_2026-05-24.md` D1a-d and
-`DOCPLUCK_HANDOFF_2026-05-25.md` D-B/D/E/F). Each fixture is a flat
+(a consumer's 2026-05-24 defect report, D1a-d, and
+its 2026-05-25 follow-up, D-B/D/E/F). Each fixture is a flat
 ``list[Cell]`` matching docpluck's `Table` schema, fed through
 `flatten_table` and asserted at the sentence + fields level.
 

@@ -1,5 +1,5 @@
 """Contract + real-PDF regression tests for v2.4.28 A3c leading-zero
-decimal recovery (cycle 14, HANDOFF_2026-05-14 deferred item D).
+decimal recovery (cycle 14, deferred item D, 2026-05-14).
 
 A3's lookbehind ``(?<![a-zA-Z,0-9\\[\\(])`` blocks legitimate
 European-decimal p-values inside parens or brackets — e.g.

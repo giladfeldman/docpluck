@@ -50,7 +50,7 @@ from docpluck.normalize import (
 )
 from docpluck.render import render_pdf_to_markdown
 
-# Vibe/MetaScienceTools -- the docpluck repo's grandparent.
+# the portfolio root -- this repo's grandparent directory.
 _META = Path(__file__).resolve().parents[2]
 
 FFFD = chr(0xFFFD)   # the replacement character pdftotext emits

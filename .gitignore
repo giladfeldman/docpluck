@@ -120,7 +120,8 @@ archive/
 
 # PDFs are never committed to this public MIT repo. Test fixtures use the
 # manifest-with-skip pattern via tests/conftest.py and tests/fixtures/structured/MANIFEST.json
-# referencing PDFs in the local corpus ($VIBE_ROOT, default ~/Vibe).
+# referencing PDFs in the local corpus ($VIBE_ROOT, or its conventional
+# default under the home directory).
 *.pdf
 
 # Verifier-output artifacts from scripts/verify_corpus.py + ad-hoc test
@@ -143,3 +144,15 @@ verify_out/
 # canary-findings-ledger.json written by canary-audit.sh. Those files
 # still live on disk and the skills still run — they are simply never
 # committed to this public repo.
+
+# --- Harness document sources (machine-local; PUBLIC repo) ---
+# The non-corpus documents live inside PRIVATE sibling repos. Their directory
+# layout is not this repo's to publish, so `scripts/harness/corpus.py` reads it
+# from here (or DOCPLUCK_HARNESS_SOURCES) instead of carrying literal paths.
+# Written once per machine; never committed.
+scripts/harness/sources.local.json
+
+# --- Machine-local corpora in PRIVATE sibling repos (PUBLIC repo) ---
+# Layout of private siblings is not this repo's to publish; see
+# tests/conftest.py::local_corpus. Written once per machine, never committed.
+tests/corpora.local.json

@@ -5,7 +5,9 @@ PDF-dependent tests are skipped gracefully when pdftotext is not installed
 or when test PDFs are not available (library tests should run anywhere).
 """
 
+import json
 import os
+import sys
 import shutil
 import pytest
 
@@ -52,10 +54,10 @@ requires_pdftotext = pytest.mark.skipif(
 
 # Test PDF directories — optional, tests skip if not present
 _HERE = os.path.dirname(__file__)
-# docpluck's sibling repos under the same parent (e.g. MetaScienceTools/).
+# docpluck's sibling repos under the same parent directory.
 # Derived from this file so paths are robust to where the tree is checked out.
 _SIBLINGS = os.path.dirname(os.path.dirname(_HERE))  # parent of the docpluck repo
-# Portfolio root: env override first, then the canonical ~/Vibe location
+# Portfolio root: env override first, then the conventional location
 # (moved out of ~/Dropbox/Vibe on 2026-08-03 — a hardcoded old root makes
 # every articlerepo/sibling-corpus test SKIP silently, which reads as green).
 _VIBE = os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe")
@@ -67,10 +69,9 @@ def _sibling_repo(name: str, *parts: str) -> str:
     THE SAME DEFECT AS THE DROPBOX MOVE, ONE DIRECTORY DEEPER. The comment above
     warns that a hardcoded root makes sibling-corpus tests skip silently and "reads
     as green" — and then this file hardcoded ``$VIBE/<name>``, while the portfolio
-    had since grouped its projects into ``MetaScienceProjects/`` and
-    ``MetaScienceTools/``. Measured 2026-08-27: ``$VIBE/MetaESCI`` and
-    ``$VIBE/MetaMisCitations`` do not exist; both live under
-    ``$VIBE/MetaScienceProjects/``.
+    had since grouped its projects into per-family subdirectories one level
+    below the root. Measured 2026-08-27: ``$VIBE/MetaESCI`` and
+    ``$VIBE/MetaMisCitations`` do not exist; both live one directory deeper.
 
     **AND IT COSTS NOTHING TODAY — say so rather than imply otherwise.** Measured the
     same day by counting `pdf_available(...)` / `pdf_path(...)` call sites per corpus
@@ -100,8 +101,21 @@ def _sibling_repo(name: str, *parts: str) -> str:
     machine (ESCIcheck, 2026-08-27) still returns a non-existent path and its tests
     still skip — correct, and now the only reason they would.
     """
-    for group in ("", "MetaScienceProjects", "MetaScienceTools"):
-        base = os.path.join(_VIBE, group, name) if group else os.path.join(_VIBE, name)
+    # Search the root and EVERY directory one level below it, rather than a
+    # hardcoded list of grouping directories. Two reasons, and the second is why
+    # this changed on 2026-09-22: a hardcoded list goes stale the next time the
+    # portfolio is reorganised (it already had, once), and this repo is PUBLIC --
+    # the grouping names were internal layout with no business being published.
+    candidates = [os.path.join(_VIBE, name)]
+    try:
+        candidates += [
+            os.path.join(_VIBE, group, name)
+            for group in sorted(os.listdir(_VIBE))
+            if os.path.isdir(os.path.join(_VIBE, group))
+        ]
+    except OSError:
+        pass
+    for base in candidates:
         if os.path.isdir(base):
             return os.path.join(base, *parts)
     # Not found anywhere — return the canonical spelling so the skip reason still
@@ -113,6 +127,11 @@ def _sibling_repo(name: str, *parts: str) -> str:
 # not through a directory, and a paper it cannot find FAILS rather than skipping.
 # The keys below are OTHER projects' corpora, which genuinely may be absent from a
 # given machine; for those a skip is the honest answer.
+# Machine-local corpora in PRIVATE sibling repos -- ONE definition, in
+# `tests/_local_corpora.py`. Re-exported here so conftest users can reach it.
+sys.path.insert(0, _HERE) if _HERE not in sys.path else None
+from _local_corpora import local_corpus  # noqa: E402,F401
+
 PDF_PATHS = {
     # The shared article repository (article-finder cache). Closed-access PDFs
     # named by canonical DOI key (e.g. "10.1525__collabra.90203.pdf"). Tests

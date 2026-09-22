@@ -107,17 +107,77 @@ def require_corpus_root() -> None:
             "look like a clean one."
         )
 
-# (source, root-relative-to-VIBE, glob, format). Order is stable — it fixes the
-# manifest ordering so a regenerated manifest diffs cleanly.
-# NOTE: the `corpus` source is NOT here. Its 101 papers come from the
-# article custodian's committed manifest (`docpluck.testing.corpus_manifest`),
-# injected by `discover()` below, because a glob computes its denominator from
-# its own numerator -- it reports 40/40 on a corpus that has silently shrunk.
-SOURCES: list[tuple[str, str, str, str]] = [
-    ("escicheck", "MetaScienceTools/ESCIcheckapp/testpdfs", "*.pdf", "pdf"),
-    ("docxtests", "MetaScienceTools/ESCIcheckapp/docxtests", "*.docx", "docx"),
-    ("fulltext-html", "ArticleRepository/fulltext", "*.html", "html"),
-]
+#: Where the non-corpus documents live, as
+#: ``(source, root-relative-to-VIBE, glob, format)``. Order is stable — it fixes
+#: the manifest ordering so a regenerated manifest diffs cleanly.
+#:
+#: NOT WRITTEN DOWN HERE, AND THAT IS THE POINT. This repo is PUBLIC; the other
+#: two sources live inside sibling repos that are PRIVATE, and their directory
+#: layout is not this repo's to publish. Until 2026-09-22 three literal paths
+#: sat here naming a private project's internal structure. They were the only
+#: *executable* instance of that leak in the tree — everything else was prose —
+#: and they reached ~10 tests through this module's importers.
+#:
+#: Configure a machine that has the documents, in either of two ways:
+#:   * ``DOCPLUCK_HARNESS_SOURCES`` — ``name:vibe-relative-dir:glob:format``
+#:     entries separated by commas; or
+#:   * ``scripts/harness/sources.local.json`` — a gitignored list of 4-item
+#:     lists, same fields. Created once per machine, never committed.
+#:
+#: NOTE: the ``corpus`` source is NOT here either, for a different reason. Its
+#: 101 papers come from the article custodian's committed manifest
+#: (``docpluck.testing.corpus_manifest``), injected by ``discover()`` below,
+#: because a glob computes its denominator from its own numerator -- it reports
+#: 40/40 on a corpus that has silently shrunk.
+_SOURCES_ENV = "DOCPLUCK_HARNESS_SOURCES"
+_SOURCES_FILE = Path(__file__).with_name("sources.local.json")
+
+
+def _parse_sources() -> list[tuple[str, str, str, str]]:
+    raw = os.environ.get(_SOURCES_ENV, "").strip()
+    if raw:
+        out = []
+        for entry in raw.split(","):
+            parts = entry.strip().split(":")
+            if len(parts) != 4:
+                raise ValueError(
+                    f"{_SOURCES_ENV}: {entry!r} is not name:dir:glob:format"
+                )
+            out.append(tuple(p.strip() for p in parts))  # type: ignore[arg-type]
+        return out  # type: ignore[return-value]
+    if _SOURCES_FILE.is_file():
+        data = json.loads(_SOURCES_FILE.read_text(encoding="utf-8"))
+        return [tuple(row) for row in data]  # type: ignore[misc]
+    return []
+
+
+SOURCES: list[tuple[str, str, str, str]] = _parse_sources()
+
+
+def require_sources(what: str) -> None:
+    """Fail loudly when no non-corpus sources are configured.
+
+    An empty ``SOURCES`` is indistinguishable from "those documents are not on
+    this machine" unless someone says so. Silence here would regenerate a
+    135-document manifest as 101 and call it a clean run -- the same shrinking
+    denominator ``discover()`` already refuses one level down.
+    """
+    if SOURCES:
+        return
+    raise RuntimeError(
+        f"{what}: no non-corpus document sources are configured on this machine, "
+        f"so only the {len(_corpus_manifest())} custodian papers can be seen. Set "
+        f"{_SOURCES_ENV} (name:dir:glob:format, comma-separated) or create "
+        f"{_SOURCES_FILE.name} beside this file (a gitignored JSON list of "
+        "4-item lists). Both are machine-local by design: this repo is public "
+        "and the directories live in private sibling repos."
+    )
+
+
+def _corpus_manifest() -> dict:
+    from docpluck.testing.corpus import MANIFEST
+
+    return MANIFEST
 
 # Files that match a glob but are not real test inputs.
 _EXCLUDE_STEMS = {"oclc_page"}
@@ -164,6 +224,7 @@ def discover() -> list[dict]:
                 "doi": _CORPUS[rel]["doi"],
             }
         )
+    require_sources("discover")
     missing_roots: list[str] = []
     for source, rel_root, pattern, fmt in SOURCES:
         root = VIBE / rel_root
@@ -252,6 +313,7 @@ def resolve(doc: dict) -> Path:
         # Rediscover the local file by CONTENT. The manifest deliberately carries
         # no path for these (see discover()), so this walks the source roots and
         # matches the hash. Raises rather than returning a path that is not there.
+        require_sources(f"resolve({doc['id']})")
         for source, rel_root, pattern, _fmt in SOURCES:
             if source != doc["source"]:
                 continue

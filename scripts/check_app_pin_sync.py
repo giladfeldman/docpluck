@@ -40,7 +40,7 @@ Usage::
     python scripts/check_app_pin_sync.py            # normal gate (verify only)
     python scripts/check_app_pin_sync.py --fix     # bump + commit the app pin
     python scripts/check_app_pin_sync.py --fix --push   # ...and push to master
-    python scripts/check_app_pin_sync.py --app-repo /path/to/PDFextractor
+    python scripts/check_app_pin_sync.py --app-repo /path/to/app-checkout
     python scripts/check_app_pin_sync.py --allow-local-fallback   # offline dev
 """
 from __future__ import annotations
@@ -334,8 +334,9 @@ def main(argv: list[str] | None = None) -> int:
         "--app-repo",
         type=Path,
         default=None,
-        help="Path to the docpluckapp (PDFextractor) checkout. "
-        "Default: sibling ../PDFextractor of this library repo.",
+        help="Path to the consumer application checkout. "
+        "Default: located structurally among this repo's siblings -- see "
+        "default_app_repo(); $DOCPLUCK_APP_REPO overrides.",
     )
     parser.add_argument(
         "--allow-local-fallback",

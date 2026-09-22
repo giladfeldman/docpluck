@@ -8,7 +8,7 @@ pdftotext-linearized cell content (column headers, then "Yes"/"No",
 then numbers) until the 400-char hard cap — so every such table's
 `caption` field became 400 chars of cell garbage.
 
-The TRIAGE_2026-05-14 G4 block (re-scoped in cycle 15f investigation)
+The 2026-05-14 gold-audit G4 block (re-scoped in cycle 15f investigation)
 calls this G4b. Fix: a table-specific trim
 (`_trim_table_caption_at_cell_region`) that cuts the raw caption region
 at the start of the linearized cell content — either at the end of a
@@ -17,7 +17,7 @@ header-like short lines.
 
 Ground truth for the expected captions is the AI-multimodal `reading`
 gold in the shared article repository
-(`~/ArticleRepository/ai_gold/<key>/reading.md`), per CLAUDE.md's
+(the custodian's `ai_gold/<key>/reading.md`), per CLAUDE.md's
 ground-truth hard rule.
 """
 
