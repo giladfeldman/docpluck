@@ -49,10 +49,20 @@ def test_method_string_indicates_structured_extraction():
     from docpluck import extract_pdf_structured
     data = _read("apa_chan_feldman_lineless")
     result = extract_pdf_structured(data)
-    # Post-LESSONS-L-006: tables come from Camelot stream. Test that the method
-    # string carries some structured-extraction marker (any of the v2 tokens).
+    # Post-LESSONS-L-006: tables come from Camelot stream.
+    #
+    # This used to accept EITHER token:
+    #     assert any(tok in method for tok in ("camelot_stream", "camelot_failed"))
+    # which passes whether Camelot worked or blew up -- the only assertion in the
+    # suite that looks at a camelot token, and it could not tell the two apart.
+    # It now requires the SUCCESS token, because this test runs with Camelot
+    # enabled (see the skipif above) and there is no healthy reason for it to be
+    # absent. The failure side is covered properly, with a two-sided control, by
+    # tests/test_camelot_total_loss_is_named.py.
     method = result["method"]
-    assert any(tok in method for tok in ("camelot_stream", "camelot_failed")), method
+    assert "camelot_stream" in method, (
+        f"Camelot did not run on a fixture it is expected to extract from: {method}"
+    )
 
 
 def test_thorough_mode_method_string():

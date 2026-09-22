@@ -15,6 +15,27 @@ from tests.structured_fixtures import fixture_entries, resolve_fixture
 # elsewhere.
 COUNT_TOLERANCE = 6
 
+# Fixtures that genuinely extract ZERO tables today, each with the measurement
+# that put it here. This is a RECORD OF A DEFECT, not an allowance: the
+# assertion below is two-sided, so the moment one of these starts producing a
+# table the test goes red and the entry must be deleted.
+#
+# It exists because tightening the zero case surfaced a real, pre-existing loss
+# that the ±6 tolerance had been hiding. Measured 2026-09-21 across all twelve
+# fixtures (expected -> actual): chan 8->9, chen 11->15, efendic 1->5,
+# ip_feldman 7->10, bmc 1->4, ieee_lattice 1->1, jama 1->3, amj 5->5,
+# scirep 1->4, nat_comms 0->0, ieee_figure_heavy 8->8 -- and this one alone at
+# 1->0. Every other fixture meets or exceeds its expectation, so the gate is
+# live for eleven of twelve rather than waived wholesale.
+KNOWN_ZERO_TABLE_FIXTURES = {
+    "nature_minimal_rule": (
+        "expects 1 table, extracts 0; measured 2026-09-21. A minimal-rule table "
+        "(few or no ruling lines) that neither the Camelot pass nor the "
+        "whitespace fallback captures. Not diagnosed -- recorded so it is "
+        "visible instead of hidden inside the tolerance band."
+    ),
+}
+
 
 @pytest.mark.parametrize("entry", fixture_entries(), ids=lambda e: e.get("id", "?"))
 def test_table_count_within_tolerance(entry):
@@ -23,6 +44,31 @@ def test_table_count_within_tolerance(entry):
     expected = entry["expected_tables"]
     result = extract_pdf_structured(pdf.read_bytes())
     actual = len(result["tables"])
+    # A TOTAL loss of the table channel must not be inside the tolerance band.
+    # Measured 2026-09-21: 8 of these 12 fixtures expect <= 6 tables, so with
+    # COUNT_TOLERANCE = 6 a run that extracted ZERO tables passed for all eight
+    # of them. The tolerance exists to absorb capture-quality drift of a few
+    # tables, not to absorb the capability being gone -- so zero is its own
+    # assertion now, rather than a point inside the band.
+    if expected > 0:
+        recorded = KNOWN_ZERO_TABLE_FIXTURES.get(entry["id"])
+        if recorded is None:
+            assert actual > 0, (
+                f"{entry['id']}: expected {expected} tables and got NONE. The "
+                f"table channel produced nothing at all, which the "
+                f"±{COUNT_TOLERANCE} tolerance below would have accepted. "
+                f"method={result['method']}"
+            )
+        else:
+            # Two-sided, so the record cannot rot into an excuse: the day this
+            # fixture starts producing tables, THIS assertion goes red and the
+            # entry has to be removed -- rather than the zero quietly becoming
+            # permanent because nobody re-measured it.
+            assert actual == 0, (
+                f"{entry['id']} is recorded as extracting ZERO tables "
+                f"({recorded}) but now extracts {actual}. Delete it from "
+                f"KNOWN_ZERO_TABLE_FIXTURES so the real assertion protects it."
+            )
     assert abs(actual - expected) <= COUNT_TOLERANCE, (
         f"{entry['id']}: expected {expected} tables (±{COUNT_TOLERANCE}), got {actual}"
     )
