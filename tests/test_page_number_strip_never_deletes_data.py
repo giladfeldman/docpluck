@@ -23,7 +23,7 @@ than a wrong number because there is nothing for a reader to challenge. Filed by
 ESCImate as `2026-08-09/DP-14`; the row-structure half of that report turned out
 to be this deletion.
 
-Found 2026-08-22 while auditing `ESCIcheckapp/REPLY_TO_DOCPLUCK_2026-08-09.md`.
+Found 2026-08-22 while auditing a consumer's 2026-08-09 reply.
 Reproduce the class:
     python tools/diag/page_number_strip_blast_radius.py --baseline
 """

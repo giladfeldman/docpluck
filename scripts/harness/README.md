@@ -37,7 +37,7 @@ that is not the current cycle's target. This harness fixes all four.
 The local FastAPI service must be running with the current library:
 
 ```
-cd PDFextractor/service
+cd <app-checkout>/service
 python -m uvicorn app.main:app --port 6117 --env-file .env --workers 4
 ```
 

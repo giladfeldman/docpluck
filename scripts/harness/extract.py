@@ -101,7 +101,8 @@ def _require_local_extraction(url: str) -> str:
     """Refuse a non-loopback extraction service unless explicitly permitted.
 
     service_config() resolves EXTRACTION_SERVICE_URL from the environment AND
-    from PDFextractor/frontend/.env.local -- which carries the PRODUCTION URL.
+    from the app checkout's own frontend env file -- which carries the
+    PRODUCTION URL.
     So this harness could reach the metered hosted service by default, with no
     guard anywhere on the path.
 
@@ -120,9 +121,9 @@ def _require_local_extraction(url: str) -> str:
         f"EXTRACTION_SERVICE_URL resolves to {url!r}, which is NOT a local "
         f"service. Cross-testing must run against a LOCAL extraction service "
         f"(user directive); hosted calls are metered and the user pays "
-        f"personally. Start PDFextractor/start_app.bat (127.0.0.1:6117), or set "
+        f"personally. Start the local app service on 127.0.0.1:6117, or set "
         f"DOCPLUCK_ALLOW_REMOTE=1 to override. Note the URL may come from "
-        f"PDFextractor/frontend/.env.local, not from your shell."
+        f"the app checkout's frontend env file, not from your shell."
     )
 
 
