@@ -23,7 +23,11 @@ import sys
 
 SCRIPT, SCRIPT_DIR = sys.argv[1], sys.argv[2]
 
-# Python puts the SCRIPT'S OWN DIRECTORY -- never the cwd -- at sys.path[0].
+# Python puts the SCRIPT'S OWN DIRECTORY at sys.path[0] -- which for a script
+# under tools/diag/ is NOT the repo root.  (Not "never the cwd": `python -c`
+# and `python -m` both put the CWD at sys.path[0]; only a SCRIPT FILE puts its
+# own directory there.  Measured 2026-09-22 from the repo root: `-c` and `-m`
+# resolve the working tree, a script file resolves site-packages.)
 sys.path[0] = SCRIPT_DIR
 
 # Some scripts parse arguments at module level AND READ THEM before importing

@@ -31,7 +31,9 @@ import os
 import re
 import sys
 
-# W-0011: Python puts THIS FILE'S directory on sys.path[0], never the cwd. Without the
+# W-0011: Python puts THIS FILE'S directory on sys.path[0] -- and this file is not at
+# the repo root. (`python -c`/`-m` DO put the cwd there; only a script file does not.
+# Measured 2026-09-22.) Without the
 # insert below, `import docpluck` in a tools/ script resolves to the INSTALLED release
 # and every number this script prints would describe site-packages, not the tree. That
 # exact bug made 17 harness scripts audit the wrong library for weeks.

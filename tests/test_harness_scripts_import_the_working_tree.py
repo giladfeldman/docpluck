@@ -2,7 +2,7 @@ r"""Every script under ``tools/`` and ``scripts/`` must import the docpluck in
 this repository -- never an installed copy from site-packages.
 
 WHY THIS IS A TEST AND NOT A CONVENTION.  Python puts the SCRIPT'S OWN
-DIRECTORY on ``sys.path[0]``, never the current working directory.  A script in
+DIRECTORY on ``sys.path[0]``.  A script in
 ``tools/diag/`` therefore has no route to the repo root, and ``import docpluck``
 silently resolves to whatever is installed.  Measured 2026-09-01 on this tree:
 
@@ -11,7 +11,25 @@ silently resolves to whatever is installed.  Measured 2026-09-01 on this tree:
     python <probe-at-repo-root>.py -> <repo>\docpluck                             2.4.138
 
 The third arm is the control: it isolates the cause to the script's DIRECTORY
-rather than to "running a script".  16 of 34 importers resolved the installed
+rather than to "running a script".
+
+NOTE THE SECOND ARM, because this docstring used to say "never the current
+working directory" one paragraph above its own table showing the opposite.
+``python -c`` and ``python -m`` BOTH put the CWD on ``sys.path[0]``; only a
+SCRIPT FILE puts its own directory there.  Re-measured 2026-09-22 from the repo
+root, four-sided::
+
+    python -c "import docpluck"           sys.path[0] = ''            -> working tree
+    python -m docpluck --version          (cwd)                       -> working tree
+    python <script-outside-the-repo>.py   sys.path[0] = that dir      -> site-packages
+    python tools/diag/<script>.py         sys.path[0] = tools/diag    -> site-packages
+
+The load-bearing row is the last one, and it is the whole of the finding: a
+scan under ``tools/diag/`` is not at the repo root, so it gets site-packages.
+The over-reaching form matters because it mispredicts ``python -m pytest``
+(which DOES get the tree) and any probe placed inside the repo.
+
+16 of 34 importers resolved the installed
 release, INCLUDING ``scripts/verify_corpus.py`` -- the 26-paper baseline that
 gates every iterate cycle.  A fix could be verified all night against a library
 it had not touched, with every log line naming the tree.
