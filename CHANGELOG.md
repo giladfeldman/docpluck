@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.4.144] - 2026-09-18 - normalization 1.9.68 - table extraction 2.4.15
+## [2.4.144] - 2026-09-22 - normalization 1.9.68 - table extraction 2.4.16
 
 Three streams landed together: the test corpus moved onto the article custodian,
 and two independent changes stopped the same PDF being parsed more times than
