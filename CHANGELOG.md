@@ -3432,7 +3432,9 @@ A calibrated layout-advance gate separating them (0.51 vs 0.99) was built and **
 
 That was `A3c`'s **only** firing in 297 English papers — 0 right, 1 wrong. The tuple/number distinction is now **positive** rather than another exclusion list: *a thousands-grouped number has every group after the first exactly three digits; anything else with 3+ comma-separated integers is a tuple or an identifier.* Covers ISBNs and unbracketed RGB triples for free.
 
-**`A3d` deleted.** 0 sites in 297 English papers, 0 in a prior 600-paper hunt. Its whole justification was the constructed string `p = ,025`, copied forward through four documents until it looked like consensus. Diverges from ESCImate shared-spec rule D1b; reported outbound.
+**`A3d` deleted.** ~~0 sites in 297 English papers,~~ 0 in a prior 600-paper hunt. Its whole justification was the constructed string `p = ,025`, copied forward through four documents until it looked like consensus. Diverges from ESCImate shared-spec rule D1b; reported outbound.
+
+> **Annotated 2026-09-21 — the 297-paper zero is UNVERIFIABLE and is struck rather than deleted.** The scan that produced it attributes sites by the step name the library reports back, and at that date it was not yet guarded against importing an *installed* copy of docpluck in place of the working tree. No release then in existence contained `A3d` at all, so the scan would have printed `0` whether or not the rule ever fired — a zero about the instrument, not the corpus. `A3d` was created and deleted entirely within uncommitted working-tree state and appears in no commit, so the figure is unreproducible permanently. **The deletion stands**: it rests on the constructed-string ground stated above, which needs no count, and on the independent 600-paper hunt.
 
 **`A4a` no longer fabricates a confidence interval.** It was turning a four-level section cross-reference into a statistic that is not in the paper:
 
@@ -3458,7 +3460,7 @@ A Satterthwaite df is **fractional by construction**. Not fixed here: `A3a` fire
 
 ### New mechanical gates
 
-- **`tools/diag/non_statistic_corpus_scan.py`** — harvests URLs, DOIs, ISBNs, IPs, version strings, dates, page ranges, file paths and statute citations **from real papers** and fails a release if a rule rewrites one. It folds out the changes docpluck is *entitled* to make (dash canonicalisation, invisible-character strips, ligature expansion), which is what makes its verdict trustworthy: **127 apparent defects became 1 real one**, and that one was the `A4` fabrication above.
+- **`tools/diag/non_statistic_corpus_scan.py`** — harvests URLs, DOIs, ISBNs, IPs, version strings, dates, page ranges, file paths and statute citations **from real papers** and fails a release if a rule rewrites one. It folds out the changes docpluck is *entitled* to make (dash canonicalisation, invisible-character strips, ligature expansion), which is what makes its verdict trustworthy: **127 apparent defects became 1 real one**, and that one was the `A4` fabrication above. *(Annotated 2026-09-21: this scan was not yet guarded against importing an installed docpluck instead of the working tree, and the tree state it ran against was later squashed into a single commit with no intermediate tags, so the count is **UNVERIFIABLE** — neither reproducible nor refutable — and should not be cited as a live figure. The `A4` defect it surfaced was confirmed on the article itself and is unaffected.)*
 - **`tools/diag/repair_site_scan.py`** — per-rule paper and site counts over English articles, attributed by `NormalizationReport.steps_changed` rather than by a copy of the regex.
 - **`tools/diag/raster_site.py`** — DOI → page → cropped raster in one command, so *"rasterize and look"* is cheap enough to actually do.
 
@@ -3644,7 +3646,7 @@ Publishing the verdict stays right; *acting* on it as though it described every 
 
 ### A3 (decimal comma) discriminated with an exclusion list, and an exclusion list is never complete
 
-The rule keyed on a lookbehind saying what may *not* precede the number — a letter, a comma, a digit, `[`, `(`. Measured over the 101-PDF corpus it fired **29 times in 13 papers, and ~27 of those were not decimals at all**, every one of them a shape the list does not mention:
+The rule keyed on a lookbehind saying what may *not* precede the number — a letter, a comma, a digit, `[`, `(`. Measured over the 101-PDF corpus it fired **29 times in ~~13~~ [19 — re-measured 2026-09-22, see the annotation at the end of this release] papers, and ~27 of those were not decimals at all**, every one of them a shape the list does not mention:
 
 ```
 'compared with controls.7,8 However'  ->  'controls.7.8 However'   Vancouver citation superscripts
@@ -3709,6 +3711,36 @@ A2 restores a decimal point the PDF lost (`d = 12` → `d = .12`), and its termi
 ### Also
 
 - `tools/diag/a3_comma_lookahead_scan.py` and `tools/diag/a3a_df_bracket_guard_scan.py` — the two corpus measurements above, re-runnable.
+
+> **Annotated 2026-09-22 — these figures were RE-MEASURED against the library they were
+> actually taken from, and they reproduce.** Both scans predate the guard that stops a `tools/`
+> script importing an *installed* docpluck instead of the working tree, so the normalized text
+> they scanned was produced by the then-**released** library. That is what the scan's docstring
+> asks for ("the shipped pipeline... today"), so the arm was coherent — and it has now been
+> checked rather than assumed. Re-run with a `v2.4.126` checkout as the specimen, over the
+> custodian's corpus, 102 PDFs scanned and 0 skipped:
+>
+> | arm | recorded here | re-measured against `v2.4.126` |
+> |---|---|---|
+> | bare-comma widening (`W1`) | 52 sites, 16 papers | **52 sites, 16 papers** — reproduces |
+> | comma+whitespace widening (`W2`) | 22 sites, 10 papers | **22 sites, 10 papers** — reproduces |
+> | what shipped `A3` converts | **29 times in 13 papers** | 29 sites, but in **19 papers** |
+>
+> **Correction: the paper count on that third row is 19, not 13.** Two independent instruments
+> agree. The scan's own regex arm finds 29 sites in 19 papers; asking the library directly —
+> counting papers where `A3_decimal_comma_normalization` appears in `steps_changed` — finds it
+> firing on 28 lines across the same 19 papers. The **site** count (29) is exactly right; only
+> the paper count was understated. The characterisation beside it is confirmed rather than
+> disturbed: sampling the firings gives Vancouver citation-superscript runs
+> (`mortality.9,10` → `mortality.9.10`) and a flattened ANOVA df pair (`9,57` → `9.57`) — false
+> positives, as described.
+>
+> For orientation, the same scan on the post-deletion tree reports **101 sites across 23
+> papers** (`W1`) and **29 sites** (`W2`): the expected direction, because a deleted `A3` leaves
+> more commas standing to be counted. **The conclusion is untouched** — both figures argued
+> *against* widening the rule, and the rule was removed outright.
+
+
 - The in-source comment on A3a's guard claimed `t(1,197)` and `chi2(2,42)` were blocked by it. Neither was. Corrected with the measured behaviour of each.
 - **New step name `A3d_leading_comma_decimal`** — the first change to the `steps_applied` / `steps_changed` vocabulary since 2.4.121 (49 → 50 names). A consumer that pins the set of step names will see one addition.
 

@@ -110,3 +110,122 @@ def test_the_census_actually_found_scripts_to_check() -> None:
         f"only {len(_importers())} docpluck importers found under {SCAN_DIRS}; "
         f"the scan is broken, not the tree clean"
     )
+
+
+# --------------------------------------------------------------------------
+# The gate above is only as good as its DENOMINATOR, and that denominator is
+# computed by a line-anchored REGEX.  A regex cannot see an import it does not
+# recognise, and a census that silently returns fewer scripts makes this whole
+# file vacuously green -- the exact "a green gate can be blind BY CONSTRUCTION"
+# shape the project's rules name.  So the census is cross-checked against an
+# independent AST walk, and the two must agree exactly.
+#
+# Measured 2026-09-21 on bca86d3: AST 43, regex 43, symmetric difference empty,
+# and no importlib/__import__ route to docpluck exists under tools/ or scripts/.
+# --------------------------------------------------------------------------
+
+import ast
+
+
+def _importers_by_ast() -> set[str]:
+    found: set[str] = set()
+    for d in SCAN_DIRS:
+        root = REPO_ROOT / d
+        if not root.is_dir():
+            continue
+        for p in sorted(root.rglob("*.py")):
+            if "__pycache__" in p.parts:
+                continue
+            try:
+                tree = ast.parse(p.read_text(encoding="utf-8", errors="replace"))
+            except SyntaxError:
+                continue
+            for n in ast.walk(tree):
+                if isinstance(n, ast.ImportFrom):
+                    if (n.module or "").split(".")[0] == "docpluck":
+                        found.add(p.relative_to(REPO_ROOT).as_posix())
+                elif isinstance(n, ast.Import):
+                    if any(a.name.split(".")[0] == "docpluck" for a in n.names):
+                        found.add(p.relative_to(REPO_ROOT).as_posix())
+    return found
+
+
+def test_regex_census_and_ast_census_agree() -> None:
+    rx = {p.relative_to(REPO_ROOT).as_posix() for p in _importers()}
+    by_ast = _importers_by_ast()
+    assert rx == by_ast, (
+        "the importer census disagrees with an independent AST walk, so the gate's "
+        "denominator is wrong and every parametrised case above may be vacuous.\n"
+        f"  seen only by AST  : {sorted(by_ast - rx)}\n"
+        f"  seen only by regex: {sorted(rx - by_ast)}\n"
+        "An `import docpluck` the regex cannot match (aliased, dynamic, or not "
+        "line-anchored) silently shrinks what this file checks."
+    )
+
+
+def test_no_dynamic_import_route_to_docpluck() -> None:
+    """`importlib.import_module("docpluck")` would evade BOTH censuses above."""
+    offenders = []
+    for d in SCAN_DIRS:
+        root = REPO_ROOT / d
+        if not root.is_dir():
+            continue
+        for p in sorted(root.rglob("*.py")):
+            if "__pycache__" in p.parts:
+                continue
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for kw in ("importlib.import_module", "__import__"):
+                if kw in text and "docpluck" in text:
+                    offenders.append(f"{p.relative_to(REPO_ROOT).as_posix()} ({kw})")
+    assert not offenders, (
+        "a dynamic import of docpluck evades both the regex and the AST census, so "
+        f"the gate cannot see which copy it resolves: {offenders}"
+    )
+
+
+# --------------------------------------------------------------------------
+# `_corpus.specimen_line()` is the durable half of the 2026-09-21 fix: it makes
+# every scan's OUTPUT say which copy of the library produced its numbers.  A
+# reporter that cannot tell the two apart is worse than none, so it is tested in
+# BOTH directions -- it must name the tree when the tree is imported, and it
+# must say INSTALLED when it is not.
+# --------------------------------------------------------------------------
+
+
+def _load_corpus_helper():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_diag_corpus_under_test", REPO_ROOT / "tools" / "diag" / "_corpus.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_specimen_line_names_the_working_tree() -> None:
+    line = _load_corpus_helper().specimen_line()
+    assert line.startswith("SPECIMEN: ")
+    assert "this working tree" in line, line
+    assert str(REPO_ROOT) in line, line
+
+
+def test_specimen_line_flags_an_installed_copy(monkeypatch, tmp_path) -> None:
+    """The NEGATIVE control.  Without it, a reporter hard-wired to say 'tree'
+    would pass the test above and re-hide the defect it exists to surface."""
+    mod = _load_corpus_helper()
+    fake_pkg = tmp_path / "site-packages" / "docpluck"
+    fake_pkg.mkdir(parents=True)
+    (fake_pkg / "__init__.py").write_text("", encoding="utf-8")
+
+    import types
+
+    stub = types.ModuleType("docpluck")
+    stub.__file__ = str(fake_pkg / "__init__.py")
+    stub.__version__ = "0.0.0-not-this-tree"
+    monkeypatch.setitem(sys.modules, "docpluck", stub)
+
+    line = mod.specimen_line()
+    assert "INSTALLED copy" in line, line
+    assert "do NOT describe this checkout" in line, line
+    assert "this working tree" not in line, line

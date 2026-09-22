@@ -313,7 +313,7 @@ stopped happening, and because the reasoning is the contract.
 | `A3` | `d = 0,45` → `d = 0.45` | EU→US conversion, out of scope. Fired 9 times in 2 papers and **not once correctly**. |
 | `A3a` | `N = 1,182` → `1182` | Existed only to pre-empt `A3`, which is gone. Produced 1000× errors on comma-decimal tables. |
 | `A3c` | `(0,003)` → `(0.003)` | EU→US conversion. Its one firing in 297 papers broke a reference-list URL. |
-| `A3d` | `p = ,025` → `p = .025` | **0 sites in 897 papers.** Built on a constructed string copied forward through four documents. |
+| `A3d` | `p = ,025` → `p = .025` | ~~**0 sites in 897 papers.**~~ **The 297-paper component of that figure is UNVERIFIABLE (2026-09-21).** The scan attributes sites by the step name the library reports, and it was not yet guarded against importing an installed copy instead of the working tree; no release in existence on the measurement date contained `A3d` at all, so a `0` was indistinguishable from "the rule never fired". `A3d` is in no commit of this repository, so the figure cannot be reproduced by anyone. The deletion itself is unaffected: it rests on the rule having been built on a constructed string copied forward through four documents, with no real article behind it. |
 | `W0n` | `p < 05` → `p < .05` | Premise false — the same shape has **opposite owners** in two real papers. |
 
 #### The two rules that decide all six

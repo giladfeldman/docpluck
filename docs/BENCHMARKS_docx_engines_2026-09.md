@@ -64,6 +64,18 @@ Pooled over cells, not averaged over documents — a mean of per-document ratios
 | python-docx | 0.9917 | 0.9893 | 0 | 0 | **~0.9 s** |
 | Word → PDF → PDF path | 0.0077 | 0.0072 | 1 | 11 | ~126 s (5 docs) |
 
+> **Provenance annotation, 2026-09-21.** For part of the day this benchmark was recorded, its
+> harness was not yet guarded against importing an *installed* copy of docpluck in place of the
+> working tree. Only two of its paths touch docpluck at all, so the exposure is confined to the
+> **`Word → PDF → PDF path`** row: those figures may describe the previously released library
+> rather than the tree under test. The four library rows above it — pandoc, mammoth,
+> docx2python, python-docx — do not import docpluck on any path and are unaffected, and the
+> ground truth is read from the OOXML itself. **The ranking stands**: the last row exists to
+> show that routing a DOCX through Word and then through the PDF pipeline loses essentially
+> every cell, and a sub-percent shift cannot reorder a 0.0077-against-0.99+ gap. The guard is
+> now pinned by `tests/test_harness_scripts_import_the_working_tree.py`, which runs every
+> harness script and asserts which copy of the library its import resolved.
+
 The pooled column hides the finding that decides the ranking. **Read the per-document
 minimum, not the average.**
 

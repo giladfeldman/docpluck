@@ -182,16 +182,59 @@ _expected = [0]
 _resolved = [0]
 
 
+def specimen_line() -> str:
+    """Name the docpluck this scan actually imported, BY PATH.
+
+    Added 2026-09-21 after a reconciliation that had to establish, by inference from
+    commit dates and symbol presence, which copy of the library produced each
+    historical figure -- and could not finish that inference for three of them.
+
+    A scan's output said WHICH CORPUS it measured (``coverage_line``) but never
+    WHICH LIBRARY, and until 2026-09-02 fourteen scans under this directory
+    imported whatever was INSTALLED rather than this tree. The numbers were
+    entirely plausible and described the wrong software.
+
+    The identifier is the PATH, deliberately. ``__version__`` cannot serve: this
+    tree has reported ``2.4.144`` while sitting in no tag and no commit, and the
+    installed copy is routinely several releases stale, so two copies report
+    plausibly and only the path distinguishes them.
+    """
+    try:
+        import docpluck
+    except Exception as exc:  # pragma: no cover - diagnostic output path
+        return (
+            f"SPECIMEN: UNKNOWN — `import docpluck` failed "
+            f"({exc.__class__.__name__}: {exc}). No figure from this run describes "
+            f"any library."
+        )
+    path = Path(docpluck.__file__).resolve()
+    repo = Path(_REPO_ROOT).resolve()
+    if repo in path.parents:
+        where = "this working tree"
+    else:
+        where = (
+            "an INSTALLED copy — figures from this run do NOT describe this checkout"
+        )
+    reported = getattr(docpluck, "__version__", "<none>")
+    return f"SPECIMEN: {path} ({where}); reports __version__={reported}"
+
+
 def coverage_line() -> str:
-    """The line every scan must print. Names the corpus AND the shortfall."""
+    """The two lines every scan must print: WHICH CORPUS, and WHICH LIBRARY.
+
+    The specimen is appended here rather than added at ~40 call sites, so every
+    scan that already prints coverage becomes self-identifying with no edit.
+    """
     exp, res = _expected[0], _resolved[0]
     if exp == 0:
-        return "COVERAGE: unknown — no corpus resolved"
-    state = "COMPLETE" if res == exp else "PARTIAL"
-    return (
-        f"COVERAGE: {state} — {res}/{exp} papers resolved from article-finder "
-        f"(custodian, not a directory listing)"
-    )
+        corpus = "COVERAGE: unknown — no corpus resolved"
+    else:
+        state = "COMPLETE" if res == exp else "PARTIAL"
+        corpus = (
+            f"COVERAGE: {state} — {res}/{exp} papers resolved from article-finder "
+            f"(custodian, not a directory listing)"
+        )
+    return f"{corpus}\n{specimen_line()}"
 
 
 def docpluck_corpus() -> list[Path]:
