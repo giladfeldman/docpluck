@@ -1,22 +1,40 @@
 # Changelog
 
-## [2.4.144] - 2026-09-22 - normalization 1.9.68 - table extraction 2.4.16
+## [2.4.144] - 2026-09-23 - normalization 1.9.68 - table extraction 2.4.16
 
-Three streams landed together: the test corpus moved onto the article custodian,
-and two independent changes stopped the same PDF being parsed more times than
-anything could use.
+About two dozen commits from several parallel work streams, released together:
+the same PDF is no longer parsed more times than anything can use; the test
+corpus resolves through the article custodian; capability failures that used to
+vanish are now recorded; `docpluck.testing` ships; and the public tree no longer
+publishes private project detail.
 
-**The rendered OUTPUT is byte-for-byte unchanged, and that was measured rather
-than assumed** -- which is why `NORMALIZATION_VERSION` does not move. The
-extraction pipeline CODE did change.
+**What a consumer will see change, stated first so it cannot be missed:**
 
-That distinction is spelled out because an earlier draft of this entry read
-"Test infrastructure only. The extraction and normalization pipelines are
-byte-for-byte unchanged." It was true while the release was test-infrastructure
-only, and became false the moment the two performance streams were folded in.
-Two separate sessions caught it before the tag. It is corrected here in the open
-rather than quietly rewritten, because the failure mode worth remembering is a
-release note that stays behind its own contents.
+- **Extracted text, normalized text and rendered markdown are byte-for-byte
+  unchanged on a healthy install** — measured, not assumed (see "What was
+  verified" below), which is why `NORMALIZATION_VERSION` does not move.
+- **`method` gains a token when Camelot cannot run**:
+  `pdftotext_default` becomes
+  `pdftotext_default+camelot_failed:camelot_not_installed` or
+  `...+camelot_failed:camelot_all_flavors_failed`. A healthy install is
+  unchanged. Because that stored string can change, `table_extraction_version`
+  moves **2.4.15 -> 2.4.16**.
+- **New keys may appear in `fallbacks`** (StructuredResult, RenderReport,
+  NormalizationReport): `camelot_not_installed`, `camelot_all_flavors_failed`,
+  `render_layout_unavailable`, `column_interleave_detector_exception`,
+  `banded_crop_timeout`, `banded_crop_exception`, `banded_crop_nonzero_exit`.
+  No existing key changed meaning.
+- **New optional, underscore-private parameters** `_raw_text` / `_page_count`
+  (below). Nothing changes for a caller that does not pass them.
+- **New public module `docpluck.testing`** (corpus resolver + manifest).
+
+An earlier draft of this entry said "Three streams landed together" and "The
+rendered OUTPUT is byte-for-byte unchanged" without qualification. The first was
+out of date once more streams were folded in, and the second was false for the
+`method` string on a machine where Camelot fails. That is the same failure an
+even earlier draft ("Test infrastructure only") had already made once: a release
+note that falls behind its own contents. It is corrected here in the open, not
+quietly rewritten.
 
 ### The same upload was extracted, and re-extracted, and parsed four times
 
@@ -133,12 +151,11 @@ tests call through `docpluck.extract` instead.
 
 ### Still open after this change
 
-The service repo does not pass any of these yet, so **production still
-duplicates**. The pin on docpluck app `origin/master` is `v2.4.143`, which has
-no `_raw_text`, so the service change lands after this releases - and the
-`/analyze` handler is itself being rewritten in that repo right now for the
-stage-opt-in work. Naming it here rather than in a handoff footnote: the
-library half is inert until the caller threads it.
+The library half does nothing until a caller threads it through. The service's
+change to `/analyze` and `/extract`, which passes these parameters, ships in the
+same coordinated release as this tag, straight after the app's pin moves to
+`v2.4.144`. It cannot go first: `v2.4.143` has no `_raw_text`, so the service
+would raise `TypeError` on every PDF.
 
 ### `extract_pdf` parsed the whole document to correct a handful of pages
 
@@ -267,6 +284,97 @@ person's name in one.** Do not "restore" the old ids — they were the leak.
 Also fixed in passing: one fixture resolver that existed in ten pasted copies is
 now one function; a `conftest.py` docstring asserting the corpus "exists and
 holds 0 PDFs" (it held 101, and 73 files used it) is corrected.
+
+### Capability failures that used to vanish are now recorded (table extraction 2.4.16)
+
+Four capabilities could fail and leave no record anywhere. One table-channel
+failure could not be told apart from a paper that simply has no tables.
+
+- **Camelot absent, or both of its parsers raising**, now records
+  `camelot_not_installed` / `camelot_all_flavors_failed` and appends
+  `camelot_failed:<event>` to `method`. Before, `extract_tables_camelot`
+  returned an empty list normally, so the caller's failure token never fired —
+  and the table COUNT did not move either, because the caption fallback
+  backfills one table per caption (measured: 9 tables in all three arms on the
+  same paper). The `method` token is therefore the only signal, which is why
+  `table_extraction_version` moves to 2.4.16: a consumer that archives `method`
+  can tell pre-fix records from post-fix ones.
+- **The render channel** records `render_layout_unavailable` when it cannot
+  obtain layout.
+- **The column-interleave detector** records its own crashes. Before, an empty
+  `column_interleave_pages` also meant "none found".
+- **A pdftotext band crop that times out or fails** now abandons the page and
+  records `banded_crop_*`. Before, it returned the page silently missing that
+  band's words, so machine load became word loss. This path sits behind
+  `DOCPLUCK_COLUMN_CORRECT_BANDED`, which is off by default, so the default
+  production path is unaffected.
+
+Every change is on a failure path. Healthy-path output is byte-identical, and
+normalized text does not change, so `NORMALIZATION_VERSION` stays at 1.9.68.
+
+### Test gates that could pass with the capability absent
+
+- `tests/test_column_correction_actually_fires.py` pins that column correction
+  FIRES on `10.1016/j.jesp.2021.104154` (page 19, default path, no environment
+  flags). Its control re-breaks it the way it broke on 2026-09-17: a signature
+  mismatch whose `TypeError` `extract.py` folded into the `method` string, so
+  every paper needing correction silently stopped getting it while the suite
+  stayed green.
+- `scripts/harness/checks.py` refuses a regression baseline that joins on zero
+  cells. The corpus repoint re-keyed every document id (baseline 180 docs,
+  manifest 135, overlap 0), which made "0 REGRESSIONS" unconditional. The
+  corpus gate likewise refuses a baseline whose denominator shrank, the
+  generator refuses to shrink the corpus it replaces, and a single-paper run no
+  longer prints a coverage line.
+- New two-sided gates for the Camelot and render losses above. An assertion that
+  accepted `camelot_failed` as a pass now requires `camelot_stream`, and the
+  smoke table count's ±6 tolerance no longer accepts zero tables.
+- Two real-PDF regressions that had been skipping silently (their papers
+  resolved from another project's directory) now resolve through the corpus
+  manifest and run.
+- Two files were SyntaxErrors on the declared floor `requires-python >=3.10`
+  (a backslash inside an f-string expression, legal only from 3.12). Both are
+  fixed; neither is inside the shipped package.
+
+### Diagnostic figures were re-checked against the library that produced them
+
+Until 2026-09-02, fourteen scans under `tools/diag/` imported whatever docpluck
+was INSTALLED rather than the checkout they sat in, because a script file puts
+its own directory, not the repo root, at the front of Python's import path. Four
+of them looked guarded and were not: they inserted their own directory, which
+reaches nothing. Every figure those scans published was reconciled:
+
+- The consumer-facing false-positive table in the 2.4.127 entry was re-run
+  against a v2.4.126 checkout and **reproduces exactly** (52 sites across 16
+  papers; 22 across 10).
+- One figure was wrong and is corrected in place: the since-deleted `A3` rule
+  fired in **19** papers, not 13. The site count was right.
+- Three counts that depended on uncommitted 2026-08 state are now labelled
+  **unverifiable**, rather than replaced with an invented number. No decision
+  they supported changes.
+
+Scans now print which copy of the library produced their numbers, by absolute
+path. The import-resolution test cross-checks its own list of scripts against an
+independent census, so it cannot silently shrink.
+
+### Public-repository hygiene
+
+- The source tree no longer publishes the directory layout of private sibling
+  projects. The harness reads its non-corpus document sources from
+  `DOCPLUCK_HARNESS_SOURCES` or a machine-local, gitignored config. It raises
+  when neither is present, instead of silently shrinking the document set (102
+  documents instead of 136).
+- The consumer application's checkout is located structurally rather than by
+  name, and tests read private corpora through one machine-local resolver.
+- A third party's e-mail address was removed from a comment in the installed
+  package, and a public design document no longer links to a private repository.
+  Consumers are named by their public product names.
+- The harness corpus manifest no longer exposes internal project names or
+  filename-derived ids (see the section above). **Older copies remain in the
+  repository's history.** Whether to rewrite that history is an open owner
+  decision, not something this release does.
+
+No change to extraction output from any of the above.
 
 ## [2.4.143] - 2026-09-16 - normalization 1.9.68 - table extraction 2.4.15
 
@@ -1133,7 +1241,7 @@ both were watched RED against the pre-repair code.
   that `changes_made["repeated_lines_stripped"]` is a **character delta under a count-shaped
   name** (165 = 5 × 33 on its fixture, not 5). The real counts live in the per-line telemetry.
 - `test_request_09_reference_normalization.py` — **all five tests in this file had been skipping
-  silently**: the fixture path pointed at `MetaScienceTools/ESCIcheckapp/testpdfs/`, which no
+  silently**: the fixture path pointed at a sibling project's test-PDF folder, which no
   longer exists. Repointed at the article repository by DOI (`10.1098/rsos.250979`), which is what
   the custody rule requires. The RSOS footer goes 40 copies in, 1 out.
 

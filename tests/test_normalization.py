@@ -625,8 +625,19 @@ class TestS9_HeaderFooter:
         collabra-rnr, social-forces-1 all had table labels false-stripped
         under the old rule."""
         # 50 lines of body prose, then 5 occurrences of a table label
-        # clustered in lines 50-60, then more body prose. Range
-        # coverage is ≤15% — well under the 75% threshold.
+        # clustered in lines 50-60, then more body prose.
+        #
+        # WHY IT IS PRESERVED, RE-MEASURED 2026-09-21. This comment used to
+        # say "Range coverage is ≤15% — well under the 75% threshold". THERE
+        # IS NO 75% THRESHOLD: `grep -c '0\.75' docpluck/normalize.py` is 0.
+        # That gate was replaced by the page-distribution discriminator, and
+        # this fixture carries no form feeds, so it reaches the UNPAGINATED
+        # line-index fallback instead. Printed from the fixture: the label
+        # sits at lines [50, 52, 54, 56, 58], so `count` is 5 and `min(gaps)`
+        # is 2. The fallback needs `min(gaps) >= 20 or count >= 20`, and 2/5
+        # clears neither — that, not a range ratio, is what spares the label.
+        # The stale claim mattered: it named a mechanism that would have to be
+        # re-tuned if this went red, and no such mechanism exists to tune.
         body_before = "\n".join(f"Intro line {i}." for i in range(50))
         label = "Intend vs. Later"
         table_block = "\n".join([f"{label}\n0.{i}5*" for i in range(5)])
