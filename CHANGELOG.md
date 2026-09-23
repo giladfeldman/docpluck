@@ -347,8 +347,10 @@ reaches nothing. Every figure those scans published was reconciled:
 - The consumer-facing false-positive table in the 2.4.127 entry was re-run
   against a v2.4.126 checkout and **reproduces exactly** (52 sites across 16
   papers; 22 across 10).
-- One figure was wrong and is corrected in place: the since-deleted `A3` rule
-  fired in **19** papers, not 13. The site count was right.
+- One figure was wrong and is now corrected everywhere it appeared, including
+  two letters sent to downstream tools: the since-deleted `A3` rule fired in
+  **19** papers, not 13. The site count was right. The 19 holds over the
+  original 101-paper corpus; the paper added since contributes no site.
 - Three counts that depended on uncommitted 2026-08 state are now labelled
   **unverifiable**, rather than replaced with an invented number. No decision
   they supported changes.
