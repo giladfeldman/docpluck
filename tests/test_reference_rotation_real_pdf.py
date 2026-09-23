@@ -32,6 +32,8 @@ import pytest
 
 from docpluck.extract import extract_pdf
 from docpluck.extract_columns import (
+    _accept_reorder,
+    _char_multiset,
     _detect_reference_rotation_pages,
     _longest_sorted_run,
     _reference_entry_keys,
@@ -122,6 +124,9 @@ def test_corrected_pages_are_sorted_and_word_identical(fixture, pages, request):
         assert p in corrected, f"{fixture} p{p} not corrected ({method})"
         # Pure reorder: not a word lost, not a word invented (rules 0a / 0b).
         assert _word_multiset(out_pages[p - 1]) == _word_multiset(raw_pages[p - 1])
+        # ...and not a character: the word multiset is blind to digits and
+        # one-letter initials (see the digit-duplication test below).
+        assert _char_multiset(out_pages[p - 1]) == _char_multiset(raw_pages[p - 1])
         keys = _reference_entry_keys(out_pages[p - 1])
         assert _longest_sorted_run(keys) >= 0.75 * len(keys), (
             f"{fixture} p{p}: {''.join(keys)}")
@@ -153,3 +158,22 @@ def test_rotation_check_refuses_a_reorder_that_changes_nothing(chen):
     pdf, _ = chen
     raw = _raw_pdftotext(pdf).split("\f")[19]
     assert not _reference_rotation_resolved(raw, raw)
+
+
+def test_a_reorder_that_duplicates_one_digit_is_refused(chen):
+    """Found by the Sonnet cross-model review, 2026-09-23, then measured: the
+    whole-page column crop cut a running header that crosses the gutter, the
+    glyph on the cut landed in BOTH crops, and "125–135" shipped as "125–13" +
+    "35" (10.1016/j.jesp.2017.05.004 p11) — on 33 of 87 corrected reference
+    pages of a 500-paper sample. Every word survived, so the word-multiset
+    guard passed it. The shape is reproduced here on a real page: the correct
+    left-then-right reorder of chen p20, plus one duplicated digit."""
+    pdf, (text, _m) = chen
+    raw = _raw_pdftotext(pdf).split("")[19]
+    fixed = text.split("")[19]
+    assert _accept_reorder(fixed, raw, True), "control: the real reorder must pass"
+    i = fixed.index("104154")
+    broken = fixed[:i] + "10415 54" + fixed[i + 6:]  # one extra "5"
+    assert _word_multiset(broken) == _word_multiset(raw), (
+        "fixture no longer isolates the blind spot: the word guard sees it")
+    assert not _accept_reorder(broken, raw, True)

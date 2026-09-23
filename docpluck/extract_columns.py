@@ -428,9 +428,10 @@ def _reference_rotation_gain(keys: list[str]) -> int:
         return 0
     base = _longest_sorted_run(keys)
     best = max(
-        _longest_sorted_run(keys[k:] + keys[:k])
-        for k in range(_ROTATION_MIN_RUN, n - _ROTATION_MIN_RUN + 1)
-    ) if n >= 2 * _ROTATION_MIN_RUN else base
+        (_longest_sorted_run(keys[k:] + keys[:k])
+         for k in range(_ROTATION_MIN_RUN, n - _ROTATION_MIN_RUN + 1)),
+        default=base,
+    )
     gain = best - base
     if (best >= _ROTATION_SORTED_FRACTION * n
             and gain >= max(_ROTATION_MIN_GAIN, _ROTATION_MIN_GAIN_FRACTION * n)):
@@ -490,6 +491,11 @@ def _word_multiset(text: str) -> "Counter":
     return Counter(toks)
 
 
+def _char_multiset(text: str) -> "Counter":
+    """Every non-whitespace character of ``text``, with multiplicity."""
+    return Counter(c for c in text if not c.isspace())
+
+
 def _accept_reorder(rewritten: str, original_page: str,
                     must_resolve_rotation: bool) -> bool:
     """The splice's acceptance test, one implementation for every geometry.
@@ -503,6 +509,16 @@ def _accept_reorder(rewritten: str, original_page: str,
     if not rewritten:
         return False
     if _word_multiset(rewritten) != _word_multiset(original_page):
+        return False
+    # EVERY non-space character, too. The word multiset deliberately ignores
+    # digits and 1-char tokens, and that hole shipped: a running header that
+    # crosses the gutter was cut by the column crop, the glyph on the cut
+    # landed in BOTH crops, and "125–135" became "125–13" + "35"
+    # (10.1016/j.jesp.2017.05.004 p11; one extra digit on 30 of 87 corrected
+    # reference pages in a 500-paper sample, measured 2026-09-23). A pure
+    # reorder cannot change the character inventory; a crop that duplicates or
+    # drops a glyph — an initial, a year digit, a page number — does.
+    if _char_multiset(rewritten) != _char_multiset(original_page):
         return False
     if rewritten.split() == original_page.split():
         return False
