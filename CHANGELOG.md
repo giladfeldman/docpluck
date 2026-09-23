@@ -332,6 +332,18 @@ normalized text does not change, so `NORMALIZATION_VERSION` stays at 1.9.68.
 - Two real-PDF regressions that had been skipping silently (their papers
   resolved from another project's directory) now resolve through the corpus
   manifest and run.
+- **The whole-corpus harness had not run since the corpus repoint.**
+  `scripts/harness/extract.py` read `doc["rel_path"]` outside its error
+  handling, and manifest records no longer carry one, so every run raised
+  `KeyError` on its first document. It also called a bare `/analyze`, which from
+  app service 1.7.0 returns tables, sections and rendered markdown only when
+  asked. It would have written fewer views while its checks read stale ones.
+  The harness now requests every stage, refuses a response that skipped one,
+  removes stale views, and records a path-free source reference.
+- The pin-mirror test crashed collection wherever the consumer app is not
+  checked out beside this repo (including a clone of this public repo on its
+  own). It now skips, naming what is missing.
+- The column-interleave detector's crash record now has a two-sided gate.
 - Two files were SyntaxErrors on the declared floor `requires-python >=3.10`
   (a backslash inside an f-string expression, legal only from 3.12). Both are
   fixed; neither is inside the shipped package.
