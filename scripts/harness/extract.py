@@ -261,7 +261,13 @@ def _process(
         "doc_id": doc["id"],
         "format": doc["format"],
         "level": level,
-        "rel_path": doc["rel_path"],
+        # Where the source came from, WITHOUT a portfolio path: a manifest record
+        # carries `corpus_path` (a custodian paper) or `sha256` (another source),
+        # and since the 2026-09-17 repoint never `rel_path`. Reading `rel_path`
+        # here raised KeyError outside the try below, so every extraction run
+        # crashed on its first document.
+        "source_ref": doc.get("corpus_path")
+        or (f"{doc['source']}:{doc['sha256'][:16]}" if "sha256" in doc else doc.get("rel_path")),
         "source_sha1": src_sha1,
         "extracted_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
         "skipped": False,

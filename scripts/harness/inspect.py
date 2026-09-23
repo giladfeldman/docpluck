@@ -217,7 +217,12 @@ def main() -> int:
         for doc in docs:
             if doc["id"] in keys:
                 continue
-            rc, out = _ai_gold("resolve", Path(doc["rel_path"]).stem)
+            # Resolve by DOI: manifest records no longer carry `rel_path` (a
+            # KeyError here since the 2026-09-17 repoint), and ai-gold refuses a
+            # bare filename stem anyway. A record with no DOI has no gold key.
+            if not doc.get("doi"):
+                continue
+            rc, out = _ai_gold("resolve", doc["doi"])
             if rc == 0 and out and "__" in out.splitlines()[-1]:
                 keys[doc["id"]] = out.splitlines()[-1].strip()
                 found += 1

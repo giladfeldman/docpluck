@@ -103,3 +103,29 @@ def test_control_a_view_that_was_produced_is_written(tmp_path):
     (tmp_path / "rendered.md").write_text("STALE", encoding="utf-8")
     hx._save_views(tmp_path, _analyze(ALL_COMPUTED, rendered="# fresh"))
     assert (tmp_path / "rendered.md").read_text(encoding="utf-8") == "# fresh"
+
+
+@pytest.mark.parametrize(
+    "doc",
+    [
+        {"id": "corpus__x", "source": "corpus", "format": "pdf",
+         "corpus_path": "ama/x.pdf", "doi": "10.1/x"},
+        {"id": "docx__abc", "source": "docx", "format": "docx", "sha256": "ab" * 32},
+    ],
+)
+def test_a_manifest_record_extracts_without_rel_path(monkeypatch, tmp_path, doc):
+    """Manifest records carry `corpus_path` or `sha256`, never `rel_path`.
+
+    `_process` read `doc["rel_path"]` outside its try block, so since the
+    2026-09-17 repoint every extraction run died with KeyError on its first
+    document. Both record shapes the committed manifest uses are exercised.
+    """
+    src = tmp_path / "src.bin"
+    src.write_bytes(b"bytes")
+    monkeypatch.setattr(hx, "OUT_ROOT", tmp_path / "out")
+    monkeypatch.setattr(hx.corpus, "resolve", lambda d: src)
+    monkeypatch.setattr(hx, "_post_analyze", lambda *a, **k: _analyze(ALL_COMPUTED))
+    meta = hx._process(doc, "academic", ("http://127.0.0.1:6117", "tok"), force=True, timeout=5)
+    assert meta["status"] == "ok", meta
+    assert meta["source_ref"]
+    assert "rel_path" not in meta
