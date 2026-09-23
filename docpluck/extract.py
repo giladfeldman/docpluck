@@ -159,6 +159,7 @@ def extract_pdf(
             from .extract_columns import (
                 splice_column_corrected_pages,
                 _detect_reference_inversion_pages,
+                _detect_reference_rotation_pages,
             )
             ff_offsets: list[int] = [0]
             for idx, ch in enumerate(text):
@@ -173,6 +174,13 @@ def extract_pdf(
             #    reorder can never lose or fabricate text (rule 0a / 0b).
             flagged_pages = _detect_column_interleave_pages(text, tuple(ff_offsets))
             inversion_pages = _detect_reference_inversion_pages(text, tuple(ff_offsets))
+            # The same inversion on a CONTINUATION page of the reference list,
+            # which carries no heading for the detector above to anchor on: the
+            # alphabetical entries read as a rotated run ("N..Z" then "G..N").
+            # chen p20 (10.1016/j.jesp.2021.104154) shipped 30 references out of
+            # order this way. Same two safeties as the inversion pages, plus the
+            # splice's requirement that the reorder leave the entries sorted.
+            rotation_pages = _detect_reference_rotation_pages(text, tuple(ff_offsets))
             # RC-1 Step 1 (v2.4.82): GENERAL two-column interleave correction.
             # The O5 inversion path has always run the column-aware re-extraction
             # under TWO safeties: the full-height GUTTER-STRIP midline detector
@@ -211,14 +219,16 @@ def extract_pdf(
             # only governs HOW aggressively the midline is detected, not whether
             # the result is trusted. Inversion pages always opt in; general
             # flagged pages opt in only under the flag.
-            gutter_fallback_pages = set(inversion_pages)
+            gutter_fallback_pages = set(inversion_pages) | set(rotation_pages)
             if general_correct or banded_correct:
                 # Under BANDED too: a flagged page that IS a clean 2-column page
                 # should be corrected by the proven whole-page gutter path; the
                 # per-band fallback only fires when that path returns "" (the
                 # table-bearing / mixed-layout pages it cannot reach).
                 gutter_fallback_pages |= set(flagged_pages)
-            all_pages = sorted(set(flagged_pages) | set(inversion_pages))
+            all_pages = sorted(
+                set(flagged_pages) | set(inversion_pages) | set(rotation_pages)
+            )
             if all_pages:
                 from .extract_layout import extract_pdf_layout
                 # ONLY the flagged pages. The splice below rewrites pages in
@@ -240,6 +250,10 @@ def extract_pdf(
                     gutter_fallback_pages=sorted(gutter_fallback_pages),
                     banded_pages=banded_pages,
                     changed_out=changed,
+                    rotation_pages=rotation_pages,
+                    edge_trimmed_pages=sorted(
+                        set(inversion_pages) | set(rotation_pages)
+                    ),
                 )
                 if corrected and corrected != text and changed:
                     text = corrected

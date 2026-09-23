@@ -358,6 +358,121 @@ def _detect_reference_inversion_pages(
     return tuple(flagged)
 
 
+# ── Reference-list ROTATION (a heading-less continuation page) ──
+#
+# The inversion detector above needs the page's own ``References`` heading, so
+# it is blind to every CONTINUATION page of a reference list — and those are the
+# majority of reference pages. On such a page pdftotext can still emit the right
+# column before the left one (chen_2021_jesp p20, 10.1016/j.jesp.2021.104154;
+# collabra.90203 pp18-20, 10.1525/collabra.90203 — both rasterized 2026-09-23).
+# The structural signature: an alphabetical reference list serialized
+# right-column-first reads as TWO sorted runs, the second of which belongs
+# BEFORE the first — "N..Z" then "G..N". Rotating the entry sequence at the
+# seam makes it sorted again; a correctly ordered page gains nothing from any
+# rotation.
+#
+# This is only a TRIGGER for the geometric re-extraction. The order that ships
+# is decided by page geometry (left column, then right), never by the alphabet,
+# and the splice accepts it only as a pure word-preserving reorder that also
+# delivers the sortedness gain that triggered it
+# (``_reference_rotation_resolved``).
+#
+# Tolerance, measured not assumed: pdftotext cannot distinguish a new entry
+# from a wrapped author line that happens to start "Frank, M. C." or
+# "Grahe, J. E.", so chen p20's 64 entry-shaped lines carry ~4 out-of-order
+# keys even in the correct order. Hence a longest-sorted-subsequence measure
+# rather than a count of descents — a strict "exactly one descent" rule fired
+# on 0 of 102 corpus papers, chen included.
+_ROTATION_MIN_ENTRIES = 12
+_ROTATION_MIN_RUN = 5
+_ROTATION_SORTED_FRACTION = 0.85
+_ROTATION_MIN_GAIN_FRACTION = 0.2
+_ROTATION_MIN_GAIN = 5
+
+
+def _reference_entry_keys(page: str) -> list[str]:
+    """First letter of the first surname of every reference-entry-shaped line,
+    accent-stripped and case-folded (``Groß`` -> ``g``, ``Östling`` -> ``o``)."""
+    import unicodedata
+    keys: list[str] = []
+    for ln in page.splitlines():
+        m = _REF_ENTRY_RE.match(ln)
+        if not m:
+            continue
+        s = unicodedata.normalize("NFKD", m.group(0).casefold())
+        for c in s:
+            if c.isalpha() and not unicodedata.combining(c):
+                keys.append(c)
+                break
+    return keys
+
+
+def _longest_sorted_run(seq: list[str]) -> int:
+    """Length of the longest non-decreasing subsequence (patience sorting)."""
+    import bisect
+    tails: list[str] = []
+    for x in seq:
+        i = bisect.bisect_right(tails, x)
+        if i == len(tails):
+            tails.append(x)
+        else:
+            tails[i] = x
+    return len(tails)
+
+
+def _reference_rotation_gain(keys: list[str]) -> int:
+    """How much more sorted the entry sequence becomes under its best rotation,
+    or 0 when the page does not carry the rotation signature."""
+    n = len(keys)
+    if n < _ROTATION_MIN_ENTRIES:
+        return 0
+    base = _longest_sorted_run(keys)
+    best = max(
+        _longest_sorted_run(keys[k:] + keys[:k])
+        for k in range(_ROTATION_MIN_RUN, n - _ROTATION_MIN_RUN + 1)
+    ) if n >= 2 * _ROTATION_MIN_RUN else base
+    gain = best - base
+    if (best >= _ROTATION_SORTED_FRACTION * n
+            and gain >= max(_ROTATION_MIN_GAIN, _ROTATION_MIN_GAIN_FRACTION * n)):
+        return gain
+    return 0
+
+
+def _detect_reference_rotation_pages(
+    text: str, page_offsets: Iterable[int]
+) -> tuple[int, ...]:
+    """Flag pages whose alphabetical reference list reads as a ROTATION —
+    a later column serialized before an earlier one. 1-indexed, like
+    ``_detect_reference_inversion_pages``. Text-only and cheap."""
+    offsets = list(page_offsets)
+    flagged: list[int] = []
+    n = len(offsets)
+    for pi in range(n):
+        start = offsets[pi]
+        end = offsets[pi + 1] if pi + 1 < n else len(text)
+        if _reference_rotation_gain(_reference_entry_keys(text[start:end])):
+            flagged.append(pi + 1)
+    return tuple(flagged)
+
+
+def _reference_rotation_resolved(rewritten: str, original: str) -> bool:
+    """True when a re-extracted page delivers the sortedness gain its
+    rotation promised: the entry sequence's longest sorted run grows by at
+    least the detector's own minimum gain.
+
+    RELATIVE, not an absolute "85% sorted" bar — measured 2026-09-23: on
+    collabra.142641 p12 wrapped author lines leave the correctly reordered page
+    at 20 of 26 keys sorted (77%), up from 13. A page carrying two genuinely
+    separate alphabetical lists gains nothing from a left-then-right read and
+    is still refused, as is a reorder that leaves the text as it was."""
+    kr = _reference_entry_keys(rewritten)
+    ko = _reference_entry_keys(original)
+    if not kr:
+        return False
+    gain = _longest_sorted_run(kr) - _longest_sorted_run(ko)
+    return gain >= max(_ROTATION_MIN_GAIN, _ROTATION_MIN_GAIN_FRACTION * len(kr))
+
+
 def _word_multiset(text: str) -> "Counter":
     """Case-folded SUBSTANTIAL-token multiset of ``text`` (whitespace- and
     order-insensitive). Substantial = an alphabetic token of length ≥ 2 — the
@@ -375,6 +490,26 @@ def _word_multiset(text: str) -> "Counter":
     return Counter(toks)
 
 
+def _accept_reorder(rewritten: str, original_page: str,
+                    must_resolve_rotation: bool) -> bool:
+    """The splice's acceptance test, one implementation for every geometry.
+
+    Accept ONLY a pure reorder: identical substantial-word multiset AND a
+    materially different token order (else it's a no-op the original already
+    had right — don't churn whitespace). Unconditional — it rejects column-crop
+    word SPLITS (jama_open_1 'adults'→'adu') that the old accept-any path
+    shipped. A rotation-flagged page must additionally come out sorted.
+    """
+    if not rewritten:
+        return False
+    if _word_multiset(rewritten) != _word_multiset(original_page):
+        return False
+    if rewritten.split() == original_page.split():
+        return False
+    return (not must_resolve_rotation) or _reference_rotation_resolved(
+        rewritten, original_page)
+
+
 def splice_column_corrected_pages(
     raw_text: str,
     layout_doc,
@@ -384,6 +519,8 @@ def splice_column_corrected_pages(
     gutter_fallback_pages: Iterable[int] | None = None,
     banded_pages: Iterable[int] | None = None,
     changed_out: list | None = None,
+    rotation_pages: Iterable[int] | None = None,
+    edge_trimmed_pages: Iterable[int] | None = None,
 ) -> str:
     """Splice column-aware re-extracted text into flagged pages of raw_text.
 
@@ -417,6 +554,14 @@ def splice_column_corrected_pages(
             mixed-layout pages it cannot reach). Same unconditional word-
             preservation guard applies, so a band crop that drops/fabricates a
             word is rejected and the page kept as-is.
+        rotation_pages: 1-indexed pages flagged by
+            ``_detect_reference_rotation_pages``. For these the reorder must
+            ALSO leave the reference-entry sequence sorted
+            (``_reference_rotation_resolved``); a reorder that does not undo the
+            rotation it was triggered for is rejected and the page kept as-is.
+        edge_trimmed_pages: 1-indexed pages that may fall back to
+            ``extract_page_text_edge_trimmed`` when the whole-page read is
+            empty or refused. Same guards.
 
     Returns:
         Rewritten raw_text with flagged pages' content replaced. Pages whose
@@ -427,6 +572,8 @@ def splice_column_corrected_pages(
     pages_set = set(pages_to_fix)
     gf_pages = set(gutter_fallback_pages or ())
     b_pages = set(banded_pages or ())
+    r_pages = set(rotation_pages or ())
+    e_pages = set(edge_trimmed_pages or ())
     if not pages_set or not offsets:
         return raw_text
 
@@ -453,28 +600,33 @@ def splice_column_corrected_pages(
             # that drops/fabricates a word is rejected (page kept as-is).
             if not rewritten and page_number_1idx in b_pages and pdf_bytes is not None:
                 rewritten = extract_page_text_banded(layout_doc, page_idx, pdf_bytes)
-            if rewritten:
-                original_page = raw_text[start:end]
-                # Accept ONLY a pure reorder: identical substantial-word multiset
-                # AND a materially different token order (else it's a no-op the
-                # original already had right — don't churn whitespace). This guard
-                # is unconditional now — it rejects column-crop word SPLITS
-                # (jama_open_1 'adults'→'adu') that the old accept-any path shipped.
-                same_words = _word_multiset(rewritten) == _word_multiset(original_page)
-                reordered = rewritten.split() != original_page.split()
-                if same_words and reordered:
-                    # Re-attach the original page's trailing separator (newlines
-                    # + form-feed) so the corrected page's last word can't glue
-                    # onto the next page's first word at the splice boundary
-                    # (bjps_1 'results'+'https'→'resultshttps'; chen running-header
-                    # 'J' gluing to the prior word) and the \f page structure is
-                    # preserved for downstream page-aware consumers.
-                    trailing = original_page[len(original_page.rstrip()):]
-                    out_parts.append(rewritten.rstrip() + trailing)
-                    cursor = end
-                    if changed_out is not None:
-                        changed_out.append(page_number_1idx)
-                    continue
+            original_page = raw_text[start:end]
+            accepted = _accept_reorder(
+                rewritten, original_page, page_number_1idx in r_pages)
+            # Reference pages whose only gutter-crossing rows are header/title/
+            # footer furniture: a second geometry, tried when the whole-page
+            # read is unavailable OR refused (its 97%-clear tolerance can cut a
+            # crossing footer word, "psychology" -> "ps" + "ychology"). Same
+            # guards, so it can only ever add a correct reorder.
+            if (not accepted and page_number_1idx in e_pages
+                    and pdf_bytes is not None):
+                rewritten = extract_page_text_edge_trimmed(
+                    layout_doc, page_idx, pdf_bytes)
+                accepted = _accept_reorder(
+                    rewritten, original_page, page_number_1idx in r_pages)
+            if accepted:
+                # Re-attach the original page's trailing separator (newlines
+                # + form-feed) so the corrected page's last word can't glue
+                # onto the next page's first word at the splice boundary
+                # (bjps_1 'results'+'https'→'resultshttps'; chen running-header
+                # 'J' gluing to the prior word) and the  page structure is
+                # preserved for downstream page-aware consumers.
+                trailing = original_page[len(original_page.rstrip()):]
+                out_parts.append(rewritten.rstrip() + trailing)
+                cursor = end
+                if changed_out is not None:
+                    changed_out.append(page_number_1idx)
+                continue
         out_parts.append(raw_text[start:end])
         cursor = end
     if cursor < len(raw_text):
@@ -872,6 +1024,60 @@ def _segment_bands(words: list[dict], gx: float) -> list[tuple[bool, float, floa
     return [tuple(b) for b in merged]
 
 
+def _pdftotext_crop(tmp_path: str, page_index: int, x: float, y: float,
+                    w: float, h: float, label: str = "banded") -> str | None:
+    """One region's pdftotext crop. ``None`` means the crop DID NOT RUN.
+
+    Shared by the banded and the edge-trimmed re-extraction; ``label`` prefixes
+    the recorded fallback (``banded_crop_timeout``, ``edge_trimmed_crop_timeout``)
+    so each path's failures stay separately countable.
+
+    That third return value is the whole point, and it is the fix for a
+    measured defect. This used to return ``""`` for three situations that
+    mean different things: a genuinely blank region, a ``pdftotext`` that
+    exited non-zero, and a ``subprocess.run`` that raised -- which under
+    machine load is the ``timeout=30`` expiring. The caller joined the
+    parts, so an expired band vanished and the page came back SHORT with
+    every surviving word still in the right order. That is
+    indistinguishable from a real word loss:
+    ``test_banded_reextraction_is_word_preserving_real_pdf`` failed with
+    ``{'and': 17} != {'and': 19}`` on 2026-09-17 during a run that took
+    1:00:06 for work that takes 46 s on a quiet machine, and passed on
+    both trees afterwards. Machine load became a correctness-shaped
+    failure, which is the most expensive kind of flake: it accuses the
+    code under test.
+
+    In production the splice's word-multiset guard refused the short page,
+    so no wrong text ever shipped -- but the correction was then dropped
+    with NO signal of any kind, which is the silent-capability-loss shape
+    every other fallback in this module exists to prevent. A failed crop
+    is now recorded and abandons the page rather than being averaged into
+    it. Gated by ``tests/test_banded_crop_failure_is_not_silent.py``.
+    """
+    if w <= 1 or h <= 1:
+        return ""  # degenerate region, not a failure: nothing to read
+    import subprocess
+
+    pa = str(page_index + 1)  # pdftotext is 1-indexed
+    try:
+        proc = subprocess.run(
+            [resolve_pdftotext_executable(), "-enc", "UTF-8", "-f", pa, "-l", pa,
+             "-x", str(int(x)), "-y", str(int(y)),
+             "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
+            capture_output=True, timeout=30, encoding="utf-8", errors="replace",
+        )
+    except subprocess.TimeoutExpired:
+        record_fallback(f"{label}_crop_timeout", detail=f"p{pa}")
+        return None
+    except Exception as exc:
+        record_fallback(f"{label}_crop_exception", detail=type(exc).__name__)
+        return None
+    if proc.returncode != 0:
+        record_fallback(f"{label}_crop_nonzero_exit", detail=str(proc.returncode))
+        return None
+    return (proc.stdout or "").rstrip("\f").strip()
+
+
 def extract_page_text_banded(layout_doc, page_index: int,
                              pdf_bytes: bytes) -> str:
     """RC-1 Step 2: re-extract a flagged page band-by-band (see module comment).
@@ -909,54 +1115,10 @@ def extract_page_text_banded(layout_doc, page_index: int,
         cuts.append((bands[i][2] + bands[i + 1][1]) / 2.0)
     cuts.append(page_height)
 
-    import subprocess
     import tempfile
 
     def _crop(tmp_path: str, x: float, y: float, w: float, h: float) -> str | None:
-        """One band's pdftotext crop. ``None`` means the crop DID NOT RUN.
-
-        That third return value is the whole point, and it is the fix for a
-        measured defect. This used to return ``""`` for three situations that
-        mean different things: a genuinely blank region, a ``pdftotext`` that
-        exited non-zero, and a ``subprocess.run`` that raised -- which under
-        machine load is the ``timeout=30`` expiring. The caller joined the
-        parts, so an expired band vanished and the page came back SHORT with
-        every surviving word still in the right order. That is
-        indistinguishable from a real word loss:
-        ``test_banded_reextraction_is_word_preserving_real_pdf`` failed with
-        ``{'and': 17} != {'and': 19}`` on 2026-09-17 during a run that took
-        1:00:06 for work that takes 46 s on a quiet machine, and passed on
-        both trees afterwards. Machine load became a correctness-shaped
-        failure, which is the most expensive kind of flake: it accuses the
-        code under test.
-
-        In production the splice's word-multiset guard refused the short page,
-        so no wrong text ever shipped -- but the correction was then dropped
-        with NO signal of any kind, which is the silent-capability-loss shape
-        every other fallback in this module exists to prevent. A failed crop
-        is now recorded and abandons the page rather than being averaged into
-        it. Gated by ``tests/test_banded_crop_failure_is_not_silent.py``.
-        """
-        if w <= 1 or h <= 1:
-            return ""  # degenerate region, not a failure: nothing to read
-        pa = str(page_index + 1)  # pdftotext is 1-indexed
-        try:
-            proc = subprocess.run(
-                [resolve_pdftotext_executable(), "-enc", "UTF-8", "-f", pa, "-l", pa,
-                 "-x", str(int(x)), "-y", str(int(y)),
-                 "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
-                capture_output=True, timeout=30, encoding="utf-8", errors="replace",
-            )
-        except subprocess.TimeoutExpired:
-            record_fallback("banded_crop_timeout", detail=f"p{pa}")
-            return None
-        except Exception as exc:
-            record_fallback("banded_crop_exception", detail=type(exc).__name__)
-            return None
-        if proc.returncode != 0:
-            record_fallback("banded_crop_nonzero_exit", detail=str(proc.returncode))
-            return None
-        return (proc.stdout or "").rstrip("\f").strip()
+        return _pdftotext_crop(tmp_path, page_index, x, y, w, h)
 
     tmp_path = ""
     try:
@@ -1000,3 +1162,211 @@ def extract_page_text_banded(layout_doc, page_index: int,
         # guard this replaces lives in one place now rather than at each site.
         unlink_temp_pdf(tmp_path)
     return "\n".join(p for p in parts if p.strip())
+
+
+# ── Edge-trimmed two-column re-extraction ──
+#
+# The whole-page corrector demands a gutter clear across ~97% of the page's
+# text rows, and on a reference page that is defeated by nothing more than the
+# page's own furniture: a centred running header, a centred ``References``
+# title, a centred footer ("Collabra: Psychology 18"), or a full-width
+# how-to-cite block under the last column. Measured 2026-09-23 on the 88
+# rotation-flagged pages of a 500-paper random sample: 46 were refused, and on
+# ~35 of them every gutter-crossing row sat ABOVE or BELOW the two-column body.
+# Worse, where the 97% gate did pass, its tolerance let the cut land inside a
+# crossing word ("psychology" -> "ps" + "ychology"), and the word-preservation
+# guard — correctly — threw the whole page away.
+#
+# This path separates the two things the whole-page test conflates. The
+# furniture rows are identified geometrically (the rows crossing the gutter),
+# may only sit in a band at the top and a band at the bottom, and are read
+# full-width; the gutter is then measured on the BODY rows alone, where it must
+# be crossed by NO row at all. A row crossing the gutter in the middle of the
+# body (a spanning table, a figure, a long URL) makes the page ineligible.
+# Full-width text above or below a two-column body is READ in its right place
+# (top band first, bottom band last), so this floor only has to say "the page
+# is mainly two-column". collabra.251 p12 closes on a 25-row how-to-cite block
+# and keeps 38 of 64 rows as body.
+_EDGE_MIN_BODY_FRACTION = 0.5
+_EDGE_MIN_BODY_ROWS = 15
+
+
+def _edge_trimmed_layout(words: list[dict], page_width: float
+                         ) -> tuple[float, float, float, tuple[float, float] | None] | None:
+    """``(midline_x, cut_top, cut_bottom, margin)`` for a page whose only
+    gutter-crossing rows are top/bottom furniture, else None. ``cut_bottom`` is
+    -1.0 when nothing sits below the body. ``margin`` is the ``(x_from, x_to)``
+    strip holding rotated margin text clear of every upright glyph, or None.
+
+    Geometry is measured on UPRIGHT text only. A rotated margin watermark
+    (Collabra's vertical "Downloaded from http://online.ucpress.edu/..." at
+    x~571-577) is one pdfplumber "word" per rotated run, each hundreds of
+    points tall, so it would stretch the body's vertical extent over the
+    footer and veto a clean cut. It is still extracted — the crops are
+    positional — and still counted by the word-preservation guard."""
+    rotated = [w for w in words if not w.get("upright", True)]
+    words = [w for w in words if w.get("upright", True)]
+    if not words:
+        return None
+    lo_i, hi_i = int(page_width * 0.35), int(page_width * 0.65)
+    rows: dict[int, list[dict]] = defaultdict(list)
+    for w in words:
+        rows[int(round(w["top"] / _LINE_Y_TOLERANCE))].append(w)
+    order = sorted(rows)
+    if len(order) < _EDGE_MIN_BODY_ROWS:
+        return None
+    crossings: dict[int, set] = defaultdict(set)
+    for rk, ws in rows.items():
+        for w in ws:
+            x0 = max(lo_i, int(w["x0"]))
+            x1 = min(hi_i, int(w["x1"]))
+            for x in range(x0, x1 + 1):
+                crossings[x].add(rk)
+    # Probe a STRIP as wide as the narrowest gutter we accept, not a single x:
+    # a centred footer whose inter-word space happens to fall on the gutter
+    # ("Collabra:" ends at 294, "Psychology" starts at 296 — collabra.90203
+    # p18) crosses no single x there, and would otherwise be classed as body
+    # and then veto every strip wide enough to be a gutter.
+    strip = int(_MIN_GUTTER_STRIP_WIDTH)
+    best: tuple[int, int, int] | None = None  # (body_len, start, end) in `order`
+    for x in range(lo_i, hi_i - strip + 1):
+        cr: set = set()
+        for xx in range(x, x + strip + 1):
+            cr |= crossings.get(xx, set())
+        # Longest run of consecutive rows none of which crosses x.
+        run_s = 0
+        for i in range(len(order) + 1):
+            if i == len(order) or order[i] in cr:
+                if best is None or i - run_s > best[0]:
+                    best = (i - run_s, run_s, i)
+                run_s = i + 1
+    if best is None:
+        return None
+    body_len, s_i, e_i = best
+
+    # A body row sharing a baseline with a furniture row belongs to the
+    # furniture: the page number "18" right of a centred "Collabra: Psychology"
+    # buckets one row apart from it (collabra.90203 p18) and would otherwise
+    # leave no glyph-free scanline between body and footer.
+    def _span(i: int) -> tuple[float, float]:
+        ws = rows[order[i]]
+        return min(w["top"] for w in ws), max(w["bottom"] for w in ws)
+
+    while s_i < e_i and s_i > 0 and _span(s_i)[0] <= max(
+            _span(i)[1] for i in range(s_i)):
+        s_i += 1
+    while e_i > s_i and e_i < len(order) and _span(e_i - 1)[1] >= min(
+            _span(i)[0] for i in range(e_i, len(order))):
+        e_i -= 1
+    body_len = e_i - s_i
+    if body_len < _EDGE_MIN_BODY_ROWS or body_len < _EDGE_MIN_BODY_FRACTION * len(order):
+        return None
+    body_keys = set(order[s_i:e_i])
+    # The gutter measured on the body alone: every x no body row crosses.
+    clear = [x for x in range(lo_i, hi_i + 1)
+             if not (crossings.get(x, set()) & body_keys)]
+    if not clear:
+        return None
+    runs: list[tuple[int, int]] = []
+    r_lo = prev = clear[0]
+    for x in clear[1:]:
+        if x != prev + 1:
+            runs.append((r_lo, prev))
+            r_lo = x
+        prev = x
+    runs.append((r_lo, prev))
+    g_lo, g_hi = max(runs, key=lambda r: r[1] - r[0])
+    if g_hi - g_lo < _MIN_GUTTER_STRIP_WIDTH:
+        return None
+    mid = (g_lo + g_hi) / 2.0
+    if not (0.40 * page_width <= mid <= 0.60 * page_width):
+        return None
+    body_words = [w for rk in order[s_i:e_i] for w in rows[rk]]
+    left = sum(1 for w in body_words if (w["x0"] + w["x1"]) / 2 < mid)
+    if (left < _MIN_COLUMN_FRACTION * len(body_words)
+            or len(body_words) - left < _MIN_COLUMN_FRACTION * len(body_words)):
+        return None
+    body_top = min(w["top"] for w in body_words)
+    body_bottom = max(w["bottom"] for w in body_words)
+    # The cuts must fall in glyph-free space: halfway to the nearest furniture
+    # row on each side, or the page edge when there is none.
+    above = [w["bottom"] for rk in order[:s_i] for w in rows[rk]]
+    below = [w["top"] for rk in order[e_i:] for w in rows[rk]]
+    if (above and max(above) >= body_top) or (below and min(below) <= body_bottom):
+        return None  # furniture overlaps the body vertically: no clean cut
+    cut_top = (max(above) + body_top) / 2.0 if above else 0.0
+    cut_bot = (body_bottom + min(below)) / 2.0 if below else None
+    # Rotated margin text runs the full page height, so a horizontal cut
+    # splits it — "by guest on 12 March 2024" came back "Ma" + "arch"
+    # (collabra.255 p14, collabra.84916 p12) and the word guard refused the
+    # page. When it sits wholly in a margin no upright glyph reaches, it gets a
+    # full-height crop of its own and the other crops stop short of it.
+    margin: tuple[float, float] | None = None
+    if rotated:
+        ux0 = min(w["x0"] for w in words)
+        ux1 = max(w["x1"] for w in words)
+        rx0 = min(w["x0"] for w in rotated)
+        rx1 = max(w["x1"] for w in rotated)
+        if rx0 > ux1:
+            margin = ((ux1 + rx0) / 2.0, page_width)
+        elif rx1 < ux0:
+            margin = (0.0, (rx1 + ux0) / 2.0)
+    return mid, cut_top, (cut_bot if cut_bot is not None else -1.0), margin
+
+
+def extract_page_text_edge_trimmed(layout_doc, page_index: int,
+                                   pdf_bytes: bytes | None) -> str:
+    """Top furniture band, left body column, right body column, bottom
+    furniture band — or "" when the page does not have that shape. Always
+    subject to the splice's word-preservation guard."""
+    if pdf_bytes is None:
+        return ""
+    if page_index < 0 or page_index >= len(layout_doc.pages):
+        return ""
+    page = layout_doc.pages[page_index]
+    page_width = float(page.width or 0.0)
+    page_height = float(page.height or 0.0)
+    if page_width <= 0 or page_height <= 0:
+        return ""
+    words = list(page.words or ())
+    if len(words) < _MIN_WORDS_FOR_COLUMN_MODE:
+        return ""
+    shape = _edge_trimmed_layout(words, page_width)
+    if shape is None:
+        return ""
+    mid, cut_top, cut_bot, margin = shape
+    if cut_bot < 0:
+        cut_bot = page_height
+    x_lo, x_hi = 0.0, page_width
+    if margin is not None:
+        if margin[0] > mid:
+            x_hi = margin[0]
+        else:
+            x_lo = margin[1]
+    import tempfile
+
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        regions = [
+            (x_lo, 0.0, x_hi - x_lo, cut_top),                     # top band
+            (x_lo, cut_top, mid - x_lo, cut_bot - cut_top),        # left body
+            (mid, cut_top, x_hi - mid, cut_bot - cut_top),         # right body
+            (x_lo, cut_bot, x_hi - x_lo, page_height - cut_bot),   # bottom band
+        ]
+        if margin is not None:                                     # margin text
+            regions.append((margin[0], 0.0, margin[1] - margin[0], page_height))
+        parts: list[str] = []
+        for x, y, w, h in regions:
+            got = _pdftotext_crop(tmp_path, page_index, x, y, w, h,
+                                  label="edge_trimmed")
+            if got is None:
+                return ""  # a crop that did not run abandons the page
+            parts.append(got)
+    finally:
+        unlink_temp_pdf(tmp_path)
+    if not parts[1].strip() or not parts[2].strip():
+        return ""
+    return "\n\n".join(p for p in parts if p.strip())
