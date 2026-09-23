@@ -1205,6 +1205,7 @@ def extract_page_text_banded(layout_doc, page_index: int,
 # and keeps 38 of 64 rows as body.
 _EDGE_MIN_BODY_FRACTION = 0.5
 _EDGE_MIN_BODY_ROWS = 15
+_EDGE_MAX_TWO_SIDED_FURNITURE = 1
 
 
 def _edge_trimmed_layout(words: list[dict], page_width: float
@@ -1296,6 +1297,25 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
         return None
     mid = (g_lo + g_hi) / 2.0
     if not (0.40 * page_width <= mid <= 0.60 * page_width):
+        return None
+    # A furniture band is read FULL WIDTH, so it must not hold column text.
+    # A header or footer line may have text on both sides of the gutter
+    # ("J. Chen et al." ... "Journal of Experimental Social Psychology"), but
+    # two such rows in one band mean two-column lines sit on the far side of a
+    # full-width row — an internal banner or spanning table, not furniture —
+    # and a full-width read of them would ship right-column text beside
+    # left-column text with every character intact (raised by the Luna
+    # cross-model review, 2026-09-23). FAIL-CLOSED and UNOBSERVED: no page of
+    # the 500-paper sample trips it, and it declined 0 of the 87 corrections
+    # there — it can only turn a reorder into a no-op, never rewrite text.
+    def _two_sided(rk: int) -> bool:
+        ws = rows[rk]
+        return (any(w["x1"] <= g_lo for w in ws)
+                and any(w["x0"] >= g_hi for w in ws)
+                and not any(w["x0"] < g_hi and w["x1"] > g_lo for w in ws))
+
+    if (sum(1 for rk in order[:s_i] if _two_sided(rk)) > _EDGE_MAX_TWO_SIDED_FURNITURE
+            or sum(1 for rk in order[e_i:] if _two_sided(rk)) > _EDGE_MAX_TWO_SIDED_FURNITURE):
         return None
     body_words = [w for rk in order[s_i:e_i] for w in rows[rk]]
     left = sum(1 for w in body_words if (w["x0"] + w["x1"]) / 2 < mid)
