@@ -704,7 +704,9 @@ neither corpus contained: `Studies 1,2, and 3 replicated` → `Studies 1.2, and 
 English list comma *is* followed by whitespace.
 
 Then the same scan, pointed at the **shipped** rule rather than the proposal: A3 fired 29
-times across 13 papers and **~27 were not decimals** — `controls.7,8` → `controls.7.8`
+times across ~~13~~ **19** papers and **~27 were not decimals** *(paper count corrected
+2026-09-22: re-measured against a v2.4.126 checkout, the release this sentence describes; the
+29 sites were right and two independent instruments agree on 19 papers)* — `controls.7,8` → `controls.7.8`
 (Vancouver superscripts after a sentence period), `Frank 1,2` → `Frank 1.2` (affiliation
 markers), `Experiments 1,2` (enumeration), `9,57` (a flattened ANOVA df pair). The
 divergence they filed was real and it was the *smaller* half of the problem.
