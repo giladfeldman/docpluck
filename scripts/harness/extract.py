@@ -153,10 +153,20 @@ def _sha1(path: Path) -> str:
     return h.hexdigest()
 
 
+# Every optional /analyze stage, requested EXPLICITLY. Since app service 1.7.0
+# these default OFF: a bare `/analyze?level=X` returns `sections`, `tables` and
+# `rendered` as null, and `_save_views` would then write fewer views while every
+# Tier-D check that reads them lost its input silently. A service older than
+# 1.7.0 ignores the flags and computes everything anyway, so this is safe both
+# ways.
+_ANALYZE_STAGES = "structured=true&sections=true&rendered=true"
+_REQUESTED_STAGES = ("sections", "tables", "rendered")
+
+
 def _post_analyze(base_url: str, token: str, file_path: Path, level: str, timeout: int) -> dict:
     body, ctype = _multipart(file_path)
     req = urllib.request.Request(
-        f"{base_url}/analyze?level={level}",
+        f"{base_url}/analyze?level={level}&{_ANALYZE_STAGES}",
         data=body,
         method="POST",
         headers={"Content-Type": ctype, "x-internal-service-token": token},
@@ -178,7 +188,22 @@ _JSON_VIEWS = {
 
 
 def _save_views(out_dir: Path, analyze: dict) -> list[str]:
-    """Split the /analyze response into per-view files. Returns the views written."""
+    """Split the /analyze response into per-view files. Returns the views written.
+
+    Refuses a response in which a stage this harness asked for was `skipped`:
+    that is the service ignoring the request, and writing the views that did
+    arrive would let the checks run over less than they think. Stale view files
+    from an earlier run are removed first, so a view this run did not produce
+    can never be read back as if it had.
+    """
+    stages = ((analyze.get("metadata") or {}).get("stages")) or {}
+    skipped = sorted(s for s in _REQUESTED_STAGES if stages.get(s) == "skipped")
+    if skipped:
+        raise RuntimeError(
+            f"/analyze skipped requested stage(s) {skipped}; metadata.stages={stages}"
+        )
+    for fname, _getter in (*_TEXT_VIEWS.values(), *_JSON_VIEWS.values()):
+        (out_dir / fname).unlink(missing_ok=True)
     written: list[str] = []
     (out_dir / "analyze.json").write_text(
         json.dumps(analyze, indent=2, ensure_ascii=False), encoding="utf-8"
