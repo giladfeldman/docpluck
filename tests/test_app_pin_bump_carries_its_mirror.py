@@ -36,7 +36,16 @@ import check_app_pin_sync as pin  # noqa: E402
 
 # Resolved through the script's own helper rather than restated here -- this
 # test exists because two copies of one fact drifted, so it must not add a third.
-REAL_GENERATOR = pin.default_app_repo() / "frontend" / "scripts" / "sync-docpluck-pin.mjs"
+#
+# `default_app_repo()` returns None when no app checkout sits beside this repo --
+# a scratchpad worktree, or anyone cloning this PUBLIC repo on its own. Joining a
+# path onto that None crashed COLLECTION with a bare TypeError, taking the whole
+# module down with no hint of the cause; the fixture below now says what is
+# missing instead.
+_APP_REPO = pin.default_app_repo()
+REAL_GENERATOR = (
+    _APP_REPO / "frontend" / "scripts" / "sync-docpluck-pin.mjs" if _APP_REPO else None
+)
 
 
 def _git(cwd: Path, *args: str) -> None:
@@ -49,6 +58,11 @@ def app_repo(tmp_path: Path) -> Path:
     """A minimal stand-in for the app repo, holding both halves of the pin."""
     if shutil.which("node") is None:
         pytest.skip("node is required: the fix calls the real mirror generator")
+    if REAL_GENERATOR is None:
+        pytest.skip(
+            "no app checkout found beside this repo (set DOCPLUCK_APP_REPO to point "
+            "at it); the pin-mirror generator lives there"
+        )
     if not REAL_GENERATOR.exists():
         pytest.skip(f"mirror generator not present at {REAL_GENERATOR}")
 
