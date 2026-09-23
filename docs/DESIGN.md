@@ -359,7 +359,7 @@ See `an internal design doc` for full data model and detection algorithm.
 
 ## Known Limitations
 
-See the Docpluck App [UNADDRESSED_ISSUES.md](https://github.com/giladfeldman/docpluckapp) for the full list. Key ones:
+The full list is tracked privately with the hosted application. Key ones:
 
 | Issue | Rate | Notes |
 |-------|------|-------|

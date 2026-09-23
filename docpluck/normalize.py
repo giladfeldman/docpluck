@@ -147,7 +147,7 @@ _WATERMARK_PATTERNS = [
         r"(?:see\s+front\s+matter|Elsevier|All\s+rights\s+reserved)[^\n]*\n?",
     ),
     # Issue L (cycle 10, D4) — Elsevier single-author corresponding-author
-    # e-mail footer line, e.g. "E-mail address: muraven@albany.edu". This is
+    # e-mail footer line, e.g. "E-mail address: <user>@<university>.edu". This is
     # page-1 footer metadata that pdftotext splices mid-Introduction. Only
     # the SINGULAR "E-mail address:" form is matched — it is a single short
     # line (one corresponding author). The plural "E-mail addresses:" form is

@@ -7,8 +7,8 @@ actual corpus paper, resolved from the article custodian by DOI.
 The PDF fixtures live OUTSIDE this repo (gitignored — closed-access journal
 content; see memory ``feedback_no_pdfs_in_repo``). Tests therefore use the
 manifest-with-skip pattern: if the fixture is missing locally, the test
-``pytest.skip``s with a clear message. CI runs in the docpluckapp repo
-where the fixtures are present.
+``pytest.skip``s with a clear message. There is no CI anywhere: these tests
+run locally, on a machine that holds the fixtures, and skip everywhere else.
 """
 
 from __future__ import annotations
