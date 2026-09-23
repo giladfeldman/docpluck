@@ -852,7 +852,7 @@ Surveying how each consumer actually obtains docpluck:
 | consumer | mechanism | gate |
 |---|---|---|
 | MetaESCI | **editable install of the working tree** | **none** — uncommitted work runs against real corpus batches |
-| ESCIcheckapp worker | HTTP to live `docpluck.app` | **none** |
+| ESCImate worker | HTTP to live `docpluck.app` | **none** |
 | CitationGuard | HTTP to the deployed service | **none** |
 | PDFextractor | git tag pin, verified against `origin/master` | yes |
 | ScienceArena | package metadata + a build gate that fails on drift | yes |
