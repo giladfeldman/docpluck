@@ -67,6 +67,10 @@ dev = [
     "lxml>=5.0.0",
     "python-docx>=1.0.0",
     "pytest-xdist>=3",
+    # tests/test_distribution_contents.py builds the sdist and wheel in-process
+    # (no network, no build isolation) and checks what they contain. The floor
+    # is the version that test was verified on (1.32.4), not a researched minimum.
+    "hatchling>=1.32",
 ]
 
 [project.scripts]
@@ -81,6 +85,16 @@ Changelog = "https://github.com/giladfeldman/docpluck/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["docpluck"]
+
+# 2026-09-25 (owner decision D1): the source archive is an EXPLICIT allowlist.
+# With no sdist section, hatchling shipped every file git does not ignore, so
+# the 2.4.144 sdist carried scripts/harness/, tools/, tests/, CLAUDE.md and
+# LESSONS.md to PyPI, where an upload can never be taken back. The GitHub repo
+# publishes those on purpose; PyPI needs only what builds the package. Adding a
+# path here is a deliberate act: tests/test_distribution_contents.py holds its
+# own copy of this list and fails on anything else.
+[tool.hatch.build.targets.sdist]
+only-include = ["docpluck", "docs/README.md", "LICENSE"]
 
 # 2026-08-05 (run 6): the project had NO pytest configuration at all, so a bare
 # `pytest` walked the whole working tree — including `tmp/`, the scratch
