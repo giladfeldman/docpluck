@@ -982,9 +982,19 @@ def _is_prose_row(row_chars: list[dict], width: float) -> bool:
     return all(b["x0"] - a["x1"] < _PROSE_MAX_GAP_PT for a, b in zip(glyphs, glyphs[1:]))
 
 
+# A vertical band with no text at all this tall is not the inside of a table:
+# consecutive table rows sit ~10-14pt apart. It is a figure, or empty page.
+_EMPTY_BAND_PT: float = 40.0
+
+
 def _prose_row_between(page_obj, *, x0: float, x1: float, top: float, bottom: float) -> bool:
-    """True when an upright prose line lies within ``x0..x1`` strictly between
-    ``top`` and ``bottom`` (pdfplumber top-down)."""
+    """True when what lies within ``x0..x1`` strictly between ``top`` and
+    ``bottom`` (pdfplumber top-down) is NOT a continuation of table rows: an
+    upright prose line, or a text-free band taller than ``_EMPTY_BAND_PT``.
+
+    The empty band is `10.48550/arxiv.2410.21901` p7: between Table 6 and the
+    Figure 5 caption is the figure itself, which carries no text, so a prose
+    test alone let the caption back in as Table 6's "note"."""
     rows: dict[int, list[dict]] = defaultdict(list)
     for c in page_obj.chars or ():
         if not _is_upright(c):
@@ -992,7 +1002,10 @@ def _prose_row_between(page_obj, *, x0: float, x1: float, top: float, bottom: fl
         ct = c.get("top", 0.0)
         if top < ct < bottom and c.get("x0", 0.0) >= x0 - 5 and c.get("x1", 0.0) <= x1 + 5:
             rows[round(ct)].append(c)
-    return any(_is_prose_row(rc, x1 - x0) for rc in rows.values())
+    if any(_is_prose_row(rc, x1 - x0) for rc in rows.values()):
+        return True
+    edges = [top] + sorted(rows) + [bottom]
+    return any(b - a > _EMPTY_BAND_PT for a, b in zip(edges, edges[1:]))
 
 
 def _is_upright(obj: dict) -> bool:

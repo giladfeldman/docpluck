@@ -156,7 +156,7 @@ def test_a_note_below_unruled_table_rows_is_still_the_tables_note():
     # fill the gap, so the note is kept.
     note = _glyphs("Note: ATC = Anatomic Therapeutic Chemical code.", 40.0, 580.0)
     fn = detect._detect_footnote_below(
-        _layout(_body(top=620.0) + _table_rows(20, 310.0) + note), page=1,
+        _layout(_body(top=620.0) + _table_rows(22, 310.0) + note), page=1,
         bbox=(40.0, 200.0, 300.0, 300.0), grid_bottom_known=True)
     assert fn is not None and fn.bbox[1] == 580.0
 
@@ -178,4 +178,15 @@ def test_rotated_margin_text_is_not_a_note():
         g["upright"] = False
     fn = detect._detect_footnote_below(_layout(_body() + strip), page=1,
                                        bbox=(40.0, 200.0, 300.0, 300.0))
+    assert fn is None
+
+
+def test_a_figure_between_a_ruled_table_and_a_caption_is_not_a_note_gap():
+    # 10.48550/arxiv.2410.21901 p7: Table 6, then a figure (no text), then the
+    # figure's caption in small type. No prose in the gap, but 200pt with no text
+    # at all is not the inside of a table.
+    caption = _glyphs("Cross-comparison of fuse functions. FIGURE 5.", 40.0, 520.0)
+    fn = detect._detect_footnote_below(_layout(_body(top=600.0) + caption), page=1,
+                                       bbox=(40.0, 200.0, 300.0, 300.0),
+                                       grid_bottom_known=True)
     assert fn is None
