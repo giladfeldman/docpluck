@@ -3,7 +3,7 @@
   "algorithm": "sha256",
   "encoding": "utf-8",
   "newline": "\n",
-  "captured_from": "docpluck v2.4.126",
+  "captured_from": "docpluck v2.4.144",
   "fixtures": {
     "amj_lattice": {
       "sha256": "b00654d9c2fc5384a0fdab08e5104dff5b3e31d27be04da1843b474e573838af",
@@ -16,9 +16,9 @@
       "method": "pdftotext_default"
     },
     "apa_chen_jesp_lineless": {
-      "sha256": "ea799af9e7e8e647ff3c757dcc1f9d26327d10f8002139b2b7e4fee8bd5192a5",
-      "bytes": 137545,
-      "method": "pdftotext_default+column_corrected:19"
+      "sha256": "f33ccf2f8754ab8ba61ba0087aada0f89495d8225846e278bb85015131d525f1",
+      "bytes": 137541,
+      "method": "pdftotext_default+column_corrected:19,20"
     },
     "apa_efendic_affect": {
       "sha256": "8d7dc505c9bddb7f324f4ab0a3a88b281f2d13f1f1abee8f149db1bff8675616",
