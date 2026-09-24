@@ -72,6 +72,7 @@ def _af(script: str, *args: str) -> subprocess.CompletedProcess:
         text=True,
         encoding="utf-8",
         errors="replace",
+        check=False,  # callers read the output; a failure surfaces as no data
     )
 
 
@@ -200,7 +201,7 @@ def specimen_line() -> str:
     """
     try:
         import docpluck
-    except Exception as exc:  # pragma: no cover - diagnostic output path
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover - any failure is reported, never raised
         return (
             f"SPECIMEN: UNKNOWN — `import docpluck` failed "
             f"({exc.__class__.__name__}: {exc}). No figure from this run describes "
@@ -261,3 +262,360 @@ def docpluck_corpus() -> list[Path]:
             f"FATAL: the docpluck corpus is not fully in custody -- {exc}. "
             "Refusing to report a result computed from a short corpus."
         ) from exc
+
+
+# ===========================================================================
+# SPECIMEN SELECTION — run a scan against a CHOSEN copy of the library.
+#
+# `specimen_line()` above is the DETECTION half of the 2026-09-21 fix: every
+# scan says which docpluck produced its numbers. This is the SELECTION half.
+# Until it existed, "what did release X actually do on the corpus?" meant
+# copying a scan's loop into a throwaway harness by hand, and a scan cost
+# ~17 min per arm because it ran one paper at a time.
+#
+# Contract, per ARM (one requested copy of the library):
+#   * the request is a directory holding a `docpluck/` package, or a git ref
+#     of THIS repository, which is checked out as a temporary worktree OUTSIDE
+#     the repository and removed when the run ends;
+#   * every process that measures inserts that root at `sys.path[0]` BEFORE
+#     anything imports docpluck, then asserts `docpluck.__file__` lies inside
+#     it — and REFUSES (SpecimenMismatch) otherwise. It never falls back to the
+#     installed copy or to this tree;
+#   * the parent re-checks the path every result reports, so an arm cannot
+#     silently mix libraries;
+#   * worker processes are SPAWNED, never forked: a forked child inherits
+#     whatever docpluck the parent already imported (the parent imports this
+#     tree to read the corpus manifest), which is the original defect again.
+#
+# The corpus manifest is always read from THIS tree, whatever the specimen: an
+# old release has no `docpluck.testing`, and the paper set must not change
+# between arms or the arms are not comparable.
+#
+# A scan that adopts this must import docpluck ONLY inside its per-paper
+# function. A spawned worker re-executes the scan's module top level before the
+# worker initializer runs, so a module-level `from docpluck... import` would
+# bind this tree first — `bind_specimen` then refuses, loudly, rather than
+# measuring the wrong library. Pinned by
+# tests/test_harness_scripts_import_the_working_tree.py.
+# ===========================================================================
+
+import re as _re
+import shutil as _shutil
+import tempfile as _tempfile
+from contextlib import ExitStack as _ExitStack
+from contextlib import contextmanager as _contextmanager
+
+
+class SpecimenMismatch(SystemExit):
+    """The docpluck actually imported is not the one that was requested.
+
+    Deliberately fatal, like :class:`CorpusUnavailable`: a scan that carries on
+    measures some OTHER library while its output names the requested one.
+    """
+
+
+def _repo_git(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", _REPO_ROOT, *args],
+        capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    )
+
+
+def _is_within(child: Path, parent: Path) -> bool:
+    child, parent = Path(child).resolve(), Path(parent).resolve()
+    return child == parent or parent in child.parents
+
+
+def _specimen_parent_dir() -> Path:
+    """Where a ref's temporary worktree goes: NEVER in or beside this repository.
+
+    The project rule (CLAUDE.md, "ONE DIRECTORY"): a stale checkout beside the
+    repo is indistinguishable from the real one at a glance. So the default is
+    the system temp directory, overridable with ``DOCPLUCK_SPECIMEN_DIR`` — and
+    an override that lands inside the repo or next to it is refused.
+    """
+    base = Path(os.environ.get("DOCPLUCK_SPECIMEN_DIR") or _tempfile.gettempdir()).resolve()
+    repo = Path(_REPO_ROOT).resolve()
+    if _is_within(base, repo) or base == repo.parent:
+        raise SpecimenMismatch(
+            f"FATAL: refusing to put a specimen worktree at {base} -- that is inside "
+            f"or beside the repository {repo}. Point DOCPLUCK_SPECIMEN_DIR at a "
+            "scratch/temp directory."
+        )
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def registered_worktrees() -> set[Path]:
+    """Every checkout ``git worktree list`` knows for this repository."""
+    r = _repo_git("worktree", "list", "--porcelain")
+    return {
+        Path(line[len("worktree "):]).resolve()
+        for line in r.stdout.splitlines()
+        if line.startswith("worktree ")
+    }
+
+
+@_contextmanager
+def specimen_root(request: str):
+    """Yield ``(root, commit)`` for one requested specimen; clean up afterwards.
+
+    ``request`` is either an existing directory that contains
+    ``docpluck/__init__.py`` (``commit`` is its HEAD, or ``None`` outside git)
+    or a git ref of this repository (a tag such as ``v2.4.126``, a branch, a
+    SHA), which is checked out detached into a fresh temporary worktree and
+    removed on exit.
+
+    Anything else raises :class:`SpecimenMismatch`. There is no fallback: a
+    mistyped tag must not quietly measure the installed release.
+    """
+    as_path = Path(request).expanduser()
+    if as_path.is_dir():
+        root = as_path.resolve()
+        if not (root / "docpluck" / "__init__.py").is_file():
+            raise SpecimenMismatch(
+                f"FATAL: specimen {request!r} is a directory but holds no "
+                f"docpluck/__init__.py ({root}). It is not a docpluck checkout; "
+                "refusing rather than falling back to another copy."
+            )
+        r = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            capture_output=True, text=True, check=False,
+        )
+        yield root, (r.stdout.strip() or None) if r.returncode == 0 else None
+        return
+
+    r = _repo_git("rev-parse", "--verify", "--quiet", f"{request}^{{commit}}")
+    sha = r.stdout.strip()
+    if r.returncode != 0 or not sha:
+        raise SpecimenMismatch(
+            f"FATAL: specimen {request!r} is neither a directory nor a git ref of "
+            f"{_REPO_ROOT}. Refusing rather than falling back to another copy."
+        )
+    safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", request)[:40]
+    dest = Path(_tempfile.mkdtemp(prefix=f"docpluck-specimen-{safe}-", dir=_specimen_parent_dir()))
+    add = _repo_git("worktree", "add", "--detach", str(dest), sha)
+    if add.returncode != 0:
+        _shutil.rmtree(dest, ignore_errors=True)
+        raise SpecimenMismatch(
+            f"FATAL: could not check out {request!r} ({sha[:12]}) at {dest}: "
+            f"{add.stderr.strip()}"
+        )
+    try:
+        yield dest.resolve(), sha
+    finally:
+        _repo_git("worktree", "remove", "--force", str(dest))
+        _repo_git("worktree", "prune")
+        _shutil.rmtree(dest, ignore_errors=True)
+        if dest.resolve() in registered_worktrees() or dest.exists():
+            print(
+                f"# WARNING: specimen worktree {dest} was NOT removed -- remove it "
+                f"with `git worktree remove --force {dest}`.",
+                file=sys.stderr,
+            )
+
+
+def bind_specimen(root: str | os.PathLike) -> Path:
+    """Make THIS process import docpluck from ``root``, and prove it did.
+
+    Returns the resolved ``docpluck/__init__.py``. Raises
+    :class:`SpecimenMismatch` when docpluck is already imported from elsewhere
+    (it is never purged and re-imported: other modules may hold references to
+    the old copy, and a purge yields one process running two libraries), or
+    when the import lands outside ``root`` -- e.g. because an import hook such
+    as an editable install's finder outranks ``sys.path``.
+    """
+    root = Path(root).resolve()
+    loaded = sys.modules.get("docpluck")
+    if loaded is not None:
+        got = Path(getattr(loaded, "__file__", None) or "<no __file__>").resolve()
+        if not _is_within(got, root):
+            raise SpecimenMismatch(
+                f"SPECIMEN MISMATCH: requested {root}, but this process had already "
+                f"imported docpluck from {got}. Refusing to measure."
+            )
+        return got
+    if str(root) in sys.path:
+        sys.path.remove(str(root))
+    sys.path.insert(0, str(root))
+    import docpluck  # the import IS the operation being checked
+
+    got = Path(getattr(docpluck, "__file__", None) or "<no __file__>").resolve()
+    if not _is_within(got, root):
+        raise SpecimenMismatch(
+            f"SPECIMEN MISMATCH: requested {root}, but `import docpluck` resolved "
+            f"{got}. Refusing to measure."
+        )
+    return got
+
+
+_WORKER_BINDING: tuple[str, str] | BaseException | None = None
+
+
+def _worker_init(root: str) -> None:
+    # An initializer that RAISES only breaks the pool: the parent sees a bare
+    # BrokenProcessPool and the reason is lost in a worker's stderr. So the
+    # refusal is kept and re-raised from the first task, where it reaches the
+    # parent verbatim.
+    global _WORKER_BINDING
+    try:
+        got = bind_specimen(root)
+        import docpluck
+
+        _WORKER_BINDING = (str(got), str(getattr(docpluck, "__version__", "<none>")))
+    except BaseException as exc:  # noqa: BLE001 - relayed to the parent, not swallowed
+        _WORKER_BINDING = exc
+
+
+def _worker_call(fn, item):
+    if isinstance(_WORKER_BINDING, BaseException):
+        raise _WORKER_BINDING
+    return _WORKER_BINDING, fn(item)
+
+
+class Arm:
+    """One requested copy of the library, and everything measured with it.
+
+    A plain class, not a dataclass, on purpose: ``@dataclass`` looks its module
+    up in ``sys.modules``, and tests load this file with
+    ``spec_from_file_location`` without registering it -- which made the
+    decorator raise at import and took ``specimen_line()``'s tests down with it.
+    """
+
+    def __init__(self, request: str, root: Path, commit: str | None,
+                 resolved: Path | None = None, version: str | None = None) -> None:
+        self.request = request
+        self.root = root
+        self.commit = commit
+        self.resolved = resolved
+        self.version = version
+        self.results: list = []
+
+    @property
+    def label(self) -> str:
+        return "tree" if self.root == Path(_REPO_ROOT).resolve() else self.request
+
+    def specimen_line(self) -> str:
+        if self.resolved is None:
+            return f"SPECIMEN[{self.label}]: UNKNOWN -- no item was measured"
+        where = (
+            "this working tree" if _is_within(self.resolved, Path(_REPO_ROOT))
+            else "NOT this working tree"
+        )
+        commit = f"commit {self.commit[:12]}" if self.commit else "not a git checkout"
+        return (
+            f"SPECIMEN[{self.label}]: {self.resolved} ({where}; {commit}); "
+            f"reports __version__={self.version}"
+        )
+
+
+def add_specimen_arguments(parser) -> None:
+    """The shared CLI: ``--specimen`` (repeatable, one per arm), ``--workers``, ``--json``."""
+    parser.add_argument(
+        "--specimen", action="append", metavar="PATH_OR_REF",
+        help="a directory holding a docpluck/ package, or a git ref of this repo "
+             "(e.g. v2.4.126, checked out as a temporary worktree outside the repo "
+             "and removed afterwards). Repeat for several arms, run concurrently. "
+             "Default: this working tree.",
+    )
+    parser.add_argument(
+        "--workers", type=int, default=1,
+        help="worker processes in total, shared across arms. Default 1 = the "
+             "original single-process run.",
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="also write one JSON record per arm under "
+             "$VIBE_ROOT/_artifacts/docpluck-diag/<scan>/ (never inside the repo).",
+    )
+
+
+def run_arms(fn, items, requests: list[str] | None = None, workers: int = 1) -> list[Arm]:
+    """Map ``fn`` over ``items`` once per requested specimen; results in ``items`` order.
+
+    ``fn`` must be a picklable module-level function that imports docpluck
+    INSIDE its body. With no ``requests`` the single arm is this working tree.
+
+    The only in-process path is the original one -- one arm, this tree, one
+    worker -- so a default run behaves as the scan always did, plus the
+    assertion. Every other combination runs in spawned worker processes; arms
+    run concurrently, each with its share of ``workers``.
+    """
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+
+    requests = list(requests or [_REPO_ROOT])
+    items = list(items)
+    with _ExitStack() as stack:
+        arms = [Arm(req, *stack.enter_context(specimen_root(req))) for req in requests]
+
+        if len(arms) == 1 and workers <= 1 and arms[0].root == Path(_REPO_ROOT).resolve():
+            arm = arms[0]
+            arm.resolved = bind_specimen(arm.root)
+            import docpluck
+
+            arm.version = str(getattr(docpluck, "__version__", "<none>"))
+            arm.results = [fn(it) for it in items]
+            return arms
+
+        per_arm = max(1, workers // len(arms))
+        ctx = multiprocessing.get_context("spawn")
+        futures = []
+        for arm in arms:
+            pool = stack.enter_context(ProcessPoolExecutor(
+                max_workers=per_arm, mp_context=ctx,
+                initializer=_worker_init, initargs=(str(arm.root),),
+            ))
+            futures.append([pool.submit(_worker_call, fn, it) for it in items])
+
+        for arm, futs in zip(arms, futures):
+            for fut in futs:
+                (got, version), result = fut.result()
+                got = Path(got)
+                if not _is_within(got, arm.root):
+                    raise SpecimenMismatch(
+                        f"SPECIMEN MISMATCH: arm {arm.label!r} requested {arm.root}, "
+                        f"but a worker measured with {got}. Refusing to report."
+                    )
+                if arm.resolved is None:
+                    arm.resolved, arm.version = got, version
+                elif got != arm.resolved:
+                    raise SpecimenMismatch(
+                        f"SPECIMEN MISMATCH: arm {arm.label!r} mixed libraries: "
+                        f"{arm.resolved} and {got}. Refusing to report."
+                    )
+                arm.results.append(result)
+        return arms
+
+
+def artifact_path(scan: str, arm: Arm) -> Path:
+    """Where ``--json`` output goes: ``$VIBE_ROOT/_artifacts/docpluck-diag/<scan>/``.
+
+    Never inside this repository -- the records carry article text (context
+    snippets), which lives only with the custodian or in scratch output outside
+    any repo. ``DOCPLUCK_DIAG_OUT`` overrides the directory; an override inside
+    the repo is refused, and a missing VIBE_ROOT fails loudly.
+    """
+    import datetime as _dt
+
+    override = os.environ.get("DOCPLUCK_DIAG_OUT")
+    if override:
+        base = Path(override)
+    else:
+        vibe = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+        if not vibe.is_dir():
+            raise CorpusUnavailable(
+                f"FATAL: VIBE_ROOT {vibe} does not exist, so there is nowhere outside "
+                "the repository to write the record. Set VIBE_ROOT or DOCPLUCK_DIAG_OUT."
+            )
+        base = vibe / "_artifacts" / "docpluck-diag"
+    base = base.resolve()
+    if _is_within(base, Path(_REPO_ROOT)):
+        raise CorpusUnavailable(
+            f"FATAL: refusing to write diag output inside the repository ({base})."
+        )
+    stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    safe = _re.sub(r"[^A-Za-z0-9._-]+", "_", arm.label)[-60:]
+    out = base / scan / f"{stamp}__{safe}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    return out
