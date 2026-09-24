@@ -73,9 +73,17 @@ def test_a_real_regression_is_still_seen_when_the_join_works(tmp_path, monkeypat
     assert diff["regressions"] == [("corpus__ama__jama-open-5", "academic", "table_parity")]
 
 
-def test_the_committed_baseline_is_currently_unjoinable():
-    """A ratchet on the real files: this must be FIXED by re-baselining, and when
-    it is, this test fails and must be deleted -- it may never rot into an excuse."""
+def test_the_committed_baseline_joins_every_manifest_document():
+    """The ratchet, turned the right way round now that the re-baseline happened.
+
+    This used to assert the committed baseline shared NO ids with the manifest
+    (true from the 2026-09-17 corpus re-key until the 2026-09-24 re-baseline),
+    written so that it would fail and be replaced the day the baseline was
+    fixed. It now pins the fixed state: every manifest document has a baseline
+    entry and the baseline names no document the manifest does not. A future
+    re-key that forgets to re-baseline turns this red instead of leaving the
+    gate joining nothing.
+    """
     base = json.loads(
         (_REPO / "scripts" / "harness" / "baseline_matrix.json").read_text(encoding="utf-8")
     )
@@ -83,10 +91,12 @@ def test_the_committed_baseline_is_currently_unjoinable():
         (_REPO / "scripts" / "harness" / "corpus_manifest.json").read_text(encoding="utf-8")
     )
     cur = {d["id"] for d in man["documents"]}
-    overlap = len(set(base) & cur)
     assert base and cur, "one of the two files parsed empty -- the instrument is broken"
-    assert overlap == 0, (
-        f"the baseline now joins ({overlap} shared doc ids). The re-baseline this "
-        "file was written for has happened -- DELETE this test; the three above "
-        "keep the guard honest."
+    missing = sorted(cur - set(base))
+    stale = sorted(set(base) - cur)
+    assert not missing and not stale, (
+        f"baseline and manifest disagree: {len(missing)} manifest docs have no "
+        f"baseline entry (e.g. {missing[:3]}), {len(stale)} baseline docs are not "
+        f"in the manifest (e.g. {stale[:3]}). Re-baseline with "
+        "`python -m scripts.harness.checks --update-baseline` after a verified run."
     )
