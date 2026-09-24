@@ -32,6 +32,12 @@ def test_table_typed_dict_fields():
         # understated what we ship (the whitespace path's boxes are built from
         # pdfplumber words and are real by construction).
         "cell_geometry",
+        # 2026-09-24: how sure we are this is a CAPTIONED table -- "matched",
+        # "none_found" (DOCX: the file declares the table), or
+        # "uncaptioned_candidate" (a PDF grid no caption claimed, kept rather than
+        # discarded under the owner's retain-and-label directive). Set on every
+        # table from every path, like `cell_geometry`.
+        "caption_status",
     }
     assert set(hints.keys()) == expected
 
