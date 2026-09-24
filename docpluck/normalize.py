@@ -5526,10 +5526,11 @@ _LIGATURE_MAP = {
 _LIGATURE_RE = re.compile("[ﬀ-ﬆ]")
 
 
-# Greek transliteration comes from THE canonical table (`docpluck.symbols`), so
-# this module and `extract.py`'s SMP fallback cannot drift apart again — they
-# had, on 9 of 9 shared letters, and the same chi-square left as `chi2` or `ch2`
-# depending only on which extraction path ran.
+# Greek transliteration comes from THE canonical table (`docpluck.symbols`). A
+# second table once lived in `extract.py`'s SMP fallback and disagreed with this
+# one on 9 of 9 shared letters, so the same chi-square left as `chi2` or `ch2`
+# depending only on which extraction path ran. That fallback was retired
+# 2026-09-24; this is now the only Greek table, which is the point.
 from .symbols import (  # noqa: E402
     GREEK_TO_ASCII,
     GREEK_UPPER_AMBIGUOUS_TO_ASCII,
@@ -6374,9 +6375,10 @@ def _normalize_text(
                   count=_n_dashes)
 
     # S5a: Context-aware U+FFFD -> eta recovery (ESCImate Request 1.2)
-    # pdftotext occasionally emits U+FFFD in place of Greek eta. The pdfplumber
-    # SMP fallback catches most; this is second-line defense when both engines
-    # drop the character. CONTEXT-AWARE — only rewrites U+FFFD when followed by
+    # pdftotext occasionally emits U+FFFD in place of Greek eta. (A pdfplumber
+    # SMP fallback in extract.py used to run first; it was RETIRED 2026-09-24,
+    # so this step is now the ONLY place a U+FFFD is rewritten -- see the note
+    # in extract.py::extract_pdf.) CONTEXT-AWARE — only rewrites U+FFFD when followed by
     # a statistical "eta-squared" pattern (eta^2 = .NNN). Generic encoding-fail
     # FFFDs in prose are left alone for the caller's quality scoring to flag.
     before = t
@@ -7633,7 +7635,7 @@ def _normalize_text(
             # Greek -> ASCII, from THE canonical table in `docpluck.symbols`.
             #
             # This block used to be a hand-written chain of ten .replace()
-            # calls, and `extract.py`'s SMP fallback carried a SECOND,
+            # calls, and `extract.py`'s SMP fallback (retired 2026-09-24) carried a SECOND,
             # DIFFERENT chain. They disagreed on 9 of 9 shared letters, so the
             # same chi-square left as `chi2` or `ch2` depending purely on
             # which extraction path ran -- and a consumer matching `chi2(`

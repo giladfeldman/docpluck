@@ -3,93 +3,16 @@
 from __future__ import annotations
 
 
-from docpluck.extract import _patch_fffds_word_by_word, count_pages
+from docpluck.extract import count_pages
 from docpluck.render import (
     _italicize_known_subtitle_badges,
     _SUBTITLE_BADGE_PATTERNS,
 )
 
 
-# ---------------------------------------------------------------------------
-# 1. _patch_fffds_word_by_word — per-word FFFD recovery
-# ---------------------------------------------------------------------------
-
-
-def test_fffd_word_patch_recovers_single_char():
-    """A word with one FFFD has a unique counterpart in pdfplumber text."""
-    pdftotext = "the qui�k brown fox jumps over the lazy dog"
-    pdfplumber = "the quick brown fox jumps over the lazy dog"
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    assert n == 1
-    assert "qui�k" not in patched
-    assert "quick" in patched
-
-
-def test_fffd_word_patch_recovers_multiple_fffds_in_one_word():
-    """Two FFFDs in the same word recovered together when pdfplumber has
-    a unique match."""
-    pdftotext = "the qu��k brown fox"
-    pdfplumber = "the quick brown fox"
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    assert n == 2
-    assert "quick" in patched
-    assert "�" not in patched
-
-
-def test_fffd_word_patch_skips_ambiguous_matches():
-    """If pdfplumber has more than one same-shape candidate, leave the
-    FFFD-bearing word alone — we won't guess."""
-    pdftotext = "the c�t sat"
-    pdfplumber = "the cat sat. cot bat hat"  # cat/cot/bat/hat all match c[A-Za-z]t
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    # Multiple candidates → no patch.
-    assert n == 0
-    assert "c�t" in patched
-
-
-def test_fffd_word_patch_skips_when_no_match():
-    """No matching candidate in pdfplumber → leave the FFFD-bearing word."""
-    pdftotext = "the q�ick brown"
-    pdfplumber = "the slow black"  # no q*ick token at all
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    assert n == 0
-    assert "q�ick" in patched
-
-
-def test_fffd_word_patch_handles_punctuation_attached_words():
-    """Word-attached punctuation (closing paren / period) shouldn't
-    confuse the matcher."""
-    pdftotext = "(study qui�k)."
-    pdfplumber = "(study quick)."
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    assert n == 1
-    assert "(study quick)." in patched
-
-
-def test_fffd_word_patch_only_substitutes_letters():
-    """The replacement is constrained to [A-Za-z] at each FFFD position,
-    so the patcher won't manufacture digits / punctuation."""
-    pdftotext = "the c�t"
-    pdfplumber = "the c5t"  # c5t has a digit at the FFFD position; must NOT match.
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    assert n == 0
-    assert "c�t" in patched
-
-
-def test_fffd_word_patch_returns_unchanged_on_no_fffds():
-    """Fast path: no FFFDs in pdftotext → no work."""
-    pdftotext = "the quick brown fox"
-    pdfplumber = "totally different text"
-    patched, n = _patch_fffds_word_by_word(pdftotext, pdfplumber)
-    assert n == 0
-    assert patched == pdftotext
-
-
-def test_fffd_word_patch_returns_unchanged_on_empty_pdfplumber():
-    pdftotext = "the qui�k brown"
-    patched, n = _patch_fffds_word_by_word(pdftotext, "")
-    assert n == 0
-    assert patched == pdftotext
+# (Section 1, the eight `_patch_fffds_word_by_word` unit tests, was removed
+# 2026-09-24 with the U+FFFD recovery it tested -- see the note in
+# `docpluck/extract.py::extract_pdf`. Numbering below is kept for history.)
 
 
 # ---------------------------------------------------------------------------

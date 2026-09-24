@@ -17,7 +17,8 @@ patterns from `symbol_contract()` rather than from samples or from a copy of our
 Until v2.4.128 docpluck could spell the same Greek letter two different ways depending on which
 extraction path handled the document. Two tables lived in one library — one in `normalize.py`'s A5
 step, one in `extract.py`'s SMP math-italic fallback — and they had diverged on **9 of 9 shared
-letters**:
+letters**. (That fallback was removed entirely in 2026-09, so today there is one table and one
+path; the history is kept because it is why this contract exists.)
 
 | codepoint | SMP fallback path | A5 path |
 |---|---|---|

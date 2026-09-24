@@ -310,7 +310,9 @@ def test_method_value_uses_known_strings(entry):
     _, method = extract_pdf(pdf_path.read_bytes())
     known_bases = {
         "pdftotext_default",
-        "pdftotext_default+pdfplumber_recovery",
+        # "pdftotext_default+pdfplumber_recovery" was retired 2026-09-24 with the
+        # U+FFFD recovery; a method value that can no longer be produced is a
+        # false contract, so it is no longer accepted here.
         "error",
     }
     # Strip the optional R4 suffix `+column_corrected:N,M,...` before checking.

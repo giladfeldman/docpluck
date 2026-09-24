@@ -7,7 +7,7 @@ Built from cross-project lessons across 8,000+ PDFs from psychology, medicine,
 economics, physics, and biology.
 
 Supports:
-- **PDF** via pdftotext (default mode, with pdfplumber SMP fallback)
+- **PDF** via pdftotext (default mode; an undecodable glyph is passed through as U+FFFD)
 - **DOCX** via mammoth (DOCX → HTML → text, preserves soft breaks)
 - **HTML** via beautifulsoup4 + lxml (custom block/inline-aware tree-walk)
 

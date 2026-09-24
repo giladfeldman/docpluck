@@ -45,29 +45,29 @@ class TestExtractPdf:
         pvalues = re.findall(r'[pP]\s*[<=>]\s*\.?\d', text)
         assert len(pvalues) >= 10, f"Expected ≥10 p-values, found {len(pvalues)}"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "THE PREMISE IS FALSE FOR THIS PAPER, measured 2026-09-17. "
-            "`nature/nathumbeh_2.pdf` extracts as `pdftotext_default` with ZERO "
-            "U+FFFD, so the pdfplumber SMP-recovery path cannot fire and the "
-            "assertion below can never pass. NOT caused by the corpus repoint: the "
-            "bytes the test reads are IDENTICAL before and after (sha b2ab88120b88), "
-            "and extract_pdf returns the same method from either copy -- checked "
-            "both ways rather than assumed, because the first diagnosis offered for "
-            "this failure was a secondary-manifestation swap that did not happen. "
-            "OWED: find a corpus paper that genuinely carries SMP fonts and repoint "
-            "this at it, or retire the assertion. strict=True so this turns RED the "
-            "moment recovery does fire, instead of quietly passing."
-        ),
-    )
-    def test_nature_smp_recovery(self):
-        """Nature-style paper with SMP fonts triggers pdfplumber recovery."""
-        content = self._read("nature", "nathumbeh_2.pdf")
+    def test_replacement_characters_pass_through_as_printed(self):
+        """U+FFFD reaches the consumer verbatim; nothing is substituted for it.
+
+        This replaced `test_nature_smp_recovery` (a strict xfail whose premise had
+        been false since 2026-09-17) when the pdfplumber U+FFFD recovery was
+        RETIRED on 2026-09-24. That recovery could swap a whole document's text on
+        a guard that accepted even unrelated text, or patch `partial <U+FFFD>2`
+        into `partial R2` -- a different statistic. The contract now is the
+        honest one: an undecodable glyph stays visibly undecodable.
+
+        `vancouver/plos_med_1.pdf` is the one corpus paper that carries enough
+        U+FFFD to have triggered the old path (9, measured 2026-09-21), and the
+        retired Mode B demonstrably EXECUTED on it. If a future change starts
+        rewriting these characters again, this goes red.
+        """
+        content = self._read("vancouver", "plos_med_1.pdf")
         text, method = extract_pdf(content)
         assert not text.startswith("ERROR:")
-        assert "pdfplumber" in method, f"SMP recovery not triggered: {method}"
-        assert text.count("\ufffd") == 0, "Garbled characters remain after SMP recovery"
+        assert "pdfplumber" not in method, f"a U+FFFD recovery path ran: {method}"
+        assert text.count("�") >= 3, (
+            "the replacement characters this paper carries were not passed through; "
+            f"found {text.count(chr(0xFFFD))}"
+        )
 
     def test_vancouver_medical(self):
         """Vancouver/BMC medical paper."""

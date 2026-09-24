@@ -5,7 +5,7 @@
 Built from cross-project experience across 8,000+ PDFs spanning psychology, medicine, economics, physics, and biology. Achieves 100% accuracy on 29 manually verified ground-truth passages (see [BENCHMARKS.md](BENCHMARKS.md)).
 
 Supports three input formats:
-- **PDF** via `pdftotext` default mode (with `pdfplumber` SMP recovery)
+- **PDF** via `pdftotext` default mode (an undecodable glyph is passed through as `U+FFFD`, never guessed)
 - **DOCX** via `mammoth` (DOCX → HTML → text, preserving Shift+Enter soft breaks)
 - **HTML** via `beautifulsoup4` + `lxml` (block/inline-aware tree-walk)
 
@@ -246,7 +246,10 @@ Extract text from PDF bytes.
 - `text` — Extracted plain text. Check `text.startswith("ERROR:")` for failure.
 - `method` — Engine used:
   - `"pdftotext_default"` — standard extraction (fast, ~400ms)
-  - `"pdftotext_default+pdfplumber_recovery"` — SMP fallback triggered (~9s), used when pdftotext outputs `U+FFFD` replacement characters (common in Nature/Cell papers using Mathematical Italic fonts)
+  - Optionally followed by `+column_corrected:<pages>` when two-column pages were re-extracted in reading order.
+  - An undecodable glyph that pdftotext emits as `U+FFFD` is **passed through as printed** — docpluck does not guess
+    what it was. (The earlier `+pdfplumber_recovery` fallback was retired in 2026-09: it could substitute a plausible
+    wrong token, such as turning a partial eta-squared into an R-squared.)
 
 **Requires:** `pdftotext` binary on PATH.
 

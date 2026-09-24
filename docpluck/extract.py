@@ -53,9 +53,11 @@ def extract_pdf(
             text from the requested sections is included. May start with
             "ERROR: ..." if extraction failed — check with
             text.startswith("ERROR:").
-          - method: Engine used. One of:
-              "pdftotext_default"                   — normal extraction
-              "pdftotext_default+pdfplumber_recovery" — SMP fallback triggered
+          - method: Engine used: ``"pdftotext_default"``, optionally followed by
+              ``+column_corrected:<pages>`` or ``+column_correction_failed:<exc>``,
+              or ``"error"``. (``pdftotext_default+pdfplumber_recovery`` and
+              ``…+pdfplumber_word_patch`` were retired in 2026-09 — see the
+              U+FFFD note in the function body.)
 
     Guardrails:
         max_input_bytes: Optional hard cap for input size. When set and
@@ -102,47 +104,23 @@ def extract_pdf(
         text = result.stdout
         method = "pdftotext_default"
 
-        # SMP recovery: Xpdf replaces U+FFFF+ characters with U+FFFD (replacement char).
-        # pdfplumber handles these correctly and remaps them to ASCII equivalents.
-        #
-        # 2026-05-11: only trigger recovery when FFFDs are meaningfully
-        # present (\u2265 3) AND pdfplumber's reading order matches pdftotext's.
-        # Previously a single stray FFFD would swap the entire pdftotext text
-        # for pdfplumber's `extract_text()` \u2014 which on multi-column papers
-        # like the Adelina/Pronin replication (IRSP) interleaves the two
-        # columns word-by-word, producing unreadable body text with similar
-        # overall length. The length-similarity check is insufficient; we
-        # need a *reading-order* check.
-        #
-        # The check: take three 60-char snippets from non-FFFD-containing
-        # regions of pdftotext's body. If pdfplumber's output contains all
-        # three verbatim, both extractors agree on column ordering and the
-        # recovery is safe. If even one snippet is reordered out, pdfplumber
-        # collapsed the columns and we keep pdftotext's text (FFFDs and all).
-        fffd_count = text.count("\ufffd")
-        if fffd_count >= 3:
-            recovered = _recover_with_pdfplumber(tmp_path)
-            if (
-                recovered
-                and recovered.count("\ufffd") < fffd_count
-                and _reading_order_agrees(text, recovered)
-            ):
-                text = recovered
-                method = "pdftotext_default+pdfplumber_recovery"
-            elif recovered:
-                # v2.3.1: reading order disagreed (pdfplumber would
-                # column-interleave a 2-column paper), but we can still
-                # recover individual U+FFFD characters word-by-word
-                # without disturbing pdftotext's reading order. For each
-                # FFFD-containing word in pdftotext, find a same-shape
-                # candidate in pdfplumber's output and substitute. This
-                # is the 50-LOC fix from
-                # ``an internal handoff doc (2026-05-11)``
-                # \u2014 "18 residual FFFDs in Adelina body".
-                patched, n_patched = _patch_fffds_word_by_word(text, recovered)
-                if n_patched > 0:
-                    text = patched
-                    method = "pdftotext_default+pdfplumber_word_patch"
+        # U+FFFD PASSES THROUGH AS PRINTED. A recovery used to live here: on >= 3
+        # U+FFFD it ran pdfplumber over the whole document and either REPLACED the
+        # entire text with pdfplumber's (Mode A) or substituted per word from a
+        # global token set (Mode B). RETIRED 2026-09-24 by owner decision, on
+        # evidence reproduced that week:
+        #   * Mode A's guard `_reading_order_agrees` accepted a document's exact
+        #     REVERSE, its blocks SHUFFLED, and completely UNRELATED text; and the
+        #     swap joined pages with blank lines, so every page boundary vanished.
+        #   * Mode B turned `partial <U+FFFD>2 = .35` into `partial R2 = .35` -- an
+        #     effect size relabelled as a different statistic -- and it already
+        #     EXECUTED on a real corpus paper (vancouver/plos_med_1.pdf), returning
+        #     nothing only because no word happened to have a unique look-alike.
+        #   * Across all 102 corpus papers NEITHER mode was ever accepted.
+        # A visible U+FFFD is a flag a consumer can act on; a plausible wrong
+        # token is not. normalize.py still maps SMP math-italic characters that
+        # pdftotext DOES decode (`_MATH_ALNUM_RE`), so nothing correctly encoded
+        # is lost. Record: communications/DECISION_2026-09-22_fffd_recovery.md.
 
         # §A R4 / B6 column-aware re-extraction (v2.4.76, 2026-05-25).
         # Detector runs on form-feed-split pdftotext output (cheap, no
@@ -364,213 +342,3 @@ def count_pages(pdf_bytes: bytes) -> int:
     except Exception as exc:
         record_fallback("count_pages_exception", detail=type(exc).__name__)
         return 0
-
-
-_FFFD_WORD_RE = re.compile(r"\S*�\S*")
-
-
-def _patch_fffds_word_by_word(
-    pdftotext_text: str, pdfplumber_text: str
-) -> tuple[str, int]:
-    """Per-word U+FFFD recovery using pdfplumber's text as the lookup source.
-
-    Strategy: scan ``pdftotext_text`` for tokens containing U+FFFD, build a
-    regex pattern with ``[A-Za-z]`` at each FFFD position (and the literal
-    char elsewhere), and look for a UNIQUE matching token in
-    ``pdfplumber_text``. When exactly one candidate matches, swap the
-    pdftotext token for the candidate (recovers the lost letter).
-
-    Conservative rules — only patch when:
-    - The FFFD position resolves to an ASCII letter (no digits / punct, so we
-      can't accidentally manufacture "1" into "I" or vice versa).
-    - The candidate is unique within pdfplumber's token set (no ambiguity).
-    - The non-FFFD characters in the pdftotext token match exactly.
-
-    Returns ``(patched_text, n_chars_recovered)``.
-
-    Caller invokes this when the full pdfplumber recovery was rejected
-    by ``_reading_order_agrees`` (e.g. two-column papers where pdfplumber
-    interleaves columns). Word-by-word patching doesn't move text around,
-    so reading order is preserved.
-    """
-    if "�" not in pdftotext_text or not pdfplumber_text:
-        return pdftotext_text, 0
-
-    # Build pdfplumber's token set once. Use the same \S+ tokenization so
-    # punctuation-attached words ("study)" / "(see") line up.
-    pp_tokens = set(re.findall(r"\S+", pdfplumber_text))
-    if not pp_tokens:
-        return pdftotext_text, 0
-
-    out_parts: list[str] = []
-    pos = 0
-    n_recovered = 0
-    for m in _FFFD_WORD_RE.finditer(pdftotext_text):
-        out_parts.append(pdftotext_text[pos:m.start()])
-        token = m.group(0)
-        # Build a per-char regex: literal escape except FFFD → [A-Za-z].
-        pattern = re.compile(
-            "^"
-            + "".join(
-                "[A-Za-z]" if ch == "�" else re.escape(ch)
-                for ch in token
-            )
-            + "$"
-        )
-        candidates = [t for t in pp_tokens if pattern.match(t)]
-        if len(candidates) == 1:
-            out_parts.append(candidates[0])
-            n_recovered += token.count("�")
-        else:
-            # Ambiguous (>1 candidate) or no match — keep the FFFD token
-            # so the caller's quality scoring still flags the document.
-            out_parts.append(token)
-        pos = m.end()
-    out_parts.append(pdftotext_text[pos:])
-    return "".join(out_parts), n_recovered
-
-
-def _reading_order_agrees(pdftotext_text: str, pdfplumber_text: str) -> bool:
-    """Return True if pdfplumber's output preserves pdftotext's reading order.
-
-    pdftotext (xpdf, no -layout flag) produces correctly-ordered column text.
-    pdfplumber's ``page.extract_text()`` defaults sort characters by y-coord
-    first, which interleaves the two columns of a two-column academic paper.
-    On such papers the lengths come out very similar but the text is shuffled.
-
-    Heuristic: extract three 60-char snippets from non-FFFD body regions of
-    pdftotext (after the first 5%, at 30%, 50%, 70% of the document) and
-    require that ALL THREE appear verbatim in pdfplumber's output. If even
-    one is missing, columns were reordered.
-    """
-    n = len(pdftotext_text)
-    if n < 2000:
-        # Too short to safely sample; trust the length-similarity heuristic.
-        ratio = len(pdfplumber_text) / max(n, 1)
-        return 0.85 < ratio < 1.15
-
-    # Build candidate windows at 30%, 50%, 70% of the doc; slide forward up
-    # to 1000 chars looking for a 60-char run with no FFFDs / form feeds.
-    for frac in (0.30, 0.50, 0.70):
-        start = int(n * frac)
-        snippet = None
-        for offset in range(0, 1000, 30):
-            window = pdftotext_text[start + offset : start + offset + 60]
-            if (
-                len(window) == 60
-                and "�" not in window
-                and "\f" not in window
-                and not window.isspace()
-            ):
-                snippet = window
-                break
-        if snippet is None:
-            # Couldn't find a clean snippet at this fraction; skip it.
-            continue
-        if snippet not in pdfplumber_text:
-            return False
-    return True
-
-
-# SMP math-italic Greek -> ASCII, spelled out to MATCH `normalize.py`'s A5 step.
-#
-# This table used to carry its own convention — single letters and digraphs
-# (`a`, `b`, `d`, `n`, `m`, `r`, `s`, `ph`, `ch`) — while A5, which defines this
-# library's Greek convention everywhere else, spells them out (`alpha`, `beta`,
-# `delta`, `eta`, `mu`, `sigma`, `phi`, `chi`). Two implementations of one rule
-# with no shared test, and they had diverged on 9 of 9 shared letters.
-#
-# Every disagreement was a silent failure downstream, and three were COLLISIONS
-# with a different statistic:
-#
-#     chi2(2) = 5.10  ->  'ch2(2)'  effectcheck matches `chi2(`; a chi-square
-#                                   test was therefore never checked, silently
-#     eta2            ->  'n2'      collides with n, the SAMPLE SIZE
-#     beta = -.02     ->  'b = -.02' collides with b, the UNSTANDARDIZED
-#                                   coefficient — the exact corruption W0m
-#                                   (v2.4.117) exists to detect and undo from
-#                                   layout font evidence. One path manufactured
-#                                   what another path repairs.
-#     rho = .31       ->  'r = .31' collides with r, the CORRELATION
-#
-# The function's own docstring said this map existed "so downstream regex
-# patterns work normally"; it did the opposite. Module-level and named so the
-# two tables can share a test (`tests/test_smp_greek_agrees_with_a5.py`) rather
-# than drifting again.
-# DERIVED from the canonical table in `docpluck.symbols`, never restated. The
-# SMP math-italic planes are the SAME letters at different codepoints, so the
-# mapping is computed by walking back to the plain letter and asking the one
-# table what it says. A hand-written second list is precisely what diverged.
-def _build_smp_greek() -> dict[str, str]:
-    from .symbols import GREEK_LOWER_TO_ASCII, GREEK_UPPER_TO_ASCII
-
-    # U+1D6E2 is MATHEMATICAL ITALIC CAPITAL ALPHA; U+1D6FC is the small alpha.
-    # Both blocks run in Greek alphabetical order, so an offset maps each to its
-    # plain counterpart (U+0391 capitals, U+03B1 smalls).
-    out: dict[str, str] = {}
-    for i in range(25):  # Alpha..Omega inclusive of the final-sigma slot
-        plain_upper = chr(0x0391 + i)
-        plain_lower = chr(0x03B1 + i)
-        if plain_upper in GREEK_UPPER_TO_ASCII:
-            out[chr(0x1D6E2 + i)] = GREEK_UPPER_TO_ASCII[plain_upper]
-        if plain_lower in GREEK_LOWER_TO_ASCII:
-            out[chr(0x1D6FC + i)] = GREEK_LOWER_TO_ASCII[plain_lower]
-    return out
-
-
-_SMP_GREEK_TO_ASCII = _build_smp_greek()
-
-
-def _smp_to_ascii_map() -> dict[str, str]:
-    """Full SMP math-italic -> ASCII map: Latin A-Z/a-z plus Greek.
-
-    Built here rather than inline so the Greek half is addressable by a test.
-    """
-    m: dict[str, str] = {}
-    # Math italic capitals A-Z: U+1D434-U+1D44D
-    for i, letter in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
-        m[chr(0x1D434 + i)] = letter
-    # Math italic small a-z: U+1D44E-U+1D467
-    for i, letter in enumerate("abcdefghijklmnopqrstuvwxyz"):
-        m[chr(0x1D44E + i)] = letter
-    m.update(_SMP_GREEK_TO_ASCII)
-    return m
-
-
-def _recover_with_pdfplumber(pdf_path: str) -> Optional[str]:
-    """Recover text using pdfplumber when pdftotext produces garbled output.
-
-    Triggered when U+FFFD (replacement character) appears in pdftotext output,
-    which indicates SMP Mathematical Italic fonts (U+1D434-U+1D467) that
-    Xpdf/poppler cannot decode. pdfplumber (using pdfminer) handles these
-    correctly. Maps the recovered SMP characters to ASCII equivalents so
-    downstream regex patterns work normally.
-
-    Args:
-        pdf_path: Path to the PDF file on disk.
-
-    Returns:
-        Recovered text string, or None if recovery failed.
-    """
-    try:
-        import pdfplumber
-
-        smp_to_ascii = _smp_to_ascii_map()
-
-        pages_text = []
-        with pdfplumber.open(pdf_path) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    pages_text.append(page_text)
-
-        full_text = "\n\n".join(pages_text)
-
-        for smp_char, ascii_equiv in smp_to_ascii.items():
-            full_text = full_text.replace(smp_char, ascii_equiv)
-
-        return full_text
-
-    except Exception as exc:
-        record_fallback("pdfplumber_recovery_exception", detail=type(exc).__name__)
-        return None

@@ -24,7 +24,7 @@ Safe for any text processing task. Applied in both `standard` and `academic` mod
 - Math italic small a-z (U+1D44E–U+1D467)
 - Math italic Greek (η, π, σ, etc.)
 
-**Why:** Some PDFs (especially from physics and biology journals) embed math using SMP italic fonts. After pdfplumber recovery (see SMP recovery in `extract_pdf()`), these characters need mapping to ASCII so downstream regexes work.
+**Why:** Some PDFs (especially from physics and biology journals) embed math using SMP italic fonts. When pdftotext decodes these characters (an undecodable one arrives as `U+FFFD` and is passed through — the pdfplumber recovery that used to run here was retired 2026-09-24), they need mapping to ASCII so downstream regexes work.
 
 **Example:**
 ```

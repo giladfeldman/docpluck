@@ -118,7 +118,7 @@ assert text1 == text2  # Always passes
 | Operation | Typical | 95th percentile | Notes |
 |-----------|:-------:|:---------------:|-------|
 | `extract_pdf()` — normal | 400ms | 800ms | pdftotext, 10-30 page paper |
-| `extract_pdf()` — SMP recovery | 9s | 15s | pdfplumber fallback |
+| ~~`extract_pdf()` — SMP recovery~~ | — | — | retired 2026-09-24; U+FFFD now passes through |
 | `normalize_text()` — standard | <1ms | 2ms | Pure Python |
 | `normalize_text()` — academic | <1ms | 3ms | Pure Python |
 | `compute_quality_score()` | <1ms | 1ms | Pure Python |
@@ -137,7 +137,7 @@ The test suite is actively expanded; use the repository CI as the current source
 | `test_normalization.py` | 63 | Core normalization families plus edge-case coverage |
 | `test_quality.py` | 10 | Score ranges, garbled detection, confidence levels |
 | `test_edge_cases.py` | 30+ | Cross-project lessons (ESCIcheck, MetaESCI, PDFextractor, Unicode) |
-| `test_extraction.py` | 15+ | Real PDFs, SMP recovery, 8 citation styles (skips if no poppler) |
+| `test_extraction.py` | 15+ | Real PDFs, U+FFFD pass-through, 8 citation styles (skips if no poppler) |
 | `test_extract_html.py` | 46 | Block/inline tree-walk, ChanORCID regression, whitespace, entities |
 | `test_extract_docx.py` | 18 | Mammoth integration, soft breaks, smart quotes, ligatures |
 | `test_benchmark_docx_html.py` | 12 | Ground truth survival, idempotency, quality, performance |
