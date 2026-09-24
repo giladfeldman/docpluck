@@ -420,15 +420,17 @@ def _pick_best_per_page(stream_tables: list, lattice_tables: list) -> list:
     for page in sorted(set(list(by_page.keys()) + list(pages_with_lattice.keys()))):
         if page in pages_with_lattice:
             stream_cts = [ct for _, ct in by_page.get(page, [])]
-            for _, ct in pages_with_lattice[page]:
-                out.append(_augment_lattice_with_stream_rows(ct, stream_cts))
+            page_lattice = [ct for _, ct in pages_with_lattice[page]]
+            for ct in page_lattice:
+                siblings = [o for o in page_lattice if o is not ct]
+                out.append(_augment_lattice_with_stream_rows(ct, stream_cts, siblings))
         else:
             for _, ct in by_page.get(page, []):
                 out.append(ct)
     return out
 
 
-def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
+def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list, siblings: list = ()):
     """Tier-2 (v2.4.94): recover rows a lattice table vertically TRUNCATED.
 
     Lattice flavor extracts clean headers + merged cells, but only inside the
@@ -448,6 +450,29 @@ def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
     captured in full, or an unrelated stream table, is never touched. Returns
     ``lattice_ct`` unchanged (possibly mutated in place) — any failure is a
     transparent no-op.
+
+    THE ROWS BELOW A BOX ARE NOT ALL THIS TABLE'S (v2.4.145). Stream flavor does
+    not stop at a table: on a page of stacked tables it returns ONE block that
+    runs through the next caption and the next table. The gate above cannot see
+    that, so the rows appended here used to be every stream row below the box —
+    the NEXT table's caption line and the next table's rows included. Two
+    structural boundaries now end the run, both read from what the page itself
+    carries rather than from any value:
+
+    * the top edge of another substantive lattice table on the same page
+      (``siblings``) — a ruled box that Camelot already extracted as its own
+      table; its rows belong to it, not to the table above;
+    * a row that IS a ``Table N.`` / ``Figure N.`` caption line
+      (``_CAPTION_ROW_PATTERN``, the same anchored shape trusted to drop a
+      caption row elsewhere) — a caption opens a new object.
+
+    Rows are taken top-down and the run stops at the first boundary, so what is
+    appended is the contiguous block directly under the box: exactly the
+    truncated-rows case this function exists for. Before the stop, the appended
+    rows were placed under the upper table's header, so the lower table's
+    ``Sleep vs Nap | -3.07 | 98 | .003 | -0.31`` — its first two cells fused by
+    stream's column split — flattened as ``F(0.003, -0.31) = 98``: a statistic
+    no page printed, built by this function.
     """
     try:
         import pandas as pd
@@ -462,7 +487,17 @@ def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
         record_fallback("lattice_augment_setup_exception", detail=type(exc).__name__)
         return lattice_ct
 
-    best: tuple[int, list[list[str]], tuple] | None = None
+    # The highest top edge (PDF bottom-up y) of a same-page ruled table lying
+    # BELOW this one: no appended row may reach it. A sibling whose top is at or
+    # above this box's bottom is beside or above, not below, and bounds nothing.
+    floor = float("-inf")
+    for sib in siblings or ():
+        sb = tuple(getattr(sib, "_bbox", ()) or ())
+        if len(sb) >= 4 and sb[3] <= l_ymin + 1.0 and _x_ranges_overlap(sb, l_bbox):
+            floor = max(floor, sb[3])
+
+    best: tuple[int, list[list[str]], tuple, float] | None = None
+    stops: list[str] = []
     for s in stream_cts:
         try:
             s_df = s.df
@@ -477,31 +512,51 @@ def _augment_lattice_with_stream_rows(lattice_ct, stream_cts: list):
             if not s_rows or len(s_rows) != len(s_df):
                 continue
             extra: list[list[str]] = []
-            for r in range(len(s_df)):
+            extra_bottom = l_ymin
+            # Top-down (Camelot's row order), so the first boundary ends the run.
+            order = sorted(range(len(s_df)), key=lambda i: -(s_rows[i][0] + s_rows[i][1]))
+            for r in order:
                 top, bottom = s_rows[r][0], s_rows[r][1]
-                if (top + bottom) / 2.0 < l_ymin:
-                    extra.append([str(s_df.iloc[r, c]) for c in range(l_cols)])
+                centre = (top + bottom) / 2.0
+                if centre >= l_ymin:
+                    continue
+                row = [str(s_df.iloc[r, c]) for c in range(l_cols)]
+                if centre <= floor:
+                    stops.append("sibling_table")
+                    break
+                if _CAPTION_ROW_PATTERN.match(_row_joined(row)):
+                    stops.append("caption_row")
+                    break
+                extra.append(row)
+                extra_bottom = min(extra_bottom, bottom)
             if extra and (best is None or len(extra) > best[0]):
-                best = (len(extra), extra, s_bbox)
+                best = (len(extra), extra, s_bbox, extra_bottom)
         except Exception as exc:
             record_fallback("lattice_augment_scan_exception", detail=type(exc).__name__)
             continue
 
+    # A withheld row is not a deleted one -- it is still on the page for the
+    # table that owns it -- but a boundary that changed the output must be
+    # countable, or its firing rate can never be checked against the corpus.
+    for why in stops:
+        record_fallback("lattice_augment_stopped_at_boundary", detail=why)
     if best is None:
         return lattice_ct
     try:
         import pandas as pd
 
-        _, extra, s_bbox = best
+        _, extra, s_bbox, extra_bottom = best
         lattice_ct.df = pd.concat(
             [lattice_ct.df, pd.DataFrame(extra, columns=lattice_ct.df.columns)],
             ignore_index=True,
         )
-        # Widen the bbox downward so caption/figure overlap logic sees the full
-        # table extent; keep the lattice top edge.
+        # Widen the bbox downward to the LAST APPENDED ROW, not to the stream
+        # table's bottom: the stream block may run on through a sibling table,
+        # and a box drawn over it makes caption/figure overlap logic see this
+        # table where the next one is. Keep the lattice top edge.
         lattice_ct._bbox = (
             min(l_bbox[0], s_bbox[0]),
-            min(l_bbox[1], s_bbox[1]),
+            min(l_bbox[1], extra_bottom),
             max(l_bbox[2], s_bbox[2]),
             l_bbox[3],
         )
@@ -1081,6 +1136,16 @@ def _bboxes_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
         max(a0, b0) < min(a2, b2)
         and max(a1, b1) < min(a3, b3)
     )
+
+
+def _x_ranges_overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
+    """True when two bboxes share any horizontal extent (``x0, _, x1, _``).
+
+    A ruled table in the OTHER column of a two-column page is not below this
+    one in any sense that bounds its rows; only one sharing its x-range is."""
+    if len(a) < 4 or len(b) < 4:
+        return False
+    return max(a[0], b[0]) < min(a[2], b[2])
 
 
 def merge_camelot_with_docpluck(

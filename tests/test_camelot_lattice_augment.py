@@ -67,8 +67,10 @@ def test_augment_appends_rows_below_lattice_box():
     assert "adjusted" in labels
     assert "remnant" in labels
     assert len(out.df) == 5
-    # bbox widened downward to cover the appended rows.
-    assert out._bbox[1] == 485.0
+    # bbox widened downward to the LAST APPENDED ROW's bottom (500), not the
+    # stream table's bottom (485): a stream block can run on past the rows that
+    # were appended, and a box drawn over it lands on whatever sits below.
+    assert out._bbox[1] == 500.0
 
 
 def test_no_augment_when_column_count_differs():
@@ -104,3 +106,94 @@ def test_no_augment_when_bboxes_do_not_overlap():
     )
     out = _augment_lattice_with_stream_rows(lat, [far])
     assert len(out.df) == 3  # unchanged
+
+
+# ---- v2.4.145: the rows below a box are not all this table's ---------------
+#
+# Stream flavor does not stop at a table. On a page of stacked tables it returns
+# one block running through the NEXT caption and the NEXT table, and every row
+# of it below the lattice box used to be appended. Measured on CitationGuard's
+# contract fixture: Table 1's lattice grid gained Table 2's caption line and
+# Table 2's rows, one of which flattened to the fabricated F(0.003, -0.31) = 98.
+
+
+def _upper_lattice():
+    # Table 1: a fully ruled 2-row grid, box y 425..497.
+    return FakeTable(
+        [["Effect", "F", "p"], ["Condition", "5.20", ".025"]],
+        bbox=(70.0, 425.0, 295.0, 497.0),
+        rows=[[497, 479], [479, 425]],
+    )
+
+
+def _lower_lattice():
+    # Table 2: its own ruled box, y 342..397, directly under Table 1.
+    return FakeTable(
+        [["Contrast", "t", "d"], ["Sleep vs Nap", "-3.07", "-0.31"]],
+        bbox=(70.0, 342.0, 266.0, 397.0),
+        rows=[[397, 379], [379, 342]],
+    )
+
+
+def _stream_block(with_caption=True):
+    # One stream block spanning BOTH tables (Camelot's actual output shape).
+    data = [
+        ["Effect", "F", "p"],
+        ["Condition", "5.20", ".025"],
+    ]
+    rows = [[495, 480], [478, 430]]
+    if with_caption:
+        data.append(["Table 2. Planned contrasts.", "", ""])
+        rows.append([418, 395])
+    data += [["Contrastt", "d", ""], ["Sleep vs Nap-3.07", "-0.31", ""]]
+    rows += [[394, 379], [378, 347]]
+    return FakeTable(data, bbox=(60.0, 337.0, 298.0, 542.0), rows=rows)
+
+
+def test_augment_stops_at_a_caption_row():
+    out = _augment_lattice_with_stream_rows(_upper_lattice(), [_stream_block()], [])
+    labels = [out.df.iloc[r, 0] for r in range(len(out.df))]
+    assert labels == ["Effect", "Condition"], labels
+    assert out._bbox[1] == 425.0  # nothing appended -> box untouched
+
+
+def test_augment_stops_at_a_sibling_ruled_table():
+    # No caption row between them: the sibling's ruled box alone must stop it.
+    out = _augment_lattice_with_stream_rows(
+        _upper_lattice(), [_stream_block(with_caption=False)], [_lower_lattice()]
+    )
+    labels = [out.df.iloc[r, 0] for r in range(len(out.df))]
+    assert "Sleep vs Nap-3.07" not in labels and "Contrastt" not in labels, labels
+
+
+def test_sibling_below_does_not_stop_rows_above_it():
+    # Truncated rows directly under the box, ABOVE the sibling, still append.
+    lat = _upper_lattice()
+    block = FakeTable(
+        [["Effect", "F", "p"], ["Time", "12.50", "<.001"], ["Contrast", "t", "d"]],
+        bbox=(60.0, 337.0, 298.0, 500.0),
+        rows=[[495, 480], [423, 405], [394, 379]],
+    )
+    out = _augment_lattice_with_stream_rows(lat, [block], [_lower_lattice()])
+    labels = [out.df.iloc[r, 0] for r in range(len(out.df))]
+    assert labels == ["Effect", "Condition", "Time"], labels
+    assert out._bbox[1] == 405.0
+
+
+def test_ruled_table_in_the_other_column_bounds_nothing():
+    # A ruled box in the OTHER column, its top (420) above the truncated row's
+    # centre (414): below this box by y alone, but beside it by x. It must not
+    # stop the row, which is this table's own.
+    beside = FakeTable(
+        [["a", "b", "c"], ["d", "e", "f"]],
+        bbox=(320.0, 300.0, 560.0, 420.0),
+        rows=[[420, 400], [400, 300]],
+    )
+    block = FakeTable(
+        [["Effect", "F", "p"], ["Time", "12.50", "<.001"]],
+        bbox=(60.0, 400.0, 298.0, 500.0),
+        rows=[[495, 480], [423, 405]],
+    )
+    out = _augment_lattice_with_stream_rows(_upper_lattice(), [block], [beside])
+    labels = [out.df.iloc[r, 0] for r in range(len(out.df))]
+    assert labels == ["Effect", "Condition", "Time"], labels
