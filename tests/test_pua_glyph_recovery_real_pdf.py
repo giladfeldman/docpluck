@@ -16,7 +16,7 @@ fallbacks) -- so no Symbol-PUA glyph reaches any output view.
 
 Corpus evidence (harness Tier-D baseline at v2.4.53):
   - escicheck Xiao-etal-2024 Monin&Miller : U+F063 x2 (chi), U+F0B7 x2 (bullet)
-  - docxtests redacted-docx           : U+F062 x2 (beta)
+  - docxtests__8452867332d36c85 (a manuscript DOCX, named by content hash): U+F062 x2 (beta)
 
 Non-ASCII codepoints are built with ``chr()`` on purpose: a literal
 Private-Use glyph is invisible and does not survive copy/paste.
@@ -24,6 +24,7 @@ Private-Use glyph is invisible and does not survive copy/paste.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import re
 from pathlib import Path
@@ -57,6 +58,7 @@ from _local_corpora import local_corpus  # noqa: E402
 
 _ESCICHECK_PDFS = Path(local_corpus("escicheck_pdfs") or _META / "__absent__")
 _DOCX_TESTS = Path(local_corpus("docx_tests") or _META / "__absent__")
+_BETA_DOCX_SHA16 = "8452867332d36c85"  # the harness manifest id docxtests__8452867332d36c85
 
 # Symbol-font PUA block -- none of these may survive to a user-facing view.
 _SYMBOL_PUA_RE = re.compile("[" + chr(0xF020) + "-" + chr(0xF0FF) + "]")
@@ -157,16 +159,24 @@ def test_xiao_monin_miller_no_symbol_pua_real_pdf():
     assert GREEK_CHI in md
 
 
-def test_bh1988_no_symbol_pua_real_docx():
-    """docxtests redacted-docx: the beta regression coefficient reaches the normalized
+def test_beta_manuscript_docx_no_symbol_pua_real_docx():
+    """docxtests__8452867332d36c85: the beta regression coefficient reaches the normalized
     DOCX view as U+F062 at v2.4.53. Drives extract_docx + normalize_text, the
     pipeline the service runs to build the DOCX `normalized` view."""
     pytest.importorskip("mammoth")
     from docpluck.extract_docx import extract_docx
 
-    docx = _DOCX_TESTS / "redacted-docx.docx"
-    if not docx.exists():
-        pytest.skip(f"fixture missing: {docx}")
+    # Located by CONTENT HASH, never by filename: this repo is public and the
+    # DOCX sources are unsubmitted manuscripts whose filenames are titles.
+    docx = next(
+        (
+            p for p in sorted(_DOCX_TESTS.glob("*.docx"))
+            if hashlib.sha256(p.read_bytes()).hexdigest().startswith(_BETA_DOCX_SHA16)
+        ),
+        None,
+    )
+    if docx is None:
+        pytest.skip(f"fixture missing: no DOCX under {_DOCX_TESTS} hashes to {_BETA_DOCX_SHA16}")
     text, _method = extract_docx(docx.read_bytes())
     normalized, report = normalize_text(text, NormalizationLevel.academic)
     leftover = _SYMBOL_PUA_RE.findall(normalized)
