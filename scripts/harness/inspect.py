@@ -14,9 +14,10 @@ This module does NOT call an LLM. It is the *driver*:
   (the tiered policy: changed docs + every open Tier-D fail + a rotating
   slice), pairs each with its gold + saved harness outputs, and writes
   ``verify_out/inspect_jobs.json``.
-- The orchestrator (docpluck-iterate / -qa) dispatches one verifier agent per
-  job, using ``VERIFIER_PROMPT.md``. Each agent writes
-  ``verify_out/<doc>/<level>/ai_verdict.json``.
+- The orchestrator (docpluck-iterate / -qa) dispatches one verifier agent
+  (``model="sonnet"``, set explicitly) per DOCUMENT, covering all of that
+  document's ready levels, using ``VERIFIER_PROMPT.md``. It writes one
+  ``verify_out/<doc>/<level>/ai_verdict.json`` per level.
 - ``collect`` — aggregates those verdicts back into the matrix.
 
 Gold keys: a document maps to a canonical ai-gold key via

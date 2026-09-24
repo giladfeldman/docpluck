@@ -62,7 +62,8 @@ python -m scripts.harness.checks --update-baseline         # accept current as b
 
 # 4. Tier-A — AI-gold deep inspection
 python -m scripts.harness.inspect prepare --affected <doc_id> ...
-#   -> orchestrator dispatches a verifier agent per job (see VERIFIER_PROMPT.md)
+#   -> orchestrator dispatches one Agent(model="sonnet") per DOCUMENT, covering
+#      all of its ready levels (see VERIFIER_PROMPT.md)
 python -m scripts.harness.inspect collect
 ```
 
