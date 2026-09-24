@@ -23,13 +23,32 @@ from typing import Literal
 # case-sensitive — it must see a literal Capital after the number so
 # body references like "Table 13 below shows" don't false-match.
 # (A bare ``re.IGNORECASE`` flag would defeat the trailing guard.)
+#
+# 2026-09-24: the PIPE separator. The Nature family prints ``Fig. 1 | Title`` and
+# ``Table 1 | Title`` — the number is followed by a space and a ``|``, which
+# neither ``[.:]`` nor ``\s+[A-Z]`` accepts. So EVERY caption in that house style
+# was invisible: on nature/nat_comms_1.pdf (10.1038/s41467-023-43885-w) five
+# printed figures yielded zero, and the Camelot tables on caption-less pages
+# were then discarded. Measured over all 102 corpus papers, accepting ``\s*\|``
+# adds 29 matches in 5 papers (all Nature Communications), and 29 of 29 are
+# real captions — no body sentence puts a pipe after a figure number.
+#
+# ONE definition of the pipe separator. `tables/camelot_extract.py` has two
+# more caption patterns (a caption row inside a captured grid, and the number
+# used as a pairing hint); they build from this same constant, so the library
+# cannot disagree with itself about what a caption is. Before 2026-09-24 they
+# did: this file accepted `Table 1 |` and those two did not, so the caption
+# row stayed INSIDE the Nature tables as their first cell.
+CAPTION_PIPE_SEPARATOR = r"\s*\|"
+
 TABLE_CAPTION_RE = re.compile(
-    r"^\s*(?:Table|TABLE)\s+(?P<num>\d+)(?:[.:]|\s+[A-Z])",
+    r"^\s*(?:Table|TABLE)\s+(?P<num>\d+)(?:[.:]|" + CAPTION_PIPE_SEPARATOR + r"|\s+[A-Z])",
     re.MULTILINE,
 )
 
 FIGURE_CAPTION_RE = re.compile(
-    r"^\s*(?:Figure|Fig\.?|FIGURE|FIG\.?)\s+(?P<num>\d+)(?:[.:]|\s+[A-Z])",
+    r"^\s*(?:Figure|Fig\.?|FIGURE|FIG\.?)\s+(?P<num>\d+)(?:[.:]|"
+    + CAPTION_PIPE_SEPARATOR + r"|\s+[A-Z])",
     re.MULTILINE,
 )
 

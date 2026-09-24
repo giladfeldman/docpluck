@@ -77,10 +77,10 @@
       "id": "nature_minimal_rule",
       "category": "nature_minimal_rule",
       "expected_tables": 1,
-      "expected_figures": 1,
-      "notes": "Nature Communications — minimal-rule tables, gray-band header.",
-      "canonical_key": "10.1038/s41467-023-43885-w",
-      "corpus_path": "nature/nat_comms_1.pdf"
+      "expected_figures": 4,
+      "notes": "Nature Communications — minimal-rule table, gray-band header (Table 1, p4); figures pp. 3, 5, 6, 7. Paper reassigned 2026-09-24: this fixture pointed at nat_comms_1, which prints no table; verified by rasterizing both papers.",
+      "canonical_key": "10.1038/s41467-023-42320-4",
+      "corpus_path": "nature/nat_comms_2.pdf"
     },
     {
       "id": "scirep_minimal_rule",
@@ -95,10 +95,10 @@
       "id": "nat_comms_figure_only",
       "category": "figure_only",
       "expected_tables": 0,
-      "expected_figures": 2,
-      "notes": "Nature Communications paper with figures, expected no tables.",
-      "canonical_key": "10.1038/s41467-023-42320-4",
-      "corpus_path": "nature/nat_comms_2.pdf"
+      "expected_figures": 5,
+      "notes": "Nature Communications paper with figures and no tables (Fig. 1-5, pp. 3-7). Paper reassigned 2026-09-24: this fixture pointed at nat_comms_2, which prints a table; verified by rasterizing both papers.",
+      "canonical_key": "10.1038/s41467-023-43885-w",
+      "corpus_path": "nature/nat_comms_1.pdf"
     },
     {
       "id": "ieee_figure_heavy",

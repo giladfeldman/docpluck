@@ -6040,7 +6040,16 @@ def _render_sections_to_markdown(
     placements: list[tuple[int, str, dict]] = []
     unlocated_tables: list[dict] = []
     unlocated_figures: list[dict] = []
+    # Grids kept WITHOUT a caption (`caption_status="uncaptioned_candidate"`) are
+    # never anchored: with no label and no caption the anchor search would look
+    # for the bare word "Table" and could pin the grid beside an unrelated real
+    # table. They get their own clearly labelled section at the end instead --
+    # retained, and marked as unverified (owner directive 2026-09-24).
+    uncaptioned_candidates: list[dict] = []
     for t in tables:
+        if t.get("caption_status") == "uncaptioned_candidate":
+            uncaptioned_candidates.append(t)
+            continue
         idx = _locate_caption_anchor(text, t.get("label") or "Table", t.get("caption") or "")
         if idx >= 0:
             placements.append((idx, "table", t))
@@ -6250,6 +6259,27 @@ def _render_sections_to_markdown(
                     out_chunks.append(raw_t)
                     out_chunks.append("\n```\n")
                 out_chunks.append("\n")
+
+    if uncaptioned_candidates:
+        out_chunks.append("## Uncaptioned table candidates (unverified)\n\n")
+        out_chunks.append(
+            "*Grids detected on pages where no table caption matched them. They are "
+            "kept rather than discarded, but they are NOT verified to be tables: some "
+            "are real uncaptioned tables, others are text laid out in columns (a "
+            "title block, a column of prose).*\n\n"
+        )
+        for t in uncaptioned_candidates:
+            cells = t.get("cells") or []
+            html = t.get("html") or (cells_to_html(cells) if cells else "")
+            raw_t = (t.get("raw_text") or "").strip()
+            out_chunks.append(
+                f"### Uncaptioned candidate {t.get('id') or ''} (page {t.get('page')})\n"
+            )
+            if html:
+                out_chunks.append(html + "\n")
+            elif raw_t:
+                out_chunks.append("```unstructured-table\n" + raw_t + "\n```\n")
+            out_chunks.append("\n")
 
     if leftover_figures:
         out_chunks.append("## Figures\n\n")

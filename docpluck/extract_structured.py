@@ -364,18 +364,28 @@ def _extract_pdf_structured(
             next_boundary_by_id, method_pieces,
         )
 
-    # Auto-detect candidate per caption (legacy pairing). Filter Camelot's output
-    # to tables that have a same-page caption — this anchors detection to caption
-    # signal (matching the pre-pdfplumber-removal behavior) and drops false
-    # positives like bibliographies. Uncaptioned auto-detect tables are dropped as
-    # before (rare in the APA corpus; existing tests are caption-anchored).
+    # Auto-detect candidate per caption (legacy pairing): a Camelot grid is paired
+    # with a same-page "Table N" caption.
+    #
+    # A grid NO caption claims used to be discarded here with a bare `continue`,
+    # justified by "rare in the APA corpus" -- never measured, and recorded
+    # nowhere. On Nature-family papers it was not rare at all: their `Table 1 |`
+    # captions were invisible to the caption pattern, so every real table on
+    # those pages went, silently. Owner directive 2026-09-24: retain and label,
+    # never drop uncertain content. Such grids are now COLLECTED here and kept
+    # below as `caption_status="uncaptioned_candidate"`, unless a captioned table
+    # already covers the same region (a surviving copy, so nothing is lost).
     pages_with_table_caption = {c.page for c in table_captions}
     auto_by_cap: dict[int, Table] = {}
+    uncaptioned_candidates: list[Table] = []
     for ct in camelot_tables:
         if (ct.get("page") or 0) not in pages_with_table_caption:
+            uncaptioned_candidates.append(ct)
             continue
         match = _find_caption_for_table(ct, table_captions, used_caption_ids)
-        if match is not None:
+        if match is None:
+            uncaptioned_candidates.append(ct)
+        else:
             used_caption_ids.add(id(match))
             ct["label"] = match.label
             ct["caption"] = _extract_caption_text(
@@ -611,6 +621,31 @@ def _extract_pdf_structured(
             else:
                 tables.append(isolated)
 
+    # ---- Uncaptioned Camelot grids: KEPT and LABELLED, never silently dropped ----
+    # A candidate is skipped only when a table already in the output covers the
+    # same region of the same page -- then a copy demonstrably survives and this
+    # is deduplication, recorded as such. Everything else is kept, marked
+    # unverified, and counted.
+    n_uncaptioned = 0
+    for ct in uncaptioned_candidates:
+        if any(ct is t for t in tables):
+            continue
+        page = ct.get("page") or 0
+        if any(
+            (t.get("page") or 0) == page
+            and _bbox_overlap_fraction(ct.get("bbox"), t.get("bbox")) >= 0.5
+            for t in tables
+        ):
+            record_fallback("camelot_candidate_duplicates_a_kept_table", detail=f"p{page}")
+            continue
+        n_uncaptioned += 1
+        ct["id"] = f"u{n_uncaptioned}"
+        ct["label"] = None
+        ct["caption"] = None
+        ct["caption_status"] = "uncaptioned_candidate"
+        record_fallback("camelot_table_kept_without_caption", detail=f"p{page}")
+        tables.append(ct)
+
     # ---- Figures ----
     for cap in captions:
         if cap.kind != "figure":
@@ -636,6 +671,13 @@ def _extract_pdf_structured(
     # which path produced it — carries the private ``_caption_hint_number`` key.
     for t in tables:
         t.pop("_caption_hint_number", None)
+        # Every table states how sure we are it is a captioned table. A PDF
+        # table with a label was paired with a caption; one without was never
+        # verified, so it can only ever be a candidate -- never "none_found",
+        # which asserts the table itself is certain.
+        t.setdefault(
+            "caption_status", "matched" if t.get("label") else "uncaptioned_candidate"
+        )
 
     # MAKE THE MIS-MAPPED SYMBOL FONTS VISIBLE. A font whose whole-document
     # repertoire is a handful of Latin letters that are all Symbol-Greek
@@ -1392,6 +1434,25 @@ def _column_body_text(
     except Exception as exc:
         record_fallback("column_body_rebuild_exception", detail=type(exc).__name__)
         return None
+
+
+def _bbox_overlap_fraction(a, b) -> float:
+    """Overlap area as a fraction of the SMALLER box; 0.0 when either is unusable.
+
+    Used to decide whether an uncaptioned Camelot grid is a duplicate of a
+    table already kept (a copy survives) or genuinely extra content.
+    """
+    try:
+        ax0, ay0, ax1, ay1 = (float(v) for v in a)
+        bx0, by0, bx1, by1 = (float(v) for v in b)
+    except (TypeError, ValueError):
+        return 0.0
+    w = min(ax1, bx1) - max(ax0, bx0)
+    h = min(ay1, by1) - max(ay0, by0)
+    if w <= 0 or h <= 0:
+        return 0.0
+    smaller = min((ax1 - ax0) * (ay1 - ay0), (bx1 - bx0) * (by1 - by0))
+    return (w * h) / smaller if smaller > 0 else 0.0
 
 
 def _find_caption_for_table(

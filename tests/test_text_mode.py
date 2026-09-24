@@ -57,8 +57,7 @@ def test_placeholder_with_figures_inserts_figure_markers():
     from docpluck import extract_pdf_structured
     data = _read("nat_comms_figure_only")
     result = extract_pdf_structured(data, table_text_mode="placeholder")
-    if not result["figures"]:
-        pytest.skip("no figures detected")
+    assert result["figures"], "no figures detected on the figure-only fixture"
     assert "[Figure" in result["text"]
 
 

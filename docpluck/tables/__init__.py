@@ -21,6 +21,18 @@ TableKind = Literal["structured", "isolated"]
 # would silently include tables that have none to report.
 TableRendering = Literal["lattice", "whitespace", "isolated", "markup"]
 
+# How sure docpluck is that this is a CAPTIONED table (2026-09-24).
+#   "matched"               -- paired with a detected "Table N" caption.
+#   "none_found"            -- no caption, but the table itself is certain: the
+#                              file DECLARES it (a DOCX `w:tbl`).
+#   "uncaptioned_candidate" -- a PDF grid Camelot found on a page where no
+#                              caption matched it. KEPT rather than discarded
+#                              (owner directive: retain and label, never drop
+#                              uncertain content) but NOT verified to be a
+#                              table: it may be a title block or prose laid out
+#                              in columns. `label` and `caption` are None.
+CaptionStatus = Literal["matched", "none_found", "uncaptioned_candidate"]
+
 
 class Cell(TypedDict):
     r: int
@@ -71,6 +83,9 @@ class Table(TypedDict):
     # silent: a zero bbox with no reason is indistinguishable from a document
     # that simply had no rotated pages. See `docpluck/tables/cell_geometry.py`.
     cell_geometry: Optional[str]
+    # See `CaptionStatus`. Never absent: an unlabelled table with no status
+    # would be indistinguishable from a labelling bug.
+    caption_status: CaptionStatus
 
 
-__all__ = ["Cell", "Table", "TableKind", "TableRendering"]
+__all__ = ["CaptionStatus", "Cell", "Table", "TableKind", "TableRendering"]

@@ -450,6 +450,9 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
             ),
             "raw_text": "\n".join("\t".join(r) for r in grid.rows),
             "cell_geometry": "no_layout:docx_states_no_page_geometry",
+            # The file declares this a table (`w:tbl`), so an absent caption
+            # makes it uncaptioned, never uncertain.
+            "caption_status": "matched" if label else "none_found",
         })
 
     return tables, "mammoth"

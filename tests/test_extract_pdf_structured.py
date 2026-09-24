@@ -128,7 +128,10 @@ def test_table_ids_unique_and_sequential():
     ids = [t["id"] for t in result["tables"]]
     assert len(set(ids)) == len(ids)
     assert all(
-        tid.startswith("t") or tid.startswith("camelot_t") for tid in ids
+        # `u<n>`: a grid kept WITHOUT a caption (caption_status
+        # "uncaptioned_candidate", 2026-09-24) -- its own prefix so it can never
+        # collide with the caption-numbered `t<N>` scheme.
+        tid.startswith(("t", "camelot_t", "u")) for tid in ids
     )
 
 
@@ -151,8 +154,8 @@ def test_figure_required_fields_present():
     from docpluck import extract_pdf_structured
     data = _read("nat_comms_figure_only")
     result = extract_pdf_structured(data)
-    if not result["figures"]:
-        pytest.skip("no figures detected")
+    # A figure-only fixture that yields no figures is the defect this test exists to catch; it used to `pytest.skip` here, which is why every `Fig. N |` caption going unread stayed invisible until 2026-09-24.
+    assert result["figures"], "no figures detected on the figure-only fixture"
     f = result["figures"][0]
     for key in ("id", "label", "page", "bbox", "caption"):
         assert key in f

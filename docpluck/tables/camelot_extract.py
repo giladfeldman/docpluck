@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 import re
 
 from docpluck.tables import Cell, Table
+from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
 from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
 from docpluck.tables.render import cells_to_html
@@ -58,14 +59,15 @@ _RUNNING_HEADER_PATTERNS = [
 ]
 
 _CAPTION_ROW_PATTERN = re.compile(
-    r"^\s*(?:Table|Fig\.?|Figure)\s+\d+(?:\.\d+)?\s*[.:]",
+    # `.`/`:` or the Nature pipe -- the pipe from the ONE definition in captions.py.
+    r"^\s*(?:Table|Fig\.?|Figure)\s+\d+(?:\.\d+)?(?:\s*[.:]|" + CAPTION_PIPE_SEPARATOR + ")",
     re.IGNORECASE,
 )
 
 # Same anchor as ``_CAPTION_ROW_PATTERN`` but capturing the integer table number,
 # for the caption-marker pairing hint (see ``_leading_table_caption_number``).
 _TABLE_CAPTION_NUMBER_PATTERN = re.compile(
-    r"^\s*Table\s+(\d+)(?:\.\d+)?\s*[.:]",
+    r"^\s*Table\s+(\d+)(?:\.\d+)?(?:\s*[.:]|" + CAPTION_PIPE_SEPARATOR + ")",
     re.IGNORECASE,
 )
 

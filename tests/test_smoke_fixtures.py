@@ -27,14 +27,13 @@ COUNT_TOLERANCE = 6
 # scirep 1->4, nat_comms 0->0, ieee_figure_heavy 8->8 -- and this one alone at
 # 1->0. Every other fixture meets or exceeds its expectation, so the gate is
 # live for eleven of twelve rather than waived wholesale.
-KNOWN_ZERO_TABLE_FIXTURES = {
-    "nature_minimal_rule": (
-        "expects 1 table, extracts 0; measured 2026-09-21. A minimal-rule table "
-        "(few or no ruling lines) that neither the Camelot pass nor the "
-        "whitespace fallback captures. Not diagnosed -- recorded so it is "
-        "visible instead of hidden inside the tolerance band."
-    ),
-}
+#
+# RESOLVED 2026-09-24, and the resolution is worth keeping in view: the one entry
+# here, "nature_minimal_rule", was NOT a capture defect. The fixture pointed at the
+# wrong paper (nat_comms_1 prints no table at all), and the paper it was meant for
+# (nat_comms_2) had its `Table 1 |` caption invisible to the caption pattern. Both
+# were fixed; this dict is empty and the mechanism stays for the next real zero.
+KNOWN_ZERO_TABLE_FIXTURES: dict[str, str] = {}
 
 
 @pytest.mark.parametrize("entry", fixture_entries(), ids=lambda e: e.get("id", "?"))
@@ -43,7 +42,12 @@ def test_table_count_within_tolerance(entry):
     from docpluck import extract_pdf_structured
     expected = entry["expected_tables"]
     result = extract_pdf_structured(pdf.read_bytes())
-    actual = len(result["tables"])
+    # CAPTIONED tables are what `expected_tables` counts. Since 2026-09-24 a grid
+    # no caption claims is kept as caption_status="uncaptioned_candidate" (owner
+    # directive: retain and label), and those are extra by construction -- 13 of
+    # them on nat_comms_2 alone, mostly structure inside figures -- so counting
+    # them here would measure the candidates, not the captioned tables.
+    actual = sum(1 for t in result["tables"] if t.get("caption_status") == "matched")
     # A TOTAL loss of the table channel must not be inside the tolerance band.
     # Measured 2026-09-21: 8 of these 12 fixtures expect <= 6 tables, so with
     # COUNT_TOLERANCE = 6 a run that extracted ZERO tables passed for all eight
@@ -81,6 +85,16 @@ def test_figure_count_within_tolerance(entry):
     expected = entry["expected_figures"]
     result = extract_pdf_structured(pdf.read_bytes())
     actual = len(result["figures"])
+    # Same hole as tables, found the same way: with COUNT_TOLERANCE = 6, ZERO
+    # figures passed for every fixture expecting <= 6. Measured 2026-09-24, two
+    # Nature Communications fixtures extracted 0 figures while printing 4 and 5
+    # -- every `Fig. N |` caption was invisible -- and this test stayed green.
+    if expected > 0:
+        assert actual > 0, (
+            f"{entry['id']}: expected {expected} figures and got NONE; the "
+            f"±{COUNT_TOLERANCE} tolerance below would have accepted that. "
+            f"method={result['method']}"
+        )
     assert abs(actual - expected) <= COUNT_TOLERANCE, (
         f"{entry['id']}: expected {expected} figures (±{COUNT_TOLERANCE}), got {actual}"
     )

@@ -16,12 +16,25 @@ def test_imports_ok():
     assert find_figures is not None
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "find_figures() has NO production caller (measured 2026-09-24: only this "
+        "test imports it; consumers get figures from extract_structured's "
+        "caption-driven path, which finds all 5 here). It finds none on this "
+        "Nature fixture because it matches captions in the LAYOUT channel's "
+        "text, where pdfplumber collapsed every space on this paper: the "
+        "caption reads `Fig.1|Lethaleffects...`. This test used to "
+        "pytest.skip on zero, which hid that. strict=True: goes red the day "
+        "the module works, so the marker cannot outlive the defect."
+    ),
+)
 def test_figure_only_fixture_finds_figures():
     layout = _layout("nat_comms_figure_only")
     from docpluck.figures.detect import find_figures
     figures = find_figures(layout)
-    if not figures:
-        pytest.skip("no figures detected on this fixture")
+    # A figure-only fixture that yields no figures is the defect this test exists to catch; it used to `pytest.skip` here, which is why every `Fig. N |` caption going unread stayed invisible until 2026-09-24.
+    assert figures, "no figures detected on the figure-only fixture"
     for f in figures:
         assert f["label"] is not None and f["label"].startswith("Figure ")
         assert f["caption"] is not None and len(f["caption"]) > 0
@@ -51,12 +64,24 @@ def test_no_figures_returns_empty_or_only_real_figures():
         assert x1 > x0
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "find_figures() has NO production caller (measured 2026-09-24: only this "
+        "test imports it; consumers get figures from extract_structured's "
+        "caption-driven path, which finds all 5 here). It finds none on this "
+        "Nature fixture because it matches captions in the LAYOUT channel's "
+        "text, where pdfplumber collapsed every space on this paper: the "
+        "caption reads `Fig.1|Lethaleffects...`. This test used to "
+        "pytest.skip on zero, which hid that. strict=True: goes red the day "
+        "the module works, so the marker cannot outlive the defect."
+    ),
+)
 def test_figure_id_is_unique_and_sequential():
     layout = _layout("nat_comms_figure_only")
     from docpluck.figures.detect import find_figures
     figures = find_figures(layout)
-    if not figures:
-        pytest.skip("no figures detected")
+    assert figures, "no figures detected on the figure-only fixture"
     ids = [f["id"] for f in figures]
     assert len(set(ids)) == len(ids)
     assert all(fid.startswith("f") for fid in ids)

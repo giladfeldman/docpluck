@@ -161,8 +161,15 @@ def test_tail_sweep_stops_at_the_first_body_line():
 
 def test_xiao_2021_crsp_contact_block_absent_from_body_real_pdf():
     md = _maybe_render("apa/xiao_2021_crsp.pdf")
-    assert "CONTACT Gilad Feldman" not in md
-    assert "Hong Kong, Hong Kong SAR" not in md
+    # The BODY, as the test's name says. Since 2026-09-24 a grid no caption claims
+    # is kept and rendered in its own labelled section at the end ("Uncaptioned
+    # table candidates (unverified)") instead of being silently discarded, and on
+    # this paper one such grid is the page-1 contact block. It must not leak into
+    # the prose -- which is the defect this test pins -- but it may appear, as
+    # labelled furniture, in that appendix.
+    body = md.split("## Uncaptioned table candidates (unverified)", 1)[0]
+    assert "CONTACT Gilad Feldman" not in body
+    assert "Hong Kong, Hong Kong SAR" not in body
 
 
 def test_xiao_2021_crsp_split_sentence_is_contiguous_real_pdf():

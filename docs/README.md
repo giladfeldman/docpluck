@@ -150,6 +150,18 @@ every Camelot cell shipped `(0.0, 0.0, 0.0, 0.0)`; they are now real pdfplumber-
 | `no_cells` | there is no grid (caption-only / isolated table) |
 | anything else (`camelot_rotated_page:…`, `grid_shape_mismatch:…`, `roundtrip_failed:…`, `no_layout`) | zeros — we refused rather than guess |
 
+**`caption_status` (new, 2026-09)** says how sure docpluck is that a table is a *captioned* table.
+Filter on it; do not infer it from `label`.
+
+| value | meaning |
+|---|---|
+| `matched` | paired with a detected `Table N` caption |
+| `none_found` | no caption, but the table itself is certain — the file declares it (a DOCX `w:tbl`) |
+| `uncaptioned_candidate` | a PDF grid found on a page where no caption matched it. **Kept, not discarded** — it may be a real uncaptioned table, or text laid out in columns (a title block, a running header, the inside of a figure). `label` and `caption` are `None`; the id starts with `u`. Rendered Markdown shows these in a separate "Uncaptioned table candidates (unverified)" section. |
+
+Until 2026-09 such grids were silently discarded. Across the 102-paper test corpus that was about
+400 grids in 83 papers; a sample of those kept is roughly half real statistical tables.
+
 **Trust the boxes only on `verified` or `whitespace_native`.** Every way of getting this wrong
 produces coordinates that are plausible and off by a page, which is worse than none. Measured over
 69 shipped tables: 81.2% verified, 91.6% of cells carrying a real box. A verified bbox is the GRID

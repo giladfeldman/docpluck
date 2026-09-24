@@ -51,13 +51,13 @@
       "method": "pdftotext_default"
     },
     "nat_comms_figure_only": {
-      "sha256": "e7c7769b5fb6d85d2ca20bd83879a5a6cc04cf94be3f4d86767dbd74d13c9c8c",
-      "bytes": 82439,
+      "sha256": "efb5c0baf642aaaf834e8a96bfd599dea9015afb91b57186e106c3d6f6772692",
+      "bytes": 77718,
       "method": "pdftotext_default"
     },
     "nature_minimal_rule": {
-      "sha256": "efb5c0baf642aaaf834e8a96bfd599dea9015afb91b57186e106c3d6f6772692",
-      "bytes": 77718,
+      "sha256": "e7c7769b5fb6d85d2ca20bd83879a5a6cc04cf94be3f4d86767dbd74d13c9c8c",
+      "bytes": 82439,
       "method": "pdftotext_default"
     },
     "scirep_minimal_rule": {
