@@ -2492,3 +2492,38 @@ print one of each before believing the difference.
   read. One sha256 settled it - identical, so no swap - and the real cause was a test
   asserting a recovery that cannot fire on that paper. **An error message's own
   suggested fix is the anticipation of whoever wrote it, not a finding.**
+
+## L-060 - A wider region reads more of the page, and every detector downstream of it becomes a new data path
+
+**What happened.** 2c8b0dd (v2.4.143) fixed real column loss by widening caption-anchored
+table regions. It was measured and correct for the tables it targeted. Eleven days later
+CitationGuard's contract fixture showed a "Table 2" holding Table 1's F-tests and a
+fabricated `F(0.003, -0.31) = 98`. The bisect was right about the commit and wrong about
+the cause. 2c8b0dd did not write that row. `_augment_lattice_with_stream_rows`
+(v2.4.94) had been appending the next table's caption and rows onto a ruled table for
+months. 2c8b0dd only made the correct candidate lose to it, through a tie-break
+("more cells wins") that favours a table which has absorbed its neighbour.
+
+A 102-paper diff (v2.4.142 vs 2.4.144, `extract_pdf_structured`) then found the same
+widening had exposed four more detectors that were never written for a wide region:
+- the caption locator matched a body cross-reference ("presented in Table 4.") above the
+  real heading (`10.5465/amj.2016.1196`);
+- the left-edge widening read whatever else sits at the same y (a side-note column,
+  `10.1001/jamanetworkopen.2023.48333`; a rotated copyright strip,
+  `10.1136/bmjopen-2022-066361`);
+- a single page-footer rule was admitted as a table rule;
+- the table-note search took a page footer 440pt below the table
+  (`10.48550/arxiv.2410.21901`).
+Three tables shipped EMPTY and one shipped its hazard ratios interleaved glyph by glyph.
+No test went red.
+
+**The rule.** A change that enlarges an input (a region, a window, a token span) is a
+change to every consumer of that input. List the consumers before merging, then diff the
+OUTPUT over the corpus, not the input. "The region is now right" was true, and it did not
+imply "the tables are now right".
+
+**Corollary: measure the fix's own blast radius with the cheapest instrument first.** A
+geometry-only census (caption bbox and region for all 429 captions, no Camelot) showed the
+first version of the note-proximity guard moving 112 regions in 43 papers. Scoped to ruled
+tables, it moved 63 in 31, and the full extraction over those showed no printed value lost.
+Without the census, the over-broad guard would have shipped as "fixes ieee_access_8".

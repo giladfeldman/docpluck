@@ -125,10 +125,23 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
     # located a grid: the ``caption_only`` fallback found none, so its band is a
     # guess, and widening a guess is the documented cog_emo Table 8/9 regression
     # (stacked tables, 8 columns collapsed to 2).
-    if signal != "caption_only":
+    #
+    # AND GATED OFF FOR LATTICE (v2.4.145). A ruled table's rules already STATE
+    # its width -- ``_horizontal_rules_in`` takes them at their full extent -- so
+    # there is no modal-row shortfall for this step to correct; it exists for a
+    # whitespace run, whose rows are the only evidence of width. What it does do
+    # on a ruled table is read rows that are not the table's: words are bucketed
+    # by y across the WHOLE page, so a row "beginning at the left edge" carries
+    # whatever else is printed at that height. On `10.1001/jamanetworkopen.2023.
+    # 48333` p6 that was the side-note column ("Abbreviation: HR, hazard ratio.")
+    # beside Table 2: the region ran from x=395 to x=557 and the Model 1 / Model 2
+    # hazard ratios came out interleaved glyph by glyph.
+    if signal == "whitespace":
         full_bbox = _widen_to_left_aligned_rows(layout, page=cap.page, bbox=full_bbox)
 
-    footnote = _detect_footnote_below(layout, page=cap.page, bbox=full_bbox)
+    footnote = _detect_footnote_below(
+        layout, page=cap.page, bbox=full_bbox, grid_bottom_known=(signal == "lattice")
+    )
     if footnote is not None:
         full_bbox = _union(full_bbox, footnote.bbox)
 
@@ -197,6 +210,24 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
         rows[round(c.get("top", 0))].append(c)
 
     # Pass 1+2: prefix-based match (legacy or normalized).
+    #
+    # A CAPTION BEGINS A TEXT BLOCK; A CROSS-REFERENCE DOES NOT (v2.4.145). The
+    # test below is CONTAINMENT, so a short caption line ("TABLE 4") matches any
+    # body sentence that mentions it, and rows are walked top-down, so a mention
+    # printed above the table wins. Measured on `10.5465/amj.2016.1196` p19: the
+    # left-column sentence "presented in Table 4. To test our first hypothesis"
+    # sits 50pt above the real "TABLE 4" heading and was taken as the caption,
+    # anchoring the region in two columns of prose. The region-driven grid was
+    # then rejected as prose and the paper's Table 4 -- every M, SD and
+    # correlation -- reached no structured table from v2.4.143 on.
+    #
+    # Where the match starts is a TYPOGRAPHIC fact: at the row's first glyph, or
+    # after a horizontal gap wider than a word space (the caption of a right-hand
+    # column, joined into one y-row with the left column's text). A mention
+    # inside a sentence follows an ordinary word space. Rows whose match starts
+    # a block are preferred; if none does, the first containing row is returned
+    # exactly as before, so a caption this cannot place is placed as it was.
+    first_containing: Bbox | None = None
     for top_key in sorted(rows.keys()):
         row_chars = sorted(rows[top_key], key=lambda c: c.get("x0", 0))
         joined = "".join(c.get("text", "") for c in row_chars)
@@ -208,7 +239,12 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
             x1 = max(c["x1"] for c in row_chars)
             top = min(c["top"] for c in row_chars)
             bottom = max(c["bottom"] for c in row_chars)
-            return (x0, top, x1, bottom)
+            if _match_starts_text_block(row_chars, target_prefix_norm):
+                return (x0, top, x1, bottom)
+            if first_containing is None:
+                first_containing = (x0, top, x1, bottom)
+    if first_containing is not None:
+        return first_containing
 
     # Pass 3: label-only fallback. The row must additionally start near the
     # left margin (label-style caption, not an inline back-reference like
@@ -233,6 +269,46 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
         bottom = max(c["bottom"] for c in row_chars)
         return (x0, top, x1, bottom)
     return None
+
+
+# A gap before the caption's first glyph wider than this means the caption
+# starts its own text block (a column boundary), not a word inside a sentence.
+# An inter-word space in body text is ~0.25em (2-3pt at 9-11pt); a two-column
+# page's gutter is 10-30pt.
+_BLOCK_START_GAP_PT: float = 6.0
+
+
+def _match_starts_text_block(row_chars: list[dict], target_norm: str) -> bool:
+    """True when ``target_norm`` occurs in this x-sorted row starting at its first
+    glyph, or right after a horizontal gap of at least ``_BLOCK_START_GAP_PT``.
+
+    Matches over the same normalized form ``_bbox_of_caption_line`` uses (spaces
+    dropped, ligatures folded, lowercase), keeping a map from each normalized
+    character back to the glyph that produced it."""
+    if not target_norm:
+        return False
+    norm_chars: list[str] = []
+    owner: list[int] = []
+    for i, c in enumerate(row_chars):
+        for ch in _normalize_for_char_match(c.get("text", "")):
+            norm_chars.append(ch)
+            owner.append(i)
+    norm = "".join(norm_chars)
+    start = norm.find(target_norm)
+    while start != -1:
+        gi = owner[start]
+        # The previous VISIBLE glyph: some producers emit explicit space glyphs,
+        # which would otherwise make every gap look like zero.
+        prev = gi - 1
+        while prev >= 0 and not (row_chars[prev].get("text") or "").strip():
+            prev -= 1
+        if prev < 0:
+            return True
+        gap = float(row_chars[gi].get("x0", 0.0)) - float(row_chars[prev].get("x1", 0.0))
+        if gap >= _BLOCK_START_GAP_PT:
+            return True
+        start = norm.find(target_norm, start + 1)
+    return False
 
 
 def _extend(bbox: Bbox, *, dy: float, direction: Literal["down", "up"]) -> Bbox:
@@ -309,13 +385,16 @@ def _widen_to_left_aligned_rows(layout: LayoutDoc, *, page: int, bbox: Bbox) -> 
     statement of a table's column extent precisely because it is the one row
     guaranteed to span every column; the modal body row is not.
 
-    WHY THE LEFT-EDGE TEST MAKES THIS SAFE. Only rows starting at the region's
-    own left edge can widen it, and on a genuine two-column page the
-    neighbouring text column starts hundreds of points to the right — so it can
-    never be pulled in. That is the ``ieee_access_7`` Table 3 regression which
-    blocks a blanket widen, and it is why ``_widen_to_content_x`` (which takes
-    ALL words in the band, at any x) needs the narrow/wide arbitration in
-    ``_detect_geometry_widen_aware`` while this does not.
+    WHY THE LEFT-EDGE TEST IS *NOT* ENOUGH ON ITS OWN (corrected v2.4.145). This
+    docstring used to say the neighbouring column "can never be pulled in",
+    because only rows starting at the region's left edge may widen it. That is
+    false: words are bucketed by y across the WHOLE page, so a row that starts at
+    the left edge also carries whatever else is printed at that height -- a
+    side-note column (`10.1001/jamanetworkopen.2023.48333` p6), a rotated margin
+    strip (`10.1136/bmjopen-2022-066361` p6), two-column body prose under a
+    mis-located caption (`10.5465/amj.2016.1196` p19). The step is therefore run
+    only for a ``whitespace`` run (a ruled table's rules already state its width)
+    and skips non-upright words; see ``_region_for_caption``.
 
     Keyed on a layout invariant; paper-, font- and publisher-agnostic.
     """
@@ -323,6 +402,13 @@ def _widen_to_left_aligned_rows(layout: LayoutDoc, *, page: int, bbox: Bbox) -> 
     page_obj = layout.pages[page - 1]
     rows: dict[float, list[dict]] = defaultdict(list)
     for w in page_obj.words:
+        # Sideways text is never a cell of a horizontal row. `10.1136/bmjopen-
+        # 2022-066361` p6 prints its copyright strip rotated down the right
+        # margin (`upright: False`, direction `ttb`); its words share a y-bucket
+        # with every row of Table 4, so each row "reached" x=585 and the region
+        # overran the page edge (v2.4.145).
+        if not _is_upright(w):
+            continue
         mid_y = (w["top"] + w["bottom"]) / 2
         if top <= mid_y <= bottom:
             bucket = round(mid_y / ROW_Y_BUCKET_PT) * ROW_Y_BUCKET_PT
@@ -358,7 +444,9 @@ def _detect_geometry(layout: LayoutDoc, *, page: int, search_bbox: Bbox) -> tupl
     has_whitespace_cols = run_bbox is not None
 
     if len(horiz) >= LATTICE_MIN_HORIZONTAL_RULES and (len(vert) >= 1 or has_whitespace_cols):
-        rule_bbox = _union_of_primitives(list(horiz) + list(vert), fallback=search_bbox)
+        rule_bbox = _union_of_primitives(
+            _without_lone_overreaching_rules(list(horiz)) + list(vert), fallback=search_bbox
+        )
         return ("lattice", rule_bbox)
     if run_bbox is not None:
         return ("whitespace", run_bbox)
@@ -428,10 +516,12 @@ def _horizontal_rules_in(page_obj, bbox: Bbox) -> list[dict]:
     columns; five of six data columns were lost, and the dropped values
     appeared NOWHERE in the rendered document.
 
-    Overlap is the safe widening test *for a ruled line specifically*, in a way
-    that word-extent widening is not: a rule does not cross a page's column
+    Overlap is the right test *for a ruled line specifically*, in a way that
+    word-extent widening is not: a TABLE rule does not cross a page's column
     gutter, so a left-column table's rules still cannot reach a right-column
-    table's. That is why ``_widen_to_content_x`` (which scans WORDS) needs the
+    table's. Page FURNITURE rules can (a footer separator spans the page), which
+    is why the lattice union drops a lone rule wider than the table's recurring
+    rules (``_without_lone_overreaching_rules``, v2.4.145). That is why ``_widen_to_content_x`` (which scans WORDS) needs the
     narrow/wide arbitration in ``_detect_geometry_widen_aware`` and this does
     not. Keyed on a layout invariant; paper-, font- and publisher-agnostic.
     """
@@ -492,6 +582,46 @@ def _coalesced_horizontal_rules(page_obj) -> list[dict]:
         else:
             merged.append(seg)
     return merged
+
+
+# Two horizontal rules draw "the same width" when both ends agree this closely.
+_RULE_EXTENT_TOL_PT: float = 3.0
+
+
+def _without_lone_overreaching_rules(rules: list[dict]) -> list[dict]:
+    """Drop a horizontal rule that is the ONLY one of its width AND reaches
+    beyond the extent the table's recurring rules establish.
+
+    A table draws its full-width rule at least twice -- top and bottom, and
+    usually under the header too. Page furniture draws one: the separator above
+    a running footer, the rule closing a figure panel. ``_horizontal_rules_in``
+    admits any rule that OVERLAPS the search band (v2.4.143, correct for the
+    table's own rules), and so admits that furniture too whenever it falls in the
+    250pt band below a caption. Measured on `10.1001/jamanetworkopen.2023.48333`
+    p6: Table 2 draws eight rules at x=47.9->395.1, the page-footer separator is
+    one rule at x=47.9->562.8; the union took the footer's x1, the region ran
+    into the side-note column, and the Model 1 and Model 2 hazard-ratio rows came
+    out interleaved glyph by glyph (``MMooddeell12bc | 11..3341((11..2220--``)
+    (v2.4.145).
+
+    A narrower rule INSIDE the recurring extent is kept -- a column-spanner
+    underline is drawn once and belongs to the table. With no recurring width at
+    all (fewer than three rules, or every one distinct) the input is returned
+    unchanged: there is no table extent to judge against, so nothing is judged.
+    """
+    if len(rules) < 3:
+        return rules
+
+    def same_width(a: dict, b: dict) -> bool:
+        return (abs(a["x0"] - b["x0"]) <= _RULE_EXTENT_TOL_PT
+                and abs(a["x1"] - b["x1"]) <= _RULE_EXTENT_TOL_PT)
+
+    recurring = [r for r in rules if any(o is not r and same_width(r, o) for o in rules)]
+    if not recurring:
+        return rules
+    ex0 = min(r["x0"] for r in recurring) - _RULE_EXTENT_TOL_PT
+    ex1 = max(r["x1"] for r in recurring) + _RULE_EXTENT_TOL_PT
+    return [r for r in rules if any(r is q for q in recurring) or (r["x0"] >= ex0 and r["x1"] <= ex1)]
 
 
 def _vertical_rules_in(page_obj, bbox: Bbox) -> list[dict]:
@@ -728,16 +858,23 @@ def _whitespace_columns_stable(layout: LayoutDoc, *, page: int, bbox: Bbox) -> b
     return _aligned_row_run(layout, page=page, bbox=bbox) is not None
 
 
-def _detect_footnote_below(layout: LayoutDoc, *, page: int, bbox: Bbox) -> _Footnote | None:
+def _detect_footnote_below(
+    layout: LayoutDoc, *, page: int, bbox: Bbox, grid_bottom_known: bool = False
+) -> _Footnote | None:
     page_obj = layout.pages[page - 1]
     chars = page_obj.chars or ()
     if not chars:
         return None
     body_size = _modal_font_size(chars)
     x0, top, x1, bottom = bbox
+    # Upright only: a rotated margin strip is not a table note. On
+    # `10.1136/bmjopen-2022-066361` p6 the copyright strip was taken as Table 4's
+    # "footnote" and the region ran to the page bottom, through two columns of
+    # body prose; the grid was lost and Table 4 shipped EMPTY (v2.4.145).
     candidates = [
         c for c in chars
         if c.get("top", 0) >= bottom and c.get("x0", 0) >= x0 - 5 and c.get("x1", 0) <= x1 + 5
+        and _is_upright(c)
     ]
     if not candidates:
         return None
@@ -761,6 +898,27 @@ def _detect_footnote_below(layout: LayoutDoc, *, page: int, bbox: Bbox) -> _Foot
     fx0 = min(c["x0"] for c in block)
     fx1 = max(c["x1"] for c in block)
     ftop = min(c["top"] for c in block)
+    # ...and the block itself must START near the table. The clip above keeps
+    # the note's rows together but never asked how far the first of them is
+    # from the grid, so the topmost small-font text ANYWHERE below the table
+    # qualified. Measured on `10.48550/arxiv.2410.21901`: Table 5's (p6) "note"
+    # was the page footer "VOLUME 4, 2024" 440pt below it, and Table 6's (p7) a
+    # figure caption 220pt below; each region then ran down through the body
+    # prose, the grid was lost, and both tables shipped EMPTY from v2.4.143 on
+    # -- a wider region (2c8b0dd) had let the footer's x-range in. A table's
+    # note is within one note-row gap of the grid, the same bound the block
+    # clip uses (v2.4.145).
+    #
+    # ONLY WHERE THE GRID'S BOTTOM IS KNOWN -- a ruled table, whose last rule is
+    # its last row. For a whitespace run or the caption-only fallback, ``bottom``
+    # is where DETECTION stopped, not where the table does: the run can stop at
+    # the modal rows and the fallback is a fixed 250pt box, and the rows between
+    # there and the note are the table's own. Measured by a region census over
+    # the 102-paper corpus, applying this gate to every signal moved 112 of 429
+    # caption regions in 43 papers -- `10.1525/collabra.90203` Table 7's region
+    # would have lost its lower 300pt -- so it is scoped to what it can judge.
+    if grid_bottom_known and ftop - bottom > _FOOTNOTE_ROW_GAP_PT:
+        return None
     fbot = max(c["bottom"] for c in block)
     block.sort(key=lambda c: (c["top"], c["x0"]))
     text = "".join(c.get("text", "") for c in block).strip()
@@ -772,6 +930,12 @@ def _detect_footnote_below(layout: LayoutDoc, *, page: int, bbox: Bbox) -> _Foot
 # gap several times that means the next small-font content is a separate object
 # (figure caption, page furniture), not a continuation of the table's note.
 _FOOTNOTE_ROW_GAP_PT: float = 25.0
+
+
+def _is_upright(obj: dict) -> bool:
+    """pdfplumber's own per-glyph / per-word orientation flag. Absent -> upright,
+    so a layout source that does not report it behaves exactly as before."""
+    return obj.get("upright", True) is not False
 
 
 def _contiguous_top_block(chars: list[dict]) -> list[dict]:
