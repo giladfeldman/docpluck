@@ -118,7 +118,9 @@ def extract_pdf(
         #     nothing only because no word happened to have a unique look-alike.
         #   * Across all 102 corpus papers NEITHER mode was ever accepted.
         # A visible U+FFFD is a flag a consumer can act on; a plausible wrong
-        # token is not. normalize.py still maps SMP math-italic characters that
+        # token is not. (This is extract_pdf's contract. normalize_text's S5a and
+        # S5b still rewrite U+FFFD in two narrow statistical contexts -- eta before
+        # `2 =`, and >= / <= before a number -- and leave it everywhere else.) normalize.py still maps SMP math-italic characters that
         # pdftotext DOES decode (`_MATH_ALNUM_RE`), so nothing correctly encoded
         # is lost. Record: communications/DECISION_2026-09-22_fffd_recovery.md.
 

@@ -53,7 +53,10 @@ class TestExtractPdf:
         RETIRED on 2026-09-24. That recovery could swap a whole document's text on
         a guard that accepted even unrelated text, or patch `partial <U+FFFD>2`
         into `partial R2` -- a different statistic. The contract now is the
-        honest one: an undecodable glyph stays visibly undecodable.
+        honest one: `extract_pdf` returns an undecodable glyph visibly undecodable.
+        (normalize_text's S5a/S5b may still rewrite it later, in two narrow
+        statistical contexts; on this paper S5b rewrites all 9 as `>=` -- that is
+        a separate rule, not tested here.)
 
         `vancouver/plos_med_1.pdf` is the one corpus paper that carries enough
         U+FFFD to have triggered the old path (9, measured 2026-09-21), and the

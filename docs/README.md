@@ -5,7 +5,7 @@
 Built from cross-project experience across 8,000+ PDFs spanning psychology, medicine, economics, physics, and biology. Achieves 100% accuracy on 29 manually verified ground-truth passages (see [BENCHMARKS.md](BENCHMARKS.md)).
 
 Supports three input formats:
-- **PDF** via `pdftotext` default mode (an undecodable glyph is passed through as `U+FFFD`, never guessed)
+- **PDF** via `pdftotext` default mode (an undecodable glyph comes back from `extract_pdf` as `U+FFFD`)
 - **DOCX** via `mammoth` (DOCX → HTML → text, preserving Shift+Enter soft breaks)
 - **HTML** via `beautifulsoup4` + `lxml` (block/inline-aware tree-walk)
 
@@ -247,9 +247,11 @@ Extract text from PDF bytes.
 - `method` — Engine used:
   - `"pdftotext_default"` — standard extraction (fast, ~400ms)
   - Optionally followed by `+column_corrected:<pages>` when two-column pages were re-extracted in reading order.
-  - An undecodable glyph that pdftotext emits as `U+FFFD` is **passed through as printed** — docpluck does not guess
-    what it was. (The earlier `+pdfplumber_recovery` fallback was retired in 2026-09: it could substitute a plausible
-    wrong token, such as turning a partial eta-squared into an R-squared.)
+  - An undecodable glyph that pdftotext emits as `U+FFFD` is returned by `extract_pdf` **unchanged**. (The earlier
+    `+pdfplumber_recovery` fallback was retired in 2026-09: it could substitute a plausible wrong token, such as
+    turning a partial eta-squared into an R-squared.) `normalize_text` still rewrites `U+FFFD` in two narrow
+    statistical contexts — step S5a (`eta` before `2 =`) and step S5b (`>=`/`<=` before a number) — and leaves it
+    everywhere else.
 
 **Requires:** `pdftotext` binary on PATH.
 

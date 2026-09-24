@@ -65,7 +65,8 @@ The `-layout` flag is strictly worse for statistical pattern extraction. It is *
 > **This recovery no longer exists.** It was removed after its reading-order guard was shown to
 > accept reversed, shuffled and even unrelated text, and its per-word mode turned a partial
 > eta-squared into an R-squared; across the 102-paper corpus neither mode was ever accepted. An
-> undecodable glyph is now passed through as `U+FFFD`. The section below is kept as the record
+> undecodable glyph now comes back from `extract_pdf` as `U+FFFD` (normalization steps S5a/S5b still
+> rewrite it in two narrow statistical contexts). The section below is kept as the record
 > of why it was built.
 
 Some journals (Nature, Cell, Physical Review) embed mathematics using SMP (Supplementary Multilingual Plane) Unicode fonts — specifically Mathematical Italic (U+1D434–U+1D467). Xpdf (which pdftotext uses internally) cannot decode characters above U+FFFF and replaces them with U+FFFD (replacement character `?`).
