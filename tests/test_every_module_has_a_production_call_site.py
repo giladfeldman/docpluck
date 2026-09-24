@@ -34,6 +34,8 @@ _REPO = Path(__file__).resolve().parents[1]
 _PKG = _REPO / "docpluck"
 
 # Modules with no production importer as of 2026-09-05, each with the decision owed.
+# `docpluck.figures.detect` left the list 2026-09-25: DELETED, not wired -- on the Nature
+# figure-only fixture it found 0 of the 5 figures the live caption-driven path finds.
 # This is a RATCHET: it may shrink, never grow. Adding a name here is a decision to ship
 # a module nothing calls, and needs the same justification as shipping dead code.
 _KNOWN_ORPHANS: dict[str, str] = {
@@ -45,7 +47,6 @@ _KNOWN_ORPHANS: dict[str, str] = {
         "single implementation and have camelot_extract call it."
     ),
     "docpluck.tables.cluster": "DECISION OWED: superseded by tables.whitespace's clustering, or unwired?",
-    "docpluck.figures.detect": "DECISION OWED: figure detection is on no production path; wire or remove.",
     "docpluck.sections.annotators.pdf": "DECISION OWED: the PDF section annotator is not imported by sections.core.",
     "docpluck.sections.boundaries": "DECISION OWED: superseded by the boundary logic in normalize/sections.core?",
 }

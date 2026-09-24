@@ -1,103 +1,17 @@
-"""Figure region detection — caption + bbox metadata only."""
+"""Unit tests for the figure-caption chart-data trim, on the copy production runs.
 
+These tests used to live in ``tests/test_figure_detect.py`` and import
+``docpluck.figures.detect._trim_caption_at_chart_data`` -- a SECOND copy of this
+function, in a module nothing in production imported. ``extract_pdf_structured``
+builds every Figure through ``extract_structured._extract_caption_text``, which
+calls ``extract_structured._trim_caption_at_chart_data``, so the tests were
+guarding code that never ran while the live copy (which has since grown two more
+signatures, see ``test_chart_data_trim_real_pdf.py``) had no synthetic coverage.
+``figures/detect.py`` was deleted on 2026-09-25; the tests were pointed at the live
+copy unchanged, and every one passes there.
+"""
 
-import pytest
-from tests.structured_fixtures import load_manifest, resolve_fixture as _resolve_fixture
-
-
-def _layout(fixture_id: str):
-    pdf = _resolve_fixture(fixture_id)
-    from docpluck.extract_layout import extract_pdf_layout
-    return extract_pdf_layout(pdf.read_bytes())
-
-
-def test_imports_ok():
-    from docpluck.figures.detect import find_figures
-    assert find_figures is not None
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "find_figures() has NO production caller (measured 2026-09-24: only this "
-        "test imports it; consumers get figures from extract_structured's "
-        "caption-driven path, which finds all 5 here). It finds none on this "
-        "Nature fixture because it matches captions in the LAYOUT channel's "
-        "text, where pdfplumber collapsed every space on this paper: the "
-        "caption reads `Fig.1|Lethaleffects...`. This test used to "
-        "pytest.skip on zero, which hid that. strict=True: goes red the day "
-        "the module works, so the marker cannot outlive the defect."
-    ),
-)
-def test_figure_only_fixture_finds_figures():
-    layout = _layout("nat_comms_figure_only")
-    from docpluck.figures.detect import find_figures
-    figures = find_figures(layout)
-    # A figure-only fixture that yields no figures is the defect this test exists to catch; it used to `pytest.skip` here, which is why every `Fig. N |` caption going unread stayed invisible until 2026-09-24.
-    assert figures, "no figures detected on the figure-only fixture"
-    for f in figures:
-        assert f["label"] is not None and f["label"].startswith("Figure ")
-        assert f["caption"] is not None and len(f["caption"]) > 0
-        x0, top, x1, bottom = f["bbox"]
-        assert x1 > x0
-        assert bottom >= top  # allow degenerate but not negative
-
-
-def test_no_figures_returns_empty_or_only_real_figures():
-    """A negative-case fixture should yield zero or only well-formed figures."""
-    # Use any fixture with expected_figures==0; if not available, skip.
-    manifest_data = load_manifest()
-    fixture_id = None
-    for e in manifest_data["fixtures"]:
-        if e.get("expected_figures") == 0:
-            fixture_id = e["id"]
-            break
-    if fixture_id is None:
-        pytest.skip("no expected_figures=0 fixture in manifest")
-    layout = _layout(fixture_id)
-    from docpluck.figures.detect import find_figures
-    figures = find_figures(layout)
-    # If any figures show up, they should at least have valid shape.
-    for f in figures:
-        assert f["label"] is None or f["label"].startswith("Figure ")
-        x0, top, x1, bottom = f["bbox"]
-        assert x1 > x0
-
-
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "find_figures() has NO production caller (measured 2026-09-24: only this "
-        "test imports it; consumers get figures from extract_structured's "
-        "caption-driven path, which finds all 5 here). It finds none on this "
-        "Nature fixture because it matches captions in the LAYOUT channel's "
-        "text, where pdfplumber collapsed every space on this paper: the "
-        "caption reads `Fig.1|Lethaleffects...`. This test used to "
-        "pytest.skip on zero, which hid that. strict=True: goes red the day "
-        "the module works, so the marker cannot outlive the defect."
-    ),
-)
-def test_figure_id_is_unique_and_sequential():
-    layout = _layout("nat_comms_figure_only")
-    from docpluck.figures.detect import find_figures
-    figures = find_figures(layout)
-    assert figures, "no figures detected on the figure-only fixture"
-    ids = [f["id"] for f in figures]
-    assert len(set(ids)) == len(ids)
-    assert all(fid.startswith("f") for fid in ids)
-    # Sequential 1..n
-    expected = [f"f{i}" for i in range(1, len(figures) + 1)]
-    assert ids == expected
-
-
-def test_figure_typeddict_shape():
-    from docpluck.figures import Figure
-    f: Figure = {
-        "id": "f1", "label": "Figure 1", "page": 3,
-        "bbox": (72.0, 100.0, 540.0, 320.0),
-        "caption": "Mean reaction time across conditions.",
-    }
-    assert f["id"] == "f1"
+from __future__ import annotations
 
 
 # v2.4.3: caption truncation at chart-data boundary
@@ -106,7 +20,7 @@ def test_figure_typeddict_shape():
 
 
 def test_trim_caption_at_chart_data_truncates_long_digit_run():
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     cap = (
         "Figure 1. Flowchart of Study Sample Selection 4876956 Pairs enrolled "
         "before April 1, 2015 1117269 Pairs excluded 741469 Withdrawal 148414 "
@@ -121,7 +35,7 @@ def test_trim_caption_at_chart_data_truncates_long_digit_run():
 
 
 def test_trim_caption_preserves_short_caption():
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     cap = "Figure 2. A short caption with a year reference 2020 here."
     out = _trim_caption_at_chart_data(cap)
     # Under 150-char threshold AND no 6-digit run; no-op.
@@ -129,7 +43,7 @@ def test_trim_caption_preserves_short_caption():
 
 
 def test_trim_caption_preserves_legitimate_5digit_numbers():
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     cap = (
         "Figure 3. Sample selection diagram including all participants from "
         "the original cohort (N = 12345) and the analytic subsample of 9876 "
@@ -142,7 +56,7 @@ def test_trim_caption_preserves_legitimate_5digit_numbers():
 
 
 def test_trim_caption_preserves_prose_with_no_digits():
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     cap = (
         "Figure 4. Cumulative incidence of depression by spouses cardiovascular "
         "event among the entire study sample. The horizontal axis shows the "
@@ -155,7 +69,7 @@ def test_trim_caption_preserves_prose_with_no_digits():
 
 
 def test_trim_caption_keeps_minimum_post_label_content():
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     # 6-digit run lands right after the label — truncation would leave
     # just "Figure 1." (under 40-char sanity check) — return original.
     short_pre_label = "Figure 5. 1234567 chart data " + "y" * 200
@@ -183,7 +97,7 @@ def test_trim_caption_at_tick_run_truncates_axis_labels():
     separated only by whitespace) — jama_open_3-style Kaplan-Meier
     captions absorb gridline values like ``0 0 5 10 15`` that the 6-digit
     rule didn't catch."""
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     cap = (
         "Figure 1. Unadjusted Kaplan-Meier Curves Across Groups With "
         "Different Objective Sleep Duration for All-Cause Mortality 100 "
@@ -201,7 +115,7 @@ def test_trim_caption_at_tick_run_truncates_axis_labels():
 def test_trim_caption_preserves_legitimate_prose_with_inline_numbers():
     """Real caption prose references numbers in stats ('n = 1234', 'p < .001'),
     but each number is followed by a word — not 5+ stacked numerics in a row."""
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     cap = (
         "Figure 2. Mean reaction times across the four experimental "
         "conditions, with n = 1234 participants total (95% CI [120.5, "
@@ -217,7 +131,7 @@ def test_trim_caption_picks_earliest_match_across_both_rules():
     """When both the 6-digit-run and the 5-token-tick rules match,
     truncate at the earlier offset so we don't keep chart data past the
     first signal."""
-    from docpluck.figures.detect import _trim_caption_at_chart_data
+    from docpluck.extract_structured import _trim_caption_at_chart_data
     # Tick run appears first; 6-digit run appears later.
     cap = (
         "Figure 3. Bar plot of conditions A through F across the years "

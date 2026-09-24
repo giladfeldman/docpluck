@@ -332,7 +332,7 @@ inscriptis is the strongest alternative — it's an academic tool (JOSS paper) w
 | Channel | Source | Consumers |
 |---|---|---|
 | **Text** (linear, reading-order) | `extract_pdf` (pdftotext default) | `sections/`, `normalize.py`, `batch.py`, statistics extraction |
-| **Layout** (per-char fonts / positions / page geometry) | `extract_pdf_layout` (pdfplumber) | `tables/`, `figures/`, F0 layout-aware running-header strip |
+| **Layout** (per-char fonts / positions / page geometry) | `extract_pdf_layout` (pdfplumber) | `tables/`, F0 layout-aware running-header strip (figures are caption-driven from the text channel; their `bbox` is not computed) |
 
 The two are **not interchangeable text sources**.  Heading regexes, taxonomy variants, watermark patterns, paragraph-detection heuristics, and ~250 unit tests are all calibrated to pdftotext's word-spacing / line-wrapping format.  Switching to pdfplumber's text breaks all of them.
 

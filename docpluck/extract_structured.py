@@ -1960,10 +1960,11 @@ def _extract_caption_text(
     return snippet
 
 
-# v2.4.4: shared chart-data trim, duplicated logic from
-# ``docpluck.figures.detect._trim_caption_at_chart_data`` so this module
-# doesn't import from ``figures.detect`` (which has its own layout-channel
-# dependencies). Two signatures of pdftotext-joined chart data:
+# v2.4.4: the chart-data trim. This is the ONLY copy: a second one lived in
+# ``docpluck/figures/detect.py`` (an unwired layout-channel figure detector) until
+# that module was deleted on 2026-09-25. Its unit tests now target this copy
+# (``tests/test_caption_chart_data_trim.py``). Two signatures of pdftotext-joined
+# chart data:
 #   1. Run of 6+ consecutive digits — flowchart counts, row IDs.
 #   2. Run of 5+ short (1–4 digit) numeric tokens separated only by
 #      whitespace — axis-tick label sequences.

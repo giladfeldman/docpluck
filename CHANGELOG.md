@@ -202,6 +202,20 @@ The whole-corpus harness check `table_parity` now counts captioned tables
 against `### Table` headings and candidates against their own heading. Before
 this it failed on every paper with a candidate (208 cells, each explained
 exactly by the candidate count), which buried the render deletion above.
+**Removed an unwired figure detector; no output changes.** `docpluck/figures/detect.py`
+(`find_figures`) had no production caller since 2026-05-09 — `extract_pdf_structured` builds
+every figure from its caption instead — and it carried a stale second copy of the table
+caption locator and of the caption chart-data trim. Measured before deleting, on four test
+papers (`find_figures` vs the live path): Nature figure-only **0 vs 5**, `efendic_2022_affect`
+**0 vs 5**, `jama_open_3` **0 vs 2**, `chan_feldman_2025_cogemo` **11 vs 10** — the extra one a
+second "Figure 10" on p13 whose caption line it could not locate, so it emitted its hard-coded
+placeholder box `(50, 100, width-50, 300)` as though measured. Wiring it in would have put
+invented geometry into a public field. No
+package in the portfolio imports it (searched every project for `find_figures` /
+`figures.detect`). Its chart-data-trim unit tests now run against the live copy
+(`tests/test_caption_chart_data_trim.py`, all passing unchanged). The `Figure` type now says
+in its docstring that `bbox` is **not computed** and is always `(0.0, 0.0, 0.0, 0.0)`,
+meaning "unknown" — it was always zeros, but nothing said so.
 
 ## [2.4.144] - 2026-09-23 - normalization 1.9.68 - table extraction 2.4.16
 
