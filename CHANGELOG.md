@@ -211,8 +211,7 @@ papers (`find_figures` vs the live path): Nature figure-only **0 vs 5**, `efendi
 second "Figure 10" on p13 whose caption line it could not locate, so it emitted its hard-coded
 placeholder box `(50, 100, width-50, 300)` as though measured. Wiring it in would have put
 invented geometry into a public field. No
-package in the portfolio imports it (searched every project for `find_figures` /
-`figures.detect`). Its chart-data-trim unit tests now run against the live copy
+known downstream consumer imports it (searched for `find_figures` / `figures.detect`). Its chart-data-trim unit tests now run against the live copy
 (`tests/test_caption_chart_data_trim.py`, all passing unchanged). The `Figure` type now says
 in its docstring that `bbox` is **not computed** and is always `(0.0, 0.0, 0.0, 0.0)`,
 meaning "unknown" — it was always zeros, but nothing said so.
