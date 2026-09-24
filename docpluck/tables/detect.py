@@ -275,6 +275,14 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
 # starts its own text block (a column boundary), not a word inside a sentence.
 # An inter-word space in body text is ~0.25em (2-3pt at 9-11pt); a two-column
 # page's gutter is 10-30pt.
+#
+# KNOWN LIMIT (cross-model review 2026-09-24, Sonnet, reproduced on a constructed
+# row): a fully justified line can stretch one word space past 6pt, so a
+# cross-reference right after such a stretch counts as a block start. The cost is
+# bounded -- that row then competes exactly as every containing row did before
+# v2.4.145 (topmost wins) -- and all 12 corpus firings matched at a row's FIRST
+# glyph, so the threshold itself is unexercised by the corpus. Unmeasured, not
+# assumed safe: raise it only with a measured gutter/word-space distribution.
 _BLOCK_START_GAP_PT: float = 6.0
 
 
@@ -608,6 +616,15 @@ def _without_lone_overreaching_rules(rules: list[dict]) -> list[dict]:
     underline is drawn once and belongs to the table. With no recurring width at
     all (fewer than three rules, or every one distinct) the input is returned
     unchanged: there is no table extent to judge against, so nothing is judged.
+
+    ONLY A RULE BELOW EVERY RECURRING RULE IS DROPPED. A table's TOP rule can be
+    its only full-width rule while its inner rules are shorter:
+    `10.1038/s41598-023-50460-2` p4 Table 3 draws one rule at x=159.4->552.2 over
+    shorter recurring ones, and the first version of this filter dropped it (1 of
+    its 9 corpus firings, found by a cross-model review and confirmed on the
+    rasterized page). Everything the filter is FOR sits below the table: a
+    footer separator, the next table's top rule. So a lone rule at or above the
+    lowest recurring rule is the table's own and is kept.
     """
     if len(rules) < 3:
         return rules
@@ -621,7 +638,11 @@ def _without_lone_overreaching_rules(rules: list[dict]) -> list[dict]:
         return rules
     ex0 = min(r["x0"] for r in recurring) - _RULE_EXTENT_TOL_PT
     ex1 = max(r["x1"] for r in recurring) + _RULE_EXTENT_TOL_PT
-    return [r for r in rules if any(r is q for q in recurring) or (r["x0"] >= ex0 and r["x1"] <= ex1)]
+    lowest = max(r["top"] for r in recurring) + _RULE_SAME_Y_TOL_PT
+    return [r for r in rules
+            if any(r is q for q in recurring)
+            or (r["x0"] >= ex0 and r["x1"] <= ex1)
+            or r["top"] <= lowest]
 
 
 def _vertical_rules_in(page_obj, bbox: Bbox) -> list[dict]:
@@ -917,7 +938,18 @@ def _detect_footnote_below(
     # the 102-paper corpus, applying this gate to every signal moved 112 of 429
     # caption regions in 43 papers -- `10.1525/collabra.90203` Table 7's region
     # would have lost its lower 300pt -- so it is scoped to what it can judge.
-    if grid_bottom_known and ftop - bottom > _FOOTNOTE_ROW_GAP_PT:
+    #
+    # AND ONLY WHEN BODY PROSE LIES BETWEEN (v2.4.145, second revision). A ruled
+    # table's last DETECTED rule is not always its last row: the search band is
+    # 250pt, and a table can rule only its header. `10.1503/cmaj.230841` p6
+    # Table 1 and `10.1177/00221465251343322` p7 Table 1 both continue far below
+    # the rules found, and the "note" 270pt down was the table's real note -- the
+    # first version rejected it (2 of 32 corpus firings wrong). What separates
+    # them from the footer / figure-caption cases is what fills the gap: table
+    # rows there, running prose here. So the gap is disqualifying only if a
+    # prose line (``_is_prose_row``) sits in it.
+    if (grid_bottom_known and ftop - bottom > _FOOTNOTE_ROW_GAP_PT
+            and _prose_row_between(page_obj, x0=x0, x1=x1, top=bottom, bottom=ftop)):
         return None
     fbot = max(c["bottom"] for c in block)
     block.sort(key=lambda c: (c["top"], c["x0"]))
@@ -930,6 +962,37 @@ def _detect_footnote_below(
 # gap several times that means the next small-font content is a separate object
 # (figure caption, page furniture), not a continuation of the table's note.
 _FOOTNOTE_ROW_GAP_PT: float = 25.0
+
+
+# A line of running prose: it spans most of the column and has no gap wide enough
+# to be a column gutter. A table row either leaves a gutter between its cells or
+# is short (a wrapped label). Justified word spacing stays far below 12pt.
+_PROSE_MAX_GAP_PT: float = 12.0
+_PROSE_MIN_SPAN_FRAC: float = 0.6
+_PROSE_MIN_GLYPHS: int = 25
+
+
+def _is_prose_row(row_chars: list[dict], width: float) -> bool:
+    glyphs = sorted((c for c in row_chars if (c.get("text") or "").strip()),
+                    key=lambda c: c.get("x0", 0.0))
+    if len(glyphs) < _PROSE_MIN_GLYPHS or width <= 0:
+        return False
+    if glyphs[-1]["x1"] - glyphs[0]["x0"] < _PROSE_MIN_SPAN_FRAC * width:
+        return False
+    return all(b["x0"] - a["x1"] < _PROSE_MAX_GAP_PT for a, b in zip(glyphs, glyphs[1:]))
+
+
+def _prose_row_between(page_obj, *, x0: float, x1: float, top: float, bottom: float) -> bool:
+    """True when an upright prose line lies within ``x0..x1`` strictly between
+    ``top`` and ``bottom`` (pdfplumber top-down)."""
+    rows: dict[int, list[dict]] = defaultdict(list)
+    for c in page_obj.chars or ():
+        if not _is_upright(c):
+            continue
+        ct = c.get("top", 0.0)
+        if top < ct < bottom and c.get("x0", 0.0) >= x0 - 5 and c.get("x1", 0.0) <= x1 + 5:
+            rows[round(ct)].append(c)
+    return any(_is_prose_row(rc, x1 - x0) for rc in rows.values())
 
 
 def _is_upright(obj: dict) -> bool:

@@ -86,6 +86,23 @@ def test_no_recurring_width_means_nothing_is_judged():
     assert detect._without_lone_overreaching_rules(rules) == rules
 
 
+def test_a_tables_unique_top_rule_is_kept():
+    # 10.1038/s41598-023-50460-2 p4 Table 3: its one full-width rule is its top
+    # rule, above shorter recurring ones. Also Sonnet's reproduction (consult
+    # round 2026-09-24): two same-width furniture rules must not make a unique
+    # table rule above them look like furniture.
+    top = _rule(100.0, 500.0, 10.0)
+    inner = [_rule(120.0, 480.0, 50.0), _rule(120.0, 480.0, 90.0)]
+    assert top in detect._without_lone_overreaching_rules([top] + inner)
+
+
+def test_only_a_lone_rule_below_the_table_is_dropped():
+    table = [_rule(120.0, 480.0, y) for y in (50.0, 90.0, 130.0)]
+    footer = _rule(40.0, 560.0, 700.0)
+    kept = detect._without_lone_overreaching_rules(table + [footer])
+    assert footer not in kept and all(r in kept for r in table)
+
+
 # ---- a table note is upright and starts near the table -----------------------
 
 def _layout(chars: list[dict]):
@@ -93,13 +110,25 @@ def _layout(chars: list[dict]):
     return SimpleNamespace(pages=[page])
 
 
-def _body(n_rows: int = 30) -> list[dict]:
-    # Enough 10pt body text for the modal size to be 10pt.
+def _body(n_rows: int = 30, top: float = 400.0) -> list[dict]:
+    # Running prose at 10pt, spanning the column: the modal size, and prose rows.
     out = []
     for i in range(n_rows):
-        for g in _glyphs("body text body text", 40.0, 400.0 + 12 * i):
+        for g in _glyphs("body text of the article, running across the column", 40.0,
+                         top + 12 * i):
             g["size"] = 10.0
             out.append(g)
+    return out
+
+
+def _table_rows(n_rows: int, top: float) -> list[dict]:
+    # 10pt table rows: a label, a gutter, then values -- not prose.
+    out = []
+    for i in range(n_rows):
+        for text, x in (("Anaemia", 40.0), ("7 (22.6)", 180.0), ("0.86", 260.0)):
+            for g in _glyphs(text, x, top + 12 * i):
+                g["size"] = 10.0
+                out.append(g)
     return out
 
 
@@ -113,11 +142,23 @@ def test_note_directly_under_the_table_is_found():
 def test_small_text_far_below_a_ruled_table_is_not_its_note():
     # 10.48550/arxiv.2410.21901 p6: the page footer 440pt below Table 5, a
     # ruled table whose last rule is its last row.
+    # Body prose fills the gap between the table and the footer.
     footer = _glyphs("VOLUME 4, 2024", 200.0, 740.0)
-    fn = detect._detect_footnote_below(_layout(_body() + footer), page=1,
+    fn = detect._detect_footnote_below(_layout(_body(top=320.0) + footer), page=1,
                                        bbox=(40.0, 200.0, 300.0, 300.0),
                                        grid_bottom_known=True)
     assert fn is None
+
+
+def test_a_note_below_unruled_table_rows_is_still_the_tables_note():
+    # 10.1503/cmaj.230841 p6: the rules found stop part-way down Table 1, which
+    # continues in rows down to its "Note:" 270pt below. Table rows, not prose,
+    # fill the gap, so the note is kept.
+    note = _glyphs("Note: ATC = Anatomic Therapeutic Chemical code.", 40.0, 580.0)
+    fn = detect._detect_footnote_below(
+        _layout(_body(top=620.0) + _table_rows(20, 310.0) + note), page=1,
+        bbox=(40.0, 200.0, 300.0, 300.0), grid_bottom_known=True)
+    assert fn is not None and fn.bbox[1] == 580.0
 
 
 def test_distance_is_not_judged_where_the_grid_bottom_is_unknown():
