@@ -205,3 +205,27 @@ def test_only_one_title_continuation_line_is_skipped():
         "study sites\nage group\nyoung\nold\n"
     )
     assert body.startswith("age group\n")
+
+
+# ── Nothing falls between caption and body ───────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "rel, label, first_lines",
+    [
+        # 10.5465/amle.2017.0488 p9: the column header "Rank" (11 tables in this
+        # paper alone) was in neither the caption nor the body.
+        ("aom/amle_1.pdf", "Table 1", ["Rank"]),
+        # 10.1001/jamanetworkopen.2023.16111 p6: the spanning header and first cells.
+        ("ama/jama_open_11.pdf", "Table 1", ["Participants, No. (%)", "Whole cohort", "(N = 4260)"]),
+        # 10.5465/annals.2022.0049 p4: the header and the first row number.
+        ("aom/annals_3.pdf", "Table 2", ["Step", "1"]),
+    ],
+)
+def test_header_cells_between_caption_and_walk_reach_the_body(rel, label, first_lines):
+    caption, body, _reason, _cap = _walk(rel, label)
+    lines = body.split("\n")
+    assert lines[: len(first_lines)] == first_lines, lines[:5]
+    # Opposite: they were not in the caption either -- that is why they were lost.
+    for cell in first_lines:
+        assert f" {cell} " not in f" {caption} "

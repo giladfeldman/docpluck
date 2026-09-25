@@ -2006,6 +2006,20 @@ def _extract_caption_text(
     effective hard cap is ``min(cap.char_end + 800, next_boundary,
     len(raw_text))``.
     """
+    start, hard_end, stopped_at_break = _caption_span(raw_text, cap, next_boundary)
+    return _caption_text_from_span(raw_text, cap, start, hard_end, stopped_at_break)
+
+
+def _caption_span(
+    raw_text: str,
+    cap: CaptionMatch,
+    next_boundary: Optional[int] = None,
+) -> tuple[int, int, bool]:
+    """Where the caption's text lies in ``raw_text``: ``(start, end,
+    stopped_at_break)``. Split out of ``_extract_caption_text`` (2026-09-25) so
+    the table body walk can ask where the CAPTION ended, instead of keeping a
+    second, disagreeing opinion (see ``_extract_table_body_text_and_reason``).
+    """
     start = cap.char_start
     # Hard cap — never read more than 800 chars from caption start. The
     # 800 figure is the handoff's "guard against runaway captions" upper
@@ -2088,6 +2102,17 @@ def _extract_caption_text(
         trimmed = _trim_table_caption_at_cell_region(region)
         if len(trimmed) < len(region):
             hard_end = start + len(trimmed)
+    return start, hard_end, stopped_at_break
+
+
+def _caption_text_from_span(
+    raw_text: str,
+    cap: CaptionMatch,
+    start: int,
+    hard_end: int,
+    stopped_at_break: bool,
+) -> str:
+    """The cleaned caption string for the span ``_caption_span`` found."""
     snippet = raw_text[start:hard_end].replace("\n", " ").strip()
     snippet = _finish_caption_label(snippet, cap)
     # v2.4.4: trim chart-data appendage from figure captions (axis-tick
@@ -3457,7 +3482,23 @@ def _extract_table_body_text_and_reason(
     paragraph delimiters being doubled.
     """
     body_start = _caption_tail_body_start(raw_text, cap, next_boundary)
+    # NOTHING FALLS BETWEEN CAPTION AND BODY (2026-09-25). The walk above and
+    # the caption's own span (`_caption_span`) are two opinions about where the
+    # caption ends. Where the walk went further, the lines between belonged to
+    # neither: measured over the 415 table captions of the 102-paper manifest,
+    # 71 captions lost 89 lines that way -- header cells (`Rank` x11,
+    # `Characteristic`, `Participants, No. (%)`, `Step`, `1`), which the caption
+    # had trimmed off as cells and the walk had consumed as caption tail. The
+    # body now starts where the caption ended whenever that is earlier.
+    #
+    # The 1500-char window stays anchored where the walk put it, so recovering
+    # the gap never pushes rows off the window's far end (a first version moved
+    # the window with the start and dropped `8.3 (2.0)` and kin from the tail
+    # of 10.1001/jamanetworkopen.2023.39337's Table 1).
     body_end_hard = min(body_start + 1500, len(raw_text))
+    caption_end = _caption_span(raw_text, cap, next_boundary)[1]
+    if cap.char_end <= caption_end < body_start:
+        body_start = caption_end
     if next_boundary is not None and next_boundary > body_start:
         body_end_hard = min(body_end_hard, next_boundary)
     region = raw_text[body_start:body_end_hard]
