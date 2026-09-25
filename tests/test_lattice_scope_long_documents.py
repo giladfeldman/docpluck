@@ -119,26 +119,46 @@ def test_an_empty_scope_makes_no_lattice_call(fake):
     assert f.calls == [("stream", "all")]
 
 
-def test_a_clean_empty_result_is_not_labelled_a_failure(fake):
-    """Two-sided control, side 1: both flavors RAN and found nothing."""
+def _layout(*, text: bool, subset: bool = False) -> SimpleNamespace:
+    chars = ({"text": "a"},) if text else ()
+    return SimpleNamespace(
+        populated_pages=(0,) if subset else None,
+        pages=(SimpleNamespace(chars=chars), SimpleNamespace(chars=())),
+    )
+
+
+def test_a_clean_empty_result_on_a_textless_pdf_is_not_labelled_a_failure(fake):
+    """Two-sided control, side 1: both flavors RAN, found nothing, and the
+    document has no text layer for them to read -- a true empty result."""
     fake()
     with fallback_scope() as fb:
-        assert ce.extract_tables_camelot(b"%PDF-1.4 fake") == []
+        assert ce.extract_tables_camelot(b"%PDF-1.4 fake", layout=_layout(text=False)) == []
     assert not (ce.CAMELOT_UNAVAILABLE_EVENTS & fb.counters.keys()), (
         f"a clean empty run was labelled as Camelot failing: {dict(fb.counters)}"
     )
 
 
-@pytest.mark.parametrize("raise_for,scope", [
-    ({"stream", "lattice"}, None),   # both raised
-    ({"stream"}, []),                # the only flavor that ran raised
-    ({"stream"}, None),              # stream raised, lattice ran clean and empty
+@pytest.mark.parametrize("raise_for,scope,layout", [
+    ({"stream", "lattice"}, None, None),              # both raised
+    ({"stream"}, [], None),                           # the only flavor that ran raised
+    ({"stream"}, None, None),                         # stream raised, lattice clean and empty
+    ({"stream"}, None, _layout(text=False)),          # raised, even on a textless PDF
+    # NOTHING raised, but the PDF has text: stream returns a candidate on any
+    # text page, so an empty result here is Camelot bailing out silently
+    # (Sonnet via /consult, 2026-09-25 -- an exceptions-only rule missed it).
+    (set(), None, _layout(text=True)),
+    # Nothing raised and the text layer is UNKNOWN (no layout, or a page subset
+    # whose unread pages are placeholders): keep the label, never assume empty.
+    (set(), None, None),
+    (set(), None, _layout(text=False, subset=True)),
 ])
-def test_an_empty_result_behind_an_exception_is_still_named(fake, raise_for, scope):
+def test_an_unexplained_empty_result_is_still_named(fake, raise_for, scope, layout):
     """Two-sided control, side 2: the loss the label exists for still fires."""
     fake(raise_for)
     with fallback_scope() as fb:
-        assert ce.extract_tables_camelot(b"%PDF-1.4 fake", lattice_pages=scope) == []
+        assert ce.extract_tables_camelot(
+            b"%PDF-1.4 fake", lattice_pages=scope, layout=layout,
+        ) == []
     assert "camelot_all_flavors_failed" in fb.counters, dict(fb.counters)
 
 

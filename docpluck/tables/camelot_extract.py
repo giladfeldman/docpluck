@@ -932,12 +932,11 @@ def extract_tables_camelot(
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
 
-    # How many flavors RAISED. An empty result is a failure only when a parser
-    # raised to produce it: a clean run that finds no table (an image-only PDF
-    # has no text layer for either flavor to read) is a true empty result, and
-    # it used to be labelled `camelot_failed:camelot_all_flavors_failed` exactly
-    # like a broken Camelot. Measured on a one-page image-only PDF: both flavors
-    # returned 0 tables with no exception, and the method string said failed.
+    # How many flavors RAISED. A clean run that finds nothing on a PDF with no
+    # text layer (image-only) is a true empty result, and it used to be labelled
+    # `camelot_failed:camelot_all_flavors_failed` exactly like a broken Camelot.
+    # Measured on a one-page image-only PDF: both flavors returned 0 tables with
+    # no exception, and the method string said failed.
     raised = 0
     try:
         try:
@@ -981,9 +980,18 @@ def extract_tables_camelot(
                 raised += 1
                 record_fallback("camelot_lattice_exception", detail=type(exc).__name__)
                 lattice_tables = []
-        if raised and not stream_tables and not lattice_tables:
-            # The parsers produced nothing and at least one of them RAISED, and
-            # this function then returns [] the same way a table-less paper does. `extract_structured` wraps this
+        if (
+            not stream_tables and not lattice_tables
+            and (raised or _has_text_layer(layout) is not False)
+        ):
+            # The parsers produced nothing, and either one of them RAISED or the
+            # document HAS text for stream to read -- stream returns at least a
+            # candidate grid on any page with text (measured on prose-only and
+            # one-line PDFs), so nothing from a text PDF is itself the anomaly
+            # (Sonnet via /consult, 2026-09-25: an exceptions-only test would go
+            # silent on a Camelot that bails out without raising). Only a
+            # document KNOWN to have no text layer is a true empty result.
+            # This function then returns [] the same way a table-less paper does. `extract_structured` wraps this
             # call in `except Exception` -> `camelot_failed:` -- which never fires
             # here, because nothing propagated. So the total loss of the table
             # channel reached the method string as silence. It is named now, and
@@ -1013,6 +1021,15 @@ def extract_tables_camelot(
             locals().get("lattice_tables"),
             locals().get("tables_obj"),
         )
+
+
+def _has_text_layer(layout) -> bool | None:
+    """True/False when the LayoutDoc says whether any page carries characters;
+    ``None`` when it cannot say (no layout, or a page-subset layout whose
+    unread pages are empty placeholders rather than evidence)."""
+    if layout is None or getattr(layout, "populated_pages", None) is not None:
+        return None
+    return any(p.chars for p in getattr(layout, "pages", ()))
 
 
 def _area_overlap_frac(a: tuple[float, ...], b: tuple[float, ...]) -> float:
