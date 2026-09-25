@@ -3706,6 +3706,23 @@ _PHANTOM_TABLE_BODY_LEAK_TOKENS = frozenset({
 })
 
 
+# The appendix heading for kept uncaptioned grids -- ONE definition, used by the
+# section emitter and by every post-process step that must recognise the section.
+_UNCAPTIONED_CANDIDATES_HEADING = "## Uncaptioned table candidates (unverified)"
+
+
+def _uncaptioned_candidates_span(text: str) -> tuple[int, int]:
+    """(start, end) of the uncaptioned-candidates appendix in ``text``; (-1, -1) if absent.
+
+    The section runs from its heading to the next ``## `` heading or the end.
+    """
+    start = text.find(_UNCAPTIONED_CANDIDATES_HEADING)
+    if start < 0:
+        return -1, -1
+    nxt = text.find("\n## ", start + len(_UNCAPTIONED_CANDIDATES_HEADING))
+    return start, (nxt if nxt >= 0 else len(text))
+
+
 def _strip_phantom_camelot_tables(text: str) -> str:
     """jama-open-1 TABLE_STRUCTURE_CORRUPT fix (v2.4.74, 2026-05-25):
     drop Camelot-emitted ``<table>`` blocks whose content is structurally
@@ -3860,8 +3877,22 @@ def _strip_phantom_camelot_tables(text: str) -> str:
             return True
         return False
 
+    # UNCAPTIONED CANDIDATES ARE NOT THIS STEP'S TO DELETE (2026-09-25). Whether a
+    # grid no caption claimed is kept is decided ONCE, at the keep step in
+    # extract_structured -- recorded there, and seen identically by `tables`,
+    # `flattened_rows` and this render. Deleting one here made the channels
+    # disagree: on 10.1017/s0007123424000024 p10 candidate u2 is a real 127-cell
+    # literature-review table whose <th> absorbed one line of body prose; this
+    # step removed the whole <table>, leaving an empty candidate heading while the
+    # JSON and the flattened rows still carried every cell. The candidate section
+    # is already labelled unverified, so a mis-captured grid there misleads nobody;
+    # a deleted real one is lost to the reader of the render.
+    cand_start, cand_end = _uncaptioned_candidates_span(text)
+
     def replacement(m):
         block = m.group(0)
+        if cand_start <= m.start() < cand_end:
+            return block
         if not is_phantom(block):
             return block
         # v2.4.130 DELETION GUARD. "Intentionally LOSSY" is defensible only
@@ -6261,7 +6292,7 @@ def _render_sections_to_markdown(
                 out_chunks.append("\n")
 
     if uncaptioned_candidates:
-        out_chunks.append("## Uncaptioned table candidates (unverified)\n\n")
+        out_chunks.append(_UNCAPTIONED_CANDIDATES_HEADING + "\n\n")
         out_chunks.append(
             "*Grids detected on pages where no table caption matched them. They are "
             "kept rather than discarded, but they are NOT verified to be tables: some "
