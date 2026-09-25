@@ -703,8 +703,14 @@ def _extract_pdf_structured(
     # attached by ``_camelot_table_to_dict`` on BOTH the auto-detect and the
     # region-driven paths). Done once here so no public Table — regardless of
     # which path produced it — carries the private ``_caption_hint_number`` key.
+    from .tables.arm_spans import anchor_super_header_spans
     for t in tables:
         t.pop("_caption_hint_number", None)
+        # A spanning super-header label ("Target article" / "Replication") lost
+        # its span in Camelot; read it back off the page's rules so flatten binds
+        # each column to the arm the page prints it under. Every PDF table passes
+        # here, whichever path built it. See `tables/arm_spans.py`.
+        anchor_super_header_spans(t, layout_doc)
         # Every table states how sure we are it is a captioned table. A PDF
         # table with a label was paired with a caption; one without was never
         # verified, so it can only ever be a candidate -- never "none_found",

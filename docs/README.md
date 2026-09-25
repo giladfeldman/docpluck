@@ -445,6 +445,15 @@ tables and half are page furniture (running headers, title blocks, the insides o
 figures), so **if you run statistical checks on these rows, decide explicitly what to do
 with `uncaptioned_candidate`** — they are included so that real statistics are not lost,
 and labelled so that you can filter them.
+
+**Parallel-arm tables carry `group`** in `fields` (`"Original"` / `"Replication"`, `"ITT"` /
+`"PP"`). Which columns belong to which arm is read from the page — a rule drawn under each
+arm label, or vertical rules between arms with the label centred over its columns — and
+recorded on the label cell as its `colspan`. A statistic column printed under **no** arm label
+(a `P value` column beside two follow-up periods) becomes its own record with **no** `group`,
+rather than being attached to one arm or copied to both. When the page draws no such rules,
+the arms are still split by column count, which is a guess; treat a grouped row from such a
+table (label cells all `colspan` 1) with the corresponding caution.
 Watch `report.fallbacks` for `flatten_dropped_*` keys — they mean a parsed statistic did
 not survive into the sidecar (see [`fallbacks`](#fallbacks--what-the-library-silently-did-instead-read-this)).
 

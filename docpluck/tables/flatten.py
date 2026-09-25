@@ -1536,6 +1536,7 @@ def _assemble_sentence(
 
 def _detect_column_groups(
     header: list[str],
+    spans: dict[int, int] | None = None,
 ) -> Optional[tuple[list[int], list[tuple[str, list[int]]]]]:
     """Detect parallel column groups from a folded super-header.
 
@@ -1552,6 +1553,37 @@ def _detect_column_groups(
     if len(starts) < 2:
         return None
     n = len(header)
+
+    # THE PAGE STATED THE SPANS. `spans` maps an arm's first column to its
+    # printed colspan, read off the page's rules by `tables/arm_spans.py` and
+    # recorded on the super-label cell. When every folded label has one, bind
+    # columns by it and never by the equal-width guess below: that guess made
+    # collabra.90203 Table 10 (printed 2 + 4) into 3 + 3 and bound the
+    # Replication's `n` to the Target article.
+    # A folded start that lies INSIDE a printed span is a wrapped sub-header
+    # line (10.1001/jamanetworkopen.2023.35237 p6 Table 2: "High-cash gift" /
+    # "group (n = 382)" under "Age 1 y"), not a new arm.
+    if spans and len(spans) >= 2 and all(s in starts for s in spans):
+        groups = [
+            (
+                (header[s].split(_MERGE_SEPARATOR, 1)[0]).strip(),
+                [i for i in range(s, s + spans[s]) if i < n],
+            )
+            for s in sorted(spans)
+        ]
+        in_arm = {i for _, cols in groups for i in cols}
+        outside = [i for i in range(n) if i not in in_arm]
+        # A STATISTIC column printed under no arm label belongs to neither arm:
+        # 10.1001/jamanetworkopen.2024.18729 p6 Table 3 prints `P value` beside,
+        # not under, "Follow-up period 1" / "Follow-up period 2". Sharing it
+        # with every arm would attach one p to two HRs; binding it to the last
+        # arm (the pre-2.4.146 behaviour) attached it to one it does not test.
+        # It becomes its own record with no `group`. Only non-statistic columns
+        # (the row label, an "Interpretation" column) are shared with each arm.
+        row_stats = [i for i in outside if _classify_column(header[i])]
+        if row_stats:
+            groups.append(("", row_stats))
+        return [i for i in outside if i not in row_stats], groups
 
     # The sentinel marks where camelot PLACED each super-label — but a *centered*
     # spanning label (colspan is lost in stream extraction) lands mid-span, not at
@@ -1823,7 +1855,16 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     page = int(table.get("page") or 0)
     label = table.get("label")
 
-    grouped = _detect_column_groups(header)
+    # Printed spans of super-header labels (see `tables/arm_spans.py`): only the
+    # top row of a PDF table carries one, and only when the page stated it.
+    top_r = min(c["r"] for c in cells)
+    printed_spans = {
+        c["c"]: int(c.get("colspan") or 1)
+        for c in cells
+        if c["r"] == top_r and int(c.get("colspan") or 1) > 1
+        and (table.get("rendering") or "") != "markup"
+    }
+    grouped = _detect_column_groups(header, printed_spans or None)
 
     # Blank-header column-role recovery (non-grouped tables only — grouped
     # tables already resolve roles per arm). When the grid header leaves stat

@@ -38,6 +38,10 @@ class Cell(TypedDict):
     r: int
     c: int
     rowspan: int
+    # DOCX: the span the file declares. PDF: 1, except a super-header label
+    # ("Target article", "Replication") whose span the page states with rules
+    # (`tables/arm_spans.py`); that cell sits at its arm's first column and
+    # carries the printed span. Camelot itself never recovers a span.
     colspan: int
     text: str
     is_header: bool
