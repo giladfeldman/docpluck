@@ -6,8 +6,9 @@ import subprocess
 import sys
 
 import pytest
-from tests.structured_fixtures import resolve_fixture as _resolve_fixture
 
+from tests.cpu_budget import run_with_cpu_budget
+from tests.structured_fixtures import resolve_fixture as _resolve_fixture
 
 # Each test here spawns a REAL `python -m docpluck` subprocess against a real
 # PDF, so its wall time is a function of how loaded the machine is -- not of
@@ -19,22 +20,23 @@ from tests.structured_fixtures import resolve_fixture as _resolve_fixture
 # 192s. That is a false RED in the release gate, which costs more than a false
 # green because it sends someone hunting a regression that does not exist.
 #
-# So the budget scales with the load, exactly as `test_benchmark_docx_html.py`
-# already does for its elapsed-time assertions. The SERIAL number is the real
-# gate and is deliberately left tight; the parallel one is load-tolerant. This
-# is a TIMEOUT, not an assertion -- a genuinely hung CLI still fails, it just
-# gets longer to prove it.
-_SUBPROCESS_TIMEOUT_S = 480 if os.environ.get("PYTEST_XDIST_WORKER") else 120
+# The fix that followed -- 120s serial, 480s under xdist -- still failed on an
+# unchanged tree on 2026-09-25 (120s serial, then 480s), with the machine out of
+# memory and failing to create processes. Scaling a WALL-clock budget chases
+# the load and never catches it. So the budget is now the child's own CPU time
+# (see `tests/cpu_budget.py`): measured at 100% machine load the same day, the
+# `--structured` run used 32-34s CPU against 55-58s wall. 120 CPU-seconds is
+# the old serial number, now held in every run mode -- tighter under xdist than
+# the 480s it replaces. A child that stops accruing CPU is failed as hung.
+_CPU_BUDGET_S = 120
+_FALLBACK_WALL_S = 480 if os.environ.get("PYTEST_XDIST_WORKER") else 120
 
 
-def _run(*args: str, timeout: int | None = None) -> subprocess.CompletedProcess:
-    cmd = [sys.executable, "-m", "docpluck", *args]
-    return subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=_SUBPROCESS_TIMEOUT_S if timeout is None else timeout,
+def _run(*args: str) -> subprocess.CompletedProcess:
+    return run_with_cpu_budget(
+        [sys.executable, "-m", "docpluck", *args],
+        cpu_budget_s=_CPU_BUDGET_S,
+        fallback_wall_s=_FALLBACK_WALL_S,
     )
 
 

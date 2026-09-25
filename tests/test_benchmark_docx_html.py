@@ -11,8 +11,6 @@ programmatically so the suite runs anywhere without external test files.
 The passages match real patterns from the PDF ground-truth set.
 """
 import io
-import os
-import time
 
 import pytest
 
@@ -22,14 +20,15 @@ pytest.importorskip("lxml", reason="lxml not installed")
 pytest.importorskip("docx", reason="python-docx not installed (dev dep)")
 
 from docx import Document
+
 from docpluck import (
+    NormalizationLevel,
+    compute_quality_score,
     extract_docx,
     extract_html,
     normalize_text,
-    NormalizationLevel,
-    compute_quality_score,
 )
-
+from tests.cpu_budget import cpu_seconds
 
 # ---------------------------------------------------------------------------
 # Ground-truth passages (mirror the PDF benchmark corpus)
@@ -244,36 +243,57 @@ class TestQualityScores:
 # Performance
 # ---------------------------------------------------------------------------
 
-def _perf_limit_s(serial: float = 1.0, parallel: float = 5.0) -> float:
-    """Wall-clock perf budget for the current run mode.
+# These budgets are CPU seconds, not wall seconds -- see ``tests/cpu_budget.py``
+# for the measurements. They used to be wall-clock, 1s serial and 5s under
+# xdist, and failed on an unchanged tree whenever the machine was saturated
+# ("2.08s (limit 1.0s)", "7.41s (limit 5.0s)", 2026-09-25). The 1s limit is
+# kept, and now applies under xdist too, where the old check allowed 5s.
+_LIMIT_S = 1.0
 
-    Absolute elapsed-time assertions are unreliable under ``pytest-xdist``
-    parallel load — CPU contention from N concurrent workers inflates the
-    measured time (a small DOCX fixture clocked 1.94s under ``-n10`` but
-    ~0.0s serially). The project's standard baseline gate runs ``-n10``
-    (see the long-runs note), so a strict 1s bound makes that gate
-    non-deterministic. Keep the strict bound for serial runs (real perf
-    regression detection) and a load-tolerant bound under xdist (still
-    catches gross regressions) so the parallel gate stays green-when-correct.
-    """
-    return parallel if os.environ.get("PYTEST_XDIST_WORKER") else serial
+# docpluck's OWN share of ``extract_docx`` -- everything but mammoth's parse.
+# The absolute limit above is ~99% mammoth (cProfile), so docpluck's share could
+# grow from under one timer tick to several hundred ms and still pass it.
+# Timing ``extract_docx`` with mammoth's conversion replaced by its precomputed
+# result isolates that share without naming any private step. The bound is
+# mammoth's own cost on this fixture (~0.25s CPU): docpluck's processing may
+# not cost more than the parse it wraps. A first version compared
+# ``extract_docx`` with a bare mammoth call and took the ratio; the difference
+# of two noisy numbers ranged 0.48x-2.50x across trials on an unchanged tree.
+_OWN_SHARE_LIMIT_S = 0.25
 
 
 class TestPerformance:
     def test_docx_extraction_under_1s(self):
         docx = _build_docx_fixture(GROUND_TRUTH_PASSAGES)
-        start = time.perf_counter()
-        extract_docx(docx)
-        elapsed = time.perf_counter() - start
-        # Should be well under 1 second for a small fixture (serial); tolerant
-        # of xdist CPU contention under the parallel baseline gate.
-        limit = _perf_limit_s()
-        assert elapsed < limit, f"DOCX extraction took {elapsed:.2f}s (limit {limit}s)"
+        extract_docx(docx)  # warm the lazy imports; they are not the budget
+        cpu = cpu_seconds(lambda: extract_docx(docx))
+        assert cpu < _LIMIT_S, f"DOCX extraction took {cpu:.2f}s CPU (limit {_LIMIT_S}s)"
+
+    def test_docx_own_processing_is_bounded(self, monkeypatch):
+        import mammoth
+
+        from docpluck.extract_docx import _inline_omml_runs
+
+        docx = _build_docx_fixture(GROUND_TRUTH_PASSAGES)
+        expected = extract_docx(docx)
+        converted = mammoth.convert_to_html(io.BytesIO(_inline_omml_runs(docx)))
+        calls = []
+
+        def precomputed(*args, **kwargs):
+            calls.append(1)
+            return converted
+
+        monkeypatch.setattr(mammoth, "convert_to_html", precomputed)
+        # The stand-in must not change what is measured, and must be on the path.
+        assert extract_docx(docx) == expected
+        assert calls, "extract_docx no longer calls mammoth.convert_to_html"
+        cpu = cpu_seconds(lambda: extract_docx(docx))
+        assert cpu < _OWN_SHARE_LIMIT_S, (
+            f"extract_docx spent {cpu:.3f}s CPU outside mammoth (limit {_OWN_SHARE_LIMIT_S}s)"
+        )
 
     def test_html_extraction_under_1s(self):
         html = _build_html_fixture(GROUND_TRUTH_PASSAGES)
-        start = time.perf_counter()
         extract_html(html)
-        elapsed = time.perf_counter() - start
-        limit = _perf_limit_s()
-        assert elapsed < limit, f"HTML extraction took {elapsed:.2f}s (limit {limit}s)"
+        cpu = cpu_seconds(lambda: extract_html(html))
+        assert cpu < _LIMIT_S, f"HTML extraction took {cpu:.2f}s CPU (limit {_LIMIT_S}s)"

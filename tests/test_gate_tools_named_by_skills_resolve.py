@@ -33,12 +33,13 @@ machine that runs the gates, which is the only machine where the gates exist.
 from __future__ import annotations
 
 import re
-import subprocess
 import os
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.cpu_budget import run_with_cpu_budget
 
 _REPO = Path(__file__).resolve().parents[1]
 _SKILLS = Path(os.environ.get("DOCPLUCK_SKILLS_DIR") or "<DOCPLUCK_SKILLS_DIR unset>")
@@ -154,9 +155,10 @@ def test_every_tool_a_gate_names_can_be_loaded(referenced):
         path = _REPO / rel
         if not path.is_file() or path.suffix != ".py":
             continue
-        proc = subprocess.run(
+        # CPU budget, not wall: see tests/cpu_budget.py.
+        proc = run_with_cpu_budget(
             [sys.executable, "-W", "ignore", str(runner), rel],
-            cwd=_REPO, capture_output=True, text=True, timeout=180,
+            cpu_budget_s=180, fallback_wall_s=180, cwd=_REPO, encoding=None,
         )
         if proc.returncode != 0:
             out = (proc.stderr or proc.stdout).strip().splitlines() or ["<no output>"]

@@ -56,6 +56,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.cpu_budget import run_with_cpu_budget
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCAN_DIRS = ("tools", "scripts")
 _IMPORTS_DOCPLUCK = re.compile(r"^\s*(?:import\s+docpluck|from\s+docpluck)")
@@ -101,9 +103,12 @@ def _resolve_docpluck_for(script: Path) -> str:
     # what this probe measures; `_corpus` now raises CorpusUnavailable at once
     # and the probe's fallback reads the sys.path the script left behind.
     env = {**os.environ, "ARTICLE_FINDER_HOME": str(REPO_ROOT / ".no-custodian-in-import-probe")}
-    proc = subprocess.run(
+    # A CPU budget, not a wall timeout: in a saturated full run on 2026-09-25
+    # these probes timed out at 180s wall yet pass alone; measured at 100% load
+    # the slowest took 54s wall on 0.5s CPU. See tests/cpu_budget.py.
+    proc = run_with_cpu_budget(
         [sys.executable, str(_PROBE_HELPER), str(script), str(script.parent)],
-        capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=180, env=env, check=False,
+        cpu_budget_s=180, fallback_wall_s=180, cwd=str(REPO_ROOT), encoding=None, env=env,
     )
     hits = [l for l in (proc.stdout or "").splitlines() if l.startswith("RESOLVED::")]
     if not hits:
