@@ -1,7 +1,5 @@
 """Real-corpus integration tests."""
 
-import os
-
 import pytest
 
 from .conftest import requires_pdftotext
@@ -32,15 +30,31 @@ pytest.importorskip("pdfplumber")
 
 @requires_pdftotext
 def test_escicheck_pdfs_smoke():
-    base = os.environ.get("DOCPLUCK_ESCICHECK_PDFS")
-    if not base or not os.path.isdir(base):
-        pytest.skip("ESCIcheck PDFs not available")
+    """Every ESCIcheck replication report yields at least 3 sections.
+
+    REPOINTED 2026-09-25. This read ``$DOCPLUCK_ESCICHECK_PDFS`` -- a folder in a
+    sibling project -- took the first five files a directory listing returned,
+    and SKIPPED when the variable was unset or the folder absent. The folder was
+    retired into the article custodian on 2026-08-28, so from then on the test
+    never ran, and no run shows how long before that the variable was set at all.
+
+    The set is now the ``escicheck/`` group of the committed corpus manifest:
+    the ESCIcheck regression papers that are published articles held by DOI (22;
+    ``apa/korbmacher_2022_kruger.pdf`` was one too and stays under ``apa/``).
+    ``corpus_pdfs`` raises when any of them does not resolve, so a missing paper
+    FAILS, and the denominator cannot shrink without a diff.
+    """
     from docpluck import extract_sections
-    files = sorted(p for p in os.listdir(base) if p.lower().endswith(".pdf"))[:5]
-    if not files:
-        pytest.skip("No PDFs found in ESCIcheck dir")
-    for fn in files:
-        with open(os.path.join(base, fn), "rb") as f:
-            doc = extract_sections(f.read())
-        # Smoke: every PDF should produce ≥3 sections.
-        assert len(doc.sections) >= 3, f"{fn}: only {len(doc.sections)} sections"
+    from docpluck.testing import corpus_names, corpus_pdfs
+
+    names = corpus_names("escicheck")
+    pdfs = corpus_pdfs("escicheck")  # raises if any of them does not resolve
+    assert len(pdfs) >= 20, f"escicheck group holds only {len(pdfs)} papers"
+    thin = []
+    for name, pdf in zip(names, pdfs):
+        doc = extract_sections(pdf.read_bytes())
+        if len(doc.sections) < 3:
+            thin.append(f"{name}: only {len(doc.sections)} sections")
+    assert not thin, (
+        f"{len(thin)}/{len(pdfs)} papers under 3 sections:\n" + "\n".join(thin)
+    )

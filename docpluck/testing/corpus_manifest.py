@@ -306,6 +306,116 @@ MANIFEST: dict[str, dict[str, str]] = {
         "held_at": 'fulltext/10.1177__00380385211073238.pdf',
         "sha256": '2fa458ea6d402556601f8f8baad3a70b93c80c097cc9a6a419200522503ffe3b',
     },
+    'escicheck/adelina_2021_irsp.pdf': {
+        "doi": '10.5334/irsp.571',
+        "held_at": 'fulltext/10.5334__irsp.571.pdf',
+        "sha256": 'a5c5a2ee064ae5c08c12be0a4022af7f88d58ebd9577645b431300fb4a732355',
+    },
+    'escicheck/anvari_2021_jesp.pdf': {
+        "doi": '10.1016/j.jesp.2020.104052',
+        "held_at": 'fulltext/10.1016__j.jesp.2020.104052.pdf',
+        "sha256": 'e0c43b95d4aa39decf38e50f3665dbd96349cdff9ab00b2e28ac4b864e542719',
+    },
+    'escicheck/brick_2021_collabra.pdf': {
+        "doi": '10.1525/collabra.23443',
+        "held_at": 'fulltext/10.1525__collabra.23443.pdf',
+        "sha256": '079cf2a1bbe6dfaeaaf50a47949886db0b024d7608384e35e3781760513857b7',
+    },
+    'escicheck/chandrashekar_2021_jdm.pdf': {
+        "doi": '10.1017/s1930297500008470',
+        "held_at": 'fulltext/10.1017__s1930297500008470.pdf',
+        "sha256": '2527f9ace940709517e45e87a7d065d1de0937dbd16c1de8cc720f6e9fc740bb',
+    },
+    'escicheck/chandrashekar_2022_jesp.pdf': {
+        "doi": '10.1016/j.jesp.2022.104372',
+        "held_at": 'fulltext/10.1016__j.jesp.2022.104372.pdf',
+        "sha256": 'd344a16847a28f1fe72ef7f88262abc43a3f0e29278b9ca98818923b67ad81ce',
+    },
+    'escicheck/chandrashekar_2024_irsp.pdf': {
+        "doi": '10.5334/irsp.946',
+        "held_at": 'fulltext/10.5334__irsp.946.pdf',
+        "sha256": 'd86ff070d241152d86ca790e56f94411340e6ca6f7f37b94556e65cabcbcb97b',
+    },
+    'escicheck/chen_2020_spps.pdf': {
+        "doi": '10.1177/1948550619900570',
+        "held_at": 'fulltext/10.1177__1948550619900570.pdf',
+        "sha256": '62833402dd1c2d61eec35aba548316ef4b787f63a26bd9a0c429d966e79b97cb',
+    },
+    'escicheck/chen_2023_collabra.pdf': {
+        "doi": '10.1525/collabra.57785',
+        "held_at": 'fulltext/10.1525__collabra.57785.pdf',
+        "sha256": 'bff34b54056f66e204adda9ccfc35df4627e1af8e4f86e3007c8959ca2b4833e',
+    },
+    'escicheck/ding_2025_rsos.pdf': {
+        "doi": '10.1098/rsos.250669',
+        "held_at": 'fulltext/10.1098__rsos.250669.pdf',
+        "sha256": 'fc8e9fe374f73a002dff1bd2add32dc6f8226b9e6b23b2339309d068136008dd',
+    },
+    'escicheck/imada_2022_collabra.pdf': {
+        "doi": '10.1525/collabra.32572',
+        "held_at": 'fulltext/10.1525__collabra.32572.pdf',
+        "sha256": '39ffd635c466d9d3d44af42e08ac52754c5712cde498e901f56b5756e9873d14',
+    },
+    'escicheck/jacobs_2024_irsp.pdf': {
+        "doi": '10.5334/irsp.932',
+        "held_at": 'fulltext/10.5334__irsp.932.pdf',
+        "sha256": 'dada08383370c522792cd2343c2d07ec5dd5fe8c0631dfe1e8b6c21e5931ebba',
+    },
+    'escicheck/li_2025_rsos.pdf': {
+        "doi": '10.1098/rsos.250979',
+        "held_at": 'fulltext/10.1098__rsos.250979.pdf',
+        "sha256": '5d33290ad3ca7e8388d8219b3686ff7cec68f6b27987bc2834c1b131402fb446',
+    },
+    'escicheck/lu_2026_jpsp.pdf': {
+        "doi": '10.1037/pspp0000586',
+        "held_at": 'fulltext/10.1037__pspp0000586.pdf',
+        "sha256": '329591db3d8263965ef11f608a3111090a7ffc49cbcb716a1189d967d6f11050',
+    },
+    'escicheck/majumder_2024_jdm.pdf': {
+        "doi": '10.1017/jdm.2024.31',
+        "held_at": 'fulltext/10.1017__jdm.2024.31.pdf',
+        "sha256": '8b97c4e2dc52af755d17a70023393962d5157feebdc7713b4b21405e977ee124',
+    },
+    'escicheck/mayiwar_2024_qjep.pdf': {
+        "doi": '10.1177/17470218241255916',
+        "held_at": 'fulltext/10.1177__17470218241255916.pdf',
+        "sha256": '512f26f24c28c71986a018e50dd93b96a33b31f7cdb3e656d810192fcc544db8',
+    },
+    'escicheck/petrov_2023_irsp.pdf': {
+        "doi": '10.5334/irsp.883',
+        "held_at": 'fulltext/10.5334__irsp.883.pdf',
+        "sha256": 'f408e34d22cd6ae5f0bc25f355edda01788f86cc8037dcaec2febbdc08d48bef',
+    },
+    'escicheck/vonasch_2023_collabra.pdf': {
+        "doi": '10.1525/collabra.77859',
+        "held_at": 'fulltext/10.1525__collabra.77859.pdf',
+        "sha256": '930ca712cdf210435e81cd3a726282f7fe86aeb83f5ef48c2d32eb234afe08f6',
+    },
+    'escicheck/xiao_2024_irsp.pdf': {
+        "doi": '10.5334/irsp.945',
+        "held_at": 'fulltext/10.5334__irsp.945.pdf',
+        "sha256": 'ca151d3be8e476a4e3f533f5d77d21d4845b4d77dc5fc79ad4ed5a7dee4873ac',
+    },
+    'escicheck/xiao_2024_poc.pdf': {
+        "doi": '10.1037/cns0000401',
+        "held_at": 'fulltext/10.1037__cns0000401.pdf',
+        "sha256": 'bcb81752c1f42863d4cd6ecf3e4dad7862e4408918198d3f746546c96c1827a7',
+    },
+    'escicheck/zhu_2025_rsos.pdf': {
+        "doi": '10.1098/rsos.250367',
+        "held_at": 'fulltext/10.1098__rsos.250367.pdf',
+        "sha256": '71131f9f1174a0e604f9ac504f5c1aa3370f701aeb0443595edeee61a61814ff',
+    },
+    'escicheck/ziano_2020_spps.pdf': {
+        "doi": '10.1177/1948550620948973',
+        "held_at": 'fulltext/10.1177__1948550620948973.pdf',
+        "sha256": '78bde0a6b8b9e52e6603bf961b46056bcfe58ee6ba35bf1e0ca0b4777238cd64',
+    },
+    'escicheck/ziano_2021_joep_money.pdf': {
+        "doi": '10.1016/j.joep.2020.102349',
+        "held_at": 'fulltext/10.1016__j.joep.2020.102349.pdf',
+        "sha256": 'ef3ad3acf890a71aca17381c581e7d76afe3b74f6af16b9f13054ae4c9a2b03a',
+    },
     'harvard/ar_royal_society_rsos_140066.pdf': {
         "doi": '10.1098/rsos.140066',
         "held_at": 'fulltext/10.1098__rsos.140066.pdf',

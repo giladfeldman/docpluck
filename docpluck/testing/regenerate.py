@@ -12,6 +12,15 @@ no local directory contains -- and because the directory this was first run
 against is being deleted, at which point a directory-only generator could no
 longer run at all.
 
+To add papers to the manifest that is already committed -- the normal case now
+that the source directory is gone -- name each one and its DOI::
+
+    python -m docpluck.testing.regenerate --add escicheck/xiao_2024_irsp.pdf=10.5334/irsp.945
+
+``--add`` starts from the existing manifest, so nothing already in it has to be
+re-derived from a directory that no longer exists. It refuses a DOI that is
+already listed under another name and a name already bound to another DOI.
+
 The manifest is COMMITTED on purpose. It is the corpus's denominator, and a
 denominator that is recomputed at read time from whatever happens to be on disk
 cannot ever report that something went missing -- it just reports a smaller
@@ -133,10 +142,29 @@ def _papers_from_view(spec: str) -> dict[str, dict[str, str]]:
             "Refusing to emit a manifest from an empty view -- a corpus that "
             "silently became empty must not read as a corpus that shrank."
         )
+    dois = [key.replace("__", "/") if key.startswith("10.") else key for key in keys]
+    return {
+        f"baseline/{Path(e['held_at']).name}": e
+        for e in _locate_in_custody(dois, f"view {spec}")
+    }
+
+
+def _locate_in_custody(dois: list[str], where: str) -> list[dict[str, str]]:
+    """Resolve each DOI to the custodian's own copy: ``{doi, held_at, sha256}``.
+
+    Order is preserved. Any DOI the custodian does not hold is FATAL, never
+    dropped. Shared by ``--from-view`` and ``--add`` so the two cannot disagree
+    about what "in custody" means.
+    """
+    af = _article_finder() / "ai-gold.py"
     finder = _article_finder() / "find-pdf.py"
+    if not (af.is_file() and finder.is_file()):
+        raise SystemExit(
+            f"FATAL: article-finder is not installed at {af.parent}. It is the sole "
+            "custodian, so there is nothing to resolve a DOI against."
+        )
     located: list[str] = []
-    for key in keys:
-        doi = key.replace("__", "/") if key.startswith("10.") else key
+    for doi in dois:
         fr = subprocess.run(
             [sys.executable, str(finder), doi, "--dry-run"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
@@ -147,7 +175,7 @@ def _papers_from_view(spec: str) -> dict[str, dict[str, str]]:
             d = {}
         if not (d.get("found") and d.get("source") == "repository_cache" and d.get("path")):
             raise SystemExit(
-                f"FATAL: {doi} is in view {spec} but not in custody on this machine. "
+                f"FATAL: {doi} is in {where} but not in custody on this machine. "
                 "Ingest it through article-finder before regenerating -- a manifest "
                 "that quietly omits it would shrink the corpus with no diff to read."
             )
@@ -166,21 +194,53 @@ def _papers_from_view(spec: str) -> dict[str, dict[str, str]]:
     )
     if not proc.stdout.strip():
         raise SystemExit(f"FATAL: in-custody produced no output.\n{proc.stderr}")
-    out: dict[str, dict[str, str]] = {}
-    for f in json.loads(proc.stdout)["files"]:
+    files = json.loads(proc.stdout)["files"]
+    if len(files) != len(dois):
+        raise SystemExit(
+            f"FATAL: asked in-custody about {len(dois)} files and got {len(files)} "
+            "answers -- refusing to pair DOIs with custody records by position."
+        )
+    out: list[dict[str, str]] = []
+    for doi, f in zip(dois, files):
         p = Path(f["path"])
         if not f.get("in_custody"):
             raise SystemExit(
-                f"FATAL: {p} is in view {spec} but NOT in custody. Ingest it through "
+                f"FATAL: {p} is in {where} but NOT in custody. Ingest it through "
                 "article-finder before regenerating."
             )
         held = f["held_at"]
-        out[f"baseline/{Path(held).name}"] = {
-            "doi": _doi_from_held_at(held),
-            "held_at": held,
-            "sha256": f["sha256"],
-        }
+        held_doi = _doi_from_held_at(held)
+        if held_doi.lower() != doi.lower():
+            raise SystemExit(
+                f"FATAL: {doi} resolved to {held}, which the custodian holds under "
+                f"{held_doi}. A manifest entry whose DOI and bytes name different "
+                "papers is the wrong-PDF defect this file's sha256 exists to catch."
+            )
+        out.append({"doi": held_doi, "held_at": held, "sha256": f["sha256"]})
     return out
+
+
+def _parse_add(specs: list[str]) -> list[tuple[str, str]]:
+    """``subdir/name.pdf=10.x/y`` pairs, validated before anything is resolved."""
+    pairs: list[tuple[str, str]] = []
+    for spec in specs:
+        name, sep, doi = spec.partition("=")
+        name = name.strip().replace("\\", "/").strip("/")
+        doi = doi.strip().lower()
+        if not sep or "/" not in name or not name.endswith(".pdf") or not doi.startswith("10."):
+            raise SystemExit(
+                f"FATAL: --add {spec!r} is not <subdir>/<name>.pdf=<doi>"
+            )
+        pairs.append((name, doi))
+    return pairs
+
+
+def _existing_manifest(out: str) -> dict[str, dict[str, str]]:
+    """The manifest ``--add`` extends. A file that is there but unreadable is FATAL."""
+    m = _read_manifest(out)
+    if m is None and Path(out).is_file():
+        raise SystemExit(f"FATAL: {out} defines no readable MANIFEST; refusing to add to it.")
+    return dict(m or {})
 
 
 def build(paths: list[str]) -> dict[str, dict[str, str]]:
@@ -260,11 +320,11 @@ def verify_against_custody(manifest: dict[str, dict[str, str]]) -> list[str]:
     return bad
 
 
-def _existing_count(out: str) -> int | None:
-    """How many papers the manifest being REPLACED holds, or None if there is none.
+def _read_manifest(out: str) -> dict | None:
+    """The manifest at ``out``, or None if there is none or it cannot be read.
 
     Read by parsing rather than importing: the target may be any path (``--out``),
-    and importing the installed package would count a different file from the one
+    and importing the installed package would read a different file from the one
     about to be overwritten.
     """
     p = Path(out)
@@ -274,9 +334,18 @@ def _existing_count(out: str) -> int | None:
         ns: dict = {}
         exec(compile(p.read_text(encoding="utf-8"), str(p), "exec"), ns)  # noqa: S102
         m = ns.get("MANIFEST")
-        return len(m) if isinstance(m, dict) else None
-    except Exception:
+        return m if isinstance(m, dict) else None
+    # A generated file of literals fails in only these ways: unreadable,
+    # undecodable (a ValueError), or not Python. Anything else is a bug here
+    # and should surface, not read as "no manifest".
+    except (OSError, SyntaxError, ValueError):
         return None
+
+
+def _existing_count(out: str) -> int | None:
+    """How many papers the manifest being REPLACED holds, or None if there is none."""
+    m = _read_manifest(out)
+    return None if m is None else len(m)
 
 
 def main() -> int:
@@ -305,12 +374,44 @@ def main() -> int:
         metavar="N",
         help="refuse to write unless the new manifest holds exactly N papers",
     )
+    ap.add_argument(
+        "--add",
+        action="append",
+        default=[],
+        metavar="NAME=DOI",
+        help="add one paper to the EXISTING manifest, e.g. "
+             "escicheck/xiao_2024_irsp.pdf=10.5334/irsp.945 (repeatable; "
+             "cannot be combined with paths or --from-view)",
+    )
     args = ap.parse_args()
 
-    if not args.paths and not args.from_view:
-        ap.error("give at least one path, or --from-view, or both")
+    if args.add and (args.paths or args.from_view):
+        ap.error("--add extends the existing manifest; do not combine it with paths or --from-view")
+    if not args.paths and not args.from_view and not args.add:
+        ap.error("give at least one path, or --from-view, or --add")
 
-    manifest = build(args.paths) if args.paths else {}
+    if args.add:
+        pairs = _parse_add(args.add)
+        manifest = _existing_manifest(args.out)
+        by_doi = {e["doi"].lower(): rel for rel, e in manifest.items()}
+        for name, doi in pairs:
+            if doi in by_doi and by_doi[doi] != name:
+                raise SystemExit(
+                    f"FATAL: {doi} is already in the manifest as {by_doi[doi]}; one paper, "
+                    "one name -- a second name would make every sweep read it twice."
+                )
+            if name in manifest and manifest[name]["doi"].lower() != doi:
+                raise SystemExit(
+                    f"FATAL: {name} is already bound to {manifest[name]['doi']}, not {doi}."
+                )
+        if len({n for n, _ in pairs}) != len(pairs) or len({d for _, d in pairs}) != len(pairs):
+            raise SystemExit("FATAL: --add names the same paper or the same name twice.")
+        resolved = _locate_in_custody([d for _, d in pairs], "--add")
+        for (name, _doi), entry in zip(pairs, resolved):
+            manifest[name] = entry
+        print(f"added {len(pairs)} papers by DOI to the existing manifest")
+    else:
+        manifest = build(args.paths) if args.paths else {}
     from_dir = len(manifest)
     if args.from_view:
         # Directory entries WIN on a DOI collision: their corpus_path is the

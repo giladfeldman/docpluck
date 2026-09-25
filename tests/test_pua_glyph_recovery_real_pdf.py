@@ -25,8 +25,8 @@ Private-Use glyph is invisible and does not survive copy/paste.
 from __future__ import annotations
 
 import hashlib
-import sys
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -49,15 +49,13 @@ from docpluck.normalize import (
 from docpluck.render import render_pdf_to_markdown
 from docpluck.tables.cell_cleaning import _html_escape
 
-# the portfolio root -- this repo's grandparent directory.
-_META = Path(__file__).resolve().parents[2]
-# Resolved from machine-local config (see conftest.local_corpus): these live in
-# a PRIVATE sibling whose layout this PUBLIC repo does not publish.
+# The DOCX fixture is an unsubmitted manuscript: it has no DOI, can never enter
+# the article custodian, and lives only in a machine-local corpus whose layout
+# this PUBLIC repo does not publish (see tests/_local_corpora.py). The PDF below
+# is a published paper and resolves by DOI -- it no longer reads that config.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _local_corpora import local_corpus  # noqa: E402
+from _local_corpora import require_local_corpus
 
-_ESCICHECK_PDFS = Path(local_corpus("escicheck_pdfs") or _META / "__absent__")
-_DOCX_TESTS = Path(local_corpus("docx_tests") or _META / "__absent__")
 _BETA_DOCX_SHA16 = "8452867332d36c85"  # the harness manifest id docxtests__8452867332d36c85
 
 # Symbol-font PUA block -- none of these may survive to a user-facing view.
@@ -145,13 +143,17 @@ def test_normalize_text_w0e_noop_when_no_pua():
 # -- real-PDF / real-DOCX regression (all channels, public entry point) --
 
 def test_xiao_monin_miller_no_symbol_pua_real_pdf():
-    """escicheck Xiao-etal-2024: chi and bullet glyphs reach the rendered .md
-    as Symbol-PUA codepoints at v2.4.53. Drives the public render entry."""
-    pdf = _ESCICHECK_PDFS / (
-        "Xiao-etal-2024-IRSP-Monin&Miller2001-replication-extensions-preprint-v9.pdf"
-    )
-    if not pdf.exists():
-        pytest.skip(f"fixture missing: {pdf}")
+    """10.5334/irsp.945 (Xiao et al. 2024, IRSP): chi and bullet glyphs reach the
+    rendered .md as Symbol-PUA codepoints at v2.4.53. Drives the public render
+    entry.
+
+    Resolved by DOI through the custodian since 2026-09-25. It used to be read
+    from a sibling project's test folder by filename, and when that folder was
+    retired into custody the test SKIPPED ("fixture missing") and stayed green.
+    The custodian's copy is the same bytes the regression was found on (the
+    preprint v9; the manifest pins its sha256), so the known positive is intact.
+    """
+    pdf = require_corpus_pdf("escicheck/xiao_2024_irsp.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     leftover = _SYMBOL_PUA_RE.findall(md)
     assert not leftover, f"Symbol-PUA glyphs remain: {[hex(ord(c)) for c in leftover]}"
@@ -166,17 +168,21 @@ def test_beta_manuscript_docx_no_symbol_pua_real_docx():
     pytest.importorskip("mammoth")
     from docpluck.extract_docx import extract_docx
 
+    # Skips only where the manuscripts are not configured at all; a configured
+    # corpus that has lost the file FAILS below.
+    docx_dir = Path(require_local_corpus("docx_tests"))
     # Located by CONTENT HASH, never by filename: this repo is public and the
     # DOCX sources are unsubmitted manuscripts whose filenames are titles.
     docx = next(
         (
-            p for p in sorted(_DOCX_TESTS.glob("*.docx"))
+            p for p in sorted(docx_dir.glob("*.docx"))
             if hashlib.sha256(p.read_bytes()).hexdigest().startswith(_BETA_DOCX_SHA16)
         ),
         None,
     )
-    if docx is None:
-        pytest.skip(f"fixture missing: no DOCX under {_DOCX_TESTS} hashes to {_BETA_DOCX_SHA16}")
+    assert docx is not None, (
+        f"no DOCX in the configured docx_tests corpus hashes to {_BETA_DOCX_SHA16}"
+    )
     text, _method = extract_docx(docx.read_bytes())
     normalized, report = normalize_text(text, NormalizationLevel.academic)
     leftover = _SYMBOL_PUA_RE.findall(normalized)

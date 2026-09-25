@@ -29,9 +29,14 @@ committed manifest cannot shrink without a diff.
 
 NOT THE SAME SET AS THE HARNESS MANIFEST
 ----------------------------------------
-``scripts/harness/corpus_manifest.json`` holds 135 documents; this one holds 102.
+``scripts/harness/corpus_manifest.json`` holds 135 documents; this one holds 124.
 That is deliberate. This is the PAPER corpus, resolved by DOI: the 101 corpus
-PDFs plus the render-baseline paper. The harness manifest additionally carries 25
+PDFs, the render-baseline paper, and (since 2026-09-25) the 22 ESCIcheck
+regression papers under ``escicheck/`` -- published replication reports that
+used to be read from a sibling project's folder and are now resolved by DOI.
+The harness manifest has not absorbed those 22 yet: its generator injects this
+manifest, so its next ``--write`` will, and its baselines must be extended in
+the same change. The harness manifest additionally carries 25
 DOCX and 9 HTML documents, which are not papers with DOIs and most of which are
 not in custody. Two numbers that look like they should match, and do not, are
 worth a sentence in both files rather than a puzzled reader in six months.

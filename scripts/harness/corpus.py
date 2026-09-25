@@ -4,9 +4,11 @@ NOT THE SAME SET AS ``docpluck/testing/corpus_manifest.py``, deliberately, and
 the next reader will assume it is. This manifest is the HARNESS corpus: the 101
 corpus PDFs plus 25 DOCX and 9 HTML documents from other sources, 135 in all.
 ``docpluck.testing``'s manifest is the PAPER corpus the test suite resolves BY
-DOI -- the same 101 PDFs plus the render-baseline paper, 102 -- and the DOCX and
-HTML are absent from it because they are not papers with DOIs and most are not in
-custody at all.
+DOI -- the same 101 PDFs plus the render-baseline paper and, since 2026-09-25,
+22 ESCIcheck regression papers, 124 in all -- and the DOCX and HTML are absent
+from it because they are not papers with DOIs and most are not in custody at all.
+``discover()`` injects that manifest, so the next ``--write`` here grows the
+committed JSON by those 22 and their baselines must be added alongside.
 
 Discovers every test document (PDF / DOCX / HTML) across the sibling repos and
 emits a committed ``corpus_manifest.json``. The manifest stores DOIs and content
