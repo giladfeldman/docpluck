@@ -37,6 +37,7 @@ where nothing asserts.
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -158,7 +159,7 @@ def test_the_event_vocabulary_has_exactly_one_definition():
     )
     # And every member must actually be recorded somewhere in the producer --
     # an event name nobody emits makes the token unreachable.
-    src = (ce.__file__ and open(ce.__file__, encoding="utf-8").read()) or ""
+    src = Path(ce.__file__).read_text(encoding="utf-8") if ce.__file__ else ""
     for event in ce.CAMELOT_UNAVAILABLE_EVENTS:
         assert f'"{event}"' in src, (
             f"{event!r} is in CAMELOT_UNAVAILABLE_EVENTS but nothing in "
