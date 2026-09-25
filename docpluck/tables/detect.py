@@ -389,7 +389,8 @@ def caption_orientation(page_obj, cap: CaptionMatch) -> str | None:
 
 
 # A text-channel line shorter than this is only called upright when it is an
-# ENTIRE upright row by itself (a lone page number). A short fragment matched as
+# ENTIRE upright row by itself in the page's edge band (a lone page number). A
+# short fragment matched as
 # a row's prefix or suffix could be a table value (".04") that merely also ends
 # some upright line, and dropping a value is the one mistake this must not make.
 _UPRIGHT_PIECE_MIN_CHARS = 4
@@ -445,13 +446,92 @@ def line_is_drawn_upright(line: str, upright_rows: list[tuple[str, bool]]) -> bo
     if not n:
         return False
     for row, at_edge in upright_rows:
-        if n == row:
+        # A short line (a page number, or a table value like "5") is upright only
+        # when it IS a whole row in the edge band: an upright "5" in the middle of
+        # the page proves nothing about a rotated cell that also reads "5".
+        if n == row and (at_edge or len(n) >= _UPRIGHT_PIECE_MIN_CHARS):
             return True
         if (
             at_edge
             and len(n) >= _UPRIGHT_PIECE_MIN_CHARS
             and (row.startswith(n) or row.endswith(n))
         ):
+            return True
+    return False
+
+
+# A sideways line is a margin banner or watermark when the same text is drawn
+# sideways at the same place on at least this share of the document's pages.
+_ROTATED_FURNITURE_PAGE_SHARE = 0.5
+_ROTATED_FURNITURE_X_TOLERANCE_PT = 6.0
+
+
+def recurring_rotated_lines(layout_doc) -> frozenset[str]:
+    """Normalised texts of SIDEWAYS lines that recur at the same x position on at
+    least half of the document's pages (and on at least 2): a journal banner
+    printed up the margin, or a watermark such as ``Author Manuscript``.
+
+    A rotated table's own furniture cannot be proven upright, because it is not:
+    on 10.1098/rsos.140072 p5 the journal banner runs up the margin in the same
+    orientation as Table 1, and it was the whole of that table's captured text.
+    Recurrence is the evidence (F0 uses the same for upright running headers): a
+    rotated table spans a few pages, a banner spans the document. Position is
+    required too, so a column label repeated across a multi-page rotated table
+    at shifting positions does not qualify.
+    """
+    pages = getattr(layout_doc, "pages", None) or ()
+    n_pages = len(pages)
+    if n_pages < 2:
+        return frozenset()
+    seen: dict[str, list[tuple[int, float]]] = defaultdict(list)
+    # Pages that are mostly upright text. A banner or watermark is printed on
+    # those too; a rotated table's own repeated column header is printed only on
+    # the rotated pages it spans. Without this, a supplement that is mostly one
+    # long sideways table could reach the page share with its header row
+    # (second-model review 2026-09-25).
+    ordinary_pages: set[int] = set()
+    for index, page_obj in enumerate(pages):
+        chars = getattr(page_obj, "chars", None) or ()
+        rotated: dict[tuple[int, int], list[dict]] = defaultdict(list)
+        n_rotated = 0
+        for c in chars:
+            if c.get("upright", True):
+                continue
+            n_rotated += 1
+            matrix = c.get("matrix") or (0, 0, 0, 0, 0, 0)
+            rotated[(1 if matrix[1] > 0 else -1, round(c.get("x0", 0)))].append(c)
+        if chars and n_rotated * 2 < len(chars):
+            ordinary_pages.add(index)
+        for (direction, x), line in rotated.items():
+            ordered = sorted(line, key=lambda c: c.get("top", 0), reverse=direction > 0)
+            text = _normalize_for_char_match("".join(c.get("text", "") for c in ordered))
+            if len(text) >= _UPRIGHT_PIECE_MIN_CHARS:
+                seen[text].append((index, float(x)))
+    need = max(2, int(n_pages * _ROTATED_FURNITURE_PAGE_SHARE + 0.9999))
+    keys = set()
+    for text, hits in seen.items():
+        for _, x in hits:
+            pages_here = {
+                i for i, x2 in hits if abs(x2 - x) <= _ROTATED_FURNITURE_X_TOLERANCE_PT
+            }
+            # At least half of its pages must be ordinary (mostly upright) pages.
+            if len(pages_here) >= need and 2 * len(pages_here & ordinary_pages) >= len(pages_here):
+                keys.add(text)
+                break
+    return frozenset(keys)
+
+
+def line_is_rotated_furniture(line: str, rotated_furniture: frozenset[str]) -> bool:
+    """True when a text-channel line is one of ``recurring_rotated_lines`` whole,
+    or the banner is that line repeated exactly: PMC prints ``Author Manuscript``
+    four times up one margin, which the layout groups as one line and pdftotext
+    emits as four. Never general containment -- L-054 measured what that deletes.
+    """
+    n = _normalize_for_char_match(line)
+    if len(n) < _UPRIGHT_PIECE_MIN_CHARS:
+        return False
+    for key in rotated_furniture:
+        if key == n or (len(key) % len(n) == 0 and n * (len(key) // len(n)) == key):
             return True
     return False
 

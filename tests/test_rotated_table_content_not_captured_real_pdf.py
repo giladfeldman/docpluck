@@ -207,6 +207,60 @@ def test_with_camelot_off_upright_furniture_alone_is_not_content(monkeypatch):
     assert "Table 2:2" in result["fallback_details"]["rotated_table_upright_lines_dropped"]
 
 
+def test_a_sideways_margin_banner_is_not_a_rotated_tables_content():
+    """Found by the second-model review: furniture drawn SIDEWAYS cannot be proven
+    upright. 10.1098/rsos.140072 p5 prints Table 1 sideways and its journal banner
+    ("rsos.royalsocietypublishing.org R. Soc. open sci. 2: 140072") and a dotted
+    rule run up the margin in the same orientation, on every page. That was all the
+    caption-only walk found, so it shipped as the table's `raw_text`."""
+    from docpluck.extract_structured import extract_pdf_structured
+
+    data = require_corpus_pdf("harvard/ar_royal_society_rsos_140072.pdf").read_bytes()
+    t1 = _tables_by_label(extract_pdf_structured(data))["Table 1"]
+    assert t1["raw_text"] == "", repr(t1["raw_text"])
+    assert t1["content_status"] == "not_captured:rotated_table"
+
+
+def test_with_camelot_off_a_watermark_goes_and_the_values_stay(monkeypatch):
+    """Two-sided on one table: 10.1177/23780231221103044 (corpus `asa/socius_2.pdf`)
+    Table 1 (p37) is a PMC author manuscript whose margin carries
+    `Author Manuscript` four times, sideways, on every page. With Camelot off the
+    watermark must leave the table's text and its values must not."""
+    from docpluck.extract_structured import extract_pdf_structured
+
+    monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+    data = require_corpus_pdf("asa/socius_2.pdf").read_bytes()
+    t1 = _tables_by_label(extract_pdf_structured(data))["Table 1"]
+    assert "Author Manuscript" not in t1["raw_text"], repr(t1["raw_text"][:200])
+    lines = t1["raw_text"].split("\n")
+    assert "72.8" in lines and "Black (%)" in lines, repr(t1["raw_text"][:300])
+    assert t1["content_status"] == "raw_text"
+
+
+def test_a_rotated_captions_own_title_is_not_its_content():
+    """10.1177/23780231251314667 (corpus `asa/socius_4.pdf`) p39: after the sideways
+    caption `Table 3.` the walk re-reads the caption's own title line, which the
+    caption already carries. A repeat is dropped only when long enough that a cell
+    value cannot coincide with caption text."""
+    from docpluck.extract_structured import _caption_dedupe_key, _line_repeats_caption
+
+    caption = _caption_dedupe_key(
+        "Table 3. American Time Use Survey Housework and Childcare Activity Codes."
+    )
+    assert _line_repeats_caption(
+        "American Time Use Survey Housework and Childcare Activity Codes.", caption
+    )
+    # Two-sided: a short fragment, and a value that happens to sit in a caption,
+    # are never treated as repeats.
+    assert not _line_repeats_caption("Housework", caption)
+    # A long run from the MIDDLE of the caption (a column header restating the
+    # caption's wording) is table content, not a repeat of the title.
+    assert not _line_repeats_caption("Time Use Survey Housework", caption)
+    assert not _line_repeats_caption(
+        "2,469", _caption_dedupe_key("Summary Statistics (n = 2,469).")
+    )
+
+
 def test_rendered_markdown_keeps_the_heading_and_says_why(pdf_bytes):
     from docpluck.render import render_pdf_to_markdown
 

@@ -30,6 +30,8 @@ from .tables import CONTENT_NOT_CAPTURED, Cell, Table, content_status_for
 from .tables.detect import (
     caption_orientation,
     line_is_drawn_upright,
+    line_is_rotated_furniture,
+    recurring_rotated_lines,
     rotated_caption_end,
     upright_row_texts,
 )
@@ -537,6 +539,21 @@ def _extract_pdf_structured(
             method_pieces.append(f"whitespace_setup_failed:{exc_name}")
             layout_doc = None
 
+    # Sideways margin banners / watermarks of this document, computed at most once
+    # and only if a rotated caption actually asks (see `recurring_rotated_lines`).
+    _banner_memo: list[frozenset[str]] = []
+
+    def _rotated_furniture() -> frozenset[str]:
+        if not _banner_memo:
+            try:
+                _banner_memo.append(recurring_rotated_lines(layout_doc))
+            except Exception as exc:
+                # Not fatal -- the banner test then cannot fire -- but not silent
+                # either: an empty set reads exactly like "no banner here".
+                record_fallback("recurring_rotated_lines_exception", detail=type(exc).__name__)
+                _banner_memo.append(frozenset())
+        return _banner_memo[0]
+
     for cap in unmatched_caps:
         cells: list[Cell] = []
         if layout_doc is not None and _whitespace_cells is not None and _region_for_caption_fn is not None:
@@ -639,6 +656,7 @@ def _extract_pdf_structured(
                 caption_override=sbs_caption,
                 body_override=sbs_body,
                 layout_page=layout_page,
+                rotated_furniture=_rotated_furniture if layout_doc is not None else None,
             )
             # A prose-rejected candidate is only actually dropped once something
             # replaces it. If the fallback carries no body text either, the
@@ -2702,6 +2720,26 @@ def _trim_overflowing_figure_caption(snippet: str, limit: int = 400) -> str:
     return snippet[:limit].rsplit(" ", 1)[0] + "…"
 
 
+# A body line is treated as a repeat of the caption only when it is at least
+# this long once normalised; below it, a cell value could coincide with caption
+# text ("2,469" inside "Summary Statistics (n = 2,469)").
+_CAPTION_REPEAT_MIN_CHARS = 12
+
+
+def _caption_dedupe_key(caption: str | None) -> str:
+    return re.sub(r"\s+", "", caption or "").lower()
+
+
+def _line_repeats_caption(line: str, caption_key: str) -> bool:
+    """The line is the caption's own START or END -- its wrapped title -- never
+    any run that merely occurs inside it: a caption often restates a column
+    header's wording, and that header is table content (second-model review)."""
+    key = re.sub(r"\s+", "", line).lower()
+    return len(key) >= _CAPTION_REPEAT_MIN_CHARS and (
+        caption_key.endswith(key) or caption_key.startswith(key)
+    )
+
+
 def _isolated_table_from_caption(
     cap: CaptionMatch,
     raw_text: str,
@@ -2710,6 +2748,7 @@ def _isolated_table_from_caption(
     caption_override: Optional[str] = None,
     body_override: Optional[str] = None,
     layout_page=None,
+    rotated_furniture=None,
 ) -> Table:
     """Build an isolated (cellless) Table dict for a caption with no Camelot match.
 
@@ -2782,8 +2821,19 @@ def _isolated_table_from_caption(
         body_text, reason = _extract_table_body_text_and_reason(raw_text, cap, next_boundary)
     if rotated:
         upright_rows = upright_row_texts(layout_page)
+        banners = rotated_furniture() if rotated_furniture is not None else frozenset()
         lines = body_text.split("\n")
-        kept = [ln for ln in lines if not line_is_drawn_upright(ln, upright_rows)]
+        caption_norm = _caption_dedupe_key(cap_text)
+        kept = [
+            ln for ln in lines
+            if not line_is_drawn_upright(ln, upright_rows)
+            and not line_is_rotated_furniture(ln, banners)
+            # The caption's own wrapped title, which the walk re-reads after a
+            # sideways caption (10.1177/23780231251314667 Table 3). Deduplication
+            # only: a copy demonstrably survives in `caption`, and a short line
+            # (a value) is never matched.
+            and not _line_repeats_caption(ln, caption_norm)
+        ]
         dropped = sum(1 for ln in lines if ln.strip()) - sum(1 for ln in kept if ln.strip())
         if dropped:
             # A removal must be countable (DELETE FURNITURE, NEVER DATA).
