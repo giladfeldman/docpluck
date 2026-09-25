@@ -2775,7 +2775,7 @@ def _isolated_table_from_caption(
             # "Study 1". So keep whichever is shorter.
             if len(bounded) < len(cap_text):
                 cap_text = bounded
-    reason: Optional[str] = None
+    reason: str | None = None
     if body_override is not None:
         body_text = body_override
     else:
@@ -3174,8 +3174,8 @@ def _extract_table_body_text(
 def _extract_table_body_text_and_reason(
     raw_text: str,
     cap: CaptionMatch,
-    next_boundary: Optional[int] = None,
-) -> tuple[str, Optional[str]]:
+    next_boundary: int | None = None,
+) -> tuple[str, str | None]:
     """Pull the text following a Table caption (intended for use when
     Camelot failed to extract cells). Returns the cell content as a flat
     string — column headers, values, group labels, etc., all linearized
