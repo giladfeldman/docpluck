@@ -142,6 +142,59 @@ def test_an_empty_result_behind_an_exception_is_still_named(fake, raise_for, sco
     assert "camelot_all_flavors_failed" in fb.counters, dict(fb.counters)
 
 
+# ── the real-PDF positive control ───────────────────────────────────────────
+
+def test_scoped_lattice_still_reads_the_pages_its_tables_are_on(monkeypatch):
+    """The scope must name the SAME page numbers Camelot uses.
+
+    Why a short paper with the threshold forced to 0. The corpus's long papers
+    (10.1098/rsos.250979, 10.15626/mp.2022.3108, 10.1109/access.2025.3645087)
+    came back byte-identical under the scope -- but none of their published tables
+    is lattice-sourced, so identity there cannot tell a correct page list from an
+    off-by-one one. 10.1038/s41598-023-50423-7 publishes four LATTICE tables
+    (pages 5-8); forcing the scoped path on it is the case that can fail.
+    """
+    import json
+    from camelot import handlers
+    from docpluck.testing import require_corpus_pdf
+
+    monkeypatch.delenv("DOCPLUCK_DISABLE_CAMELOT", raising=False)
+    pdf = require_corpus_pdf("nature/sci_rep_1.pdf").read_bytes()
+
+    parses: list[tuple[str, int]] = []
+    orig = handlers.PDFHandler._parse_page
+
+    def counting(self, page, parser, layout_kwargs, flavor="lattice", **kw):
+        parses.append((flavor, page.page_idx + 1))
+        return orig(self, page, parser, layout_kwargs, flavor=flavor, **kw)
+
+    monkeypatch.setattr(handlers.PDFHandler, "_parse_page", counting)
+
+    full = es.extract_pdf_structured(pdf)
+    full_lattice = [p for f, p in parses if f == "lattice"]
+    parses.clear()
+    monkeypatch.setattr(es, "LATTICE_FULL_SCAN_MAX_PAGES", 0)
+    scoped = es.extract_pdf_structured(pdf)
+    scoped_lattice = [p for f, p in parses if f == "lattice"]
+
+    lattice_pages = sorted({t["page"] for t in full["tables"] if t.get("camelot_flavor") == "lattice"})
+    assert lattice_pages, (
+        "the control paper no longer publishes a lattice table, so this test proves "
+        "nothing -- pick another paper rather than letting it pass vacuously"
+    )
+    assert len(scoped_lattice) < len(full_lattice), (full_lattice, scoped_lattice)
+    assert set(lattice_pages) <= set(scoped_lattice), (
+        f"lattice-sourced tables sit on pages {lattice_pages} but the scoped pass read "
+        f"{sorted(set(scoped_lattice))}"
+    )
+    dump = lambda ts: json.dumps(ts, sort_keys=True, default=str)  # noqa: E731
+    assert dump(scoped["tables"]) == dump(full["tables"]), (
+        "caption-page scoping changed published tables on a paper whose tables all "
+        "sit on caption pages"
+    )
+    assert "lattice_scope:" in scoped["method"] and "lattice_scope:" not in full["method"]
+
+
 def test_an_image_only_pdf_is_not_labelled_a_camelot_failure(tmp_path, monkeypatch):
     """The real case that exposed the label: no text layer, nothing raised."""
     reportlab = pytest.importorskip("reportlab")  # noqa: F841
