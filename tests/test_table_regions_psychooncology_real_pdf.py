@@ -35,7 +35,7 @@ from docpluck.testing.corpus import require_corpus_pdf
 PAPER = "vancouver/psychooncology_1.pdf"  # 10.1002/pon.2046
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _tables() -> dict:
     pytest.importorskip("camelot")
     from docpluck.extract_structured import extract_pdf_structured
