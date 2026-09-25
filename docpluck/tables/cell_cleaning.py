@@ -616,6 +616,22 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                 return False
         return True
 
+    # A wrapped line of words continues words; it cannot continue a statistic.
+    # When the cell it would join is a complete data value (`3.91`, `.020`,
+    # `[.00, .021]`, `N/A`) and the line carries letters, it is a row of its own
+    # -- in collabra.90203 Table 8 (p12) the section heading "H2: Interaction:
+    # Identifiability and Explicit Learning" sat in column 1 and was glued onto
+    # the H1b Replication row's `F`, so `3.91` became unreadable and the heading
+    # vanished as a row. Keyed on the slot's class, not on any paper's text.
+    def _prose_onto_value(row: list[str], parent: list[str]) -> bool:
+        for i, c in enumerate(row):
+            v = (c or "").strip()
+            if not v or not re.search(r"[A-Za-z]", v) or i >= len(parent):
+                continue
+            if _DATA_VALUE_CELL_RE.match((parent[i] or "").strip()):
+                return True
+        return False
+
     out: list[list[str]] = []
     for row in rows:
         first = row[0].strip() if row else ""
@@ -627,7 +643,13 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             out.append([(c or "").strip() for c in row])
             continue
 
-        if out and not first and rest_has_content and _looks_prose_like(row[1:]):
+        if (
+            out
+            and not first
+            and rest_has_content
+            and _looks_prose_like(row[1:])
+            and not _prose_onto_value(row, out[-1])
+        ):
             parent = out[-1]
             for i in range(min(len(row), len(parent))):
                 v = (row[i] or "").strip()
