@@ -207,6 +207,13 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
 
     rows: dict[int, list[dict]] = defaultdict(list)
     for c in chars:
+        # A rotated margin glyph is never part of a caption line, but one that
+        # shares the line's y joins its row: on `10.1017/s0007123424000346` p12
+        # the vertical DOI strip at x=5.4 set the left edge of Table 1's caption
+        # box, and the region grid then carried the DOI as an extra first column
+        # (v2.4.145).
+        if not _is_upright(c):
+            continue
         rows[round(c.get("top", 0))].append(c)
 
     # Pass 1+2: prefix-based match (legacy or normalized).
