@@ -2782,8 +2782,8 @@ def _isolated_table_from_caption(
 
     WHY NOT DISCARD THE WALK OUTRIGHT, which the first version did. Measured
     over the 102-paper corpus manifest: 31 of 435 table captions are rotated.
-    With Camelot on, 27 are captured as grids and never reach this function,
-    and the 4 that do carried no value of their table. With Camelot OFF --
+    With Camelot on, 28 are captured as grids and never reach this function,
+    and the 3 that do carried no value of their table. With Camelot OFF --
     ``DOCPLUCK_DISABLE_CAMELOT``, or Camelot failing, which production does
     under memory pressure -- all 31 arrive here, and for most of them the walk
     IS the table's values (10.1177/01461672251327169 Table 7

@@ -207,18 +207,28 @@ def test_with_camelot_off_upright_furniture_alone_is_not_content(monkeypatch):
     assert "Table 2:2" in result["fallback_details"]["rotated_table_upright_lines_dropped"]
 
 
-def test_a_sideways_margin_banner_is_not_a_rotated_tables_content():
+def test_a_sideways_margin_banner_is_not_a_rotated_tables_content(monkeypatch):
     """Found by the second-model review: furniture drawn SIDEWAYS cannot be proven
     upright. 10.1098/rsos.140072 p5 prints Table 1 sideways and its journal banner
     ("rsos.royalsocietypublishing.org R. Soc. open sci. 2: 140072") and a dotted
     rule run up the margin in the same orientation, on every page. That was all the
-    caption-only walk found, so it shipped as the table's `raw_text`."""
+    caption-only walk found, so it shipped as the table's `raw_text`.
+
+    Camelot is switched off to reach the caption-only path: since the 2.4.145
+    table-region fix, Camelot captures this table as a real grid, which this
+    change leaves untouched (asserted below as the other side)."""
     from docpluck.extract_structured import extract_pdf_structured
 
     data = require_corpus_pdf("harvard/ar_royal_society_rsos_140072.pdf").read_bytes()
-    t1 = _tables_by_label(extract_pdf_structured(data))["Table 1"]
+    with monkeypatch.context() as m:
+        m.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+        t1 = _tables_by_label(extract_pdf_structured(data))["Table 1"]
     assert t1["raw_text"] == "", repr(t1["raw_text"])
     assert t1["content_status"] == "not_captured:rotated_table"
+
+    grid = _tables_by_label(extract_pdf_structured(data))["Table 1"]
+    assert grid["cells"] and grid["content_status"] == "cells"
+    assert "breeder male 9 10.0 (9.6–11.2)" in grid["raw_text"]
 
 
 def test_with_camelot_off_a_watermark_goes_and_the_values_stay(monkeypatch):
