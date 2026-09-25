@@ -23,7 +23,6 @@ Request: ``REQUEST_11_FLATTEN_FIELDS_NONCLINICAL_TABLES.md``.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -392,24 +391,7 @@ class TestNoFabrication:
 
 _AR = "articlerepo"
 
-# These end-to-end tests assert EXACT statistics from a live Camelot extraction.
-# Camelot's table extraction is non-deterministic under heavy parallel load
-# (the project's baseline gate runs `-n10`; see test_benchmark_docx_html.py) —
-# the same PDF can yield a degraded cell grid when 10 workers extract at once,
-# making value-exact assertions flake. The flatten LOGIC is fully covered by the
-# synthetic-grid contract tests above (which run under `-n10`); these run
-# serially, where Camelot is deterministic. Skip under an xdist worker so the
-# parallel gate doesn't false-fail; `pytest tests/ -q` (the canonical
-# /docpluck-qa command) runs them for real.
-_skip_under_xdist = pytest.mark.skipif(
-    bool(os.environ.get("PYTEST_XDIST_WORKER")),
-    reason="real-PDF Camelot value-exact extraction is non-deterministic under "
-    "parallel xdist load; runs serially (synthetic-grid tests cover the logic under -n10)",
-)
-
-
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1525__collabra.77859.pdf"),
     reason="closed-access fixture not present in the article repository",
@@ -444,7 +426,6 @@ def test_collabra_77859_table4_separate_eval_real_pdf():
 
 
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1525__collabra.77859.pdf"),
     reason="closed-access fixture not present in the article repository",
@@ -488,7 +469,6 @@ def test_collabra_77859_table2_packed_arms_real_pdf():
 
 
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1525__collabra.90203.pdf"),
     reason="closed-access fixture not present in the article repository",
@@ -515,7 +495,6 @@ def test_collabra_90203_tables_8_9_real_pdf():
 
 
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1371__journal.pmed.1004323.pdf"),
     reason="closed-access fixture not present in the article repository",

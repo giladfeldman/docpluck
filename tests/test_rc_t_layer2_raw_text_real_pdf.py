@@ -41,13 +41,6 @@ from .conftest import pdf_available, pdf_path, requires_pdftotext
 
 from docpluck.testing import require_corpus_pdf
 
-_skip_under_xdist = pytest.mark.skipif(
-    bool(os.environ.get("PYTEST_XDIST_WORKER")),
-    reason="real-PDF Camelot extraction is non-deterministic under parallel "
-    "xdist load; runs serially (isolation/serial run is the real gate)",
-)
-
-
 # ── contract tests: the FP-safe degenerate-prose predicate (deterministic) ────
 
 # All-prose block that STARTS mid-sentence (lowercase multi-letter word) — the
@@ -118,7 +111,6 @@ def chan_md() -> str:
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_t1_note_anchor_trims_trailing_prose(chan_md: str):
     """Table 1: body prose after the ``Note:`` footnote must be trimmed from the
     fallback block (FAIL at HEAD — it was swallowed)."""
@@ -130,7 +122,6 @@ def test_t1_note_anchor_trims_trailing_prose(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_t1_table_content_and_note_retained(chan_md: str):
     """FP guard: the Note-anchor must KEEP the table content + the note itself
     (hypotheses come before the note; trimming starts after it)."""
@@ -140,7 +131,6 @@ def test_t1_table_content_and_note_retained(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_t9_degenerate_block_suppressed_no_duplication(chan_md: str):
     """Table 9: the all-prose fallback (a verbatim duplicate of ## Discussion)
     must be suppressed — the Discussion opener appears exactly once, never inside
@@ -156,7 +146,6 @@ def test_t9_degenerate_block_suppressed_no_duplication(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_t3_legit_fallback_table_survives(chan_md: str):
     """FP guard: Table 3 (a real descriptive table starting with a Capitalized
     label) must keep its fallback block + its Note — never suppressed/over-trimmed."""
@@ -182,7 +171,6 @@ def test_t3_legit_fallback_table_survives(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_t3_first_rows_not_dropped(chan_md: str):
     """TEXT-LOSS guard (real assert since v2.4.119): Table 3's FIRST rows must
     be present. Gold Table 3 is a 2-column comparison (McCullough 1997 vs US

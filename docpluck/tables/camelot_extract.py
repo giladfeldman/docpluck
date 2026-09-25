@@ -14,11 +14,11 @@ silently fall back to the existing pdfplumber path.
 
 from __future__ import annotations
 
+import re
 import tempfile
 from typing import TYPE_CHECKING
 
-import re
-
+from docpluck.resources import call_with_resource_retry
 from docpluck.tables import Cell, Table
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
@@ -27,7 +27,6 @@ from docpluck.tables.column_split import resplit_merged_columns
 from docpluck.tables.render import cells_to_html
 from docpluck.telemetry import record_fallback
 from docpluck.tempfiles import unlink_temp_pdf
-
 
 # Patterns used to detect rows that look like running headers / page footers.
 # These are rows where the joined cell content matches one of:
@@ -928,22 +927,32 @@ def extract_tables_camelot(
             # `strip_text="\n"` collapses cell-internal newlines so multi-line
             # cells render as single lines (per Camelot best practice).
             # Run BOTH stream and lattice; pick the better one per (page, region).
-            stream_tables = list(
-                camelot.read_pdf(tmp_path, pages="all", flavor="stream", strip_text="\n")
+            stream_tables = call_with_resource_retry(
+                lambda: list(
+                    camelot.read_pdf(tmp_path, pages="all", flavor="stream", strip_text="\n")
+                ),
+                what="camelot_stream",
             )
         except Exception as exc:
             record_fallback("camelot_stream_exception", detail=type(exc).__name__)
             stream_tables = []
         try:
-            lattice_tables = list(
-                camelot.read_pdf(
-                    tmp_path,
-                    pages="all",
-                    flavor="lattice",
-                    strip_text="\n",
-                    line_scale=40,
-                    process_background=True,
-                )
+            # The lattice pass rasterises every page and thresholds it with
+            # OpenCV -- the allocation that fails first under memory pressure
+            # (`cv2.error -4`, measured). Without the retry, a busy machine
+            # silently returned the stream reading of every ruled table.
+            lattice_tables = call_with_resource_retry(
+                lambda: list(
+                    camelot.read_pdf(
+                        tmp_path,
+                        pages="all",
+                        flavor="lattice",
+                        strip_text="\n",
+                        line_scale=40,
+                        process_background=True,
+                    )
+                ),
+                what="camelot_lattice",
             )
         except Exception as exc:
             record_fallback("camelot_lattice_exception", detail=type(exc).__name__)
@@ -1096,12 +1105,15 @@ def extract_tables_camelot_by_region(
             batched = [s for s in specs if not s.get("isolate")]
             for spec in isolated:
                 try:
-                    tables = list(
-                        camelot.read_pdf(
-                            tmp_path, pages=str(page), flavor="stream",
-                            table_areas=[spec["area"]], strip_text="\n",
-                            suppress_stdout=True,
-                        )
+                    tables = call_with_resource_retry(
+                        lambda page=page, spec=spec: list(
+                            camelot.read_pdf(
+                                tmp_path, pages=str(page), flavor="stream",
+                                table_areas=[spec["area"]], strip_text="\n",
+                                suppress_stdout=True,
+                            )
+                        ),
+                        what="camelot_region",
                     )
                 except Exception as exc:
                     record_fallback("camelot_region_exception", detail=type(exc).__name__)
@@ -1110,11 +1122,14 @@ def extract_tables_camelot_by_region(
             if batched:
                 areas = [s["area"] for s in batched]
                 try:
-                    tables = list(
-                        camelot.read_pdf(
-                            tmp_path, pages=str(page), flavor="stream",
-                            table_areas=areas, strip_text="\n", suppress_stdout=True,
-                        )
+                    tables = call_with_resource_retry(
+                        lambda page=page, areas=areas: list(
+                            camelot.read_pdf(
+                                tmp_path, pages=str(page), flavor="stream",
+                                table_areas=areas, strip_text="\n", suppress_stdout=True,
+                            )
+                        ),
+                        what="camelot_region",
                     )
                 except Exception as exc:
                     record_fallback("camelot_region_exception", detail=type(exc).__name__)

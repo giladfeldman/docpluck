@@ -31,6 +31,17 @@ import sys
 from collections import Counter
 from contextvars import ContextVar
 
+from docpluck.resources import (
+    RESOURCE_EXHAUSTED,
+    RESOURCE_RETRY,
+    is_resource_exhaustion,
+)
+
+# Events that describe resource exhaustion themselves; never re-derived from
+# the in-flight exception (a retry is recorded INSIDE the handler of the very
+# failure it is retrying, and must not mark the result incomplete if it works).
+_RESOURCE_EVENTS = frozenset({RESOURCE_EXHAUSTED, RESOURCE_RETRY})
+
 # Process-lifetime cumulative totals. Diagnostics and batch summaries read this;
 # per-document results never do (see the module docstring).
 _FALLBACK_COUNTERS: Counter[str] = Counter()
@@ -64,6 +75,18 @@ def record_fallback(event: str, *, detail: str | None = None) -> None:
     if os.environ.get("DOCPLUCK_FALLBACK_LOG", "0") == "1":
         suffix = f" ({detail})" if detail else ""
         print(f"[docpluck:fallback] {event}{suffix}", file=sys.stderr)
+    # WAS THIS DEGRADATION CAUSED BY THE MACHINE? Nearly every call site of this
+    # function sits in an `except` that turns a failure into a smaller result.
+    # When the exception being handled is memory/disk exhaustion, the same bytes
+    # give a different answer on a busier machine -- measured, see
+    # `docpluck/resources.py`. Reading the in-flight exception HERE covers every
+    # catch site in every channel at once, including ones written after this line;
+    # a per-site flag would be fixed at N of N+1 sites, which is this library's
+    # documented failure shape.
+    if event not in _RESOURCE_EVENTS:
+        handling = sys.exc_info()[1]
+        if handling is not None and is_resource_exhaustion(handling):
+            record_fallback(RESOURCE_EXHAUSTED, detail=event)
 
 
 def get_fallback_counters() -> dict[str, int]:

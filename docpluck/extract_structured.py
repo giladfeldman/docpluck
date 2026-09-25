@@ -38,6 +38,7 @@ from .tables.captions import (
 )
 from .tables.render import cells_to_html
 from .tables.whitespace import grid_is_body_prose
+from .resources import INCOMPLETE_METHOD_PIECE, RESOURCE_EXHAUSTED
 from .telemetry import fallback_scope, record_fallback
 
 
@@ -120,6 +121,14 @@ def extract_pdf_structured(
         )
     result["fallbacks"] = dict(fb.counters)
     result["fallback_details"] = fb.details
+    # THE MACHINE RAN OUT, AND IT SHOWS IN `method`. `fallbacks` alone was not
+    # enough: the service drops it from its tables payload, and a consumer that
+    # reads only `method` was handed a smaller table set under a method string
+    # byte-identical to a healthy run's (measured, `docpluck/resources.py`).
+    # Resource retries that SUCCEEDED do not reach here -- their output is the
+    # quiet-machine output -- so this marks exactly the results that differ.
+    if fb.counters.get(RESOURCE_EXHAUSTED):
+        result["method"] = f"{result['method']}+{INCOMPLETE_METHOD_PIECE}"
     return result
 
 

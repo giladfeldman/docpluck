@@ -282,6 +282,103 @@ known downstream consumer imports it (searched for `find_figures` / `figures.det
 (`tests/test_caption_chart_data_trim.py`, all passing unchanged). The `Figure` type now says
 in its docstring that `bbox` is **not computed** and is always `(0.0, 0.0, 0.0, 0.0)`,
 meaning "unknown" — it was always zeros, but nothing said so.
+## [Unreleased] - table extraction 2.4.17
+
+### A machine that runs out of memory no longer changes the tables silently
+
+**What a consumer will see change:**
+
+- **On a healthy machine, nothing.** Same tables, same `method`, same `fallbacks`.
+- **Under memory or disk pressure that passes, the tables are now the normal ones.**
+  `fallbacks` gains `resource_retry` (one per retried call); `method` is unchanged.
+- **Under pressure that does not pass, the result is labelled.** `fallbacks` gains
+  `resource_exhausted` (detail = the step that degraded) and `method` ends in
+  `+incomplete:resource_exhausted`. Before, such a result had fewer or different
+  tables under a `method` byte-identical to a healthy run's.
+- `table_extraction_version` moves **2.4.16 -> 2.4.17**, because the stored `method`
+  string can now differ.
+
+**What happened.** The 2026-09-24 release A/B ran 135 papers through the service at
+three normalization levels. Tables do not depend on the level, yet 7-8 papers gave
+different `tables.json` across the three runs of the same PDF (e.g.
+10.15626/mp.2022.3108: page-10 tables from the region pass in one run, from auto-detect
+in another; 10.1038/s41598-023-50588-1: Table 4 "isolated" vs "structured"). 19 tests
+had been skipped under pytest-xdist for the same reason ("non-deterministic under
+parallel load").
+
+**It was memory, not CPU load, and not threads.** Measured, in order:
+
+- 12 simultaneous processes on 10.15626/mp.2022.3108 gave 12 byte-identical results.
+  CPU contention alone changes nothing.
+- The machine was out of commit ("the paging file is too small"; 3 MB of virtual
+  memory available, later 145 MB free on C:). A per-process memory cap (a Windows Job
+  Object, touching no other process) reproduces the variance on demand:
+  10.1038/s41598-023-50588-1 gives different tables at 700 MB and the normal ones at
+  1000 and 1500 MB; 10.1038/s41598-023-50460-2 loses its lattice tables at 640 and
+  680 MB and is normal at 720 and 760 MB, 2 runs each. In every degraded run `method`
+  was identical to the healthy one.
+- The failing step is Camelot's lattice pass: it rasterises each page and thresholds
+  it with OpenCV, which raises `cv2.error (-4: Insufficient memory)`.
+  `extract_tables_camelot` recorded `camelot_lattice_exception` and carried on with
+  the stream reading of every ruled table. The region-driven pass does the same per
+  page (`camelot_region_exception` -> `continue`), and a full disk does it one step
+  earlier (`OSError [Errno 28]` writing the temp PDF).
+
+**The fix** (`docpluck/resources.py`, new):
+
+- `is_resource_exhaustion(exc)` separates "the machine ran out" from "the document
+  failed", keyed on the error CODES the libraries define (`MemoryError`; `OSError`
+  ENOSPC/ENOMEM/EMFILE/ENFILE; Windows 8/14/112/1450/1455; `cv2.error` with
+  `code == cv2.Error.StsNoMem`), never on message text, and walks the
+  `__cause__`/`__context__` chain.
+- `call_with_resource_retry` wraps all four `camelot.read_pdf` calls: 4 attempts,
+  `gc.collect()` between them, 1/2/4 s backoff. It retries only exhaustion; a
+  document-caused exception propagates on the first attempt.
+- `record_fallback` now checks the exception being handled. If it is exhaustion, it
+  also records `resource_exhausted`. That covers every catch site in every channel at
+  once, including ones not written yet. `extract_pdf_structured` then labels `method`.
+
+**What was verified, two-sided, on 10.1038/s41598-023-50460-2** (5 paired rounds, the
+pre-fix tree at ce7414d and the fixed tree run concurrently in each round; memory capped
+at 640 MB per process and lifted to 2500 MB right after the first Camelot failure, so the
+shortage ends as it does when another process frees memory):
+
+| arm | tables fingerprint | `method` | runs |
+|---|---|---|---|
+| pre-fix, pressure | `61da0d` (lattice tables lost) | unchanged from healthy | 5/5 |
+| fixed, pressure | `f67a82` (the healthy output), `resource_retry: 1` | unchanged | 5/5 |
+| both, no cap | `f67a82` | unchanged | 1/1 each |
+
+Under a cap that is never lifted, the fixed tree gives the same reduced tables as before,
+but now says so: `method` ends `+incomplete:resource_exhausted` and `fallbacks` carries
+`resource_exhausted` (10.1038/s41598-023-50588-1 at 700 MB). New tests:
+`tests/test_resource_exhaustion_is_never_silent.py` (19; the two end-to-end tests inject
+the failure into `camelot.read_pdf` on 10.1371/journal.pmed.1004323).
+
+The 19 `_skip_under_xdist` markers are removed
+(`test_rc_t_degenerate_table_real_pdf.py` x8, `test_rc_t_layer2_raw_text_real_pdf.py`
+x5, `test_tables_flatten_blank_header_recovery.py` x4,
+`test_tables_superheader_alignment_real_pdf.py` x2). Measured with the four files under
+`pytest -n 6`, each run inside one Windows job whose total memory is capped (workers
+inherit it):
+
+| job cap | pre-fix (markers removed) | fixed |
+|---|---|---|
+| 7000 MB (peak use ~4.9 GB, cap never reached) | 60 passed | 60 passed |
+| 3500 MB (below what 6 workers need at once) | 55 passed, 5 **worker crashes** | 53 passed, 7 **worker crashes** |
+
+So the markers were about memory, not parallelism. With enough memory, both trees pass
+in parallel. Under a shortage that never ends, no retry can help: in both trees every
+failure was a worker process crashing (`node down: Not properly terminated`), and none
+was a test getting quietly different tables. A crash turns the run red, so nothing
+wrong passes. What the fix adds is for the shortage that passes, which is the service's
+case: shown above, 5/5 retried to the normal output.
+
+**Not fixed here, and why:** at a 680 MB cap one run of the pre-fix code died with a
+native segmentation fault. A crash inside compiled code cannot be caught from Python,
+so the caller gets an error, not a wrong table. It was not traced to the service: the
+A/B's two failed requests for corpus paper `nature/nat_comms_3` (a timeout and a
+`ConnectionResetError`) look like it but were not reproduced.
 
 ## [2.4.144] - 2026-09-23 - normalization 1.9.68 - table extraction 2.4.16
 

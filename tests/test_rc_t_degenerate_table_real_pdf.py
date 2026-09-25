@@ -27,7 +27,6 @@ repository fixture is absent.
 """
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
@@ -38,19 +37,6 @@ from docpluck.render import render_pdf_to_markdown
 from .conftest import pdf_available, pdf_path, requires_pdftotext
 
 from docpluck.testing import require_corpus_pdf
-
-# Real-PDF Camelot extraction is non-deterministic under parallel xdist load
-# (10 concurrent Ghostscript/temp-dir subprocesses make Camelot intermittently
-# return no tables — the "tables present" FP-guards then false-fail). These
-# tests run for real SERIALLY (`pytest tests/ -q`, the canonical /docpluck-qa
-# command); skip them under an xdist worker so the parallel gate stays green.
-# Same convention as test_tables_flatten_blank_header_recovery.py.
-_skip_under_xdist = pytest.mark.skipif(
-    bool(os.environ.get("PYTEST_XDIST_WORKER")),
-    reason="real-PDF Camelot extraction is non-deterministic under parallel "
-    "xdist load; runs serially (isolation/serial run is the real gate)",
-)
-
 
 def _norm(s: str) -> str:
     """Collapse whitespace — Camelot cells join words with double spaces, the
@@ -94,7 +80,6 @@ def amp_md() -> str:
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_maier_t7_prose_header_not_in_any_table(maier_md: str):
     """maier Table 7: the Discussion line Camelot folded into a <th> must not
     survive inside a <table> (a garbage prose grid at HEAD)."""
@@ -106,7 +91,6 @@ def test_maier_t7_prose_header_not_in_any_table(maier_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_maier_t7_heading_preserved_and_prose_in_body(maier_md: str):
     """Fail-clean, not delete: the `### Table 7` heading survives (table_parity)
     and the stripped prose remains in the body (no TEXT-LOSS, rule 0a)."""
@@ -118,7 +102,6 @@ def test_maier_t7_heading_preserved_and_prose_in_body(maier_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_chan_feldman_t6_prose_not_in_any_table(chan_md: str):
     """chan_feldman Table 6: a Measures-section sentence Camelot clustered into a
     grid must not survive inside a <table>."""
@@ -129,7 +112,6 @@ def test_chan_feldman_t6_prose_not_in_any_table(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_chan_feldman_t6_prose_survives_in_body(chan_md: str):
     assert "associations between the six measures of interest" in _norm(chan_md), (
         "chan_feldman T6 prose vanished entirely (rule 0a TEXT-LOSS)."
@@ -140,7 +122,6 @@ def test_chan_feldman_t6_prose_survives_in_body(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_chan_feldman_t2_correlation_table_survives(chan_md: str):
     """FP guard: the Table 2 correlation matrix (a real table whose <th> carries
     a running-header leak '1232 C. F. CHAN AND G. FELDMAN' — 8 words but fn=1)
@@ -154,7 +135,6 @@ def test_chan_feldman_t2_correlation_table_survives(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_chan_feldman_t5_comparison_table_survives(chan_md: str):
     """FP guard: the Table 5 comparison table (real 4-column data whose cells are
     full descriptive sentences) must survive — prose *in cells* is legitimate for
@@ -170,7 +150,6 @@ def test_chan_feldman_t5_comparison_table_survives(chan_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_ip_feldman_no_discussion_prose_in_tables(ipf_md: str):
     """ip_feldman T10's Discussion prose ('ported and documented below …') was a
     whole-page-bbox region; it must never appear inside a <table>."""
@@ -180,7 +159,6 @@ def test_ip_feldman_no_discussion_prose_in_tables(ipf_md: str):
 
 
 @requires_pdftotext
-@_skip_under_xdist
 def test_amp1_t5_title_leak_table_survives(amp_md: str):
     """FP guard (the title-leak exclusion). amp_1 Table 5 leaks its own caption
     ("Improving Scholarly Impact Assessment Using the CSII: Implications for

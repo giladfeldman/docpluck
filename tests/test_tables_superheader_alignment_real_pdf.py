@@ -31,7 +31,6 @@ deterministic, so the real-PDF tests skip there and run serially (the canonical
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -43,11 +42,6 @@ from docpluck.tables.flatten import _detect_column_groups, flatten_table
 from .conftest import pdf_available, pdf_path, requires_pdftotext
 
 _AR = "articlerepo"
-_skip_under_xdist = pytest.mark.skipif(
-    bool(os.environ.get("PYTEST_XDIST_WORKER")),
-    reason="real-PDF Camelot extraction is non-deterministic under parallel xdist; "
-    "runs serially (the serial run is the real gate)",
-)
 
 
 # ── Contract: _is_header_like_row recognizes APA data-value cells ─────────────
@@ -111,7 +105,6 @@ class TestSuperHeaderBlockAlignment:
 
 
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1525__collabra.90203.pdf"),
     reason="closed-access fixture not present in the article repository",
@@ -148,7 +141,6 @@ def test_collabra_90203_table10_all_six_conditions_real_pdf():
 
 
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1080__23743603.2021.1878340.pdf"),
     reason="closed-access fixture not present in the article repository",

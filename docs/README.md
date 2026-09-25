@@ -122,6 +122,8 @@ Batch runs get it per file in the `<stem>.json` sidecar.
 | `w0h_ambiguous_pairing_refused` / `w0m_…` | a repair was declined; the token is what the paper printed |
 | `camelot_table_*` / `region_grid_*` / `cells_grid_to_html_*` | a table or its rows were dropped by us |
 | `flatten_dropped_*` | a parsed statistic was dropped from the structured sidecar |
+| `resource_exhausted` | the MACHINE ran out of memory or disk and a step degraded because of it — this result is not the one a quiet machine gives for the same file. `method` also ends in `+incomplete:resource_exhausted`. Re-run it; do not archive it as the document's answer. The detail names the step that degraded |
+| `resource_retry` | a step failed for want of memory/disk and was retried. On its own (no `resource_exhausted`) the retry succeeded and the output is the normal one |
 
 Repairs are labelled by the **evidence** they rest on: *typographic* (something the renderer put on
 the page) is acted on; *inferential* (what a number ought to be) is properly your call, and where we
