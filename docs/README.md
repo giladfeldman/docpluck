@@ -157,7 +157,7 @@ Filter on it; do not infer it from `label`.
 |---|---|
 | `matched` | paired with a detected `Table N` caption |
 | `none_found` | no caption, but the table itself is certain — the file declares it (a DOCX `w:tbl`) |
-| `uncaptioned_candidate` | a PDF grid found on a page where no caption matched it. **Kept, not discarded** — it may be a real uncaptioned table, or text laid out in columns (a title block, a running header, the inside of a figure). `label` and `caption` are `None`; the id starts with `u`. Rendered Markdown shows these in a separate "Uncaptioned table candidates (unverified)" section. |
+| `uncaptioned_candidate` | a PDF grid found on a page where no caption matched it. **Kept, not discarded** — it may be a real uncaptioned table, or text laid out in columns (a title block, a running header, the inside of a figure). `label` and `caption` are `None`; the id starts with `u`. Rendered Markdown shows these in a separate "Uncaptioned table candidates (unverified)" section. A grid that is demonstrably a copy of its own page's running text — no cell carries a statistic, and every line is found on that page of `text` — is not kept a second time; each such skip is counted in `fallbacks` as `camelot_candidate_is_page_running_text` (page in `fallback_details`); likewise a page-1 grid without statistics that the body's masthead test would strip (`camelot_candidate_is_page_masthead`). A grid with statistics is always kept, even when `text` repeats it word for word. |
 
 Until 2026-09 such grids were silently discarded. Across the 102-paper test corpus that was about
 400 grids in 83 papers; a sample of those kept is roughly half real statistical tables.
@@ -474,6 +474,14 @@ md = render_flattened_inline(rows, table_id="T1", label="Table 1")
 ```
 
 `flatten_table` handles a single `Table` when you do not want the whole paper.
+
+**Every row carries `caption_status`** — the source table's (see the table above):
+`matched`, `none_found`, or `uncaptioned_candidate`. Rows from an `uncaptioned_candidate`
+table come from a grid no caption claimed. Roughly half of those are real statistical
+tables and half are page furniture (running headers, title blocks, the insides of
+figures), so **if you run statistical checks on these rows, decide explicitly what to do
+with `uncaptioned_candidate`** — they are included so that real statistics are not lost,
+and labelled so that you can filter them.
 Watch `report.fallbacks` for `flatten_dropped_*` keys — they mean a parsed statistic did
 not survive into the sidecar (see [`fallbacks`](#fallbacks--what-the-library-silently-did-instead-read-this)).
 

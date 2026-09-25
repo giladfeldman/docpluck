@@ -622,11 +622,14 @@ def _extract_pdf_structured(
                 tables.append(isolated)
 
     # ---- Uncaptioned Camelot grids: KEPT and LABELLED, never silently dropped ----
-    # A candidate is skipped only when a table already in the output covers the
-    # same region of the same page -- then a copy demonstrably survives and this
-    # is deduplication, recorded as such. Everything else is kept, marked
-    # unverified, and counted.
+    # A candidate is skipped only when a copy demonstrably survives -- a table
+    # already in the output covers the same region of the same page, or the
+    # grid is that page's own running text (`_candidate_is_page_running_text`)
+    # or page 1's masthead by the body's own test (`_candidate_is_page_masthead`).
+    # Either skip is deduplication and is recorded as such. Everything else is
+    # kept, marked unverified, and counted.
     n_uncaptioned = 0
+    page_words: Optional[list[str]] = None
     for ct in uncaptioned_candidates:
         if any(ct is t for t in tables):
             continue
@@ -637,6 +640,16 @@ def _extract_pdf_structured(
             for t in tables
         ):
             record_fallback("camelot_candidate_duplicates_a_kept_table", detail=f"p{page}")
+            continue
+        if page_words is None:
+            page_words = _page_word_strings(raw_text)
+        if _candidate_is_page_running_text(
+            ct, page_words[page - 1] if 1 <= page <= len(page_words) else None
+        ):
+            record_fallback("camelot_candidate_is_page_running_text", detail=f"p{page}")
+            continue
+        if _candidate_is_page_masthead(ct, page):
+            record_fallback("camelot_candidate_is_page_masthead", detail=f"p{page}")
             continue
         n_uncaptioned += 1
         ct["id"] = f"u{n_uncaptioned}"
@@ -1453,6 +1466,149 @@ def _bbox_overlap_fraction(a, b) -> float:
         return 0.0
     smaller = min((ax1 - ax0) * (ay1 - ay0), (bx1 - bx0) * (by1 - by0))
     return (w * h) / smaller if smaller > 0 else 0.0
+
+
+# ---- An uncaptioned "grid" that is the page's own running text ----
+#
+# Camelot's stream flavor will call any region with aligned whitespace a grid,
+# including a two-column page of prose. Kept as an uncaptioned candidate, such
+# a grid re-emits the page's text a second time, OUTSIDE the text channel -- and
+# therefore outside every furniture and metadata filter the body gets. Found by
+# the canary on 10.1177/01461672251327169 p1: candidate u1 was the "Received
+# ...; revision accepted ..." history line (which the body strips as metadata)
+# plus the Introduction's opening sentence (which the body already carries).
+#
+# A candidate is dropped as a duplicate ONLY when a copy demonstrably survives
+# and nothing in it can be data:
+#   1. no cell carries a statistic (`render._carries_statistical_content`, the
+#      shared guard every content-removing step consults -- one definition --
+#      asked with DOIs/URLs blanked, see `_cell_carries_statistic`);
+#   2. EVERY line of every cell is found, as a contiguous word run, in the
+#      text channel's copy of the SAME page; and
+#   3. most of its words sit on lines of >= _RUNNING_TEXT_MIN_WORDS words, so
+#      the match is evidence of running text, not of a few short labels that
+#      would match any page that mentions them.
+# Condition 1 is not optional: pdftotext linearizes REAL tables into the text
+# channel too, so condition 2 alone fires on genuine statistical grids (measured
+# 2026-09-25: the "Outcome / beta (95% CI)" grid on 10.1001/jamanetworkopen.2023.16111
+# p7 is present word for word). Condition 3 keeps short-label grids -- flowchart boxes, a
+# two-word header -- where "the words occur on the page" proves nothing.
+#
+# Unit of comparison: each LINE of each CELL, never a row. Camelot merges a
+# heading from one column with a prose line from the next into one row, and a
+# row read across its cells is a word sequence that exists nowhere on the page.
+# A line ending in a hyphen may match a rejoined word ("indepen-" ->
+# "independent"), and a line's first word may be the tail of one ("ory" ->
+# "theory"), because the text channel rejoins hyphenated line breaks.
+#
+# What the dedupe does NOT decide: whether the surviving text is kept. The text
+# channel's own filters make that call exactly as they do for the body -- so the
+# history line above is stripped as metadata, and the Introduction sentence stays.
+_RUNNING_TEXT_MIN_WORDS = 5
+# A DOI or URL is an identifier, not a quantity -- but `10.1177/01461672251327169`
+# reads to the statistics guard as a number, and on the masthead grid above it
+# vetoed the dedupe of a title block. DOI syntax is fixed ("10." + registrant
+# digits + "/"), so it is blanked BEFORE the shared guard is asked; the guard
+# itself is not changed, and every other character of the cell is still checked.
+_DOI_OR_URL_RE = re.compile(r"(?:https?://|www\.)\S+|\b10\.\d{4,9}/\S+", re.IGNORECASE)
+_RUNNING_TEXT_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _cell_carries_statistic(text: str) -> bool:
+    """`render._carries_statistical_content`, with DOIs and URLs blanked first."""
+    # Lazy import: render imports this module at load time.
+    from .render import _carries_statistical_content
+
+    return _carries_statistical_content(_DOI_OR_URL_RE.sub(" ", text))
+
+
+def _page_word_strings(raw_text: str) -> list[str]:
+    """One space-delimited lowercase word string per page (form-feed split)."""
+    return [
+        " " + " ".join(_RUNNING_TEXT_WORD_RE.findall(page.lower())) + " "
+        for page in raw_text.split("\f")
+    ]
+
+
+def _line_found_in_page(line: str, page_words: str) -> bool:
+    words = _RUNNING_TEXT_WORD_RE.findall(line.lower())
+    if not words:
+        return True  # nothing to lose: punctuation or symbols only
+    body = re.escape(" ".join(words))
+    tail = r"[a-z0-9]*" if line.rstrip().endswith(("-", "\u00ad")) else ""
+    if len(words) >= _RUNNING_TEXT_MIN_WORDS:
+        return re.search(r" [a-z0-9]*" + body + tail + " ", page_words) is not None
+    return re.search(" " + body + tail + " ", page_words) is not None
+
+
+def _candidate_is_page_running_text(table: Table, page_words: Optional[str]) -> bool:
+    """True when an uncaptioned grid is demonstrably a copy of its page's text.
+
+    See the block comment above for the three conditions and why each exists.
+    ``page_words`` is ``None`` when the page cannot be located in the text
+    channel -- then no copy is demonstrated, and the candidate is kept.
+    """
+    if not page_words:
+        return False
+    lines: list[str] = []
+    for c in table.get("cells") or []:
+        text = (c.get("text") or "").strip()
+        if not text:
+            continue
+        if _cell_carries_statistic(text):
+            return False
+        lines.extend(ln for ln in text.split("\n") if ln.strip())
+    if not lines:
+        return False
+    total = long_words = 0
+    for ln in lines:
+        n = len(_RUNNING_TEXT_WORD_RE.findall(ln.lower()))
+        total += n
+        if n >= _RUNNING_TEXT_MIN_WORDS:
+            long_words += n
+        if not _line_found_in_page(ln, page_words):
+            return False
+    return total > 0 and long_words * 2 >= total
+
+
+# ---- An uncaptioned "grid" that is the article's front-matter masthead ----
+#
+# The same page-1 region can come back from Camelot as a different grid from run
+# to run. On 10.1177/01461672251327169 one run gives the prose grid handled
+# above; another gives the title block: journal name, title lines, "1 -19",
+# "(c) 2025 by the Society for Personality", "and Social Psychology, Inc",
+# "Article reuse guidelines", a DOI glued to a URL. Two of its lines are glued
+# across a line break, so no line-by-line match against the page can succeed --
+# yet it is exactly the masthead the body strips by design
+# (`render._strip_frontmatter_masthead_block`).
+#
+# So the candidate is judged by the body's OWN test, not a new one: a PAGE-1
+# grid is the masthead when at least 2 of its lines are masthead hard markers
+# (`render._looks_like_masthead_hard_marker`, the body's threshold too), and no
+# cell carries a statistic. Both gates are needed, and measured: over the census
+# of 341 candidates the marker test fires on >= 2 lines of 15 grids, 14 of them
+# real tables whose age or year ranges ("55-59", "2003-2005") read as page
+# ranges -- all carrying statistics -- and 1 a figure's "(c)" panel labels on
+# page 15. With the page-1 gate and the statistics veto (DOIs blanked) it fires
+# on 1 of the 341, the title block of 10.1177/00031224241253268 p1, plus the
+# title block above -- both mastheads the body strips.
+def _candidate_is_page_masthead(table: Table, page: int) -> bool:
+    if page != 1:
+        return False
+    # Lazy import: render imports this module at load time.
+    from .render import _looks_like_masthead_hard_marker
+
+    markers = 0
+    for c in table.get("cells") or []:
+        text = (c.get("text") or "").strip()
+        if not text:
+            continue
+        if _cell_carries_statistic(text):
+            return False
+        markers += sum(
+            1 for ln in text.split("\n") if ln.strip() and _looks_like_masthead_hard_marker(ln)
+        )
+    return markers >= 2
 
 
 def _find_caption_for_table(

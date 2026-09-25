@@ -43,7 +43,7 @@ from __future__ import annotations
 import re
 from typing import Optional, TypedDict
 
-from . import Cell, Table
+from . import CaptionStatus, Cell, Table
 from .cell_cleaning import (
     _MERGE_SEPARATOR,
     _SUP_OPEN,
@@ -89,6 +89,14 @@ class FlattenedRow(TypedDict):
     raw_cells: list[str]            # Body-row cells (same len as header)
     sentence: str                   # Best-effort flattened English
     fields: dict[str, object]       # Structured parsed values (may be empty)
+    # The source table's `caption_status` (2026-09-24, owner decision "option B").
+    # A row from an "uncaptioned_candidate" table comes from a grid NO caption
+    # claimed -- about half of those are real statistical tables, about half are
+    # furniture (running headers, title blocks, the insides of figures). The
+    # row is KEPT, so real statistics still reach consumers, and LABELLED, so a
+    # consumer running statistical checks can filter. Without this field those
+    # rows were indistinguishable from rows of captioned tables.
+    caption_status: CaptionStatus
 
 
 # ── Grid construction (mirrors cells_grid_to_html cleaning steps) ───────────
@@ -1754,6 +1762,28 @@ def _flatten_packed_arms(
 
 
 def flatten_table(table: Table) -> list[FlattenedRow]:
+    """Flatten one `Table` into `FlattenedRow` records -- see `_flatten_table_rows`.
+
+    A thin wrapper so that EVERY row, from every return path of the flattener
+    (the packed-arms path returns early), carries the table's `caption_status`.
+    Stamping it inside the flattener would have to be repeated at each return;
+    a field set on one path and missed on another is how this project's
+    provenance fields have gone wrong before.
+    """
+    rows = _flatten_table_rows(table)
+    # Same rule as extract_structured's chokepoint: a table that states its
+    # status keeps it; one that does not (a hand-built dict) is "matched" only
+    # if it has a label, and otherwise can only be a candidate -- never
+    # "none_found", which asserts the table itself is certain.
+    status = table.get("caption_status") or (
+        "matched" if table.get("label") else "uncaptioned_candidate"
+    )
+    for r in rows:
+        r["caption_status"] = status
+    return rows
+
+
+def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     """Flatten a structured `Table` into per-row `FlattenedRow` records.
 
     Returns ``[]`` for tables with no usable cells or fewer than 2 rows
