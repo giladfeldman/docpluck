@@ -46,7 +46,9 @@ CaptionStatus = Literal["matched", "none_found", "uncaptioned_candidate"]
 #                             matrix): the table is printed rotated, and nothing
 #                             that followed the caption was drawn as part of it
 #                             -- only upright lines (running header, page
-#                             number, body prose), which are dropped.
+#                             number, body prose), sideways margin banners or
+#                             watermarks recurring on most pages, or the
+#                             caption's own title again; all are dropped.
 #       page_furniture_only   everything after the caption was page-break
 #                             furniture: the next page's running header plus a
 #                             page marker (`_raw_text_is_page_furniture_only`).

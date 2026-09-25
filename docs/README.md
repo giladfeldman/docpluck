@@ -82,8 +82,10 @@ Filter on it before reading `cells` or `raw_text`; an empty table is never just 
 
 Before this field, a rotated table could ship with its page's running header as its content
 (`10.1038/s41467-024-45528-0` Table 4 had `raw_text="Article"`). For a table printed sideways,
-lines drawn upright (running headers, page numbers, prose beside a half-page table) are no longer
-kept in its `raw_text`; the table's own lines always are. Each `not_captured` table is also
+lines drawn upright (running headers, page numbers, prose beside a half-page table), sideways
+margin banners or watermarks that recur on most pages (e.g. PMC's `Author Manuscript`), and a
+repeat of the caption's own title are no longer kept in its `raw_text`; the table's own lines
+always are. Each `not_captured` table is also
 counted in the result's `fallbacks` as `table_content_not_captured`.
 
 **Trust the boxes only on `verified` or `whitespace_native`.** Every way of getting this wrong
