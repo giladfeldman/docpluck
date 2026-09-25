@@ -36,8 +36,9 @@ def pytest_addoption(parser):
     )
     g.addoption(
         "--snapshot-explain", action="store_true", default=False,
-        help="on mismatch, dump the actual extract_pdf() text to tmp/snapshots/ "
-             "so it can be diffed locally (never committed)",
+        help="on mismatch, dump the actual extract_pdf() text to "
+             "<system temp>/docpluck-snapshots/ so it can be diffed locally "
+             "(never inside this repo)",
     )
 
 

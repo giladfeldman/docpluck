@@ -12,14 +12,15 @@ refuses to commit. A hash asserts exactly the same thing in ~1 KB and asserts
 nothing about anyone's copyright.
 
 What a hash cannot do is print a diff. ``pytest --snapshot-explain`` restores
-that: on mismatch it writes the actual text to ``tmp/snapshots/`` (gitignored)
-for local diffing. ``pytest --snapshot-update`` re-pins the checksums after an
+that: on mismatch it writes the actual text to ``<system temp>/docpluck-snapshots/``
+for local diffing -- never inside this repo, gitignored or not. ``pytest --snapshot-update`` re-pins the checksums after an
 intentional extraction change.
 """
 
 import hashlib
 import json
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -283,11 +284,13 @@ def test_extract_pdf_byte_identical(entry, request):
         )
 
     if request.config.getoption("--snapshot-explain"):
-        out_dir = Path(__file__).resolve().parents[1] / "tmp" / "snapshots"
+        # Outside the repo: this is publication text, and the custody rule
+        # forbids it here even in a gitignored directory.
+        out_dir = Path(tempfile.gettempdir()) / "docpluck-snapshots"
         out_dir.mkdir(parents=True, exist_ok=True)
         dump = out_dir / f"{entry['id']}.actual.txt"
         dump.write_text(text, encoding="utf-8")
-        detail.append(f"  actual text written to {dump} (gitignored)")
+        detail.append(f"  actual text written to {dump} (outside the repo)")
         detail.extend(_explain_against_custodian(entry, text, out_dir))
     else:
         detail.append(

@@ -64,7 +64,7 @@ Failure tags emitted (single-letter, easy to grep):
 Usage:
   python scripts/verify_corpus.py
   python scripts/verify_corpus.py --paper 10.1016/j.jesp.2021.104154
-  python scripts/verify_corpus.py --diff                    # dump rendered to tmp/
+  python scripts/verify_corpus.py --diff                    # dump rendered to the system temp dir
   python scripts/verify_corpus.py --baseline-view render-baseline__docpluck@2.5.0
 """
 from __future__ import annotations
@@ -96,6 +96,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import NamedTuple, Optional
@@ -154,6 +155,13 @@ def _af(script: str, *args: str) -> subprocess.CompletedProcess:
         [sys.executable, str(ARTICLE_FINDER / script), *args],
         capture_output=True, text=True,
     )
+
+
+def _diff_dump_dir() -> Path:
+    """Where ``--diff`` writes renders: the system temp dir, never this repo."""
+    d = Path(tempfile.gettempdir()) / "docpluck-verify-corpus"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def _sha256(path: Path) -> str:
@@ -443,7 +451,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--paper", help="run only this paper (canonical key or DOI)")
     ap.add_argument("--diff", action="store_true",
-                    help="dump rendered output to tmp/")
+                    help="dump rendered output to <system temp>/docpluck-verify-corpus/ "
+                         "(never inside this repo: rendered output is publication text)")
     ap.add_argument("--baseline-view", default=DEFAULT_BASELINE_SPEC,
                     help="'<family>__<producer>' (resolved to the newest "
                          "version) or a fully pinned '...@<version>'")
@@ -588,10 +597,11 @@ def main() -> int:
         print(f"{status:9} {key:40} {tag_str:12} {m['total_chars']:>8} {m['section_count']:>5} {m['table_html_count']:>5} {m['longest_fig_caption_chars']:>6} {ratio_str:>6} {jacc_str:>6}  {elapsed:.1f}s")
 
         if args.diff:
-            out_dir = REPO_ROOT / "tmp"
-            out_dir.mkdir(exist_ok=True)
-            (out_dir / f"{key}.rendered.md").write_text(md, encoding="utf-8")
-            print(f"  → dumped to tmp/{key}.rendered.md")
+            # A render IS the publication's text, and no publication text may
+            # live in this repo -- gitignored included (CLAUDE.md custody rule).
+            dump = _diff_dump_dir() / f"{key}.rendered.md"
+            dump.write_text(md, encoding="utf-8")
+            print(f"  → dumped to {dump}")
 
     print()
     print("# Summary")
@@ -629,6 +639,17 @@ def main() -> int:
         print("  The repository holds a different file for this DOI than the "
               "baseline was built from.\n  Re-register the baseline against the "
               "repository's copy, or reconcile the two manifestations.")
+
+    # A --paper run exits 0 only if the paper was actually COMPARED. Measured 2026-09-25:
+    # a PDF_DRIFT paper printed the line above and exited 0 with nothing
+    # rendered, because the final return counts only FAIL and ERROR. A
+    # skipped paper (PDF_DRIFT / NO_PDF / NO_BASE) is not a pass.
+    if args.paper and verified < len(papers):
+        print(f"  {'RESULT':10} NOT COMPARED -- {len(papers) - verified} "
+              f"of {len(papers)} requested paper(s) were skipped, so this "
+              f"run verified nothing about them. Exit 1.",
+              file=sys.stderr)
+        return 1
 
     # "Nothing was verified" is a clean skip ONLY when nothing was ever
     # attempted. If renders crashed or the source PDFs drifted, verified is
