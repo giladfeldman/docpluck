@@ -179,3 +179,29 @@ def test_title_continuation_predicate(line, continues):
     from docpluck.extract_structured import _is_title_continuation
 
     assert _is_title_continuation(line) is continues
+
+
+# ── Constructed inputs: they pin what the CODE does at two bounds raised in review
+# (Sonnet, /consult tier 2, 2026-09-25). Neither shape was observed in the 102-paper
+# manifest; they are not evidence that the shape occurs.
+
+
+def _body_start_of(text: str) -> str:
+    from docpluck import extract_structured as ES
+    from docpluck.tables.captions import find_caption_matches
+
+    cap = next(c for c in find_caption_matches(text, [0]) if c.kind == "table")
+    return text[ES._caption_tail_body_start(text, cap, None):]
+
+
+def test_the_label_step_never_crosses_a_page_break():
+    body = _body_start_of("Intro text.\nTable 2\n\x0cJournal of Things Vol 12\nAuthor Name Here\nx\n")
+    assert body.startswith("\x0cJournal of Things")  # unchanged from before the fix
+
+
+def test_only_one_title_continuation_line_is_skipped():
+    body = _body_start_of(
+        "Intro.\nTable 3\nDemographic characteristics of the sample across all four\n"
+        "study sites\nage group\nyoung\nold\n"
+    )
+    assert body.startswith("age group\n")

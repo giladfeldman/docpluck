@@ -3241,17 +3241,16 @@ def _past_title_continuation(raw_text: str, start: int, limit: int) -> int:
     suppressed the whole table, values included, as body prose. Only lines
     before ``limit`` (the ones the caption walk has already read) are
     candidates, so this never reaches further into the page than the walk.
+
+    ONE line, measured: over the 415 table captions of the 102-paper manifest
+    this fired 9 times; the 6 firings that changed any output each skipped a
+    single line, and the 3 that skipped more changed nothing. A second line is
+    where a lowercase first CELL (``age group``) would be taken for a title tail.
     """
-    pos = start
-    while pos < limit:
-        end = raw_text.find("\n", pos)
-        if end == -1 or end >= limit:
-            break
-        line = raw_text[pos:end].strip()
-        if not _is_title_continuation(line):
-            break
-        pos = end + 1
-    return pos
+    end = raw_text.find("\n", start, limit)
+    if end != -1 and _is_title_continuation(raw_text[start:end].strip()):
+        return end + 1
+    return start
 
 
 def _caption_tail_body_start(
@@ -3294,6 +3293,14 @@ def _caption_tail_body_start(
     nothing else (``_LABEL_ALONE_RE``). Such a line is stepped over whatever
     break follows it (a blank line after a lone label does not end a caption
     that has not started), and the caption's first line is the one after it.
+
+    The step is taken only when the next line carries two or more words and no
+    page break intervenes. Measured over the 102-paper manifest: 138 table
+    captions have a lone label; the line after it is a title, a PMC
+    ``Author Manuscript`` stamp or a running header in every case but one, a
+    cell (``.6***``), which the two-word test keeps in the body. KNOWN LIMIT: a
+    lone label followed directly by a multi-word HEADER row (no title) would
+    move that row into the caption. Observed 0 times in the 138.
     """
     pos = cap.char_end
     cap_tail_end = min(cap.char_end + 800, len(raw_text))
@@ -3312,9 +3319,13 @@ def _caption_tail_body_start(
             # ``cap.char_end`` is the end of the caption LINE, so this first
             # break is the one after the lone label.
             label_line_pending = False
-            following_end = raw_text.find("\n", nxt + step)
+            following_end = raw_text.find("\n", nxt + step, cap_tail_end)
             following = raw_text[nxt + step: following_end if following_end != -1 else cap_tail_end]
-            if len(_TITLE_WORD_RE.findall(following)) >= 2:
+            # Never across a page break: a caption does not continue onto the
+            # next page, whose first line is its running header.
+            if "\x0c" not in raw_text[nxt:nxt + step] + following and (
+                len(_TITLE_WORD_RE.findall(following)) >= 2
+            ):
                 # The label line still spends one line of the wrap budget, so
                 # the walk reaches no further into the page than it did before.
                 lines_walked += 1
