@@ -1,5 +1,9 @@
-"""A right-column caption's region must start at the caption, not at the page's
-left column -- or the wrong grid is delivered under the caption's label.
+"""Two region defects on one real paper, each keyed on what the file states.
+
+1. A right-column caption's region must start at the caption, not at the page's
+   left column -- or the wrong grid is delivered under the caption's label.
+2. A caption box that reaches the rotated download notice printed up the right
+   margin makes a region no table grid survives in.
 
 ``10.1002/pon.2046`` (McLean et al. 2013, Psycho-Oncology 22:28-38), PDF page 8,
 rasterized and read (``pdftoppm -png -r 150 -f 8 -l 8``): Table 4, a 6-row
@@ -73,3 +77,35 @@ def test_the_figure_legend_is_not_delivered_as_table_4():
     assert t4 is not None
     texts = {(c.get("text") or "").strip() for c in t4.get("cells") or []}
     assert not texts & {"EFT PT", "EFT CG", "SC PT", "SC CG"}, texts
+
+
+# Table 3, page 7: a full-width table. Its caption's y-row also holds a glyph
+# of the download notice printed rotated up the right margin, so the caption
+# box, and the region below it, ran to x=584. No region grid survived and
+# Table 3 shipped with no cells (measured at b052205). Caption rows built
+# from upright glyphs only end the box at the column edge, and all six rows come
+# back. Columns: Treatment F, p; Measure at T0 F, p; Patient status F, p; Sex.
+TABLE_3 = {
+    "RDAS total score": ["80.68", "<0.0001", "35.38", "<0.0001", "4.26", "0.04", "ns"],
+    "BDI prorated total score": ["0.55", "0.46", "30.43", "<0.0001", "ns", "ns", "ns"],
+    "BHS prorated total score": ["1.38", "0.24", "38.87", "<0.0001", "ns", "ns", "ns"],
+    "RFCS total score": ["5.84", "0.02", "71.67", "<0.0001", "ns", "ns", "ns"],
+    "CBS1": ["0.02", "0.88", "27.78", "<0.0001", "ns", "ns", "ns"],
+    "CBS2": ["2.88", "0.09", "49.69", "<0.0001", "ns", "ns", "ns"],
+}
+
+
+def test_table_3_has_its_rows():
+    t3 = _tables().get("Table 3")
+    assert t3 is not None and t3.get("page") == 7
+    rows = {r[0]: r[1:8] for r in _rows(t3) if r}
+    for label, values in TABLE_3.items():
+        assert rows.get(label) == values, (label, rows.get(label))
+
+
+def test_table_3_does_not_carry_the_rotated_margin_notice():
+    # The download notice printed up the right margin (upright False) sits
+    # beside the caption line; a region reaching it adds it as a column.
+    t3 = _tables().get("Table 3")
+    assert t3 is not None
+    assert not any("Downloaded from" in (c.get("text") or "") for c in t3.get("cells") or [])
