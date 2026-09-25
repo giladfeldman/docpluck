@@ -18,7 +18,7 @@ import re
 import tempfile
 from typing import TYPE_CHECKING
 
-from docpluck.resources import call_with_resource_retry
+from docpluck.resources import call_with_resource_retry, note_if_exhausted
 from docpluck.tables import Cell, Table
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
@@ -579,7 +579,8 @@ def _camelot_flavor(ct) -> str | None:
     """
     try:
         flavor = getattr(ct, "flavor", None)
-    except Exception:
+    except Exception as exc:
+        note_if_exhausted(exc, where="camelot_flavor")
         return None
     return str(flavor) if flavor else None
 

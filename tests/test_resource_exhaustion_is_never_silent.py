@@ -158,6 +158,64 @@ def test_a_degradation_caused_by_the_document_is_not():
     assert RESOURCE_EXHAUSTED not in fb.counters
 
 
+def test_a_document_failure_raised_WHILE_the_machine_is_out_is_labelled():
+    """The classifier walks ``__context__`` as well as ``__cause__``, so a
+    document-looking exception raised while an exhaustion is being handled is
+    labelled. That is deliberate, not a false positive: the machine DID run out
+    during this extraction, so the result is not the quiet-machine one. Pinned
+    because a Sonnet review (2026-09-25) asked whether the implicit-chain walk
+    could mislabel; the only way it fires is when exhaustion really happened."""
+    with fallback_scope() as fb:
+        try:
+            try:
+                raise MemoryError()
+            except MemoryError:
+                raise ValueError("raised during the handler")  # noqa: B904
+        except ValueError:
+            record_fallback("some_step_exception", detail="ValueError")
+    assert fb.counters.get(RESOURCE_EXHAUSTED) == 1
+
+
+def test_a_site_that_records_outside_its_handler_still_labels():
+    """``cell_geometry`` returns a refusal reason from its handler and the caller
+    records LATER, where ``sys.exc_info()`` is empty -- so the telemetry hook
+    cannot see it. ``note_if_exhausted`` is called inside such handlers (Sonnet
+    review, 2026-09-25)."""
+    from docpluck.resources import note_if_exhausted
+
+    with fallback_scope() as fb:
+        note_if_exhausted(MemoryError(), where="cell_geometry_cell")
+        note_if_exhausted(ValueError(), where="cell_geometry_cell")
+    assert fb.counters.get(RESOURCE_EXHAUSTED) == 1
+    assert fb.details[RESOURCE_EXHAUSTED] == {"cell_geometry_cell": 1}
+
+
+def test_cell_geometry_labels_an_exhausted_cell():
+    """End to end through the real function: a Camelot cell whose coordinates
+    cannot be read for want of memory becomes ZERO_BBOX -- and is now labelled."""
+    from types import SimpleNamespace
+
+    from docpluck.tables.cell_geometry import camelot_cell_bboxes
+
+    class OOMCell:
+        @property
+        def x1(self):
+            raise MemoryError()
+
+    class DF:
+        columns = [0]
+
+        def __len__(self):
+            return 1
+
+    ct = SimpleNamespace(df=DF(), cells=[[OOMCell()]], page=1,
+                         pdf_size=None, rotation="", _bbox=(0, 0, 1, 1))
+    layout = SimpleNamespace(pages=[SimpleNamespace(width=612.0, height=792.0)])
+    with fallback_scope() as fb:
+        camelot_cell_bboxes(ct, layout=layout, page=1)
+    assert fb.details.get(RESOURCE_EXHAUSTED) == {"cell_geometry_cell": 1}, fb.counters
+
+
 # ── end to end: the real extraction path ────────────────────────────────────
 
 
@@ -205,6 +263,25 @@ def test_transient_exhaustion_yields_the_quiet_machine_tables(monkeypatch):
     assert loaded["method"] == quiet["method"]
     assert loaded["fallbacks"].get(RESOURCE_RETRY) == 1
     assert RESOURCE_EXHAUSTED not in loaded["fallbacks"]
+
+
+def test_control_without_the_retry_the_same_fault_changes_the_tables(monkeypatch):
+    """The two-sided half of the test above: with retries switched off, the SAME
+    injected fault must change the output. Without this, the test above could
+    pass because the fault happened not to matter on this paper (Sonnet review,
+    2026-09-25, asked exactly that)."""
+    from docpluck.extract_structured import extract_pdf_structured
+
+    data = _real_pdf()
+    quiet = extract_pdf_structured(data)
+    monkeypatch.setattr(resources, "RETRY_ATTEMPTS", 1)
+    _fake_camelot_that_runs_out(monkeypatch, failures=1)
+    degraded = extract_pdf_structured(data)
+    assert _fingerprint(degraded) != _fingerprint(quiet), (
+        "the injected fault did not change the tables on this paper, so the "
+        "retry test proves nothing here -- pick a paper where it does"
+    )
+    assert degraded["method"].endswith("+" + INCOMPLETE_METHOD_PIECE)
 
 
 def test_persistent_exhaustion_is_labelled_in_method(monkeypatch):

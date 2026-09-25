@@ -114,6 +114,24 @@ def is_resource_exhaustion(exc: BaseException | None) -> bool:
     return False
 
 
+def note_if_exhausted(exc: BaseException, *, where: str) -> None:
+    """Record :data:`RESOURCE_EXHAUSTED` for a catch site that deliberately does
+    NOT call ``record_fallback`` inside its handler (it returns a refusal reason,
+    or substitutes a placeholder, and the caller records later -- outside the
+    handler, where the in-flight exception is already gone).
+
+    Found by a Sonnet review, 2026-09-25: ``cell_geometry`` swallowed a failure
+    per table and per cell, so a MemoryError there changed ``cell_geometry`` and
+    the bboxes with no label. An AST scan of the library the same day found 17
+    broad handlers that neither record nor re-raise; these (and one in
+    ``camelot_extract._camelot_flavor``) were the only ones on the table path.
+    """
+    if is_resource_exhaustion(exc):
+        from docpluck.telemetry import record_fallback
+
+        record_fallback(RESOURCE_EXHAUSTED, detail=where)
+
+
 def call_with_resource_retry(fn: Callable[[], T], *, what: str) -> T:
     """Call ``fn()``; if it fails for want of resources, release what we hold,
     wait, and try again, up to :data:`RETRY_ATTEMPTS` in total.

@@ -95,6 +95,7 @@ import re
 from collections import Counter
 from typing import Any
 
+from ..resources import note_if_exhausted
 from .bbox_utils import Bbox, chars_in_bbox
 
 _WS_RE = re.compile(r"\s+")
@@ -204,6 +205,7 @@ def camelot_cell_bboxes(
         n_rows, n_cols = len(df), len(df.columns)
         cam_cells = ct.cells
     except Exception as exc:  # noqa: BLE001 - a malformed table is a refusal, not a crash
+        note_if_exhausted(exc, where="cell_geometry_table")
         return None, f"camelot_table_exception:{type(exc).__name__}"
     if n_rows < 1 or n_cols < 1:
         return None, "camelot_table_empty"
@@ -230,7 +232,8 @@ def camelot_cell_bboxes(
                 cell = cam_cells[r][c]
                 x1, y1 = float(cell.x1), float(cell.y1)
                 x2, y2 = float(cell.x2), float(cell.y2)
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
+                note_if_exhausted(exc, where="cell_geometry_cell")
                 row.append(ZERO_BBOX)
                 continue
             if x2 <= x1 or y2 <= y1:

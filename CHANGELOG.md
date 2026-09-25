@@ -337,6 +337,12 @@ parallel load").
 - `record_fallback` now checks the exception being handled. If it is exhaustion, it
   also records `resource_exhausted`. That covers every catch site in every channel at
   once, including ones not written yet. `extract_pdf_structured` then labels `method`.
+- `note_if_exhausted` covers the handlers that record LATER, outside the `except`, where
+  the in-flight exception is already gone: `cell_geometry` (per table and per cell) and
+  `_camelot_flavor`. Found by a Sonnet review (tier 2: one provider, so a second model
+  rather than an independent vendor); an AST scan of the library then showed these
+  three were the only silent broad handlers on the table path (17 library-wide; the
+  rest are version probing, batch/CLI wrappers and temp-file cleanup).
 
 **What was verified, two-sided, on 10.1038/s41598-023-50460-2** (5 paired rounds, the
 pre-fix tree at ce7414d and the fixed tree run concurrently in each round; memory capped
@@ -352,7 +358,7 @@ shortage ends as it does when another process frees memory):
 Under a cap that is never lifted, the fixed tree gives the same reduced tables as before,
 but now says so: `method` ends `+incomplete:resource_exhausted` and `fallbacks` carries
 `resource_exhausted` (10.1038/s41598-023-50588-1 at 700 MB). New tests:
-`tests/test_resource_exhaustion_is_never_silent.py` (19; the two end-to-end tests inject
+`tests/test_resource_exhaustion_is_never_silent.py` (23; the three end-to-end tests inject
 the failure into `camelot.read_pdf` on 10.1371/journal.pmed.1004323).
 
 The 19 `_skip_under_xdist` markers are removed
