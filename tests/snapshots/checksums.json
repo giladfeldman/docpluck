@@ -36,9 +36,9 @@
       "method": "pdftotext_default"
     },
     "ieee_figure_heavy": {
-      "sha256": "74c88e035da3f754f65592a5101a2ef54b6cb6365cc3340c507c868a62d9c1df",
+      "sha256": "a6502546f9be8b1c451884ab00ae159724055ac3dbfd95fbb54c45975daa5ece",
       "bytes": 81919,
-      "method": "pdftotext_default"
+      "method": "pdftotext_default+column_corrected:14"
     },
     "ieee_lattice": {
       "sha256": "038e40d41cc0a08790eeb50c0f5556cc59fe6061bb073c6f6b294729959761a8",
@@ -46,9 +46,9 @@
       "method": "pdftotext_default"
     },
     "jama_lattice": {
-      "sha256": "a1d0f7d759339bf1866035f4eb210c9fcf34dcab8f134ca44e4d285f0bef12f9",
-      "bytes": 51112,
-      "method": "pdftotext_default"
+      "sha256": "66fb41f835f4a903e31f5cd0ecd0182ddafdd4308e816ad6f0a22a32d619591e",
+      "bytes": 51090,
+      "method": "pdftotext_default+column_corrected:1"
     },
     "nat_comms_figure_only": {
       "sha256": "efb5c0baf642aaaf834e8a96bfd599dea9015afb91b57186e106c3d6f6772692",
