@@ -204,7 +204,10 @@ def test_the_jama_article_keeps_its_title():
     with open(pdf_path(*_JAMA), "rb") as fh:
         raw, engine = extract_pdf(fh.read())  # TUPLE -- unpack, never measure whole
     assert len(raw) > 10_000, "extraction failed; this test would pass vacuously"
-    assert engine == "pdftotext_default", (
+    # The ENGINE is the part before any "+": a post-pass tag such as
+    # "+column_corrected:1" (this paper's page 1 since the glyph-free column
+    # cut) records what happened to the text afterwards, not which engine read it.
+    assert engine.split("+")[0] == "pdftotext_default", (
         "PIN THE ENGINE, NOT THE FLAG. docpluck never varies the pdftotext flag, "
         "but extract_pdf DOES vary the engine on SMP Unicode input -- the flag is "
         "chosen by a person, the engine is chosen by the PDF."
