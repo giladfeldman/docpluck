@@ -38,6 +38,10 @@ def test_table_typed_dict_fields():
         # discarded under the owner's retain-and-label directive). Set on every
         # table from every path, like `cell_geometry`.
         "caption_status",
+        # 2026-09-25: what the table's CONTENT is -- "cells", "raw_text", or
+        # "not_captured:<reason>" (a real caption kept, its content not
+        # captured: a rotated table, or only page furniture after the caption).
+        "content_status",
     }
     assert set(hints.keys()) == expected
 

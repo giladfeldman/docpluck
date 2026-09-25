@@ -71,6 +71,21 @@ Filter on it; do not infer it from `label`.
 Until 2026-09 such grids were silently discarded. Across the 102-paper test corpus that was about
 400 grids in 83 papers; a sample of those kept is roughly half real statistical tables.
 
+**`content_status` (new, 2026-09)** says what a table's *content* is — separately from its caption.
+Filter on it before reading `cells` or `raw_text`; an empty table is never just empty.
+
+| value | meaning |
+|---|---|
+| `cells` | a grid was captured (`cells` is non-empty) |
+| `raw_text` | no grid; the text after the caption is given as a flat list in `raw_text` |
+| `not_captured:<reason>` | the caption is real and the table is **kept**, but nothing under it is the table's content: `cells` is empty and `raw_text` is `""`. Reasons: `rotated_table` (the table is printed sideways and nothing drawn as part of it followed the caption — docpluck cannot read a rotated table yet), `page_furniture_only` (only a running header/footer followed the caption), `body_prose_overshoot` (only the surrounding section's prose followed it), `no_text_after_caption`. Rendered Markdown says so under the caption. |
+
+Before this field, a rotated table could ship with its page's running header as its content
+(`10.1038/s41467-024-45528-0` Table 4 had `raw_text="Article"`). For a table printed sideways,
+lines drawn upright (running headers, page numbers, prose beside a half-page table) are no longer
+kept in its `raw_text`; the table's own lines always are. Each `not_captured` table is also
+counted in the result's `fallbacks` as `table_content_not_captured`.
+
 **Trust the boxes only on `verified` or `whitespace_native`.** Every way of getting this wrong
 produces coordinates that are plausible and off by a page, which is worse than none. Measured over
 69 shipped tables: 81.2% verified, 91.6% of cells carrying a real box. A verified bbox is the GRID

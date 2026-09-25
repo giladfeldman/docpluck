@@ -116,6 +116,39 @@ def _table_completeness_marker(cells, raw_text: str) -> str:
     return ""
 
 
+# What a reader is told when a table is KEPT under its real caption but its
+# content was not captured (`content_status="not_captured:<reason>"`, see
+# `docpluck.tables`). Owner directive: retain and label, never drop -- so the
+# table keeps its heading and caption, and says plainly that what should be
+# under it is missing and why, instead of looking like a table that was empty.
+_NOT_CAPTURED_NOTES = {
+    "rotated_table": (
+        "this table is printed rotated on the page, and docpluck cannot yet read "
+        "a rotated table. Its values are not in this table record; see the PDF."
+    ),
+    "page_furniture_only": (
+        "only running headers or footers followed the caption, so none of it was "
+        "kept as the table's content."
+    ),
+    "body_prose_overshoot": (
+        "only body text of the surrounding section followed the caption, so none "
+        "of it was kept as the table's content."
+    ),
+    "no_text_after_caption": "no table text was found after the caption.",
+}
+
+
+def _table_not_captured_note(item) -> str:
+    """The reader-facing note for a table whose content was not captured, or ""."""
+    status = str(item.get("content_status") or "")
+    prefix = "not_captured:"
+    if not status.startswith(prefix):
+        return ""
+    reason = status[len(prefix):]
+    detail = _NOT_CAPTURED_NOTES.get(reason, "its content was not captured.")
+    return f"\n> Table content not captured ({reason}): {detail}\n\n"
+
+
 def _pretty_label(label: str) -> str:
     """Return a presentable heading for a canonical section label."""
     s = (label or "").strip()
@@ -6223,6 +6256,9 @@ def _render_sections_to_markdown(
                     if completeness_marker:
                         body_chunks.append(completeness_marker)
                     body_chunks.append(f"*{cap}*\n")
+                    not_captured = _table_not_captured_note(item)
+                    if not_captured:
+                        body_chunks.append(not_captured)
             else:
                 body_chunks.append(f"\n### {label}\n")
                 if cap:
@@ -6288,6 +6324,10 @@ def _render_sections_to_markdown(
                     out_chunks.append("```unstructured-table\n")
                     out_chunks.append(raw_t)
                     out_chunks.append("\n```\n")
+                else:
+                    not_captured = _table_not_captured_note(t)
+                    if not_captured:
+                        out_chunks.append(not_captured)
                 out_chunks.append("\n")
 
     if uncaptioned_candidates:

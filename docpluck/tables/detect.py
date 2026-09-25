@@ -319,6 +319,189 @@ def _match_starts_text_block(row_chars: list[dict], target_norm: str) -> bool:
     return False
 
 
+# A caption's own first characters must open its line: the label plus at most
+# this many leading glyphs (a "*" or a stray bullet), exactly the tolerance
+# ``_bbox_of_caption_line`` pass 3 uses. An inline back-reference ("... see
+# Table 4") sits mid-line and never qualifies.
+_CAPTION_LEAD_TOLERANCE = 4
+
+
+def _line_opens_with(joined_norm: str, needle_norm: str) -> bool:
+    pos = joined_norm.find(needle_norm)
+    return 0 <= pos <= _CAPTION_LEAD_TOLERANCE
+
+
+def caption_orientation(page_obj, cap: CaptionMatch) -> str | None:
+    """How the renderer DREW this caption: ``"upright"``, ``"rotated"``, or
+    ``None`` when the caption line is found in neither orientation.
+
+    TYPOGRAPHIC, not inferential: the evidence is each glyph's text matrix, which
+    pdfplumber exposes per character as ``upright`` (``matrix[1] == matrix[2] ==
+    0``). A table typeset sideways on a portrait page carries its caption
+    sideways with it, and the text channel cannot linearise it: on
+    ``10.1038/s41467-024-45528-0`` p6 (Table 4, drawn with matrix
+    ``(0, s, -s, 0)`` — read bottom-to-top) pdftotext emits the table's cells
+    BEFORE its caption, so the caption-anchored walk finds only the next upright
+    line, the running header ``Article``.
+
+    Upright rows are grouped by ``top`` exactly as ``_bbox_of_caption_line`` does.
+    A rotated line cannot be: its glyphs share an x, not a y. Rotated glyphs are
+    grouped by rotation direction and rounded ``x0`` and ordered along the
+    baseline (descending ``top`` for text read upward, ascending for downward).
+    A line qualifies only when it OPENS with the caption's normalised prefix
+    (the whole first 20 characters, not just the label), so body prose that
+    mentions the table cannot qualify in either orientation.
+
+    ``"rotated"`` requires the caption to be found rotated AND not found upright:
+    when both exist (a rotated back-reference beside an upright caption), the
+    upright one wins, because the upright reading is the one the text channel
+    got right.
+    """
+    chars = getattr(page_obj, "chars", None) or ()
+    if not chars:
+        return None
+    target = (cap.line_text or "").strip()
+    needle = _normalize_for_char_match(target[:20]) if target else ""
+    if not needle:
+        needle = _normalize_for_char_match(cap.label or "")
+    if not needle:
+        return None
+
+    upright_rows: dict[int, list[dict]] = defaultdict(list)
+    rotated_lines: dict[tuple[int, int], list[dict]] = defaultdict(list)
+    for c in chars:
+        if c.get("upright", True):
+            upright_rows[round(c.get("top", 0))].append(c)
+            continue
+        matrix = c.get("matrix") or (0, 0, 0, 0, 0, 0)
+        # matrix[1] > 0: the baseline points up the page (text read upward).
+        direction = 1 if matrix[1] > 0 else -1
+        rotated_lines[(direction, round(c.get("x0", 0)))].append(c)
+
+    for row in upright_rows.values():
+        joined = "".join(c.get("text", "") for c in sorted(row, key=lambda c: c.get("x0", 0)))
+        if _line_opens_with(_normalize_for_char_match(joined), needle):
+            return "upright"
+    for joined_norm in _rotated_line_texts(rotated_lines):
+        if _line_opens_with(joined_norm, needle):
+            return "rotated"
+    return None
+
+
+# A text-channel line shorter than this is only called upright when it is an
+# ENTIRE upright row by itself (a lone page number). A short fragment matched as
+# a row's prefix or suffix could be a table value (".04") that merely also ends
+# some upright line, and dropping a value is the one mistake this must not make.
+_UPRIGHT_PIECE_MIN_CHARS = 4
+
+
+# The top and bottom bands of a page, as a fraction of its height, where a
+# running header or footer is drawn. Only a row inside them may match a line by
+# its start or end; a row in the body must match whole.
+_PAGE_EDGE_BAND = 0.12
+
+
+def upright_row_texts(page_obj) -> list[tuple[str, bool]]:
+    """Every upright row on the page, joined in x order and normalised, with
+    whether it lies in the page's top or bottom edge band."""
+    rows: dict[int, list[dict]] = defaultdict(list)
+    for c in getattr(page_obj, "chars", None) or ():
+        if c.get("upright", True):
+            rows[round(c.get("top", 0))].append(c)
+    height = float(getattr(page_obj, "height", 0.0) or 0.0)
+    out = []
+    for row in rows.values():
+        text = _normalize_for_char_match(
+            "".join(c.get("text", "") for c in sorted(row, key=lambda c: c.get("x0", 0)))
+        )
+        top = min(c.get("top", 0) for c in row)
+        bottom = max(c.get("bottom", 0) for c in row)
+        at_edge = bool(height) and (
+            top < _PAGE_EDGE_BAND * height or bottom > (1 - _PAGE_EDGE_BAND) * height
+        )
+        out.append((text, at_edge))
+    return out
+
+
+def line_is_drawn_upright(line: str, upright_rows: list[tuple[str, bool]]) -> bool:
+    """True only on POSITIVE evidence that a text-channel line was drawn upright:
+    it is a whole upright row anywhere on the page, or (at least
+    ``_UPRIGHT_PIECE_MIN_CHARS`` long) the start or end of an upright row in the
+    page's top or bottom edge band -- pdftotext splits the running-header span
+    ``Article https://doi.org/...`` into two lines.
+
+    The edge restriction is measured, not cautious: without it, the rotated
+    column label ``The Eyewitness`` of 10.1016/j.jesp.2020.103977 Table 4 was
+    dropped because a line of body prose beside the table happens to end with
+    the same two words.
+
+    Deliberately one-sided. A rotated table's own lines are NOT tested for
+    membership in the rotated glyph groups, because that test fails exactly where
+    it matters: a minus sign or a superscript sits on its own baseline, so the
+    line ``-0.55***`` is in no single rotated group (seen on
+    10.1038/s41467-024-45528-0 p6). A line that cannot be shown upright is kept.
+    """
+    n = _normalize_for_char_match(line)
+    if not n:
+        return False
+    for row, at_edge in upright_rows:
+        if n == row:
+            return True
+        if (
+            at_edge
+            and len(n) >= _UPRIGHT_PIECE_MIN_CHARS
+            and (row.startswith(n) or row.endswith(n))
+        ):
+            return True
+    return False
+
+
+def _rotated_line_texts(rotated_lines: dict) -> list[str]:
+    """Each rotated line's glyphs in baseline order, normalised for matching."""
+    out = []
+    for (direction, _x), line in rotated_lines.items():
+        ordered = sorted(line, key=lambda c: c.get("top", 0), reverse=direction > 0)
+        out.append(_normalize_for_char_match("".join(c.get("text", "") for c in ordered)))
+    return out
+
+
+def rotated_caption_end(page_obj, text: str, cap: CaptionMatch) -> int | None:
+    """Where a ROTATED caption stops in the text channel.
+
+    A caption drawn sideways can only continue onto lines drawn sideways too. The
+    text channel does not know that: after ``10.1038/s41467-024-45528-0`` Table 4's
+    rotated caption it emits the upright running header ``Article`` and then the
+    tail of the table's rotated footnote, and the caption walk joined all three.
+    Returns the offset of the first non-blank line after the caption's own line
+    that is NOT found in any rotated line on the page (the upright ``Article``),
+    or ``None`` when the caption is not rotated or nothing bounds it.
+
+    Membership is tested on the normalised text of whole rotated lines, so a
+    wrapped caption continuation -- itself a rotated line -- is kept.
+    """
+    chars = getattr(page_obj, "chars", None) or ()
+    rotated_lines: dict[tuple[int, int], list[dict]] = defaultdict(list)
+    for c in chars:
+        if c.get("upright", True):
+            continue
+        matrix = c.get("matrix") or (0, 0, 0, 0, 0, 0)
+        rotated_lines[(1 if matrix[1] > 0 else -1, round(c.get("x0", 0)))].append(c)
+    if not rotated_lines:
+        return None
+    rotated_texts = _rotated_line_texts(rotated_lines)
+    pos = text.find("\n", cap.char_start)
+    while pos != -1 and pos < len(text):
+        line_start = pos + 1
+        line_end = text.find("\n", line_start)
+        if line_end == -1:
+            line_end = len(text)
+        line_norm = _normalize_for_char_match(text[line_start:line_end])
+        if line_norm and not any(line_norm in t for t in rotated_texts):
+            return line_start
+        pos = line_end if line_end < len(text) else -1
+    return None
+
+
 def _extend(bbox: Bbox, *, dy: float, direction: Literal["down", "up"]) -> Bbox:
     x0, top, x1, bottom = bbox
     if direction == "down":

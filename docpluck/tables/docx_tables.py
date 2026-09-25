@@ -51,7 +51,7 @@ import io
 import re
 from typing import Optional
 
-from . import Cell, Table
+from . import Cell, Table, content_status_for
 from .captions import TABLE_CAPTION_RE
 from .cell_cleaning import (
     decompose_ligatures,
@@ -453,6 +453,7 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
             # The file declares this a table (`w:tbl`), so an absent caption
             # makes it uncaptioned, never uncertain.
             "caption_status": "matched" if label else "none_found",
+            "content_status": content_status_for(cells, "\n".join("\t".join(r) for r in grid.rows)),
         })
 
     return tables, "mammoth"

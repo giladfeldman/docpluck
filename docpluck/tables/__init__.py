@@ -33,6 +33,41 @@ TableRendering = Literal["lattice", "whitespace", "isolated", "markup"]
 #                              in columns. `label` and `caption` are None.
 CaptionStatus = Literal["matched", "none_found", "uncaptioned_candidate"]
 
+# What the table's CONTENT is, as opposed to its caption (2026-09-25). One string,
+# following the `cell_geometry` precedent of "<state>" or "<state>:<reason>":
+#   "cells"                 -- a grid was captured (`cells` is non-empty).
+#   "raw_text"              -- no grid, but the text that follows the caption was
+#                              captured as a flat list (`raw_text`).
+#   "not_captured:<reason>" -- the caption is real and the table is KEPT (owner
+#                              directive: retain and label, never drop), but
+#                              nothing under it is the table's content. `cells`
+#                              is empty and `raw_text` is "". The reasons:
+#       rotated_table         the caption is drawn sideways (a 90-degree text
+#                             matrix): the table is printed rotated, and nothing
+#                             that followed the caption was drawn as part of it
+#                             -- only upright lines (running header, page
+#                             number, body prose), which are dropped.
+#       page_furniture_only   everything after the caption was page-break
+#                             furniture: the next page's running header plus a
+#                             page marker (`_raw_text_is_page_furniture_only`).
+#       body_prose_overshoot  everything after the caption was body prose that
+#                             belongs to the surrounding section.
+#       no_text_after_caption nothing at all followed the caption.
+# Before this field an empty capture and a furniture-only capture were both
+# indistinguishable from a table that had been read: 10.1038/s41467-024-45528-0
+# Table 4 shipped `raw_text="Article"` (the page's running header) as its content.
+CONTENT_NOT_CAPTURED = "not_captured"
+
+
+def content_status_for(cells, raw_text, not_captured_reason: str = "no_text_after_caption") -> str:
+    """The ``content_status`` a table with these cells and raw text carries."""
+    if cells:
+        return "cells"
+    if (raw_text or "").strip():
+        return "raw_text"
+    return f"{CONTENT_NOT_CAPTURED}:{not_captured_reason}"
+
+
 
 class Cell(TypedDict):
     r: int
@@ -90,6 +125,12 @@ class Table(TypedDict):
     # See `CaptionStatus`. Never absent: an unlabelled table with no status
     # would be indistinguishable from a labelling bug.
     caption_status: CaptionStatus
+    # See `content_status_for` above. Never absent: a table with no cells and no
+    # text must say WHY, or it reads as a table that was simply empty.
+    content_status: str
 
 
-__all__ = ["CaptionStatus", "Cell", "Table", "TableKind", "TableRendering"]
+__all__ = [
+    "CONTENT_NOT_CAPTURED", "CaptionStatus", "Cell", "Table", "TableKind",
+    "TableRendering", "content_status_for",
+]

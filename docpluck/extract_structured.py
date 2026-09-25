@@ -26,7 +26,13 @@ from typing import Literal, Optional, TypedDict
 
 from .extract import extract_pdf, count_pages
 from .figures import Figure
-from .tables import Cell, Table
+from .tables import CONTENT_NOT_CAPTURED, Cell, Table, content_status_for
+from .tables.detect import (
+    caption_orientation,
+    line_is_drawn_upright,
+    rotated_caption_end,
+    upright_row_texts,
+)
 from .tables.camelot_extract import (
     CAMELOT_UNAVAILABLE_EVENTS,
     extract_tables_camelot,
@@ -623,10 +629,16 @@ def _extract_pdf_structured(
                     ),
                 )
         else:
+            layout_page = None
+            if layout_doc is not None:
+                pages = getattr(layout_doc, "pages", None) or ()
+                if 1 <= cap.page <= len(pages):
+                    layout_page = pages[cap.page - 1]
             isolated = _isolated_table_from_caption(
                 cap, rejoined, next_boundary_by_id.get(id(cap)),
                 caption_override=sbs_caption,
                 body_override=sbs_body,
+                layout_page=layout_page,
             )
             # A prose-rejected candidate is only actually dropped once something
             # replaces it. If the fallback carries no body text either, the
@@ -640,6 +652,15 @@ def _extract_pdf_structured(
                 )
                 tables.append(stashed)
             else:
+                status = isolated.get("content_status") or ""
+                if status.startswith(CONTENT_NOT_CAPTURED + ":"):
+                    # The table is kept under its real caption; its content was
+                    # not captured, and this is the count that says so. Before
+                    # 2026-09-25 no event named an empty capture at all.
+                    record_fallback(
+                        "table_content_not_captured",
+                        detail=f"{cap.label or '?'}:{status.split(':', 1)[1]}",
+                    )
                 tables.append(isolated)
 
     # ---- Uncaptioned Camelot grids: KEPT and LABELLED, never silently dropped ----
@@ -718,6 +739,9 @@ def _extract_pdf_structured(
         t.setdefault(
             "caption_status", "matched" if t.get("label") else "uncaptioned_candidate"
         )
+        # Every table states what its CONTENT is. The isolated path sets it
+        # with a reason; every grid path has cells by construction.
+        t.setdefault("content_status", content_status_for(t.get("cells"), t.get("raw_text")))
 
     # MAKE THE MIS-MAPPED SYMBOL FONTS VISIBLE. A font whose whole-document
     # repertoire is a handful of Latin letters that are all Symbol-Greek
@@ -2685,6 +2709,7 @@ def _isolated_table_from_caption(
     *,
     caption_override: Optional[str] = None,
     body_override: Optional[str] = None,
+    layout_page=None,
 ) -> Table:
     """Build an isolated (cellless) Table dict for a caption with no Camelot match.
 
@@ -2701,11 +2726,74 @@ def _isolated_table_from_caption(
     (the layout-channel column-bounded rebuild for a side-by-side caption) so an
     isolated table on a 2-column page does not fall back to the gutter-crossing
     text-channel caption/body (which interleaves the two side-by-side tables).
+
+    ``layout_page`` (2026-09-25) lets the record say when what follows the
+    caption is NOT the table, instead of shipping it as the table's content. The
+    test reads what the file states, never the words: the caption's glyphs are
+    drawn ROTATED (``detect.caption_orientation``, the per-character text
+    matrix). The table is then printed sideways, and the linear text channel
+    does not put its cells after its caption -- on ``10.1038/s41467-024-45528-0``
+    p6 it puts them BEFORE, and the walk found the running header ``Article``.
+
+    So for a rotated caption the walk's lines that are POSITIVELY drawn upright
+    (``detect.line_is_drawn_upright``: a running header, a page number, body
+    prose beside a half-page table) are removed, and every other line is kept.
+    If nothing is left the record is kept -- its caption is real -- with
+    ``raw_text=""`` and ``content_status="not_captured:rotated_table"``.
+
+    WHY NOT DISCARD THE WALK OUTRIGHT, which the first version did. Measured
+    over the 102-paper corpus manifest: 31 of 435 table captions are rotated.
+    With Camelot on, 27 are captured as grids and never reach this function,
+    and the 4 that do carried no value of their table. With Camelot OFF --
+    ``DOCPLUCK_DISABLE_CAMELOT``, or Camelot failing, which production does
+    under memory pressure -- all 31 arrive here, and for most of them the walk
+    IS the table's values (10.1177/01461672251327169 Table 7
+    ``0.76 [0.67, 0.86]``; 10.5465/amd.20150115 Table 1's correlations). Discarding the
+    walk deleted them. Removing only lines proven upright deletes nothing that
+    was drawn as part of a rotated table.
+
+    A second, layout-recurrence furniture signal was built and measured in the
+    same run and NOT shipped: it fired on 0 tables that the rotation signal did
+    not already catch, and 40 of the 102 papers have no recurring header it
+    could key on. A rule with no observed independent firing is surface
+    without benefit.
     """
+    rotated = layout_page is not None and caption_orientation(layout_page, cap) == "rotated"
     cap_text = caption_override or _extract_caption_text(raw_text, cap, next_boundary)
-    body_text = body_override if body_override is not None else _extract_table_body_text(
-        raw_text, cap, next_boundary
-    )
+    if rotated and caption_override is None:
+        # A sideways caption continues only onto sideways lines; the text channel
+        # follows it with whatever is upright next (the running header).
+        end = rotated_caption_end(layout_page, raw_text, cap)
+        if end is not None and (next_boundary is None or end < next_boundary):
+            bounded = _extract_caption_text(raw_text, cap, end)
+            # The bound may only SHORTEN a caption, never lengthen it. Cutting the
+            # region early also hides the table's own rotated cells from
+            # `_trim_table_caption_at_cell_region`, which needs them to find where
+            # the cells start: measured on 10.5465/amj.2016.1196 (corpus
+            # `aom/amj_1.pdf`) Table 2 with Camelot off, the bounded walk kept
+            # "... Study 1 .04 .03" where the unbounded one correctly stopped at
+            # "Study 1". So keep whichever is shorter.
+            if len(bounded) < len(cap_text):
+                cap_text = bounded
+    reason: Optional[str] = None
+    if body_override is not None:
+        body_text = body_override
+    else:
+        body_text, reason = _extract_table_body_text_and_reason(raw_text, cap, next_boundary)
+    if rotated:
+        upright_rows = upright_row_texts(layout_page)
+        lines = body_text.split("\n")
+        kept = [ln for ln in lines if not line_is_drawn_upright(ln, upright_rows)]
+        dropped = sum(1 for ln in lines if ln.strip()) - sum(1 for ln in kept if ln.strip())
+        if dropped:
+            # A removal must be countable (DELETE FURNITURE, NEVER DATA).
+            record_fallback(
+                "rotated_table_upright_lines_dropped",
+                detail=f"{cap.label or '?'}:{dropped}",
+            )
+        body_text = "\n".join(kept).strip()
+        if not body_text:
+            reason = "rotated_table"
     return {
         "id": f"t{cap.number}",
         "label": cap.label,
@@ -2729,6 +2817,9 @@ def _isolated_table_from_caption(
         # rather than absent: a consumer must be able to tell "no geometry
         # because no grid" from "a grid whose geometry we refused".
         "cell_geometry": "no_cells",
+        "content_status": content_status_for(
+            [], body_text, reason or "no_text_after_caption"
+        ),
     }
 
 
@@ -3076,6 +3167,15 @@ def _extract_table_body_text(
     cap: CaptionMatch,
     next_boundary: Optional[int] = None,
 ) -> str:
+    """The body text alone; see ``_extract_table_body_text_and_reason``."""
+    return _extract_table_body_text_and_reason(raw_text, cap, next_boundary)[0]
+
+
+def _extract_table_body_text_and_reason(
+    raw_text: str,
+    cap: CaptionMatch,
+    next_boundary: Optional[int] = None,
+) -> tuple[str, Optional[str]]:
     """Pull the text following a Table caption (intended for use when
     Camelot failed to extract cells). Returns the cell content as a flat
     string — column headers, values, group labels, etc., all linearized
@@ -3190,14 +3290,21 @@ def _extract_table_body_text(
     # ``DOCPLUCK_RCT_L2_BYPASS`` reverts both Layer-2 additions (Note-anchor
     # + this guard) to HEAD behavior — used only by the FP-scan harness to
     # diff guard-live vs guard-bypassed over the full corpus.
+    #
+    # Each suppression RETURNS ITS REASON (2026-09-25). Until then all three
+    # empty outcomes -- prose overshoot, page furniture, nothing at all -- left
+    # the caller holding "" and no way to say which, so the table record could
+    # only look empty, never state why (the `content_status` field).
     if not os.environ.get("DOCPLUCK_RCT_L2_BYPASS") and _raw_text_is_degenerate_prose(result):
-        return ""
+        return "", "body_prose_overshoot"
     # v2.4.119: same suppression for a fallback that is ONLY page-break
     # furniture (next-page running header + page ordinal / date), with no
     # table cell content — jama_open_1 Table 2, a caption at a page foot.
     if _raw_text_is_page_furniture_only(result):
-        return ""
-    return result
+        return "", "page_furniture_only"
+    if not result:
+        return "", "no_text_after_caption"
+    return result, None
 
 
 def _figure_from_caption(
