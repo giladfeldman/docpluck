@@ -47,6 +47,7 @@ API
 
 from __future__ import annotations
 
+import math
 from collections import Counter, defaultdict
 from typing import Iterable
 
@@ -112,6 +113,9 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
     if page_width <= 0 or page_height <= 0:
         return ""
 
+    # The detectors below keep reading pdfplumber's own coordinates, exactly as
+    # they always have, so WHICH pages qualify is unchanged; only the cut is
+    # placed in crop space (`_crop_space_words`), translating their midline.
     all_words = list(page.words or ())
     if len(all_words) < _MIN_WORDS_FOR_COLUMN_MODE:
         return ""
@@ -201,11 +205,18 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
     # preserves pdfplumber's spacing semantics (which handle kerned text the
     # word-join approach loses).
     if pdf_bytes is not None:
-        text = _crop_and_extract(pdf_bytes, page_index, midline_x, page_width, page_height)
-        if text:
-            return text
+        ox = (getattr(page, "origin", None) or (0.0, 0.0))[0]
+        # No fall-through to the word-join below when the crop read declines:
+        # `_crop_and_extract` returns "" exactly when the page has no
+        # glyph-free cut or no real second column, and the word-join splits at
+        # the raw midline with neither check — it would re-admit the page the
+        # cut layout just refused.
+        return _crop_and_extract(pdf_bytes, page_index, midline_x - ox,
+                                 page_width, page_height,
+                                 _crop_space_words(page))
 
-    # Fallback: word-join approach (no inter-word spacing fix).
+    # Without the PDF bytes there is nothing to crop: word-join approach (no
+    # inter-word spacing fix).
     left_words = [w for w in all_words if (w["x0"] + w["x1"]) / 2 < midline_x]
     right_words = [w for w in all_words if (w["x0"] + w["x1"]) / 2 >= midline_x]
     left_text = _words_to_column_text(left_words)
@@ -216,85 +227,48 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
 
 
 def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
-                       page_width: float, page_height: float) -> str:
+                       page_width: float, page_height: float,
+                       words: list[dict] | None = None) -> str:
     """Crop each column and run pdftotext to preserve proper word spacing.
 
     pdfplumber's `extract_text()` on tight-kerned PDFs (JAMA Open et al.)
     drops inter-word spaces because the PDF positions characters without
     explicit space chars. pdftotext does its own gap analysis to insert
     spaces correctly. pdftotext supports cropping via `-x -y -W -H` flags:
-    we run it twice per flagged page (once per column) and concatenate.
+    we run it once per region of the page and concatenate.
 
-    Returns empty string on any failure — caller falls back to the
-    pdfplumber word-join path (which at least preserves column separation
-    even when spacing is lost).
+    WHERE the cut goes is decided by `_column_cut_layout`, never by the
+    detector's midline as such (``midline_x`` is only the hint of which gutter
+    to use). pdftotext keeps a glyph in a crop when the glyph's advance box
+    merely TOUCHES the crop, so a cut through a glyph puts that glyph in both
+    columns: the detector's histogram midline sat inside the text on 27 of the
+    38 pages the v2.4.143 corrector rewrote in a 601-paper sample ("125–135" ->
+    "125–13" + "35", 10.1016/j.jesp.2017.05.004 p11). The cut now falls only
+    where no upright glyph of the column body lies, and the rows that cross
+    every such x — a running header, a page number, a "Downloaded from" line —
+    are read full width above or below the columns.
+
+    ``words`` must be in crop space (`_crop_space_words`). Returns "" when the
+    page has no glyph-free cut or a crop failed — caller falls back.
     """
-    try:
-        import subprocess
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            tmp.write(pdf_bytes)
-            tmp_path = tmp.name
-        try:
-            page_arg = str(page_index + 1)  # pdftotext is 1-indexed
-            # Left column: x=0, width=midline_x.
-            left_proc = subprocess.run(
-                [
-                    resolve_pdftotext_executable(), "-enc", "UTF-8",
-                    "-f", page_arg, "-l", page_arg,
-                    "-x", "0", "-y", "0",
-                    "-W", str(int(midline_x)),
-                    "-H", str(int(page_height)),
-                    tmp_path, "-",
-                ],
-                capture_output=True, timeout=30,
-                encoding="utf-8", errors="replace",
-            )
-            if left_proc.returncode != 0:
-                # READ THE DIAGNOSTIC CHANNEL. `capture_output=True` collects
-                # pdftotext's stderr and every one of these paths dropped it,
-                # returning a bare "" that the caller reads as "no column text
-                # here" — identical to a clean no-op (register H3f).
-                record_fallback(
-                    "column_extract_pdftotext_failed",
-                    detail=(left_proc.stderr or "").strip()[:120] or f"rc={left_proc.returncode}",
-                )
-                return ""
-            right_proc = subprocess.run(
-                [
-                    resolve_pdftotext_executable(), "-enc", "UTF-8",
-                    "-f", page_arg, "-l", page_arg,
-                    "-x", str(int(midline_x)), "-y", "0",
-                    "-W", str(int(page_width - midline_x)),
-                    "-H", str(int(page_height)),
-                    tmp_path, "-",
-                ],
-                capture_output=True, timeout=30,
-                encoding="utf-8", errors="replace",
-            )
-            if right_proc.returncode != 0:
-                record_fallback(
-                    "column_extract_pdftotext_failed",
-                    detail=(right_proc.stderr or "").strip()[:120] or f"rc={right_proc.returncode}",
-                )
-                return ""
-            left_text = (left_proc.stdout or "").rstrip("\f").strip()
-            right_text = (right_proc.stdout or "").rstrip("\f").strip()
-            if not left_text or not right_text:
-                record_fallback(
-                    "column_extract_empty_column",
-                    detail=f"left={len(left_text)} right={len(right_text)}",
-                )
-                return ""
-            return left_text + "\n\n" + right_text
-        finally:
-            # One cleanup, one implementation — see `docpluck/tempfiles.py`. The
-            # bare `except: pass` this replaces was SILENT, and silence is what
-            # let 1,535 temp copies of user documents accumulate unnoticed.
-            unlink_temp_pdf(tmp_path)
-    except Exception as exc:
-        record_fallback("column_extract_exception", detail=type(exc).__name__)
+    if words is None:
         return ""
+    shape = _column_cut_layout(words, page_width, hint_x=midline_x)
+    if shape is None:
+        record_fallback("column_extract_no_glyph_free_cut", detail=f"p{page_index + 1}")
+        return ""
+    parts = _read_column_regions(pdf_bytes, page_index, shape, page_width,
+                                 page_height, label="column_extract")
+    if parts is None:
+        return ""
+    top, left, right, bottom, margin = parts
+    if not left or not right:
+        record_fallback(
+            "column_extract_empty_column",
+            detail=f"left={len(left)} right={len(right)}",
+        )
+        return ""
+    return "\n\n".join(p for p in (top, left, right, bottom, margin) if p)
 
 
 import re as _re
@@ -635,7 +609,7 @@ def splice_column_corrected_pages(
                 # + form-feed) so the corrected page's last word can't glue
                 # onto the next page's first word at the splice boundary
                 # (bjps_1 'results'+'https'→'resultshttps'; chen running-header
-                # 'J' gluing to the prior word) and the  page structure is
+                # 'J' gluing to the prior word) and the \f page structure is
                 # preserved for downstream page-aware consumers.
                 trailing = original_page[len(original_page.rstrip()):]
                 out_parts.append(rewritten.rstrip() + trailing)
@@ -1040,8 +1014,8 @@ def _segment_bands(words: list[dict], gx: float) -> list[tuple[bool, float, floa
     return [tuple(b) for b in merged]
 
 
-def _pdftotext_crop(tmp_path: str, page_index: int, x: float, y: float,
-                    w: float, h: float, label: str = "banded") -> str | None:
+def _pdftotext_crop(tmp_path: str, page_index: int, left: float, top: float,
+                    right: float, bottom: float, label: str = "banded") -> str | None:
     """One region's pdftotext crop. ``None`` means the crop DID NOT RUN.
 
     Shared by the banded and the edge-trimmed re-extraction; ``label`` prefixes
@@ -1069,17 +1043,27 @@ def _pdftotext_crop(tmp_path: str, page_index: int, x: float, y: float,
     every other fallback in this module exists to prevent. A failed crop
     is now recorded and abandons the page rather than being averaged into
     it. Gated by ``tests/test_banded_crop_failure_is_not_silent.py``.
+
+    EDGES, not an origin and a size, and in CROP SPACE (`_crop_space_words`).
+    pdftotext takes integers, and ``-x int(x) -W int(w)`` put a shared edge at
+    ``int(x) + int(w)`` on one side and ``int(x)`` on the other — up to a point
+    apart. An interior cut arrives here as an integer (`_column_cut_layout`
+    makes it one), so both crops meeting at it receive the SAME x; an outer edge
+    is widened to the next integer so no glyph at the page border is shaved.
     """
-    if w <= 1 or h <= 1:
-        return ""  # degenerate region, not a failure: nothing to read
+    import math
     import subprocess
 
+    x0, y0 = max(0, math.floor(left)), max(0, math.floor(top))
+    x1, y1 = math.ceil(right), math.ceil(bottom)
+    if x1 - x0 <= 1 or y1 - y0 <= 1:
+        return ""  # degenerate region, not a failure: nothing to read
     pa = str(page_index + 1)  # pdftotext is 1-indexed
     try:
         proc = subprocess.run(
             [resolve_pdftotext_executable(), "-enc", "UTF-8", "-f", pa, "-l", pa,
-             "-x", str(int(x)), "-y", str(int(y)),
-             "-W", str(int(w)), "-H", str(int(h)), tmp_path, "-"],
+             "-x", str(x0), "-y", str(y0),
+             "-W", str(x1 - x0), "-H", str(y1 - y0), tmp_path, "-"],
             capture_output=True, timeout=30, encoding="utf-8", errors="replace",
         )
     except subprocess.TimeoutExpired:
@@ -1089,7 +1073,13 @@ def _pdftotext_crop(tmp_path: str, page_index: int, x: float, y: float,
         record_fallback(f"{label}_crop_exception", detail=type(exc).__name__)
         return None
     if proc.returncode != 0:
-        record_fallback(f"{label}_crop_nonzero_exit", detail=str(proc.returncode))
+        # pdftotext's own complaint, not just its exit code: the whole-page
+        # column read recorded the stderr text before it came through this
+        # helper (register H3f), and an exit code alone does not say why.
+        record_fallback(
+            f"{label}_crop_nonzero_exit",
+            detail=(proc.stderr or "").strip()[:120] or f"rc={proc.returncode}",
+        )
         return None
     return (proc.stdout or "").rstrip("\f").strip()
 
@@ -1112,7 +1102,7 @@ def extract_page_text_banded(layout_doc, page_index: int,
     page_height = float(page.height or 0.0)
     if page_width <= 0 or page_height <= 0:
         return ""
-    words = list(page.words or ())
+    words = _crop_space_words(page)
     if len(words) < _MIN_WORDS_FOR_COLUMN_MODE:
         return ""
     gx = _band_gutter_x(words, page_width)
@@ -1125,16 +1115,18 @@ def extract_page_text_banded(layout_doc, page_index: int,
     # Cut lines: bands are non-overlapping after the merge, so the midpoint of
     # each inter-band gap is a glyph-free scanline. First band starts at the page
     # top, last band runs to the page bottom — every glyph lands in exactly one
-    # crop, the precondition for word-preservation.
+    # crop, the precondition for word-preservation. Each interior cut is an
+    # INTEGER so the two bands meeting at it receive the same pdftotext edge.
     cuts = [0.0]
     for i in range(len(bands) - 1):
-        cuts.append((bands[i][2] + bands[i + 1][1]) / 2.0)
+        cuts.append(float(int((bands[i][2] + bands[i + 1][1]) / 2.0)))
     cuts.append(page_height)
 
     import tempfile
 
-    def _crop(tmp_path: str, x: float, y: float, w: float, h: float) -> str | None:
-        return _pdftotext_crop(tmp_path, page_index, x, y, w, h)
+    def _crop(tmp_path: str, left: float, top: float, right: float,
+              bottom: float) -> str | None:
+        return _pdftotext_crop(tmp_path, page_index, left, top, right, bottom)
 
     tmp_path = ""
     try:
@@ -1147,7 +1139,6 @@ def extract_page_text_banded(layout_doc, page_index: int,
         # reorder's clothes, and the splice can only refuse what it can see.
         for i, (fw, _yt, _yb, bwords) in enumerate(bands):
             top, bot = cuts[i], cuts[i + 1]
-            h = bot - top
             did_2col = False
             if not fw and bwords:
                 left = [w for w in bwords if (w["x0"] + w["x1"]) / 2 < gx]
@@ -1161,15 +1152,15 @@ def extract_page_text_banded(layout_doc, page_index: int,
                 if (len(left) >= 0.25 * len(bwords)
                         and len(right) >= 0.25 * len(bwords)
                         and not straddles):
-                    lt = _crop(tmp_path, 0, top, gx, h)
-                    rt = _crop(tmp_path, gx, top, page_width - gx, h)
+                    lt = _crop(tmp_path, 0, top, gx, bot)
+                    rt = _crop(tmp_path, gx, top, page_width, bot)
                     if lt is None or rt is None:
                         return ""
                     if lt.strip() and rt.strip():
                         parts.append((lt + "\n" + rt).strip())
                         did_2col = True
             if not did_2col:
-                whole = _crop(tmp_path, 0, top, page_width, h)
+                whole = _crop(tmp_path, 0, top, page_width, bot)
                 if whole is None:
                     return ""
                 parts.append(whole)
@@ -1207,30 +1198,97 @@ _EDGE_MIN_BODY_FRACTION = 0.5
 _EDGE_MIN_BODY_ROWS = 15
 _EDGE_MAX_TWO_SIDED_FURNITURE = 1
 
+# How far (as a fraction of page width) either side of a detector's midline the
+# glyph-free cut may be looked for. The word-centre histogram reports the centre
+# of a 5%-of-width bucket run, so the gutter it found can sit most of a bucket
+# away from the value it returns: rsos.180914 p1 returns 195.7 for a sidebar
+# gutter clear from 197 to 210.
+_CUT_SEARCH_FRACTION = 0.08
+# A page reached through a detector midline has already passed that detector's
+# own word-count and column-balance gates, so the body only has to be more than
+# a handful of rows; the reference-page floor above is for pages found by the
+# edge-trimmed path alone.
+_CUT_MIN_BODY_ROWS = 5
+# The smaller side of a cut must hold this share of the body's words (see the
+# balance check in `_column_cut_layout` for the measurement that placed it).
+_CUT_MIN_SIDE_FRACTION = 0.15
+# A row joins an adjacent full-width band only when it sits at most this far
+# from it (points): the leading inside one box, not the gap between blocks.
+_BAND_JOIN_MAX_GAP = 3.0
 
-def _edge_trimmed_layout(words: list[dict], page_width: float
-                         ) -> tuple[float, float, float, tuple[float, float] | None] | None:
-    """``(midline_x, cut_top, cut_bottom, margin)`` for a page whose only
-    gutter-crossing rows are top/bottom furniture, else None. ``cut_bottom`` is
-    -1.0 when nothing sits below the body. ``margin`` is the ``(x_from, x_to)``
-    strip holding rotated margin text clear of every upright glyph, or None.
+
+def _crop_space_words(page) -> list[dict]:
+    """The page's words in the coordinates ``pdftotext -x/-y`` measures in.
+
+    pdfplumber reports geometry in the PDF's user space; pdftotext measures a
+    crop from the MediaBox's top-left corner. They agree when the MediaBox
+    starts at (0, 0) and are off by its origin otherwise — 9pt on the PDF held
+    under 10.1177/0956797611420730, whose ``/MediaBox`` is ``[9 9 594 792]``
+    (pdfplumber's top-down ``bbox``: ``(9, -9, 594, 774)``). Measured
+    2026-09-25 on four papers against ``pdftotext -bbox``: after this shift
+    every matched word's x0 and x1 agree to 0.001pt, so the cut can be placed
+    on pdfplumber geometry exactly. Every column crop reads its words here."""
+    ox, oy = getattr(page, "origin", None) or (0.0, 0.0)
+    words = list(page.words or ())
+    if not ox and not oy:
+        return words
+    return [{**w, "x0": w["x0"] - ox, "x1": w["x1"] - ox,
+             "top": w["top"] - oy, "bottom": w["bottom"] - oy} for w in words]
+
+
+def _column_cut_layout(words: list[dict], page_width: float,
+                       hint_x: float | None = None,
+                       ) -> tuple[int, int, int, tuple[int, int, int, int] | None] | None:
+    """``(cut_x, cut_top, cut_bottom, margin)`` — where to cut a two-column page
+    so that NO glyph lies on a cut — or None when there is no such place.
+
+    THE ONE PLACE every column crop gets its geometry (the whole-page read via
+    ``_crop_and_extract``, the edge-trimmed read). pdftotext keeps a glyph in a
+    crop when the glyph's advance box touches the crop at all (measured
+    2026-09-25: a comma spanning x 193.95-195.82 is in a crop ending at 194 and
+    in one starting at 195, and in neither ending at 193 or starting at 196), so
+    a cut through a glyph duplicates it. Here the vertical cut is an INTEGER x
+    that no body word's box reaches (``int(x0) <= x <= int(x1)`` blocks x, so a
+    glyph ending exactly on the cut is also kept off it); the rows that cross
+    every such x are FURNITURE and are read full width, above or below the
+    columns. ``cut_top`` is 0 when nothing sits above the body, ``cut_bottom``
+    -1 when nothing sits below. A horizontal cut is safe between rows because
+    pdftotext places a glyph in a band by its BASELINE point, not its box
+    (measured the same day: a line whose baseline is at 198.65 is in a band
+    starting at y=198 and not in one starting at 199).
+
+    ``hint_x`` is a detector's midline. With it, the cut is looked for within
+    ``_CUT_SEARCH_FRACTION`` of the page width either side and the gutter
+    nearest the hint wins; without it (a reference page reaching the
+    edge-trimmed read on its own), the widest gutter in the central band wins
+    and must sit within 40-60% of the width.
 
     Geometry is measured on UPRIGHT text only. A rotated margin watermark
     (Collabra's vertical "Downloaded from http://online.ucpress.edu/..." at
     x~571-577) is one pdfplumber "word" per rotated run, each hundreds of
     points tall, so it would stretch the body's vertical extent over the
     footer and veto a clean cut. It is still extracted — the crops are
-    positional — and still counted by the word-preservation guard."""
+    positional — and still counted by the reorder guard. ``margin`` is the
+    ``(x_from, x_to, y_from, y_to)`` box holding it clear of every upright
+    glyph, or None.
+
+    ``words`` must be in crop space (``_crop_space_words``)."""
     rotated = [w for w in words if not w.get("upright", True)]
     words = [w for w in words if w.get("upright", True)]
     if not words:
         return None
-    lo_i, hi_i = int(page_width * 0.35), int(page_width * 0.65)
+    if hint_x is None:
+        lo_i, hi_i = int(page_width * 0.35), int(page_width * 0.65)
+    else:
+        reach = _CUT_SEARCH_FRACTION * page_width
+        lo_i = int(max(page_width * 0.2, hint_x - reach))
+        hi_i = int(min(page_width * 0.8, hint_x + reach))
     rows: dict[int, list[dict]] = defaultdict(list)
     for w in words:
         rows[int(round(w["top"] / _LINE_Y_TOLERANCE))].append(w)
     order = sorted(rows)
-    if len(order) < _EDGE_MIN_BODY_ROWS:
+    min_rows = _EDGE_MIN_BODY_ROWS if hint_x is None else _CUT_MIN_BODY_ROWS
+    if len(order) < min_rows:
         return None
     crossings: dict[int, set] = defaultdict(set)
     for rk, ws in rows.items():
@@ -1245,21 +1303,25 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
     # p18) crosses no single x there, and would otherwise be classed as body
     # and then veto every strip wide enough to be a gutter.
     strip = int(_MIN_GUTTER_STRIP_WIDTH)
-    best: tuple[int, int, int] | None = None  # (body_len, start, end) in `order`
+    # (body_len, -distance to hint, start, end) in `order`: the longest body
+    # wins, and among equals the strip nearest the detector's midline.
+    best: tuple[int, float, int, int] | None = None
     for x in range(lo_i, hi_i - strip + 1):
         cr: set = set()
         for xx in range(x, x + strip + 1):
             cr |= crossings.get(xx, set())
+        near = 0.0 if hint_x is None else -abs(x + strip / 2.0 - hint_x)
         # Longest run of consecutive rows none of which crosses x.
         run_s = 0
         for i in range(len(order) + 1):
             if i == len(order) or order[i] in cr:
-                if best is None or i - run_s > best[0]:
-                    best = (i - run_s, run_s, i)
+                cand = (i - run_s, near, run_s, i)
+                if best is None or cand[:2] > best[:2]:
+                    best = cand
                 run_s = i + 1
     if best is None:
         return None
-    body_len, s_i, e_i = best
+    _, _, s_i, e_i = best
 
     # A body row sharing a baseline with a furniture row belongs to the
     # furniture: the page number "18" right of a centred "Collabra: Psychology"
@@ -1275,8 +1337,34 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
     while e_i > s_i and e_i < len(order) and _span(e_i - 1)[1] >= min(
             _span(i)[0] for i in range(e_i, len(order))):
         e_i -= 1
+
+    # A row that sits against a furniture band and apart from the columns is
+    # part of that band, not the last line of a column: collabra.95 p17 closes
+    # on a boxed "Editor Decision Letter" whose heading fits inside the left
+    # column but whose text line crosses the gutter. The heading is 1.5pt above
+    # its text and 40pt below the references, and read as column text it came
+    # out after the whole right column, parted from the line it heads. A row
+    # joins the band only when its gap to the band is less than half its gap
+    # to the column text AND it sits tight against the band (at most
+    # `_BAND_JOIN_MAX_GAP`, a line's own leading); ordinary leading keeps a
+    # column's last line in the column. The tightness bound stops a cascade:
+    # without it collabra.138638 p11, a letter set in short blocks with wide
+    # gaps between them, was absorbed block by block until no body was left.
+    def _gap(upper: int, lower: int) -> float:
+        return _span(lower)[0] - _span(upper)[1]
+
+    def _joins(g_band: float, g_body: float) -> bool:
+        g_band = max(g_band, 0.0)
+        return g_band <= _BAND_JOIN_MAX_GAP and 2 * g_band < g_body
+
+    while (s_i > 0 and e_i - s_i > 2
+           and _joins(_gap(s_i - 1, s_i), _gap(s_i, s_i + 1))):
+        s_i += 1
+    while (e_i < len(order) and e_i - s_i > 2
+           and _joins(_gap(e_i - 1, e_i), _gap(e_i - 2, e_i - 1))):
+        e_i -= 1
     body_len = e_i - s_i
-    if body_len < _EDGE_MIN_BODY_ROWS or body_len < _EDGE_MIN_BODY_FRACTION * len(order):
+    if body_len < min_rows or body_len < _EDGE_MIN_BODY_FRACTION * len(order):
         return None
     body_keys = set(order[s_i:e_i])
     # The gutter measured on the body alone: every x no body row crosses.
@@ -1292,11 +1380,16 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
             r_lo = x
         prev = x
     runs.append((r_lo, prev))
-    g_lo, g_hi = max(runs, key=lambda r: r[1] - r[0])
-    if g_hi - g_lo < _MIN_GUTTER_STRIP_WIDTH:
+    runs = [r for r in runs if r[1] - r[0] >= _MIN_GUTTER_STRIP_WIDTH]
+    if not runs:
         return None
-    mid = (g_lo + g_hi) / 2.0
-    if not (0.40 * page_width <= mid <= 0.60 * page_width):
+    if hint_x is None:
+        g_lo, g_hi = max(runs, key=lambda r: r[1] - r[0])
+    else:
+        g_lo, g_hi = min(runs, key=lambda r: max(r[0] - hint_x, hint_x - r[1], 0.0))
+    # An INTEGER inside the run: both crops meeting here get this same x.
+    mid = (g_lo + g_hi) // 2
+    if hint_x is None and not (0.40 * page_width <= mid <= 0.60 * page_width):
         return None
     # A furniture band is read FULL WIDTH, so it must not hold column text.
     # A header or footer line may have text on both sides of the gutter
@@ -1305,9 +1398,8 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
     # full-width row — an internal banner or spanning table, not furniture —
     # and a full-width read of them would ship right-column text beside
     # left-column text with every character intact (raised by the Luna
-    # cross-model review, 2026-09-23). FAIL-CLOSED and UNOBSERVED: no page of
-    # the 500-paper sample trips it, and it declined 0 of the 87 corrections
-    # there — it can only turn a reorder into a no-op, never rewrite text.
+    # cross-model review, 2026-09-23). FAIL-CLOSED: it can only turn a reorder
+    # into a no-op, never rewrite text.
     def _two_sided(rk: int) -> bool:
         ws = rows[rk]
         return (any(w["x1"] <= g_lo for w in ws)
@@ -1319,9 +1411,39 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
         return None
     body_words = [w for rk in order[s_i:e_i] for w in rows[rk]]
     left = sum(1 for w in body_words if (w["x0"] + w["x1"]) / 2 < mid)
-    if (left < _MIN_COLUMN_FRACTION * len(body_words)
+    # Column balance is the DETECTOR's call when there is one: it has already
+    # weighed the whole page, and re-judging the body alone by its 25% bar
+    # would second-guess it on a sidebar page — rsos.180914 p1's left sidebar
+    # holds 25% of the page's words but less of the body once its "Downloaded
+    # from" footer rows are set aside as furniture.
+    if hint_x is None and (
+            left < _MIN_COLUMN_FRACTION * len(body_words)
             or len(body_words) - left < _MIN_COLUMN_FRACTION * len(body_words)):
         return None
+    # ...but a cut with next to nothing on one side is not a column gutter at
+    # all, however the detector voted. A detector midline can land beside a
+    # one-column page's single ragged line ("Personality and Social
+    # Psychology | Bulletin, 44(7)" on an eScholarship cover sheet,
+    # 10.1177/0146167218760798 p1) or in the gap between an author photo and
+    # its biography (10.1109/access.2024.3421281 p17, which then spliced the
+    # biography into the reference list). Counted over EVERY word in the body
+    # rows, rotated ones included, so a column that is a rotated table
+    # (10.1038/s41467-024-45528-0 p6) still counts as a column. Measured
+    # 2026-09-25 over the 150 pages this corrector rewrites in the 601-paper
+    # sample: the smaller side held 0.7% and 7.7% of the body's words on the
+    # two pages that are not two-column, and at least 21.5% on every other.
+    if hint_x is not None:
+        top_y = min(w["top"] for w in body_words)
+        bot_y = max(w["bottom"] for w in body_words)
+        ux0 = min(w["x0"] for w in words)
+        ux1 = max(w["x1"] for w in words)
+        region = body_words + [
+            w for w in rotated
+            if top_y <= (w["top"] + w["bottom"]) / 2 <= bot_y
+            and w["x1"] >= ux0 and w["x0"] <= ux1]
+        n_left = sum(1 for w in region if (w["x0"] + w["x1"]) / 2 < mid)
+        if min(n_left, len(region) - n_left) < _CUT_MIN_SIDE_FRACTION * len(region):
+            return None
     body_top = min(w["top"] for w in body_words)
     body_bottom = max(w["bottom"] for w in body_words)
     # The cuts must fall in glyph-free space: halfway to the nearest furniture
@@ -1330,31 +1452,81 @@ def _edge_trimmed_layout(words: list[dict], page_width: float
     below = [w["top"] for rk in order[e_i:] for w in rows[rk]]
     if (above and max(above) >= body_top) or (below and min(below) <= body_bottom):
         return None  # furniture overlaps the body vertically: no clean cut
-    cut_top = (max(above) + body_top) / 2.0 if above else 0.0
-    cut_bot = (body_bottom + min(below)) / 2.0 if below else None
+    cut_top = int((max(above) + body_top) / 2.0) if above else 0
+    cut_bot = int((body_bottom + min(below)) / 2.0) if below else -1
     # Rotated margin text runs the full page height, so a horizontal cut
     # splits it — "by guest on 12 March 2024" came back "Ma" + "arch"
     # (collabra.255 p14, collabra.84916 p12) and the word guard refused the
     # page. When it sits wholly in a margin no upright glyph reaches, it gets a
-    # full-height crop of its own and the other crops stop short of it.
-    margin: tuple[float, float] | None = None
+    # crop of its own and the other crops stop short of it. That crop spans
+    # only the rows the rotated text occupies, not the page height: on
+    # collabra.95 p17 a glyph pdfplumber does not report at all — pdftotext's
+    # "	", 720pt of advance from x=68 at y~767, far below the watermark —
+    # reached into a full-height margin crop as well as the bottom band and
+    # came out twice.
+    margin: tuple[int, int, int, int] | None = None
     if rotated:
         ux0 = min(w["x0"] for w in words)
         ux1 = max(w["x1"] for w in words)
         rx0 = min(w["x0"] for w in rotated)
         rx1 = max(w["x1"] for w in rotated)
+        ry0 = max(0, math.floor(min(w["top"] for w in rotated)) - 1)
+        ry1 = math.ceil(max(w["bottom"] for w in rotated)) + 1
         if rx0 > ux1:
-            margin = ((ux1 + rx0) / 2.0, page_width)
+            margin = (int((ux1 + rx0) / 2.0), math.ceil(page_width), ry0, ry1)
         elif rx1 < ux0:
-            margin = (0.0, (rx1 + ux0) / 2.0)
-    return mid, cut_top, (cut_bot if cut_bot is not None else -1.0), margin
+            margin = (0, int((rx1 + ux0) / 2.0), ry0, ry1)
+    return mid, cut_top, cut_bot, margin
+
+
+def _read_column_regions(pdf_bytes: bytes, page_index: int, shape,
+                         page_width: float, page_height: float, label: str
+                         ) -> tuple[str, str, str, str, str] | None:
+    """Crop a page along a ``_column_cut_layout`` shape: ``(top band, left
+    body, right body, bottom band, margin)``, each already stripped. None when
+    any crop did not run — a page assembled from SOME of its regions is a word
+    loss wearing a reorder's clothes."""
+    import tempfile
+
+    mid, cut_top, cut_bot, margin = shape
+    bottom = page_height if cut_bot < 0 else cut_bot
+    x_lo, x_hi = 0.0, page_width
+    if margin is not None:
+        if margin[0] > mid:
+            x_hi = margin[0]
+        else:
+            x_lo = margin[1]
+    regions = [
+        (x_lo, 0.0, x_hi, cut_top),               # top band
+        (x_lo, cut_top, mid, bottom),             # left body
+        (mid, cut_top, x_hi, bottom),             # right body
+        (x_lo, bottom, x_hi, page_height),        # bottom band
+    ]
+    if margin is not None:                        # margin text
+        regions.append((margin[0], margin[2], margin[1], margin[3]))
+    tmp_path = ""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        parts: list[str] = []
+        for region in regions:
+            got = _pdftotext_crop(tmp_path, page_index, *region, label=label)
+            if got is None:
+                return None
+            parts.append(got)
+    finally:
+        unlink_temp_pdf(tmp_path)
+    if margin is None:
+        parts.append("")
+    return tuple(parts)  # type: ignore[return-value]
 
 
 def extract_page_text_edge_trimmed(layout_doc, page_index: int,
                                    pdf_bytes: bytes | None) -> str:
     """Top furniture band, left body column, right body column, bottom
     furniture band — or "" when the page does not have that shape. Always
-    subject to the splice's word-preservation guard."""
+    subject to the splice's reorder guard."""
     if pdf_bytes is None:
         return ""
     if page_index < 0 or page_index >= len(layout_doc.pages):
@@ -1364,45 +1536,17 @@ def extract_page_text_edge_trimmed(layout_doc, page_index: int,
     page_height = float(page.height or 0.0)
     if page_width <= 0 or page_height <= 0:
         return ""
-    words = list(page.words or ())
+    words = _crop_space_words(page)
     if len(words) < _MIN_WORDS_FOR_COLUMN_MODE:
         return ""
-    shape = _edge_trimmed_layout(words, page_width)
+    shape = _column_cut_layout(words, page_width)
     if shape is None:
         return ""
-    mid, cut_top, cut_bot, margin = shape
-    if cut_bot < 0:
-        cut_bot = page_height
-    x_lo, x_hi = 0.0, page_width
-    if margin is not None:
-        if margin[0] > mid:
-            x_hi = margin[0]
-        else:
-            x_lo = margin[1]
-    import tempfile
-
-    tmp_path = ""
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-            tmp.write(pdf_bytes)
-            tmp_path = tmp.name
-        regions = [
-            (x_lo, 0.0, x_hi - x_lo, cut_top),                     # top band
-            (x_lo, cut_top, mid - x_lo, cut_bot - cut_top),        # left body
-            (mid, cut_top, x_hi - mid, cut_bot - cut_top),         # right body
-            (x_lo, cut_bot, x_hi - x_lo, page_height - cut_bot),   # bottom band
-        ]
-        if margin is not None:                                     # margin text
-            regions.append((margin[0], 0.0, margin[1] - margin[0], page_height))
-        parts: list[str] = []
-        for x, y, w, h in regions:
-            got = _pdftotext_crop(tmp_path, page_index, x, y, w, h,
-                                  label="edge_trimmed")
-            if got is None:
-                return ""  # a crop that did not run abandons the page
-            parts.append(got)
-    finally:
-        unlink_temp_pdf(tmp_path)
-    if not parts[1].strip() or not parts[2].strip():
+    parts = _read_column_regions(pdf_bytes, page_index, shape, page_width,
+                                 page_height, label="edge_trimmed")
+    if parts is None:
         return ""
-    return "\n\n".join(p for p in parts if p.strip())
+    top, left, right, bottom, margin = parts
+    if not left or not right:
+        return ""
+    return "\n\n".join(p for p in (top, left, right, bottom, margin) if p)

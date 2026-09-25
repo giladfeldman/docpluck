@@ -39,6 +39,14 @@ class PageLayout:
     curves: tuple[dict, ...] = ()
     chars: tuple[dict, ...] = ()
     words: tuple[dict, ...] = ()
+    # Top-left corner of the page's MediaBox in the coordinates ``chars`` and
+    # ``words`` are reported in. pdfplumber reports geometry in the PDF's own
+    # user space, so a page whose ``/MediaBox`` is ``[9 9 594 792]`` (pdfplumber
+    # ``bbox`` ``(9, -9, 594, 774)``) puts its left edge at x=9, while
+    # ``pdftotext -x/-y`` measure from the MediaBox corner.
+    # Anything that turns layout geometry into a pdftotext crop must subtract
+    # this first — see ``extract_columns._crop_space_words``.
+    origin: tuple[float, float] = (0.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -136,6 +144,7 @@ def extract_pdf_layout(
                     curves=tuple(p.curves or ()),
                     chars=tuple(chars),
                     words=tuple(p.extract_words() or ()),
+                    origin=(float(p.bbox[0]), float(p.bbox[1])),
                 ))
             else:
                 out_pages.append(PageLayout(
