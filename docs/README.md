@@ -571,11 +571,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.144',            # docpluck itself
+# {'version': '2.4.145',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.68',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.69',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
-#  'table_extraction_version': '2.4.16',
+#  'table_extraction_version': '2.4.17',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs

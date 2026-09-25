@@ -1,5 +1,123 @@
 # Changelog
 
+## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
+
+Three fixes, two of them for defects that were **live in 2.4.144 and earlier
+releases** and changed what a consumer received without anything in the output
+saying so. Both
+normalized text and table output change, so `NORMALIZATION_VERSION` moves
+1.9.68 -> 1.9.69 and `TABLE_EXTRACTION_VERSION` 2.4.16 -> 2.4.17 (one bump for
+the release).
+
+**What a consumer will see change, stated first:**
+
+| surface | 2.4.144 | 2.4.145 |
+|---|---|---|
+| a ruled table directly above another table | could absorb the next table's caption and rows; the arbiter then preferred the merged grid | stops at the next caption line or sibling ruled table |
+| text on a page the column corrector rewrote | could carry a duplicated or split character (see below) | a reorder is refused unless every non-space character of the page survives |
+| two-column reference pages that pdftotext reads right column first | delivered right-then-left | re-read left column then right |
+| `method` for such a paper | e.g. `...column_corrected:19` | may list more pages, e.g. `...column_corrected:19,20` |
+| an undecodable glyph (U+FFFD) in `extract_pdf` | possibly replaced by pdfplumber's text (`+pdfplumber_recovery` / `+pdfplumber_word_patch`) | passed through as U+FFFD; those `method` tokens and the `pdfplumber_recovery_exception` fallback are never produced |
+| Nature-family captions `Fig. 1 \|`, `Table 1 \|` | not recognised: those figures and tables were invisible | recognised |
+| a Camelot grid no caption claims | silently discarded | kept, `caption_status="uncaptioned_candidate"`, id `u<n>`, no label or caption; event `camelot_table_kept_without_caption`; rendered only in a separate `## Uncaptioned table candidates (unverified)` section |
+| every `Table` | — | new field `caption_status` in {`matched`, `none_found`, `uncaptioned_candidate`} |
+| every `FlattenedRow` | — | new field `caption_status` (its table's); candidate rows appear in `flattened_rows` |
+| a candidate grid that is the page's own running text or page-1 masthead | — | not emitted; recorded `camelot_candidate_is_page_running_text` / `camelot_candidate_is_page_masthead` |
+
+### A ruled table swallowed the next table (live in 2.4.144 and earlier)
+
+`_augment_lattice_with_stream_rows` (since 2.4.94) appended every stream row
+below a ruled table's box to that table — including the next table's caption
+and rows, mis-columned. On a consumer's contract fixture this produced a
+"Table 2" holding Table 1's F-test rows plus an F row assembled from two
+tables that the paper never printed, while Table 2's own t-tests vanished. A
+2.4.143 change that made the region candidates correct exposed it through the
+"more cells wins" tie-break, which made it worse; on the same fixture 2.4.141
+already emitted the two invented F rows. Four neighbouring weaknesses were fixed with it: a
+body cross-reference ("presented in Table 4.") taken as the caption line; a
+region widened by rows from a side-note column or a rotated copyright strip; a
+lone page-footer rule admitted into the lattice union; and a "table note" taken
+from the page footer or a figure caption far below.
+
+Each guard was counted over the 102-paper corpus and every firing judged from
+its text: augmentation stop 6/6 correct, caption-must-start-a-block 12/12, lone
+overreaching rule 5/5, distant note 22/22. Two earlier versions of these guards
+were wrong on real pages and were narrowed before release. Recovered tables
+include `10.1136/bmjopen-2022-066361` T4 (empty -> 17x6),
+`10.48550/arxiv.2410.21901` T5/T6 (empty -> 10x4 each),
+`10.1017/jdm.2023.15` T3 (another table's rows -> its regression table) and
+`10.1001/jamanetworkopen.2023.48333` T2 (glyph-interleaved -> 9x5).
+**Still lost:** `10.5465/amj.2016.1196` Table 4 (lost since 2.4.143; no
+detector finds it once its caption is located correctly).
+
+### Column reorders must preserve every character (live defect)
+
+The column corrector (in the library since about 2.4.76) re-reads a page column
+by column when pdftotext interleaves it. It checked that every *word* survived
+the reorder, not every *character* — and the column crop duplicated the glyph
+lying on the cut. Measured 2026-09-25 against a 2.4.141 checkout, over the 37
+papers of a 601-paper sample on which the released corrector rewrites a page:
+**27 of the 38 rewritten pages carried an extra or split character** — an extra
+page-number digit on 16 JESP pages (2017-2025), DOI watermark URLs split on six
+Royal Society Open Science first pages, and single stray letters on three more.
+Every such record carries `column_corrected:` in `method`.
+
+A reorder is now accepted only if the page's multiset of non-space characters is
+identical to pdftotext's. On that sample the 17 JESP pages are now corrected
+exactly, and the 10 others keep pdftotext's order with exact characters (they
+may read column-interleaved, as before the corrector existed). **Consumers
+should re-extract any record whose `method` contains `column_corrected:`.** The
+cut itself is fixed in a later release; this one stops the damage.
+
+### Reference lists read right-column-first
+
+pdftotext serializes some two-column reference pages right column first; the
+existing corrector only saw a page carrying its own References heading. A
+text-only trigger now flags a page whose alphabetical entries read as a rotated
+run ("N..Z" then "G..N"), and the page is re-read left column then right by
+geometry, with centred headers, footers and rotated margin watermarks read as
+their own bands. On a 500-paper random sample the signature fired on 88 pages
+in 57 papers (11%, two journals dominant): 86 corrected, 1 genuine page and 1
+false trigger refused.
+
+### The U+FFFD recovery is retired
+
+Its reading-order guard accepted reversed, shuffled and even unrelated text, its
+whole-text swap erased page boundaries, and its per-word mode could turn a
+partial eta-squared into an R-squared. Across the 102-paper corpus neither mode
+ever fired. `normalize_text`'s S5a/S5b still rewrite U+FFFD in two narrow
+statistical contexts.
+
+### Gates for four failure markers
+
+Four `*_failed` telemetry tokens that nothing asserted now each have a two-sided
+test (the token appears when the failure is forced, and not on a healthy paper).
+Tests only.
+
+### Nature captions, and uncaptioned grids kept and labelled
+
+Four caption patterns rejected the pipe separator, so every Nature-family figure
+and table was invisible (+23 figures, +6 tables on five such papers); all four
+now share one definition. A Camelot grid no caption claims is no longer dropped:
+across 102 papers, 83 gain at least one candidate (369 candidates, 40 removed as
+copies of a kept table). Roughly half of a random sample are real statistical
+tables and half are page furniture — which is why they are labelled
+`uncaptioned_candidate`, kept out of the numbered tables, and rendered in their
+own section marked unverified. Two test fixtures that had been attached to each
+other's papers were corrected against the printed pages.
+
+**Every `FlattenedRow` now carries its table's `caption_status`**, because
+candidate rows also reach `flattened_rows`: a consumer running statistical
+checks on those rows must decide explicitly what to do with
+`uncaptioned_candidate` rows. And a candidate that is demonstrably the page's
+own running text, or page 1's masthead, is no longer emitted: each skip is
+recorded as `camelot_candidate_is_page_running_text` /
+`camelot_candidate_is_page_masthead` with its page, and a grid carrying a
+statistic is never skipped. Over the 70 corpus papers holding a statistic-free
+candidate, 80 of 341 candidates are skipped, all 80 page furniture judged from
+their text, 0 of the 185 carrying a statistic; four real uncaptioned tables
+(one of which pdftotext prints word for word) are kept by test.
+
 ## [2.4.144] - 2026-09-23 - normalization 1.9.68 - table extraction 2.4.16
 
 About two dozen commits from several parallel work streams, released together:
