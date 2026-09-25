@@ -898,12 +898,21 @@ def extract_tables_camelot(
     *,
     accuracy_threshold: float = 50.0,
     layout=None,
+    lattice_pages: list[int] | None = None,
 ) -> list[Table]:
     """Run Camelot stream on each page; return tables as docpluck Table dicts.
 
     Returns ``[]`` if camelot is not installed or fails to run. Tables below
     ``accuracy_threshold`` (Camelot's self-reported accuracy 0–100) are filtered
     out. Tables with fewer than 2 rows or 2 columns are filtered out.
+
+    ``lattice_pages`` (1-indexed) limits the LATTICE pass to those pages; ``None``
+    runs it on every page, which is what this function always did. Stream always
+    reads every page. The limit exists because lattice rasterises each page at
+    300 dpi and is the dominant cost of the whole table stage — measured on the
+    72-page 10.1098/rsos.250979, one lattice page-parse cost ~7.7x one stream
+    page-parse in the same run, and the lattice pass was ~83% of Camelot's time.
+    The CALLER decides the scope and is responsible for saying so.
 
     The returned dicts have ``label=None`` and ``caption=None`` because Camelot
     does not extract these. Callers (typically ``extract_structured``) should
@@ -923,6 +932,13 @@ def extract_tables_camelot(
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
 
+    # How many flavors RAISED. An empty result is a failure only when a parser
+    # raised to produce it: a clean run that finds no table (an image-only PDF
+    # has no text layer for either flavor to read) is a true empty result, and
+    # it used to be labelled `camelot_failed:camelot_all_flavors_failed` exactly
+    # like a broken Camelot. Measured on a one-page image-only PDF: both flavors
+    # returned 0 tables with no exception, and the method string said failed.
+    raised = 0
     try:
         try:
             # `strip_text="\n"` collapses cell-internal newlines so multi-line
@@ -935,35 +951,42 @@ def extract_tables_camelot(
                 what="camelot_stream",
             )
         except Exception as exc:
+            raised += 1
             record_fallback("camelot_stream_exception", detail=type(exc).__name__)
             stream_tables = []
-        try:
-            # The lattice pass rasterises every page and thresholds it with
-            # OpenCV -- the allocation that fails first under memory pressure
-            # (`cv2.error -4`, measured). Without the retry, a busy machine
-            # silently returned the stream reading of every ruled table.
-            lattice_tables = call_with_resource_retry(
-                lambda: list(
-                    camelot.read_pdf(
-                        tmp_path,
-                        pages="all",
-                        flavor="lattice",
-                        strip_text="\n",
-                        line_scale=40,
-                        process_background=True,
-                    )
-                ),
-                what="camelot_lattice",
-            )
-        except Exception as exc:
-            record_fallback("camelot_lattice_exception", detail=type(exc).__name__)
-            lattice_tables = []
-        if not stream_tables and not lattice_tables:
-            # BOTH parsers failed, and this function then returns [] the same way
-            # a table-less paper does. `extract_structured` wraps this call in
-            # `except Exception` -> `camelot_failed:` -- which never fires here,
-            # because nothing propagated. So the total loss of the table channel
-            # reached the method string as silence. It is named now, and
+        lattice_tables = []
+        if lattice_pages is None or lattice_pages:
+            try:
+                # The lattice pass rasterises every page and thresholds it with
+                # OpenCV -- the allocation that fails first under memory pressure
+                # (`cv2.error -4`, measured). Without the retry, a busy machine
+                # silently returned the stream reading of every ruled table.
+                lattice_tables = call_with_resource_retry(
+                    lambda: list(
+                        camelot.read_pdf(
+                            tmp_path,
+                            pages=(
+                                "all" if lattice_pages is None
+                                else ",".join(str(p) for p in sorted(set(lattice_pages)))
+                            ),
+                            flavor="lattice",
+                            strip_text="\n",
+                            line_scale=40,
+                            process_background=True,
+                        )
+                    ),
+                    what="camelot_lattice",
+                )
+            except Exception as exc:
+                raised += 1
+                record_fallback("camelot_lattice_exception", detail=type(exc).__name__)
+                lattice_tables = []
+        if raised and not stream_tables and not lattice_tables:
+            # The parsers produced nothing and at least one of them RAISED, and
+            # this function then returns [] the same way a table-less paper does. `extract_structured` wraps this
+            # call in `except Exception` -> `camelot_failed:` -- which never fires
+            # here, because nothing propagated. So the total loss of the table
+            # channel reached the method string as silence. It is named now, and
             # `CAMELOT_UNAVAILABLE_EVENTS` is the one place that names it.
             record_fallback("camelot_all_flavors_failed")
         tables_obj = _pick_best_per_page(stream_tables, lattice_tables)

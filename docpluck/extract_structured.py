@@ -56,6 +56,15 @@ TABLE_EXTRACTION_VERSION = "2.4.17" # v2.4.17 (2026-09-25, v2.4.145): a ruled ta
 
 TableTextMode = Literal["raw", "placeholder"]
 
+# Documents longer than this get Camelot's LATTICE pass on their table-caption
+# pages only; everything at or below it is scanned exactly as before. A bound on
+# the INPUT, never on the clock: the same PDF always gets the same cut, on any
+# machine under any load, and the cut is announced in `method` and `fallbacks`.
+# Why lattice: it rasterises every page at 300 dpi and was ~83% of Camelot's
+# time on the 72-page 10.1098/rsos.250979, whose /analyze ran past the 200 s
+# upstream abort (see `_lattice_scope`).
+LATTICE_FULL_SCAN_MAX_PAGES = 40
+
 
 class StructuredResult(TypedDict):
     text: str
@@ -327,8 +336,11 @@ def _extract_pdf_structured(
             # second case and the method string said nothing at all. Nested
             # scopes also propagate to the enclosing one, so `fallbacks` still
             # carries these events to the consumer.
+            lattice_pages = _lattice_scope(page_count, captions, method_pieces)
             with fallback_scope() as _camelot_fb:
-                camelot_tables = extract_tables_camelot(pdf_bytes, layout=layout_doc)
+                camelot_tables = extract_tables_camelot(
+                    pdf_bytes, layout=layout_doc, lattice_pages=lattice_pages,
+                )
             if camelot_tables:
                 method_pieces.append("camelot_stream")
             else:
@@ -762,6 +774,38 @@ def _extract_pdf_structured(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _lattice_scope(
+    page_count: int,
+    captions: list[CaptionMatch],
+    method_pieces: list[str],
+) -> Optional[list[int]]:
+    """Pages Camelot's lattice pass should read: ``None`` means every page.
+
+    At or below :data:`LATTICE_FULL_SCAN_MAX_PAGES` nothing changes. Above it,
+    lattice reads only the pages that carry a "Table N" caption, and the cut is
+    ANNOUNCED -- ``lattice_scope:<read>/<total>`` in ``method`` and
+    ``camelot_lattice_limited_to_caption_pages`` in ``fallbacks`` -- because a
+    page that was never scanned for ruled tables must not look like a page that
+    was scanned and had none.
+
+    What the cut can change, stated rather than assumed: lattice output is used
+    only where it beats stream on a page (``_pick_best_per_page``), and a grid on
+    a page with no caption is not paired to any caption. So on an uncaptioned
+    page the grid is whatever STREAM found instead of what lattice found, and the
+    enumeration-derived ``camelot_t<N>`` ids of later tables can shift. Pages with
+    a caption are read exactly as before.
+    """
+    if page_count <= LATTICE_FULL_SCAN_MAX_PAGES:
+        return None
+    pages = sorted({c.page for c in captions if c.kind == "table" and c.page})
+    method_pieces.append(f"lattice_scope:{len(pages)}/{page_count}")
+    record_fallback(
+        "camelot_lattice_limited_to_caption_pages",
+        detail=f"{len(pages)}/{page_count}",
+    )
+    return pages
 
 
 def _page_offsets(raw_text: str) -> list[int]:
