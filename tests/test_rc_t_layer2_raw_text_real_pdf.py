@@ -194,7 +194,8 @@ def test_amc1_t3_bibliography_table_not_truncated_real_pdf():
     line for hundreds of chars. The unguarded per-line walk consumed rows as
     'caption tail' until the 800-char cap (−352 chars vs HEAD). The
     max-wrap-lines cap must put body_start right after the caption's own
-    line, keeping the title line and every leading reference row."""
+    title line (the label stands alone on the line above it), keeping every
+    leading reference row."""
     from docpluck.extract import extract_pdf
     from docpluck.tables.captions import find_caption_matches
     import docpluck.extract_structured as ES
@@ -210,13 +211,22 @@ def test_amc1_t3_bibliography_table_not_truncated_real_pdf():
     later = [s for s in starts if s > t3.char_end]
     nb = later[0] if later else None
     body = ES._extract_table_body_text(raw, t3, nb)
-    # The title line and the first bibliography rows must survive.
-    assert "Academy of Management Collection" in body, (
-        "amc_1 T3 lost its title line (caption-tail walk consumed content)"
+    # The first group header and the first bibliography rows must survive.
+    assert body.startswith("The 1970s: Inception and Development of the CSR Construct"), (
+        "amc_1 T3 lost its first group-header row (caption-tail walk consumed content)"
     )
     assert "Davis, K. 1973" in body, (
         "amc_1 T3 lost its first bibliography row (truncation regression)"
     )
+    # CORRECTED 2026-09-25. This test used to require the TITLE line
+    # ("Academy of Management Collection: CSR (Grouped by Decade)") in the body.
+    # Rasterized, p4 prints that line as the second line of the caption, under
+    # the lone label "TABLE 3" -- it is the caption, not a row. It only reached
+    # the body because the walk treated the bare label as the caption's first
+    # line (see `_caption_tail_body_start`, "A LABEL ALONE ON ITS LINE").
+    caption = ES._extract_caption_text(raw, t3, nb)
+    assert "Academy of Management Collection: CSR (Grouped by Decade)" in caption
+    assert "Academy of Management Collection: CSR" not in body
 
 
 @requires_pdftotext

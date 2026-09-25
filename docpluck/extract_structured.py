@@ -3207,6 +3207,52 @@ def _raw_text_is_page_furniture_only(text: str) -> bool:
 # of chars — the pre-guard per-line walk truncated 352 chars of them).
 _CAPTION_TAIL_MAX_LINES = 4
 
+# A caption line that carries its label and nothing else (``TABLE 2``,
+# ``Table 10.``, ``Table 3:``) -- its title is on the following line(s). The
+# label forms are the ones ``captions.TABLE_CAPTION_RE`` accepts.
+_LABEL_ALONE_RE = re.compile(r"(?:Table|TABLE)\s+\d+\s*[.:|]?")
+# A word of two or more letters. The line after a lone label is taken as the
+# caption's title only when it carries at least two: a PMC author manuscript
+# follows ``Table 2.`` straight with a cell (``.6***``, 10.1177/23780231251314667
+# p37), and that cell must stay the body's first line.
+_TITLE_WORD_RE = re.compile(r"[^\W\d_]{2,}")
+
+
+def _is_title_continuation(line: str) -> bool:
+    """A line that opens mid-sentence: a lowercase word of 2+ letters, followed
+    by at least one more word (a lone ``ns``, or ``df 1``, is a cell, not a wrap)."""
+    words = line.split()
+    return (
+        len(words[0]) >= 2
+        and words[0].isalpha()
+        and words[0].islower()
+        and len(_TITLE_WORD_RE.findall(" ".join(words[1:]))) >= 1
+    ) if words else False
+
+
+def _past_title_continuation(raw_text: str, start: int, limit: int) -> int:
+    """Advance ``start`` past lines that continue the caption's title.
+
+    A line that opens with a lowercase word of two or more letters continues
+    the sentence above it: ``Table 8`` / ``Summary of ... based on logistic`` /
+    ``regression analysis`` (10.15626/mp.2022.3108 p10). Left in the body,
+    that tail became the body's first line, and the degenerate-prose guard --
+    which reads a lowercase first word as "the walk landed mid-paragraph" --
+    suppressed the whole table, values included, as body prose. Only lines
+    before ``limit`` (the ones the caption walk has already read) are
+    candidates, so this never reaches further into the page than the walk.
+    """
+    pos = start
+    while pos < limit:
+        end = raw_text.find("\n", pos)
+        if end == -1 or end >= limit:
+            break
+        line = raw_text[pos:end].strip()
+        if not _is_title_continuation(line):
+            break
+        pos = end + 1
+    return pos
+
 
 def _caption_tail_body_start(
     raw_text: str,
@@ -3233,6 +3279,21 @@ def _caption_tail_body_start(
          physical lines — if neither a terminator nor a blank line appears
          by then, the walk is consuming table content, and the body starts
          right after the caption's own first line (the amc_1 T3 guard).
+
+    A LABEL ALONE ON ITS LINE IS NOT THE CAPTION'S FIRST LINE (2026-09-25).
+    When nothing but the label is printed on the caption line -- ``TABLE 2``
+    over its title (AOM), ``Table 10`` over an italic title (APA) -- rule 3's
+    "first line" was the bare label, so the body started AT the title. A title
+    that pdftotext joins into one line of 80+ characters then reads as body
+    prose to ``_line_is_body_prose``, which stops the body walk on its very
+    first line, and the table came back with no content at all:
+    ``10.5465/annals.2016.0011`` Table 2 (28 journal names) and
+    ``10.15626/mp.2022.3108`` Table 10 (a 3-study findings grid), both
+    ``not_captured:no_text_after_caption`` although pdftotext holds every
+    cell. The test is on the line pdftotext emitted: it holds the label and
+    nothing else (``_LABEL_ALONE_RE``). Such a line is stepped over whatever
+    break follows it (a blank line after a lone label does not end a caption
+    that has not started), and the caption's first line is the one after it.
     """
     pos = cap.char_end
     cap_tail_end = min(cap.char_end + 800, len(raw_text))
@@ -3240,12 +3301,25 @@ def _caption_tail_body_start(
         cap_tail_end = min(cap_tail_end, next_boundary)
     first_line_break: Optional[int] = None
     lines_walked = 0
+    label_line_pending = bool(_LABEL_ALONE_RE.fullmatch(cap.line_text.strip()))
     while pos < cap_tail_end:
         nxt = raw_text.find("\n", pos)
         if nxt == -1 or nxt >= cap_tail_end:
             pos = cap_tail_end
             break
         step = 2 if raw_text[nxt:nxt + 2] == "\n\n" else 1
+        if label_line_pending:
+            # ``cap.char_end`` is the end of the caption LINE, so this first
+            # break is the one after the lone label.
+            label_line_pending = False
+            following_end = raw_text.find("\n", nxt + step)
+            following = raw_text[nxt + step: following_end if following_end != -1 else cap_tail_end]
+            if len(_TITLE_WORD_RE.findall(following)) >= 2:
+                # The label line still spends one line of the wrap budget, so
+                # the walk reaches no further into the page than it did before.
+                lines_walked += 1
+                pos = nxt + step
+                continue
         line_start = raw_text.rfind("\n", 0, nxt) + 1
         line = raw_text[line_start:nxt].rstrip()
         if first_line_break is None:
@@ -3258,7 +3332,9 @@ def _caption_tail_body_start(
             pos = nxt + step  # paragraph break: caption over, unterminated
             break
         if lines_walked >= _CAPTION_TAIL_MAX_LINES:
-            pos = first_line_break  # tail is content, not a caption wrap
+            # Tail is content, not a caption wrap -- except the title's own
+            # wrapped continuation, among the lines already walked.
+            pos = _past_title_continuation(raw_text, first_line_break, nxt + step)
             break
         pos = nxt + step
     return pos
