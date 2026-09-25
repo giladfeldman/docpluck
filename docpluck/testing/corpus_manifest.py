@@ -631,4 +631,9 @@ MANIFEST: dict[str, dict[str, str]] = {
         "held_at": 'fulltext/10.1371__journal.pmed.1004323.pdf',
         "sha256": 'e6b4cea5767d1ec1eccdd8e448e6f9a6cab57ef740ae1f3fac6c59cddf6dbfd5',
     },
+    'vancouver/psychooncology_1.pdf': {
+        "doi": '10.1002/pon.2046',
+        "held_at": 'fulltext/10.1002__pon.2046.pdf',
+        "sha256": '9caf08cc1fe378bd1d3467eacda055036619ef897d00c7623f7c9aff8a82bc51',
+    },
 }

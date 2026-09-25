@@ -239,8 +239,28 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
             x1 = max(c["x1"] for c in row_chars)
             top = min(c["top"] for c in row_chars)
             bottom = max(c["bottom"] for c in row_chars)
-            if _match_starts_text_block(row_chars, target_prefix_norm):
-                return (x0, top, x1, bottom)
+            block = _text_block_start(row_chars, target_prefix_norm)
+            if block is not None:
+                # THE BOX STARTS WHERE THE CAPTION STARTS. When the caption opens
+                # a block after a column-sized gap, every glyph left of that gap
+                # is another block that happens to share the y-row -- on a
+                # two-column page, the left column's body line. Keeping it made
+                # the caption box, and every region built on it, span both
+                # columns: on `10.1002/pon.2046` p8 Table 4's box ran from
+                # x=58 (the left column's "groups differed ...") and the region
+                # became the whole page, so no region grid survived and the lone
+                # Camelot grid on the page -- Figure 2's legend boxes -- was
+                # delivered as Table 4. Only the LEFT edge moves: the right-hand
+                # crop is the one that cost `ip_feldman` Table 10 a column in
+                # 2026-08 (register J14), and a caption at the row's first glyph
+                # (block == 0) is byte-unchanged.
+                own = row_chars[block:]
+                return (
+                    min(c["x0"] for c in own),
+                    min(c["top"] for c in own),
+                    x1,
+                    max(c["bottom"] for c in own),
+                )
             if first_containing is None:
                 first_containing = (x0, top, x1, bottom)
     if first_containing is not None:
@@ -288,13 +308,19 @@ _BLOCK_START_GAP_PT: float = 6.0
 
 def _match_starts_text_block(row_chars: list[dict], target_norm: str) -> bool:
     """True when ``target_norm`` occurs in this x-sorted row starting at its first
-    glyph, or right after a horizontal gap of at least ``_BLOCK_START_GAP_PT``.
+    glyph, or right after a horizontal gap of at least ``_BLOCK_START_GAP_PT``."""
+    return _text_block_start(row_chars, target_norm) is not None
+
+
+def _text_block_start(row_chars: list[dict], target_norm: str) -> int | None:
+    """Index of the glyph where ``target_norm`` starts a text block in this
+    x-sorted row (see ``_match_starts_text_block``), or ``None``.
 
     Matches over the same normalized form ``_bbox_of_caption_line`` uses (spaces
     dropped, ligatures folded, lowercase), keeping a map from each normalized
     character back to the glyph that produced it."""
     if not target_norm:
-        return False
+        return None
     norm_chars: list[str] = []
     owner: list[int] = []
     for i, c in enumerate(row_chars):
@@ -311,12 +337,12 @@ def _match_starts_text_block(row_chars: list[dict], target_norm: str) -> bool:
         while prev >= 0 and not (row_chars[prev].get("text") or "").strip():
             prev -= 1
         if prev < 0:
-            return True
+            return gi
         gap = float(row_chars[gi].get("x0", 0.0)) - float(row_chars[prev].get("x1", 0.0))
         if gap >= _BLOCK_START_GAP_PT:
-            return True
+            return gi
         start = norm.find(target_norm, start + 1)
-    return False
+    return None
 
 
 # A caption's own first characters must open its line: the label plus at most

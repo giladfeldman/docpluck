@@ -43,6 +43,34 @@ def test_caption_after_a_column_gutter_counts_as_a_block_start():
     assert detect._match_starts_text_block(row, "table2.")
 
 
+def test_right_column_caption_box_starts_at_the_caption_not_the_row():
+    # 10.1002/pon.2046 p8: the left column's "groups differed on any of the
+    # outcome variables at" (x=58..285) shares a y-row with "Table 4. Results
+    # ..." (x=306, after an 18pt gutter). The box -- and every region built on
+    # it -- must start at the caption, not at the left column's first glyph.
+    left = _glyphs("groups differed on any of the outcome", 58.0, 75.0)
+    right = _glyphs("Table 4. Results of three-way analyses", 306.0, 75.0)
+    page = SimpleNamespace(chars=left + right, width=595.3)
+    cap = SimpleNamespace(line_text="Table 4. Results of three-way analyses of",
+                          label="Table 4")
+    x0, top, x1, _ = detect._bbox_of_caption_line(page, cap)
+    assert (round(x0), round(top)) == (306, 75)
+    assert x1 == max(g["x1"] for g in right)
+
+
+def test_caption_at_the_rows_first_glyph_keeps_the_whole_row():
+    # The left edge moves only when the caption starts AFTER a gap; a caption
+    # that begins the row keeps its box exactly as before, right edge included
+    # (the right-hand crop is the one reverted in 2026-08, register J14).
+    cap_glyphs = _glyphs("Table 2. Results", 58.0, 75.0)
+    beside = _glyphs("right column prose", 320.0, 75.0)
+    page = SimpleNamespace(chars=cap_glyphs + beside, width=595.3)
+    cap = SimpleNamespace(line_text="Table 2. Results", label="Table 2")
+    x0, _, x1, _ = detect._bbox_of_caption_line(page, cap)
+    assert round(x0) == 58
+    assert x1 == max(g["x1"] for g in beside)
+
+
 def test_inline_mention_after_a_word_space_is_not_a_block_start():
     row = _glyphs("presented in Table 4. To test", 46.0, 500.0)
     assert not detect._match_starts_text_block(row, "table4")
