@@ -260,14 +260,11 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
                 # delivered as Table 4. Only the LEFT edge moves: the right-hand
                 # crop is the one that cost `ip_feldman` Table 10 a column in
                 # 2026-08 (register J14), and a caption at the row's first glyph
-                # (block == 0) is byte-unchanged.
-                own = row_chars[block:]
-                return (
-                    min(c["x0"] for c in own),
-                    min(c["top"] for c in own),
-                    x1,
-                    max(c["bottom"] for c in own),
-                )
+                # (block == 0) is byte-unchanged. Top and bottom stay the row's:
+                # the side-by-side caption/body split reads them, and a taller
+                # glyph in the other block must not move its cut-offs (Sonnet
+                # review 2026-09-25).
+                return (row_chars[block]["x0"], top, x1, bottom)
             if first_containing is None:
                 first_containing = (x0, top, x1, bottom)
     if first_containing is not None:
