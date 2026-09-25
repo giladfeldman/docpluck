@@ -205,6 +205,31 @@ def test_wrapped_label_still_merges_onto_a_label():
     assert out[0][1].startswith("H1b:")
 
 
+def test_header_line_still_joins_a_raised_superscript():
+    # 10.1016/j.jesp.2020.103977 Table 3 (p7): the "2" of ηp² sits a line above
+    # "pηp". It is not a data row (no label, one token), so the merge stands --
+    # refusing it made the superscript a fabricated `d = 2`.
+    rows = [
+        ["", "", "", "", "2", ""],
+        ["", "", "tpd[95% CI]tpd[95% CI]", "F", "pηp", "[95% CI]"],
+    ]
+    out = _merge_continuation_rows([list(r) for r in rows])
+    assert len(out) == 1
+
+
+def test_a_citation_footer_is_not_split_off_as_a_row():
+    # 10.1001/jamanetworkopen.2023.48333 Table 2 (p6): the page footer lands in
+    # the grid below a data row. Splitting it off would let flatten read
+    # `est = 2023`; it keeps the pre-existing merge until the table region stops
+    # absorbing the footer.
+    rows = [
+        ["Model 2c", "0.90 (0.59-1.39)", "1.31 (1.19-1.44)", "1.31 (1.20-1.44)"],
+        ["", "", "(Reprinted)", "JAMA Network Open. 2023;6(12):e2348333."],
+    ]
+    out = _merge_continuation_rows([list(r) for r in rows])
+    assert len(out) == 1
+
+
 def test_wrapped_prose_still_merges_onto_prose():
     rows = [["2a", "People underestimate how much"], ["", "others value the gift"]]
     out = _merge_continuation_rows([list(r) for r in rows])

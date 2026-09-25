@@ -624,6 +624,23 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
     # the H1b Replication row's `F`, so `3.91` became unreadable and the heading
     # vanished as a row. Keyed on the slot's class, not on any paper's text.
     def _prose_onto_value(row: list[str], parent: list[str]) -> bool:
+        # Only a DATA ROW is protected: a row label plus >= 2 complete values.
+        # A lone raised token is not one -- 10.1016/j.jesp.2020.103977 Table 3
+        # (p7) prints the "2" of ηp² a line above "pηp", so
+        # Camelot emits ['', '', '', '', '2', ''] and the header line must still
+        # join it (refusing turned the superscript into a fabricated `d = 2`).
+        if not (parent and (parent[0] or "").strip()):
+            return False
+        if sum(1 for p in parent[1:] if _DATA_VALUE_CELL_RE.match((p or "").strip())) < 2:
+            return False
+        # A heading carries no numbers beyond its own label ("H2:"). A line with
+        # a decimal or a 3+-digit run anywhere is something else -- in
+        # 10.1001/jamanetworkopen.2023.48333 Table 2 it is the page footer
+        # "(Reprinted) | JAMA Network Open. 2023;6(12):e2348333", which a split
+        # would hand to flatten as `est = 2023`. That footer belongs to
+        # table-region detection; here it keeps the pre-existing merge.
+        if re.search(r"\d{3,}|\d\.\d", " ".join((c or "") for c in row)):
+            return False
         for i, c in enumerate(row):
             v = (c or "").strip()
             if not v or not re.search(r"[A-Za-z]", v) or i >= len(parent):
