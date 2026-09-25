@@ -264,8 +264,8 @@ def test_xiao_t6_selfterminated_caption_not_truncated_real_pdf():
 # Both defects were EXPOSED by the corrected caption-tail walk: it recovers
 # leading content the old walk silently skipped, so a caption sitting at a page
 # foot now surfaces the next page's running header, and plos_med Table 2's
-# recovered rows carry the cmsy10 `≥`-as-U+FFFD corruption that only the
-# channel-1 normalize pass had been fixing.
+# recovered rows carry the cmsy10 `≥`-as-U+FFFD glyph that only the
+# channel-1 normalize pass had been rewriting (both retired 2026-09-25).
 
 
 def test_page_furniture_only_block_detected():
@@ -315,13 +315,14 @@ def test_jama_open_1_t2_furniture_not_dumped_real_pdf():
 
 
 @requires_pdftotext
-def test_plos_med_t2_ge_glyph_recovered_in_table_rows_real_pdf():
+def test_plos_med_t2_fffd_passes_through_table_rows_real_pdf():
     """plos_med Table 2's remnant-size rows reach the .md via the raw_text
-    fallback (channel 3), which bypasses normalize_text — the cmsy10 `≥` must
-    still be recovered there, not left as U+FFFD mojibake."""
+    fallback (channel 3). Until 2026-09-25 S5b rewrote their U+FFFD to `≥` from
+    context there; S5b is retired (it also wrote `<=` onto HAL cover pages), so
+    the rows now carry the U+FFFD exactly as the body text does."""
     pdf = require_corpus_pdf("vancouver/plos_med_1.pdf")
     if not os.path.isfile(pdf):
         pytest.skip(f"fixture missing: {pdf}")
     md = render_pdf_to_markdown(Path(pdf).read_bytes())
-    assert "�" not in md, f"{md.count(chr(0xFFFD))} replacement char(s) remain"
-    assert "≥5–10 mm" in md, "Table 2 remnant-size row lost its recovered ≥"
+    assert "�5–10 mm" in md, "Table 2 remnant-size row did not reach the .md as printed"
+    assert "≥5–10 mm" not in md, "a `≥` was invented from context in the table channel"

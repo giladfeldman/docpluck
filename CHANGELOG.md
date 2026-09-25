@@ -69,6 +69,37 @@ elsewhere in any other checkout and skipped there silently. They now use the new
 `custody_path(*parts)`. `tests/test_article_repository_is_env_only.py` pins both changes.
 **Anyone running the corpus-backed suite must set `ARTICLE_REPOSITORY`.** Nothing in the
 extraction pipeline changes.
+## [Unreleased] - normalization 1.9.70
+
+**U+FFFD is no longer guessed from context anywhere.** Normalize steps **S5a** (`<U+FFFD>2 = .04`
+-> `eta2 = .04`) and **S5b** (`<U+FFFD>N` -> `>=N` / `<=N`), and S5b's second call in the Markdown
+render pass, are retired (owner decision 2026-09-25). This completes the 2.4.145 retirement of the
+`extract_pdf` recovery: an undecodable glyph now reaches the consumer as `U+FFFD` in every channel.
+
+Why: both rules decided from the surrounding text only, never from the glyph itself. Measured over
+all 9,988 PDFs in the article repository (110 carry U+FFFD):
+- S5a fired **0** times.
+- S5b fired **20** times in **6** papers: **15 correct**, all in one paper
+  (10.1371/journal.pmed.1004323, where `age >=18 years` and the fibroid-size bins are real `>=`);
+  **5 wrong**, all HAL archive cover pages, where the blank bracket before the DOI became an
+  operator: `<=10.1016/j.jesp.2010.12.004` (also 10.1016/j.jesp.2011.03.003,
+  10.1016/j.jesp.2011.03.007, 10.1016/j.jesp.2024.104697, 10.1098/rsos.230219). The page prints
+  nothing there. The cause was a fallback that copied whichever operator the article used
+  elsewhere.
+- 199 more `<U+FFFD>N` sites in 92 papers were one `>=` away from the same fallback; on the
+  rasterized page they are as often an asterisk or an equals sign (`n = 100`) as an operator.
+
+**What a consumer will see change:**
+- Those 20 sites now read `U+FFFD` (e.g. `age <U+FFFD>18 years`, `(<20/<U+FFFD>20 mm)` in
+  10.1371/journal.pmed.1004323; `<U+FFFD>10.1016/j.jesp.2010.12.004` on the HAL cover pages).
+  `n_replacement_chars` rises by the same count.
+- `NormalizationReport` no longer lists steps `S5a_fffd_context_recovery` /
+  `S5b_fffd_comparison_recovery` and no longer carries the keys `fffd_context_recovered` /
+  `fffd_comparison_recovered`. `RenderReport` loses the step `recover_fffd_comparison_operators`.
+- `docpluck.normalize.recover_fffd_comparison_operators` is removed.
+- The three text channels now agree: the structured table-cell output never ran S5b.
+
+Record: communications/DECISION_2026-09-25_s5a_s5b_fffd_rewrites.md.
 
 ## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
 

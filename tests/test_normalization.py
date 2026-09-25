@@ -1312,36 +1312,32 @@ class TestA3a_ThousandsSeparator:
         assert not any("A3a" in s for s in report.steps_applied), report.steps_applied
 
 
-# ── S5a: Context-aware U+FFFD recovery (ESCImate Request 1.2) ──────
+# ── S5a RETIRED 2026-09-25: U+FFFD before `2 =` is no longer guessed as eta ──
+# It fired 0 times over 9,988 repository PDFs and decided on context alone (the
+# character could as well be omega, epsilon or R). Full record and the S5b
+# shapes: tests/test_fffd_passes_through_normalization_real_pdf.py.
 
-class TestS5a_FffdContextRecovery:
-    def test_fffd_with_superscript_two(self):
-        result = norm("Main effect was significant (\ufffd\u00B2 = 0.04)", "standard")
-        assert "eta" in result
-        assert "\ufffd" not in result
+class TestS5a_Retired_FffdPassesThrough:
+    def test_fffd_with_superscript_two_is_kept(self):
+        result = norm("Main effect was significant (�² = 0.04)", "standard")
+        assert "�" in result
+        assert "eta" not in result
 
-    def test_fffd_with_plain_digit_two(self):
-        result = norm("Main effect, \ufffd2 = 0.04, was strong", "standard")
-        assert "eta2 = 0.04" in result or "eta 2 = 0.04" in result
-
-    def test_fffd_partial_eta_subscript(self):
-        result = norm("\ufffd_p\u00B2 = .12 in the interaction", "standard")
-        assert "eta" in result
-        # The _p^2 should be preserved since we only replaced FFFD
-        assert "_p" in result
+    def test_fffd_with_plain_digit_two_is_kept(self):
+        result = norm("Main effect, �2 = 0.04, was strong", "standard")
+        assert "�2 = 0.04" in result
 
     def test_fffd_in_non_stat_context_preserved(self):
-        """Generic FFFD in prose must NOT be replaced."""
-        result = norm("The \ufffd symbol is a replacement character.", "standard")
-        assert "\ufffd" in result  # left alone
+        result = norm("The � symbol is a replacement character.", "standard")
+        assert "�" in result
 
-    def test_fffd_report_tracks_recovery_count(self):
+    def test_report_carries_no_fffd_recovery(self):
         _, report = norm_report(
-            "Main (\ufffd\u00B2 = 0.04) and interaction (\ufffd\u00B2 = 0.12)",
+            "Main (�² = 0.04) and interaction (�² = 0.12)",
             "standard",
         )
-        assert report.changes_made.get("fffd_context_recovered") == 2
-        assert "S5a_fffd_context_recovery" in report.steps_applied
+        assert "fffd_context_recovered" not in report.changes_made
+        assert "S5a_fffd_context_recovery" not in report.steps_applied
 
 
 # ── A3: Author-affiliation false-positive protection (ESCImate regression) ──

@@ -174,9 +174,10 @@ Extract text from PDF bytes.
   - `"error"` when extraction failed (the text then starts with `ERROR:`).
   - An undecodable glyph that pdftotext emits as `U+FFFD` is returned by `extract_pdf` **unchanged**. (The earlier
     `+pdfplumber_recovery` fallback was retired in 2026-09: it could substitute a plausible wrong token, such as
-    turning a partial eta-squared into an R-squared.) `normalize_text` still rewrites `U+FFFD` in two narrow
-    statistical contexts — step S5a (`eta` before `2 =`) and step S5b (`>=`/`<=` before a number) — and leaves it
-    everywhere else.
+    turning a partial eta-squared into an R-squared.) `normalize_text` and the Markdown render pass it through
+    too: steps S5a (`eta` before `2 =`) and S5b (`>=`/`<=` before a number), which guessed the character from
+    the surrounding text, were retired as well — S5b wrote `<=` in front of DOIs on HAL cover pages. Count them
+    with `n_replacement_chars`.
 
 **Requires:** `pdftotext` binary on PATH.
 
@@ -761,7 +762,7 @@ from docpluck import get_version_info
 get_version_info()
 # {'version': '2.4.146',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.69',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.70',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
 #  'table_extraction_version': '2.4.17',
 #  'python_version': '3.14.5',      # the interpreter…

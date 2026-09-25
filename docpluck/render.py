@@ -43,7 +43,6 @@ from .normalize import (
     recover_lt_as_b_operator,
     recover_corrupted_minus_signs,
     recover_minus_via_ci_pairing,
-    recover_fffd_comparison_operators,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
 )
@@ -7049,17 +7048,11 @@ def _render_pdf_to_markdown(
     # BOTH call sites in the same change is the three-channel discipline: a
     # repair retired in one channel and left in another makes a body sentence
     # and a flattened caption disagree about the same input.
-    # v2.4.119 (S5b third channel): recover the cmsy10 `≥`/`≤` glyphs that
-    # pdftotext destroys to U+FFFD. The channel-1 normalize pass covers body
-    # prose, but a table's raw_text fallback / unstructured-table block and
-    # flattened captions bypass normalize_text entirely — plos_med Table 2's
-    # remnant-size rows (`≥5–10 mm` …) reach the .md as mojibake. Same
-    # three-channel discipline as W0b/W0c/W0j/W0k/W0l/W0n
-    # (`glyph-fixes-need-all-three-text-channels`). Rule 2's document-consensus
-    # gate makes this safe here: the assembled .md carries the SAME document's
-    # Rule-1 evidence, so a lone FFFD is only rewritten when this document's
-    # unanimous mapping is known.
-    md = _step(_report, "recover_fffd_comparison_operators", recover_fffd_comparison_operators, md)
+    # S5b's THIRD-CHANNEL CALL SITE WAS HERE AND IS DELETED (2026-09-25), together
+    # with the channel-1 step in `normalize_text` and the function itself. It rewrote
+    # U+FFFD to `>=` / `<=` from context; retired by owner decision after it turned a HAL
+    # cover page's blank DOI bracket into `<=`. Both channels removed in one change, so a
+    # table cell and a body sentence keep giving the same answer for one input.
     # W0g's SECOND-CHANNEL CALL SITE WAS HERE AND IS DELETED (2026-09-08),
     # together with the channel-1 call in `normalize_text`. Removing it from one
     # channel and not the other is the defect this repo keeps rediscovering: a

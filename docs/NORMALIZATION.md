@@ -514,6 +514,8 @@ S2  Accent recombination
 S3  Ligature expansion
 S4  Quote normalization
 S5  Dash and minus normalization
+    [S5a / S5b WERE HERE — U+FFFD rewritten to `eta` / `>=` / `<=` from the
+     surrounding text; retired 2026-09-25, U+FFFD now passes through]
 S6  Whitespace and invisible character normalization
 S7  Hyphenation repair
 S8  Mid-sentence line break joining
