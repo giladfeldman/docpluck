@@ -27,7 +27,9 @@ from tests.structured_fixtures import resolve_fixture as _resolve_fixture
 # (see `tests/cpu_budget.py`): measured at 100% machine load the same day, the
 # `--structured` run used 32-34s CPU against 55-58s wall. 120 CPU-seconds is
 # the old serial number, now held in every run mode -- tighter under xdist than
-# the 480s it replaces. A child that stops accruing CPU is failed as hung.
+# the 480s it replaces. A child that stops accruing CPU for 600s is failed as
+# hung: longer than the probes' 180s because this child legitimately waits on
+# pdftotext, which the library itself bounds at 120s per call.
 _CPU_BUDGET_S = 120
 _FALLBACK_WALL_S = 480 if os.environ.get("PYTEST_XDIST_WORKER") else 120
 

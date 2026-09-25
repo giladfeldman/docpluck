@@ -155,10 +155,12 @@ def test_every_tool_a_gate_names_can_be_loaded(referenced):
         path = _REPO / rel
         if not path.is_file() or path.suffix != ".py":
             continue
-        # CPU budget, not wall: see tests/cpu_budget.py.
+        # CPU budget, not wall: see tests/cpu_budget.py. The probe only loads a
+        # module, so 180s without CPU progress is a hang -- the old wall
+        # timeout's latency, and never stricter than it.
         proc = run_with_cpu_budget(
             [sys.executable, "-W", "ignore", str(runner), rel],
-            cpu_budget_s=180, fallback_wall_s=180, cwd=_REPO, encoding=None,
+            cpu_budget_s=180, fallback_wall_s=180, stall_s=180, cwd=_REPO, encoding=None,
         )
         if proc.returncode != 0:
             out = (proc.stderr or proc.stdout).strip().splitlines() or ["<no output>"]

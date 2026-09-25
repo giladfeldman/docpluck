@@ -105,10 +105,14 @@ def _resolve_docpluck_for(script: Path) -> str:
     env = {**os.environ, "ARTICLE_FINDER_HOME": str(REPO_ROOT / ".no-custodian-in-import-probe")}
     # A CPU budget, not a wall timeout: in a saturated full run on 2026-09-25
     # these probes timed out at 180s wall yet pass alone; measured at 100% load
-    # the slowest took 54s wall on 0.5s CPU. See tests/cpu_budget.py.
+    # the slowest took 54s wall on 0.5s CPU. See tests/cpu_budget.py. A probe
+    # waits on nothing but its own imports, so 180s with NO CPU progress is a
+    # hang -- the same detection latency as the old 180s wall timeout, and never
+    # stricter, since a probe that stalls 180s also ran past 180s wall.
     proc = run_with_cpu_budget(
         [sys.executable, str(_PROBE_HELPER), str(script), str(script.parent)],
-        cpu_budget_s=180, fallback_wall_s=180, cwd=str(REPO_ROOT), encoding=None, env=env,
+        cpu_budget_s=180, fallback_wall_s=180, stall_s=180,
+        cwd=str(REPO_ROOT), encoding=None, env=env,
     )
     hits = [l for l in (proc.stdout or "").splitlines() if l.startswith("RESOLVED::")]
     if not hits:
