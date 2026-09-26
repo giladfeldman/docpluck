@@ -99,8 +99,10 @@ Tests only.
 Four caption patterns rejected the pipe separator, so every Nature-family figure
 and table was invisible (+23 figures, +6 tables on five such papers); all four
 now share one definition. A Camelot grid no caption claims is no longer dropped:
-across 102 papers, 83 gain at least one candidate (369 candidates, 40 removed as
-copies of a kept table). Roughly half of a random sample are real statistical
+across the 102-paper corpus about 75 papers keep at least one candidate (286
+in the release's whole-corpus run, 288 in an independent census: Camelot's grid
+for the same region varies between runs), after copies of a kept table and page
+furniture are skipped as described below. Roughly half of a random sample are real statistical
 tables and half are page furniture — which is why they are labelled
 `uncaptioned_candidate`, kept out of the numbered tables, and rendered in their
 own section marked unverified. Two test fixtures that had been attached to each
@@ -117,6 +119,19 @@ statistic is never skipped. Over the 70 corpus papers holding a statistic-free
 candidate, 80 of 341 candidates are skipped, all 80 page furniture judged from
 their text, 0 of the 185 carrying a statistic; four real uncaptioned tables
 (one of which pdftotext prints word for word) are kept by test.
+
+**The render chain no longer deletes a kept candidate.** The phantom-table
+stripper used to remove a candidate's whole `<table>` from the rendered text
+while `tables` and `flattened_rows` kept its cells, leaving an empty candidate
+heading. Over the 102-paper corpus it removed 9 candidates this way, 2 of them
+real tables (a literature-review table in `10.1017/s0007123424000024`, a
+45-row appendix table in another paper). Keep-or-drop for a candidate is now
+decided once, at the recorded keep step, and all three channels agree.
+
+The whole-corpus harness check `table_parity` now counts captioned tables
+against `### Table` headings and candidates against their own heading. Before
+this it failed on every paper with a candidate (208 cells, each explained
+exactly by the candidate count), which buried the render deletion above.
 
 ## [2.4.144] - 2026-09-23 - normalization 1.9.68 - table extraction 2.4.16
 

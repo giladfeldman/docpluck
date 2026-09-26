@@ -18,8 +18,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -43,8 +43,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -68,8 +68,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -172,8 +172,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -197,8 +197,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -222,8 +222,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -326,8 +326,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -351,8 +351,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -376,8 +376,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -403,8 +403,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -428,8 +428,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -453,8 +453,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -480,8 +480,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -505,8 +505,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -530,8 +530,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -634,8 +634,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -659,8 +659,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -684,8 +684,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -711,8 +711,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -736,8 +736,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -761,8 +761,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -865,8 +865,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -890,8 +890,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -915,8 +915,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -942,8 +942,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -967,8 +967,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -992,8 +992,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -1019,8 +1019,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 10,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -1044,8 +1044,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 10,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -1069,8 +1069,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 10,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -1096,8 +1096,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 13,
-        "html_tables": 13
+        "tables_json": 19,
+        "html_tables": 19
       },
       "glyph": {
         "verdict": "pass"
@@ -1121,8 +1121,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 13,
-        "html_tables": 13
+        "tables_json": 19,
+        "html_tables": 19
       },
       "glyph": {
         "verdict": "pass"
@@ -1146,8 +1146,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 13,
-        "html_tables": 13
+        "tables_json": 19,
+        "html_tables": 19
       },
       "glyph": {
         "verdict": "pass"
@@ -1173,12 +1173,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 7,
+        "tables_json": 17,
         "table_headings": 7,
-        "html_tables": 4,
-        "structured": 6,
+        "candidates": 10,
+        "candidate_headings": 10,
+        "html_tables": 14,
+        "structured": 16,
         "problems": [
-          "<table> count=4 but 6 structured tables in json"
+          "<table> count=14 but 16 structured tables in json"
         ]
       },
       "glyph": {
@@ -1203,12 +1205,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 7,
+        "tables_json": 17,
         "table_headings": 7,
-        "html_tables": 4,
-        "structured": 6,
+        "candidates": 10,
+        "candidate_headings": 10,
+        "html_tables": 14,
+        "structured": 16,
         "problems": [
-          "<table> count=4 but 6 structured tables in json"
+          "<table> count=14 but 16 structured tables in json"
         ]
       },
       "glyph": {
@@ -1233,12 +1237,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 7,
+        "tables_json": 17,
         "table_headings": 7,
-        "html_tables": 4,
-        "structured": 6,
+        "candidates": 10,
+        "candidate_headings": 10,
+        "html_tables": 14,
+        "structured": 16,
         "problems": [
-          "<table> count=4 but 6 structured tables in json"
+          "<table> count=14 but 16 structured tables in json"
         ]
       },
       "glyph": {
@@ -1342,8 +1348,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 0
+        "tables_json": 11,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -1367,8 +1373,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 0
+        "tables_json": 11,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -1392,8 +1398,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 0
+        "tables_json": 11,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -1419,8 +1425,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 14,
+        "html_tables": 13
       },
       "glyph": {
         "verdict": "pass"
@@ -1444,8 +1450,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 14,
+        "html_tables": 13
       },
       "glyph": {
         "verdict": "pass"
@@ -1469,8 +1475,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 14,
+        "html_tables": 13
       },
       "glyph": {
         "verdict": "pass"
@@ -1573,8 +1579,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -1598,8 +1604,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -1623,8 +1629,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -1727,8 +1733,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 1,
+        "html_tables": 1
       },
       "glyph": {
         "verdict": "pass"
@@ -1752,8 +1758,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -1777,8 +1783,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 1,
+        "html_tables": 1
       },
       "glyph": {
         "verdict": "pass"
@@ -1808,12 +1814,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 9,
+        "tables_json": 11,
         "table_headings": 9,
-        "html_tables": 6,
-        "structured": 7,
+        "candidates": 2,
+        "candidate_headings": 2,
+        "html_tables": 8,
+        "structured": 9,
         "problems": [
-          "<table> count=6 but 7 structured tables in json"
+          "<table> count=8 but 9 structured tables in json"
         ]
       },
       "glyph": {
@@ -1838,12 +1846,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 9,
+        "tables_json": 11,
         "table_headings": 9,
-        "html_tables": 6,
-        "structured": 7,
+        "candidates": 2,
+        "candidate_headings": 2,
+        "html_tables": 8,
+        "structured": 9,
         "problems": [
-          "<table> count=6 but 7 structured tables in json"
+          "<table> count=8 but 9 structured tables in json"
         ]
       },
       "glyph": {
@@ -1868,12 +1878,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 9,
+        "tables_json": 11,
         "table_headings": 9,
-        "html_tables": 6,
-        "structured": 7,
+        "candidates": 2,
+        "candidate_headings": 2,
+        "html_tables": 8,
+        "structured": 9,
         "problems": [
-          "<table> count=6 but 7 structured tables in json"
+          "<table> count=8 but 9 structured tables in json"
         ]
       },
       "glyph": {
@@ -1900,12 +1912,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 10,
+        "tables_json": 32,
         "table_headings": 10,
-        "html_tables": 6,
-        "structured": 7,
+        "candidates": 22,
+        "candidate_headings": 22,
+        "html_tables": 28,
+        "structured": 29,
         "problems": [
-          "<table> count=6 but 7 structured tables in json"
+          "<table> count=28 but 29 structured tables in json"
         ]
       },
       "glyph": {
@@ -1930,12 +1944,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 10,
+        "tables_json": 40,
         "table_headings": 10,
-        "html_tables": 6,
-        "structured": 7,
+        "candidates": 30,
+        "candidate_headings": 30,
+        "html_tables": 37,
+        "structured": 38,
         "problems": [
-          "<table> count=6 but 7 structured tables in json"
+          "<table> count=37 but 38 structured tables in json"
         ]
       },
       "glyph": {
@@ -1960,12 +1976,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 10,
+        "tables_json": 32,
         "table_headings": 10,
-        "html_tables": 6,
-        "structured": 7,
+        "candidates": 22,
+        "candidate_headings": 22,
+        "html_tables": 28,
+        "structured": 29,
         "problems": [
-          "<table> count=6 but 7 structured tables in json"
+          "<table> count=28 but 29 structured tables in json"
         ]
       },
       "glyph": {
@@ -1992,8 +2010,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 15,
-        "html_tables": 13
+        "tables_json": 16,
+        "html_tables": 15
       },
       "glyph": {
         "verdict": "pass"
@@ -2021,8 +2039,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 15,
-        "html_tables": 13
+        "tables_json": 16,
+        "html_tables": 15
       },
       "glyph": {
         "verdict": "pass"
@@ -2050,8 +2068,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 15,
-        "html_tables": 13
+        "tables_json": 16,
+        "html_tables": 15
       },
       "glyph": {
         "verdict": "pass"
@@ -2235,8 +2253,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -2260,8 +2278,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -2285,8 +2303,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -2389,8 +2407,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -2414,8 +2432,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -2439,8 +2457,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -2620,8 +2638,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 1
+        "tables_json": 5,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -2645,8 +2663,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 1
+        "tables_json": 5,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -2670,8 +2688,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 1
+        "tables_json": 5,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -2697,8 +2715,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 17,
-        "html_tables": 16
+        "tables_json": 18,
+        "html_tables": 17
       },
       "glyph": {
         "verdict": "pass"
@@ -2722,8 +2740,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 17,
-        "html_tables": 16
+        "tables_json": 18,
+        "html_tables": 17
       },
       "glyph": {
         "verdict": "pass"
@@ -2747,8 +2765,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 17,
-        "html_tables": 16
+        "tables_json": 18,
+        "html_tables": 17
       },
       "glyph": {
         "verdict": "pass"
@@ -2778,8 +2796,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 11,
-        "html_tables": 9
+        "tables_json": 12,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -2803,8 +2821,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 11,
-        "html_tables": 9
+        "tables_json": 12,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -2828,8 +2846,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 11,
-        "html_tables": 9
+        "tables_json": 12,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -2855,8 +2873,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 8
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -2880,8 +2898,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 8
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -2905,8 +2923,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 8
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -2932,8 +2950,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -2957,8 +2975,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -2982,8 +3000,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -3009,8 +3027,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -3034,8 +3052,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -3059,8 +3077,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 5
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -3086,8 +3104,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -3111,8 +3129,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -3136,8 +3154,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -3394,8 +3412,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -3419,8 +3437,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -3444,8 +3462,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -3471,8 +3489,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -3496,8 +3514,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -3521,8 +3539,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -3548,8 +3566,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 9,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -3573,8 +3591,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 9,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -3598,8 +3616,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 9,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -3629,8 +3647,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 23,
+        "html_tables": 22
       },
       "glyph": {
         "verdict": "pass"
@@ -3658,8 +3676,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 23,
+        "html_tables": 22
       },
       "glyph": {
         "verdict": "pass"
@@ -3687,8 +3705,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 23,
+        "html_tables": 22
       },
       "glyph": {
         "verdict": "pass"
@@ -3714,8 +3732,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -3739,8 +3757,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -3764,8 +3782,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -3791,8 +3809,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -3816,8 +3834,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -3841,8 +3859,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -3868,8 +3886,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -3893,8 +3911,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -3918,8 +3936,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -3945,8 +3963,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -3970,8 +3988,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -3995,8 +4013,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -4099,8 +4117,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4124,8 +4142,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4149,8 +4167,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4176,8 +4194,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4201,8 +4219,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4226,8 +4244,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4253,8 +4271,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -4278,8 +4296,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -4303,8 +4321,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -4330,8 +4348,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -4355,8 +4373,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -4380,8 +4398,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -4561,8 +4579,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -4586,8 +4604,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -4611,8 +4629,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -4638,8 +4656,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -4663,8 +4681,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -4688,8 +4706,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -4715,8 +4733,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 13,
+        "html_tables": 13
       },
       "glyph": {
         "verdict": "pass"
@@ -4740,8 +4758,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 13,
+        "html_tables": 13
       },
       "glyph": {
         "verdict": "pass"
@@ -4765,8 +4783,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 13,
+        "html_tables": 13
       },
       "glyph": {
         "verdict": "pass"
@@ -4792,8 +4810,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4817,8 +4835,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4842,8 +4860,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -4946,8 +4964,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 1,
+        "html_tables": 1
       },
       "glyph": {
         "verdict": "pass"
@@ -4971,8 +4989,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 1,
+        "html_tables": 1
       },
       "glyph": {
         "verdict": "pass"
@@ -4996,8 +5014,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 1,
+        "html_tables": 1
       },
       "glyph": {
         "verdict": "pass"
@@ -5023,8 +5041,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 0
+        "tables_json": 4,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -5048,8 +5066,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 0
+        "tables_json": 4,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -5073,8 +5091,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 0
+        "tables_json": 4,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -5177,8 +5195,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 2
+        "tables_json": 5,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -5202,8 +5220,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 2
+        "tables_json": 5,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -5227,8 +5245,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 2
+        "tables_json": 5,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -5254,8 +5272,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -5279,8 +5297,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -5304,8 +5322,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -5408,8 +5426,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 2
+        "tables_json": 10,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -5433,8 +5451,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 2
+        "tables_json": 10,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -5458,8 +5476,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 2
+        "tables_json": 10,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -5485,8 +5503,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -5510,8 +5528,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -5535,8 +5553,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -5562,8 +5580,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -5587,8 +5605,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -5612,8 +5630,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 11,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -5638,14 +5656,9 @@
         "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "fail",
-        "tables_json": 1,
-        "table_headings": 1,
-        "html_tables": 0,
-        "structured": 1,
-        "problems": [
-          "<table> count=0 but 1 structured tables in json"
-        ]
+        "verdict": "pass",
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -5669,8 +5682,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -5693,14 +5706,9 @@
         "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "fail",
-        "tables_json": 1,
-        "table_headings": 1,
-        "html_tables": 0,
-        "structured": 1,
-        "problems": [
-          "<table> count=0 but 1 structured tables in json"
-        ]
+        "verdict": "pass",
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -5726,8 +5734,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 8,
-        "html_tables": 8
+        "tables_json": 9,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -5750,14 +5758,9 @@
         "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "fail",
-        "tables_json": 8,
-        "table_headings": 8,
-        "html_tables": 3,
-        "structured": 4,
-        "problems": [
-          "<table> count=3 but 4 structured tables in json"
-        ]
+        "verdict": "pass",
+        "tables_json": 9,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -5780,14 +5783,9 @@
         "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "fail",
-        "tables_json": 8,
-        "table_headings": 8,
-        "html_tables": 3,
-        "structured": 4,
-        "problems": [
-          "<table> count=3 but 4 structured tables in json"
-        ]
+        "verdict": "pass",
+        "tables_json": 9,
+        "html_tables": 9
       },
       "glyph": {
         "verdict": "pass"
@@ -5813,8 +5811,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 12,
-        "html_tables": 10
+        "tables_json": 13,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -5838,8 +5836,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 12,
-        "html_tables": 10
+        "tables_json": 13,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -5863,8 +5861,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 12,
-        "html_tables": 10
+        "tables_json": 13,
+        "html_tables": 11
       },
       "glyph": {
         "verdict": "pass"
@@ -5890,8 +5888,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 5
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -5915,8 +5913,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 5
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -5940,8 +5938,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 5
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -5967,12 +5965,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 10,
+        "tables_json": 13,
         "table_headings": 10,
-        "html_tables": 4,
-        "structured": 5,
+        "candidates": 3,
+        "candidate_headings": 3,
+        "html_tables": 8,
+        "structured": 9,
         "problems": [
-          "<table> count=4 but 5 structured tables in json"
+          "<table> count=8 but 9 structured tables in json"
         ]
       },
       "glyph": {
@@ -5997,12 +5997,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 10,
+        "tables_json": 13,
         "table_headings": 10,
-        "html_tables": 4,
-        "structured": 5,
+        "candidates": 3,
+        "candidate_headings": 3,
+        "html_tables": 8,
+        "structured": 9,
         "problems": [
-          "<table> count=4 but 5 structured tables in json"
+          "<table> count=8 but 9 structured tables in json"
         ]
       },
       "glyph": {
@@ -6027,12 +6029,14 @@
       },
       "table_parity": {
         "verdict": "fail",
-        "tables_json": 10,
+        "tables_json": 13,
         "table_headings": 10,
-        "html_tables": 4,
-        "structured": 5,
+        "candidates": 3,
+        "candidate_headings": 3,
+        "html_tables": 8,
+        "structured": 9,
         "problems": [
-          "<table> count=4 but 5 structured tables in json"
+          "<table> count=8 but 9 structured tables in json"
         ]
       },
       "glyph": {
@@ -6059,8 +6063,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 3
+        "tables_json": 8,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -6084,8 +6088,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 3
+        "tables_json": 8,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -6109,8 +6113,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 5,
-        "html_tables": 3
+        "tables_json": 8,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -6136,8 +6140,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -6161,8 +6165,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -6186,8 +6190,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 4
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -6213,8 +6217,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -6238,8 +6242,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -6263,8 +6267,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -6290,8 +6294,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -6314,14 +6318,9 @@
         "reflowed_exempt": 0
       },
       "table_parity": {
-        "verdict": "fail",
-        "tables_json": 2,
-        "table_headings": 2,
-        "html_tables": 1,
-        "structured": 2,
-        "problems": [
-          "<table> count=1 but 2 structured tables in json"
-        ]
+        "verdict": "pass",
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -6345,8 +6344,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -6372,8 +6371,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -6397,8 +6396,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -6422,8 +6421,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -6449,8 +6448,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 14,
+        "html_tables": 14
       },
       "glyph": {
         "verdict": "pass"
@@ -6474,8 +6473,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 14,
+        "html_tables": 14
       },
       "glyph": {
         "verdict": "pass"
@@ -6499,8 +6498,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 14,
+        "html_tables": 14
       },
       "glyph": {
         "verdict": "pass"
@@ -6526,8 +6525,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -6551,8 +6550,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -6576,8 +6575,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 3,
+        "html_tables": 3
       },
       "glyph": {
         "verdict": "pass"
@@ -6603,8 +6602,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 5,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -6628,8 +6627,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 5,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -6653,8 +6652,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 5,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -6680,8 +6679,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -6705,8 +6704,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -6730,8 +6729,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -6757,8 +6756,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 21,
+        "html_tables": 21
       },
       "glyph": {
         "verdict": "pass"
@@ -6782,8 +6781,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 21,
+        "html_tables": 21
       },
       "glyph": {
         "verdict": "pass"
@@ -6807,8 +6806,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 0,
-        "html_tables": 0
+        "tables_json": 21,
+        "html_tables": 21
       },
       "glyph": {
         "verdict": "pass"
@@ -6988,8 +6987,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -7013,8 +7012,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -7038,8 +7037,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 8,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -7219,8 +7218,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -7244,8 +7243,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -7269,8 +7268,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 2,
-        "html_tables": 2
+        "tables_json": 4,
+        "html_tables": 4
       },
       "glyph": {
         "verdict": "pass"
@@ -7296,8 +7295,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 7
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -7321,8 +7320,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 7
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -7346,8 +7345,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 7
+        "tables_json": 10,
+        "html_tables": 10
       },
       "glyph": {
         "verdict": "pass"
@@ -7373,8 +7372,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -7398,8 +7397,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -7423,8 +7422,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 6,
-        "html_tables": 6
+        "tables_json": 7,
+        "html_tables": 7
       },
       "glyph": {
         "verdict": "pass"
@@ -7450,8 +7449,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -7475,8 +7474,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -7500,8 +7499,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 1,
-        "html_tables": 1
+        "tables_json": 2,
+        "html_tables": 2
       },
       "glyph": {
         "verdict": "pass"
@@ -7527,8 +7526,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 6
+        "tables_json": 9,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -7552,8 +7551,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 6
+        "tables_json": 9,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -7577,8 +7576,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 7,
-        "html_tables": 6
+        "tables_json": 9,
+        "html_tables": 8
       },
       "glyph": {
         "verdict": "pass"
@@ -7604,8 +7603,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -7629,8 +7628,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -7654,8 +7653,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 3
+        "tables_json": 5,
+        "html_tables": 5
       },
       "glyph": {
         "verdict": "pass"
@@ -7681,8 +7680,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -7706,8 +7705,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -7731,8 +7730,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 4,
-        "html_tables": 4
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -7758,8 +7757,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -7783,8 +7782,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
@@ -7808,8 +7807,8 @@
       },
       "table_parity": {
         "verdict": "pass",
-        "tables_json": 3,
-        "html_tables": 3
+        "tables_json": 6,
+        "html_tables": 6
       },
       "glyph": {
         "verdict": "pass"
