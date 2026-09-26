@@ -154,7 +154,7 @@ def _make_wrapper(original):
             if text:
                 sink.drops.append((page, text))
             return res  # could not place it in the tied row; Camelot's result stands
-        sink.ties.append((table, r_idx, page, text))
+        sink.ties.append((table, r_idx, {ix[1] for ix in fixed[0]}, page, text))
         return fixed
 
     setattr(get_table_index, _MARK, True)
@@ -191,7 +191,7 @@ def boundary_tie_scope():
         yield
     finally:
         _ACTIVE.reset(token)
-        for _table, _r, page, text in sink.ties:
+        for _table, _r, _cols, page, text in sink.ties:
             record_fallback(TIE_EVENT, detail=f"p{page}:{text[:60]}")
         for page, text in sink.drops:
             record_fallback(DROP_EVENT, detail=f"p{page}:{text[:60]}")
@@ -202,15 +202,19 @@ def _row_texts(table, r: int) -> list[str]:
     return [(cell.text or "").strip() for cell in table.cells[r]]
 
 
-def join_tie_split_rows(table, tie_rows) -> list[int]:
+def join_tie_split_rows(table, tie_cells) -> list[int]:
     """Join each tied row into the row below it when they are one printed line.
 
-    ``tie_rows``: indices of rows a tie assignment was placed in. Returns the
-    upper-row indices that were joined. Conditions, all required:
+    ``tie_cells``: ``{row: {columns a tie assignment was placed in}}``. Returns
+    the upper-row indices that were joined. Conditions, all required:
 
       * row ``r + 1`` exists and its top edge IS row ``r``'s bottom edge (the
         boundary the tie sat on, compared exactly, as the tie was);
       * both rows carry text (joining into an empty row changes nothing);
+      * EVERY filled cell of row ``r`` was placed there by a tie -- never move a
+        cell Camelot placed on its own (tightened after consult round 2; measured
+        2026-09-26 the row-level rule moved 0 such cells in 852 moves, so this
+        changes nothing on the corpus and closes the case rather than trusting it);
       * no column is filled in both rows (a collision is left split).
 
     Rows are visited bottom-up so a chain of ties collapses no further than one
@@ -219,11 +223,13 @@ def join_tie_split_rows(table, tie_rows) -> list[int]:
     joined: list[int] = []
     rows = table.rows
     n = len(table.cells)
-    for r in sorted(set(tie_rows), reverse=True):
+    for r in sorted(tie_cells, reverse=True):
         if r + 1 >= n or r + 1 >= len(rows) or rows[r][1] != rows[r + 1][0]:
             continue
         upper, lower = _row_texts(table, r), _row_texts(table, r + 1)
         if not any(upper) or not any(lower):
+            continue
+        if any(u and c not in tie_cells[r] for c, u in enumerate(upper)):
             continue
         if any(u and lo for u, lo in zip(upper, lower)):
             continue
@@ -244,16 +250,20 @@ def join_tie_split_rows(table, tie_rows) -> list[int]:
 
 def _join_tie_split_rows(ties) -> None:
     by_table: dict[int, tuple] = {}
-    for table, r_idx, _page, _text in ties:
-        by_table.setdefault(id(table), (table, set()))[1].add(r_idx)
-    for table, tie_rows in by_table.values():
+    for table, r_idx, cols, _page, _text in ties:
+        by_table.setdefault(id(table), (table, {}))[1].setdefault(r_idx, set()).update(cols)
+    for table, tie_cells in by_table.values():
         try:
-            joined = join_tie_split_rows(table, tie_rows)
+            joined = join_tie_split_rows(table, tie_cells)
         except Exception as exc:  # noqa: BLE001 - recorded; the unjoined grid stands
             record_fallback(MERGE_FAILED_EVENT, detail=type(exc).__name__)
             continue
+        # Recorded per stream table as parsed, BEFORE `_pick_best_per_page` may
+        # prefer a lattice grid: this counts joins made, not joins delivered.
         for r in joined:
-            record_fallback(MERGE_EVENT, detail=f"p{getattr(table, 'page', None)}:r{r}")
+            first = next((t for t in _row_texts(table, r + 1) if t), "")
+            record_fallback(MERGE_EVENT,
+                            detail=f"p{getattr(table, 'page', None)}:r{r}:{first[:40]}")
 
 
 __all__ = [

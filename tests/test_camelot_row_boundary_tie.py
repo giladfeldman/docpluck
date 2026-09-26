@@ -147,6 +147,36 @@ def test_a_failed_join_is_recorded_and_leaves_the_grid():
             raise RuntimeError("boom")
 
     with fallback_scope() as fb:
-        camelot_row_ties._join_tie_split_rows([(_Broken(), 0, 7, "x")])
+        camelot_row_ties._join_tie_split_rows([(_Broken(), 0, {0}, 7, "x")])
     assert fb.counters.get(MERGE_FAILED_EVENT) == 1
     assert MERGE_EVENT not in fb.counters
+
+
+def test_join_never_moves_a_cell_camelot_placed_itself():
+    """Consult round 2 (Sonnet, 2026-09-26): the row-level rule would move EVERY
+    filled cell of a tied row. On the corpus that moved 0 cells not placed by a
+    tie in 852 moves; the rule is now per cell so it cannot. A stub grid, because
+    no real paper produces the case -- this pins the rule, not a prevalence."""
+
+    class _Cell:
+        def __init__(self, text):
+            self._text = text
+
+        @property
+        def text(self):
+            return self._text
+
+    class _Table:
+        rows = ((30.0, 20.0), (20.0, 10.0))
+
+        def __init__(self, upper, lower):
+            self.cells = [[_Cell(t) for t in upper], [_Cell(t) for t in lower]]
+            self.df = None
+
+    both_tied = _Table(["Label", "1.0", ""], ["", "", "2.0*"])
+    assert camelot_row_ties.join_tie_split_rows(both_tied, {0: {0, 1}}) == [0]
+    assert [c.text for c in both_tied.cells[1]] == ["Label", "1.0", "2.0*"]
+
+    one_untied = _Table(["Label", "1.0", ""], ["", "", "2.0*"])
+    assert camelot_row_ties.join_tie_split_rows(one_untied, {0: {1}}) == []
+    assert [c.text for c in one_untied.cells[0]] == ["Label", "1.0", ""]
