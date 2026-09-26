@@ -278,3 +278,28 @@ def test_a_label_row_cannot_pull_data_rows_into_the_note():
     assert not any("12.5" in ln or "11.9" in ln for ln in note), note
     # Two-sided: the real note is still found.
     assert note and note[-1].startswith("Note."), note
+
+
+def test_a_reader_crash_names_itself_and_the_table_still_ships(monkeypatch):
+    """Rule 40: a recorded failure must be asserted. If the rotated reader raises,
+    the table falls back to the text-channel record, and the crash is named in
+    `method` (`rotated_read_failed:<Exception>`) and counted
+    (`rotated_table_read_exception`). Two-sided: on the healthy path neither
+    appears, and the table is the reader's grid."""
+    import docpluck.extract_structured as ES
+
+    healthy = _structured(_RSOS, camelot=False, monkeypatch=monkeypatch)
+    assert "rotated_read_failed" not in healthy["method"]
+    assert "rotated_table_read_exception" not in healthy["fallbacks"]
+    assert _table(healthy, "Table 1")["cell_geometry"] == "whitespace_rotated"
+
+    def boom(*a, **k):
+        raise RuntimeError("probe")
+
+    monkeypatch.setattr(ES, "read_rotated_table", boom)
+    crashed = _structured(_RSOS, camelot=False, monkeypatch=monkeypatch)
+    assert "rotated_read_failed:RuntimeError" in crashed["method"], crashed["method"]
+    assert "Table 1:RuntimeError" in crashed["fallback_details"]["rotated_table_read_exception"]
+    t1 = _table(crashed, "Table 1")
+    assert t1["cell_geometry"] != "whitespace_rotated"
+    assert t1["content_status"].startswith(("raw_text", "not_captured:"))
