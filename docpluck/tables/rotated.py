@@ -63,7 +63,11 @@ from itertools import pairwise
 
 from . import Cell
 from .captions import FIGURE_CAPTION_RE, TABLE_CAPTION_RE, CaptionMatch
-from .detect import _bbox_of_caption_line, line_is_rotated_furniture, rotated_caption_direction
+from .detect import (
+    _bbox_of_caption_line,
+    line_is_rotated_furniture,
+    rotated_caption_direction,
+)
 from .whitespace import WORD_GAP_RATIO
 
 Bbox = tuple[float, float, float, float]
