@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from typing import Literal, Optional, TypedDict
 
 from .extract import extract_pdf, count_pages
@@ -2013,7 +2014,7 @@ def _extract_caption_text(
 def _caption_span(
     raw_text: str,
     cap: CaptionMatch,
-    next_boundary: Optional[int] = None,
+    next_boundary: int | None = None,
 ) -> tuple[int, int, bool]:
     """Where the caption's text lies in ``raw_text``: ``(start, end,
     stopped_at_break)``. Split out of ``_extract_caption_text`` (2026-09-25) so
@@ -2951,12 +2952,20 @@ def _isolated_table_from_caption(
             if len(bounded) < len(cap_text):
                 cap_text = bounded
     reason: str | None = None
+    upright_rows = upright_row_texts(layout_page) if rotated else None
     if body_override is not None:
         body_text = body_override
     else:
-        body_text, reason = _extract_table_body_text_and_reason(raw_text, cap, next_boundary)
+        # On a sideways caption the line after a lone label may be an UPRIGHT
+        # running header ("Roth et al."), which must not be read as the title:
+        # the upright filter below owns those lines, and counts them.
+        body_text, reason = _extract_table_body_text_and_reason(
+            raw_text, cap, next_boundary,
+            title_line_ok=(
+                (lambda ln: not line_is_drawn_upright(ln, upright_rows)) if rotated else None
+            ),
+        )
     if rotated:
-        upright_rows = upright_row_texts(layout_page)
         banners = rotated_furniture() if rotated_furniture is not None else frozenset()
         lines = body_text.split("\n")
         caption_norm = _caption_dedupe_key(cap_text)
@@ -3282,6 +3291,7 @@ def _caption_tail_body_start(
     raw_text: str,
     cap: CaptionMatch,
     next_boundary: Optional[int] = None,
+    title_line_ok: Callable[[str], bool] | None = None,
 ) -> int:
     """RC-T (v2.4.119): find where a table's body text begins, walking past
     the caption sentence's (possibly wrapped) tail.
@@ -3350,6 +3360,7 @@ def _caption_tail_body_start(
             # next page, whose first line is its running header.
             if "\x0c" not in raw_text[nxt:nxt + step] + following and (
                 len(_TITLE_WORD_RE.findall(following)) >= 2
+                and (title_line_ok is None or title_line_ok(following.strip()))
             ):
                 # The label line still spends one line of the wrap budget, so
                 # the walk reaches no further into the page than it did before.
@@ -3460,6 +3471,8 @@ def _extract_table_body_text_and_reason(
     raw_text: str,
     cap: CaptionMatch,
     next_boundary: int | None = None,
+    *,
+    title_line_ok: Callable[[str], bool] | None = None,
 ) -> tuple[str, str | None]:
     """Pull the text following a Table caption (intended for use when
     Camelot failed to extract cells). Returns the cell content as a flat
@@ -3481,7 +3494,7 @@ def _extract_table_body_text_and_reason(
     text channels are supported: the line-by-line walk doesn't depend on
     paragraph delimiters being doubled.
     """
-    body_start = _caption_tail_body_start(raw_text, cap, next_boundary)
+    body_start = _caption_tail_body_start(raw_text, cap, next_boundary, title_line_ok)
     # NOTHING FALLS BETWEEN CAPTION AND BODY (2026-09-25). The walk above and
     # the caption's own span (`_caption_span`) are two opinions about where the
     # caption ends. Where the walk went further, the lines between belonged to
