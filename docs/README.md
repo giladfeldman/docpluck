@@ -100,11 +100,9 @@ caption as printed, and a trailing note set smaller than the table, or running a
 is in `footnote`. When the grid does not pass the gates — most often because a column is filled on
 too few rows for its boundary to be found — the table is **not** gridded: `raw_text` then holds its
 own lines **in reading order**, one column segment per line (`content_status == "raw_text"`), rather
-than a grid with two published columns in one cell. Over the 31 rotated table captions in the
-102-paper test corpus, 10 are gridded and 21 come back as reading-order text; with Camelot on, 27 of
-the 31 are captured by Camelot first and this path is not reached. Each read is counted as
+than a grid with two published columns in one cell. Over the 31 rotated table captions in the 102-paper test corpus, with Camelot off 11 are gridded and 20 come back as reading-order text; with Camelot on, Camelot captures 28 first, and of the 3 that reach this path 1 is gridded and 2 come back as text. Each read is counted as
 `rotated_table_read` (detail `<label>:grid` or `<label>:raw_text:<why>`), lines of the table's own
-direction that were not read as it (before its caption; dotted rules drawn as glyphs) as
+direction that were not read as it (before its caption; dotted rules drawn as glyphs; a banner recurring up the margin of most pages) as
 `rotated_table_lines_not_read`, and a reader failure — the record then falls back to the text
 channel — as `rotated_table_read_exception`.
 
