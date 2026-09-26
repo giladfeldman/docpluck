@@ -56,6 +56,7 @@ every Camelot cell shipped `(0.0, 0.0, 0.0, 0.0)`; they are now real pdfplumber-
 |---|---|
 | `verified:<fraction>` | real — round-trip-checked against the page's own characters |
 | `whitespace_native` | real — built directly from pdfplumber words |
+| `whitespace_rotated` | real — a table printed **sideways**, gridded in its own upright frame and mapped back to page space; the text inside each box runs up (or down) the page |
 | `no_cells` | there is no grid (caption-only / isolated table) |
 | anything else (`camelot_rotated_page:…`, `grid_shape_mismatch:…`, `roundtrip_failed:…`, `no_layout`) | zeros — we refused rather than guess |
 
@@ -78,7 +79,7 @@ Filter on it before reading `cells` or `raw_text`; an empty table is never just 
 |---|---|
 | `cells` | a grid was captured (`cells` is non-empty) |
 | `raw_text` | no grid; the text after the caption is given as a flat list in `raw_text` |
-| `not_captured:<reason>` | the caption is real and the table is **kept**, but nothing under it is the table's content: `cells` is empty and `raw_text` is `""`. Reasons: `rotated_table` (the table is printed sideways and nothing drawn as part of it followed the caption — docpluck cannot read a rotated table yet), `page_furniture_only` (only a running header/footer followed the caption), `body_prose_overshoot` (only the surrounding section's prose followed it), `no_text_after_caption`. Rendered Markdown says so under the caption. |
+| `not_captured:<reason>` | the caption is real and the table is **kept**, but nothing under it is the table's content: `cells` is empty and `raw_text` is `""`. Reasons: `rotated_table` (the table is printed sideways and its own frame could not be read either — see below), `page_furniture_only` (only a running header/footer followed the caption), `body_prose_overshoot` (only the surrounding section's prose followed it), `no_text_after_caption`. Rendered Markdown says so under the caption. |
 
 Before this field, a rotated table could ship with its page's running header as its content
 (`10.1038/s41467-024-45528-0` Table 4 had `raw_text="Article"`). For a table printed sideways,
@@ -88,7 +89,26 @@ repeat of the caption's own title are no longer kept in its `raw_text`; the tabl
 always are. Each `not_captured` table is also
 counted in the result's `fallbacks` as `table_content_not_captured`.
 
-**Trust the boxes only on `verified` or `whitespace_native`.** Every way of getting this wrong
+**Tables printed sideways are read in their own frame (new, 2026-09).** A table typeset rotated by
+90° — on a landscape page, or on half a page beside upright text — is read from its glyphs turned
+upright by their text matrix, and gridded with the same column clustering and quality gates as an
+upright table. Only glyphs that turn the **same way as the table's caption** are read, so upright
+body text beside the table and sideways page furniture drawn the other way round (a repository
+watermark, a running header along the page edge) are not part of it; nothing is removed from the
+document's text. Such a grid has `cell_geometry == "whitespace_rotated"`, its `caption` is the
+caption as printed, and a trailing note set smaller than the table, or running across its columns,
+is in `footnote`. When the grid does not pass the gates — most often because a column is filled on
+too few rows for its boundary to be found — the table is **not** gridded: `raw_text` then holds its
+own lines **in reading order**, one column segment per line (`content_status == "raw_text"`), rather
+than a grid with two published columns in one cell. Over the 31 rotated table captions in the
+102-paper test corpus, 10 are gridded and 21 come back as reading-order text; with Camelot on, 27 of
+the 31 are captured by Camelot first and this path is not reached. Each read is counted as
+`rotated_table_read` (detail `<label>:grid` or `<label>:raw_text:<why>`), lines of the table's own
+direction that were not read as it (before its caption; dotted rules drawn as glyphs) as
+`rotated_table_lines_not_read`, and a reader failure — the record then falls back to the text
+channel — as `rotated_table_read_exception`.
+
+**Trust the boxes only on `verified`, `whitespace_native` or `whitespace_rotated`.** Every way of getting this wrong
 produces coordinates that are plausible and off by a page, which is worse than none. Measured over
 69 shipped tables: 81.2% verified, 91.6% of cells carrying a real box. A verified bbox is the GRID
 RECTANGLE for that (row, column) — not a promise that `cells[i]["text"]` is exactly the text

@@ -186,6 +186,9 @@ def main() -> int:
             geometry_states[geom.split(":")[0]] += 1
             # GATE. Only a table whose rectangles were round-trip verified (or
             # are real by construction on the whitespace path) can speak here.
+            # `whitespace_rotated` boxes are real too, but their text runs up or
+            # down the page, and this scan measures gaps along the page's x --
+            # so a sideways table is excluded, not mis-measured.
             if not (geom.startswith("verified") or geom == "whitespace_native"):
                 continue
             tables_gated += 1

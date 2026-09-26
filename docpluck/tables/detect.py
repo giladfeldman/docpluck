@@ -357,6 +357,31 @@ def caption_orientation(page_obj, cap: CaptionMatch) -> str | None:
     upright one wins, because the upright reading is the one the text channel
     got right.
     """
+    found = _caption_line_orientation(page_obj, cap)
+    return None if found is None else found[0]
+
+
+def rotated_caption_direction(page_obj, cap: CaptionMatch) -> int | None:
+    """Which way a ROTATED caption reads: ``1`` up the page (text matrix
+    ``(0, s, -s, 0)``), ``-1`` down it (``(0, -s, s, 0)``), ``None`` when the
+    caption is not drawn rotated. Same evidence and same precedence as
+    :func:`caption_orientation`, which it shares its search with.
+
+    The direction matters because a wholly sideways page can carry sideways
+    FURNITURE drawn the other way round: on ``10.1098/rsos.140072`` p5 Table 1
+    reads upward and the journal's running header, printed along the opposite
+    edge, reads downward. A table's own glyphs all turn the same way as its
+    caption.
+    """
+    found = _caption_line_orientation(page_obj, cap)
+    if found is None or found[0] != "rotated":
+        return None
+    return found[1]
+
+
+def _caption_line_orientation(page_obj, cap: CaptionMatch) -> tuple[str, int] | None:
+    """``("upright", 0)``, ``("rotated", direction)`` or ``None``; see
+    :func:`caption_orientation` for the evidence and the precedence."""
     chars = getattr(page_obj, "chars", None) or ()
     if not chars:
         return None
@@ -381,10 +406,10 @@ def caption_orientation(page_obj, cap: CaptionMatch) -> str | None:
     for row in upright_rows.values():
         joined = "".join(c.get("text", "") for c in sorted(row, key=lambda c: c.get("x0", 0)))
         if _line_opens_with(_normalize_for_char_match(joined), needle):
-            return "upright"
-    for joined_norm in _rotated_line_texts(rotated_lines):
+            return ("upright", 0)
+    for (direction, _x), joined_norm in zip(rotated_lines, _rotated_line_texts(rotated_lines)):
         if _line_opens_with(joined_norm, needle):
-            return "rotated"
+            return ("rotated", direction)
     return None
 
 

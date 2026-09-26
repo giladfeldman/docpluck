@@ -21,6 +21,13 @@ typographic -- the caption's own glyphs are drawn with a rotated text matrix
 (`detect.caption_orientation`) -- and never the string ``Article``.
 
 Every assertion below is paired with its opposite.
+
+SINCE THE ROTATED READER (owner decision 2026-09-25, option B;
+``docpluck/tables/rotated.py``, tested in ``test_rotated_table_extraction_real_pdf``)
+Table 4 is READ, not labelled: it is a 14x5 grid. The label path below is now the
+fallback for a rotated caption whose own frame cannot be read, so each test of it
+first disables the reader (``_without_rotated_reader``) and a paired test shows
+what the reader delivers instead.
 """
 
 import pytest
@@ -51,6 +58,19 @@ def structured(pdf_bytes):
     from docpluck.extract_structured import extract_pdf_structured
 
     return extract_pdf_structured(pdf_bytes)
+
+
+@pytest.fixture(scope="module")
+def structured_without_reader(pdf_bytes):
+    """The pipeline with the rotated reader disabled: the fallback this file pins."""
+    import docpluck.extract_structured as ES
+
+    mp = pytest.MonkeyPatch()
+    try:
+        mp.setattr(ES, "_read_rotated_table", lambda *a, **k: None)
+        return ES.extract_pdf_structured(pdf_bytes)
+    finally:
+        mp.undo()
 
 
 def _tables_by_label(result) -> dict:
@@ -90,7 +110,18 @@ def test_caption_orientation_reads_the_glyph_matrix(pdf_bytes, layout):
     assert [k for k, v in verdicts.items() if "rotated" in v] == [("table", "Table 4")]
 
 
-def test_rotated_table_is_kept_and_labelled_not_captured(structured):
+def test_rotated_table_is_read_when_its_frame_can_be_read(structured):
+    """The reader's side of the pair below: Table 4 is a grid, nothing is
+    labelled not-captured, and the running header is not its content."""
+    t4 = _tables_by_label(structured)["Table 4"]
+    assert t4["content_status"] == "cells" and t4["cells"]
+    assert t4["cell_geometry"] == "whitespace_rotated"
+    assert "Article" not in " ".join(c["text"] for c in t4["cells"])
+    assert not structured["fallback_details"].get("table_content_not_captured")
+
+
+def test_rotated_table_is_kept_and_labelled_not_captured(structured_without_reader):
+    structured = structured_without_reader
     tables = _tables_by_label(structured)
     t4 = tables.get("Table 4")
     assert t4 is not None, f"Table 4 must be KEPT: {sorted(tables)}"
@@ -110,8 +141,9 @@ def test_rotated_table_is_kept_and_labelled_not_captured(structured):
     assert "Table 4:rotated_table" in structured["fallback_details"]["table_content_not_captured"]
 
 
-def test_upright_tables_on_the_same_paper_keep_their_cells(structured):
+def test_upright_tables_on_the_same_paper_keep_their_cells(structured_without_reader):
     """Two-sided: the rotated verdict must not reach the paper's upright tables."""
+    structured = structured_without_reader
     tables = _tables_by_label(structured)
     for label in ("Table 1", "Table 2", "Table 3"):
         t = tables.get(label)
@@ -138,7 +170,8 @@ def test_the_gate_detects_the_regression_it_exists_for(pdf_bytes, monkeypatch):
     running header as Table 4's content, and the caption running on into it."""
     import docpluck.extract_structured as ES
 
-    monkeypatch.setattr(ES, "caption_orientation", lambda page, cap: None)
+    monkeypatch.setattr(ES, "caption_orientation", lambda *a, **k: None)
+    monkeypatch.setattr(ES, "_read_rotated_table", lambda *a, **k: None)
     t4 = _tables_by_label(ES.extract_pdf_structured(pdf_bytes))["Table 4"]
     assert t4["raw_text"] == "Article", repr(t4["raw_text"])
     assert t4["content_status"] == "raw_text"
@@ -186,6 +219,10 @@ def test_with_camelot_off_a_rotated_tables_values_are_kept(monkeypatch):
     assert t7["kind"] == "isolated", "the Camelot-off arm must reach the caption-only path"
     assert "0.76 [0.67, 0.86]" in t7["raw_text"], repr(t7["raw_text"][:300])
     assert t7["content_status"] == "raw_text", t7["content_status"]
+    # Since the rotated reader: the text is the table's own, in reading order --
+    # the first row's label precedes its values.
+    raw = t7["raw_text"]
+    assert raw.index("Had fight/argument") < raw.index("42.63") < raw.index("0.76 [0.67, 0.86]")
 
 
 def test_with_camelot_off_upright_furniture_alone_is_not_content(monkeypatch):
@@ -194,10 +231,20 @@ def test_with_camelot_off_upright_furniture_alone_is_not_content(monkeypatch):
     the upright running header ``Roth et al.`` and
     ``Page 24``. Both are drawn upright, so both go, nothing is left, and the table
     is kept as not captured -- and its caption no longer carries them."""
+    import docpluck.extract_structured as ES
     from docpluck.extract_structured import extract_pdf_structured
 
     monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
     data = require_corpus_pdf("asa/socius_5.pdf").read_bytes()
+    # The reader's side: Table 2's summary statistics, in reading order, and
+    # neither upright line.
+    read = _tables_by_label(extract_pdf_structured(data))["Table 2"]
+    assert read["content_status"] == "raw_text"
+    assert "284.32\n115.08\n46.50\n1,226.00" in read["raw_text"], read["raw_text"][:300]
+    for upright in ("Roth et al.", "Page 24"):
+        assert upright not in read["raw_text"] and upright not in read["caption"]
+    # The fallback's side, with the reader disabled:
+    monkeypatch.setattr(ES, "_read_rotated_table", lambda *a, **k: None)
     result = extract_pdf_structured(data)
     t2 = _tables_by_label(result)["Table 2"]
     assert t2["raw_text"] == "", repr(t2["raw_text"])
@@ -220,8 +267,13 @@ def test_a_sideways_margin_banner_is_not_a_rotated_tables_content(monkeypatch):
     from docpluck.extract_structured import extract_pdf_structured
 
     data = require_corpus_pdf("harvard/ar_royal_society_rsos_140072.pdf").read_bytes()
+    import docpluck.extract_structured as ES
+
     with monkeypatch.context() as m:
         m.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
+        # The label fallback, which is what this test pins: the rotated reader
+        # (tests/test_rotated_table_extraction_real_pdf.py) grids this table.
+        m.setattr(ES, "_read_rotated_table", lambda *a, **k: None)
         t1 = _tables_by_label(extract_pdf_structured(data))["Table 1"]
     assert t1["raw_text"] == "", repr(t1["raw_text"])
     assert t1["content_status"] == "not_captured:rotated_table"
@@ -238,8 +290,17 @@ def test_with_camelot_off_a_watermark_goes_and_the_values_stay(monkeypatch):
     watermark must leave the table's text and its values must not."""
     from docpluck.extract_structured import extract_pdf_structured
 
+    import docpluck.extract_structured as ES
+
     monkeypatch.setenv("DOCPLUCK_DISABLE_CAMELOT", "1")
     data = require_corpus_pdf("asa/socius_2.pdf").read_bytes()
+    # The reader's side: a grid, with the values and without the watermark.
+    read = _tables_by_label(extract_pdf_structured(data))["Table 1"]
+    assert read["content_status"] == "cells"
+    read_text = " ".join(c["text"] for c in read["cells"]) + " " + read["caption"]
+    assert "72.8" in read_text and "Author Manuscript" not in read_text
+    # The fallback's side, with the reader disabled:
+    monkeypatch.setattr(ES, "_read_rotated_table", lambda *a, **k: None)
     t1 = _tables_by_label(extract_pdf_structured(data))["Table 1"]
     assert "Author Manuscript" not in t1["raw_text"], repr(t1["raw_text"][:200])
     lines = t1["raw_text"].split("\n")
@@ -271,9 +332,24 @@ def test_a_rotated_captions_own_title_is_not_its_content():
     )
 
 
-def test_rendered_markdown_keeps_the_heading_and_says_why(pdf_bytes):
+def test_rendered_markdown_shows_the_read_table(pdf_bytes):
+    """The reader's side: Table 4 renders as a grid with its values, and no
+    table on the paper says "not captured"."""
     from docpluck.render import render_pdf_to_markdown
 
+    md = render_pdf_to_markdown(pdf_bytes)
+    at = md.find("### Table 4")
+    assert at != -1
+    block = md[at:at + 6000]
+    assert "<table" in block and "-5.9 (-10.3, -1.4) P = 0.03" in block
+    assert "Table content not captured (" not in md
+
+
+def test_rendered_markdown_keeps_the_heading_and_says_why(pdf_bytes, monkeypatch):
+    import docpluck.extract_structured as ES
+    from docpluck.render import render_pdf_to_markdown
+
+    monkeypatch.setattr(ES, "_read_rotated_table", lambda *a, **k: None)
     md = render_pdf_to_markdown(pdf_bytes)
     at = md.find("### Table 4")
     assert at != -1, "Table 4 heading must be kept"

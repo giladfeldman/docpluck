@@ -97,3 +97,35 @@ def test_prose_cells_still_rejected(cell: str):
 def test_empty_and_whitespace_are_not_data():
     assert _is_clean("") is False
     assert _is_clean("   ") is False
+
+
+# 2026-09-25: single-letter statistic markers are data ONLY in the rotated frame
+# (`marker_letters=True`). Every value cell of 10.1038/s41467-024-45528-0 Table 4
+# carries its own P -- these are its cells, verbatim. On the upright path the
+# default stays letter-free: admitting letters there let four garbled grids
+# through over the corpus (see `_CLEAN_DATA_ALLOWED_RE`). Both sides are pinned.
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "−152 (−1528, 1223) P = 0.86",
+        "0.11 (0.04, 0.33) P = 0.001",
+        "−405 (−738, −73) P=0.05",
+    ],
+)
+def test_single_letter_statistic_markers_are_data_in_the_rotated_frame(cell: str):
+    assert _cell_is_clean_data(cell, marker_letters=True) is True, cell
+    assert _is_clean(cell) is False, cell
+
+
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "Colostrum n=25",            # column head: a real word beside the n
+        "SD 2.1",                    # two letters is a word, as the comment says
+        "Study 1",
+        "ηp2 = .06",                 # unchanged: non-ASCII letters were never admitted
+    ],
+)
+def test_a_two_letter_run_still_disqualifies(cell: str):
+    assert _is_clean(cell) is False, cell
+    assert _cell_is_clean_data(cell, marker_letters=True) is False, cell

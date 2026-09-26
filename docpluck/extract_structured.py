@@ -32,9 +32,11 @@ from .tables.detect import (
     line_is_drawn_upright,
     line_is_rotated_furniture,
     recurring_rotated_lines,
+    rotated_caption_direction,
     rotated_caption_end,
     upright_row_texts,
 )
+from .tables.rotated import read_rotated_table
 from .tables.camelot_extract import (
     CAMELOT_UNAVAILABLE_EVENTS,
     extract_tables_camelot,
@@ -566,6 +568,42 @@ def _extract_pdf_structured(
                 record_fallback("whitespace_cells_region_exception", detail=exc_name)
                 method_pieces.append(f"whitespace_region_failed:{exc_name}")
                 cells = []
+        # A table PRINTED SIDEWAYS that no capture above gridded (owner decision
+        # 2026-09-25, option B): read it in its own frame -- its glyphs turned
+        # upright by their text matrix -- and grid it with the whitespace path's
+        # clustering and gates. See `docpluck/tables/rotated.py`.
+        layout_page = None
+        if layout_doc is not None:
+            pages = getattr(layout_doc, "pages", None) or ()
+            if 1 <= cap.page <= len(pages):
+                layout_page = pages[cap.page - 1]
+        rotated_read = None
+        if not cells and layout_page is not None:
+            rotated_read = _read_rotated_table(layout_page, cap, _rotated_furniture)
+            if rotated_read is not None:
+                if rotated_read.cells:
+                    cells = rotated_read.cells
+                    method_pieces.append("rotated_whitespace_cells")
+                record_fallback(
+                    "rotated_table_read",
+                    detail=(
+                        f"{cap.label or '?'}:grid" if rotated_read.cells
+                        else f"{cap.label or '?'}:raw_text:{rotated_read.grid_rejected}"
+                    ),
+                )
+                if rotated_read.lines_before_caption or rotated_read.dotted_rules or rotated_read.banner_lines:
+                    # Glyphs turned the caption's way that were NOT read as this
+                    # table. Nothing is removed from the document; this says that
+                    # the table record does not carry them (DELETE FURNITURE,
+                    # NEVER DATA -- and count what you did not read).
+                    record_fallback(
+                        "rotated_table_lines_not_read",
+                        detail=(
+                            f"{cap.label or '?'}:before_caption={rotated_read.lines_before_caption}"
+                            f",dotted_rules={rotated_read.dotted_rules}"
+                            f",banner={rotated_read.banner_lines}"
+                        ),
+                    )
         # Side-by-side caption: rebuild from the caption's own column so it can't
         # absorb the sibling caption across the gutter (chandrashekar Table 3,
         # which falls to this fallback because its left column is a 1-column
@@ -585,16 +623,23 @@ def _extract_pdf_structured(
         if cells:
             n_rows = max((c["r"] for c in cells), default=-1) + 1
             n_cols = max((c["c"] for c in cells), default=-1) + 1
-            cap_text = sbs_caption or _extract_caption_text(
-                rejoined, cap, next_boundary_by_id.get(id(cap))
-            )
+            from_rotated = rotated_read is not None and bool(rotated_read.cells)
+            if from_rotated and rotated_read.caption:
+                # The text channel's caption for a sideways table runs on into
+                # whatever pdftotext emits next (`Table 1. Author Manuscript` on
+                # 10.1177/23780231251314667); the rotated frame's is as printed.
+                cap_text = _finish_caption_label(rotated_read.caption, cap)
+            else:
+                cap_text = sbs_caption or _extract_caption_text(
+                    rejoined, cap, next_boundary_by_id.get(id(cap))
+                )
             tables.append({
                 "id": f"t{cap.number}",
                 "label": cap.label,
                 "page": cap.page,
                 "bbox": (0.0, 0.0, 0.0, 0.0),
                 "caption": cap_text,
-                "footnote": None,
+                "footnote": rotated_read.footnote if from_rotated else None,
                 # SCHEMA VIOLATION FIXED v2.4.133 (register C4). This path used
                 # to emit `kind="whitespace"` / `rendering="structured"` — both
                 # outside their declared Literal types, and transposed relative
@@ -625,9 +670,16 @@ def _extract_pdf_structured(
                 # converts INTO. Leaving the field unset here reported this path
                 # as geometry-less when it was the reference implementation the
                 # Camelot path is validated against.
-                "cell_geometry": "whitespace_native",
+                #
+                # A ROTATED table's cells are built the same way in the table's
+                # own upright frame and mapped back to page space, so they are
+                # real page rectangles too -- but a consumer comparing a box's
+                # width with its text's must know the text runs up (or down) the
+                # page inside it, so the state is named separately.
+                "cell_geometry": "whitespace_rotated" if from_rotated else "whitespace_native",
             })
-            method_pieces.append("whitespace_cells")
+            if not from_rotated:
+                method_pieces.append("whitespace_cells")
             # The provisional rejection guarantees only that SOMETHING replaces the
             # rejected candidate, never that the replacement is as large. Usually
             # smaller IS correct — 10.48550/arxiv.2406.11713 Table 5 goes 18 cells
@@ -646,17 +698,13 @@ def _extract_pdf_structured(
                     ),
                 )
         else:
-            layout_page = None
-            if layout_doc is not None:
-                pages = getattr(layout_doc, "pages", None) or ()
-                if 1 <= cap.page <= len(pages):
-                    layout_page = pages[cap.page - 1]
             isolated = _isolated_table_from_caption(
                 cap, rejoined, next_boundary_by_id.get(id(cap)),
                 caption_override=sbs_caption,
                 body_override=sbs_body,
                 layout_page=layout_page,
                 rotated_furniture=_rotated_furniture if layout_doc is not None else None,
+                rotated_read=rotated_read,
             )
             # A prose-rejected candidate is only actually dropped once something
             # replaces it. If the fallback carries no body text either, the
@@ -1890,6 +1938,53 @@ def _rescue_duplicate_starved_captions(
     return reassigned
 
 
+def _finish_caption_label(snippet: str, cap: CaptionMatch) -> str:
+    """The label and whitespace finishing every table/figure caption gets, from
+    whichever channel it was read: soft-hyphen rejoin, whitespace collapse, the
+    label re-prefixed in its canonical form, a duplicate ALL-CAPS label and a
+    PMC running header between label and title removed.
+
+    Factored out of `_extract_caption_text` (2026-09-25) so that a caption read
+    in a ROTATED table's own frame (`tables.rotated`) is finished the same way as
+    one read from the text channel: before, 10.5465/amd.20150115 Table 1 came out
+    ``TABLE 1 Correlations of Model Variables`` from the rotated frame and
+    ``Table 1. Correlations of Model Variables`` from the text channel.
+    """
+    # v2.3.0 soft-hyphen rejoin (per `an internal handoff doc (2026-05-11)`
+    # "Soft-hyphen artifacts in captions" — chen.pdf showed `Sup­ plementary`).
+    # Captions don't flow through ``normalize_text``, so apply the same
+    # rejoin here. ``­`` followed by any whitespace = word-wrap artifact
+    # → drop both. Orphan ``­`` is also invisible by Unicode and gets
+    # dropped.
+    snippet = re.sub("­\\s+", "", snippet)
+    snippet = snippet.replace("­", "")
+    # Collapse runs of any whitespace (including U+2002 EN SPACE, etc.) to a
+    # single space; many APA PDFs use unusual spaces between label and caption.
+    snippet = re.sub(r"\s+", " ", snippet)
+    # Strip leading orphan punctuation that can occur when the rejoin produced
+    # a partial caption (e.g., "Table 1. : Studies 1b and 3...").
+    snippet = re.sub(r"^[\s.:\-—–]+", "", snippet)
+    # Re-prefix the label if stripping ate it.
+    if cap.label and not snippet.startswith(cap.label):
+        snippet = f"{cap.label}. {snippet}".strip()
+    # v2.4.25: strip a duplicate ALL-CAPS label that pdftotext often
+    # captures alongside the title-case caption label (AOM / IEEE PMC
+    # patterns: "Figure 1. FIGURE 1 Theoretical Framework …", "Figure 2.
+    # FIGURE 2. Continuous-time …"). Keep title-case label, drop the
+    # ALL-CAPS one.
+    snippet = _strip_duplicate_uppercase_label(snippet, cap.label)
+    # Cycle 15n (v2.4.31): when the paragraph-walk above absorbs a
+    # cross-page running header that pdftotext placed BETWEEN the
+    # caption's label line and the description (PMC reprint pattern:
+    # ``FIGURE 4.\n\nAuthor Manuscript\n\nTwo options …``), the
+    # running header survives into the snippet as a leading prefix
+    # after the label. Strip a sequence of "Author Manuscript " (one
+    # or more occurrences) that sits between the label and the
+    # description.
+    snippet = _strip_leading_pmc_running_header(snippet)
+    return snippet
+
+
 def _extract_caption_text(
     raw_text: str,
     cap: CaptionMatch,
@@ -1994,38 +2089,7 @@ def _extract_caption_text(
         if len(trimmed) < len(region):
             hard_end = start + len(trimmed)
     snippet = raw_text[start:hard_end].replace("\n", " ").strip()
-    # v2.3.0 soft-hyphen rejoin (per `an internal handoff doc (2026-05-11)`
-    # "Soft-hyphen artifacts in captions" — chen.pdf showed `Sup­ plementary`).
-    # Captions don't flow through ``normalize_text``, so apply the same
-    # rejoin here. ``­`` followed by any whitespace = word-wrap artifact
-    # → drop both. Orphan ``­`` is also invisible by Unicode and gets
-    # dropped.
-    snippet = re.sub("­\\s+", "", snippet)
-    snippet = snippet.replace("­", "")
-    # Collapse runs of any whitespace (including U+2002 EN SPACE, etc.) to a
-    # single space; many APA PDFs use unusual spaces between label and caption.
-    snippet = re.sub(r"\s+", " ", snippet)
-    # Strip leading orphan punctuation that can occur when the rejoin produced
-    # a partial caption (e.g., "Table 1. : Studies 1b and 3...").
-    snippet = re.sub(r"^[\s.:\-—–]+", "", snippet)
-    # Re-prefix the label if stripping ate it.
-    if cap.label and not snippet.startswith(cap.label):
-        snippet = f"{cap.label}. {snippet}".strip()
-    # v2.4.25: strip a duplicate ALL-CAPS label that pdftotext often
-    # captures alongside the title-case caption label (AOM / IEEE PMC
-    # patterns: "Figure 1. FIGURE 1 Theoretical Framework …", "Figure 2.
-    # FIGURE 2. Continuous-time …"). Keep title-case label, drop the
-    # ALL-CAPS one.
-    snippet = _strip_duplicate_uppercase_label(snippet, cap.label)
-    # Cycle 15n (v2.4.31): when the paragraph-walk above absorbs a
-    # cross-page running header that pdftotext placed BETWEEN the
-    # caption's label line and the description (PMC reprint pattern:
-    # ``FIGURE 4.\n\nAuthor Manuscript\n\nTwo options …``), the
-    # running header survives into the snippet as a leading prefix
-    # after the label. Strip a sequence of "Author Manuscript " (one
-    # or more occurrences) that sits between the label and the
-    # description.
-    snippet = _strip_leading_pmc_running_header(snippet)
+    snippet = _finish_caption_label(snippet, cap)
     # v2.4.4: trim chart-data appendage from figure captions (axis-tick
     # sequences, raw bar-chart values pdftotext joined inline into the
     # caption paragraph). For tables the appendage is usually the next-
@@ -2740,6 +2804,24 @@ def _line_repeats_caption(line: str, caption_key: str) -> bool:
     )
 
 
+def _read_rotated_table(layout_page, cap: CaptionMatch, banners=None):
+    """``tables.rotated.read_rotated_table``, with a failure COUNTED, never raised
+    and never silent: the caller then falls through to the text-channel record
+    exactly as before this path existed."""
+    try:
+        # `banners` is the memoised banner-set factory: computed only when a
+        # caption actually turns out rotated.
+        if banners is not None and rotated_caption_direction(layout_page, cap) is not None:
+            return read_rotated_table(layout_page, cap, banners())
+        return read_rotated_table(layout_page, cap)
+    except Exception as exc:  # noqa: BLE001 -- counted below, and the record still ships
+        record_fallback(
+            "rotated_table_read_exception",
+            detail=f"{cap.label or '?'}:{type(exc).__name__}",
+        )
+        return None
+
+
 def _isolated_table_from_caption(
     cap: CaptionMatch,
     raw_text: str,
@@ -2749,6 +2831,7 @@ def _isolated_table_from_caption(
     body_override: Optional[str] = None,
     layout_page=None,
     rotated_furniture=None,
+    rotated_read=None,
 ) -> Table:
     """Build an isolated (cellless) Table dict for a caption with no Camelot match.
 
@@ -2796,7 +2879,30 @@ def _isolated_table_from_caption(
     not already catch, and 40 of the 102 papers have no recurring header it
     could key on. A rule with no observed independent firing is surface
     without benefit.
+
+    ``rotated_read`` (owner decision 2026-09-25, option B) supersedes all of the
+    above for a table whose rotated frame could be read
+    (``tables.rotated.read_rotated_table``) but did not grid: its caption is the
+    caption as printed in that frame, its ``raw_text`` the table's own lines in
+    reading order, and its ``footnote`` the note set smaller beneath it. The
+    text-channel walk it replaces is not a superset of it -- pdftotext emits a
+    sideways table's cells elsewhere on the page -- so this is a re-read, not a
+    filter.
     """
+    if rotated_read is not None:
+        if caption_override:
+            rot_caption = caption_override
+        elif rotated_read.caption:
+            rot_caption = _finish_caption_label(rotated_read.caption, cap)
+        else:
+            rot_caption = _extract_caption_text(raw_text, cap, next_boundary)
+        return _isolated_record(
+            cap,
+            caption=rot_caption,
+            body_text=rotated_read.raw_text,
+            reason=None if rotated_read.raw_text else "rotated_table",
+            footnote=rotated_read.footnote,
+        )
     rotated = layout_page is not None and caption_orientation(layout_page, cap) == "rotated"
     cap_text = caption_override or _extract_caption_text(raw_text, cap, next_boundary)
     if rotated and caption_override is None:
@@ -2844,13 +2950,25 @@ def _isolated_table_from_caption(
         body_text = "\n".join(kept).strip()
         if not body_text:
             reason = "rotated_table"
+    return _isolated_record(cap, caption=cap_text, body_text=body_text, reason=reason)
+
+
+def _isolated_record(
+    cap: CaptionMatch,
+    *,
+    caption: str,
+    body_text: str,
+    reason: str | None,
+    footnote: str | None = None,
+) -> Table:
+    """The cellless Table dict ``_isolated_table_from_caption`` returns."""
     return {
         "id": f"t{cap.number}",
         "label": cap.label,
         "page": cap.page,
         "bbox": (0.0, 0.0, 0.0, 0.0),
-        "caption": cap_text,
-        "footnote": None,
+        "caption": caption,
+        "footnote": footnote,
         "kind": "isolated",
         "rendering": "isolated",
         "confidence": None,

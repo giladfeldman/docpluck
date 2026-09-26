@@ -203,7 +203,8 @@ should know where they are:
   v2.4.135). Every Camelot cell used to ship `(0.0, 0.0, 0.0, 0.0)`; they are now genuine
   pdfplumber-space rectangles `(x0, top, x1, bottom)`, the same convention the whitespace path
   already used. **Gate on the field**: trust the boxes when it starts with `verified` or equals
-  `whitespace_native`; on `camelot_rotated_page:…`, `grid_shape_mismatch:…`,
+  `whitespace_native` or `whitespace_rotated` (a sideways table, gridded upright and mapped back
+  to page space); on `camelot_rotated_page:…`, `grid_shape_mismatch:…`,
   `roundtrip_failed:…` or `no_layout` the boxes are zeros because we refused rather than guess.
   We refuse because every way of getting this wrong yields coordinates that are *plausible and off
   by a page* — worse than none. Measured over 69 shipped tables: **81.2% verified, 5,206 of 5,686

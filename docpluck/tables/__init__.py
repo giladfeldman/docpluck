@@ -43,12 +43,17 @@ CaptionStatus = Literal["matched", "none_found", "uncaptioned_candidate"]
 #                              nothing under it is the table's content. `cells`
 #                              is empty and `raw_text` is "". The reasons:
 #       rotated_table         the caption is drawn sideways (a 90-degree text
-#                             matrix): the table is printed rotated, and nothing
-#                             that followed the caption was drawn as part of it
-#                             -- only upright lines (running header, page
-#                             number, body prose), sideways margin banners or
-#                             watermarks recurring on most pages, or the
-#                             caption's own title again; all are dropped.
+#                             matrix) and the table's own frame could not be
+#                             read either (`tables.rotated.read_rotated_table`,
+#                             owner decision 2026-09-25): nothing that followed
+#                             the caption was drawn as part of it -- only upright
+#                             lines (running header, page number, body prose),
+#                             sideways margin banners or watermarks recurring on
+#                             most pages, or the caption's own title again; all
+#                             are dropped. When the frame CAN be read the table
+#                             is gridded (`cell_geometry == "whitespace_rotated"`)
+#                             or its own lines come back in reading order as
+#                             `raw_text`.
 #       page_furniture_only   everything after the caption was page-break
 #                             furniture: the next page's running header plus a
 #                             page marker (`_raw_text_is_page_furniture_only`).
@@ -120,7 +125,10 @@ class Table(TypedDict):
     # `"verified:<fraction>"` when the round-trip identity guard passed and every
     # cell rectangle is a genuine pdfplumber-space box; otherwise
     # `"<reason>"` naming the refusal (`no_layout`, `camelot_rotated_page:...`,
-    # `grid_shape_mismatch:...`, `roundtrip_failed:...`). Never absent and never
+    # `grid_shape_mismatch:...`, `roundtrip_failed:...`). `"whitespace_native"`
+    # and `"whitespace_rotated"` are real by construction (the latter: a sideways
+    # table gridded in its upright frame, boxes mapped back to page space, the
+    # text inside each running up or down the page). Never absent and never
     # silent: a zero bbox with no reason is indistinguishable from a document
     # that simply had no rotated pages. See `docpluck/tables/cell_geometry.py`.
     cell_geometry: Optional[str]

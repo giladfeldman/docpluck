@@ -15,7 +15,8 @@ Returns [] when fewer than 3 rows or fewer than 2 columns can be derived.
 from __future__ import annotations
 
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
+from itertools import pairwise
 from typing import Any
 
 from docpluck.extract_layout import LayoutDoc
@@ -30,7 +31,6 @@ from .cell_cleaning import (
 )
 from .detect import CandidateRegion
 
-
 WHITESPACE_MIN_ROWS: int = 3
 ROW_GAP_RATIO: float = 1.2
 ROW_GAP_FLOOR_PT: float = 5.0
@@ -38,6 +38,16 @@ COLUMN_GAP_PT: float = 5.0
 COLUMN_STABILITY_FRACTION: float = 0.6
 HEADER_HEIGHT_RATIO: float = 1.05
 BODY_HEIGHT_FALLBACK: float = 10.0
+
+# Word break inside a line whose glyphs carry no space glyph, as a fraction of the
+# font size: the rotated-table path (`docpluck.tables.rotated`) splits words at
+# it and `_text_by_lines` re-joins a touching sub/superscript at it. MEASURED, not
+# borrowed: over the 31 rotated-table pages of the corpus manifest, consecutive
+# glyphs on one line sit either <= 0.02 font sizes apart (34,618 pairs: inside a
+# word) or >= 0.09 (word spaces, most at 0.16-0.34), with none between.
+# `extract_layout._join_chars_with_spaces`'s 0.20 would glue the 2,068 pairs at
+# 0.19 -- every word of 10.1098/rsos.140072 p5's Table 1 caption.
+WORD_GAP_RATIO: float = 0.10
 
 # A row taller than this multiple of the row threshold is a SMEAR — the signature
 # that licenses anchor-relative re-clustering. Same factor the census defaults to
@@ -178,6 +188,307 @@ def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list
     if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
         return []
     return repair_cells(cells, layout=layout)
+
+
+def rotated_frame_cells(
+    words: list[dict[str, Any]], *, own_caption_number: int | None = None
+) -> tuple[list[Cell], str | None]:
+    """Grid a ROTATED table's words, already turned upright by
+    ``docpluck.tables.rotated``, with the same clustering and the same gates as
+    :func:`whitespace_cells`. Returns ``(cells, None)`` or ``([], reason)``.
+
+    Two things differ from the upright word path, both measured on
+    ``10.1038/s41467-024-45528-0`` Table 4 (p6, printed sideways), and both are
+    why this is a separate entry point rather than a flag on the upright one
+    (whose output would otherwise move for every upright table):
+
+    * **Columns are voted on column STARTS, not gap midpoints.** The words here
+      are real words (rotated glyphs carry no space glyph, so the caller splits
+      them on a font-relative gap, L-007), and a label column of ragged width
+      scatters gap midpoints so no boundary reaches the stability threshold --
+      the upright word path found ``[50, 735]``, one column. The char path's
+      start-edge voting finds the four data columns at x=369/462/562/650, but at
+      its 12pt char gap it misses the last: two of that table's column gaps are
+      6.3pt. At word level the separation is ``COLUMN_GAP_PT`` (5pt) against a
+      measured 1.8-2.4pt word space, so both are used here: start-edge voting on
+      words.
+    * **A cell's text is assembled LINE BY LINE.** Row clustering merges the
+      visual lines of a two-line cell into one row, which is right, but sorting
+      its words by x alone interleaves them (``Composite Care, score adjusted
+      ...``). Words are grouped into lines first (:func:`_text_by_lines`).
+
+    And one gate is added: :func:`_grid_has_inner_gutter`. A rotated table
+    reaches this path because Camelot did not grid it, so there is no second
+    capture to arbitrate against, and an UNDER-segmented grid -- two published
+    columns fused into one cell -- puts values under the wrong header, which is
+    worse than the flat text the caller falls back to.
+    """
+    words = [w for w in words if (w.get("text") or "").strip()]
+    if len(words) < WHITESPACE_MIN_ROWS:
+        return [], "too_few_words"
+    # Rows are clustered from printed LINES, not from words (`_rows_from_lines`),
+    # so that a subscript cannot chain two rows: on 10.1001/jamanetworkopen.
+    # 2023.39337 Table 2 the ``1c`` of ``HbA1c``, clustered as a word, sat between
+    # the HbA1c row and the next and merged their values into shared cells.
+    rows = _rows_from_lines(_visual_lines(words))
+    if len(rows) < WHITESPACE_MIN_ROWS:
+        return [], "too_few_rows"
+    bbox = (
+        min(w["x0"] for w in words),
+        min(w["top"] for w in words),
+        max(w["x1"] for w in words),
+        max(w["bottom"] for w in words),
+    )
+    column_xs = _find_stable_column_boundaries(
+        rows, bbox=bbox, gap_pt=COLUMN_GAP_PT, bucket_pt=CHAR_BOUNDARY_BUCKET_PT
+    )
+    if len(column_xs) < 3:
+        return [], "no_stable_columns"
+    body_height = _modal_word_height(words)
+    header_row_is_header = _row_is_header(rows[0], body_height)
+    columns = list(pairwise(column_xs))
+
+    def column_of(w: dict[str, Any]) -> int:
+        mid = (w["x0"] + w["x1"]) / 2
+        return next((i for i, (a, b) in enumerate(columns) if a <= mid <= b), len(columns) - 1)
+
+    assigned = [{id(w): column_of(w) for w in row_words} for row_words in rows]
+    _keep_header_phrases_whole(rows, assigned, column_of)
+    cells: list[Cell] = []
+    cell_words: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for r, row_words in enumerate(rows):
+        row_top = min(w["top"] for w in row_words)
+        row_bot = max(w["bottom"] for w in row_words)
+        for c, (x_left, x_right) in enumerate(columns):
+            in_cell = [w for w in row_words if assigned[r][id(w)] == c]
+            cell_words[(r, c)] = in_cell
+            cells.append({
+                "r": r,
+                "c": c,
+                "rowspan": 1,
+                "colspan": 1,
+                "text": _normalize_cell_text(_text_by_lines(in_cell)),
+                "is_header": header_row_is_header if r == 0 else False,
+                "bbox": (x_left, row_top, x_right, row_bot),
+            })
+    if _grid_has_inner_gutter(cell_words.values()):
+        return [], "column_fused_in_cell"
+    cells = _trim_trailing_prose_rows(cells)
+    if not _whitespace_grid_is_clean(cells, own_caption_number=own_caption_number, rotated_frame=True):
+        return [], "grid_not_clean"
+    return repair_cells(cells), None
+
+
+def _keep_header_phrases_whole(rows, assigned, column_of) -> None:
+    """In the table's HEADER rows, keep a phrase in one cell when a column
+    boundary falls between two of its words that sit a word space apart
+    (<= ``COLUMN_GAP_PT``) on one line. Mutates ``assigned`` in place.
+
+    A spanning column head is wider than the column it is voted into, so the
+    boundary cuts it: on 10.1177/23780231251321549 Table 2 (p23, sideways)
+    ``Model 5`` came out as ``Model`` | ``5``, and the lone ``5`` was then
+    blanked by the HTML cleaner as a leaked page number
+    (``cell_cleaning_running_header_cell_blanked``) -- a header lost with a
+    count but no reason. The whole phrase goes to the column under its MIDDLE:
+    10.1177/23780231221103044 Table 1's ``Total Students (Grades 3-8)`` starts
+    in the label column's x-range and spans the two data columns it heads.
+
+    Header rows only: the leading rows with fewer than two data cells (a lone
+    ``5`` split off a head must not make its row "data"). In a data row a sub-5pt
+    gap at a boundary can be two tight VALUES, and joining them would fuse two
+    published numbers into one cell.
+    """
+    for r, row_words in enumerate(rows):
+        texts: dict[int, list[str]] = {}
+        for w in row_words:
+            texts.setdefault(assigned[r][id(w)], []).append(w.get("text", ""))
+        if sum(1 for t in texts.values() if _cell_is_clean_data(" ".join(t), marker_letters=True)) >= 2:
+            return
+        for line in _visual_lines(list(row_words)):
+            runs: list[list[dict[str, Any]]] = [[line[0]]]
+            for a, b in pairwise(line):
+                if b["x0"] - a["x1"] <= COLUMN_GAP_PT:
+                    runs[-1].append(b)
+                else:
+                    runs.append([b])
+            for run in runs:
+                if len({assigned[r][id(w)] for w in run}) < 2:
+                    continue
+                mid = {"x0": run[0]["x0"], "x1": run[-1]["x1"]}
+                col = column_of(mid)
+                for w in run:
+                    assigned[r][id(w)] = col
+
+
+def _word_size(w: dict[str, Any]) -> float:
+    return float(w.get("size") or 0.0) or max(w["bottom"] - w["top"], 0.0) or BODY_HEIGHT_FALLBACK
+
+
+# A word set smaller than this fraction of its line's size, centred within the
+# line vertically and touching one of its words, is a sub- or superscript of it. The
+# same 0.92 ratio `detect._detect_footnote_below` uses for "set smaller".
+_SCRIPT_SIZE_RATIO: float = 0.92
+
+
+def _is_script_of(w: dict[str, Any], line: list[dict[str, Any]]) -> bool:
+    line_size = max(_word_size(x) for x in line)
+    if _word_size(w) >= line_size * _SCRIPT_SIZE_RATIO:
+        return False
+    # Its vertical CENTRE must lie within the line's span, not merely touch it:
+    # on 10.1098/rsos.140072 p5 each 5pt dotted rule overlaps the 10pt row above
+    # it by 0.9pt, and an overlap test attached all 382 dots to that row.
+    centre = (w["top"] + w["bottom"]) / 2
+    if not (min(x["top"] for x in line) <= centre <= max(x["bottom"] for x in line)):
+        return False
+    reach = 0.5 * _word_size(w)
+    return any(w["x0"] - x["x1"] <= reach and x["x0"] - w["x1"] <= reach for x in line)
+
+
+def _visual_lines(words: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    """``words`` grouped into printed lines, top to bottom, each sorted by x.
+
+    A word joins the current line when its top is within half a line height of
+    the line's first word, taking the taller of the two words: a superscript or a
+    minus sign drawn on its own baseline (about 1pt off on
+    10.1038/s41467-024-45528-0 p6; 2.6pt for ``· min−1)`` on 10.1098/rsos.140072
+    p5) stays on its line, and the next line of a wrapped cell (a full line pitch
+    down) does not. Per pair, not a page median: on rsos p5 the median word is a
+    5pt leader dot, and a median tolerance split that 10pt header line in two.
+
+    A word further off than that still joins a line when it is a sub- or
+    superscript of it (:func:`_is_script_of`: smaller, centred within the line,
+    touching a word): the ``1c`` of ``HbA1c`` on 10.1001/jamanetworkopen.2023.39337
+    p8 sits too low for the first rule and otherwise formed a line of its own.
+    """
+    if not words:
+        return []
+    ordered = sorted(words, key=lambda w: (w["top"], w["x0"]))
+    lines: list[list[dict[str, Any]]] = []
+    for w in ordered:
+        if lines:
+            anchor = lines[-1][0]
+            height = max(anchor["bottom"] - anchor["top"], w["bottom"] - w["top"], 0.0)
+            if w["top"] - anchor["top"] <= 0.5 * (height or BODY_HEIGHT_FALLBACK):
+                lines[-1].append(w)
+                continue
+            host = next((ln for ln in reversed(lines[-2:]) if _is_script_of(w, ln)), None)
+            if host is not None:
+                host.append(w)
+                continue
+        lines.append([w])
+    return [sorted(line, key=lambda w: w["x0"]) for line in lines]
+
+
+def _rows_from_lines(lines: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]]:
+    """Group printed lines into table rows by the table's OWN line spacing.
+
+    The table's ROW pitch is its modal line pitch. Two lines are one row (a
+    wrapped label, or an estimate over its CI) only when they sit clearly closer
+    than that -- ``ROW_GAP_RATIO`` times closer -- and every other line starts a
+    row. Pitches are taken between the median BOTTOM of each line's base
+    (full-size) words. Not their tops: a word carrying a raised significance
+    star has a taller box, so on 10.1177/00031224241252079 Table 3 (p15,
+    sideways) the estimate lines' tops sat 2.3pt high, every pitch alternated
+    13.3 / 8.7pt instead of 11 / 11, and each standard error was grouped with
+    the NEXT row's estimate -- ``(.948) 8.441***`` in one cell. When the pitches do not separate,
+    lines stay apart: an estimate and its CI in two rows is a split a consumer
+    can see, a merge of two published rows into one cell is not.
+
+    NOT `_cluster_into_rows`' rule, and the difference is measured.
+    ``max(1.2 x median height, 5pt)`` ignores leading, and a table set with
+    lines 1.1-1.2 font sizes apart has every pitch under it:
+    10.1080/23743603.2021.1878340 Table 8 (p24, sideways) came out as 4 "rows",
+    one cell holding the five lines ``Decoy effect / Control / Regret-Salient /
+    Low-Reversibility / Condition effect``. Measured from the table itself,
+    evenly spaced lines are one row each, while 10.1038/s41467-024-45528-0
+    Table 4 (8.5pt inside a two-line cell, 12pt between rows) and
+    10.1001/jamanetworkopen.2023.39337 Table 2 keep their two-line cells.
+
+    Not the TIGHTEST pitch either, which was tried first: on
+    10.1177/23780231251314667 Table 1 the row pitch varies 14.0-16.5pt with no
+    wrapped cell at all, and ``1.2 x 14.0`` merged every row into two.
+    """
+    if not lines:
+        return []
+    baselines = []
+    heights = []
+    for ln in lines:
+        base = max(_word_size(w) for w in ln) * _SCRIPT_SIZE_RATIO
+        base_words = [w for w in ln if _word_size(w) >= base]
+        bottoms = sorted(w["bottom"] for w in base_words)
+        baselines.append(bottoms[len(bottoms) // 2])
+        heights.append(_word_size(base_words[0]))
+    heights.sort()
+    median_h = heights[len(heights) // 2] or BODY_HEIGHT_FALLBACK
+    pitches = [b - a for a, b in pairwise(baselines)]
+    counts = Counter(round(p * 2) / 2 for p in pitches if p >= 0.5 * median_h)
+    row_pitch = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0] if counts else 0.0
+    rows: list[list[dict[str, Any]]] = [list(lines[0])]
+    for pitch, ln in zip(pitches, lines[1:]):
+        if pitch < 0.5 * median_h or pitch * ROW_GAP_RATIO < row_pitch:
+            rows[-1].extend(ln)
+        else:
+            rows.append(list(ln))
+    return rows
+
+
+def _text_by_lines(words: list[dict[str, Any]]) -> str:
+    """A cell's text, line by line; within a line a sub- or superscript touching
+    its neighbour (``HbA`` + ``1c``) is joined without a space. Only a SCRIPT --
+    one word set smaller than the other: same-size words were split by the word
+    extractor for a reason, and a slanted face's boxes overlap its word spaces
+    (10.1215/00703370-10878053 Table 1's note came out ``Notes:Sample`` when any
+    touching pair was joined)."""
+    out: list[str] = []
+    for line in _visual_lines(words):
+        text = ""
+        prev = None
+        for w in line:
+            small, big = sorted((_word_size(w), _word_size(prev))) if prev is not None else (0, 0)
+            touching = prev is not None and small < big * _SCRIPT_SIZE_RATIO and (
+                w["x0"] - prev["x1"] <= WORD_GAP_RATIO * small
+            )
+            text += (w.get("text", "") if touching or prev is None else " " + w.get("text", ""))
+            prev = w
+        out.append(text)
+    return " ".join(out)
+
+
+def _grid_has_inner_gutter(cells_words) -> bool:
+    """True when some cell holds two words on one printed line separated by a
+    column-sized gap (> ``COLUMN_GAP_PT``): the column detector missed a
+    boundary, and that cell is two published columns fused.
+
+    Measured on 10.1016/j.jesp.2020.103977 Table 4 (p8, sideways): its columns
+    are filled on few rows, so only some boundaries clear the stability vote and
+    one cell read ``Omission will be associated with a bias towards lower
+    Immorality -1.21 [-1.55, -1.46 [-1.83,`` -- a hypothesis, a rating
+    attribute and two scenarios' estimates in one cell. On 10.1038/s41467-024-
+    45528-0 Table 4, which grids correctly, no cell has a gap over 2.4pt.
+
+    A gap is BRIDGED, and so not a gutter, when another word of the same cell
+    lies in it and overlaps the line vertically: a subscript or superscript set
+    on its own baseline. On 10.1001/jamanetworkopen.2023.39337 Table 2 (p8) the ``1c``
+    of ``HbA1c`` falls to a line of its own and left a 7pt gap in ``HbA level,
+    %``, which is one column.
+    """
+    for words in cells_words:
+        words = list(words)
+        for line in _visual_lines(words):
+            top = min(w["top"] for w in line)
+            bottom = max(w["bottom"] for w in line)
+            for a, b in pairwise(line):
+                if b["x0"] - a["x1"] <= COLUMN_GAP_PT:
+                    continue
+                bridged = any(
+                    w["x1"] > a["x1"] and w["x0"] < b["x0"]
+                    and w["top"] < bottom and w["bottom"] > top
+                    for w in words
+                    if w is not a and w is not b
+                )
+                if not bridged:
+                    return True
+    return False
 
 
 def _region_caption_number(region: CandidateRegion) -> int | None:
@@ -758,16 +1069,37 @@ def _trim_trailing_prose_rows(
 # A "substantive word" is an alphabetic run of 2+ letters, so single-letter statistic
 # markers (M, SD is two letters and deliberately NOT allowed here, n, p, r, d) do not
 # smuggle prose in: the cell must still be digit-bearing to qualify at all.
+#
+# THE PARAGRAPH ABOVE IS NOT WHAT THE DEFAULT PATTERN DOES, and on the upright
+# path that is now deliberate (measured 2026-09-25). The default pattern admits NO
+# letter, so a cell like ``-152 (-1528, 1223) P = 0.86`` is not "data". Admitting
+# isolated single letters everywhere was tried: over the 102-paper corpus with
+# Camelot off it let four GARBLED upright grids through the gates -- doubled-glyph
+# cells like ``SSiiggnnaall--iinnccoonnssiisstteenntt`` (10.15626/mp.2022.3108 Table 10;
+# 10.1080/23743603.2021.1878340 Tables 1 and 7; 10.1016/j.jesp.2021.104154 Table
+# 14), and two of them then REPLACED a correct raw_text fallback. The upright char
+# path's garble is what the letter-free pattern was filtering, by accident.
+#
+# `marker_letters=True` admits them -- isolated single letters only
+# (`_SUBSTANTIVE_WORD_RE`) -- and is used by the ROTATED path alone, whose words are
+# built from glyph gaps (no char-path garble) and whose grids pass an extra
+# fused-column gate. There it is required: every value cell of
+# 10.1038/s41467-024-45528-0 Table 4 carries its own ``P =``.
 _CLEAN_DATA_ALLOWED_RE = re.compile(r"^[\d\s.,;:%±*†‡/\-–—−+()\[\]<>=≤≥]+$")
+_CLEAN_DATA_WITH_MARKERS_RE = re.compile(r"^[\d\s.,;:%±*†‡/\-–—−+()\[\]<>=≤≥A-Za-z]+$")
+_SUBSTANTIVE_WORD_RE = re.compile(r"[A-Za-z]{2,}")
 
 
-def _cell_is_clean_data(text: str) -> bool:
-    """True when ``text`` is a data cell: digit-bearing and free of substantive words."""
+def _cell_is_clean_data(text: str, *, marker_letters: bool = False) -> bool:
+    """True when ``text`` is a data cell: digit-bearing and free of substantive
+    words (with ``marker_letters``, single-letter markers such as ``P =`` allowed)."""
     s = (text or "").strip()
     if not s:
         return False
     if not any(ch.isdigit() for ch in s):
         return False
+    if marker_letters:
+        return bool(_CLEAN_DATA_WITH_MARKERS_RE.match(s)) and not _SUBSTANTIVE_WORD_RE.search(s)
     return bool(_CLEAN_DATA_ALLOWED_RE.match(s))
 # A severely GARBLED cell — a long run of one repeated letter (vertical-text
 # merge: ``caaaaaaaaaDott…``), a very long unbroken alpha token (columns the
@@ -857,6 +1189,7 @@ def _whitespace_grid_is_clean(
     *,
     allow_categorical: bool = False,
     own_caption_number: int | None = None,
+    rotated_frame: bool = False,
 ) -> bool:
     """Accept a whitespace/char grid ONLY when it looks like a real DATA table.
 
@@ -954,13 +1287,30 @@ def _whitespace_grid_is_clean(
         # Validity → repaired form.
         if any(_cell_is_garbled(t) for t in rep_texts):
             garbled_rows += 1
-        if any(_cell_is_clean_data(t) for t in rep_texts if t):
+        if any(_cell_is_clean_data(t, marker_letters=rotated_frame) for t in rep_texts if t):
             clean_data_rows += 1
         # Content-deleting (feeds the prose-contamination REJECT below) → both
         # forms must agree before a row counts against the grid.
+        #
+        # A LONG ROW LABEL IS NOT ABSORBED PROSE WHEN ITS ROW CARRIES DATA --
+        # ROTATED FRAME ONLY (2026-09-25). Measured on 10.1038/s41467-024-45528-0
+        # Table 4: 8 of its 14 rows are labelled like "Change in weight (kg)
+        # between baseline and day 15", which `_cell_is_prose` rightly calls a
+        # >=6-word fragment, and every one of those rows carries four clean
+        # result cells beside it. All 8 counted against the grid and it was
+        # rejected as body prose. So in the rotated frame a prose cell in the
+        # FIRST column is exempt when a clean data cell sits in another column of
+        # the same row. Not on the upright path: together with `marker_letters`
+        # it let garbled upright grids through (see `_CLEAN_DATA_ALLOWED_RE`).
+        row_has_data_beside_label = rotated_frame and any(
+            _cell_is_clean_data(rt, marker_letters=True)
+            for c, rt in zip(row_cells, rep_texts)
+            if c["c"] != 0 and rt
+        )
         if any(
             _cell_is_prose(t) and _cell_is_prose(rt)
-            for t, rt in zip(texts, rep_texts)
+            and not (c["c"] == 0 and row_has_data_beside_label)
+            for c, t, rt in zip(row_cells, texts, rep_texts)
         ):
             prose_cell_rows += 1
     total_rows = len(by_row)
@@ -1088,4 +1438,4 @@ def grid_is_body_prose(cells: list[Cell]) -> bool:
     return prose_rows * _PROSE_GRID_ROW_FRACTION >= len(by_row)
 
 
-__all__ = ["whitespace_cells", "char_whitespace_cells", "grid_is_body_prose"]
+__all__ = ["whitespace_cells", "char_whitespace_cells", "rotated_frame_cells", "grid_is_body_prose"]
