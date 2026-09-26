@@ -17,7 +17,15 @@ assignment.
 
 import pytest
 
-from docpluck.tables.camelot_row_ties import TIE_EVENT, boundary_tie_scope, tied_row
+from docpluck.tables import camelot_row_ties
+from docpluck.tables.camelot_row_ties import (
+    DROP_EVENT,
+    MERGE_EVENT,
+    MERGE_FAILED_EVENT,
+    TIE_EVENT,
+    boundary_tie_scope,
+    tied_row,
+)
 from docpluck.telemetry import fallback_scope
 from docpluck.testing import require_corpus_pdf
 
@@ -56,8 +64,12 @@ def test_scope_restores_the_header_and_changes_nothing_else():
     changed = [(i, j, before.iat[i, j], after.iat[i, j])
                for i in range(before.shape[0]) for j in range(before.shape[1])
                if before.iat[i, j] != after.iat[i, j]]
-    assert changed == [(0, 3, "", "Imatinib+placebo")]
+    # Rescued into its own row 0, then JOINED into row 1, the row holding
+    # "Imatinib+vitamin D3" -- the header printed beside it on the same line.
+    assert changed == [(1, 3, "", "Imatinib+placebo")]
+    assert after.iat[1, 2] == "Imatinib+vitamin D3"
     assert fb.counters.get(TIE_EVENT) == 1
+    assert fb.counters.get(MERGE_EVENT) == 1
     # And the scope is INERT outside itself: other Camelot callers are untouched.
     assert _grid(path).equals(before)
 
@@ -72,3 +84,69 @@ def test_production_path_delivers_the_header_and_counts_it():
     )
     assert "Imatinib+placebo" in p5_text
     assert result["fallbacks"].get(TIE_EVENT, 0) >= 1
+
+
+# --- the row join, on a real table, both directions ---------------------------
+#
+# 10.1177/23780231251314667 (asa/socius_4). Page 35, Table 1: every unstarred value
+# and every row label shared its printed line with a starred value and was dropped;
+# rescued, it sat on a row of its own above the starred values. Page 38: Camelot
+# built 6 grid columns for 10 printed ones, so a rescued row and its starred row
+# COLLIDE in a column and must stay split.
+
+_SOCIUS4 = "asa/socius_4.pdf"
+
+
+def _page_grid(rel, page):
+    with fallback_scope() as fb, boundary_tie_scope():
+        tables = camelot.read_pdf(str(require_corpus_pdf(rel)), pages=str(page),
+                                  flavor="stream", strip_text="\n")
+    # The join edits Camelot's cells AND its already-built df; they must agree.
+    assert tables[0].data == tables[0].df.values.tolist()
+    return tables[0].df.values.tolist(), fb
+
+
+def test_join_rebuilds_the_printed_row():
+    rows, fb = _page_grid(_SOCIUS4, 35)
+    # Read off the page raster (100 dpi): "Total housework 18.5 17.8* 17.8*
+    # 17.8* 17.9+ 17.2** 18.8 18.1 17.7+".
+    assert ["Total housework", "18.5", "17.8*", "17.8*", "17.8*", "17.9+",
+            "17.2**", "18.8", "18.1", "17.7+"] in rows
+    assert fb.counters.get(MERGE_EVENT, 0) >= 1
+
+
+def test_join_refuses_a_column_collision():
+    rows, _ = _page_grid(_SOCIUS4, 38)
+    # Three printed year columns share grid column 2, so the rescued unstarred
+    # values and the starred ones would both need that cell: left split.
+    assert ["Garden and animal care", "2.1", "2.02.01.9", "2.2", "2.12.2", "2.0"] in rows
+    assert ["", "", "", "", "1.7+", ""] in rows
+
+
+def test_an_unrescued_drop_is_counted(monkeypatch):
+    """With the tie test disabled, the same specimen line is dropped -- and the
+    drop must reach `fallbacks`, not vanish."""
+    monkeypatch.setattr(camelot_row_ties, "tied_row", lambda rows, y_mid: None)
+    with fallback_scope() as fb, boundary_tie_scope():
+        df = _grid(require_corpus_pdf(_PAPER))
+    assert not any("Imatinib+placebo" in str(v) for v in df.values.ravel())
+    assert "p5:Imatinib+placebo" in fb.details.get(DROP_EVENT, {})
+    # Two-sided: the unmodified module rescues it and records no drop.
+    monkeypatch.undo()
+    with fallback_scope() as fb2, boundary_tie_scope():
+        _grid(require_corpus_pdf(_PAPER))
+    assert DROP_EVENT not in fb2.counters
+
+
+def test_a_failed_join_is_recorded_and_leaves_the_grid():
+    class _Broken:
+        page = 7
+
+        @property
+        def cells(self):
+            raise RuntimeError("boom")
+
+    with fallback_scope() as fb:
+        camelot_row_ties._join_tie_split_rows([(_Broken(), 0, 7, "x")])
+    assert fb.counters.get(MERGE_FAILED_EVENT) == 1
+    assert MERGE_EVENT not in fb.counters
