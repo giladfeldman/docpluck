@@ -2120,7 +2120,19 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
         if c["r"] == top_r and int(c.get("colspan") or 1) > 1
         and (table.get("rendering") or "") != "markup"
     }
-    grouped = _detect_column_groups(
+    # PACKED ARMS ARE DECIDED FIRST, from the body. `_detect_column_groups` reads
+    # the `_MERGE_SEPARATOR` sentinel as a folded SUPER-header, but the same
+    # sentinel is written by the continuation merge for a single column's
+    # two-line header ("Underfilled" over "M (SD)"). Measured 2026-09-26 on
+    # 10.1525/collabra.77859 Table 2: once Camelot's dropped header line was
+    # recovered (tables/camelot_row_ties.py), two such columns read as arms
+    # "Underfilled"/"Overfilled", the fallback grouping handed t, p, df and d to
+    # the last one, and every record lost its t, p and df. The packed-arm
+    # signature is in the BODY -- the same k arm names on every data row and
+    # k-splittable data cells -- and cannot be produced by a header, so when it
+    # is present the arms are the rows' own and a header grouping is not.
+    packed = _detect_packed_arms(header, body)
+    grouped = None if packed is not None else _detect_column_groups(
         header, printed_spans or None, _top_row_arm_cols(grid) or None
     )
 
@@ -2149,9 +2161,8 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     level_context = vocab_all
 
     # Packed parallel-arm table (Separate/Joint values space-joined inside each
-    # cell). Detected only when there are no column-groups; handled by its own
-    # split-then-flatten path so each arm becomes its own typed record.
-    packed = _detect_packed_arms(header, body) if grouped is None else None
+    # cell), detected above; handled by its own split-then-flatten path so each
+    # arm becomes its own typed record.
     if packed is not None:
         return _flatten_packed_arms(
             table_id,
