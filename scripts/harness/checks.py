@@ -291,12 +291,25 @@ def check_table_parity(out_dir: Path, fmt: str) -> dict:
     tables = json.loads(tables_p.read_text(encoding="utf-8")).get("tables", [])
     rendered = rendered_p.read_text(encoding="utf-8", errors="replace")
     n_json = len(tables)
+    # Since 2.4.145 a Camelot grid no caption claims is kept with
+    # caption_status="uncaptioned_candidate" and rendered under its own
+    # "### Uncaptioned candidate ..." heading, never as "### Table N". Each
+    # class is matched to its own heading, so a candidate can neither pad the
+    # captioned count nor hide a missing captioned table.
+    n_candidates = sum(1 for t in tables if t.get("caption_status") == "uncaptioned_candidate")
+    n_captioned = n_json - n_candidates
     n_headings = len(re.findall(r"^#{2,4}\s+Table\b", rendered, re.M))
+    n_candidate_headings = len(re.findall(r"^#{2,4}\s+Uncaptioned candidate\b", rendered, re.M))
     n_html = rendered.count("<table")
     n_structured = sum(1 for t in tables if t.get("kind") == "structured" and t.get("html"))
     problems: list[str] = []
-    if n_headings != n_json:
-        problems.append(f"### Table headings={n_headings} but tables.json has {n_json}")
+    if n_headings != n_captioned:
+        problems.append(f"### Table headings={n_headings} but tables.json has {n_captioned} captioned")
+    if n_candidate_headings != n_candidates:
+        problems.append(
+            f"### Uncaptioned candidate headings={n_candidate_headings} "
+            f"but tables.json has {n_candidates} candidates"
+        )
     if n_html < n_structured:
         problems.append(f"<table> count={n_html} but {n_structured} structured tables in json")
     if problems:
@@ -304,6 +317,8 @@ def check_table_parity(out_dir: Path, fmt: str) -> dict:
             "verdict": "fail",
             "tables_json": n_json,
             "table_headings": n_headings,
+            "candidates": n_candidates,
+            "candidate_headings": n_candidate_headings,
             "html_tables": n_html,
             "structured": n_structured,
             "problems": problems,
