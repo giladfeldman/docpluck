@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from docpluck.glyph_names import repair_glyph_names
 from docpluck.resources import call_with_resource_retry, is_render_failure, note_if_exhausted
 from docpluck.tables import Cell, Table
+from docpluck.tables.camelot_row_ties import boundary_tie_scope
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
 from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
@@ -1020,12 +1021,17 @@ def extract_tables_camelot(
             # `strip_text="\n"` collapses cell-internal newlines so multi-line
             # cells render as single lines (per Camelot best practice).
             # Run BOTH stream and lattice; pick the better one per (page, region).
-            stream_tables = call_with_resource_retry(
-                lambda: list(
-                    camelot.read_pdf(tmp_path, pages="all", flavor="stream", strip_text="\n")
-                ),
-                what="camelot_stream",
-            )
+            # `boundary_tie_scope`: Camelot 2.0 stream discards a textline whose
+            # centre lands exactly on a row boundary it built -- see
+            # `camelot_row_ties`. Stream only: the tie is a stream `_join_rows`
+            # artefact, and lattice rows come from ruling lines.
+            with boundary_tie_scope():
+                stream_tables = call_with_resource_retry(
+                    lambda: list(
+                        camelot.read_pdf(tmp_path, pages="all", flavor="stream", strip_text="\n")
+                    ),
+                    what="camelot_stream",
+                )
         except Exception as exc:
             raised += 1
             record_fallback("camelot_stream_exception", detail=type(exc).__name__)
@@ -1251,16 +1257,17 @@ def extract_tables_camelot_by_region(
             batched = [s for s in specs if not s.get("isolate")]
             for spec in isolated:
                 try:
-                    tables = call_with_resource_retry(
-                        lambda page=page, spec=spec: list(
-                            camelot.read_pdf(
-                                tmp_path, pages=str(page), flavor="stream",
-                                table_areas=[spec["area"]], strip_text="\n",
-                                suppress_stdout=True,
-                            )
-                        ),
-                        what="camelot_region",
-                    )
+                    with boundary_tie_scope():  # see `camelot_row_ties`
+                        tables = call_with_resource_retry(
+                            lambda page=page, spec=spec: list(
+                                camelot.read_pdf(
+                                    tmp_path, pages=str(page), flavor="stream",
+                                    table_areas=[spec["area"]], strip_text="\n",
+                                    suppress_stdout=True,
+                                )
+                            ),
+                            what="camelot_region",
+                        )
                 except Exception as exc:
                     record_fallback("camelot_region_exception", detail=type(exc).__name__)
                     continue
@@ -1268,15 +1275,16 @@ def extract_tables_camelot_by_region(
             if batched:
                 areas = [s["area"] for s in batched]
                 try:
-                    tables = call_with_resource_retry(
-                        lambda page=page, areas=areas: list(
-                            camelot.read_pdf(
-                                tmp_path, pages=str(page), flavor="stream",
-                                table_areas=areas, strip_text="\n", suppress_stdout=True,
-                            )
-                        ),
-                        what="camelot_region",
-                    )
+                    with boundary_tie_scope():  # see `camelot_row_ties`
+                        tables = call_with_resource_retry(
+                            lambda page=page, areas=areas: list(
+                                camelot.read_pdf(
+                                    tmp_path, pages=str(page), flavor="stream",
+                                    table_areas=areas, strip_text="\n", suppress_stdout=True,
+                                )
+                            ),
+                            what="camelot_region",
+                        )
                 except Exception as exc:
                     record_fallback("camelot_region_exception", detail=type(exc).__name__)
                     continue
