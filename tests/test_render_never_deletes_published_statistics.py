@@ -671,3 +671,45 @@ def test_a_line_extended_in_place_is_not_a_removal():
     before = "*Figure 5: a long caption here about several things*"
     after = "*Figure 5: a long caption here about several things and more text.*"
     assert R.removed_lines(before, after) == []
+
+
+def test_a_dedup_whose_survivor_differs_only_in_CASE_is_not_a_removal():
+    """The caption suppressors match case-insensitively; so must the telemetry.
+
+    Measured on `10.1109/access.2025.3645087` PDF p.6 Figure 9 (2026-09-26, page rasterized): IEEE prints
+    the inline caption label as `FIGURE 9.`, the figure block reads `Figure 9.`,
+    and `_suppress_inline_duplicate_figure_captions` correctly dropped the inline
+    copy — yet `removed_lines` (and so `render_deletion_scan.py`, exit 1) called
+    it a deletion, because its survival check was case-sensitive. Driven through
+    the real step, not a hand-built before/after.
+    """
+    text = "\n".join([
+        "### Figure 9",
+        "",
+        "*Figure 9. Mean RRMSE in percentage across parameter ranges of γ range "
+        "of [0,1] with 10 linearly spaced points.*",
+        "",
+        "## Results",
+        "",
+        "FIGURE 9. Mean RRMSE in percentage across parameter ranges of γ range "
+        "of [0,1] with",
+        "10 linearly spaced points.",
+        "",
+    ])
+    out = R._suppress_inline_duplicate_figure_captions(text)
+    assert out.count("Mean RRMSE") == 1, "the step no longer deduplicates this copy"
+    assert R.removed_lines(text, out) == []
+
+
+def test_case_folding_does_not_excuse_a_real_deletion():
+    """The other side: a removed statistic with no surviving copy in ANY case
+    is still reported. Case-folding only licenses a copy that is otherwise
+    character-identical."""
+    before = "Intro text.\nTHE EFFECT WAS LARGE, t(87) = 2.01, p = .048.\nEnd."
+    after = "Intro text.\nEnd."
+    assert R.removed_lines(before, after) == [
+        "THE EFFECT WAS LARGE, t(87) = 2.01, p = .048."
+    ]
+    # ...and a differently-numbered copy in another case is not a survivor.
+    after_other = "Intro text.\nthe effect was large, t(87) = 2.10, p = .048.\nEnd."
+    assert R.removed_lines(before, after_other) != []

@@ -6502,6 +6502,18 @@ def removed_lines(before: str, after: str) -> list:
             core = stripped.strip("*_`~ ").strip()
             if len(core) >= 20 and core in after:
                 continue
+            # ...and once more ignoring LETTER CASE only. The duplicate-caption
+            # suppressors match their copy case-insensitively
+            # (`bc.lower().startswith(acc_norm.lower())`), so a dedup whose
+            # survivor differs from the dropped copy only in case — IEEE prints
+            # the inline label `FIGURE 9.` while the figure block reads
+            # `Figure 9.` — was reported as a deletion: the step and this
+            # function disagreed about what a copy is (L-024). Measured on
+            # `10.1109/access.2025.3645087` PDF p.6 Figure 9, 2026-09-26 (rasterized): the full
+            # caption survives in the `### Figure 9` block. Case-folding
+            # changes no digit and no symbol, so a statistic cannot hide here.
+            if len(core) >= 20 and core.casefold() in after.casefold():
+                continue
             elsewhere = difflib.get_close_matches(stripped, a_stripped, n=5, cutoff=0.9)
             if elsewhere:
                 signature = _digit_signature(stripped)
