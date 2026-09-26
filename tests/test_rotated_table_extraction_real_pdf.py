@@ -248,3 +248,33 @@ def test_the_other_rotation_direction_is_read_correctly():
     down = lines(-1)
     assert any(ln.startswith("rsos.royalsocietypublishing.org") for ln in down), down
     assert not any("royalsocietypublishing" in ln for ln in lines(1))
+
+
+def _w(text, x0, top, size=7.0):
+    """A word in the table's upright frame (code-behaviour fixture, not a paper)."""
+    return {"text": text, "x0": x0, "x1": x0 + 0.5 * size * len(text), "top": top,
+            "bottom": top + size, "size": size}
+
+
+def test_a_label_row_cannot_pull_data_rows_into_the_note():
+    """Second-model review (Sonnet, 2026-09-25), constructed from the logic, not
+    observed in the corpus: a label-only row at the table's left edge could OPEN a
+    note, and the label-and-value rows after it came along as "continuation"
+    because their gap was under 12pt. A wrapped line may now only follow note
+    text. This pins what the CODE does; the 31 corpus tables' notes are unchanged."""
+    from docpluck.tables.rotated import _note_start
+
+    body = [
+        [_w("Age", 10, 0), _w("34.1", 200, 0)],
+        [_w("Income", 10, 12), _w("51,000", 200, 12)],
+        [_w("Tenure", 10, 24), _w("7.2", 200, 24)],
+        [_w("Subtotal", 10, 36)],                         # label-only row, left edge
+        [_w("Men only", 10, 48), _w("12.5", 46, 48)],    # label + value, 8pt gap
+        [_w("Women only", 10, 60), _w("11.9", 53, 60)],  # (under the 12pt wrap limit)
+        [_w("Note. " + "values are means across all participants in the sample", 10, 76)],
+    ]
+    start = _note_start(body, 5.0)
+    note = [" ".join(w["text"] for w in ln) for ln in body[start:]]
+    assert not any("12.5" in ln or "11.9" in ln for ln in note), note
+    # Two-sided: the real note is still found.
+    assert note and note[-1].startswith("Note."), note

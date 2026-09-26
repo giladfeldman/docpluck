@@ -579,7 +579,7 @@ def _extract_pdf_structured(
                 layout_page = pages[cap.page - 1]
         rotated_read = None
         if not cells and layout_page is not None:
-            rotated_read = _read_rotated_table(layout_page, cap, _rotated_furniture)
+            rotated_read = _read_rotated_table(layout_page, cap, _rotated_furniture, method_pieces)
             if rotated_read is not None:
                 if rotated_read.cells:
                     cells = rotated_read.cells
@@ -2804,10 +2804,13 @@ def _line_repeats_caption(line: str, caption_key: str) -> bool:
     )
 
 
-def _read_rotated_table(layout_page, cap: CaptionMatch, banners=None):
+def _read_rotated_table(layout_page, cap: CaptionMatch, banners=None, method_pieces=None):
     """``tables.rotated.read_rotated_table``, with a failure COUNTED, never raised
     and never silent: the caller then falls through to the text-channel record
-    exactly as before this path existed."""
+    exactly as before this path existed, and the failure is named in the result's
+    ``method`` (``rotated_read_failed:<Exception>``) as well as in ``fallbacks``,
+    the way a whitespace-region failure is -- a consumer that reads only
+    ``method`` must not see a crash as "not rotated" (second-model review)."""
     try:
         # `banners` is the memoised banner-set factory: computed only when a
         # caption actually turns out rotated.
@@ -2819,6 +2822,8 @@ def _read_rotated_table(layout_page, cap: CaptionMatch, banners=None):
             "rotated_table_read_exception",
             detail=f"{cap.label or '?'}:{type(exc).__name__}",
         )
+        if method_pieces is not None:
+            method_pieces.append(f"rotated_read_failed:{type(exc).__name__}")
         return None
 
 

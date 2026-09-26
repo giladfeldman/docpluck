@@ -344,9 +344,10 @@ def _note_start(body: list[list[dict]], gap: float) -> int:
     * a short line starting at the table's left edge with no column gap in it
       (``c Indicates statistical significance using P < .05.``).
 
-    A line CONTINUES a note when it is smaller-set or has no gap of
-    ``_PROSE_MAX_GAP_PT`` -- the hanging-indented, justified second and third
-    lines of 10.1080/23743603.2021.1878340 Table 2's ``(1) The F-statistics ...``.
+    A line CONTINUES a note when it opens one itself, or WRAPS the note text
+    above it -- no gap of ``_PROSE_MAX_GAP_PT`` and directly under running text or
+    smaller type: the hanging-indented, justified second and third lines of
+    10.1080/23743603.2021.1878340 Table 2's ``(1) The F-statistics ...``.
 
     Guards: the block must hold a smaller-set or running-text line, so a
     trailing wrapped label (``mg/dL``) stays in the table; some line above it
@@ -372,12 +373,30 @@ def _note_start(body: list[list[dict]], gap: float) -> int:
             ln[0]["x0"] - left <= _NOTE_LEFT_TOL_PT and _max_gap(ln) <= gap and _mostly_letters(ln)
         )
 
-    def continues(ln: list[dict]) -> bool:
-        return opens(ln) or (_max_gap(ln) < _PROSE_MAX_GAP_PT and _mostly_letters(ln))
+    def wraps(ln: list[dict]) -> bool:
+        return _max_gap(ln) < _PROSE_MAX_GAP_PT and _mostly_letters(ln)
+
+    def is_note_block(block: list[list[dict]]) -> bool:
+        # A WRAPPED line (justified, hanging indent) may only follow a line that
+        # is itself note text -- running text, smaller type, or another wrapped
+        # line of it. Without that, a label-only row at the table's left edge
+        # opened a "note" and the label-and-value rows after it came along as
+        # continuation (second-model review, Sonnet, 2026-09-25).
+        if not opens(block[0]):
+            return False
+        in_prose = strong(block[0])
+        for ln in block[1:]:
+            if strong(ln):
+                in_prose = True
+            elif opens(ln):
+                in_prose = False
+            elif not (in_prose and wraps(ln)):
+                return False
+        return True
 
     for i in range(WHITESPACE_MIN_ROWS, len(body)):
         block = body[i:]
-        if not opens(block[0]) or not all(continues(ln) for ln in block[1:]):
+        if not is_note_block(block):
             continue
         if not any(strong(ln) for ln in block):
             continue
