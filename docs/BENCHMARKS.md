@@ -88,7 +88,7 @@ Artifact rates observed across real deployments. Sources: ESCIcheck (51 PDFs, ~4
 | Column merge garbling | **0.65%** | Quality detection | MetaESCI |
 | Page footer in p-value (`p = 806 U.S.`) | **0.25%** | Partial S9 | MetaESCI |
 | Soft hyphen in words | Found in 14/50 test PDFs | S6 | PDFextractor corpus |
-| SMP Unicode (Math Italic fonts) | Found in 2/50 test PDFs | pdfplumber recovery | PDFextractor corpus |
+| SMP Unicode (Math Italic fonts) | Found in 2/50 test PDFs | ~~pdfplumber recovery~~ (retired 2026-09-24; U+FFFD now passes through, see below) | hosted-service test corpus |
 | Ligatures remaining after extraction | 27.6 avg per PDF | S3 | PDFextractor corpus |
 
 ### Statistical reporting artifacts (downstream consumer issues)
