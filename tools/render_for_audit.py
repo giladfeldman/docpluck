@@ -200,6 +200,16 @@ _canary_json = (
     Path(os.environ.get("DOCPLUCK_SKILLS_DIR") or "<DOCPLUCK_SKILLS_DIR unset>")
     / "_project" / "canary.json"
 )
+if not args.expected_sha and not _canary_json.is_file():
+    # Say so. load_expected_sha() returns None for a missing file exactly as it
+    # does for an un-pinned key, so without this line an unset
+    # DOCPLUCK_SKILLS_DIR would switch the provenance guard off for EVERY key
+    # with nothing printed.
+    print(
+        f"WARNING: input-PDF provenance NOT checked: canary config not found at "
+        f"{_canary_json} (set DOCPLUCK_SKILLS_DIR, or pass --expected-sha).",
+        file=sys.stderr,
+    )
 expected_sha = args.expected_sha or load_expected_sha(str(_canary_json), args.key)
 _prov_ok, _prov_msg = check_provenance(args.key, pdf_sha, expected_sha)
 if not _prov_ok:
@@ -236,7 +246,8 @@ manifest = {
     "pdf_path": str(pdf_path),
     "pdf_sha": pdf_sha,
     "expected_pdf_sha": expected_sha or "",
-    "provenance_ok": True,
+    # None = not checked (no pinned sha); a mismatch exits 4 before this point.
+    "provenance_ok": True if expected_sha else None,
     "rendered_path": str(out_path),
     "rendered_sha": rendered_sha,
     "rendered_bytes": len(md.encode("utf-8")),

@@ -120,8 +120,8 @@ archive/
 
 # PDFs are never committed to this public MIT repo. Test fixtures use the
 # manifest-with-skip pattern via tests/conftest.py and tests/fixtures/structured/MANIFEST.json
-# referencing PDFs in the local corpus ($VIBE_ROOT, or its conventional
-# default under the home directory).
+# referencing PDFs in the local article repository ($ARTICLE_REPOSITORY; no
+# default location).
 *.pdf
 
 # Verifier-output artifacts from scripts/verify_corpus.py + ad-hoc test

@@ -62,6 +62,13 @@ def load_gold_keys() -> dict[str, str]:
 
 
 def _ai_gold(*args: str) -> tuple[int, str]:
+    if not AI_GOLD.is_file():
+        # Fail loud. A missing tool would otherwise read as "this document has
+        # no gold" for every document, and the inspection would run on nothing.
+        raise SystemExit(
+            f"FATAL: article-finder's ai-gold.py not found at {AI_GOLD}. "
+            "Set ARTICLE_FINDER_HOME."
+        )
     try:
         p = subprocess.run(
             [sys.executable, str(AI_GOLD), *args],
