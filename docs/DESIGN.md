@@ -231,7 +231,7 @@ All current and planned dependencies are MIT or BSD-compatible:
 
 | Dep | License | Purpose |
 |-----|---------|---------|
-| pdfplumber | MIT | layout channel (`extract_pdf_layout`): per-character font/position, tables, figures. (Its SMP Unicode recovery use, described in §3 below, was retired 2026-09-24.) |
+| pdfplumber | MIT | layout channel (`extract_pdf_layout`): per-character font/position, tables. (Figures are caption-driven from the text channel; their `bbox` is not computed.) (Its SMP Unicode recovery use, described in §3 below, was retired 2026-09-24.) |
 | mammoth | BSD-2 | DOCX → HTML conversion |
 | beautifulsoup4 | MIT | HTML parsing |
 | lxml | BSD-3 | HTML parser backend |

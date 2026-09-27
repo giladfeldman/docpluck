@@ -59,7 +59,6 @@ def test_whitespace_returns_empty_on_no_words():
     layout = _layout("apa_chan_feldman_lineless")
     region = CandidateRegion(
         label=None, page=1, bbox=(0.0, 0.0, 5.0, 5.0),
-        caption=None, footnote=None,
         geometry_signal="whitespace", caption_match=None,
     )
     cells = whitespace_cells(layout, region=region)

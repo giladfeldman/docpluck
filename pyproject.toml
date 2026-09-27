@@ -94,7 +94,7 @@ packages = ["docpluck"]
 # path here is a deliberate act: tests/test_distribution_contents.py holds its
 # own copy of this list and fails on anything else.
 [tool.hatch.build.targets.sdist]
-only-include = ["docpluck", "docs/README.md", "LICENSE"]
+only-include = ["docpluck", "README.md", "LICENSE"]
 
 # 2026-08-05 (run 6): the project had NO pytest configuration at all, so a bare
 # `pytest` walked the whole working tree — including `tmp/`, the scratch

@@ -259,16 +259,18 @@ def test_xiao_2021_table4_arms_not_swapped_real_pdf():
     assert by_arm["Original"]["F"] == pytest.approx(18.36)
     assert by_arm["Replication"]["F"] == pytest.approx(0.14)
     # p16 prints one underline rule per arm (x 130.8-245.9 and 245.9-354.1);
-    # the Interpretation column sits under neither and stays shared.
+    # the Interpretation column sits under neither and stays shared. Each arm prints
+    # THREE columns (F, p, eta2p (90% CI)); until the super-header column split
+    # (2.4.146) Camelot fused p and eta2p into one column, so the spans read 2+2.
+    # Rasterized p16 checked 2026-09-28.
     spans = {c["text"]: (c["c"], c["colspan"]) for c in t4["cells"] if c["r"] == 0}
-    assert spans == {"Original": (1, 2), "Replication": (3, 2)}
+    assert spans == {"Original": (1, 3), "Replication": (4, 3)}
 
 
 # ── Real-PDF: collabra.90203 Table 8 — a heading is not glued onto a value ────
 
 
 @requires_pdftotext
-@_skip_under_xdist
 @pytest.mark.skipif(
     not pdf_available(_AR, "10.1525__collabra.90203.pdf"),
     reason="closed-access fixture not present in the article repository",

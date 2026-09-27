@@ -39,7 +39,7 @@ SDIST_ROOT_FILES = {
     "LICENSE",
     # The `readme` in pyproject.toml; it becomes the PyPI project page, and the
     # wheel cannot be built from the sdist without it.
-    "docs/README.md",
+    "README.md",
     # Hatchling copies this into every sdist unconditionally, so a rebuild from
     # the archive honours the same ignores. It is already public on GitHub; the
     # guard rates its content 0 blocking (6 suspect: names of IGNORED categories).
@@ -171,7 +171,7 @@ def _planted_tree(dst: Path) -> Path:
         REPO / "docpluck", dst / "docpluck",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
-    for rel in ("pyproject.toml", "LICENSE", "docs/README.md", ".gitignore"):
+    for rel in ("pyproject.toml", "LICENSE", "README.md", ".gitignore"):
         (dst / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO / rel, dst / rel)
     # Four non-allowlisted files: three in places the old config shipped, one

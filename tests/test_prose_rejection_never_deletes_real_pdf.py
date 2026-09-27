@@ -68,6 +68,20 @@ def _populated(table) -> int:
     return sum(1 for c in (table.get("cells") or []) if (c.get("text") or "").strip())
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "2026-09-28 (2.4.146): the backstop has NO real positive on this paper any more, "
+        "and that is the correct outcome. It used to fire because the caption-only fallback "
+        "shipped Table 1 EMPTY (a caption label alone on its line ended the body walk), so the "
+        "revert put the rejected candidate back -- and that candidate's 5 cells were body "
+        "prose from BELOW the table (`CURATION PROCESS AND`, `principles directly applicable "
+        "to managerial practice`), checked on the rasterized p2. With the lone-label fix the "
+        "fallback now carries the table's own Source column, so the rejection stands. "
+        "strict=True: this goes red the day the backstop fires here again, which would mean "
+        "the fallback lost Table 1's text. A real positive elsewhere is owed (TODO.md)."
+    ),
+)
 def test_the_backstop_actually_fires_on_a_real_paper(amc_result):
     """A guard nobody has watched work is a guard nobody can trust.
 
@@ -86,7 +100,18 @@ def test_the_qualitative_review_tables_keep_their_content(amc_result):
     """The content the unconditional rejection destroyed."""
     t1, t4 = _table(amc_result, "Table 1"), _table(amc_result, "Table 4")
     assert t1 is not None and t4 is not None
-    assert _populated(t1) >= 5, f"Table 1 lost cells: {_populated(t1)}"
+    # Table 1 (p2) prints a Source column and a Definition column. What reaches the
+    # consumer must be the TABLE: the five sources, and none of the body prose below
+    # it. Until 2.4.146 this asserted ">= 5 cells", and the 5 cells it was satisfied
+    # by were that body prose (rasterized p2, 2026-09-28) -- a pin on the defect.
+    t1_text = " ".join(
+        [t1.get("raw_text") or ""] + [c.get("text") or "" for c in (t1.get("cells") or [])]
+    )
+    for source in ("Davis (1973)", "Carroll (1979)", "Wood (1991)",
+                   "McWilliams and Siegel (2001)", "Matten and Moon (2008)"):
+        assert source in t1_text, f"Table 1 lost its source row {source!r}"
+    for prose in ("CURATION PROCESS", "principles directly applicable"):
+        assert prose not in t1_text, f"Table 1 carries body prose {prose!r}"
     assert len((t4.get("raw_text") or "")) >= 1500, (
         f"Table 4's raw_text collapsed to {len(t4.get('raw_text') or '')} chars "
         "(it carries ~2,008 in a healthy run)"
