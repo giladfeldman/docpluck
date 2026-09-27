@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+## [2.4.146] - 2026-09-27 - normalization 1.9.69 - table extraction 2.4.17
+
+**Public-repository cleanup. Nothing in the extraction pipeline changes: extracted,
+normalized and rendered text are byte-identical to 2.4.145.** This release also ships the README and API-reference rewrite
+(below). It removes internal references (private directory layouts, internal project and folder names, and
+citations of internal notes by file path) from code, comments, tests and documentation.
+
+### Changed — test support: every local location comes from an environment variable
+
+There is no default location for anything the test and gate code reads from the local
+machine. Three variables, one resolver each in `docpluck/testing/_root.py`:
+
+| variable | what it points at | unset |
+|---|---|---|
+| `ARTICLE_REPOSITORY` | the article repository (papers, by DOI) | one test fails and names the variable; every other paper-backed test skips with that reason |
+| `ARTICLE_FINDER_HOME` | the article-finder tool directory | the tests that call it skip |
+| `DOCPLUCK_SKILLS_DIR` | the maintainer's gate-skill directory (canary list) | the tests that read it skip |
+
+New public helpers: `docpluck.testing.article_finder_home()`, `project_skills_dir()`,
+`tool_problem()`. Machine-local configs (`tests/corpora.local.json`,
+`scripts/harness/sources.local.json`, `DOCPLUCK_LOCAL_CORPORA`, `DOCPLUCK_HARNESS_SOURCES`)
+must now give ABSOLUTE paths; a relative one raises instead of being joined onto a fixed
+root. `DOCPLUCK_HARNESS_SOURCES` entries are now `name|dir|glob|format` (a Windows path
+contains `:`). The harness scratch output defaults to the system temp directory.
+`tools/diag/docx_grid_integrity_scan.py --wide DIR` takes the directory to walk.
+
+**With `ARTICLE_REPOSITORY` unset, one test fails on purpose**
+(`test_corpus_manifest.py::test_the_custodian_is_reachable`), so a run that read no paper
+never reads as green; the other paper-backed tests are reported as skipped, not failed.
+
+### Changed — repository contents
+
+`CLAUDE.md` and `LESSONS.md` are no longer tracked (maintainer files; kept locally).
+`tests/test_public_repo_hygiene.py::test_no_internal_reference_in_tracked_files` fails on
+any reappearance of the removed references, in path and quoted-segment form, with planted
+positive and clean negative controls.
+
 ### Documentation
 
 - The GitHub/PyPI `README.md` is now the full landing page: purpose and scientific basis,

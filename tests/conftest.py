@@ -246,18 +246,45 @@ def _camelot_disabled_per_module(request):
 # 2026-09-17 directive). The conversion happens ONLY when the repository itself
 # is unreachable: with it configured, a missing paper still fails.
 
+# What marks a failure as "caused by the unconfigured repository": the exception
+# type, the unresolved-path sentinel that `docpluck.testing` builds on purpose
+# (it names its own cause), or the resolver's own sentence.
+_NO_REPO_SIGNS = ("no-article-repository", "ARTICLE_REPOSITORY is not set")
+_SENTINEL_TEST = "test_the_custodian_is_reachable"
+
+
+def _caused_by_unconfigured_repository(excinfo, text: str) -> bool:
+    from docpluck.testing import CorpusPaperMissing, corpus_available
+
+    if corpus_available():
+        return False
+    if excinfo is not None and excinfo.errisinstance(CorpusPaperMissing):
+        return True
+    return any(sign in text for sign in _NO_REPO_SIGNS)
+
+
+def _skip_reason() -> str:
+    from docpluck.testing import root_problem
+
+    return f"Skipped: article repository not configured -- {root_problem()}"
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     outcome = yield
     rep = outcome.get_result()
-    if not rep.failed or call.excinfo is None:
+    if not rep.failed or item.name == _SENTINEL_TEST:
         return
-    from docpluck.testing import CorpusPaperMissing, corpus_available, root_problem
-
-    if call.excinfo.errisinstance(CorpusPaperMissing) and not corpus_available():
+    if _caused_by_unconfigured_repository(call.excinfo, rep.longreprtext):
         rep.outcome = "skipped"
-        rep.longrepr = (
-            str(item.path),
-            item.location[1] or 0,
-            f"Skipped: article repository not configured -- {root_problem()}",
-        )
+        rep.longrepr = (str(item.path), item.location[1] or 0, _skip_reason())
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_make_collect_report(collector):
+    """Same rule for a module that resolves its paper at import time."""
+    outcome = yield
+    rep = outcome.get_result()
+    if rep.failed and _caused_by_unconfigured_repository(None, rep.longreprtext):
+        rep.outcome = "skipped"
+        rep.longrepr = (str(collector.path), 0, _skip_reason())
