@@ -335,7 +335,7 @@ def normalize_cell_whitespace(text: str) -> str:
     return _CELL_WHITESPACE_RE.sub(" ", text).strip()
 
 
-def repair_cells(cells: "list[Cell]") -> "list[Cell]":
+def repair_cells(cells: "list[Cell]", *, layout=None) -> "list[Cell]":
     """Apply :func:`clean_cell_text` to every cell — the LAST step before emission.
 
     **Where a capture path calls this is load-bearing, not a detail.** It must run
@@ -352,6 +352,13 @@ def repair_cells(cells: "list[Cell]") -> "list[Cell]":
     diverge on what "repaired" means — the one-concept-one-table rule applied to
     the seam that broke it last time. Mutates in place and returns the same list.
     """
+    # W0s: an operator glyph the text layer mislabels as a digit, PROVEN by the
+    # two-origin test in `glyph_evidence` (declared font + rendered bar shape).
+    # Runs BEFORE `clean_cell_text` so the minus is in place before any
+    # sign-sensitive repair reads the cell. The layout is REQUIRED: without it
+    # there is no evidence and the cell passes through as declared.
+    from docpluck.glyph_evidence import apply_to_cells
+    apply_to_cells(cells, layout)
     for c in cells:
         c["text"] = clean_cell_text(c.get("text") or "")
     return cells

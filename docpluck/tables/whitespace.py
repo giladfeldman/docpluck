@@ -113,7 +113,7 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
     cells = _trim_trailing_prose_rows(cells)
     if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
         return []
-    return repair_cells(cells)
+    return repair_cells(cells, layout=layout)
 
 
 def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
@@ -177,7 +177,7 @@ def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list
     cells = _trim_trailing_prose_rows(cells)
     if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
         return []
-    return repair_cells(cells)
+    return repair_cells(cells, layout=layout)
 
 
 def _region_caption_number(region: CandidateRegion) -> int | None:

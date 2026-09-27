@@ -793,7 +793,7 @@ def _camelot_table_to_dict(
     # repaired — the "one concept, one table" rule applied to the thing that
     # broke it last time. `raw_row_texts` is derived from the repaired cells
     # below so `raw_text` agrees with `cells[].text` and the rendered HTML.
-    cells = repair_cells(cells)
+    cells = repair_cells(cells, layout=layout)
     by_row: dict[int, list[Cell]] = {}
     for c in cells:
         by_row.setdefault(c["r"], []).append(c)

@@ -5911,6 +5911,25 @@ def _normalize_text(
         report.page_offsets = layout.page_offsets
     t = text
 
+    # ── W0s (2026-09-27, owner decision "B"): an OPERATOR GLYPH the text layer
+    # labels as a digit. `10.5465/amj.2016.1196` draws `=` and `−` in a separate
+    # font whose character map says `5` and `2`, so every extractor reads
+    # `t 5 20.63` where the page prints `t = −0.63`. Corrected ONLY where two
+    # signals of different physical origin agree -- the declared font (a
+    # five-glyph repertoire beside a text font) and the RENDERED ink (a bar,
+    # rasterized by poppler) -- and only in a word whose every layout instance
+    # carries the proven glyph at the same place. See `glyph_evidence`.
+    # FIRST, before any step rewrites a token the layout must be matched against.
+    _w0s_layout = dropped_minus_layout if dropped_minus_layout is not None else layout
+    if _w0s_layout is not None:
+        from .glyph_evidence import apply_to_document_text
+        before = t
+        t, _w0s_fixed, _w0s_refused = apply_to_document_text(t, _w0s_layout)
+        report._track("W0s_operator_glyph_layout", before, t,
+                      "operator_glyphs_recovered", count=_w0s_fixed)
+        if _w0s_refused:
+            record_fallback("operator_glyph_refused_in_text", detail=str(_w0s_refused))
+
     # ── NFC composition (Cycle 15c, G15 — combining-char split fix) ───
     # pdftotext sometimes emits author names with combining accents in NFD
     # decomposed form ("Förster", "Potočnik") or with a stray space

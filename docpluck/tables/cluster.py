@@ -87,7 +87,7 @@ def lattice_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
     # normaliser that never called the repair chain, so wiring it in later would
     # silently have reintroduced the pre-v2.4.133 unrepaired-cell divergence.
     # A dormant fourth capture path is exactly where that defect would come back.
-    return repair_cells(cells)
+    return repair_cells(cells, layout=layout)
 
 
 # --- helpers ---

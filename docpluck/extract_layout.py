@@ -8,8 +8,8 @@ LayoutDoc) is NOT promised externally; see TODO.md.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from typing import Iterable
+from dataclasses import dataclass, field
+from typing import Any, Iterable
 
 
 @dataclass(frozen=True)
@@ -60,6 +60,11 @@ class LayoutDoc:
     # latter gets a wrong answer with no error. Check this field before treating
     # an empty page as evidence about the PDF.
     populated_pages: tuple[int, ...] | None = None
+    # Two-origin evidence for operator glyphs the text layer labels as digits
+    # (see `glyph_evidence`). Computed only for a FULL layout: the font census
+    # that decides it is a whole-document property, and a page subset would
+    # make a genuine digit font look like a five-glyph operator font.
+    glyph_evidence: Any = field(default=None, compare=False, hash=False)
 
 
 def extract_pdf_layout(
@@ -140,7 +145,7 @@ def extract_pdf_layout(
                     spans=(),
                 ))
 
-    return LayoutDoc(
+    doc = LayoutDoc(
         pages=tuple(out_pages),
         raw_text="".join(raw_chunks),
         page_offsets=tuple(offsets),
@@ -149,6 +154,11 @@ def extract_pdf_layout(
             else tuple(sorted(i for i in wanted if 0 <= i < len(out_pages)))
         ),
     )
+    if wanted is None:
+        import dataclasses
+        from .glyph_evidence import collect_glyph_evidence
+        doc = dataclasses.replace(doc, glyph_evidence=collect_glyph_evidence(pdf_bytes, doc))
+    return doc
 
 
 class PartialLayoutError(ValueError):
