@@ -598,6 +598,27 @@ def _unlink_temp_pdf(tmp_path: str, *held) -> None:
     unlink_temp_pdf(tmp_path, *held)
 
 
+def capture_quality(
+    accuracy: float, filled: int, n_rows: int | None, n_cols: int | None
+) -> tuple[float, float]:
+    """``(confidence, whitespace_pct)`` for the grid docpluck SHIPS: Camelot's
+    own formula ``(accuracy/100) * (1 - whitespace/100)``, with whitespace
+    counted over the emitted cells. One definition, so a grid trimmed after
+    construction (a note moved to ``footnote``) is scored the way it would have
+    been had it been built that way. See the CONFIDENCE note in
+    ``_camelot_table_to_dict``."""
+    total_slots = (n_rows or 0) * (n_cols or 0)
+    whitespace_pct = (
+        100.0 * (1.0 - filled / float(total_slots)) if total_slots > 0 else 0.0
+    )
+    # Clip to [0, 1] — Camelot's `accuracy` is occasionally ≥ 100 due to
+    # floating-point arithmetic; without this clip, ``confidence > 1.0``
+    # fails the ``test_table_html_renders_when_structured`` invariant.
+    acc_frac = max(0.0, min(1.0, accuracy / 100.0))
+    confidence = max(0.0, min(1.0, acc_frac * (1.0 - whitespace_pct / 100.0)))
+    return confidence, whitespace_pct
+
+
 def _camelot_table_to_dict(
     ct,
     idx: int,
@@ -841,16 +862,7 @@ def _camelot_table_to_dict(
     # rejects 30%. Academic tables are legitimately sparse — a correlation
     # matrix leaves its upper triangle empty — so re-gating on this number
     # would delete real tables wholesale. Whitespace is reported, never gated.
-    filled = len(cells)
-    total_slots = (n_rows or 0) * (n_cols or 0)
-    whitespace_pct = (
-        100.0 * (1.0 - filled / float(total_slots)) if total_slots > 0 else 0.0
-    )
-    # Clip to [0, 1] — Camelot's `accuracy` is occasionally ≥ 100 due to
-    # floating-point arithmetic; without this clip, ``confidence > 1.0``
-    # fails the ``test_table_html_renders_when_structured`` invariant.
-    acc_frac = max(0.0, min(1.0, accuracy / 100.0))
-    confidence = max(0.0, min(1.0, acc_frac * (1.0 - whitespace_pct / 100.0)))
+    confidence, whitespace_pct = capture_quality(accuracy, len(cells), n_rows, n_cols)
 
     return {
         "id": f"{id_prefix}{idx}",

@@ -29,6 +29,7 @@ from .cell_cleaning import (
     normalize_cell_whitespace,
     repair_cells,
 )
+from ..telemetry import record_fallback
 from .detect import CandidateRegion
 
 WHITESPACE_MIN_ROWS: int = 3
@@ -122,6 +123,13 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
     # `_repaired_view`.
     cells = _trim_trailing_prose_rows(cells)
     if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
+        # A REJECTION MUST LEAVE A TRACE, as the Camelot path's
+        # `region_grid_failed_clean_gate` does; the char path below records the
+        # same event. Found 2026-09-25: on `10.1080/02699931.2024.2434156` both
+        # whitespace regions are rejected by this gate (Table 9 here, Table 7 via
+        # the char fallback), nothing recorded it, and a test built on them had
+        # skipped on every run.
+        record_fallback("whitespace_grid_failed_clean_gate", detail=region.label or "?")
         return []
     return repair_cells(cells, layout=layout)
 
@@ -186,6 +194,7 @@ def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list
     # `_repaired_view`.
     cells = _trim_trailing_prose_rows(cells)
     if not _whitespace_grid_is_clean(cells, own_caption_number=_region_caption_number(region)):
+        record_fallback("whitespace_grid_failed_clean_gate", detail=f"{region.label or '?'}:chars")
         return []
     return repair_cells(cells, layout=layout)
 

@@ -53,8 +53,7 @@ def _page_with(chars: list[dict], words: list[dict], width=320.0, height=400.0) 
 
 def _region(bbox, page=1) -> CandidateRegion:
     return CandidateRegion(
-        label="Table 1", page=page, bbox=bbox, caption="Table 1. Test.",
-        footnote=None, geometry_signal="whitespace", caption_match=None,
+        label="Table 1", page=page, bbox=bbox, geometry_signal="whitespace", caption_match=None,
     )
 
 
@@ -189,7 +188,8 @@ def test_ip_feldman_table10_data_recovered_real_pdf():
     if pdf is None:
         pytest.skip("ip_feldman fixture not in article-finder cache")
     from docpluck.extract_layout import extract_pdf_layout
-    from docpluck.tables.detect import _region_for_caption, find_caption_matches
+    from docpluck.tables.captions import find_caption_matches
+    from docpluck.tables.detect import _region_for_caption
     from docpluck.extract_columns import _band_gutter_x
 
     layout = extract_pdf_layout(pdf.read_bytes())
@@ -207,7 +207,6 @@ def test_ip_feldman_table10_data_recovered_real_pdf():
     x0, top, x1, bottom = region.bbox
     clipped = CandidateRegion(
         label=region.label, page=region.page, bbox=(x0, top, min(x1, gx), bottom),
-        caption=region.caption, footnote=region.footnote,
         geometry_signal=region.geometry_signal, caption_match=region.caption_match,
     )
     cells = char_whitespace_cells(layout, region=clipped)

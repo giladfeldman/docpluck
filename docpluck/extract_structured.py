@@ -1,20 +1,25 @@
 """
 docpluck.extract_structured — top-level structured PDF extraction.
 
-Per [LESSONS L-006](../LESSONS.md#l-006), this module is pdfplumber-free.
-Tables come from Camelot stream flavor; figures and captions are detected
-purely from the pdftotext text channel via the regexes in
-``docpluck.tables.captions``.
+Captions, figure captions and table notes are read from the pdftotext TEXT
+channel; the pdfplumber LAYOUT channel supplies geometry only (table regions,
+per-cell boxes, where a caption line or a note sits on the page). Tables come
+from Camelot, with a whitespace/isolated fallback. (Until 2026-09 this
+docstring called the module pdfplumber-free; it has used the layout channel for
+geometry since region-driven capture, per L-006's successors.)
 
 Pipeline:
     1. ``extract_pdf`` → linear pdftotext text + page count.
     2. ``find_caption_matches`` → "Table N" / "Figure N" caption lines on
        each page.
-    3. ``extract_tables_camelot`` → cell-bearing tables from each page.
-    4. Match each Camelot table to its same-page caption (label, caption text).
-    5. Build :class:`Figure` dicts from caption matches that don't pair with
-       any table.
-    6. Optional placeholder mode replaces caption lines with
+    3. ``extract_tables_camelot`` + region-driven capture → cell-bearing tables.
+    4. Match each table to its same-page caption (label, caption text); a
+       caption with no grid falls back to whitespace cells or an isolated table.
+    5. ``_attach_table_notes`` → each captioned table's printed note into
+       ``footnote`` (``tables.notes``), moved out of the grid only where it
+       survives there verbatim.
+    6. Build :class:`Figure` dicts from figure captions.
+    7. Optional placeholder mode replaces caption lines with
        ``[Label: caption]`` markers.
 """
 
@@ -474,6 +479,9 @@ def _extract_pdf_structured(
     # 10.5465/amc.2022.0006, whose Tables 1 and 4 were dropped to 0 cells AND 0
     # raw_text by an unconditional rejection. Never trade content for emptiness.
     region_win = region_only = 0
+    # {id(table): caption} for every table paired with a caption, whichever path
+    # produced it -- the anchor `_attach_table_notes` reads each note from.
+    cap_of_table: dict[int, CaptionMatch] = {}
     # {id(cap): Table} — candidates rejected as body prose, kept so the fallback loop
     # can put one back rather than emit an empty table.
     prose_rejected: dict[int, Table] = {}
@@ -505,6 +513,7 @@ def _extract_pdf_structured(
         elif best is region_td:
             region_only += 1
         tables.append(best)
+        cap_of_table[id(best)] = cap
         used_caption_ids.add(id(cap))
     if region_win or region_only:
         method_pieces.append(f"region_pick:{region_win}+{region_only}")
@@ -679,6 +688,7 @@ def _extract_pdf_structured(
                 # page inside it, so the state is named separately.
                 "cell_geometry": "whitespace_rotated" if from_rotated else "whitespace_native",
             })
+            cap_of_table[id(tables[-1])] = cap
             if not from_rotated:
                 method_pieces.append("whitespace_cells")
             # The provisional rejection guarantees only that SOMETHING replaces the
@@ -729,6 +739,7 @@ def _extract_pdf_structured(
                         detail=f"{cap.label or '?'}:{status.split(':', 1)[1]}",
                     )
                 tables.append(isolated)
+            cap_of_table[id(tables[-1])] = cap
 
     # ---- Uncaptioned Camelot grids: KEPT and LABELLED, never silently dropped ----
     # A candidate is skipped only when a copy demonstrably survives -- a table
@@ -767,6 +778,11 @@ def _extract_pdf_structured(
         ct["caption_status"] = "uncaptioned_candidate"
         record_fallback("camelot_table_kept_without_caption", detail=f"p{page}")
         tables.append(ct)
+
+    # ---- Table notes ----
+    layout_doc = _attach_table_notes(
+        pdf_bytes, tables, cap_of_table, captions, rejoined, layout_doc, sbs_column_by_id,
+    )
 
     # ---- Figures ----
     for cap in captions:
@@ -1419,6 +1435,246 @@ def _region_driven_capture(
     return result, cap_column_by_id, layout_doc
 
 
+def _flatten_snippet(snippet: str) -> str:
+    """One text-channel span as one line: line breaks become spaces, a soft
+    hyphen that wrapped a word is dropped with its line break, and whitespace
+    runs (incl. U+2002 EN SPACE and friends) collapse. Shared by the caption
+    and the table note so the two fields of one table cannot be cleaned two
+    different ways."""
+    snippet = snippet.replace("\n", " ").strip()
+    snippet = re.sub("­\\s+", "", snippet)
+    snippet = snippet.replace("­", "")
+    return re.sub(r"\s+", " ", snippet)
+
+
+def _attach_table_notes(
+    pdf_bytes: bytes,
+    tables: list[Table],
+    cap_of_table: dict[int, CaptionMatch],
+    captions: list[CaptionMatch],
+    rejoined: str,
+    layout_doc,
+    sbs_column_by_id: dict[int, tuple[int, float, float]],
+):
+    """Fill ``Table["footnote"]`` for every captioned PDF table whose printed
+    note can be located, and return the (possibly newly materialised) layout.
+
+    Until this existed ``footnote`` was the literal ``None`` on every PDF capture
+    path, while ``detect._detect_footnote_below`` computed a note for every
+    region and nothing read it -- and its text, joined from layout glyphs, has no
+    spaces on tight-kerned PDFs. See ``tables.notes`` for why the page layout
+    decides where the note is and the text channel supplies its characters.
+
+    Keyed on the CAPTION, not on which capture path won, so a Camelot grid, a
+    whitespace grid and a cell-less isolated table get the same answer for the
+    same caption. An uncaptioned candidate has no anchor and keeps ``None``.
+    """
+    todo = [(t, cap_of_table[id(t)]) for t in tables if id(t) in cap_of_table]
+    if not todo:
+        return layout_doc
+    if layout_doc is None:
+        try:
+            from .extract_layout import extract_pdf_layout
+            layout_doc = extract_pdf_layout(pdf_bytes)
+            # The pdfplumber pass this step paid for, recorded as the symbol-font
+            # scan records its own -- which no longer fires for this document,
+            # because the scan below now finds the layout already built.
+            record_fallback("table_note_layout_materialized")
+        except Exception as exc:
+            # Say that we could not look, rather than shipping every note as
+            # absent for an unstated reason.
+            record_fallback("table_note_not_run", detail=type(exc).__name__)
+            return None
+    from .tables.detect import _bbox_of_caption_line, _region_for_caption
+    from .tables.notes import caption_run_span, locate_table_note
+
+    pages = layout_doc.pages
+    offsets = _page_offsets(rejoined)
+    line_cache: dict[int, object] = {}
+
+    def line(c: CaptionMatch):
+        if id(c) not in line_cache:
+            line_cache[id(c)] = (
+                _bbox_of_caption_line(pages[c.page - 1], c)
+                if 1 <= c.page <= len(pages) else None
+            )
+        return line_cache[id(c)]
+
+    for t, cap in todo:
+        label = cap.label or "?"
+        cb = line(cap)
+        if cb is None:
+            record_fallback("table_note_caption_unlocated", detail=label)
+            continue
+        page_obj = pages[cap.page - 1]
+        col = sbs_column_by_id.get(id(cap))
+        if col is not None:
+            x_range = (col[1], col[2])
+        else:
+            x_range = caption_run_span(page_obj, cb, cap.label or "")
+            try:
+                region = _region_for_caption(layout_doc, cap)
+            except Exception as exc:
+                record_fallback("table_note_region_exception", detail=type(exc).__name__)
+                region = None
+            if region is not None and region.geometry_signal != "caption_only":
+                # A region reaching ABOVE the caption line may be a table printed
+                # above its caption; its note would then be above the caption too,
+                # and the first label below the caption would belong to whatever
+                # is printed next. Not searched, rather than misattributed. This
+                # is deliberately over-cautious: measured 2026-09-25 it fires on 23
+                # of 415 corpus captions, mostly Scientific Reports and IEEE tables
+                # whose caption IS above them (their region takes in a rule over
+                # the caption), and 5 of those carry a note that is therefore not
+                # delivered. A refusal, never a wrong note.
+                if region.bbox[1] < cb[1] - 5.0:
+                    record_fallback("table_note_region_above_caption", detail=label)
+                    continue
+                x_range = (min(x_range[0], region.bbox[0]), max(x_range[1], region.bbox[2]))
+        nxt = [
+            b[1] for o in captions
+            if o is not cap and o.page == cap.page
+            and (b := line(o)) is not None and b[1] > cb[1] + 5.0
+        ]
+        above = min(nxt) if nxt else None
+        lo = offsets[cap.page - 1] if cap.page - 1 < len(offsets) else len(rejoined)
+        hi = offsets[cap.page] if cap.page < len(offsets) else len(rejoined)
+        note, why = locate_table_note(
+            layout_doc, rejoined, page=cap.page, page_text_span=(lo, hi),
+            below=cb[1], above=above, x_range=x_range, after_offset=cap.char_end,
+        )
+        if note is None:
+            if why == "channels_disagree":
+                record_fallback("table_note_channels_disagree", detail=label)
+            elif why == "unlabelled_lead":
+                record_fallback("table_note_unlabelled_lead_refused", detail=label)
+            continue
+        if why == "partial":
+            # Only the first rows agree across channels. Delivering them would
+            # ship a note cut short with nothing saying so -- measured 2026-09-25,
+            # 8 such notes in the 102-paper corpus, e.g. `10.5465/annals.2016.0011`
+            # p13, where the text channel dropped the source index "10" before
+            # "Balluerka" and the note stopped after its first line. Refused and
+            # recorded; the note stays wherever it already was.
+            record_fallback(
+                "table_note_partial_refused",
+                detail=f"{label}:{note.rows}/{note.rows_located}",
+            )
+            continue
+        t["footnote"] = _flatten_snippet(note.text)
+        _move_note_rows_to_footnote(t, label)
+    return layout_doc
+
+
+def _no_space(s: str) -> str:
+    return re.sub(r"\s+", "", s.replace("­", ""))
+
+
+def _rows_survive_in(rows: list[str], footnote: str) -> bool:
+    """True when every non-space character of ``rows``, in order and
+    contiguously, is in ``footnote``. A row-final hyphen may be absent from the
+    footnote: a word wrapped at a soft hyphen reaches the grid as ``behav-`` and
+    the footnote as ``behaviour``, and it is the only character allowed to
+    differ."""
+    rows = [r for r in (_no_space(r) for r in rows) if r]
+    f = _no_space(footnote)
+    if not rows:
+        return False
+    first = rows[0][:-1] if rows[0].endswith("-") else rows[0]
+    start = f.find(first)
+    while start != -1:
+        p, ok = start, True
+        for r in rows:
+            if f.startswith(r, p):
+                p += len(r)
+            elif r.endswith("-") and f.startswith(r[:-1], p):
+                p += len(r) - 1
+            else:
+                ok = False
+                break
+        if ok:
+            return True
+        start = f.find(first, start + 1)
+    return False
+
+
+def _move_note_rows_to_footnote(t: Table, label: str) -> None:
+    """Take a table's note OUT OF ITS GRID -- but only where every character of
+    it demonstrably survives in ``footnote``.
+
+    Until ``footnote`` was populated, the grid rows were the only place a
+    Camelot/whitespace table's note reached a consumer (the v2.4.145 trims were
+    changed to keep them for exactly that reason). Once the same text is in
+    ``footnote`` they are a second copy, and in the grid they read as data rows.
+
+    DELETE FURNITURE, NEVER DATA: the rows moved are the LAST rows of the grid,
+    starting at a row that begins with a note label, and are moved only if
+    their text is found verbatim (whitespace aside) in the footnote. Anything
+    else -- a cell repair that changed a glyph, a grid that captured more than
+    the page note -- keeps the rows where they are and says so.
+    """
+    from .tables.notes import starts_with_note_label
+    cells = t.get("cells") or []
+    footnote = t.get("footnote") or ""
+    if not footnote:
+        return
+    if not cells:
+        # A cell-less (isolated) table: `raw_text` is its linearised body, and
+        # the text channel's note is its last paragraph. Same rule, by line.
+        lines = (t.get("raw_text") or "").split("\n")
+        start = next((i for i, ln in enumerate(lines) if starts_with_note_label(ln)), None)
+        if start is None:
+            return
+        if start == 0 or not _rows_survive_in(lines[start:], footnote):
+            record_fallback("table_note_rows_kept_no_verbatim_copy", detail=label)
+            return
+        t["raw_text"] = "\n".join(lines[:start]).rstrip()
+        record_fallback(
+            "table_note_rows_moved_to_footnote", detail=f"{label}:{len(lines) - start}"
+        )
+        return
+    by_row: dict[int, list[Cell]] = {}
+    for c in cells:
+        by_row.setdefault(c["r"], []).append(c)
+    order = sorted(by_row)
+
+    def row_text(r: int, sep: str) -> str:
+        return sep.join(
+            (c.get("text") or "") for c in sorted(by_row[r], key=lambda c: c["c"])
+        ).strip()
+
+    start = next(
+        (i for i, r in enumerate(order) if starts_with_note_label(row_text(r, " "))), None
+    )
+    if start is None:
+        return
+    if start == 0:
+        # The whole grid would go; a grid that is only a note is not ours to empty.
+        record_fallback("table_note_rows_kept_no_verbatim_copy", detail=label)
+        return
+    moved = order[start:]
+    if not _rows_survive_in([row_text(r, "") for r in moved], footnote):
+        record_fallback("table_note_rows_kept_no_verbatim_copy", detail=label)
+        return
+    gone = set(moved)
+    kept = [c for c in cells if c["r"] not in gone]
+    t["cells"] = kept
+    n_rows = max(c["r"] for c in kept) + 1
+    t["n_rows"] = n_rows
+    t["html"] = cells_to_html(kept)
+    if (t.get("raw_text") or "").strip():
+        # Camelot's raw_text is the grid's rows; keep it the grid's rows.
+        t["raw_text"] = "\n".join(
+            txt for r in order[:start] if (txt := row_text(r, " "))
+        )
+    if t.get("accuracy") is not None:
+        from .tables.camelot_extract import capture_quality
+        t["confidence"], t["whitespace"] = capture_quality(
+            t["accuracy"], len(kept), n_rows, t.get("n_cols")
+        )
+    record_fallback("table_note_rows_moved_to_footnote", detail=f"{label}:{len(moved)}")
+
+
 # A layout-channel caption-column line that signals the caption text has ENDED
 # and table/body content has begun: an APA condition/stimulus block opener
 # (``[Introduction]:``), a "Note"/"Source" footnote label, a bullet/dash list
@@ -1952,16 +2208,11 @@ def _finish_caption_label(snippet: str, cap: CaptionMatch) -> str:
     ``Table 1. Correlations of Model Variables`` from the text channel.
     """
     # v2.3.0 soft-hyphen rejoin (per `an internal handoff doc (2026-05-11)`
-    # "Soft-hyphen artifacts in captions" — chen.pdf showed `Sup­ plementary`).
-    # Captions don't flow through ``normalize_text``, so apply the same
-    # rejoin here. ``­`` followed by any whitespace = word-wrap artifact
-    # → drop both. Orphan ``­`` is also invisible by Unicode and gets
-    # dropped.
-    snippet = re.sub("­\\s+", "", snippet)
-    snippet = snippet.replace("­", "")
-    # Collapse runs of any whitespace (including U+2002 EN SPACE, etc.) to a
-    # single space; many APA PDFs use unusual spaces between label and caption.
-    snippet = re.sub(r"\s+", " ", snippet)
+    # "Soft-hyphen artifacts in captions" -- chen.pdf showed `Sup­ plementary`).
+    # Captions don't flow through ``normalize_text``, so the rejoin and the
+    # whitespace collapse (many APA PDFs use unusual spaces between label and
+    # caption) happen here, in the helper the table note shares.
+    snippet = _flatten_snippet(snippet)
     # Strip leading orphan punctuation that can occur when the rejoin produced
     # a partial caption (e.g., "Table 1. : Studies 1b and 3...").
     snippet = re.sub(r"^[\s.:\-—–]+", "", snippet)

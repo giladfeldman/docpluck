@@ -6059,6 +6059,32 @@ def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
     return chosen.start()
 
 
+def _key_of(t: str) -> str:
+    from .tables.notes import _key
+    return _key(t)
+
+
+def _letters(t: str) -> str:
+    from .tables.notes import _key
+    return "".join(ch for ch in _key(t) if ch.isalpha())
+
+
+def _note_already_in(doc_letters: str, doc_key: str, note: str) -> bool:
+    """True when the document's text already carries the note's opening: its
+    first 60 LETTERS. Letters only, because body normalization may rewrite the
+    digits and symbols the raw note keeps (`10.5465/amd.20150115`: the text
+    layer's "N 5 763" is "N = 763" in the body). A note with fewer than 20
+    letters (a bare legend, `10.1017/s0007123424000346`'s "Note: *p < 0.1,
+    **p < 0.05, ***p < 0.001.") is matched on letters AND digits instead,
+    against ``doc_key``; under 8 of those it counts as absent."""
+    head = _letters(note)[:60]
+    if len(head) >= 20:
+        return head in doc_letters
+    from .tables.notes import _key
+    k = _key(note)
+    return len(k) >= 8 and k in doc_key
+
+
 def _render_sections_to_markdown(
     sectioned,
     tables: list[dict],
@@ -6100,6 +6126,10 @@ def _render_sections_to_markdown(
     # ``unlocated_tables`` / ``unlocated_figures`` and are emitted in the
     # appendix at the bottom of the rendered output. They are NOT spliced
     # at position 0 — that was the v2.2.0 behavior that produced Bug 3.
+    # Letters of the whole document text, for `_note_already_in`: a table note
+    # the text already carries is never printed a second time.
+    doc_letters = _letters(sectioned.normalized_text or "")
+    doc_key = _key_of(sectioned.normalized_text or "")
     placements: list[tuple[int, str, dict]] = []
     unlocated_tables: list[dict] = []
     unlocated_figures: list[dict] = []
@@ -6259,6 +6289,23 @@ def _render_sections_to_markdown(
                     not_captured = _table_not_captured_note(item)
                     if not_captured:
                         body_chunks.append(not_captured)
+                # The table's printed note, under the table -- but only when the
+                # document's text does not already carry it. Extraction moves a
+                # note out of the grid / raw_text into `footnote`; pdftotext
+                # usually also linearises it into the body, and that copy is
+                # left exactly where it is: editing the body changes what the
+                # heuristic steps after this one see (measured 2026-09-27 on
+                # `10.1525/collabra.90203` p6, where cutting the note paragraph
+                # let `_suppress_inline_duplicate_table_captions` delete a
+                # subsection heading and its paragraph). So nothing is removed
+                # from the body and no note is printed twice.
+                fn = (item.get("footnote") or "").strip()
+                if fn:
+                    if _note_already_in(doc_letters, doc_key, fn):
+                        record_fallback("render_table_note_left_in_body", detail=label)
+                    else:
+                        record_fallback("render_table_note_printed", detail=label)
+                        body_chunks.append(f"\n{fn}\n")
             else:
                 body_chunks.append(f"\n### {label}\n")
                 if cap:
@@ -6328,6 +6375,10 @@ def _render_sections_to_markdown(
                     not_captured = _table_not_captured_note(t)
                     if not_captured:
                         out_chunks.append(not_captured)
+                fn = (t.get("footnote") or "").strip()
+                if fn and not _note_already_in(doc_letters, doc_key, fn):
+                    record_fallback("render_table_note_printed", detail=label)
+                    out_chunks.append(f"\n{fn}\n")
                 out_chunks.append("\n")
 
     if uncaptioned_candidates:

@@ -2,7 +2,7 @@
 
 
 import pytest
-from tests.structured_fixtures import resolve_fixture as _resolve_fixture
+from tests.structured_fixtures import caption_regions, resolve_fixture as _resolve_fixture
 
 
 def _layout(fixture_id: str):
@@ -17,10 +17,9 @@ def test_imports_ok():
 
 
 def test_lattice_emits_grid_cells_on_lattice_fixture():
-    layout = _layout("ieee_lattice")
-    from docpluck.tables.detect import find_table_regions
+    layout, regions = caption_regions("ieee_lattice")
     from docpluck.tables.cluster import lattice_cells
-    regions = [r for r in find_table_regions(layout) if r.geometry_signal == "lattice"]
+    regions = [r for r in regions if r.geometry_signal == "lattice"]
     if not regions:
         pytest.skip("no lattice region detected on this fixture")
     cells = lattice_cells(layout, region=regions[0])
@@ -32,10 +31,9 @@ def test_lattice_emits_grid_cells_on_lattice_fixture():
 
 
 def test_lattice_cells_have_text():
-    layout = _layout("ieee_lattice")
-    from docpluck.tables.detect import find_table_regions
+    layout, regions = caption_regions("ieee_lattice")
     from docpluck.tables.cluster import lattice_cells
-    regions = [r for r in find_table_regions(layout) if r.geometry_signal == "lattice"]
+    regions = [r for r in regions if r.geometry_signal == "lattice"]
     if not regions:
         pytest.skip("no lattice region detected")
     cells = lattice_cells(layout, region=regions[0])
@@ -51,7 +49,6 @@ def test_lattice_returns_empty_when_geometry_missing():
     layout = _layout("nat_comms_figure_only")  # any fixture works for this test
     region = CandidateRegion(
         label=None, page=1, bbox=(0.0, 0.0, 50.0, 50.0),
-        caption=None, footnote=None,
         geometry_signal="lattice", caption_match=None,
     )
     cells = lattice_cells(layout, region=region)
@@ -59,10 +56,9 @@ def test_lattice_returns_empty_when_geometry_missing():
 
 
 def test_lattice_cells_have_required_typeddict_fields():
-    layout = _layout("ieee_lattice")
-    from docpluck.tables.detect import find_table_regions
+    layout, regions = caption_regions("ieee_lattice")
     from docpluck.tables.cluster import lattice_cells
-    regions = [r for r in find_table_regions(layout) if r.geometry_signal == "lattice"]
+    regions = [r for r in regions if r.geometry_signal == "lattice"]
     if not regions:
         pytest.skip("no lattice region detected")
     cells = lattice_cells(layout, region=regions[0])

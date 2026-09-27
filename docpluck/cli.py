@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     extract.add_argument("--structured", action="store_true",
                          help="Emit JSON with tables and figures (PDF and DOCX; figures PDF only).")
     extract.add_argument("--thorough", action="store_true",
-                         help="With --structured: scan every page for uncaptioned tables (PDF only).")
+                         help="Accepted for compatibility; no effect on the tables returned (every page is already scanned).")
     extract.add_argument("--text-mode", default="raw", choices=("raw", "placeholder"),
                          dest="text_mode",
                          help="With --structured: how to render table/figure regions in 'text' (PDF only).")

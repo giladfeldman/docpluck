@@ -65,3 +65,47 @@ __all__ = [
     "load_manifest",
     "resolve_fixture",
 ]
+
+
+def caption_regions(fixture_id: str):
+    """``caption_regions_for_pdf`` for a structured fixture."""
+    return caption_regions_for_pdf(resolve_fixture(fixture_id).read_bytes())
+
+
+def caption_regions_for_pdf(pdf: bytes):
+    """``(layout, regions)``: one ``CandidateRegion`` per TABLE caption of the
+    fixture, located the way production locates it -- the caption from the text
+    channel (``extract_structured`` rejoins pdftotext's text and matches captions
+    there), the region from ``detect._region_for_caption``.
+
+    Replaces ``detect.find_table_regions`` (removed 2026-09-25), which matched
+    captions in the LAYOUT channel's text instead: on tight-kerned PDFs that text
+    has no spaces, and it found 0 of `10.5465/amj.2016.1196`'s five table
+    captions while production found all five. Tests that borrowed regions from it
+    were testing geometry on a path no document took.
+    """
+    from docpluck.extract import extract_pdf
+    from docpluck.extract_layout import extract_pdf_layout
+    from docpluck.extract_structured import _join_split_captions, _page_offsets
+    from docpluck.tables.captions import (
+        caption_anchor_is_in_text_reference,
+        find_caption_matches,
+    )
+    from docpluck.tables.detect import _region_for_caption
+
+    raw, _ = extract_pdf(pdf)
+    rejoined = _join_split_captions(raw)
+    by_key: dict = {}
+    for c in find_caption_matches(rejoined, _page_offsets(rejoined)):
+        if c.kind == "table":
+            by_key.setdefault(c.number, []).append(c)
+    captions = sorted(
+        (
+            next((c for c in group if not caption_anchor_is_in_text_reference(rejoined, c)), group[0])
+            for group in by_key.values()
+        ),
+        key=lambda c: c.char_start,
+    )
+    layout = extract_pdf_layout(pdf)
+    regions = [r for r in (_region_for_caption(layout, c) for c in captions) if r is not None]
+    return layout, regions

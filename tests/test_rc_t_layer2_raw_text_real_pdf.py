@@ -127,7 +127,13 @@ def test_t1_table_content_and_note_retained(chan_md: str):
     (hypotheses come before the note; trimming starts after it)."""
     blocks = _unstructured_blocks(chan_md)
     assert "There is a positive association" in blocks, "T1 hypothesis content lost (over-trim)"
-    assert "Hypothesis 3 is not included in the replication" in blocks, "T1 Note paragraph lost (over-trim)"
+    # The note moved from the cell list to Table["footnote"]; the rendered
+    # Markdown keeps the body copy pdftotext already gave it (render prints
+    # the footnote only when the text lacks it), so "not lost" is checked on
+    # the whole document.
+    assert "Hypothesis 3 is not included in the replication" in re.sub(r"\s+", " ", chan_md), (
+        "T1 Note paragraph lost (over-trim)"
+    )
 
 
 @requires_pdftotext
@@ -151,7 +157,9 @@ def test_t3_legit_fallback_table_survives(chan_md: str):
     label) must keep its fallback block + its Note — never suppressed/over-trimmed."""
     blocks = _unstructured_blocks(chan_md)
     assert "Median age" in blocks, "chan_feldman T3 descriptive fallback wrongly suppressed (FP)"
-    assert "Origin was not explicitly mentioned" in blocks, "T3 Note over-trimmed (FP)"
+    assert "Origin was not explicitly mentioned" in re.sub(r"\s+", " ", chan_md), (
+        "T3 Note over-trimmed (FP)"
+    )
 
 
 # ── RC-T TEXT-LOSS: the caption-tail-walk overshoot (FIXED, v2.4.119) ─────────

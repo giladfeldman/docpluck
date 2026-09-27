@@ -112,6 +112,16 @@ produces coordinates that are plausible and off by a page, which is worse than n
 RECTANGLE for that (row, column) — not a promise that `cells[i]["text"]` is exactly the text
 standing inside it.
 
+**`footnote` (PDF: new, 2026-09)** is the table's printed note — the block under the table that
+begins `Note.`, `Notes:`, `Source:` or `Abbreviation(s):`, with its continuation lines, lettered
+footnotes and significance legend. Until 2026-09 it was always `None` for a PDF. It is read from the
+same text channel as `caption` and cleaned the same way, and it is delivered only where the page
+layout and that text agree on every letter and digit; otherwise it is `None` and `fallbacks` says
+why (`table_note_*`). A note is taken out of `cells` / `raw_text` only when it survives in
+`footnote` verbatim. Not captured: a note with no printed label, a note printed on a later page, a
+note above its caption. Like the caption, it carries whatever the PDF's text layer decodes — on some
+publishers' fonts `=` arrives as `5` and `<` as `,`.
+
 ### `fallbacks` — what the library silently did instead (read this)
 
 Every result carries a record of the fallback paths that fired for **that document**. This is the
@@ -167,13 +177,16 @@ keep such a repair it is declared here rather than applied silently. See `docs/S
 ### Modes
 
 ```python
-# Default: caption-anchored fast path.
+# Default. Every page is scanned; a grid no caption claims is still returned,
+# marked caption_status="uncaptioned_candidate".
 extract_pdf_structured(pdf_bytes)
 
-# Thorough: scan every page for uncaptioned tables (slower).
+# Accepted for backward compatibility and has NO effect on the tables returned
+# (it only adds "thorough" to `method`): the default already scans every page.
 extract_pdf_structured(pdf_bytes, thorough=True)
 
-# Strip table/figure regions from `text` and replace with [Label: caption] markers.
+# Replace each table/figure CAPTION LINE in `text` with a [Label: caption]
+# marker. The table's body text is left in place.
 extract_pdf_structured(pdf_bytes, table_text_mode="placeholder")
 ```
 

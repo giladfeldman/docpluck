@@ -63,13 +63,18 @@ def test_table_regions_preserves_text_inside_regions():
 
 
 def test_extract_pdf_structured_yields_table_footnotes_when_present():
-    """Sanity: extract_pdf_structured may surface table.footnote on real APA PDFs.
-    Not a strict requirement (footnote detection is heuristic), but verifies the API works."""
+    """extract_pdf_structured surfaces table.footnote on a real APA PDF.
+
+    This test used to accept `None` for every table -- "not a strict
+    requirement" -- which is how `footnote` stayed the literal None on every PDF
+    capture path while the note was computed and discarded next door. This
+    fixture prints a labelled note under seven of its nine tables (rasterized
+    2026-09-25); each one that is delivered must be a note, not a fragment."""
     from docpluck import extract_pdf_structured
     data = _read("apa_chan_feldman_lineless")
     result = extract_pdf_structured(data)
-    # Just confirm the fields exist and aren't malformed.
     for t in result["tables"]:
         assert "footnote" in t
-        if t["footnote"] is not None:
-            assert isinstance(t["footnote"], str)
+    notes = [t["footnote"] for t in result["tables"] if t["footnote"] is not None]
+    assert len(notes) >= 7, notes
+    assert all(n.startswith("Note:") for n in notes), notes

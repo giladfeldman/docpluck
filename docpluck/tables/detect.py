@@ -1,19 +1,25 @@
 """
-Table region detection.
+Table region detection: the caption-anchored region for one caption.
 
-Pipeline (per spec §5.2):
-  1. Caption-regex pre-scan on layout.raw_text -> CaptionMatch list.
-  2. For each caption, search ±window in PDF pt for geometric signal:
-     - lattice signal: ≥2 horizontal rules + (≥1 vertical rule OR clean
+``_region_for_caption(layout, cap)`` is the production entry point. The
+caption itself comes from the TEXT channel (``extract_structured`` finds it in
+the rejoined pdftotext text); this module only locates it on the page and
+measures the geometry around it:
+  1. Search below (then above) the caption line for geometric signal:
+     - lattice signal: >=2 horizontal rules + (>=1 vertical rule OR clean
        column-gap whitespace).
-     - whitespace signal: ≥3 y-clustered rows with stable column boundaries.
-  3. Otherwise: caption_only with a 200-pt block below the caption.
-  4. Bbox = union of (caption line) ∪ (rules/word cluster) ∪ (footnote).
-  5. Caption + footnote text are sliced from layout.raw_text.
+     - whitespace signal: >=3 y-clustered rows with stable column boundaries.
+  2. Otherwise: caption_only with a fixed block below the caption.
+  3. Bbox = union of (caption line) U (rules/word cluster) U (the small-type
+     block under it, see ``_detect_footnote_below``).
 
-In thorough mode, a second pass scans every page not already covered by a
-caption-anchored region for ≥3 horizontal rules and emits them as caption_only
-candidates with label=None, caption=None.
+``find_table_regions`` (a whole-document scan finding captions in the LAYOUT
+channel's text) was removed 2026-09-25: nothing in production called it, and on
+tight-kerned PDFs that layout text has no spaces, so it found 0 of
+`10.5465/amj.2016.1196`'s five table captions. A table's printed note is read by
+``tables.notes``; CandidateRegion no longer carries a caption or note text
+(both were computed and read by nothing, and the caption was sliced from the
+layout text at offsets that belong to the text channel's string).
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ from typing import Literal
 from docpluck.extract_layout import LayoutDoc
 
 from .bbox_utils import Bbox, words_in_bbox
-from .captions import CaptionMatch, find_caption_matches
+from .captions import CaptionMatch
 
 
 GeometrySignal = Literal["lattice", "whitespace", "caption_only"]
@@ -36,8 +42,6 @@ class CandidateRegion:
     label: str | None
     page: int                         # 1-indexed
     bbox: Bbox                        # pdfplumber top-down: (x0, top, x1, bottom)
-    caption: str | None
-    footnote: str | None
     geometry_signal: GeometrySignal
     caption_match: CaptionMatch | None
 
@@ -45,36 +49,9 @@ class CandidateRegion:
 SEARCH_BELOW_PT: float = 250.0
 SEARCH_ABOVE_PT: float = 150.0
 LATTICE_MIN_HORIZONTAL_RULES: int = 2
-THOROUGH_MIN_RULES: int = 3
 WHITESPACE_MIN_ROWS: int = 3
 COLUMN_STABILITY_FRACTION: float = 0.6
 ROW_Y_BUCKET_PT: float = 5.0
-
-
-def find_table_regions(layout: LayoutDoc, *, thorough: bool = False) -> list[CandidateRegion]:
-    """Detect table regions in the document.
-
-    Default mode (`thorough=False`): caption-anchored only — every region has
-    `caption_match is not None`.
-
-    Thorough mode: also scans every page not already covered for ≥3 horizontal
-    rules and emits caption_only regions for them (label=None, caption=None).
-    """
-    captions = [
-        m for m in find_caption_matches(layout.raw_text, list(layout.page_offsets))
-        if m.kind == "table"
-    ]
-
-    regions: list[CandidateRegion] = []
-    for cap in captions:
-        region = _region_for_caption(layout, cap)
-        if region is not None:
-            regions.append(region)
-
-    if thorough:
-        regions.extend(_find_uncaptioned_tables(layout, exclude_pages={r.page for r in regions}))
-
-    return regions
 
 
 def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion | None:
@@ -145,15 +122,10 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
     if footnote is not None:
         full_bbox = _union(full_bbox, footnote.bbox)
 
-    caption_text = _full_caption_text(layout.raw_text, cap)
-    footnote_text = footnote.text if footnote is not None else None
-
     return CandidateRegion(
         label=cap.label,
         page=cap.page,
         bbox=full_bbox,
-        caption=caption_text,
-        footnote=footnote_text,
         geometry_signal=signal,
         caption_match=cap,
     )
@@ -161,7 +133,9 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
 
 @dataclass(frozen=True)
 class _Footnote:
-    text: str
+    # Geometry only: the block extends the region. Its TEXT was once carried
+    # here and read by nothing -- joined from layout glyphs, it has no spaces
+    # on tight-kerned PDFs. The note a consumer receives is `tables.notes`'.
     bbox: Bbox
 
 
@@ -1270,9 +1244,7 @@ def _detect_footnote_below(
             and _prose_row_between(page_obj, x0=x0, x1=x1, top=bottom, bottom=ftop)):
         return None
     fbot = max(c["bottom"] for c in block)
-    block.sort(key=lambda c: (c["top"], c["x0"]))
-    text = "".join(c.get("text", "") for c in block).strip()
-    return _Footnote(text=text, bbox=(fx0, ftop, fx1, fbot))
+    return _Footnote(bbox=(fx0, ftop, fx1, fbot))
 
 
 # A footnote block ends at the first inter-row vertical gap wider than this. One
@@ -1364,40 +1336,4 @@ def _modal_font_size(chars) -> float:
     return max(counts.items(), key=lambda kv: kv[1])[0]
 
 
-def _full_caption_text(raw_text: str, cap: CaptionMatch) -> str:
-    """Caption is the matched line + continuation up to the next paragraph break."""
-    end = raw_text.find("\n\n", cap.char_end)
-    if end == -1:
-        end = min(cap.char_end + 500, len(raw_text))
-    return raw_text[cap.char_start:end].replace("\n", " ").strip()
-
-
-def _find_uncaptioned_tables(layout: LayoutDoc, *, exclude_pages: set[int]) -> list[CandidateRegion]:
-    out: list[CandidateRegion] = []
-    for i, page_obj in enumerate(layout.pages, start=1):
-        if i in exclude_pages:
-            continue
-        horiz_rules = [
-            ln for ln in page_obj.lines or ()
-            if (ln["x1"] - ln["x0"]) > 50
-            and (ln["x1"] - ln["x0"]) > max(ln["bottom"] - ln["top"], 0.5) * 5
-        ]
-        if len(horiz_rules) < THOROUGH_MIN_RULES:
-            continue
-        x0 = min(ln["x0"] for ln in horiz_rules)
-        x1 = max(ln["x1"] for ln in horiz_rules)
-        top = min(ln["top"] for ln in horiz_rules)
-        bottom = max(ln["bottom"] for ln in horiz_rules)
-        out.append(CandidateRegion(
-            label=None,
-            page=i,
-            bbox=(x0, top, x1, bottom),
-            caption=None,
-            footnote=None,
-            geometry_signal="lattice",
-            caption_match=None,
-        ))
-    return out
-
-
-__all__ = ["find_table_regions", "CandidateRegion", "GeometrySignal"]
+__all__ = ["CandidateRegion", "GeometrySignal"]

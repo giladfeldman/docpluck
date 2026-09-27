@@ -136,6 +136,114 @@ everywhere as
 
 `NORMALIZATION_VERSION` and `TABLE_EXTRACTION_VERSION` must move with this change (normalized
 text and table cells both change for the papers above).
+### Table notes reach `Table["footnote"]` on PDF paths
+
+**Not yet versioned: the version is assigned when this is released.** The stored
+table output changes (a new non-null field value, and grid rows moved out), so
+`TABLE_EXTRACTION_VERSION` must move with this change's release.
+
+**What a consumer will see change, stated first:**
+
+| surface | 2.4.145 | this change |
+|---|---|---|
+| `Table["footnote"]`, PDF | always `None`, on every capture path | the printed note (`Note.` / `Notes:` / `Source:` / `Abbreviation(s):` block and its continuation lines) when it can be located and read; `None` otherwise |
+| a grid whose last rows are the note | note carried as data rows | those rows moved to `footnote`, **only** when their text survives there verbatim (whitespace aside); otherwise kept, event `table_note_rows_kept_no_verbatim_copy` |
+| a cell-less (isolated) table | note at the end of `raw_text` | same rule: removed from `raw_text` only when it survives verbatim in `footnote` |
+| rendered Markdown (`render_pdf_to_markdown`) | a note appeared wherever pdftotext put it in the body, and a second time inside the table's grid when Camelot captured it there | the grid copy is gone with the grid rows; the body copy is left exactly where it was; the note is printed on its own line under its table ONLY when the document text does not already carry it. Measured over the 41 corpus papers with notes: no note lost, none gains a second copy, 9 notes the Markdown lacked are now printed, notes appearing more than once fall from 38 to 32. Events `render_table_note_printed` / `render_table_note_left_in_body` |
+| `flatten_table` | caption vocabulary only for PDF tables | also reads the note's vocabulary (as it already did for DOCX) when typing an unlabelled estimate column |
+| `fallbacks` | - | new events: `table_note_partial_refused`, `table_note_unlabelled_lead_refused`, `table_note_region_above_caption`, `table_note_caption_unlocated`, `table_note_channels_disagree`, `table_note_rows_moved_to_footnote`, `table_note_rows_kept_no_verbatim_copy`, `table_note_layout_materialized`, `table_note_not_run`, `table_note_region_exception`, `whitespace_grid_failed_clean_gate`, `render_table_note_printed`, `render_table_note_left_in_body` |
+
+### How a note is read (`docpluck/tables/notes.py`)
+
+The page layout decides WHERE the note is (the first line under this table's
+caption that begins with a note label, and the rows that continue it); the text
+channel supplies the characters, exactly as it does for captions; the note is
+delivered only where the two channels agree on every letter and digit. The
+note is cleaned like the caption (line breaks and soft-hyphen wraps joined,
+whitespace collapsed) through one shared helper, and is otherwise the text
+channel verbatim: where a paper's text layer decodes `=` as `5`, `<` as `,` or a
+minus as `2` (AOM and some APA fonts), the note carries that decoding, as the
+caption on the same page already does. That is a file lie passed through, not a
+repair; consumers parsing statistics out of notes must treat it as they treat
+captions.
+
+**Measured over the 102-paper corpus** (`docpluck.testing.corpus`, 415 table
+captions): 143 notes delivered in 41 papers. Refused, with a recorded reason
+and `footnote` left `None`: 10 where only the first rows agree across channels
+(`table_note_partial_refused`), 5 where the note visibly begins above its label
+(`table_note_unlabelled_lead_refused`), 23 where the detected region reaches
+above the caption (`table_note_region_above_caption`, deliberately cautious: it
+costs 5 real notes on Scientific Reports / IEEE / APA pages), 35 where the caption
+line could not be located on the page. Correctness: see "Verification" below.
+
+A note set in two columns under a wide table (JAMA Network Open) is read column
+by column, and still ships only where the text channel agrees in that order.
+One inherited quirk, shared with captions through the same cleanup: a hard hyphen
+that the text layer marks as a soft hyphen at a line break is joined without it
+(`10.1001/jamanetworkopen.2023.35237` p6: printed "Patient-Reported", delivered
+"PatientReported").
+
+**Not captured, by design:** a note with no printed label, a note on a later
+page than its caption, a note printed above its caption, and uncaptioned
+candidate grids (no anchor).
+
+### Verification
+
+Every one of the 143 delivered notes was compared against a rendered crop of
+its page (caption down to below the note) by a Sonnet reviewer, and about 30 of
+them, including every disputed one, by the main session. Five were found
+incomplete and fixed before this entry was written: two JAMA notes set in two
+columns, and three `10.1017/jdm.2023.16` notes whose final symbol-only token
+`(×).` was dropped. Earlier rounds of the same check found, and led to fixing, a
+page footer read as a note line, significance legends and lettered footnotes
+cut off, a subscript ("HbA1c") and a hyphenated word that broke agreement, and
+a table's last row mistaken for a note's first line. Every character difference
+found is the text layer's own symbol decoding; one reported digit error was a
+reviewer misread, checked at 300 dpi.
+
+**Before/after, full pipeline, 102 papers** (`extract_pdf_structured` at 494fac4
+vs this change, BEFORE from a frozen worktree): no caption, table count or
+non-note cell changed. 143 `footnote` values set; 10 grids and 7 cell-less
+tables lost their note rows, each present verbatim in `footnote`. In
+`flatten_table`: 3 records that WERE the note (e.g. `row_label` "Note: Apology
+scores ranged …") are gone, 4 records' `raw_cells` no longer carry note text
+glued onto their last value (`.101 Note: N 5 763. …` → `.101`), and no typed
+`fields` value changed anywhere in the corpus.
+
+**Recall, measured the other way round:** 52 labelled note paragraphs on table
+pages were not delivered. 15 are the refusals above, 3 are figure notes, and 34
+are misses: 18 whose caption line could not be located, 5 behind the
+region-above-caption guard, 11 with no label found in the searched area (for
+example a JAMA page setting the note beside the caption line).
+
+**Why render does not move the body copy under its table.** It was tried: cutting
+the note paragraph out of the body changed what later heuristic render steps
+saw, and on `10.1525/collabra.90203` p6 `_suppress_inline_duplicate_table_captions`
+then deleted a subsection heading and its paragraph. The body is not edited.
+
+### Found and fixed on the way
+
+* `detect.find_table_regions` and `_find_uncaptioned_tables` REMOVED. No
+  production caller; they matched captions in the layout channel's text, which
+  has no spaces on tight-kerned PDFs, and found 0 of `10.5465/amj.2016.1196`'s
+  five table captions (8 of 9 on `10.1080/02699931.2024.2434156`). Tests that
+  borrowed regions from them now get them the production way
+  (`tests/structured_fixtures.caption_regions`).
+* `CandidateRegion.caption` and `.footnote` REMOVED: computed, read by nothing,
+  and the caption was sliced from the layout text at offsets that belong to the
+  text channel's string.
+* `whitespace_cells` / `char_whitespace_cells` rejected grids at their clean
+  gate with no trace; now `whitespace_grid_failed_clean_gate`. Two tests in
+  `test_whitespace_cluster.py` had skipped on every run because of it; they now
+  assert on `10.1109/access.2024.3349497` Table 2, the one corpus table this
+  path delivers, plus a two-sided test of the new event.
+* `thorough=True` / `--thorough` were documented as "scan every page for
+  uncaptioned tables"; they change nothing but the `method` string. README and
+  CLI help now say so. Placeholder mode was documented as stripping table
+  regions; it replaces the caption line only. Corrected.
+* `camelot_extract.capture_quality` is now the single definition of
+  `confidence` / `whitespace`, so a grid trimmed after construction is scored
+  as if built that way.
 
 ## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
 
