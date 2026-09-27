@@ -97,3 +97,11 @@ def test_amj_evidence_proves_only_the_bar_shaped_codes():
     assert ev.proven == {("AdvOT463cc31e", "2"): MINUS, ("AdvOT463cc31e", "5"): EQUALS}
     # `<`, `3` and `;` are not bars; they must stay as declared, never guessed.
     assert {c for (_f, c) in ev.unresolved} == {",", "3", ";"}
+
+
+def test_no_neighbour_match_falls_back_to_the_whole_document_and_refuses_mixed():
+    # Sonnet review 2026-09-27: when a genuine digit's own layout record drops out
+    # (the channels tokenised its neighbours differently), isolated proven glyphs
+    # must not decide it. The whole document's instances must agree.
+    index = {"5": [(None, None, ((0, "="),)), ("Study", "was", ())]}
+    assert resolve_token("5", "Experiment", "showed", index) == ("5", "refused")

@@ -151,15 +151,15 @@ def merged_column_split_points(ct: Any, layout: Any, page: int) -> list[float]:
     return splits
 
 
-def _glyphs(ct: Any) -> Counter:
+def _glyphs_of_row(ct: Any, r: int) -> Counter | None:
     try:
         df = ct.df
         return Counter(
-            ch for r in range(len(df)) for c in range(len(df.columns))
+            ch for c in range(len(df.columns))
             for ch in str(df.iloc[r, c]) if not ch.isspace()
         )
-    except Exception:  # noqa: BLE001 - an unreadable grid is simply not comparable
-        return Counter()
+    except Exception:  # noqa: BLE001 - an unreadable row is never "equal"
+        return None
 
 
 def resplit_merged_columns(camelot: Any, tmp_path: str, ct: Any, layout: Any) -> Any:
@@ -202,8 +202,14 @@ def resplit_merged_columns(camelot: Any, tmp_path: str, ct: Any, layout: Any) ->
         record_fallback("camelot_column_resplit_refused",
                         detail=f"cols={len(new.df.columns)}")
         return ct
-    if _glyphs(new) != _glyphs(ct):
-        record_fallback("camelot_column_resplit_refused", detail="glyph_multiset_changed")
+    # PER ROW, not per table: a whole-table multiset passes a re-read whose row
+    # boundaries moved and shifted values between rows (Sonnet review,
+    # 2026-09-27). A split may only move text sideways within its own row.
+    if len(new.df) != len(ct.df) or any(
+        _glyphs_of_row(ct, r) is None or _glyphs_of_row(new, r) != _glyphs_of_row(ct, r)
+        for r in range(len(ct.df))
+    ):
+        record_fallback("camelot_column_resplit_refused", detail="row_glyphs_changed")
         return ct
     record_fallback("camelot_column_resplit", detail=f"p{page}+{len(extra)}")
     return new

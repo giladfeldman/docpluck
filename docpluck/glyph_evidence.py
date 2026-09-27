@@ -371,6 +371,13 @@ def resolve_token(tok: str, prev: str | None, nxt: str | None,
         if exact:
             recs = exact
             break
+    else:
+        # NO neighbour matched anywhere. Wildcard-compatible records alone are not
+        # evidence: when the two channels tokenise a genuine digit's surroundings
+        # differently, its own layout record drops out and only isolated proven
+        # glyphs elsewhere remain (Sonnet review, 2026-09-27). Fall back to the
+        # WHOLE document: every layout instance of this string must agree.
+        recs = list(index.get(tok, ()))
     if not recs or not any(r[2] for r in recs):
         return tok, ("refused" if not recs and tok in index else "none")
     fixes = {r[2] for r in recs}
