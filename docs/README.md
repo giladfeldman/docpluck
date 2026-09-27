@@ -676,6 +676,19 @@ All default to off; set to `1` to enable.
 | `DOCPLUCK_COLUMN_CORRECT_BANDED` | experimental: per-band re-extraction for mixed-layout pages the whole-page corrector skips |
 | `DOCPLUCK_RCT_L2_BYPASS` | diagnostic: turns off two table-region guards so their effect can be measured |
 
+**Test and maintainer tooling only.** These are read by `docpluck.testing`, the test suite
+and the scripts under `scripts/` and `tools/`, never by the extraction pipeline. None has a
+default location; when one is unset, the code that needs it skips and names the variable.
+
+| variable | points at |
+|---|---|
+| `ARTICLE_REPOSITORY` | the directory of real test papers (not distributed with this repository). Unset: one test fails on purpose, naming the variable, and every other paper-backed test skips |
+| `ARTICLE_FINDER_HOME` | the paper-lookup tool the verification scripts call |
+| `DOCPLUCK_SKILLS_DIR` | the maintainer's release-gate configuration (canary paper list) |
+| `DOCPLUCK_LOCAL_CORPORA` | JSON object of extra local corpora, `{"key": "<absolute path>"}` (alternative to a gitignored `tests/corpora.local.json`) |
+| `DOCPLUCK_HARNESS_SOURCES` | extra verification-harness sources, comma-separated `name\|absolute-dir\|glob\|format` entries (alternative to a gitignored `scripts/harness/sources.local.json`) |
+| `DOCPLUCK_HARNESS_OUT` | where the verification harness writes scratch output (default: the system temp directory) |
+
 ---
 
 ## Integration Examples
