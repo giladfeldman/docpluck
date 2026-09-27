@@ -249,8 +249,13 @@ def test_efendic_table_point_estimates_in_the_DISABLE_CAMELOT_fallback():
     # Mediation estimate recovered in body prose (confirmed vs AI gold) — this
     # one has its CI on the same line, so the pairing reaches it.
     assert "Mposterior = -0.54" in md
-    # The table's data survives the render chain at all.
-    assert "21.34" in md, "the linearized table must not be deleted"
+    # The table's data survives the render chain at all -- and, since W0s
+    # (2026-09-27), with its signs. The KNOWN GAP above is closed by TYPOGRAPHIC
+    # evidence, not by pairing: this paper's `AdvP586B` draws the minus, and every
+    # rasterized sample of its `2` is a bar. The B column now reads -0.26, -0.21,
+    # -0.95 ... -1.34, each inside its printed interval.
+    assert "-1.34" in md, "the linearized table must not be deleted"
+    assert "21.34" not in md, "the corrupt '2'-for-minus estimate must be gone"
     assert "[-1.58, -1.10]" in md, "the CI column must survive"
     # Idempotence still holds: a second pairing pass changes nothing, because
     # everything it can structurally reach has already been recovered.

@@ -273,7 +273,12 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # "d or dz [95%CI]" / "d [95% CI]". The cell then holds an estimate AND its
     # interval (e.g. "-1.01% (-10.36-8.34)" or "0.76 [.50, 1.02]"). Must precede
     # the bare-"CI" pattern so a combined column is not mis-read as interval-only.
-    ("est_ci", re.compile(r"[A-Za-z].*[\(\[]\s*95\s*%?\s*C\.?\s*I", re.I)),
+    # Any LETTER may lead (a Greek effect symbol: `η2p (90% CI)`), and any
+    # two-digit CI level (APA reports eta-squared with a 90% interval). Measured
+    # 2026-09-27 on 10.1080/23743603.2021.1878340 p16 T4: the Latin-only, 95%-only
+    # form left the column unclassified, which shifted the Original/Replication
+    # arm boundary by one column and put the Replication F under Original.
+    ("est_ci", re.compile(r"[^\W\d_].*[\(\[]\s*\d{2}(?:\.\d)?\s*%?\s*C\.?\s*I", re.I)),
     ("CI",    re.compile(r"^\s*(?:95\s*%?\s*)?CI(?:\s*\[?\s*lower\s*,?\s*upper\s*\]?)?\s*$", re.I)),
     ("CI_lo", re.compile(r"^\s*(?:lower|LL|lo|95\s*%?\s*lower)\s*$", re.I)),
     ("CI_hi", re.compile(r"^\s*(?:upper|UL|hi|95\s*%?\s*upper)\s*$", re.I)),
