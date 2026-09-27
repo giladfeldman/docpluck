@@ -1,4 +1,4 @@
-"""End-of-section boundary patterns (lifted from CitationGuard endPatterns)."""
+"""End-of-section boundary patterns (lifted from Scimeto endPatterns)."""
 
 from docpluck.sections.boundaries import is_section_boundary
 

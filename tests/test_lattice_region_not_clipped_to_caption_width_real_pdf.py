@@ -52,20 +52,14 @@ Ground truth is the printed page: page 9 of the PDF, rasterized and read
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 
 import pytest
 
 from docpluck.render import render_pdf_to_markdown
 
-_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
-_PDF = (
-    _VIBE
-    / "ArticleRepository"
-    / "fulltext"
-    / "10.1001__jamanetworkopen.2023.39337.pdf"
-)
+from docpluck.testing import custody_path
+
+_PDF = custody_path("fulltext", "10.1001__jamanetworkopen.2023.39337.pdf")
 
 # From the printed page 9, Table 3. Each is a value docpluck dropped entirely.
 # Chosen to span all three dropped groups and both dropped rows of the surviving

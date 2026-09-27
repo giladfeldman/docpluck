@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -51,17 +50,28 @@ FOOTER = "}\n"
 
 
 def _article_finder() -> Path:
-    return Path(
-        os.environ.get("ARTICLE_FINDER_HOME")
-        or (Path.home() / ".claude" / "skills" / "article-finder")
+    from docpluck.testing._root import (
+        ENV_ARTICLE_FINDER,
+        article_finder_home,
+        tool_problem,
     )
+
+    home = article_finder_home()
+    if home is None:
+        raise SystemExit(f"FATAL: {tool_problem(ENV_ARTICLE_FINDER)}")
+    return home
 
 
 def _repository_root() -> Path:
-    explicit = os.environ.get("ARTICLE_REPOSITORY")
-    if explicit:
-        return Path(explicit)
-    return Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe")) / "ArticleRepository"
+    """The shared resolver (``_root.py``), made fatal: this is a CLI that writes a
+    committed file, so a missing repository stops it instead of emitting a
+    manifest verified against nothing."""
+    from docpluck.testing._root import repository_root, root_problem
+
+    root = repository_root()
+    if root is None:
+        raise SystemExit(f"FATAL: {root_problem()}")
+    return root
 
 
 def _doi_from_held_at(held_at: str) -> str:
@@ -145,8 +155,8 @@ def _papers_from_view(spec: str) -> dict[str, dict[str, str]]:
 
     # ``held_at`` comes from the CUSTODIAN, never from arithmetic on the path we
     # were handed. Deriving it locally looked like one line and was wrong: the
-    # repository presents itself at two paths on this machine (a Vibe-relative
-    # one and the Dropbox directory it links to), so ``relative_to`` against the
+    # repository can present itself at two paths on one machine (a symlinked
+    # one and the directory it links to), so ``relative_to`` against the
     # configured root raised on files that were plainly in custody. ``build()``
     # already asks ``in-custody`` for exactly this field, and one concept gets
     # one implementation -- two would drift, and the drift would be silent.

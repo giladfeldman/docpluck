@@ -5,16 +5,18 @@ are private. Their directory layout is not this PUBLIC repo's to publish, so it
 is not written down in tracked source: it comes from ``tests/corpora.local.json``
 (gitignored, written once per machine) or from ``$DOCPLUCK_LOCAL_CORPORA``.
 
-Added 2026-09-22. Before that, three tests carried paths like
-``_VIBE / "<group>" / "<private repo>" / "apps" / "worker" / ...`` assembled from
-quoted segments -- and **every gate missed them**, because both
+Added 2026-09-22. Before that, three tests carried paths into a private sibling
+repo, assembled from quoted segments -- and **every gate missed them**, because both
 ``tests/test_public_repo_hygiene.py`` and ``public-repo-guard.py`` match a
 project name followed by a SLASH, and a split path has none. The whole-tree
 audit reported the code clean while 20 such paths were live.
 
 A missing key means "not on this machine" and the caller SKIPS, exactly as the
-hardcoded paths did. It never raises: a private corpus being absent is the
-normal state for any clone of a public repo.
+hardcoded paths did: a private corpus being absent is the normal state for any
+clone of a public repo. Values must be ABSOLUTE paths (``~`` is expanded). A
+relative value RAISES: it used to be joined onto a fixed portfolio root, which
+published that layout here, and guessing a base would turn a configuration error
+into a silent skip.
 
 This is a standalone module rather than a ``conftest`` helper because ``tests/``
 is not a package and ``from conftest import ...`` does not resolve under this
@@ -29,7 +31,6 @@ import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CONFIG = os.path.join(_HERE, "corpora.local.json")
-_VIBE = os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe")
 
 
 def local_corpus(key: str) -> str | None:
@@ -48,4 +49,10 @@ def local_corpus(key: str) -> str | None:
     if not val:
         return None
     p = os.path.expanduser(val)
-    return p if os.path.isabs(p) else os.path.join(_VIBE, p)
+    if not os.path.isabs(p):
+        raise ValueError(
+            f"local corpus {key!r} is configured as the relative path {val!r}; "
+            "give an absolute path in tests/corpora.local.json or "
+            "$DOCPLUCK_LOCAL_CORPORA."
+        )
+    return p

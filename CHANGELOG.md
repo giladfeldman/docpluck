@@ -22,6 +22,19 @@
   enum value, CLI option, environment variable or extra is missing from the docs, when the
   changelog/citation versions disagree, or when the README quickstart does not run.
 
+### Changed — test support: the article repository is found through `ARTICLE_REPOSITORY` only
+
+`docpluck.testing` no longer falls back to a fixed directory under the home directory when
+`ARTICLE_REPOSITORY` is unset. The fallback published one machine's layout in the package
+that ships to PyPI. An unset or wrong variable is not silent:
+`tests/test_corpus_manifest.py::test_the_custodian_is_reachable` fails and names the cause,
+using the new `root_problem()`. Fourteen tests and diagnostic tools rebuilt the path
+themselves, two of them by counting parent directories up from the test file, which pointed
+elsewhere in any other checkout and skipped there silently. They now use the new
+`custody_path(*parts)`. `tests/test_article_repository_is_env_only.py` pins both changes.
+**Anyone running the corpus-backed suite must set `ARTICLE_REPOSITORY`.** Nothing in the
+extraction pipeline changes.
+
 ## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
 
 Three fixes, two of them for defects that were **live in 2.4.144 and earlier
@@ -1530,7 +1543,7 @@ each stopped one layer short of a consumer.
 
 #### 5. The consult round — one seat found two real defects, and one of them used my own test
 
-Round: `Vibe/ResearchPlatforms/_scratch/docpluck-consult-20260828/round/`.
+Round: retained privately (consult round of 2026-08-28).
 **Honestly labelled: 2 seats / 2 providers, DEGRADED.** Sol (openai) never ran — a foreground
 wall-clock cap on this session, not a vendor outage or a defect. Grok returned narration on its
 first attempt (33,126 output tokens, 717 chars returned) and its review was recovered from the
@@ -1659,7 +1672,7 @@ nine fixes; each was reverted in isolation and watched **red** before being acce
 > (2 → 1) — the same L-052 class this release claimed to have closed at five sites.
 >
 > Full evidence, the five things that must change first, and what could NOT be established:
-> `communications/FINDINGS_2026-08-27_consult_v1960_page_gate_NOGO.md`.
+> the 2026-08-27 page-gate consult findings note (internal).
 >
 > **The `git_state` fix in this file is independent of all of the above and is sound.**
 >
@@ -2110,7 +2123,7 @@ new one.
 **Blast radius, swept and controlled rather than assumed.** Across the portfolio only two repos
 touch `extract_to_dir` / `ExtractionReport` / `get_version_info`: docpluck itself and **MetaESCI**
 (5 source files + 2 tests) — the sole consumer casualty. Explicitly **not** exposed, each with a
-two-sided control so the zero is a real zero: **CitationGuard** references docpluck in 5+ Python
+two-sided control so the zero is a real zero: **Scimeto** references docpluck in 5+ Python
 files but touches none of the three symbols and reaches the library over the HTTP `/extract`
 endpoint; the **PDFextractor service** references docpluck in 4 files and calls none of the three.
 
@@ -2244,7 +2257,7 @@ floor — the property that makes docpluck worth fixing rather than replacing �
 > A ScienceArena session (`sciencearena-6c`, relayed by CONDUCTOR #6) measured **`PMC13131283`
 > dropping 0.0306 on that arena's section metric** — a paper this row's "only two papers move
 > at all" does not contain. **`PMC13131283` IS in this population**: our own
-> `docs/REPLY_TO_SCIENCEARENA_2026-08-21.md:41` scores it 0.3714 → 0.9245.
+> our 2026-08-21 reply to ScienceArena (internal) scores it 0.3714 → 0.9245.
 >
 > **The two measurements are probably not the same quantity, and that is a hypothesis, not a
 > defence.** The strongest hint is that their gain for `PMC13137375` is **+0.0403** where this
@@ -2378,14 +2391,14 @@ floor — the property that makes docpluck worth fixing rather than replacing �
 > triple-AI rule have NOT been run on this conclusion.
 >
 > **A citation in this block does not resolve in a clone.**
-> `docs/REPLY_TO_SCIENCEARENA_2026-08-21.md`, cited above and below, is gitignored by
+> our 2026-08-21 reply to ScienceArena, cited above and below, is gitignored by
 > `.gitignore:55` (`REPLY_*`, cross-project correspondence, "never public") — deliberate, since
 > this repo is public. The figures it carries are restated here so this block stands alone. The
 > same applies to `docs/superpowers/` (`.gitignore:36`) and `todo.md` (`.gitignore:48`): a
 > handoff written to either persists on one machine only, and no clone will ever see it.
 
 For context, the arena's own experiment reached 0.7521 blind with a stated oracle *ceiling* of
-0.7922. See `docs/REPLY_TO_SCIENCEARENA_2026-08-21.md`, which also corrects their §3.2 per-label
+0.7922. See our 2026-08-21 reply to ScienceArena (internal), which also corrects their §3.2 per-label
 paper counts and records that the rest of their harness reproduces to four decimals.
 
 ### Also in this release — an unreachable pass deleted
@@ -2847,8 +2860,8 @@ first and watched fail: 4 failed / 8 passed before, 13 passed after.
 
 ### 21 test files still resolved fixtures under the pre-2026-08-03 Dropbox root
 
-`conftest.py` has the correct `VIBE_ROOT`-aware resolver. 21 test modules bypassed it with their own
-`Path.home() / "Dropbox" / "Vibe"`, so their fixtures "were not present" and the tests **skipped
+`conftest.py` has the correct portfolio-root-aware resolver. 21 test modules bypassed it with their own
+a hardcoded root inside a synced folder, so their fixtures "were not present" and the tests **skipped
 silently** — on a machine where those PDFs are sitting at the current root. An earlier commit fixed
 the snapshot suite only; the rest were missed, which is the same *covered-the-case-in-front-of-us*
 shape as the two defects above.
@@ -2856,7 +2869,7 @@ shape as the two defects above.
 This is the failure mode `CLAUDE.md`'s own rule warns about verbatim: *"a discovery helper that
 returns empty when the root is wrong makes a broken run look like a clean one — that is exactly why
 the 2026-08-03 move went unnoticed for five weeks while the weekly reviews passed."* All 21 now
-resolve `VIBE_ROOT` with a `~/Vibe` fallback.
+resolve the portfolio root from an environment variable.
 
 ### What the two final reviews found — and it was the same defect twice more
 
@@ -4163,7 +4176,7 @@ A test asserting only `"poppler_version" in info` would have let the next unrepo
 
 The S6 invisible-character block already stripped U+200B / U+200C / U+200D and U+FEFF, but **skipped U+200E / U+200F** — an omission in a sequence, not a design decision.
 
-**Why this is a correctness defect and not cosmetics.** An invisible character inside rendered output breaks **string equality and search** for every downstream consumer. A citation checker comparing `(2013)` against `(2013)‎` sees a mismatch it *cannot see on screen* — and docpluck's output feeds exactly such consumers (citelink, CitationGuard). This is the same rationale already recorded for the U+00AD soft-hyphen strip twelve lines above it ("invisible, breaks search").
+**Why this is a correctness defect and not cosmetics.** An invisible character inside rendered output breaks **string equality and search** for every downstream consumer. A citation checker comparing `(2013)` against `(2013)‎` sees a mismatch it *cannot see on screen* — and docpluck's output feeds exactly such consumers (citelink, Scimeto). This is the same rationale already recorded for the U+00AD soft-hyphen strip twelve lines above it ("invisible, breaks search").
 
 Now also stripping U+2060 WORD JOINER, which is in the same class.
 
@@ -4317,7 +4330,7 @@ This also permanently removes the flakiness from `test_regex_no_catastrophic_bac
 
 **The fix (W0n — `recover_p_threshold_dropped_decimal`).** A pure text-shape recovery, safe because a DOTLESS, leading-zero-free canonical threshold after a p-comparator is never legitimate statistical notation. Because a wrong insertion would silently change a number 10-fold, W0n fires only when ALL four guards hold: (1) the operator is `<`/`>`/`≤`/`≥` — never `=` (an exact `p = 05` could be a zero-padded participant/model ID); (2) the digits are exactly a canonical threshold 05/01/001 — leading-zero variants (`005`, `0001`) are ambiguous between corrupted `0.05` and corrupted `.005` and are left alone; (3) the digits are not part of a longer number (`p < 052`, `p < 05.3` untouched); (4) the clause reads as a significance statement — comma/semicolon after a statistic token (`= 2.01, p < 05`), an opening paren (`(p > 05)`), a legend marker (`* p < 05`), or line start. A prose subject (`the probability p < 0.5` hypothetically losing its dot) never fires — the false negative leaves already-corrupt text no worse, while a false positive would manufacture a wrong number. Wired into channel 1 (`normalize_text`) AND channel 3 (`render_pdf_to_markdown` post-process) per the three-channel glyph discipline.
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds — never pdftotext). ar_apa: `p < .05 (see Fig. 1)` restored; the paper's healthy `.001`/`.068`/`.025` thresholds byte-identical. A 101-PDF raw-text corpus scan fires ONLY on the ar_apa target site; a 13-case adversarial battery (healthy dots, `p = 05` IDs, `p < 052`/`p < 05.3` continuations, `005`/`0001` leading-zero ambiguity, prose subjects) changes nothing. New real-PDF end-to-end test fails at HEAD (v2.4.117), passes with W0n. Also this release: the committed diag scan harnesses (`tools/diag/w0l_fp_scan.py`, `rct_body_text_diff.py`) no longer point at the dead pre-migration Dropbox corpus path — they resolve `VIBE_ROOT` and fail loudly when the corpus is missing instead of reporting a false CLEAN on 0 PDFs.
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds — never pdftotext). ar_apa: `p < .05 (see Fig. 1)` restored; the paper's healthy `.001`/`.068`/`.025` thresholds byte-identical. A 101-PDF raw-text corpus scan fires ONLY on the ar_apa target site; a 13-case adversarial battery (healthy dots, `p = 05` IDs, `p < 052`/`p < 05.3` continuations, `005`/`0001` leading-zero ambiguity, prose subjects) changes nothing. New real-PDF end-to-end test fails at HEAD (v2.4.117), passes with W0n. Also this release: the committed diag scan harnesses (`tools/diag/w0l_fp_scan.py`, `rct_body_text_diff.py`) no longer point at the dead pre-migration Dropbox corpus path — they resolve the portfolio root from an environment variable and fail loudly when the corpus is missing instead of reporting a false CLEAN on 0 PDFs.
 
 ## [2.4.117] — 2026-07-07
 
@@ -4325,7 +4338,7 @@ This also permanently removes the flakiness from `test_regex_no_catastrophic_bac
 
 **The fix (W0m — `recover_beta_via_layout`).** A text-only `b =` → `β =` rewrite is unsafe: `b` (unstandardized) is a legitimate, distinct statistic. The discriminator is the LAYOUT channel: the corrupted symbol is a `b` char whose font matches the math-symbol subset (`AdvPSMP…`) sitting immediately before `=` on its visual line — the coefficient operator slot. A genuine body `b` uses the body serif font; a word-internal `b` (`bleat…`) or a figure label (`b0`, ArialMT) is never followed by `=`. W0m flips at most as many `b = <coef>` text slots as the layout counted — the same conservative layout-correlation mechanism as W0h (dropped-minus). Gated on the same layout param, so the section path is a no-op.
 
-**Verification** (ground truth = AI multimodal read via article-finder `reading` golds). ar_apa: all five coefficients now render `β` (`β = -.022`, `β = .48`, `β = -.88`, `β = .245`, `β = -.428`), matching the gold's symbols; the genuinely-positive `.48` keeps its sign; `.245`'s missing minus remains the documented OCR-only limitation. A corpus-wide layout scan confirms the recovery fires only on papers whose layout carries math-symbol-font `b`-before-`=` glyphs. 5 new unit tests (symbol-font flip, body-font never flipped, non-`=` slot never flipped, layout-count cap, no-layout no-op) + the real-PDF render test updated to assert β (fails at v2.4.116). Also this release: the post-move editable install was repaired (`pip install -e .` at the new `~/Vibe` path) — the Dropbox→Vibe migration had left `import docpluck` broken machine-wide.
+**Verification** (ground truth = AI multimodal read via article-finder `reading` golds). ar_apa: all five coefficients now render `β` (`β = -.022`, `β = .48`, `β = -.88`, `β = .245`, `β = -.428`), matching the gold's symbols; the genuinely-positive `.48` keeps its sign; `.245`'s missing minus remains the documented OCR-only limitation. A corpus-wide layout scan confirms the recovery fires only on papers whose layout carries math-symbol-font `b`-before-`=` glyphs. 5 new unit tests (symbol-font flip, body-font never flipped, non-`=` slot never flipped, layout-count cap, no-layout no-op) + the real-PDF render test updated to assert β (fails at v2.4.116). Also this release: the post-move editable install was repaired (`pip install -e .` at the new path) — the portfolio migration out of Dropbox had left `import docpluck` broken machine-wide.
 
 ## [2.4.116] — 2026-07-04
 
@@ -4724,7 +4737,7 @@ Corpus audit (101 PDFs, academic-normalized, old vs new): **5 papers changed, ev
 
 New regression tests in `tests/test_normalize_a3_r2_body_integer_real_pdf.py`: quantifier-head helper positives (`of 3 instruments`, `the 5 factors`), content-word-leak negative (`psychological 41 science` still strips), and a real-PDF assertion on `plos_med_1` (`of 3 instruments` present, `of instruments measuring` absent).
 
-> **Handoff items 1–3 (chen_2021_jesp) — won't-fix, PDF-text-layer corruption.** The same handoff filed three other defects on `chen_2021_jesp`: the lost "Registered reports: " title prefix (Nosek & Lakens), the "TurkPrime.com" → "TurkPrime. Com" space injection (Litman et al.), and the "Open Science Collaboration" → "Open, S. C." + stray "Psychology." mangle (OSC 2015). Verified that **both** MIT extractors — pdftotext (text channel) and pdfplumber (layout channel) — produce byte-identical corruption on all three. When two independent extractors read the same bytes, the corruption lives in the PDF's embedded text layer, not in any tool's reading order, and there is no in-text signal (the references read as clean and complete) to trigger a conditional fallback. No general structural signature exists to detect or repair them, and a tool swap is both forbidden (CLAUDE.md L-001 / AGPL ban) and would not help. These remain consumer-side / unrecoverable without OCR or AI re-read — the established `project_citationguard_extraction_defects_wontfix` class.
+> **Handoff items 1–3 (chen_2021_jesp) — won't-fix, PDF-text-layer corruption.** The same handoff filed three other defects on `chen_2021_jesp`: the lost "Registered reports: " title prefix (Nosek & Lakens), the "TurkPrime.com" → "TurkPrime. Com" space injection (Litman et al.), and the "Open Science Collaboration" → "Open, S. C." + stray "Psychology." mangle (OSC 2015). Verified that **both** MIT extractors — pdftotext (text channel) and pdfplumber (layout channel) — produce byte-identical corruption on all three. When two independent extractors read the same bytes, the corruption lives in the PDF's embedded text layer, not in any tool's reading order, and there is no in-text signal (the references read as clean and complete) to trigger a conditional fallback. No general structural signature exists to detect or repair them, and a tool swap is both forbidden (CLAUDE.md L-001 / AGPL ban) and would not help. These remain consumer-side / unrecoverable without OCR or AI re-read — the established won't-fix class of Scimeto-reported extraction defects.
 
 ## [2.4.83] — 2026-06-08
 
@@ -4783,13 +4796,13 @@ Triage for the full sweep (incl. the dominant column-interleave architectural fi
 
 ## [2.4.80] — 2026-06-07
 
-**O5 — reference reading-order inversion fixed (citationguard-iterate handoff).** Region-aware column re-extraction (`extract.py` + `extract_columns.py`); no `NORMALIZATION_VERSION` change (text channel only). Keyed on a STRUCTURAL signature — reference-list entries serialized ABOVE their own `References` heading on a page — never paper identity. Gated against the 26-paper corpus baseline + the column-test suite (32 existing pass) + 5 new real-PDF tests.
+**O5 — reference reading-order inversion fixed (Scimeto handoff).** Region-aware column re-extraction (`extract.py` + `extract_columns.py`); no `NORMALIZATION_VERSION` change (text channel only). Keyed on a STRUCTURAL signature — reference-list entries serialized ABOVE their own `References` heading on a page — never paper identity. Gated against the 26-paper corpus baseline + the column-test suite (32 existing pass) + 5 new real-PDF tests.
 
-- **Root cause:** on two-column papers whose final page stacks a full-width contributor (CRediT) table ABOVE a two-column reference list, pdftotext serializes the page's columns out of order — emitting the RIGHT reference column before the LEFT column that carries the `References` heading. A block of reference entries is thereby stranded ABOVE the heading, invisible to any consumer scanning for references after it (citationguard-iterate O5: "36 chen refs stranded before the References header"). This is the R4/reading-order half of the same column-interleave root cause diagnosed for `ip_feldman` (finding #5 in 2.4.79).
+- **Root cause:** on two-column papers whose final page stacks a full-width contributor (CRediT) table ABOVE a two-column reference list, pdftotext serializes the page's columns out of order — emitting the RIGHT reference column before the LEFT column that carries the `References` heading. A block of reference entries is thereby stranded ABOVE the heading, invisible to any consumer scanning for references after it (Scimeto O5: "36 chen refs stranded before the References header"). This is the R4/reading-order half of the same column-interleave root cause diagnosed for `ip_feldman` (finding #5 in 2.4.79).
 - **`_detect_reference_inversion_pages`** (`extract_columns.py`): a cheap, text-only detector flagging a page when ≥3 reference-list-entry lines (`Surname, F. M.` shape, anchored at line start so in-text citations don't match) appear before that page's `References`/`Bibliography` heading. Reference entries cannot precede their own section heading in correct reading order, so this is an unambiguous inversion signature. Fires on exactly 2 of the 101-paper corpus (`chen_2021_jesp` p19, `jamison_2020_jesp` p9) — both genuine inversions.
 - **`_detect_2col_midline_gutter`** (`extract_columns.py`): a full-height empty central GUTTER-STRIP midline detector. Stronger than the word-center histogram for narrow (~4pt) reference-column gutters the histogram can't resolve, and — because a clean full-height strip cannot coexist with a full-width table row crossing the center — it lets the prose columns be corrected while BYPASSING the y-row bilateral gate that (correctly) protects genuine table pages. Confined to the inversion path (`allow_gutter_fallback`), so the legacy column-interleave path is byte-identical.
 - **Word-preservation guard** (`splice_column_corrected_pages` `word_preserve_pages`): a flagged page's geometric re-extraction is accepted ONLY if it preserves the page's substantial-word multiset (every alphabetic token of length ≥2) — a pure reorder that can never drop or fabricate reference text (rules 0a / 0b). Trivial digit/single-char churn at crop boundaries is tolerated.
-- **Result:** `chen_2021_jesp` 0 reference entries stranded before the heading (was 36+); 101 entries now follow it in alphabetical order. `jamison_2020_jesp` likewise (0 stranded; 37 entries). All other 99 corpus papers unchanged (detector does not fire; legacy path byte-identical). Classes A–D from the same handoff are pdftotext text-channel / source-PDF artifacts and remain consumer-side (citelink) — see `docs/superpowers/handoffs/2026-06-07-text-extraction-defects-from-citationguard-iterate.md`.
+- **Result:** `chen_2021_jesp` 0 reference entries stranded before the heading (was 36+); 101 entries now follow it in alphabetical order. `jamison_2020_jesp` likewise (0 stranded; 37 entries). All other 99 corpus papers unchanged (detector does not fire; legacy path byte-identical). Classes A–D from the same handoff are pdftotext text-channel / source-PDF artifacts and remain consumer-side (citelink) (Scimeto report of 2026-06-07, internal).
 
 New regression tests: `tests/test_o5_reference_inversion_real_pdf.py` (detection + correction + text-preservation + detector-selectivity; real-PDF, parametrized over chen + jamison).
 
@@ -4806,13 +4819,13 @@ New regression tests: `tests/test_normalize_metadata_leak_real_pdf.py` (US-forma
 
 ## [2.4.78] — 2026-06-06
 
-**Cycle 4 redux — canary findings #1/#3/#4 cleared on `ip_feldman_2025_pspb` + citationguard text-extraction handoff Defect 1.** `NORMALIZATION_VERSION` 1.9.26 → 1.9.27. Driven by the Sonnet-via-Claude-Max canary audit (headless gate now operational after `claude setup-token`). Five render/normalize fixes, each keyed on a STRUCTURAL signature (never paper identity), each gated against the 26-paper corpus baseline + full pytest:
+**Cycle 4 redux — canary findings #1/#3/#4 cleared on `ip_feldman_2025_pspb` + Scimeto text-extraction handoff Defect 1.** `NORMALIZATION_VERSION` 1.9.26 → 1.9.27. Driven by the Sonnet-via-Claude-Max canary audit (headless gate now operational after `claude setup-token`). Five render/normalize fixes, each keyed on a STRUCTURAL signature (never paper identity), each gated against the 26-paper corpus baseline + full pytest:
 
 - **Cluster E re-land** (`normalize.py` `_FRONTMATTER_LEAK_LINE_PATTERNS`): the `_ARTICLE_TYPE_CODE` (`research-article2025` etc.) + `_BARE_ARTICLE_ID` (6–8 digit standalone) patterns drafted in v2.4.77 were **reverted there** (they exposed a wrapped-title duplicate) and shipped as dead code. Now genuinely wired — the revert's blocker is resolved by the new wrapped-title demoter below. Clears the bare article-ID + article-type-code half of canary finding #1.
 - **Wrapped-title-duplicate demoter** (`render.py` `_demote_wrapped_title_duplicate`): strips a `### {prefix-of-H1}` + continuation block immediately under the H1 (pdftotext emits the title twice on PSPB/Sage column layouts). Token-prefix match vs the H1 with a ≥75%-coverage gate; runs after title rescue. Resolves the side-effect that forced the v2.4.77 Cluster E revert.
 - **Cohesive masthead-block strip** (`render.py` `_strip_frontmatter_masthead_block`): strips the residual publisher masthead (author+superscript lines, journal-name wraps, page range, copyright tail, `DOI:` label, bare DOI) between the H1 and the first `## ` heading. Self-limiting ≥2-hard-marker gate; a prose-break guard preserves an undetected abstract. Clears the remainder of canary finding #1 — the doc now flows `# Title` → `## Abstract` cleanly.
 - **Column-wrapped heading repair** (`render.py` `_repair_column_wrapped_headings`): Rule A promotes a body `{Title} et al.` + bare `(YYYY)` citation-wrap to `### {Title} et al. (YYYY)` (finding #3 — "Choice of Study for Replication"); Rule B reattaches a short colon-/paren-led orphan tail onto a heading split mid-title (finding #4 — "Original Hypotheses…Target Article: Jordan et al. (2011)"). Both gated on followed-by-prose so two real sibling headings are never merged.
-- **Soft-hyphen line-break dehyphenation** (`normalize.py` S6): a U+00AD immediately before a line break is always a discretionary extraction hyphen splitting one word across the wrap; the join now drops the U+00AD *and* the newline (gated on a following letter) BEFORE the existing bare strip, so `relation­\nship` → `relationship` instead of the previously-surviving space-broken `relation ship`. Closes citationguard text-extraction handoff Defect 1 (recovered com/mitment, pro/motion, altru/ism, relation/ship on chan_feldman_2025_cogemo; U+00AD count 0). Defect 3 (dropped reference line) verified CLEAN in docpluck (pymupdf-only); Defect 2 (position-dependent glyph mis-map `Västfjäll`→`Vastfall`) reproduced but deferred — needs a same-document surname-consensus normalizer (architecture decision).
+- **Soft-hyphen line-break dehyphenation** (`normalize.py` S6): a U+00AD immediately before a line break is always a discretionary extraction hyphen splitting one word across the wrap; the join now drops the U+00AD *and* the newline (gated on a following letter) BEFORE the existing bare strip, so `relation­\nship` → `relationship` instead of the previously-surviving space-broken `relation ship`. Closes Scimeto text-extraction handoff Defect 1 (recovered com/mitment, pro/motion, altru/ism, relation/ship on chan_feldman_2025_cogemo; U+00AD count 0). Defect 3 (dropped reference line) verified CLEAN in docpluck (pymupdf-only); Defect 2 (position-dependent glyph mis-map `Västfjäll`→`Vastfall`) reproduced but deferred — needs a same-document surname-consensus normalizer (architecture decision).
 
 **Run-11 hallucinated-heading guards** (`render.py` `_promote_isolated_titlecase_subsection_headings` + new `_strip_pre_title_heading_noise` / `_nearest_h2_parent_label`): three general structural guards that clear four mis-promoted-heading findings across the canary set:
 
@@ -4820,7 +4833,7 @@ New regression tests: `tests/test_normalize_metadata_leak_real_pdf.py` (US-forma
 - **Regular-path blacklisted-parent reject** — the regular promotion path now consults `_CHAIN_REJECT_PARENTS` (walking back to the nearest `## ` parent, tolerating interleaved running-header lines), matching the chain path. Clears `### Methodology` (a CRediT role label under `## Author Contributions` on plos_med, promoted when a running-header broke chain adjacency).
 - **Lowercase-body reject** — a candidate whose following body's first alphabetic char is lowercase is a fragment torn from a running sentence, not a title. Clears `### Close replication` (chan_feldman) and `### Proced` (plos_med truncation fragment).
 
-Deferred (surfaced, not hacked): `### Reasons for change` (ip_feldman — a Table 5 column header; needs table-region awareness), the `## Data Availability` end-matter absence (RCA correction: it never enters the text channel — pdftotext drops the box; cross-channel/layout recovery, NOT a demoter over-strip as the run-11 handoff assumed), and the citationguard `Open Science Collaboration`→`Open, S. C.` org-author collapse (RCA: baked into the PDF's embedded text by the publisher; identical in pdftotext AND pdfplumber; no safe general docpluck fix — routed to CitationGuard for DOI/CrossRef author reconciliation).
+Deferred (surfaced, not hacked): `### Reasons for change` (ip_feldman — a Table 5 column header; needs table-region awareness), the `## Data Availability` end-matter absence (RCA correction: it never enters the text channel — pdftotext drops the box; cross-channel/layout recovery, NOT a demoter over-strip as the run-11 handoff assumed), and the Scimeto `Open Science Collaboration`→`Open, S. C.` org-author collapse (RCA: baked into the PDF's embedded text by the publisher; identical in pdftotext AND pdfplumber; no safe general docpluck fix — routed to Scimeto for DOI/CrossRef author reconciliation).
 
 New regression tests: `tests/test_render_frontmatter_masthead.py` (27 cases — wrapped-title demoter, masthead-block gate, column-wrapped heading repair, pre-H1/blacklist-parent/lowercase-body guards + real-PDF), `tests/test_normalize_soft_hyphen_dehyphenation.py` (5 cases incl. real-PDF), plus front-matter cases added to `tests/test_normalize_metadata_leak_real_pdf.py`. **NOT yet tagged** — canary still has open table findings (#2/#6/#7 Camelot, multi-session) + reading-order findings (#5/#8, R4 column-aware) + the deferred items above. See the 2026-06-06 handoff.
 
@@ -5187,7 +5200,7 @@ Harness Tier-D academic: pending re-extract + check. NORMALIZATION_VERSION 1.9.1
 
 NORMALIZATION_VERSION 1.9.12. 4 new tests. Harness Tier-D: 0 regressions, 0 new fails (cycle 7 ships, run continues).
 
-**Also (test-infra):** `tests/conftest.py` `PDF_PATHS["docpluck"]` was stale — pointed to `~/Dropbox/Vibe/PDFextractor` when the repo lives at `~/Dropbox/Vibe/MetaScienceTools/PDFextractor`. Three real-PDF tests (`test_extraction.py`, `test_metaesci_followups.py`, `test_sections_real_corpus.py`) were silently skipping. Now derived as the sibling-repo path, robust to checkout location.
+**Also (test-infra):** `tests/conftest.py` `PDF_PATHS["docpluck"]` was stale — pointed one directory level too high for the app repo. Three real-PDF tests (`test_extraction.py`, `test_metaesci_followups.py`, `test_sections_real_corpus.py`) were silently skipping. Now derived as the sibling-repo path, robust to checkout location.
 
 ## [2.4.57] — 2026-05-18
 
@@ -5931,7 +5944,7 @@ skill."
 
 ### Phase 6c — Rendered ↔ structured-tables parity check (new MUST-RUN gate)
 
-Added to `.claude/skills/docpluck-iterate/SKILL.md` Phase 6 table:
+Added to the docpluck-iterate skill's Phase 6 table:
 
 > For each affected paper: (a) count `### Table N` blocks in the
 > rendered .md, (b) call `/extract-structured` and count tables in the
@@ -6320,7 +6333,7 @@ Two pattern groups inside P1:
 This release is also the first end-to-end use of the new
 `/docpluck-iterate` skill (Phase 0 → 12: preflight, broad-read, triage
 pick, library fix, Tier 1 verify, Tier 2 parity, release, Tier 3 verify,
-LEARNINGS append, handoff). See `.claude/skills/docpluck-iterate/` and
+LEARNINGS append, handoff). See the docpluck-iterate skill and
 the run-meta JSON for the audit trail.
 
 ## [2.4.15] — 2026-05-13
@@ -6832,7 +6845,7 @@ On `xiao_2021_crsp`: 18 `Q. XIAO ET AL.` standalone leaks → 0 (one residual is
 
 ### New: QA skill spec updates
 
-4. **`.claude/skills/docpluck-qa/SKILL.md`** — three new checks documented:
+4. **the docpluck-qa skill** — three new checks documented:
    - 7c: Visible-Defect Heuristic Linter (the `lint_rendered_corpus.py` script).
    - 7d: AI Inspection of Rendered Output (Claude subagent compares `.md` paragraph-by-paragraph against source PDF).
    - 7e: Text-Coverage Baseline (asserts `len(rendered.md) ≥ 0.85 × len(pdftotext_raw)` to catch silent text-loss).
@@ -7009,9 +7022,9 @@ Follow-up to v2.3.0. Closes the four remaining items from an internal handoff an
 
 ### Skill integration
 
-4. **`.claude/skills/docpluck-qa/SKILL.md`** — new Check 7b ("Corpus Render Verifier"). After Check 7 (batch extraction), `/docpluck-qa` now runs `python scripts/verify_corpus.py` against the 26-paper baseline corpus and reports per-paper PASS/FAIL with failure tags. Total check count: 14 → 15.
+4. **the docpluck-qa skill** — new Check 7b ("Corpus Render Verifier"). After Check 7 (batch extraction), `/docpluck-qa` now runs `python scripts/verify_corpus.py` against the 26-paper baseline corpus and reports per-paper PASS/FAIL with failure tags. Total check count: 14 → 15.
 
-5. **`.claude/skills/docpluck-review/SKILL.md`** — new Rule 12 ("Corpus render verifier must pass on changes to render / extract / tables"). When a `/docpluck-review` invocation detects changes to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py`, the reviewer must run `scripts/verify_corpus.py` (8–12 min) or `pytest tests/test_corpus_smoke.py` (~45s) before approving. Severity: BLOCKER for `render.py` / `extract_structured.py` / `tables/`; WARN for other touches.
+5. **the docpluck-review skill** — new Rule 12 ("Corpus render verifier must pass on changes to render / extract / tables"). When a `/docpluck-review` invocation detects changes to `docpluck/render.py`, `docpluck/extract_structured.py`, `docpluck/extract.py`, `docpluck/tables/*.py`, or `docpluck/normalize.py`, the reviewer must run `scripts/verify_corpus.py` (8–12 min) or `pytest tests/test_corpus_smoke.py` (~45s) before approving. Severity: BLOCKER for `render.py` / `extract_structured.py` / `tables/`; WARN for other touches.
 
 ### Bumps
 
@@ -7657,7 +7670,7 @@ cross-format benchmarks.
   `normalize_text`, and `compute_quality_score` signatures are unchanged.
 - All 211 pre-existing tests continue to pass. 16 new regression tests added
   (total 227).
-- Verified no regressions on Scimeto/CitationGuard DOCX corpus (20/20 real
+- Verified no regressions on Scimeto DOCX corpus (20/20 real
   papers extract at 100/100 quality) or cross-format parity (99.0% similarity
   on the DOCX→PDF spot check, identical to v1.3.0).
 

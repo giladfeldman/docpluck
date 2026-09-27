@@ -37,8 +37,8 @@ _CHECKSUMS = _SNAPSHOT_DIR / "checksums.json"
 # so there is no portfolio path here to get wrong any more. The incident below is
 # kept because it is why a miss must FAIL rather than skip.
 #
-# 2026-08-07: this was hardcoded to `$HOME/Dropbox/Vibe`. The portfolio moved
-# OUT of Dropbox on 2026-08-03 (Dropbox syncing a live .git corrupts repos), so
+# 2026-08-07: this was hardcoded to a synced-folder portfolio root. The portfolio
+# moved out of that folder on 2026-08-03 (Dropbox syncing a live .git corrupts repos), so
 # every fixture resolved to a path that no longer exists and **all 12 tests
 # SKIPPED** — silently, for four days. That is the precise failure the hard
 # rule warns about: "a discovery helper that returns empty when the root is
@@ -129,9 +129,11 @@ def _explain_against_custodian(entry: dict, actual: str, out_dir: Path) -> list[
         return ["  (no canonical_key in MANIFEST.json — cannot fetch the "
                 "expected text from article-finder)"]
 
-    finder = Path(os.path.expanduser("~")) / ".claude" / "skills" / "article-finder"
-    if not finder.is_dir():
-        return [f"  (article-finder not installed at {finder} — actual text only)"]
+    from docpluck.testing import article_finder_home
+
+    finder = article_finder_home()
+    if finder is None:
+        return ["  (article-finder not configured: set ARTICLE_FINDER_HOME — actual text only)"]
 
     import subprocess
     import sys as _sys

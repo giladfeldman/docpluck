@@ -55,13 +55,12 @@ Ground truth is the printed page: page 10 of the PDF, rasterized and read
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 
 import pytest
 
-_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
-_PDF = _VIBE / "ArticleRepository" / "fulltext" / "10.1371__journal.pmed.1004323.pdf"
+from docpluck.testing import custody_path
+
+_PDF = custody_path("fulltext", "10.1371__journal.pmed.1004323.pdf")
 
 
 def _cells_text(table) -> str:

@@ -1,12 +1,12 @@
 """Input-feed provenance helpers for the docpluck-iterate canary (rec R-0003).
 
-Cross-project lesson transfer (CitationGuard => docpluck): the verification
+Cross-project lesson transfer (Scimeto => docpluck): the verification
 substrate (the PDF rendered for audit) must be byte-equal to the canonical
 production input feed BEFORE scoring. docpluck already scores render-vs-AI-gold
 (never vs a deterministic extractor -- CLAUDE.md hard rule), so the residual
 gap is INPUT provenance: a render of a drifted PDF scored against a gold made
 from the original PDF is the same "wrong substrate" bug class that gave
-CitationGuard a misleading whole-run score.
+Scimeto a misleading whole-run score.
 
 canary.json pins each canary paper's expected input-PDF sha256
 (`expected_pdf_sha`). `render_for_audit.py` and

@@ -9,7 +9,7 @@ Why it matters beyond cosmetics: an invisible character inside rendered output
 breaks *string equality and search* for every downstream consumer. A citation
 checker comparing ``(2013)`` against ``(2013)‎`` sees a mismatch it cannot
 see on screen -- and docpluck's output feeds exactly such consumers (citelink,
-CitationGuard). It is the same failure class the U+00AD soft-hyphen strip on
+Scimeto). It is the same failure class the U+00AD soft-hyphen strip on
 ``normalize.py`` was added for ("invisible, breaks search").
 
 The S6 invisible-character block already strips U+200B/C/D and U+FEFF but

@@ -99,8 +99,11 @@ def test_harness_records_which_library_it_used(tmp_path):
     tell that was site-packages rather than a stale tree, because the version does
     not carry the origin. The receipt must carry the PATH.
     """
-    if not (Path.home() / ".claude/skills/article-finder/cache-check.py").exists():
-        pytest.skip("article-finder not present on this machine")
+    from docpluck.testing import article_finder_home
+
+    af = article_finder_home()
+    if af is None or not (af / "cache-check.py").exists():
+        pytest.skip("article-finder not configured (set ARTICLE_FINDER_HOME)")
     out = tmp_path / "r.md"
     r = subprocess.run(
         [sys.executable, str(HARNESS), "--key", CANARY_DOI, "--out", str(out)],

@@ -1,6 +1,6 @@
 """Reproduce BOTH sign defects in the `<td>` table channel, in one run, no PDF needed.
 
-Findings doc: communications/FINDINGS_2026-09-02_table_channel_sign_defects.md
+Findings doc: 2026-09-02 table-channel sign-defect note (internal)
 Backlog row:  todo.md W-0016
 
 The channel UNDER-SIGNS and OVER-SIGNS at once, by two independent mechanisms:

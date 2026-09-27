@@ -1,9 +1,9 @@
 """
 Input-feed provenance gate for the docpluck-iterate canary (rec R-0003, 2026-06-15).
 
-Cross-project lesson transfer (CitationGuard => docpluck): the verification
+Cross-project lesson transfer (Scimeto => docpluck): the verification
 substrate must be byte-equal to the production input feed BEFORE scoring. A
-CitationGuard run once scored its tool output against raw PyMuPDF for a whole
+Scimeto run once scored its tool output against raw PyMuPDF for a whole
 run, producing a misleading score.
 
 docpluck already scores render-vs-AI-gold (never vs a deterministic extractor --
@@ -35,15 +35,21 @@ if _TOOLS not in sys.path:
 
 import canary_provenance as cp  # noqa: E402
 
-CANARY_JSON = os.path.join(_REPO, ".claude", "skills", "_project", "canary.json")
+# Both locations are machine-local configuration ($DOCPLUCK_SKILLS_DIR,
+# $ARTICLE_FINDER_HOME), never a path written into this public repo.
+CANARY_JSON = os.path.join(
+    os.environ.get("DOCPLUCK_SKILLS_DIR") or "<DOCPLUCK_SKILLS_DIR unset>",
+    "_project", "canary.json",
+)
 CACHE_CHECK = os.path.join(
-    os.path.expanduser("~"), ".claude", "skills", "article-finder", "cache-check.py"
+    os.environ.get("ARTICLE_FINDER_HOME") or "<ARTICLE_FINDER_HOME unset>",
+    "cache-check.py",
 )
 
 
 def _canary_papers():
-    # canary.json lives under .claude/, which is deliberately NOT tracked in
-    # this PUBLIC repo (see .gitignore + /docpluck-cleanup Section 0). A public
+    # canary.json lives in the project's skills directory, which is deliberately
+    # NOT tracked in this PUBLIC repo (see .gitignore + /docpluck-cleanup Section 0). A public
     # clone therefore has no canary config, and the canary-dependent tests here
     # must SKIP rather than error. This helper is called at COLLECTION time by
     # the parametrize below, so it must never raise -- an exception here takes

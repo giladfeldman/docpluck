@@ -63,20 +63,21 @@ a test body when you want the raise at the point of use.
 from __future__ import annotations
 
 import hashlib
-import os
 from pathlib import Path
 
 from docpluck.testing.corpus_manifest import MANIFEST
 
 __all__ = [
-    "CorpusPaperMissing",
     "MANIFEST",
+    "CorpusPaperMissing",
     "corpus_available",
     "corpus_names",
     "corpus_pdf",
     "corpus_pdfs",
+    "custody_path",
     "repository_root",
     "require_corpus_pdf",
+    "root_problem",
     "verify_manifest",
 ]
 
@@ -90,22 +91,27 @@ class CorpusPaperMissing(AssertionError):
     """
 
 
-# The custodian's root. Resolved, never hardcoded -- the portfolio root has moved
-# once already and a helper that silently returns nothing when it moves makes a
-# broken run look like a clean one.
-_ENV_REPO = "ARTICLE_REPOSITORY"
-_ENV_VIBE = "VIBE_ROOT"
+# The custodian's root: `$ARTICLE_REPOSITORY`, with NO default location (owner
+# decision 2026-09-25 -- see `_root.py`). One resolver, shared with regenerate.py.
+from docpluck.testing._root import ENV_REPO as _ENV_REPO
+from docpluck.testing._root import repository_root, root_problem
 
 
-def repository_root() -> Path | None:
-    """The article repository root, or None when it is not on this machine."""
-    explicit = os.environ.get(_ENV_REPO)
-    if explicit:
-        p = Path(explicit)
-        return p if p.is_dir() else None
-    base = Path(os.environ.get(_ENV_VIBE) or (Path.home() / "Vibe"))
-    p = base / "ArticleRepository"
-    return p if p.is_dir() else None
+def custody_path(*parts: str) -> Path:
+    """``<repository>/<parts>`` for a file held in custody but NOT in the manifest.
+
+    Some tests key on a paper by its canonical DOI filename, e.g.
+    ``custody_path("fulltext", "10.1001__jamanetworkopen.2023.39337.pdf")``.
+    They used to rebuild the repository path themselves, fourteen different
+    ways, two of them by counting parent directories up from the test file --
+    which pointed somewhere else in any other checkout, so those tests skipped
+    silently there. Never raises: with no repository, the returned path does not
+    exist and names the cause, and the integrity test fails loudly once.
+    """
+    root = repository_root()
+    if root is None:
+        return _unresolved_path("/".join(parts), "no-article-repository")
+    return root.joinpath(*parts)
 
 
 def corpus_available() -> bool:
@@ -154,9 +160,11 @@ def corpus_pdf(rel: str) -> Path:
 def require_corpus_pdf(rel: str) -> Path:
     """Like :func:`corpus_pdf`, but raises :class:`CorpusPaperMissing` on a miss.
 
-    Use inside a test body. Does not raise merely because the repository is
-    absent -- that case is reported once, by the integrity test, rather than 73
-    times.
+    Use inside a test body. It raises in all three miss cases, including an
+    unconfigured repository; docpluck's own ``tests/conftest.py`` reports THAT
+    case as a skip, so it is failed once, by the integrity test, rather than in
+    every test that names a paper. (This docstring used to say the function did
+    not raise for an absent repository; the code always has.)
     """
     key = rel.replace("\\", "/").strip("/")
     p = corpus_pdf(key)
@@ -164,8 +172,7 @@ def require_corpus_pdf(rel: str) -> Path:
         return p
     if not corpus_available():
         raise CorpusPaperMissing(
-            f"{key}: the article repository is not on this machine. Set "
-            f"{_ENV_REPO} (or {_ENV_VIBE}) to point at it."
+            f"{key}: the article repository is not reachable. {root_problem()}"
         )
     reason = (
         "no manifest entry -- the name matches no paper in custody"

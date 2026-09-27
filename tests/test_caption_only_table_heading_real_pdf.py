@@ -19,12 +19,9 @@ every detected table is structurally visible.
 
 from __future__ import annotations
 
-import os
-
 import json
 import re
 from pathlib import Path
-
 
 # Camelot is not needed by this module's tests; skipping it keeps them fast.
 # Declarative on purpose: this was `os.environ.setdefault(...)` at module scope,
@@ -38,15 +35,14 @@ from docpluck.extract_structured import extract_pdf_structured
 from docpluck.render import render_pdf_to_markdown
 
 _REPO = Path(__file__).resolve().parents[1]
-_VIBE = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
 _MANIFEST = json.loads(
     (_REPO / "scripts" / "harness" / "corpus_manifest.json").read_text(encoding="utf-8")
 )
 _BY_ID = {d["id"]: d for d in _MANIFEST["documents"]}
 
-from scripts.harness.corpus import resolve as _harness_resolve  # noqa: E402
+from scripts.harness.corpus import resolve as _harness_resolve
 
-_TABLE_HEADING_RE = re.compile(r"^#{2,4}\s+Table\b", re.M)
+_TABLE_HEADING_RE = re.compile(r"^#{2,4}\s+Table\b", re.MULTILINE)
 
 
 def _assert_every_table_has_a_heading(doc_id: str):

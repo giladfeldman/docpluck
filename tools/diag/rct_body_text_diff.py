@@ -77,7 +77,6 @@ def _new_body_start(raw_text, cap, next_boundary):
     return ES._caption_tail_body_start(raw_text, cap, next_boundary)
 
 
-_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
 pdfs = [str(p) for p in docpluck_corpus()]
 print(f"guard-diff over {len(pdfs)} PDFs (body_start walk: old vs v2.4.117)\n")
 

@@ -1,7 +1,6 @@
 """`eta` must not match inside ordinary English words.
 
-Filed by Scimeto/CitationGuard in `INBOX_FROM_SCIMETO_2026-08-21b_flatten_typing_and_sections.md`
-§1, with a three-line reproduction:
+Filed by Scimeto on 2026-08-21 (flatten-typing request, §1), with a three-line reproduction:
 
     from docpluck.tables.flatten import _effect_type_for
     _effect_type_for('Table 2. Body Weight, Glycemic Control, and Cardiometabolic Risk Factors')

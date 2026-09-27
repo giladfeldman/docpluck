@@ -1,9 +1,9 @@
 """`sectioning_text_id` — the offsets must name the buffer they index.
 
-Asked for independently by Scimeto/CitationGuard and ESCImate on 2026-08-21,
+Asked for independently by Scimeto and ESCImate on 2026-08-21,
 after Scimeto measured that **27 of 27** of their stored documents held
 `char_start`/`char_end` indexing a string they did not have
-(`INBOX_FROM_SCIMETO_2026-08-21c_offsets_are_not_one_flag.md` §1). Nothing threw;
+(Scimeto request of 2026-08-21, §1). Nothing threw;
 a drifted slice still returns text, just starting a few words off.
 
 The field's whole value is that it cannot be right by accident, so these tests

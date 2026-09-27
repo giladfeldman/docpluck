@@ -1,7 +1,7 @@
 """
 Quality Scoring
 ================
-From CitationGuard's _check_text_quality() + MetaESCI's artifact detection.
+From Scimeto's _check_text_quality() + MetaESCI's artifact detection.
 """
 
 

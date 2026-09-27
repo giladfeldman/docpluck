@@ -189,7 +189,7 @@ def test_track_accumulates_wired_counts_across_rules():
     not pdf_available("articlerepo", _JESP_2021),
     reason=(
         "shared article repository not present — "
-        "python ~/.claude/skills/article-finder/find-pdf.py 10.1016/j.jesp.2021.104154"
+        "fetch 10.1016/j.jesp.2021.104154 with article-finder (find-pdf.py)"
     ),
 )
 def test_the_real_paper_still_publishes_six():

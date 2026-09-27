@@ -15,9 +15,7 @@ this is safe and general across Elsevier / ScienceDirect papers.
 
 from __future__ import annotations
 
-import os
 
-from pathlib import Path
 
 import pytest
 
@@ -29,10 +27,12 @@ import pytest
 # reads this flag and restores the prior value when the module finishes.
 DISABLE_CAMELOT = True
 
-from docpluck.render import render_pdf_to_markdown
+from docpluck.render import render_pdf_to_markdown  # noqa: E402 -- after the DISABLE_CAMELOT flag, as before
 
 # Article-finder fulltext repository (the JESP CrossMark papers live here).
-REPO = Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe") / "ArticleRepository" / "fulltext"
+from docpluck.testing import custody_path  # noqa: E402
+
+REPO = custody_path("fulltext")
 
 
 def _title_of(md: str) -> str:

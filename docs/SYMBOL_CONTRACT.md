@@ -211,7 +211,7 @@ If your tool matches any of these tokens, please check it against this table:
   `(?:eta2p|η2p|etap2|ηp2|eta_p2|…)`. `eta2p` is what we emit; confirm the rest of your
   alternation matches this contract, and that your chi-square pattern expects `chi2` (we never
   emit `ch2`).
-- **Scimeto / CitationGuard** — `statisticalExtractor.ts`.
+- **Scimeto** — `statisticalExtractor.ts`.
 - **citelink** — hand-maintains a copy of docpluck's ligature map; consider reading
   `symbol_contract()` instead.
 

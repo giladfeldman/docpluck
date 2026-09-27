@@ -589,11 +589,9 @@ def score(truth: list[list[list[str]]], got: list[list[list[str]]]) -> dict:
 
 
 def repo_root() -> Path:
-    ar = os.environ.get("ARTICLE_REPOSITORY")
-    if ar:
-        return Path(ar)
-    vibe = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
-    return vibe / "ArticleRepository"
+    from docpluck.testing import custody_path
+
+    return custody_path()
 
 
 def _body_text(docx_bytes: bytes) -> str:

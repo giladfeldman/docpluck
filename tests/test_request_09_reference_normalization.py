@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path
 
 import pytest
 
 from docpluck.extract import extract_pdf_file
 from docpluck.normalize import normalize_text, NormalizationLevel
+from docpluck.testing import custody_path
 from .conftest import requires_pdftotext
 
 # CUSTODY: article-finder's repository is the SOLE custodian of papers
@@ -35,12 +35,7 @@ from .conftest import requires_pdftotext
 # tests here SKIPPED SILENTLY — a coverage hole wearing a green tick, and the
 # reason the obsolete contract below outlived the release that invalidated it.
 DOI = "10.1098/rsos.250979"
-PDF = str(
-    Path(os.environ.get("VIBE_ROOT") or Path.home() / "Vibe")
-    / "ArticleRepository"
-    / "fulltext"
-    / (DOI.replace("/", "__") + ".pdf")
-)
+PDF = str(custody_path("fulltext", DOI.replace("/", "__") + ".pdf"))
 
 
 def _pdf_available() -> bool:

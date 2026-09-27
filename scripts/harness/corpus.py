@@ -9,8 +9,8 @@ HTML are absent from it because they are not papers with DOIs and most are not i
 custody at all.
 
 Discovers every test document (PDF / DOCX / HTML) across the sibling repos and
-emits a committed ``corpus_manifest.json``. The manifest stores Vibe-relative
-paths only — no document bytes are committed (the repo is public; see
+emits a committed ``corpus_manifest.json``. The manifest stores DOIs and content
+hashes only — no paths and no document bytes are committed (the repo is public; see
 ``feedback_no_pdfs_in_repo``). A document that has moved/disappeared is reported
 by ``verify``, never silently dropped.
 """
@@ -38,10 +38,9 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 
-# All corpora live under the Vibe portfolio root. Resolved via VIBE_ROOT so the
-# manifest stays portable across machines and future moves (the root moved off
-# ~/Dropbox/Vibe on 2026-08-03); never hardcode an absolute user path here.
-VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+# No machine's directory layout is written here. The papers resolve through
+# `$ARTICLE_REPOSITORY` (docpluck.testing); the other sources come from a
+# machine-local config (see SOURCES below), which must give ABSOLUTE paths.
 
 
 def _out_root() -> Path:
@@ -65,8 +64,7 @@ def _out_root() -> Path:
 
     Resolution order:
       1. ``DOCPLUCK_HARNESS_OUT``  — explicit override.
-      2. ``$VIBE_ROOT/_artifacts/docpluck-harness`` — beside the portfolio, not
-         inside a git repo.
+      2. ``<system temp dir>/docpluck-harness`` — outside any git repo.
 
     Output worth KEEPING is registered with article-finder under
     ``--artifact-class tool`` as ``<family>__<producer>@<version>``; an
@@ -76,14 +74,16 @@ def _out_root() -> Path:
     override = os.environ.get("DOCPLUCK_HARNESS_OUT")
     if override:
         return Path(override)
-    return VIBE / "_artifacts" / "docpluck-harness"
+    import tempfile
+
+    return Path(tempfile.gettempdir()) / "docpluck-harness"
 
 
 OUT_ROOT = _out_root()
 
 
 def require_corpus_root() -> None:
-    """Fail loudly when the portfolio root is missing.
+    """Fail loudly when the article repository is not reachable.
 
     A missing root must never be silent: discovering 0 documents makes a broken
     run look like a clean one, which is how the 2026-08-03 move went unnoticed
@@ -100,15 +100,17 @@ def require_corpus_root() -> None:
     document calls this first, so a real run still fails loudly and
     immediately. Only the import is now free.
     """
-    if not VIBE.is_dir():
+    from docpluck.testing import root_problem
+
+    problem = root_problem()
+    if problem:
         raise FileNotFoundError(
-            f"Vibe root not found at {VIBE} — set VIBE_ROOT. A missing root must "
-            "fail loudly: silently discovering 0 documents makes a broken run "
-            "look like a clean one."
+            f"{problem} A missing root must fail loudly: silently discovering 0 "
+            "documents makes a broken run look like a clean one."
         )
 
 #: Where the non-corpus documents live, as
-#: ``(source, root-relative-to-VIBE, glob, format)``. Order is stable — it fixes
+#: ``(source, absolute-dir, glob, format)``. Order is stable — it fixes
 #: the manifest ordering so a regenerated manifest diffs cleanly.
 #:
 #: NOT WRITTEN DOWN HERE, AND THAT IS THE POINT. This repo is PUBLIC; the other
@@ -119,7 +121,7 @@ def require_corpus_root() -> None:
 #: and they reached ~10 tests through this module's importers.
 #:
 #: Configure a machine that has the documents, in either of two ways:
-#:   * ``DOCPLUCK_HARNESS_SOURCES`` — ``name:vibe-relative-dir:glob:format``
+#:   * ``DOCPLUCK_HARNESS_SOURCES`` — ``name|absolute-dir|glob|format``
 #:     entries separated by commas; or
 #:   * ``scripts/harness/sources.local.json`` — a gitignored list of 4-item
 #:     lists, same fields. Created once per machine, never committed.
@@ -138,10 +140,10 @@ def _parse_sources() -> list[tuple[str, str, str, str]]:
     if raw:
         out = []
         for entry in raw.split(","):
-            parts = entry.strip().split(":")
+            parts = entry.strip().split("|")
             if len(parts) != 4:
                 raise ValueError(
-                    f"{_SOURCES_ENV}: {entry!r} is not name:dir:glob:format"
+                    f"{_SOURCES_ENV}: {entry!r} is not name|dir|glob|format"
                 )
             out.append(tuple(p.strip() for p in parts))  # type: ignore[arg-type]
         return out  # type: ignore[return-value]
@@ -152,6 +154,21 @@ def _parse_sources() -> list[tuple[str, str, str, str]]:
 
 
 SOURCES: list[tuple[str, str, str, str]] = _parse_sources()
+
+
+def _source_root(configured: str) -> Path:
+    """A source directory from the machine-local config. Must be absolute.
+
+    A relative entry used to be joined onto a fixed portfolio root, which put one
+    machine's layout into this public file. It is refused rather than guessed.
+    """
+    p = Path(os.path.expanduser(configured))
+    if not p.is_absolute():
+        raise ValueError(
+            f"harness source directory {configured!r} is relative. Give an "
+            f"absolute path in {_SOURCES_ENV} or {_SOURCES_FILE.name}."
+        )
+    return p
 
 
 def require_sources(what: str) -> None:
@@ -167,7 +184,7 @@ def require_sources(what: str) -> None:
     raise RuntimeError(
         f"{what}: no non-corpus document sources are configured on this machine, "
         f"so only the {len(_corpus_manifest())} custodian papers can be seen. Set "
-        f"{_SOURCES_ENV} (name:dir:glob:format, comma-separated) or create "
+        f"{_SOURCES_ENV} (name|dir|glob|format, comma-separated) or create "
         f"{_SOURCES_FILE.name} beside this file (a gitignored JSON list of "
         "4-item lists). Both are machine-local by design: this repo is public "
         "and the directories live in private sibling repos."
@@ -211,7 +228,7 @@ def discover() -> list[dict]:
 
     for rel in sorted(_CORPUS):
         sub, _, stem = rel.rpartition("/")
-        stem = stem[:-4] if stem.endswith(".pdf") else stem
+        stem = stem.removesuffix(".pdf")
         parts = ["corpus"] + ([sub] if sub else []) + [stem]
         doc_id = "__".join(_slug(x) for x in parts)
         seen_ids.add(doc_id)
@@ -227,7 +244,7 @@ def discover() -> list[dict]:
     require_sources("discover")
     missing_roots: list[str] = []
     for source, rel_root, pattern, fmt in SOURCES:
-        root = VIBE / rel_root
+        root = _source_root(rel_root)
         if not root.is_dir():
             # ANNOUNCE THE SHRINK. This was a bare `continue`, so a declared
             # source whose root had gone missing removed its documents from the
@@ -317,7 +334,7 @@ def resolve(doc: dict) -> Path:
         for source, rel_root, pattern, _fmt in SOURCES:
             if source != doc["source"]:
                 continue
-            root = VIBE / rel_root
+            root = _source_root(rel_root)
             if not root.is_dir():
                 continue
             for path in sorted(root.glob(pattern), key=lambda p: str(p).lower()):
@@ -328,7 +345,10 @@ def resolve(doc: dict) -> Path:
             f"{doc['sha256'][:16]}.... The document has been moved, renamed or "
             "changed; regenerate the manifest rather than guessing which file it was."
         )
-    return VIBE / doc["rel_path"]
+    raise FileNotFoundError(
+        f"{doc['id']}: the record carries neither `corpus_path` nor `sha256`, so "
+        "there is nothing to resolve it by. Regenerate the manifest."
+    )
 
 
 def main() -> None:

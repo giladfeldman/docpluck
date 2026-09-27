@@ -45,7 +45,6 @@ from docpluck.normalize import (
 # by the wrong N. `docpluck_corpus()` raises rather than returning a short list.
 from _corpus import docpluck_corpus  # noqa: E402
 
-_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
 pdfs = [str(p) for p in docpluck_corpus()]
 print(f"scanning {len(pdfs)} corpus PDFs for W0l false positives...\n")
 

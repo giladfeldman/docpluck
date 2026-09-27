@@ -204,10 +204,12 @@ def _load_efendic_pdf_bytes():
     import json
     import subprocess
 
-    home = os.path.expanduser("~")
-    cc = os.path.join(home, ".claude", "skills", "article-finder", "cache-check.py")
-    if not os.path.exists(cc):
-        pytest.skip("article-finder cache-check.py not available")
+    from docpluck.testing import article_finder_home
+
+    af = article_finder_home()
+    if af is None or not (af / "cache-check.py").exists():
+        pytest.skip("article-finder not configured (set ARTICLE_FINDER_HOME)")
+    cc = str(af / "cache-check.py")
     try:
         raw = subprocess.check_output(["py", "-3", cc, _EFENDIC_KEY], text=True)
     except Exception as exc:  # pragma: no cover - environment dependent

@@ -13,7 +13,6 @@ run locally, on a machine that holds the fixtures, and skip everywhere else.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 
@@ -38,7 +37,11 @@ def _maybe_render(rel: str) -> str:
 # v2.4.81: untested-corpus-sweep fixtures (Collabra) live in the shared
 # article-finder repository under a DOI key, not in docpluck's own corpus
 # manifest. Resolved through the `articlerepo` helper rather than corpus_pdf.
-_AF_FULLTEXT = Path(__file__).resolve().parents[3] / "ArticleRepository" / "fulltext"
+# Was `Path(__file__).parents[3] / ...`: right in one checkout, and a silent skip in
+# any other (a worktree sits elsewhere). The shared resolver takes no position.
+from docpluck.testing import custody_path  # noqa: E402
+
+_AF_FULLTEXT = custody_path("fulltext")
 
 
 def _maybe_render_af_cache(doi_stem: str) -> str:

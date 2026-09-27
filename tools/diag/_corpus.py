@@ -48,8 +48,7 @@ if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
 ARTICLE_FINDER = Path(
-    os.environ.get("ARTICLE_FINDER_HOME")
-    or (Path.home() / ".claude" / "skills" / "article-finder")
+    os.environ.get("ARTICLE_FINDER_HOME") or "<ARTICLE_FINDER_HOME unset>"
 )
 
 # The render-baseline view whose registered papers are docpluck's OWN corpus —

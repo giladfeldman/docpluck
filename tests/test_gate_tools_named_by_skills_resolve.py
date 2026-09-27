@@ -23,8 +23,9 @@ references and pass. `test_the_parser_actually_found_the_gate_commands` asserts 
 the number of references parsed AND that specific known-present tools are among them. A
 zero here must read as a broken parser, never as a clean repo.
 
-SCOPE. `.claude/` is gitignored and untracked (this is a PUBLIC repo; skill definitions must
-not ship in it). So on any clone the skills are absent and these tests SKIP -- loudly, naming
+SCOPE. The gate skills are gitignored and untracked (this is a PUBLIC repo; skill definitions
+must not ship in it), and are located through $DOCPLUCK_SKILLS_DIR. So on any clone the skills
+are absent and these tests SKIP -- loudly, naming
 the reason, because a skip is a coverage hole wearing a green tick. They are live on the
 machine that runs the gates, which is the only machine where the gates exist.
 """
@@ -33,13 +34,14 @@ from __future__ import annotations
 
 import re
 import subprocess
+import os
 import sys
 from pathlib import Path
 
 import pytest
 
 _REPO = Path(__file__).resolve().parents[1]
-_SKILLS = _REPO / ".claude" / "skills"
+_SKILLS = Path(os.environ.get("DOCPLUCK_SKILLS_DIR") or "<DOCPLUCK_SKILLS_DIR unset>")
 
 _SKILL_FILES = (
     "docpluck-qa/SKILL.md",
@@ -88,8 +90,8 @@ def _referenced_tools() -> dict[str, list[str]]:
 def referenced() -> dict[str, list[str]]:
     if not _skills_present():
         pytest.skip(
-            "SKIPPED, NOT PASSED: .claude/skills/ is gitignored and untracked in this "
-            "PUBLIC repo, so the gate skills are absent from any clone. This check is "
+            "SKIPPED, NOT PASSED: the gate skills are untracked in this PUBLIC repo and "
+            "DOCPLUCK_SKILLS_DIR does not point at them, so they are absent here. This check is "
             "live only where the gates themselves live."
         )
     return _referenced_tools()

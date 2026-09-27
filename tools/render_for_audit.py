@@ -70,7 +70,7 @@ def _log(msg: str) -> None:
 
 # --- locate PDF via article-finder (I9 compliance) -------------------------
 
-AF_CACHE_CHECK = Path.home() / ".claude" / "skills" / "article-finder" / "cache-check.py"
+AF_CACHE_CHECK = Path(os.environ.get("ARTICLE_FINDER_HOME") or "<ARTICLE_FINDER_HOME unset>") / "cache-check.py"
 
 if not AF_CACHE_CHECK.exists():
     print(
@@ -197,7 +197,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from canary_provenance import check_provenance, load_expected_sha  # noqa: E402
 
 _canary_json = (
-    Path(__file__).resolve().parents[1] / ".claude" / "skills" / "_project" / "canary.json"
+    Path(os.environ.get("DOCPLUCK_SKILLS_DIR") or "<DOCPLUCK_SKILLS_DIR unset>")
+    / "_project" / "canary.json"
 )
 expected_sha = args.expected_sha or load_expected_sha(str(_canary_json), args.key)
 _prov_ok, _prov_msg = check_provenance(args.key, pdf_sha, expected_sha)

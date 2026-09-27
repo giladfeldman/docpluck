@@ -30,7 +30,7 @@ TWO injuries, both silent:
 
 WHY IT WAS NOT CAUGHT EARLIER, stated plainly because it is the interesting
 part: the superscript-detection signal had been validated and documented
-(`communications/FINDINGS_2026-08-13`, capability A: median size ratio 0.667,
+(the 2026-08-13 findings note, capability A: median size ratio 0.667,
 `upright == True` filtering mandatory) and then **wired into nothing**. It was
 recorded as "signal validated, not yet wired". A capability that is built,
 measured and then invoked by nothing is indistinguishable from one never built,

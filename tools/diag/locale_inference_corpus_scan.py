@@ -109,7 +109,6 @@ def infer(text: str) -> tuple[str, int, int, dict]:
     return ("decisive_eu" if ne > nu else "decisive_us"), ne, nu, ev
 
 
-_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
 pdfs = [str(p) for p in docpluck_corpus()]
 if not pdfs:
     sys.exit("FATAL: 0 PDFs in corpus - refusing to report a false CLEAN")

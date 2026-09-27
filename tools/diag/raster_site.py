@@ -38,8 +38,7 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ARTICLE_FINDER = Path(
-    os.environ.get("ARTICLE_FINDER_HOME")
-    or (Path.home() / ".claude" / "skills" / "article-finder")
+    os.environ.get("ARTICLE_FINDER_HOME") or "<ARTICLE_FINDER_HOME unset>"
 )
 
 

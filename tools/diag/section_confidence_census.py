@@ -5,8 +5,7 @@ Scimeto measured **17 of 17** detected `references` sections at `confidence=high
 and `detected_via=heading_match` -- including one whose span was a
 data-availability statement, not a reference list -- and concluded: *"The field
 carries no discriminating information at the moment, so a consumer cannot use it
-to gate on."* (`INBOX_FROM_SCIMETO_2026-08-21b_flatten_typing_and_sections.md`
-§2, 2026-08-21.)
+to gate on."* (Scimeto request of 2026-08-21, §2.)
 
 That is a claim about ONE label over 18 papers. This scan measures the
 denominator, per the standing rule that one observation proves a shape exists and

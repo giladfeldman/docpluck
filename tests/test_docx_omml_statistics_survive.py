@@ -15,7 +15,7 @@ one is structurally unidentifiable.
 
 WHY IT SURVIVED FOR YEARS — the module's own docstring said OMML was "rare in
 social science papers where stats are written as plain text." Measured over 26
-real papers from CitationGuard's validation corpus:
+real papers from a downstream consumer's validation corpus:
 
     4 / 26 papers (15%) contain OMML
     ~45 non-empty math spans
@@ -36,9 +36,8 @@ is the whole point (`= .361` is only interpretable if its label precedes it).
 from __future__ import annotations
 
 import io
-import zipfile
-import os
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -47,20 +46,13 @@ pytest.importorskip("mammoth", reason="mammoth not installed (pip install docplu
 
 from docpluck.extract_docx import _inline_omml_runs, extract_docx
 
-# NEVER hardcode the portfolio root — env override first, then the canonical
-# conventional portfolio-root location. This file previously embedded
-# an absolute path into a sibling project's directory, twice,
-# which is three
-# defects in one string: an absolute local user path in a PUBLIC repo, the name
-# and internal layout of a DIFFERENT private project, and a path that resolves
-# on exactly one machine — so everywhere else these tests SKIP SILENTLY and read
-# as green. Found by /docpluck-cleanup Section 0.3, 2026-08-20.
-_VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+# A private corpus: its location is machine-local config, never written in this
+# public file (see tests/_local_corpora.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _local_corpora import local_corpus  # noqa: E402
+from _local_corpora import local_corpus
 
 # A PRIVATE sibling's internal corpus layout -- machine-local, never published.
-_DOCX_CORPUS = Path(local_corpus("docx_validation") or _VIBE / "__absent__")
+_DOCX_CORPUS = Path(local_corpus("docx_validation") or "<docx_validation corpus not configured>")
 
 _REAL = _DOCX_CORPUS / "28_ImageMemorability.docx"
 

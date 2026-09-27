@@ -1,4 +1,4 @@
-"""D1 + D2 regression tests — citationguard-iterate handoff 2026-06-12.
+"""D1 + D2 regression tests — Scimeto handoff 2026-06-12.
 
 D1: Harvard / Cambridge name-year reference entries ("Surname A and Surname B
     (2020) …") were not recognised as reference-entry starts, so R3's

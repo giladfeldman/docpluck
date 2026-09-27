@@ -1,7 +1,7 @@
 """
 Normalization Pipeline
 =======================
-Consolidated from ESCIcheck, MetaESCI, Scimeto/CitationGuard, MetaMisCitations.
+Consolidated from ESCIcheck, MetaESCI, Scimeto, MetaMisCitations.
 Each step is documented, versioned, and independently toggleable.
 
 Levels:
@@ -255,7 +255,7 @@ _REFS_END = re.compile(
 )
 _REF_START_VANCOUVER = re.compile(r"^\d{1,3}\.\s+[A-Z]")
 _REF_START_IEEE = re.compile(r"^\[\d+\]\s+[A-Z]")
-# Harvard / Cambridge name-year reference entry start (D1, citationguard-iterate
+# Harvard / Cambridge name-year reference entry start (D1, Scimeto
 # 2026-06-12): "Surname A and Surname B (2020) …", "Surname A et al. (2020) …",
 # "Surname A, Surname B and Surname C (2019) …". Distinct from APA, which puts a
 # comma immediately after surname-1 ("Surname, A.") — the Harvard form has NO
@@ -1094,7 +1094,7 @@ _R2_BODY_NOUN_PATTERN = re.compile(
 # enumerate every countable noun a reference title might quantify ("3
 # instruments", "5 trajectories", "12 heuristics", …). The amle_1 fix
 # (v2.4.17) added nouns one at a time; the plos_med_1 "Clinimetric properties
-# of 3 instruments" → "… of instruments" drop (filed by citationguard-iterate
+# of 3 instruments" → "… of instruments" drop (filed by Scimeto
 # 2026-06-10, same class as the earlier Mayiwar case) is the same whack-a-mole
 # recurring.
 #
@@ -2479,7 +2479,7 @@ _AUTHOR_ETAL_INITIAL = re.compile(
 )
 
 
-# D2 (citationguard-iterate 2026-06-12): single-word / short category-label
+# D2 (Scimeto 2026-06-12): single-word / short category-label
 # running headers. Nature-family and many journals print the article-type label
 # ("Article", "Review", "Letter", "Matters Arising", …) at the top of every page.
 # H0 already curates these in _HEADER_BANNER_PATTERNS, but H0 only fires in the
@@ -5572,7 +5572,7 @@ _GREEK_AMBIGUOUS_UPPER_RE = re.compile(
 #     '∼5×10⁶ possible'            ->   '5x106'
 #     'p < .001¹'                  ->   '.0011'       a different p-value
 #
-# `communications/FINDINGS_2026-08-13` examined these exact tokens when rejecting decision
+# The 2026-08-13 findings note (internal) examined these exact tokens when rejecting decision
 # D4's "delete citation superscripts" option — "deleting the 9 loses nine orders
 # of magnitude" — and the reasoning was right. But it measured a PROPOSED rule
 # while this SHIPPED one was already doing equivalent damage to the same tokens.
@@ -6420,7 +6420,7 @@ def _normalize_text(
 
     # S6: Whitespace and invisible character normalization
     before = t
-    # 2026-06-06 (citationguard text-extraction handoff, Defect 1): a SOFT
+    # 2026-06-06 (Scimeto text-extraction handoff, Defect 1): a SOFT
     # HYPHEN (U+00AD) immediately before a line break is ALWAYS a
     # discretionary extraction hyphen splitting one word across the wrap
     # (relation\u00AD\nship). Join the fragments (drop U+00AD AND the
@@ -7779,7 +7779,7 @@ def _normalize_text(
         for r_start, r_end in reversed(_refs_spans):
             refs_text = t[r_start:r_end]
 
-            # R3 page-break stitch (D2, citationguard-iterate 2026-06-12): inside
+            # R3 page-break stitch (D2, Scimeto 2026-06-12): inside
             # a bibliography a form-feed (page break) NEVER coincides with a
             # paragraph boundary — entries are delimited by ref-starts, not blank
             # lines. When an entry straddles a page break, pdftotext emits

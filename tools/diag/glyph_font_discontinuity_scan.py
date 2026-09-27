@@ -98,7 +98,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import warnings
 from collections import Counter
@@ -119,7 +118,6 @@ if _REPO_ROOT not in sys.path:
 
 from scripts.harness.corpus import resolve as _harness_resolve
 
-VIBE = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
 _MANIFEST = Path(__file__).resolve().parents[2] / "scripts" / "harness" / "corpus_manifest.json"
 
 # A font is "narrow" when its whole-document repertoire is at most this many

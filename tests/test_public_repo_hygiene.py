@@ -47,23 +47,19 @@ ABSOLUTE_USER_PATH = re.compile(
 # Files where a historical absolute path is part of the record, not a live
 # instruction. Each is a deliberate exemption, not a convenience.
 EXEMPT = {
-    # The incident log and the rules file quote old paths when explaining what
-    # went wrong; removing the quote removes the reason.
-    "LESSONS.md",
-    "CLAUDE.md",
     # A historical changelog entry describing a path that WAS wrong and was
     # fixed. Rewriting shipped history to look tidier is its own defect.
     "CHANGELOG.md",
 }
 
 
-def _tracked_text_files() -> list[Path]:
+def _tracked_text_files(exempt: frozenset[str] | set[str] = EXEMPT) -> list[Path]:
     out = subprocess.run(
         ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout.splitlines()
     files = []
     for rel in out:
-        if rel in EXEMPT:
+        if rel in exempt:
             continue
         p = REPO / rel
         if not p.is_file():
@@ -89,9 +85,8 @@ def test_no_absolute_user_path_in_any_tracked_file():
                 offenders.append(f"{rel}:{lineno}: {m.group(0)}")
 
     assert not offenders, (
-        "absolute local paths in a PUBLIC repo — resolve the root instead "
-        "(`os.environ.get('VIBE_ROOT') or Path.home() / 'Vibe'`), per the "
-        "portfolio rule 'never hardcode the Vibe root':\n  "
+        "absolute local paths in a PUBLIC repo — read the location from a "
+        "documented environment variable instead (e.g. ARTICLE_REPOSITORY):\n  "
         + "\n  ".join(offenders)
     )
 
@@ -122,6 +117,95 @@ def test_no_sibling_private_project_paths_in_tracked_source():
         "a PUBLIC file hardcodes the on-disk location of a PRIVATE sibling "
         "project:\n  " + "\n  ".join(offenders)
     )
+
+
+# ── Internal portfolio references ─────────────────────────────────────────
+#
+# Owner decision 2026-09-27: every public repo is cleaned of personal and
+# internal information. Before that day HEAD carried ~115 lines naming the
+# owner's portfolio root, a private project's internal name, the gitignored
+# correspondence and skills folders, and the article repository's directory --
+# in code, comments, the changelog and two consumer contracts. The two gates
+# above could not see them: both need an ABSOLUTE path before the word, and a
+# path assembled from quoted segments has none.
+#
+# So this one matches the WORDS, in every tracked file, in both the slash form
+# and the quoted-segment form. The only exemption is this file, because a
+# detector has to spell out the vocabulary it detects; `.gitignore` keeps the
+# folder names it ignores, which is what it is for.
+INTERNAL_REFERENCE = re.compile(
+    r"""(?x)
+      \bVibe\b                      # the portfolio root, any spelling of the path
+    | VIBE_ROOT                     # ... and its environment variable
+    | (?i:citationguard)            # a private project's internal name ("Scimeto" is public)
+    | ArticleRepository             # the article repository's directory name
+    | communications/               # the gitignored correspondence folder, as a path
+    | \.claude[/\\]                 # the gitignored skills folder, as a path
+    | ["']\.claude["']              # ... and as a quoted path segment
+    | \b(INBOX|OUTBOX|HANDOFF|FINDINGS|TRIAGE|BRIEF|DECISION|ADJUDICATION|REPLY_TO|NOTICE|MEMO)_
+      [A-Za-z0-9_-]*20\d\d          # a dated correspondence FILE cited by name
+    """
+)
+INTERNAL_REFERENCE_EXEMPT = {".gitignore", "tests/test_public_repo_hygiene.py"}
+
+
+def _internal_reference_offenders() -> list[str]:
+    offenders: list[str] = []
+    for path in _tracked_text_files(exempt=frozenset()):
+        rel = path.relative_to(REPO).as_posix()
+        if rel in INTERNAL_REFERENCE_EXEMPT:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            m = INTERNAL_REFERENCE.search(line)
+            if m:
+                offenders.append(f"{rel}:{lineno}: {m.group(0)}")
+    return offenders
+
+
+def test_no_internal_reference_in_tracked_files():
+    """No tracked file names the owner's private layout or private projects."""
+    offenders = _internal_reference_offenders()
+    assert not offenders, (
+        "internal portfolio references in a PUBLIC repo. Name the public product "
+        "(Scimeto) or 'a downstream consumer'; read locations from a documented "
+        "environment variable (ARTICLE_REPOSITORY, ARTICLE_FINDER_HOME, "
+        "DOCPLUCK_SKILLS_DIR); cite internal notes by date, not by path:\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+@pytest.mark.parametrize(
+    "planted",
+    [
+        'root = Path.home() / "Vibe"',
+        "os.environ.get('VIBE_ROOT')",
+        "# measured on CitationGuard's corpus",
+        'p = base / "ArticleRepository" / "fulltext"',
+        "see communications/FINDINGS_2026-01-01.md",
+        "~/.claude/skills/article-finder/find-pdf.py",
+        'os.path.join(home, ".claude", "skills")',
+        "filed in `INBOX_FROM_SCIMETO_2026-08-21.md` §1",
+    ],
+)
+def test_the_internal_reference_pattern_fires(planted):
+    """Two-sided control: every form the pattern exists to catch is caught."""
+    assert INTERNAL_REFERENCE.search(planted), planted
+
+
+@pytest.mark.parametrize(
+    "clean",
+    [
+        "Scimeto's validation corpus",
+        "ARTICLE_REPOSITORY is not set",
+        "the gitignored correspondence folder",
+        "vibe coding",  # lower-case prose is not the portfolio root
+        "INBOX_",  # a bare prefix with no dated file name
+        "docpluck/testing/_root.py",
+    ],
+)
+def test_the_internal_reference_pattern_spares_clean_text(clean):
+    assert not INTERNAL_REFERENCE.search(clean), clean
 
 
 @pytest.mark.parametrize(
@@ -178,8 +262,7 @@ ALLOWED_DIRECTORY_PREFIXES = (
     "tools/",             # diagnostics
 )
 # NOTE: `.github/` is deliberately ABSENT. There is no CI in this repo — see
-# test_no_github_actions_workflows_exist below and the NO GITHUB ACTIONS rule
-# in CLAUDE.md.
+# test_no_github_actions_workflows_exist below.
 
 ALLOWED_ROOT_FILES = {
     "README.md",
@@ -187,9 +270,10 @@ ALLOWED_ROOT_FILES = {
     "CHANGELOG.md",
     "pyproject.toml",
     ".gitignore",
-    # Public by explicit owner decision, 2026-08-06.
-    "CLAUDE.md",
-    "LESSONS.md",
+    # CLAUDE.md and LESSONS.md were public by an owner decision of 2026-08-06
+    # and were UNTRACKED by the owner's decision of 2026-09-27: they are the
+    # owner's AI-instruction and incident files and stay local (gitignored). Not
+    # being listed here is what makes re-tracking either one fail this test.
     # Standard open-source metadata, added 2026-09-27 with the README rewrite:
     # citation metadata (GitHub's "Cite this repository") and contributor guide.
     "CITATION.cff",
@@ -284,8 +368,8 @@ def test_no_github_actions_workflows_exist():
     )
     assert not workflows, (
         "GitHub Actions is not available to this portfolio and never will be. "
-        "Replacements are local and already wired — see the NO GITHUB ACTIONS "
-        "rule in CLAUDE.md for the mapping:\n  " + "\n  ".join(workflows)
+        "Replacements are local and already wired (pytest, the pre-push hook, "
+        "scripts/check_app_pin_sync.py):\n  " + "\n  ".join(workflows)
     )
 
 
@@ -298,10 +382,9 @@ def test_no_tracked_file_assumes_a_workflow_exists():
         r"\.github/workflows|bump-app-pin\.yml|verify-railway-deploy\.yml"
         r"|post-deploy-verify\.yml|actions/checkout|uses:\s*actions/"
     )
-    # LESSONS.md and CLAUDE.md record what was deleted and why — that is the
-    # opposite of assuming it exists, and deleting the record would lose the
-    # reason. The hygiene test itself names the files it forbids.
-    allowed = {"LESSONS.md", "CLAUDE.md", "CHANGELOG.md",
+    # CHANGELOG.md records what was deleted and why — that is the opposite of
+    # assuming it exists. The hygiene test itself names the files it forbids.
+    allowed = {"CHANGELOG.md",
                "tests/test_public_repo_hygiene.py", "scripts/check_app_pin_sync.py"}
     offenders = []
     for path in _tracked_text_files():

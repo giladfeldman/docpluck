@@ -120,8 +120,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # baselines. Overridable for a relocated install; never defaulted to a path
 # inside this repo, which is the coupling this rewire exists to remove.
 ARTICLE_FINDER = Path(
-    os.environ.get("ARTICLE_FINDER_HOME")
-    or Path(os.path.expanduser("~")) / ".claude" / "skills" / "article-finder"
+    os.environ.get("ARTICLE_FINDER_HOME") or "<ARTICLE_FINDER_HOME unset>"
 )
 
 # The baseline this corpus is measured against, as `<family>__<producer>`.

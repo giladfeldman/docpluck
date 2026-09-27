@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 import re
 import zipfile
 from pathlib import Path
@@ -32,7 +31,6 @@ pytest.importorskip("bs4", reason="beautifulsoup4 not installed (pip install doc
 pytest.importorskip("docx", reason="python-docx not installed (dev dependency)")
 
 from docx import Document  # noqa: E402
-from docx.shared import Pt  # noqa: E402
 
 from docpluck import (  # noqa: E402
     extract_docx_structured,
@@ -600,11 +598,9 @@ class TestDegradesWithoutLying:
 
 
 def _custody_docx() -> list[tuple[str, Path]]:
-    repo = Path(
-        os.environ.get("ARTICLE_REPOSITORY")
-        or (Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe")) / "ArticleRepository")
-    )
-    index = repo / "index.json"
+    from docpluck.testing import custody_path
+
+    index = custody_path("index.json")
     if not index.exists():
         return []
     try:
@@ -618,7 +614,7 @@ def _custody_docx() -> list[tuple[str, Path]]:
         fn = str(entry.get("filename") or "")
         if not fn.lower().endswith(".docx"):
             continue
-        p = repo / "fulltext" / fn
+        p = custody_path("fulltext", fn)
         if p.exists():
             out.append((key, p))
     return sorted(out)

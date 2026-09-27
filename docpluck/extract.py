@@ -125,7 +125,7 @@ def extract_pdf(
         # S5b still rewrite U+FFFD in two narrow statistical contexts -- eta before
         # `2 =`, and >= / <= before a number -- and leave it everywhere else.) normalize.py still maps SMP math-italic characters that
         # pdftotext DOES decode (`_MATH_ALNUM_RE`), so nothing correctly encoded
-        # is lost. Record: communications/DECISION_2026-09-22_fffd_recovery.md.
+        # is lost. Recorded in the 2026-09-22 FFFD-recovery decision note (internal).
 
         # §A R4 / B6 column-aware re-extraction (v2.4.76, 2026-05-25).
         # Detector runs on form-feed-split pdftotext output (cheap, no

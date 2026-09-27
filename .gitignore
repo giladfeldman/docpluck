@@ -156,3 +156,9 @@ scripts/harness/sources.local.json
 # Layout of private siblings is not this repo's to publish; see
 # tests/conftest.py::local_corpus. Written once per machine, never committed.
 tests/corpora.local.json
+
+# --- The owner's AI-instruction and incident files: LOCAL ONLY ---
+# Untracked 2026-09-27 by owner decision (public-repo cleanup). They stay on
+# disk, where the project skills read them; they are no longer published.
+/CLAUDE.md
+/LESSONS.md

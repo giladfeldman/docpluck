@@ -26,7 +26,7 @@ that has not passed `--self-test` is a claim about the instrument, not the corpu
 
     python tools/diag/docx_grid_integrity_scan.py --self-test
     python tools/diag/docx_grid_integrity_scan.py             # custody corpus
-    python tools/diag/docx_grid_integrity_scan.py --wide      # every DOCX under VIBE_ROOT
+    python tools/diag/docx_grid_integrity_scan.py --wide DIR  # every DOCX under DIR
 
 Measured 2026-09-05 with `--wide` (619 readable documents, 3,019 tables):
 `_SpanGrid` stale events **0** over 41,942 rows; tables with any `gridBefore`
@@ -152,11 +152,9 @@ def grid_before_tables(docx_bytes: bytes) -> tuple[int, int, int, int]:
 
 def custody_docx() -> list[tuple[str, Path]]:
     """DOCX resolved through article-finder's index -- never a directory glob."""
-    repo = Path(
-        os.environ.get("ARTICLE_REPOSITORY")
-        or (Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe")) / "ArticleRepository")
-    )
-    index = repo / "index.json"
+    from docpluck.testing import custody_path
+
+    index = custody_path("index.json")
     if not index.exists():
         raise SystemExit(
             f"FATAL: article-finder index not found at {index}. It is the sole "
@@ -171,14 +169,14 @@ def custody_docx() -> list[tuple[str, Path]]:
         fn = str(entry.get("filename") or "")
         if not fn.lower().endswith(".docx"):
             continue
-        p = repo / "fulltext" / fn
+        p = custody_path("fulltext", fn)
         if p.exists():
             out.append((key, p))
     return sorted(out)
 
 
-def wide_docx() -> list[tuple[str, Path]]:
-    """Every DOCX under VIBE_ROOT -- a STRUCTURAL denominator, not a paper corpus.
+def wide_docx(root: Path) -> list[tuple[str, Path]]:
+    """Every DOCX under ``root`` -- a STRUCTURAL denominator, not a paper corpus.
 
     Grid placement is a property of OOXML, not of a document's language or
     discipline, so a wider denominator is strictly better evidence about how often
@@ -186,7 +184,8 @@ def wide_docx() -> list[tuple[str, Path]]:
     and nothing is written anywhere, so this does not move any article into or out
     of custody.
     """
-    root = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
+    if not root.is_dir():
+        raise SystemExit(f"FATAL: --wide root {root} is not a directory.")
     skip = {".git", "node_modules", ".venv", "venv", "__pycache__", ".next"}
     out: list[tuple[str, Path]] = []
     for r, d, f in os.walk(root):
@@ -266,8 +265,8 @@ def self_test() -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--wide", action="store_true",
-                    help="every DOCX under VIBE_ROOT, not only the custody corpus")
+    ap.add_argument("--wide", metavar="DIR", type=Path,
+                    help="every DOCX under DIR, not only the custody corpus")
     ap.add_argument("--self-test", action="store_true",
                     help="show both detectors firing on a known positive and silent "
                          "on a known negative, then exit")
@@ -282,13 +281,13 @@ def main() -> int:
         print("FATAL: a detector failed its own control. Refusing to report counts.")
         return 3
 
-    docs = wide_docx() if args.wide else custody_docx()
+    docs = wide_docx(args.wide) if args.wide else custody_docx()
     if not docs:
         print("NO CORPUS -- 0 DOCX resolvable. This is a statement about the "
               "repository, not about the code.")
         return 2
     print(f"\nCORPUS: {len(docs)} DOCX "
-          f"({'VIBE_ROOT walk' if args.wide else 'article-finder custody index'})")
+          f"({'directory walk' if args.wide else 'article-finder custody index'})")
 
     tot = {"docs_requested": len(docs), "unreadable": 0, "tables": 0, "rows": 0,
            "span_tables": 0, "span_rows": 0, "stale_events": 0,

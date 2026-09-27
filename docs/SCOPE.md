@@ -350,7 +350,7 @@ PDF, DOCX and HTML. See `docs/SYMBOL_CONTRACT.md` for the symbol conventions.
 
 ## For consumer maintainers
 
-If you are ESCImate/effectcheck, Scimeto/CitationGuard, citelink, MetaESCI, ScienceArena, or any
+If you are ESCImate/effectcheck, Scimeto, citelink, MetaESCI, ScienceArena, or any
 other consumer:
 
 - **Assume English input.** If your corpus contains non-English articles, filter them before

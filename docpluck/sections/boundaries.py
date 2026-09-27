@@ -1,6 +1,6 @@
 """End-of-section boundary patterns.
 
-Lifted and consolidated from CitationGuard's `endPatterns`
+Lifted and consolidated from Scimeto's `endPatterns`
 (apps/worker/src/processors/referenceParser.ts ~lines 825-858).
 These close a section ONLY when no canonical heading is found before
 the next boundary. Primary boundary signal = next strong heading.

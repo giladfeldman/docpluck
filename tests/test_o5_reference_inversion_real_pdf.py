@@ -9,7 +9,7 @@ column that carries the ``References`` heading. The result: a block of reference
 entries is stranded ABOVE the ``References`` heading in the extracted text, and
 any consumer that scans for references *after* the heading silently misses them.
 
-Reported by citationguard-iterate (2026-06-07, O5: "36 chen refs stranded before
+Reported by Scimeto (2026-06-07, O5: "36 chen refs stranded before
 the References header"). Root cause + fix are documented in
 ``an internal design doc``
 and ``an internal design doc``.

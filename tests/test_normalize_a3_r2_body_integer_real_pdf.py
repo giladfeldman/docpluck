@@ -202,7 +202,7 @@ def test_r2_quantifier_head_preserves_of_three_instruments():
     # "of 3 instruments" — "of" is a function word heading a noun phrase, so
     # the digit is a quantifier and must be preserved even though the prior
     # noun list never enumerated "instruments". This is the plos_med_1
-    # Clinimetric defect (citationguard-iterate 2026-06-10) root signature.
+    # Clinimetric defect (Scimeto 2026-06-10) root signature.
     refs_text = "Clinimetric properties of 3 instruments measuring recovery."
     pos = refs_text.find("3")
     assert _r2_is_body_phrase("3", refs_text, pos) is True
@@ -257,7 +257,7 @@ def test_plos_med_1_three_instruments_preserved_real_pdf():
     # postoperative recovery in a gynecologic surgical population." R2 saw "3"
     # as a recurring standalone-line page number and stripped it from the
     # title → "… properties of instruments measuring …", silently corrupting
-    # the citation citationguard consumed (filed 2026-06-10). The v2.4.84
+    # the citation Scimeto consumed (filed 2026-06-10). The v2.4.84
     # quantifier-head guard preserves it because "of" precedes the digit.
     md = _maybe_render("vancouver/plos_med_1.pdf")
     assert "of 3 instruments" in md, "R2 still strips the quantifier '3' from the title"

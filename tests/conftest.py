@@ -5,10 +5,10 @@ PDF-dependent tests are skipped gracefully when pdftotext is not installed
 or when test PDFs are not available (library tests should run anywhere).
 """
 
-import json
 import os
-import sys
 import shutil
+import sys
+
 import pytest
 
 # Ensure subprocess calls that invoke the docpluck CLI inherit UTF-8 stdio.
@@ -52,102 +52,35 @@ requires_pdftotext = pytest.mark.skipif(
     reason="pdftotext not installed (apt-get install poppler-utils)"
 )
 
-# Test PDF directories — optional, tests skip if not present
+# Test PDF directories — optional, tests skip if not present.
+# No machine's directory layout is written in this public file: the article
+# repository comes from $ARTICLE_REPOSITORY, private corpora from
+# `tests/corpora.local.json` (see `_local_corpora.py`).
 _HERE = os.path.dirname(__file__)
-# docpluck's sibling repos under the same parent directory.
-# Derived from this file so paths are robust to where the tree is checked out.
-_SIBLINGS = os.path.dirname(os.path.dirname(_HERE))  # parent of the docpluck repo
-# Portfolio root: env override first, then the conventional location
-# (moved out of ~/Dropbox/Vibe on 2026-08-03 — a hardcoded old root makes
-# every articlerepo/sibling-corpus test SKIP silently, which reads as green).
-_VIBE = os.environ.get("VIBE_ROOT") or os.path.join(os.path.expanduser("~"), "Vibe")
-
-
-def _sibling_repo(name: str, *parts: str) -> str:
-    """Locate a sibling project's corpus, wherever the portfolio keeps it.
-
-    THE SAME DEFECT AS THE DROPBOX MOVE, ONE DIRECTORY DEEPER. The comment above
-    warns that a hardcoded root makes sibling-corpus tests skip silently and "reads
-    as green" — and then this file hardcoded ``$VIBE/<name>``, while the portfolio
-    had since grouped its projects into per-family subdirectories one level
-    below the root. Measured 2026-08-27: ``$VIBE/MetaESCI`` and
-    ``$VIBE/MetaMisCitations`` do not exist; both live one directory deeper.
-
-    **AND IT COSTS NOTHING TODAY — say so rather than imply otherwise.** Measured the
-    same day by counting `pdf_available(...)` / `pdf_path(...)` call sites per corpus
-    across `tests/*.py`: ``escicheck`` **0 files**, ``metaesci`` **0**,
-    ``metamiscitations`` **0**. All three are dead configuration, so these stale paths
-    were costing zero skips, and repairing them buys zero coverage back. A first draft
-    of this docstring claimed a corpus of "198 PDFs" had been invisible to the suite —
-    that number came from a RECURSIVE find (they are nested under `jdm/` and
-    `pci_rr/`), the non-recursive listing this file actually uses returns 0, and no
-    test wanted them either way. It is fixed because a latent wrong path becomes a
-    silent skip the moment someone writes the first test against it, not because
-    anything is being recovered.
-
-    **A paragraph here used to say the docpluck corpus "exists and holds 0 PDFs".
-    That was measured wrong and then read as current for three weeks.** The sibling
-    directory held **101** PDFs the whole time, and 73 test files — not 6 — resolved
-    papers through it. Anyone acting on the old sentence would have concluded the
-    corpus tests were already dead and deleted the directory outright, switching off
-    all 73 files' coverage without turning anything red.
-
-    The corpus itself is gone from here as of 2026-09-17: papers resolve through the
-    article custodian by DOI, via ``docpluck.testing.corpus``. Nothing in this file
-    points at it any more. The lesson is left in place because the failure was not the
-    wrong number, it was quoting a measurement with no command behind it.
-
-    So the location is SEARCHED rather than asserted. A name genuinely not on this
-    machine (ESCIcheck, 2026-08-27) still returns a non-existent path and its tests
-    still skip — correct, and now the only reason they would.
-    """
-    # Search the root and EVERY directory one level below it, rather than a
-    # hardcoded list of grouping directories. Two reasons, and the second is why
-    # this changed on 2026-09-22: a hardcoded list goes stale the next time the
-    # portfolio is reorganised (it already had, once), and this repo is PUBLIC --
-    # the grouping names were internal layout with no business being published.
-    candidates = [os.path.join(_VIBE, name)]
-    try:
-        candidates += [
-            os.path.join(_VIBE, group, name)
-            for group in sorted(os.listdir(_VIBE))
-            if os.path.isdir(os.path.join(_VIBE, group))
-        ]
-    except OSError:
-        pass
-    for base in candidates:
-        if os.path.isdir(base):
-            return os.path.join(base, *parts)
-    # Not found anywhere — return the canonical spelling so the skip reason still
-    # names a path a human can go and check.
-    return os.path.join(_VIBE, name, *parts)
 
 # NOTE: there is no "docpluck" key here any more. docpluck's own corpus resolves
 # through the article custodian by DOI -- `docpluck.testing.corpus.corpus_pdf` --
 # not through a directory, and a paper it cannot find FAILS rather than skipping.
-# The keys below are OTHER projects' corpora, which genuinely may be absent from a
-# given machine; for those a skip is the honest answer.
+# The one key below is the custodian's DOI-named fulltext folder, for tests that
+# key on a paper outside the manifest.
 # Machine-local corpora in PRIVATE sibling repos -- ONE definition, in
 # `tests/_local_corpora.py`. Re-exported here so conftest users can reach it.
 sys.path.insert(0, _HERE) if _HERE not in sys.path else None
-from _local_corpora import local_corpus  # noqa: E402,F401
+from _local_corpora import local_corpus  # noqa: F401
+
+from docpluck.testing import custody_path as _custody_path
 
 PDF_PATHS = {
     # The shared article repository (article-finder cache). Closed-access PDFs
     # named by canonical DOI key (e.g. "10.1525__collabra.90203.pdf"). Tests
     # that key on a specific paper skip gracefully when the repo isn't present.
-    "articlerepo": os.path.join(_VIBE, "ArticleRepository", "fulltext"),
-    # Other-project corpora — if not under `_SIBLINGS`, dependent tests skip
-    # gracefully (pdf_available returns False). Update to repo-relative once
-    # the locations of these sibling repos are confirmed.
-    "escicheck": _sibling_repo("ESCIcheck", "testpdfs", "Coded already"),
-    "metaesci": _sibling_repo("MetaESCI", "data", "pdfs"),
-    "metamiscitations": _sibling_repo("MetaMisCitations", "data", "pretest_a", "pdfs"),
+    # Resolved by the shared custodian resolver ($ARTICLE_REPOSITORY, no default).
+    "articlerepo": str(_custody_path("fulltext")),
 }
 
 
 def pdf_path(corpus: str, *parts: str) -> str:
-    """Return path to a test PDF in one of the OTHER projects' corpora.
+    """Return path to a test PDF under one of the ``PDF_PATHS`` roots.
 
     AN UNKNOWN CORPUS NAME RAISES. It used to return "", which made
     `pdf_available` return False and every caller skip -- so deleting a key from
@@ -299,3 +232,32 @@ def _camelot_disabled_per_module(request):
             os.environ.pop("DOCPLUCK_DISABLE_CAMELOT", None)
         else:
             os.environ["DOCPLUCK_DISABLE_CAMELOT"] = prior
+
+
+# ---------------------------------------------------------------------------
+# No article repository configured: ONE loud failure, every other paper test skips
+# ---------------------------------------------------------------------------
+#
+# Owner decision 2026-09-27. With $ARTICLE_REPOSITORY unset (any public clone),
+# `require_corpus_pdf` raises CorpusPaperMissing in ~100 tests. A hundred red
+# lines bury the one fact that matters, so those tests are reported SKIPPED with
+# the reason, while `test_corpus_manifest.py::test_the_custodian_is_reachable`
+# still FAILS -- so the run never reads as green when nothing was read (the
+# 2026-09-17 directive). The conversion happens ONLY when the repository itself
+# is unreachable: with it configured, a missing paper still fails.
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    rep = outcome.get_result()
+    if not rep.failed or call.excinfo is None:
+        return
+    from docpluck.testing import CorpusPaperMissing, corpus_available, root_problem
+
+    if call.excinfo.errisinstance(CorpusPaperMissing) and not corpus_available():
+        rep.outcome = "skipped"
+        rep.longrepr = (
+            str(item.path),
+            item.location[1] or 0,
+            f"Skipped: article repository not configured -- {root_problem()}",
+        )

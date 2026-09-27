@@ -1,6 +1,6 @@
 """Soft-hyphen (U+00AD) line-break dehyphenation — S6 fix (2026-06-06).
 
-Source: the citationguard text-extraction handoff (Defect 1). pdftotext (and
+Source: the Scimeto text-extraction handoff (Defect 1). pdftotext (and
 pymupdf) emit a SOFT HYPHEN U+00AD before the newline when a word wraps across
 a line. docpluck's S6 already strips bare U+00AD, but stripping alone left
 `relation\\nship`, which reflowed to the space-broken `relation ship` ~1/3 of
@@ -74,7 +74,7 @@ def test_real_hyphen_still_handled_by_s7():
 
 def test_chan_feldman_soft_hyphen_cleared_real_pdf():
     """chan_feldman_2025_cogemo (DOI 10.1080/02699931.2024.2434156): the
-    citationguard handoff measured 151 U+00AD in pymupdf and 6 space-broken
+    Scimeto handoff measured 151 U+00AD in pymupdf and 6 space-broken
     words surviving docpluck's old bare-strip. After the S6 join: zero
     U+00AD, zero space-broken residuals, whole words recovered."""
     # The "also lives under the cogemo stem in some trees" rglob fallback is gone

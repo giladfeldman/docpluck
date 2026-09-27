@@ -118,7 +118,6 @@ def classify(text: str, m: re.Match) -> str:
     return "OTHER"
 
 
-_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
 pdfs = [str(p) for p in docpluck_corpus()]
 if not pdfs:
     sys.exit("FATAL: 0 PDFs in corpus - refusing to report a false CLEAN")

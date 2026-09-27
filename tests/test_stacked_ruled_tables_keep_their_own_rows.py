@@ -1,7 +1,7 @@
 """Two ruled tables stacked on one page must each keep their own rows.
 
-WHAT BROKE (v2.4.143 -> v2.4.144, reported by CitationGuard's contract suite)
-----------------------------------------------------------------------------
+WHAT BROKE (v2.4.143 -> v2.4.144, reported by Scimeto's contract suite)
+------------------------------------------------------------------------
 On a page carrying two fully ruled tables one above the other, the table
 captioned "Table 2" came out holding TABLE 1's F-tests, then Table 2's caption
 line as a data row, then Table 2's t-tests with the ``t`` column fused into the
@@ -27,7 +27,7 @@ grid.
 
 THE FIXTURE IS CONSTRUCTED, ON PURPOSE
 --------------------------------------
-It is built here with reportlab to the geometry of CitationGuard's contract
+It is built here with reportlab to the geometry of Scimeto's contract
 fixture (two ruled 5-column tables, 18pt rows, the second caption ~8pt below
 the first box), because a published article may not be committed to this
 public repository. A constructed page proves what the CODE does, not that

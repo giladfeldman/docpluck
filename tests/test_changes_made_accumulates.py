@@ -1,6 +1,6 @@
 """`changes_made[metric]` must ACCUMULATE — three rules share one key.
 
-Filed by ESCImate/effectcheck in `INBOX_FROM_ESCIMATE_2026-08-21.md` §4, verified
+Filed by ESCImate/effectcheck on 2026-08-21 (request §4), verified
 by reading docpluck's source rather than inferred from behaviour:
 
     if diff != 0:

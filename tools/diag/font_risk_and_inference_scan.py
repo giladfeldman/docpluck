@@ -74,7 +74,6 @@ Run:  python tools/diag/font_risk_and_inference_scan.py [--sample N]
 from __future__ import annotations
 
 import argparse
-import os
 import random
 import subprocess
 import sys
@@ -86,8 +85,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from docpluck.extract import extract_pdf  # noqa: E402
 from docpluck.normalize import NormalizationLevel, normalize_text  # noqa: E402
 
-_VIBE = os.environ.get("VIBE_ROOT") or str(Path.home() / "Vibe")
-_REPO = Path(_VIBE) / "ArticleRepository" / "fulltext"
+from docpluck.testing import custody_path  # noqa: E402
+
+_REPO = custody_path("fulltext")
 
 # The three rules that decide by statistical inference, plus the typographic
 # ones for contrast. Tracked-step names, so attribution comes from the library

@@ -20,7 +20,7 @@ Known limitations:
   as plain text" — was MEASURED FALSE on 2026-08-15** and is recorded rather
   than deleted, because it is why nobody looked for years.
 
-  Measured over 26 real papers from CitationGuard's validation corpus:
+  Measured over 26 real papers from Scimeto's validation corpus:
       4 / 26 papers (15%) contain OMML
       ~45 non-empty math spans across them
       EVERY ONE is `ηp2`, `χ2` or `ρ` — precisely the effect-size and

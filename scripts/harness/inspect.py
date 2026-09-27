@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -45,7 +46,8 @@ from . import checks, corpus
 OUT_ROOT = corpus.OUT_ROOT
 JOBS_PATH = OUT_ROOT / "inspect_jobs.json"
 GOLD_KEYS_PATH = Path(__file__).with_name("gold_keys.json")
-AI_GOLD = Path.home() / ".claude" / "skills" / "article-finder" / "ai-gold.py"
+# article-finder's location comes from $ARTICLE_FINDER_HOME; there is no default.
+AI_GOLD = Path(os.environ.get("ARTICLE_FINDER_HOME") or "<ARTICLE_FINDER_HOME unset>") / "ai-gold.py"
 
 ROTATING_SLICE = 10  # docs rotated through AI-verify when nothing else selects them
 

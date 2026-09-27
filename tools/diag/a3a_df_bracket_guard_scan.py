@@ -66,7 +66,6 @@ from docpluck.extract import extract_pdf  # noqa: E402
 # by the wrong N. `docpluck_corpus()` raises rather than returning a short list.
 from _corpus import docpluck_corpus  # noqa: E402
 
-_VIBE_ROOT = os.environ.get("VIBE_ROOT") or os.path.expanduser("~/Vibe")
 pdfs = [str(p) for p in docpluck_corpus()]
 if not pdfs:
     sys.exit("FATAL: 0 PDFs in corpus - refusing to report a false CLEAN")

@@ -112,7 +112,7 @@ def test_no_augment_when_bboxes_do_not_overlap():
 #
 # Stream flavor does not stop at a table. On a page of stacked tables it returns
 # one block running through the NEXT caption and the NEXT table, and every row
-# of it below the lattice box used to be appended. Measured on CitationGuard's
+# of it below the lattice box used to be appended. Measured on Scimeto's
 # contract fixture: Table 1's lattice grid gained Table 2's caption line and
 # Table 2's rows, one of which flattened to the fabricated F(0.003, -0.31) = 98.
 

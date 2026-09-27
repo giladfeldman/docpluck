@@ -56,9 +56,12 @@ DOI = "10.1001/jamanetworkopen.2023.39337"
 
 def _render_via_article_finder(tmp_path) -> str:
     """Render the canary paper at HEAD. Skips if the paper is not in custody."""
-    finder = os.path.expanduser("~/.claude/skills/article-finder/cache-check.py")
-    if not os.path.exists(finder):
-        pytest.skip("article-finder not present on this machine")
+    from docpluck.testing import article_finder_home
+
+    af = article_finder_home()
+    finder = str(af / "cache-check.py") if af else ""
+    if not finder or not os.path.exists(finder):
+        pytest.skip("article-finder not configured (set ARTICLE_FINDER_HOME)")
     probe = subprocess.run([sys.executable, finder, DOI], capture_output=True, text=True)
     if probe.returncode != 0 or '"found": true' not in probe.stdout:
         pytest.skip(f"{DOI} is not in article-finder custody on this machine")

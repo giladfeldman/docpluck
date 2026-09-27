@@ -67,7 +67,7 @@ def sectioning_text_id(text: str, sectioning_version: str) -> str:
     Returned on every :class:`SectionedDocument` as ``sectioning_text_id``, so a
     consumer that persists ``char_start``/``char_end`` can persist this beside
     them and later prove the two still belong together. Asked for by
-    Scimeto/CitationGuard and ESCImate on 2026-08-21, both independently, after
+    Scimeto and ESCImate on 2026-08-21, both independently, after
     27 of 27 of Scimeto's stored documents turned out to hold offsets into a
     string they did not have.
 
@@ -98,7 +98,7 @@ def sectioning_text_id(text: str, sectioning_version: str) -> str:
     fall, and it is the one that moves when they do.
 
     (This is narrower than the "hash of the buffer plus the version triple"
-    promised in ``OUTBOX_TO_CONSUMERS_2026-08-21_v2.4.137.md`` §3. The change,
+    promised in the 2026-08-21 consumer notice for v2.4.137, §3. The change,
     and this reasoning, are stated in the reply that ships with it — a contract
     quietly delivered smaller than announced is the defect, not the field.)
     """

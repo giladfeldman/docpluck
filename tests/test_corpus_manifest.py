@@ -45,7 +45,7 @@ from docpluck.testing.corpus import (
     MANIFEST,
     corpus_available,
     corpus_names,
-    repository_root,
+    root_problem,
     verify_manifest,
 )
 
@@ -160,10 +160,9 @@ def test_the_custodian_is_reachable():
     """
     assert corpus_available(), (
         "the article repository is not on this machine, so NOTHING in the "
-        "corpus-backed suite actually ran against a paper. Set ARTICLE_REPOSITORY "
-        "to its location (or VIBE_ROOT to the portfolio root). This is a failure "
-        "rather than a skip on purpose: a skip here reported success for a suite "
-        f"that read nothing. Looked for: {repository_root()}"
+        f"corpus-backed suite actually ran against a paper. {root_problem()} "
+        "This is a failure rather than a skip on purpose: a skip here reported "
+        "success for a suite that read nothing."
     )
 
 
@@ -185,6 +184,9 @@ def test_every_corpus_paper_a_test_names_is_in_the_manifest(named):
 
 def test_every_manifest_paper_resolves_and_its_bytes_are_right():
     """Existence AND content. The second half is the one that catches a wrong paper."""
+    if not corpus_available():
+        # Reported ONCE, by test_the_custodian_is_reachable, which fails.
+        pytest.skip(f"article repository not configured -- {root_problem()}")
     problems = verify_manifest(check_bytes=True)
     assert not problems, (
         f"{len(problems)} of {len(MANIFEST)} corpus papers did not check out:\n"
