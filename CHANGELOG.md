@@ -1,7 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
 ## [2.4.146] - 2026-09-28 - normalization 1.9.69 - table extraction 2.4.17
 
 **Public-repository cleanup. Nothing in the extraction pipeline changes: extracted,

@@ -72,3 +72,28 @@ def test_the_declared_version_appears_in_the_changelog():
         f"looking up what changed in {version} finds the previous version's entry instead. "
         "Add the section before tagging."
     )
+
+
+def _empty_unreleased(text: str) -> bool:
+    """True when `## [Unreleased]` is followed directly by the next `## ` heading."""
+    return bool(re.search(r"^## \[Unreleased\][ \t]*\r?\n(?:[ \t]*\r?\n)*## ", text, re.MULTILINE))
+
+
+def test_no_empty_unreleased_section():
+    """An empty `[Unreleased]` heading reads as "there is pending work" when there is none.
+
+    Found by /docpluck-cleanup on the 2.4.146 release (Section 1.2: "No [Unreleased] section
+    if there's nothing in it"); the heading was left behind when the release section was cut.
+    """
+    text = (_REPO / "CHANGELOG.md").read_text(encoding="utf-8", errors="replace")
+    assert not _empty_unreleased(text), (
+        "CHANGELOG.md has an empty `## [Unreleased]` section; remove the heading until "
+        "there is an entry to put under it."
+    )
+
+
+def test_the_empty_unreleased_check_can_fire():
+    """Two-sided control for the check above."""
+    assert _empty_unreleased("# Changelog\n\n## [Unreleased]\n\n## [1.0.0] - x\n")
+    assert not _empty_unreleased("# Changelog\n\n## [Unreleased]\n\n### Fixed\n- a\n\n## [1.0.0]\n")
+    assert not _empty_unreleased("# Changelog\n\n## [1.0.0] - x\n")
