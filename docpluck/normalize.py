@@ -5306,6 +5306,18 @@ def recover_beta_via_layout(text: str, layout) -> str:
     return text
 
 
+# ── RETIRED 2.4.146 (d-a4ceab): `recover_dropped_minus_ci_upper` below has NO
+# production call site. It decides INFERENTIALLY (estimate-containment
+# arithmetic), and on 10.1080/02699931.2024.2434156 p13 Table 9 row 2bii — the
+# very row its comment below cites — the rasterized page prints
+# `r = -.43 [−0.52, 0.33]`: no minus on the upper bound, the authors' own typo
+# (Table 8 on the same page prints `[−.52, −.33]`). The rule fabricated `−0.33`
+# and silently corrected the paper. Its note that Table 8 rows 2bi/2bii carry
+# the corruption is also wrong: those rows live in Table 9, and 2bi prints a
+# DETACHED dash (`[−0.78, − 0.67]`), which the typographic path still repairs.
+# The definition is KEPT so the evidence survives and nobody re-proposes it;
+# tests/test_dropped_minus_ci_upper_recovery_real_pdf.py pins that nothing in
+# docpluck/ calls it.
 # §A R5 / B7 (NORMALIZATION_VERSION 1.9.36, 2026-06-30): recover a CI UPPER
 # bound whose leading minus pdftotext/Camelot DROPPED (or detached into a stray
 # en-dash). W0g (CI-pairing) and W0h (layout) repair a *coefficient* proven
@@ -5398,47 +5410,34 @@ _CI_UPPER_DROPPED_RE = re.compile(
 
 
 def recover_dropped_minus_ci_upper_in_text(text: str, _counter: list[int] | None = None) -> str:
-    """Recover a dropped/detached minus on a CI UPPER bound inside a self-
-    contained ``<estimate> … [lo, hi]`` cell or clause (the table-cell and
-    raw-text surfaces). For each estimate-anchored bracket, the estimate-
-    containment invariant (``recover_dropped_minus_ci_upper``) decides whether
-    the positive upper bound is a dropped-minus victim; on a flip the bracket is
-    re-emitted with a single ASCII-hyphen minus on the upper bound (and any
-    stray detached dash collapsed), leaving the lower bound and all surrounding
-    text untouched. A bound that ALREADY carries an attached minus is parsed as
-    negative, so the invariant's ``lo < 0 < hi`` gate leaves it alone (no churn
-    on correct rows). No-op when no estimate-anchored bracket is present.
+    """Reattach a DETACHED minus to a CI UPPER bound inside a self-contained
+    ``<estimate> … [lo, – hi]`` cell or clause (the body-text and table-cell
+    surfaces). Only a dash the renderer actually emitted is reattached; an
+    upper bound with no dash before it is passed through exactly as printed.
+    No-op when no estimate-anchored bracket is present.
 
-    ## Which EVIDENCE each rewrite rests on — and why both are now declared
+    ## Evidence: TYPOGRAPHIC only (the inferential arm was RETIRED, 2.4.146)
 
-    The project's evidence-axis rule splits repairs into TYPOGRAPHIC (something
-    the renderer emitted) and INFERENTIAL (what the number ought to be), and
-    assigns inferential judgement to consumers. This function was doing both and
-    saying neither, so the two are now separated and each is RECORDED:
-
-    * **TYPOGRAPHIC** — the bracket carries a DETACHED DASH before its upper
-      bound (``[−0.78,  –  0.67]``). The dash is a glyph the renderer put on the
-      page; what used to be inferential was its *reading*, and the COMMA settles
-      that: in ``[lo, – hi]`` the comma already occupies the separator role, so
-      the dash cannot be a range separator and can only be a sign that lost its
-      kerning. (Both independent reviewers reached this argument separately on
-      2026-08-15.) ``_CI_UPPER_DROPPED_RE`` requires that comma, so the gate
-      inherits the condition rather than assuming it. Group 5 CAPTURED this dash
-      all along and nothing ever read it — register O5.
-    * **INFERENTIAL** — no dash, nothing on the page to point at, and only the
-      estimate-containment arithmetic says the bound lost a minus.
-
-    **The inferential arm is KEPT, deliberately, and this is not a re-derivation
-    of the doctrine.** Retiring it was proposed and then refuted against the
-    primary source: `chan_feldman_2025_cogemo` Table 9 row 2bii extracts as
-    ``[−0.52,  0.33]`` with NO dash and no font signal, and the arithmetic is the
-    only mechanism that recovers its published ``−0.33``. Deleting it would drop
-    a repair with a real-DOI justification. The doctrine's stated REASON for
-    assigning inferential calls to consumers is that *docpluck has no channel
-    through which to relay that it guessed* — and that premise changed in this
-    release: `NormalizationReport.fallbacks` now reaches them. So the guess is
-    declared instead of hidden, and the retirement stays an owner decision with a
-    measurement attached rather than a plan author's call.
+    * **TYPOGRAPHIC — kept.** The bracket carries a DETACHED DASH before its
+      upper bound (``[−0.78,  –  0.67]``). The dash is a glyph on the page; the
+      COMMA settles its reading: in ``[lo, – hi]`` the comma already occupies
+      the separator role, so the dash can only be a sign that lost its kerning.
+      ``_CI_UPPER_DROPPED_RE`` requires that comma. The monotonicity check
+      (``lo < -hi``) is a well-formedness test on the RESULT, not estimate
+      arithmetic. Recorded as ``ci_upper_minus_reattached_from_detached_dash``.
+    * **INFERENTIAL — retired.** No dash, nothing on the page to point at, only
+      estimate-containment arithmetic (``recover_dropped_minus_ci_upper``)
+      saying the bound "should" be negative. It was kept on 2026-08-15 on the
+      claim that `10.1080/02699931.2024.2434156` Table 9 row 2bii publishes
+      ``−0.33``. **That claim was wrong.** Rasterized p13 (``pdftoppm -r 300``,
+      re-read 2026-09-27) prints ``r = -.43  [−0.52, 0.33]`` — no minus on the
+      upper bound — while Table 8 on the SAME page prints ``[−.52, −.33]``.
+      The row is the authors' own typo, and the arithmetic was fabricating a
+      minus the page does not print, silently correcting the paper (DP-17,
+      d-a4ceab). Flagging an interval that looks wrong is ESCImate's and
+      Scimeto's job; they hold the parsed statistic and have a UI. Pinned by
+      tests/test_ci_upper_evidence_is_declared.py and
+      tests/test_dropped_minus_ci_upper_recovery_real_pdf.py.
     """
     if not text or "[" not in text:
         return text
@@ -5470,14 +5469,10 @@ def recover_dropped_minus_ci_upper_in_text(text: str, _counter: list[int] | None
             record_fallback("ci_upper_minus_reattached_from_detached_dash",
                             detail=f"{m.group(3)}")
         else:
-            fixed_hi = recover_dropped_minus_ci_upper(est, lo, hi)
-            if fixed_hi is None:
-                return m.group(0)
-            # INFERENTIAL — declared, so a consumer can find every one of these
-            # and re-check it against the paper. Nothing the renderer emitted
-            # supports this rewrite; only the containment arithmetic does.
-            record_fallback("ci_upper_minus_inferred_from_containment",
-                            detail=f"{m.group(3)}")
+            # No dash on the page: pass through verbatim. The estimate-
+            # containment arithmetic is inferential and is not consulted here
+            # (retired 2.4.146 — see the docstring).
+            return m.group(0)
         # Preserve the lower bound's original glyph (e.g. U+2212) verbatim,
         # stripping only interior spaces, so a corrected row's lo still matches
         # the sibling rows' display; emit the upper bound with a single minus

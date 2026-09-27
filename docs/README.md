@@ -117,7 +117,7 @@ Batch runs get it per file in the `<stem>.json` sidecar.
 | key | meaning |
 |---|---|
 | `symbol_font_greek_corruption_detected` | Greek letters in this document are unreliable — a Cronbach's α can arrive as `a5(.93)` |
-| `ci_upper_minus_inferred_from_containment` | a CI sign was inferred, not read off the page — treat as a hypothesis |
+| `ci_upper_minus_inferred_from_containment` | **no longer emitted since 2.4.146** — the inference it declared was retired; a CI upper bound with no printed dash now passes through as printed |
 | `w0j_mstat_sign_inferred_from_variable_name` | likewise |
 | `w0h_ambiguous_pairing_refused` / `w0m_…` | a repair was declined; the token is what the paper printed |
 | `camelot_table_*` / `region_grid_*` / `cells_grid_to_html_*` | a table or its rows were dropped by us |

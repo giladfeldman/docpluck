@@ -128,16 +128,17 @@ bound while keeping the lower bound's, so a printed `[−0.78, −0.66]` arrives
 That result is **ascending, well-formed, and plausible**. Nothing about it is anomalous, so no
 consumer validation can flag it — unlike a reversed interval, which announces itself.
 
-docpluck recovers this class **only when it can prove the flip**, and there are two grades of
-proof, which are now reported separately so you can tell them apart:
+docpluck recovers this class **only when the page shows the minus** — a dash the renderer emitted
+before the bound. Until 2.4.146 there was a second, inferential grade; it was retired after it
+fabricated a minus the page does not print (`10.1080/02699931.2024.2434156` p13 Table 9 row 2bii
+prints `r = -.43 [−0.52, 0.33]`, the authors' typo, and was delivered as `[−0.52, −0.33]`):
 
 | `fallbacks` key | evidence | trust |
 |---|---|---|
 | `ci_upper_minus_reattached_from_detached_dash` | **typographic** — the renderer emitted a dash before the bound and the comma proves it is a sign, not a range separator | high |
-| `ci_upper_minus_inferred_from_containment` | **inferential** — no glyph survived; only the estimate-containment arithmetic says the bound lost a minus | treat as a hypothesis |
+| ~~`ci_upper_minus_inferred_from_containment`~~ | **retired in 2.4.146, no longer emitted** — was inferential: no glyph survived, only estimate-containment arithmetic | — |
 
-**Neither key present does NOT mean the interval is sound.** When the estimate is absent, or when
-containment cannot discriminate, docpluck leaves the interval exactly as extracted and says
+**The key absent does NOT mean the interval is sound.** When no dash was printed, docpluck leaves the interval exactly as extracted and says
 nothing, because it has nothing to say. **A CI sign is not a verified quantity in docpluck's
 output.** If your pipeline depends on interval direction, cross-check it against the estimate
 yourself — you hold the parsed statistic and its context, and we hold text.

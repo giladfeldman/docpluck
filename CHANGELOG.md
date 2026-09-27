@@ -100,6 +100,41 @@ all 9,988 PDFs in the article repository (110 carry U+FFFD):
 - The three text channels now agree: the structured table-cell output never ran S5b.
 
 Record: communications/DECISION_2026-09-25_s5a_s5b_fffd_rewrites.md.
+### A CI upper bound is no longer given a minus sign the page does not print
+
+**What a consumer will see change:** a confidence interval printed as `r = -.43 [-0.52, 0.33]`
+— an upper bound with no minus in front of it — is now delivered exactly like that, in body text,
+in the `<table>` HTML, and in `flattened_rows`. Until now docpluck rewrote it to `[-0.52, -0.33]`
+and, in body text and same-cell table text, declared the rewrite as the fallback event
+`ci_upper_minus_inferred_from_containment`. That event is no longer emitted. In the separate-cell
+grid and in `flattened_rows` the rewrite was not declared at all.
+
+**Why.** The rewrite rested only on arithmetic (the estimate "fits" the flipped interval better),
+never on anything printed. Checked against the rasterized page (300 dpi) of every interval it
+touched in the 102-paper test corpus: it fired on 4 distinct printed intervals with no dash and
+**was wrong on all 4** — each is printed without a minus:
+
+| DOI | page / table | printed | delivered before |
+|---|---|---|---|
+| 10.1080/02699931.2024.2434156 | p13 Table 9, 2bii | `r = -.43 [−0.52, 0.33]` | `[−0.52, −0.33]` |
+| 10.1177/01461672251327169 | p11 Table 6 | `−0.32 [−0.40, 0.24]` | `[−0.40, −0.24]` |
+| 10.1177/01461672251327169 | p11 Table 6 | `−0.64 [−0.73, 0.56]` | `[−0.73, −0.56]` |
+| 10.1177/01461672251327169 | p11 Table 6 | `−0.86 [−0.95, 0.76]` | `[−0.95, −0.76]` |
+
+These are the papers' own errors (on the first, Table 8 on the same page prints the same
+correlation as `[−.52, −.33]`). Correcting them silently hid a real published inconsistency from
+the tools whose job is to flag it; ESCImate's `ci_check_status = INCONSISTENT` on the first one was
+right.
+
+**What still happens:** when the page prints a minus that the text layer detached from its digit
+(`[−0.78, − 0.67]`, extracted as `[−0.78,  –  0.67]`), the minus is reattached, and this now
+happens the same way in all four places a bracket can reach you (body text, table cell, separate
+grid cell, `flattened_rows`) and is recorded everywhere as
+`ci_upper_minus_reattached_from_detached_dash`. The inferential helper
+`recover_dropped_minus_ci_upper` is kept in `docpluck.normalize` but has no call site.
+
+`NORMALIZATION_VERSION` and `TABLE_EXTRACTION_VERSION` must move with this change (normalized
+text and table cells both change for the papers above).
 
 ## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
 

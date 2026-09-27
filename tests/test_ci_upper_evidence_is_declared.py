@@ -10,20 +10,19 @@ estimate-containment arithmetic. So the one case carrying real typographic
 evidence was adjudicated as though it had none, and the register's Plan Step D
 (keep the dash, retire the arithmetic) was never implemented.
 
-## Why the arithmetic was NOT retired
+## Why the arithmetic WAS retired (2.4.146, d-a4ceab / DP-17)
 
-Both reviewers checked the primary source independently on 2026-08-15 and found
-the same thing in ``chan_feldman_2025_cogemo`` Table 9:
+It was kept on 2026-08-15 on the claim that ``chan_feldman_2025_cogemo``
+(``10.1080/02699931.2024.2434156``) Table 9 row 2bii publishes ``−0.33``. That
+reading was wrong. Rasterized p13 at 300 dpi, re-read 2026-09-27:
 
-    row 2bi   `[−0.78,  –  0.67]`   detached dash present -> TYPOGRAPHIC
-    row 2bii  `[−0.52,  0.33]`      no dash at all        -> INFERENTIAL only
+    row 2bi   `[−0.78, − 0.67]`   detached minus PRINTED -> TYPOGRAPHIC, repaired
+    row 2bii  `[−0.52, 0.33]`     NO minus printed       -> passes through
 
-Row 2bii's published upper bound is ``−0.33`` and the arithmetic is the only
-mechanism that recovers it. Retiring it would delete a repair with a real-DOI
-justification and flip a published number back to wrong. So both arms stay, and
-each one now RECORDS which evidence it used — the doctrine's stated reason for
-handing inferential calls to consumers is that docpluck had no channel to
-announce a guess, and that channel now exists.
+Table 8 on the same page prints the 2bii correlation as ``[−.52, −.33]``, so
+2bii is the authors' own typo, and the arithmetic was fabricating a minus the
+page does not print. Declaring the guess did not make it evidence; flagging the
+interval is the consumer's job (ESCImate caught it as INCONSISTENT, correctly).
 
 ## Why the dash counts as typographic
 
@@ -39,7 +38,7 @@ from __future__ import annotations
 from docpluck.normalize import recover_dropped_minus_ci_upper_in_text
 from docpluck.telemetry import fallback_scope
 
-# The two real shapes, as they extract from the source PDF.
+# The two real shapes, as they extract from the source PDF (p13, Table 9).
 _TYPOGRAPHIC = "r = -.73, 95% CI [-0.78,  -  0.67]"
 _INFERENTIAL = "r = -.43, 95% CI [-0.52,  0.33]"
 
@@ -54,16 +53,13 @@ def test_detached_dash_is_repaired_and_recorded_as_typographic():
     assert "ci_upper_minus_inferred_from_containment" not in fb.counters
 
 
-def test_fully_dropped_minus_is_repaired_and_recorded_as_inferential():
-    """The repair is KEPT — it recovers a published -0.33 — but it is declared,
-    so a consumer can find every guess and re-check it against the paper."""
+def test_upper_bound_with_no_printed_dash_passes_through_and_records_nothing():
+    """2bii as printed. No dash, so nothing the renderer emitted supports a
+    minus: the text comes back byte-identical and no repair is booked."""
     with fallback_scope() as fb:
         out = recover_dropped_minus_ci_upper_in_text(_INFERENTIAL)
-    assert "[-0.52, -0.33]" in out, out
-    assert "ci_upper_minus_inferred_from_containment" in fb.counters, (
-        f"an INFERENTIAL rewrite shipped undeclared: {fb.counters}"
-    )
-    assert "ci_upper_minus_reattached_from_detached_dash" not in fb.counters
+    assert out == _INFERENTIAL, f"fabricated a minus the page does not print: {out}"
+    assert fb.counters == {}, fb.counters
 
 
 def test_a_correct_interval_is_untouched_and_records_nothing():

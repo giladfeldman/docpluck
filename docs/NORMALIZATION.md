@@ -491,14 +491,18 @@ This repair previously existed **only in the table-cell channel**, so a CI in a 
 never met it — the three-channel rule, violated. Confirmed against the rasterized page of
 `10.1016/j.jesp.2021.104154` p13.
 
-Recovery is reported per evidence class, and consumers should treat the two differently:
+Recovery is reported as `ci_upper_minus_reattached_from_detached_dash` (typographic — the dash
+was on the page). The same rule runs in all four places a CI bracket can reach the consumer: body
+text, a table cell, a separate-cell grid row, and the flattened sidecar.
 
-| `fallbacks` key | meaning |
-|---|---|
-| `ci_upper_minus_reattached_from_detached_dash` | typographic — the dash was on the page |
-| `ci_upper_minus_inferred_from_containment` | inferential — no glyph survived; treat as a hypothesis |
+**Retired in 2.4.146: the inferential arm.** A bound with NO dash used to be flipped negative when
+the row's estimate "fitted" the flipped interval better (`recover_dropped_minus_ci_upper`, declared
+as `ci_upper_minus_inferred_from_containment`). On `10.1080/02699931.2024.2434156` p13 Table 9 row
+2bii the page prints `r = -.43 [−0.52, 0.33]` — the authors' typo; Table 8 on the same page prints
+`[−.52, −.33]` — and the rule delivered `[−0.52, −0.33]`, a number the paper never printed. That
+key is no longer emitted; the function is kept unwired as evidence.
 
-**Neither key present does not mean the interval is sound.** See `docs/SCOPE.md`.
+**The key absent does not mean the interval is sound.** See `docs/SCOPE.md`.
 
 ## Ordering Summary
 

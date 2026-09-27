@@ -98,15 +98,17 @@ def test_normalize_scales_sub_quadratically_on_pathological_input():
 
 
 def test_dropped_minus_upper_bound_still_recovers():
-    """The bound must not cost a real recovery (estimate-containment invariant)."""
-    out = recover_dropped_minus_ci_upper_in_text("r = -0.72 [-0.78, 0.67]")
+    """The bound must not cost a real recovery. Since 2.4.146 only a DETACHED
+    dash the page printed is reattached (the estimate-containment arm is retired),
+    so the recovery shape carries that dash."""
+    out = recover_dropped_minus_ci_upper_in_text("r = -0.72 [-0.78, - 0.67]")
     assert "[-0.78, -0.67]" in out
 
 
 def test_wide_but_bounded_decoration_still_recovers():
     """Decoration well past the widest real fixture gap (54 chars) still matches."""
     decoration = "*** " + "<br> " * 12  # ~64 chars, inside the bound
-    out = recover_dropped_minus_ci_upper_in_text(f"r = -0.72 {decoration}[-0.78, 0.67]")
+    out = recover_dropped_minus_ci_upper_in_text(f"r = -0.72 {decoration}[-0.78, - 0.67]")
     assert "[-0.78, -0.67]" in out
 
 

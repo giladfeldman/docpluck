@@ -47,7 +47,6 @@ from docpluck.normalize import (
     recover_corrupted_lt_operator,
     recover_lt_as_b_operator,
     recover_corrupted_minus_signs,
-    recover_dropped_minus_ci_upper,
     recover_dropped_minus_ci_upper_in_text,
     recover_pua_glyphs,
     recover_times_interaction_glyph,
@@ -415,16 +414,13 @@ _EST_CELL_RE = re.compile(
 
 
 def _recover_ci_upper_in_grid_row(row: list[str]) -> list[str]:
-    """Recover a dropped/detached minus on a CI UPPER bound when the estimate
-    and the CI live in SEPARATE cells of the same row (the region-driven grid
-    shape: ``… <td>r = -.73</td> <td>[−0.78,  –  0.67]</td> …``). For each
-    CI-bracket cell, the nearest signed-estimate cell to its LEFT in the same
-    row anchors the estimate-containment invariant
-    (``recover_dropped_minus_ci_upper``); on a flip the bracket cell is
-    rewritten with a single minus on the upper bound. The same-cell shape
-    (estimate+CI mashed in one cell) is handled separately by
-    ``recover_dropped_minus_ci_upper_in_text`` in ``_html_escape``. No-op when a
-    row has no estimate-anchored bracket cell."""
+    """Reattach a DETACHED minus to a CI UPPER bound when the estimate and the
+    CI live in SEPARATE cells of the same row (the region-driven grid shape:
+    ``… <td>r = -.73</td> <td>[−0.78,  –  0.67]</td> …``). Only a dash the
+    renderer emitted is reattached; a bound with no dash passes through as
+    printed. The same-cell shape (estimate+CI mashed in one cell) is handled by
+    ``recover_dropped_minus_ci_upper_in_text`` in ``clean_cell_text``. No-op
+    when a row has no estimate-anchored bracket cell."""
     # Pre-scan the row for signed point estimates (cell index -> value).
     est_at: dict[int, float] = {}
     for i, cell in enumerate(row):
@@ -446,7 +442,17 @@ def _recover_ci_upper_in_grid_row(row: list[str]) -> list[str]:
         left_est_idx = [k for k in est_at if k < j]
         if not left_est_idx:
             continue
-        est = est_at[max(left_est_idx)]
+        # TYPOGRAPHIC ONLY (2.4.146). Rewrite only when the renderer emitted a
+        # DETACHED dash before the upper bound (group 2); the comma already
+        # occupies the separator role, so that dash can only be the bound's
+        # sign. A bound with no dash is passed through as printed, even when
+        # the row's estimate "should" make it negative: that inference was
+        # retired after it fabricated a minus the page does not print
+        # (10.1080/02699931.2024.2434156 p13 Table 9 row 2bii, d-a4ceab).
+        # The estimate cell to the left is kept only as SCOPE (a statistic
+        # row), not as evidence.
+        if not m.group(2):
+            continue
         try:
             lo = float(m.group(1).replace("−", "-").replace(" ", ""))
             attached = m.group(3) or ""
@@ -454,9 +460,12 @@ def _recover_ci_upper_in_grid_row(row: list[str]) -> list[str]:
             hi = float(hi_signed)
         except ValueError:
             continue
-        fixed_hi = recover_dropped_minus_ci_upper(est, lo, hi)
-        if fixed_hi is None:
+        # Well-formedness of the RESULT, not estimate arithmetic: never emit a
+        # bracket that runs backwards.
+        if not (lo < 0 < hi and lo < -hi):
             continue
+        record_fallback("ci_upper_minus_reattached_from_detached_dash",
+                        detail=cell)
         lo_txt = re.sub(r"\s+", "", m.group(1))
         minus = "−" if lo_txt.startswith("−") else "-"
         out[j] = f"[{lo_txt}, {minus}{m.group(4)}]"
@@ -1256,14 +1265,11 @@ def cells_grid_to_html(
         # estimate and CI are in separate cells (region-driven grid). The
         # same-cell shape is handled inside _html_escape.
         #
-        # OFF for markup formats. This repair decides INFERENTIALLY — it argues
-        # the interval must be negative because otherwise it excludes the
-        # estimate — and CLAUDE.md reserves inferential evidence for the
-        # consumer, which holds the parsed statistic and has a UI to flag it.
-        # It is justified on a PDF because a broken font really does drop the
-        # glyph; a DOCX carries real Unicode, so the same rewrite would
-        # manufacture a minus the author never typed. Measured 2026-09-05:
-        # `-.73 [-0.78, 0.67]` became `[-0.78, -0.67]` in the DOCX html channel.
+        # OFF for markup formats. A DOCX/HTML carries real Unicode, so a
+        # detached dash there is what the author typed, not a kerning loss.
+        # (Until 2.4.146 this repair also decided INFERENTIALLY; measured
+        # 2026-09-05, `-.73 [-0.78, 0.67]` became `[-0.78, -0.67]` in the DOCX
+        # html channel. The inferential arm is now retired on every channel.)
         if recover_ci_upper:
             row = _recover_ci_upper_in_grid_row(row)
         lines.append("    <tr>")
