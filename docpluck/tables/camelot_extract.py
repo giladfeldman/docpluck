@@ -23,6 +23,7 @@ from docpluck.tables import Cell, Table
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
 from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
+from docpluck.tables.column_split import resplit_merged_columns
 from docpluck.tables.render import cells_to_html
 from docpluck.telemetry import record_fallback
 from docpluck.tempfiles import unlink_temp_pdf
@@ -959,6 +960,7 @@ def extract_tables_camelot(
 
         out: list[Table] = []
         for idx, ct in enumerate(tables_obj):
+            ct = resplit_merged_columns(camelot, tmp_path, ct, layout)
             td = _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold,
                                         layout=layout)
             if td is not None:
@@ -1069,7 +1071,7 @@ def extract_tables_camelot_by_region(
             used_t.add(ti)
             spec = specs[si]
             td = _camelot_table_to_dict(
-                tables[ti], 0,
+                resplit_merged_columns(camelot, tmp_path, tables[ti], layout), 0,
                 accuracy_threshold=accuracy_threshold,
                 id_prefix="region_t",
                 label=spec.get("label"),
