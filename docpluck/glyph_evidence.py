@@ -58,6 +58,9 @@ MIN_BODY_DIGITS = 50
 SAMPLES_PER_PAIR = 3
 #: Render resolution for the shape test.
 RASTER_DPI = 600
+#: Ink touching the crop edge is a neighbour's only if it is this thin a fraction
+#: of the box (amj p23 descender: 4 of 83 rows = 0.05).
+EDGE_SLIVER_FRACTION = 0.15
 
 MINUS = "−"
 EQUALS = "="
@@ -147,7 +150,19 @@ def classify_bar_shape(w: int, h: int, pixels: bytes) -> str | None:
     # (a descender from above, an ascender from below) spilling into this glyph's
     # box -- measured on 10.5465/amj.2016.1196 p23, where a clean minus bar sat
     # under the tail of the line above. The glyph's own bar is interior.
-    bands = [(s, e) for s, e in bands if s > 0 and e < h]
+    #
+    # ONLY A SLIVER may be discarded. Measured 2026-09-27 on
+    # 10.1038/s41598-023-50588-1 p4: genuine digits in a stacked fraction's
+    # denominator touch both edges of their box, and dropping that ink left only
+    # the fraction's rule -- a clean bar -- so `2` and `6` were "proven" minus
+    # signs. A glyph's own figure is tall; a neighbour's descender is a sliver.
+    kept = []
+    for s, e in bands:
+        if s > 0 and e < h:
+            kept.append((s, e))
+        elif (e - s) > EDGE_SLIVER_FRACTION * h:
+            return None  # a figure filling the box: never a bar
+    bands = kept
     if not bands or len(bands) > 2:
         return None
     widths = []

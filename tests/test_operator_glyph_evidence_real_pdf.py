@@ -105,3 +105,19 @@ def test_no_neighbour_match_falls_back_to_the_whole_document_and_refuses_mixed()
     # must not decide it. The whole document's instances must agree.
     index = {"5": [(None, None, ((0, "="),)), ("Study", "was", ())]}
     assert resolve_token("5", "Experiment", "showed", index) == ("5", "refused")
+
+
+def test_a_figure_filling_its_box_is_refused_even_beside_a_rule():
+    # 10.1038/s41598-023-50588-1 p4: digits of a stacked fraction's denominator
+    # fill their box and a fraction rule crosses it. Dropping edge-touching ink
+    # left only the rule, and `2`/`6` were "proven" minus signs (2026-09-27).
+    rows = ["..####.."] * 3 + ["########"] + ["..####.."] * 3
+    assert classify_bar_shape(*_pixels(rows)) is None
+
+
+def test_sci_rep_fraction_digits_are_not_proven_operators():
+    from docpluck.extract_layout import extract_pdf_layout
+
+    pdf = require_corpus_pdf("nature/sci_rep_2.pdf")  # 10.1038/s41598-023-50588-1
+    ev = extract_pdf_layout(pdf.read_bytes()).glyph_evidence
+    assert ev is not None and ev.proven == {}
