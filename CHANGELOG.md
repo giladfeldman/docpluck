@@ -128,8 +128,9 @@ right.
 
 **What still happens:** when the page prints a minus that the text layer detached from its digit
 (`[−0.78, − 0.67]`, extracted as `[−0.78,  –  0.67]`), the minus is reattached, and this now
-happens the same way in all four places a bracket can reach you (body text, table cell, separate
-grid cell, `flattened_rows`) and is recorded everywhere as
+happens on that same evidence in all four places a bracket can reach you (body text, table cell,
+separate grid cell, and `flattened_rows` when the interval is one bracket cell) and is recorded
+everywhere as
 `ci_upper_minus_reattached_from_detached_dash`. The inferential helper
 `recover_dropped_minus_ci_upper` is kept in `docpluck.normalize` but has no call site.
 

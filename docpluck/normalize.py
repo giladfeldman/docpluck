@@ -5448,13 +5448,12 @@ def recover_dropped_minus_ci_upper_in_text(text: str, _counter: list[int] | None
     def _sub(m: "re.Match[str]") -> str:
         attached_sign = m.group(6) or ""
         # An attached minus (no intervening space) is a genuine sign → parse the
-        # upper bound as negative so the invariant skips it. A DETACHED dash
-        # (group 5) is treated as a dropped/garbled minus, NOT a present sign:
-        # the magnitude is parsed positive and the invariant adjudicates.
+        # upper bound as negative so the `lo < 0 < hi` gate skips it. A DETACHED
+        # dash (group 5) is a printed minus that lost its kerning: the magnitude
+        # is parsed positive and the dash is reattached below.
         detached_dash = bool(m.group(5))
         hi_signed = ("-" if attached_sign in ("-", "−") else "") + m.group(7)
         try:
-            est = float(_fold(m.group(1) + m.group(2)))
             lo = float(_fold(m.group(4)))
             hi = float(hi_signed)
         except ValueError:
@@ -5465,7 +5464,6 @@ def recover_dropped_minus_ci_upper_in_text(text: str, _counter: list[int] | None
             # RESULT, not estimate arithmetic — it refuses to produce a bracket
             # that runs backwards, which would be a new defect rather than a
             # repair.
-            fixed_hi = -hi
             record_fallback("ci_upper_minus_reattached_from_detached_dash",
                             detail=f"{m.group(3)}")
         else:

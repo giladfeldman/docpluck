@@ -493,7 +493,8 @@ never met it — the three-channel rule, violated. Confirmed against the rasteri
 
 Recovery is reported as `ci_upper_minus_reattached_from_detached_dash` (typographic — the dash
 was on the page). The same rule runs in all four places a CI bracket can reach the consumer: body
-text, a table cell, a separate-cell grid row, and the flattened sidecar.
+text, a table cell, a separate-cell grid row, and the flattened sidecar (where the interval is one
+bracket cell; a CI split across lower/upper columns is not covered).
 
 **Retired in 2.4.146: the inferential arm.** A bound with NO dash used to be flipped negative when
 the row's estimate "fitted" the flipped interval better (`recover_dropped_minus_ci_upper`, declared

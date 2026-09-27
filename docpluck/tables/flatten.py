@@ -589,12 +589,12 @@ def _resolve_hyphen_ci(
 # inference (`recover_dropped_minus_ci_upper`) is NOT used here any more: it was
 # retired in 2.4.146 after it fabricated a minus the page does not print.
 from docpluck.normalize import _CI_DASH, _CI_DEC, _CI_SIGN  # noqa: E402
-_CI_DETACHED_UPPER_DASH_RE = re.compile(  # noqa: E305
+from docpluck.telemetry import record_fallback  # noqa: E402
+
+_CI_DETACHED_UPPER_DASH_RE = re.compile(
     r"\[\s*" + _CI_SIGN + r"?\s*" + _CI_DEC + r"\s*,\s*" + _CI_DASH + r"\s+"
     + _CI_DEC + r"\s*\]"
 )
-_CI_HI_DETACHED_DASH_RE = re.compile(r"^\s*" + _CI_DASH + r"\s+" + _CI_DEC + r"\s*\]?\s*$")
-from docpluck.telemetry import record_fallback  # noqa: E402
 
 
 def _parse_ci_cell(
@@ -1332,15 +1332,17 @@ def _flatten_one_row(
     # 10.1080/02699931.2024.2434156 p13 Table 9 row 2bii, which prints `0.33`
     # (the authors' typo — Table 8 on the same page prints `[−.52, −.33]`).
     # Runs BEFORE the monotonicity guard so the reattached interval is kept.
+    # Scope: a CI written as ONE bracket cell. A split CI_lo / CI_hi column
+    # pair whose upper cell reads `– 0.67` never reaches here — `_parse_number`
+    # refuses a detached sign, so that pair is not consolidated at all. No
+    # real paper with that shape has been observed; a branch for it was
+    # written and removed as unreachable (Sonnet review, 2026-09-27).
     if "CI_lower" in role_nums and "CI_upper" in role_nums:
         _lo, _hi = role_nums["CI_lower"], role_nums["CI_upper"]
         if (
             _lo < 0 < _hi
             and _lo < -_hi
-            and (
-                _CI_DETACHED_UPPER_DASH_RE.search(role_vals.get("CI") or "")
-                or _CI_HI_DETACHED_DASH_RE.match(role_vals.get("CI_hi") or "")
-            )
+            and _CI_DETACHED_UPPER_DASH_RE.search(role_vals.get("CI") or "")
         ):
             role_nums["CI_upper"] = -_hi
             role_vals.pop("CI", None)
