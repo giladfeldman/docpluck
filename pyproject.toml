@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "docpluck"
 version = "2.4.145"
 description = "PDF, DOCX, and HTML text extraction and normalization for academic papers"
-readme = "docs/README.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
@@ -42,10 +42,11 @@ dependencies = [
     # can't silently drift in and re-zero table extraction. Bump deliberately
     # after re-verifying the corpus render.
     "camelot-py[cv]>=0.11.0,<3.0",
-    # Lattice flavor also needs Ghostscript at runtime — the system binary,
-    # installed via Dockerfile (apt-get install ghostscript). Without it,
-    # lattice silently fails and only the (often noisier) stream flavor
-    # contributes to detection.
+    # Lattice flavor rasterizes pages through pypdfium2 (Camelot's default
+    # "pdfium" image backend, a pip dependency). Ghostscript is only one of
+    # Camelot's FALLBACK backends and is not required. (Corrected 2026-09-27:
+    # this comment said Ghostscript was needed; camelot 2.x
+    # parsers/lattice.py defaults `backend="pdfium"`.)
 ]
 
 [project.optional-dependencies]

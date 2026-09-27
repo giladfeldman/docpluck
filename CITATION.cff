@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use docpluck in research, please cite the version you used (docpluck --version prints it)."
+title: "docpluck: Text and statistic extraction from academic papers"
+abstract: >-
+  A Python library and command-line tool that extracts text, sections, tables and
+  figures from academic papers in PDF, DOCX and HTML, canonicalises statistical
+  notation for automated checks of the published record, records every fallback it
+  took per document, and reports the exact engine versions behind each output.
+type: software
+authors:
+  - family-names: Feldman
+    given-names: Gilad
+    affiliation: "University of Innsbruck"
+repository-code: "https://github.com/giladfeldman/docpluck"
+url: "https://docpluck.app"
+license: MIT
+version: "2.4.145"
+date-released: "2026-09-26"
+keywords:
+  - meta-science
+  - PDF extraction
+  - text mining
+  - statistical reporting
+  - research integrity
+  - reproducibility

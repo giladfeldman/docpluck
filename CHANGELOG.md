@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Documentation
+
+- The GitHub/PyPI `README.md` is now the full landing page: purpose and scientific basis,
+  install (extras and system programs), a quickstart that is executed by the docs gate, every
+  feature, the complete CLI, environment variables, output formats, limitations and how to
+  cite. `pyproject.toml` now publishes this file to PyPI (it published `docs/README.md`).
+- `docs/README.md` is now the API reference: the 15 previously undocumented public
+  functions (`extract_pdf_file`, `extract_pdf_layout`, `extract_docx_structured`,
+  `render_pdf_to_markdown`, `extract_to_dir`, ...), every parameter, and field-by-field
+  tables for every output type.
+- Corrected three stale claims: Ghostscript is not required (Camelot rasterizes through
+  pypdfium2); `extract_pdf` no longer falls back to pdfplumber for undecodable glyphs (retired
+  in 2.4.145, docstrings still said otherwise); `garbled` needs corroborating evidence, not
+  only a low common-word ratio.
+- New `CITATION.cff` and `CONTRIBUTING.md`.
+- New gate `scripts/check_docs_coverage.py` (pinned two-sided by
+  `tests/test_docs_coverage_gate.py`): fails when any public name, parameter, output field,
+  enum value, CLI option, environment variable or extra is missing from the docs, when the
+  changelog/citation versions disagree, or when the README quickstart does not run.
+
 ## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
 
 Three fixes, two of them for defects that were **live in 2.4.144 and earlier

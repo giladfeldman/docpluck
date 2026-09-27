@@ -395,7 +395,8 @@ These are the ONLY files under `docs/` that are public — the list is the
 allowlist in `/docpluck-cleanup` Section 0.1, and `tests/test_public_repo_hygiene.py`
 enforces it. Everything else under `docs/` is internal by default and gitignored.
 
-- `docs/README.md` — public-facing library README (renders on GitHub + PyPI).
+- `README.md` (repo root) — the landing README; renders on GitHub AND on PyPI (`pyproject.toml readme`). Kept complete by `scripts/check_docs_coverage.py` (`/docpluck-cleanup` 1.0).
+- `docs/README.md` — the API reference: every function, parameter, output field, CLI option and env var.
 - `docs/BENCHMARKS.md` — extraction-quality benchmarks across 50 PDFs.
 - `docs/BENCHMARKS_liteparse_2026-06.md` — the liteparse comparison run (a dated RECORD, not a live claim).
 - `docs/BENCHMARKS_docx_engines_2026-09.md` — the DOCX engine comparison behind the 2.4.139

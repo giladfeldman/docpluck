@@ -1,15 +1,15 @@
-# docpluck
+# docpluck — API reference
 
-**PDF, DOCX, and HTML text extraction and normalization for academic papers.**
+This page documents every public function, parameter and output field of the `docpluck`
+Python library. For what docpluck is, why it exists, installation and a quickstart, start with
+the [project README](../README.md).
 
-Built from cross-project experience across 8,000+ PDFs spanning psychology, medicine, economics, physics, and biology. Achieves 100% accuracy on 29 manually verified ground-truth passages (see [BENCHMARKS.md](BENCHMARKS.md)).
+All names below are importable from the package root: `from docpluck import <name>`.
 
-Supports three input formats:
-- **PDF** via `pdftotext` default mode (an undecodable glyph comes back from `extract_pdf` as `U+FFFD`)
-- **DOCX** via `mammoth` (DOCX → HTML → text, preserving Shift+Enter soft breaks)
-- **HTML** via `beautifulsoup4` + `lxml` (block/inline-aware tree-walk)
-
-All three formats feed into the same normalization pipeline and quality scoring.
+Contents: [structured extraction](#structured-extraction-v20) ·
+[function reference](#api-reference) · [output schemas](#output-schemas) ·
+[command-line interface](#command-line-interface) · [environment variables](#environment-variables) ·
+[integration examples](#integration-examples) · [what gets fixed](#what-gets-fixed)
 
 ---
 
@@ -20,101 +20,10 @@ All three formats feed into the same normalization pipeline and quality scoring.
 >
 > **It canonicalises NOTATION. It does not fix the paper.**
 
-Two consequences that are deliberate limits, not bugs:
-
-1. **European numbers pass through exactly as printed.** `d = 0,45` stays `d = 0,45`; `N = 1,182`
-   keeps its comma. We do not convert them, because the source token is the only evidence you have
-   of what the paper meant — once converted, that evidence is gone. `.replace(",", "")` is one line
-   on your side and irreversible on ours.
-2. **The paper's own errors reach you untouched.** `p = 38.`, `p < 05` and `p = 001` are what those
-   pages actually print (each verified by rasterizing the page). Silently repairing them would
-   launder a real defect into your analysis: you would validate a number the paper never printed,
-   and the author would never learn. Detecting and flagging them is yours — you hold the parsed
-   statistic and its context.
-
-**What we DO fix is damage our own pipeline caused** — a glyph the text layer lost, a fused
-exponent, a sign-flipped interval, a `<` extracted as `b`. That is the whole distinction: *did we
-break this, or did the paper?*
-
-Full statement, including the known limits: **[SCOPE.md](SCOPE.md)**.
-
----
-
-## Install
-
-```bash
-# PDF only (pdfplumber)
-pip install docpluck
-
-# + DOCX support (adds mammoth)
-pip install docpluck[docx]
-
-# + HTML support (adds beautifulsoup4 + lxml)
-pip install docpluck[html]
-
-# Everything
-pip install docpluck[all]
-```
-
-**System requirement for `extract_pdf()`:** [poppler-utils](https://poppler.freedesktop.org/) (provides the `pdftotext` binary). DOCX and HTML are pure Python — no system dependencies.
-
-```bash
-# Linux / WSL
-apt-get install poppler-utils
-
-# macOS
-brew install poppler
-
-# Windows
-# Download from https://github.com/oschwartz10612/poppler-windows/releases
-# Add bin/ to PATH
-```
-
-**Install from GitHub** (like R's `remotes::install_github()`):
-
-```bash
-pip install git+https://github.com/giladfeldman/docpluck.git
-
-# Pinned version
-pip install "docpluck>=1.3.0"
-```
-
----
-
-## Quick Start
-
-```python
-from docpluck import (
-    extract_pdf, extract_docx, extract_html,
-    normalize_text, NormalizationLevel, compute_quality_score,
-)
-
-# 1. Extract text from any supported format
-with open("paper.pdf", "rb") as f:
-    text, method = extract_pdf(f.read())
-
-# Or from DOCX:
-# with open("paper.docx", "rb") as f:
-#     text, method = extract_docx(f.read())
-
-# Or from HTML:
-# with open("paper.html", "rb") as f:
-#     text, method = extract_html(f.read())
-
-print(f"Extracted {len(text):,} chars via {method}")
-
-# 2. Normalize for statistical pattern matching
-normalized, report = normalize_text(text, NormalizationLevel.academic)
-
-print(f"Steps applied: {report.steps_applied}")
-print(f"Changes made: {report.changes_made}")
-
-# 3. Check quality
-quality = compute_quality_score(normalized)
-print(f"Quality: {quality['score']}/100 ({quality['confidence']})")
-if quality["garbled"]:
-    print("Warning: text may be corrupted (column merge or encoding failure)")
-```
+European numbers pass through exactly as printed, and the paper's own errors (`p = 38.`,
+`p < 05`) reach you untouched: detecting and flagging them is the job of the tool that holds the
+parsed statistic. What docpluck does fix is damage its own pipeline caused — a glyph the text
+layer lost, a fused exponent, a `<` extracted as `b`. Full statement: **[SCOPE.md](SCOPE.md)**.
 
 ---
 
@@ -241,24 +150,28 @@ docpluck extract paper.pdf --structured --html-tables-to ./out/
 
 `extract_pdf()` (the v1 text-only path) is unchanged. New consumers opt in to the structured path; existing consumers see no behavioral change.
 
-See `an internal design doc` for the full schema and design rationale.
+The full schema of every field is under [Output schemas](#output-schemas) below.
 
 ---
 
 ## API Reference
 
-### `extract_pdf(pdf_bytes: bytes) → tuple[str, str]`
+### `extract_pdf(pdf_bytes, *, sections=None, max_input_bytes=None, pdftotext_timeout_seconds=120) → tuple[str, str]`
 
 Extract text from PDF bytes.
 
 **Parameters:**
 - `pdf_bytes` — Raw PDF file content as `bytes`
+- `sections` — optional list of section labels (`["abstract", "methods"]`); only those sections' text is returned, in document order. Labels are `SectionLabel` values.
+- `max_input_bytes` — optional size cap; a larger input raises `ValueError`
+- `pdftotext_timeout_seconds` — timeout for the `pdftotext` subprocess
 
 **Returns:** `(text, method)` tuple where:
 - `text` — Extracted plain text. Check `text.startswith("ERROR:")` for failure.
 - `method` — Engine used:
-  - `"pdftotext_default"` — standard extraction (fast, ~400ms)
-  - Optionally followed by `+column_corrected:<pages>` when two-column pages were re-extracted in reading order.
+  - `"pdftotext_default"` — standard extraction
+  - Optionally followed by `+column_corrected:<pages>` when two-column pages were re-extracted in reading order, or `+column_correction_failed:<exception>` when that re-extraction raised (the uncorrected text is returned).
+  - `"error"` when extraction failed (the text then starts with `ERROR:`).
   - An undecodable glyph that pdftotext emits as `U+FFFD` is returned by `extract_pdf` **unchanged**. (The earlier
     `+pdfplumber_recovery` fallback was retired in 2026-09: it could substitute a plausible wrong token, such as
     turning a partial eta-squared into an R-squared.) `normalize_text` still rewrites `U+FFFD` in two narrow
@@ -275,9 +188,17 @@ if text.startswith("ERROR:"):
     raise RuntimeError(f"Extraction failed: {text}")
 ```
 
+### `extract_pdf_file(path) → tuple[str, str]`
+
+`extract_pdf` for a file on disk: reads `path` (a `str` or `pathlib.Path`) and returns the same `(text, method)`.
+
+### `extract_pdf_layout(pdf_bytes, *, pages=None) → LayoutDoc`
+
+The **layout channel**: reads the PDF with pdfplumber and returns a `LayoutDoc` with `pages` (one `PageLayout` per page: `width`, `height`, text `spans`, `words`, and `chars` — pdfplumber's per-character dicts with font name, size and position), `raw_text`, `page_offsets` and `populated_pages`. `pages=` restricts it to some page indices. Tables, figures and the font-evidence glyph repairs read this channel; text for sections and normalization comes from `extract_pdf`, never from here.
+
 ---
 
-### `extract_docx(docx_bytes: bytes) → tuple[str, str]`
+### `extract_docx(docx_bytes, *, sections=None, max_input_bytes=None) → tuple[str, str]`
 
 Extract text from DOCX (Word) file bytes via `mammoth`.
 
@@ -304,7 +225,7 @@ with open("paper.docx", "rb") as f:
 
 ---
 
-### `extract_html(html_bytes: bytes) → tuple[str, str]`
+### `extract_html(html_bytes, *, sections=None, max_input_bytes=None) → tuple[str, str]`
 
 Extract text from HTML file bytes via `beautifulsoup4` + `lxml`.
 
@@ -337,7 +258,7 @@ text = html_to_text("<p>Hello <a>world</a></p>")
 
 ### `count_pages(pdf_bytes: bytes) → int`
 
-Count pages in a PDF using byte pattern matching. No external binary required. **PDF only** — returns `None` is not applicable for DOCX/HTML.
+Count pages in a PDF using byte pattern matching. No external binary required. **PDF only** — DOCX has no page model, and HTML has no pages.
 
 ```python
 with open("paper.pdf", "rb") as f:
@@ -348,13 +269,17 @@ print(f"{n} pages")
 
 ---
 
-### `normalize_text(text: str, level: NormalizationLevel) → tuple[str, NormalizationReport]`
+### `normalize_text(text, level, *, layout=None, table_regions=None, preserve_math_glyphs=False, dropped_minus_layout=None) → tuple[str, NormalizationReport]`
 
 Apply the normalization pipeline at the specified level.
 
 **Parameters:**
 - `text` — Raw extracted text
 - `level` — `NormalizationLevel.none` | `NormalizationLevel.standard` | `NormalizationLevel.academic`
+- `layout` — optional `LayoutDoc` from `extract_pdf_layout`; enables the layout-aware strip of running headers, footers and footnotes (step F0) and fills `footnote_spans` / `page_offsets`
+- `table_regions` — optional list of `{"page": int, "bbox": (x0, top, x1, bottom)}`; with `layout`, lines inside a table are never stripped as footnotes (keeps `Note. *p < .05.`)
+- `preserve_math_glyphs` — `True` skips the Greek/math transliteration step (A5), keeping `β`, `η²`, `≥` as printed; this is what the Markdown renderer uses
+- `dropped_minus_layout` — optional `LayoutDoc`; lets step W0h recover a minus sign the text layer lost by reading the surviving glyph from the layout channel
 
 **Returns:** `(normalized_text, report)` tuple.
 
@@ -389,8 +314,17 @@ print(report.changes_made)     # {"ligatures_expanded": 27, "dashes_normalized":
 |-------|------|-------------|
 | `level` | `str` | Level used: `"none"`, `"standard"`, or `"academic"` |
 | `version` | `str` | Pipeline version (e.g. `"1.9.35"`) |
-| `steps_applied` | `list[str]` | Step codes in order (e.g. `["S1_encoding_validation", "S3_ligature_expansion"]`) |
-| `changes_made` | `dict[str, int]` | Character-level change counts per step |
+| `steps_applied` | `list[str]` | Step codes that ran, in order (e.g. `["S1_encoding_validation", "S3_ligature_expansion"]`) |
+| `steps_changed` | `list[str]` | The subset of steps that actually changed the text |
+| `changes_made` | `dict[str, int]` | Change counts per change type |
+| `changes_made_by_step` | `dict[str, int]` | Characters changed per step |
+| `footnote_spans` | `tuple[tuple[int, int], ...]` | Character spans of stripped footnotes (needs `layout`) |
+| `footnote_texts` | `tuple[str, ...]` | The stripped footnote texts, so nothing is silently lost |
+| `page_offsets` | `tuple[int, ...]` | Start offset of each page in the returned text |
+| `residual_control_chars` | `int` | Non-space control characters still in the returned text |
+| `column_interleave_pages` | `tuple[int, ...]` | Pages detected as read across both columns |
+| `fallbacks` | `dict[str, int]` | Fallback events during normalization (see [`fallbacks`](#fallbacks--what-the-library-silently-did-instead-read-this)) |
+| `fallback_details` | `dict[str, dict[str, int]]` | The specific font/token behind each event |
 
 ---
 
@@ -404,12 +338,13 @@ Compute extraction quality metrics.
 {
     "score": 85,                    # 0–100 composite score
     "common_word_ratio": 0.142,     # fraction of first 2000 words that are common English words
-    "garbled": False,               # True if common_word_ratio < 0.02 (column merge / encoding failure)
+    "garbled": False,               # common_word_ratio < 0.02 AND (a corruption signal OR < 500 chars)
     "confidence": "high",           # "high" (≥80), "medium" (≥50), "low" (<50)
     "details": {
         "ligatures_remaining": 0,   # count of ff/fi/fl ligature chars not yet expanded
         "garbled_chars": 0,         # count of U+FFFD replacement characters
         "non_ascii_ratio": 0.031,   # fraction of non-ASCII characters
+        "has_corruption_signal": False,  # any U+FFFD, > 20% non-ASCII, or >= 20 ligatures
     }
 }
 ```
@@ -431,7 +366,7 @@ elif quality["score"] < 50:
     print(f"Low quality ({quality['score']}) — verify manually")
 ```
 
-### `extract_sections(file_bytes, *, source_format=None, ...) → SectionedDocument`
+### `extract_sections(file_bytes=None, *, text=None, source_format=None, preserve_math_glyphs=False, normalization_level=None) → SectionedDocument`
 
 Identify a paper's structure — abstract, introduction, methods, results, discussion,
 references, and the endmatter around them. Works on PDF, DOCX and HTML.
@@ -448,9 +383,34 @@ for section in doc.sections:
 results = [s for s in doc.sections if s.label == SectionLabel.RESULTS]
 ```
 
+Pass `file_bytes` with `source_format` (`"pdf"`, `"docx"`, `"html"`), or `text=` for text you
+already extracted. `normalization_level` overrides the level used before sectioning;
+`preserve_math_glyphs` is passed to `normalize_text`.
+
 Every character of the source belongs to exactly one section — the partition is total, so
-nothing is silently dropped. Unrecognised spans carry `SectionLabel.UNKNOWN` rather than
+nothing is silently dropped. Unrecognised spans carry `SectionLabel.unknown` rather than
 being merged into a neighbour. Pipeline version: `SECTIONING_VERSION`.
+
+**`SectionedDocument`**: `sections` (tuple of `Section`), `normalized_text` (the buffer the
+offsets index into), `sectioning_version`, `source_format`, and `sectioning_text_id` — a
+fingerprint from `sectioning_text_id(text, sectioning_version)` so a consumer can tell whether
+stored offsets still refer to the same text and the same algorithm. Helpers:
+`doc.abstract` / `.introduction` / `.methods` / `.results` / `.discussion` / `.references`
+(first section with that canonical label, or `None`), `doc.all(label)` (every section with
+that canonical label — `methods`, `methods_2`, ...), `doc.get(label)` (exact label),
+`doc.text_for(*labels)` (their text joined in document order) and `doc.to_dict()`.
+
+**`Section`**: `label` (`"methods"`, `"methods_2"`), `canonical_label` (`SectionLabel`),
+`text`, `char_start` / `char_end` (offsets into `normalized_text`), `pages`, `confidence`
+(`Confidence`: `high`, `medium`, `low`), `detected_via` (`DetectedVia`: `heading_match`,
+`markup`, `layout_signal`, `text_pattern_fallback`, `position_inferred`), `heading_text`
+(the heading as printed, if any) and `subheadings` (unrecognised headings inside it).
+
+**`SectionLabel` values**: `title_block`, `abstract`, `keywords`, `author_note`,
+`introduction`, `literature_review`, `methods`, `results`, `discussion`,
+`general_discussion`, `conclusion`, `acknowledgments`, `funding`, `conflict_of_interest`,
+`data_availability`, `author_contributions`, `references`, `appendix`, `supplementary`,
+`footnotes`, `study_n_header`, `unknown`.
 
 ### `flatten_tables_for_paper(tables) → list[FlattenedRow]`
 
@@ -501,11 +461,226 @@ explain_symbol("η")                   # 'eta'
 Copying the tables into your own code is how two tools end up disagreeing about what
 `chi2` means. Ask the contract. Full prose reference: [SYMBOL_CONTRACT.md](./SYMBOL_CONTRACT.md).
 
+### `extract_pdf_structured(pdf_bytes, *, thorough=False, table_text_mode="raw", max_input_bytes=None, extract_timeout_seconds=120) → StructuredResult`
+
+Text plus tables and figures from a PDF; see [Structured extraction](#structured-extraction-v20)
+for the modes and [Output schemas](#output-schemas) for every field. `table_text_mode` is
+`"raw"` (table text stays in `text`) or `"placeholder"` (table and figure regions are replaced
+by `[Label: caption]` markers). `extract_timeout_seconds` bounds the text extraction.
+`TABLE_EXTRACTION_VERSION` versions the table pipeline and is echoed as
+`result["table_extraction_version"]`.
+
+### `extract_docx_structured(docx_bytes, *, max_input_bytes=None) → StructuredResult`
+
+Text plus tables from a DOCX, in the **same** `StructuredResult` shape as the PDF path, so one
+consumer handles both. The grid is read from the document's own table markup (`w:tbl`), so
+`rendering` is `"markup"`, `caption_status` is `matched` or `none_found`, and `method` is
+`"mammoth+tables:mammoth"`. Two values are deliberate, not missing features: `page_count` is
+`0` (a DOCX has no page model; pagination depends on the program that opens it) and `figures`
+is `[]` (DOCX figure extraction is not implemented). Requires `[docx]`.
+
+```python
+from docpluck import extract_docx_structured
+
+with open("paper.docx", "rb") as f:
+    result = extract_docx_structured(f.read())
+for t in result["tables"]:
+    print(t["id"], t["label"], t["n_rows"], "x", t["n_cols"])
+```
+
+### `render_pdf_to_markdown(pdf_bytes, *, normalization_level=NormalizationLevel.academic, flatten_tables_inline=False, report=None) → str`
+
+The whole paper as Markdown: title, section headings, body text with Greek letters and math
+glyphs as printed, tables as HTML under their captions, figure captions, and a separate
+"Uncaptioned table candidates (unverified)" section. `flatten_tables_inline=True` adds a
+readable one-sentence-per-row block below each table, bounded by HTML-comment markers.
+
+Pass a `RenderReport()` as `report` to learn what the post-processing did:
+
+| field | meaning |
+|---|---|
+| `steps_applied` | post-processing steps that ran |
+| `steps_changed` | the steps that changed the Markdown |
+| `lines_removed` | each removed line, with the step that removed it |
+| `chars_delta` | net characters added or removed by post-processing |
+| `render_version` | version of the post-processing chain |
+| `fallbacks`, `fallback_details` | every fallback event beneath the render, including table extraction and sectioning |
+
+```python
+from docpluck import render_pdf_to_markdown, RenderReport
+
+rep = RenderReport()
+md = render_pdf_to_markdown(pdf_bytes, report=rep)
+print(rep.steps_changed, rep.fallbacks)
+```
+
+### `extract_to_dir(pdf_paths, out_dir, level=NormalizationLevel.academic, write_sidecar=True) → ExtractionReport`
+
+Batch extraction. For each PDF it writes `<stem>.txt` (normalized text) and, unless
+`write_sidecar=False`, a `<stem>.json` sidecar with that file's result. A failure on one file
+is recorded, not raised.
+
+**`ExtractionReport`** — the reproducibility receipt: `docpluck_version`, `normalize_version`,
+`git_sha`, `git_state`, `level`, `out_dir`, `symbol_contract_version`, `sectioning_version`,
+`table_extraction_version`, `python_version`, `unicodedata_version`, `pdftotext_path`,
+`pdftotext_version`, `pdftotext_engine`, `poppler_version`, `pdfplumber_version`,
+`pdfminer_six_version`, `camelot_version`, `pypdfium2_version`, `opencv_version`,
+`mammoth_version`, `beautifulsoup4_version`, `lxml_version`, `n_total`, `n_ok`, `n_failed`,
+`elapsed_seconds` and `results`. `report.to_dict()` serialises it; `report.write_receipt(path)`
+writes it as JSON.
+
+**`ExtractionFileResult`** (one per file in `results`):
+
+| field | meaning |
+|---|---|
+| `path`, `ok`, `error` | the input, whether it succeeded, and the error if not |
+| `method` | the `extract_pdf` method string |
+| `n_chars_raw`, `n_chars_normalized` | length before and after normalization |
+| `n_replacement_chars` | U+FFFD count in the output — glyphs lost before docpluck saw them |
+| `n_greek_chars` | Greek letters in the output |
+| `normalize_steps_changed` | normalization steps that changed this file |
+| `layout_available`, `layout_error` | whether the layout channel could be read (needed for the font-evidence repairs) |
+| `fallbacks`, `fallback_details` | fallback events for this file |
+| `elapsed_seconds` | time taken |
+
+`count_replacement_chars(text)` and `count_greek_chars(text)` compute the two counts on any
+text.
+
+### `get_version_info() → dict`
+
+Every version input that can change docpluck's output; see
+[Reproducibility receipts](#reproducibility-receipts) for the keys. This is what
+`docpluck --version` prints.
+
+---
+
+## Output schemas
+
+`StructuredResult`, `Table`, `Cell`, `Figure` and `FlattenedRow` are typed dictionaries: read
+them with `result["tables"]`, not attribute access. They serialise to JSON as-is (this is
+what `docpluck extract --structured` prints).
+
+### `StructuredResult`
+
+| key | type | meaning |
+|---|---|---|
+| `text` | `str` | the document text (tables replaced by markers when `table_text_mode="placeholder"`) |
+| `method` | `str` | extraction path, as for `extract_pdf` / `"mammoth+tables:mammoth"` for DOCX |
+| `page_count` | `int` | pages (`0` for DOCX) |
+| `tables` | `list[Table]` | tables in document order |
+| `figures` | `list[Figure]` | figures (`[]` for DOCX) |
+| `table_extraction_version` | `str` | `TABLE_EXTRACTION_VERSION` |
+| `fallbacks` | `dict[str, int]` | fallback events for this document |
+| `fallback_details` | `dict[str, dict[str, int]]` | which font, token or exception each event names |
+
+### `Table`
+
+| key | type | meaning |
+|---|---|---|
+| `id` | `str` | id within the document, e.g. `t2` or `camelot_t5`; uncaptioned candidates are `u1`, `u2`, ... |
+| `label` | `str \| None` | `"Table 1"`; `None` for an uncaptioned candidate |
+| `page` | `int` | 1-based page (DOCX: `0`) |
+| `bbox` | `(x0, top, x1, bottom)` | table region in pdfplumber page coordinates |
+| `caption` | `str \| None` | caption text |
+| `footnote` | `str \| None` | table note (`Note. ...`) |
+| `kind` | `"structured"` \| `"isolated"` | a cell grid, or a caption-only table whose grid could not be captured |
+| `rendering` | `"lattice"` \| `"whitespace"` \| `"isolated"` \| `"markup"` | how the grid was obtained: ruled lines, whitespace alignment, not at all, or DOCX markup |
+| `confidence` | `float \| None` | capture quality in [0, 1]: `(accuracy/100) * (1 - whitespace/100)` |
+| `accuracy` | `float \| None` | Camelot's structural accuracy, 0–100 |
+| `whitespace` | `float \| None` | share of empty cells in the shipped grid, 0–100 |
+| `camelot_flavor` | `"stream"` \| `"lattice"` \| `None` | which Camelot parser won; `None` when not from Camelot |
+| `n_rows`, `n_cols`, `header_rows` | `int \| None` | grid dimensions and number of header rows |
+| `cells` | `list[Cell]` | the grid |
+| `html` | `str \| None` | the table as HTML |
+| `raw_text` | `str` | the region's text as extracted |
+| `cell_geometry` | `str \| None` | whether `cells[].bbox` is real — see the table under [Structured extraction](#structured-extraction-v20) |
+| `caption_status` | `"matched"` \| `"none_found"` \| `"uncaptioned_candidate"` | how sure docpluck is this is a captioned table |
+
+### `Cell`
+
+| key | type | meaning |
+|---|---|---|
+| `r`, `c` | `int` | 0-based row and column |
+| `rowspan`, `colspan` | `int` | spans |
+| `text` | `str` | cell text |
+| `is_header` | `bool` | part of the header rows |
+| `bbox` | `(x0, top, x1, bottom)` | the cell's grid rectangle; zeros unless `cell_geometry` says it is real |
+
+### `Figure`
+
+| key | type | meaning |
+|---|---|---|
+| `id` | `str` | id within the document, e.g. `f1` |
+| `label` | `str \| None` | `"Figure 1"` |
+| `page` | `int` | 1-based page |
+| `bbox` | `(x0, top, x1, bottom)` | figure region |
+| `caption` | `str \| None` | caption text |
+
+### `FlattenedRow`
+
+| key | type | meaning |
+|---|---|---|
+| `table_id`, `page`, `label` | | the source table |
+| `row_idx` | `int` | 0-based body-row index |
+| `row_label` | `str` | the row's label cell (left-most non-numeric cell, else the first cell) |
+| `header` | `list[str]` | column headers |
+| `raw_cells` | `list[str]` | the row's cells, same length as `header` |
+| `sentence` | `str` | the row as an English sentence, e.g. `"Importance: t(741) = 3.93, p < .001, d = 0.29"` |
+| `fields` | `dict` | parsed statistical values (may be empty) |
+| `caption_status` | `str` | the source table's `caption_status` |
+
+`render_flattened_inline(records, *, table_id, label=None, version=None)` renders one table's
+rows as a Markdown block bounded by HTML-comment markers.
+
+---
+
+## Command-line interface
+
+`docpluck` (or `python -m docpluck`). The input type is chosen from the file extension
+(`.pdf`, `.docx`, `.html`, `.htm`); output is UTF-8 on standard output.
+
+```
+docpluck --version                                   # JSON: get_version_info()
+docpluck extract FILE [--sections L1,L2]             # text (all or some sections)
+docpluck extract FILE --structured [--thorough] [--text-mode raw|placeholder]
+                      [--tables-only | --figures-only] [--html-tables-to DIR]
+docpluck sections FILE [--format json|summary]       # SectionedDocument
+docpluck render FILE [--level none|standard|academic]
+                     [--flatten-tables-inline] [--tables-jsonl PATH]
+```
+
+| option | applies to | effect |
+|---|---|---|
+| `--sections L1,L2` | `extract` | only those sections' text |
+| `--structured` | `extract` | `StructuredResult` as JSON (PDF, DOCX) |
+| `--thorough` | `extract --structured` | scan pages with no table caption too (PDF) |
+| `--text-mode raw\|placeholder` | `extract --structured` | table regions in `text` (PDF) |
+| `--tables-only`, `--figures-only` | `extract --structured` | omit the other list |
+| `--html-tables-to DIR` | `extract --structured` | write each table's HTML to `DIR/<id>.html` |
+| `--format json\|summary` | `sections` | full JSON, or one line per section |
+| `--level` | `render` | normalization level (default `academic`) |
+| `--flatten-tables-inline` | `render` | readable row sentences below each table |
+| `--tables-jsonl PATH` | `render` | every `FlattenedRow` to `PATH` as JSON Lines |
+
+---
+
+## Environment variables
+
+All default to off; set to `1` to enable.
+
+| variable | effect |
+|---|---|
+| `DOCPLUCK_FALLBACK_LOG` | print each fallback event to standard error as it is recorded |
+| `DOCPLUCK_DISABLE_CAMELOT` | do not run Camelot; tables come only from the non-Camelot capture paths |
+| `DOCPLUCK_COLUMN_CORRECT_GENERAL` | experimental: two-column re-ordering on more pages, still only with a clean central gutter and every word preserved |
+| `DOCPLUCK_COLUMN_CORRECT_BANDED` | experimental: per-band re-extraction for mixed-layout pages the whole-page corrector skips |
+| `DOCPLUCK_RCT_L2_BYPASS` | diagnostic: turns off two table-region guards so their effect can be measured |
+
 ---
 
 ## Integration Examples
 
-### ESCIcheck / effectcheck
+### Statistical-reporting checks
 
 ```python
 from docpluck import extract_pdf, normalize_text, NormalizationLevel, compute_quality_score
@@ -527,7 +702,7 @@ def extract_stats(pdf_path: str) -> list[dict]:
     return p_values
 ```
 
-### Scimeto / MetaESCI (batch processing)
+### Batch processing
 
 ```python
 from docpluck import extract_pdf, normalize_text, NormalizationLevel, compute_quality_score
@@ -614,7 +789,7 @@ r.n_replacement_chars   # U+FFFD count — a glyph was lost before docpluck saw 
 r.n_greek_chars         # Greek letters; pair with n_chars_normalized for density
 ```
 
-### MetaMisCitations (URL-based)
+### From a URL
 
 ```python
 import httpx
@@ -684,6 +859,7 @@ Scope is **English-language articles written in US numeric convention** (`.` dec
 |-------------|---------|-------|
 | Python | ≥ 3.10 | |
 | pdfplumber | ≥ 0.11.0 | Core pip dependency — installed automatically |
+| camelot-py[cv] | ≥ 0.11, < 3 | Core pip dependency — table detection; rasterizes through pypdfium2, so no Ghostscript needed |
 | poppler-utils | any recent | System package — for `extract_pdf()` only |
 | mammoth | ≥ 1.8.0 | Optional (`[docx]`) — pure Python, no system deps |
 | beautifulsoup4 | ≥ 4.12.0 | Optional (`[html]`) — pure Python |
@@ -699,9 +875,4 @@ MIT. See [LICENSE](../LICENSE).
 
 ## Citation
 
-If you use docpluck in research, please cite:
-
-```
-Feldman, G. (2026). docpluck: PDF text extraction and normalization for academic papers.
-https://github.com/giladfeldman/docpluck
-```
+See the [project README](../README.md#citing-docpluck) and [CITATION.cff](../CITATION.cff).

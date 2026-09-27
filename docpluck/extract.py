@@ -2,7 +2,9 @@
 PDF Text Extraction
 ====================
 Primary engine: pdftotext default mode (no -layout flag)
-Fallback: pdfplumber for PDFs with SMP Unicode (Mathematical Italic fonts)
+Column correction: pages read across both columns are re-extracted column by column.
+(The pdfplumber U+FFFD / SMP recovery fallback was RETIRED 2026-09-24; an
+undecodable glyph is now returned as U+FFFD.)
 
 Requires poppler-utils installed on the system:
   - Linux/WSL: apt-get install poppler-utils
@@ -35,9 +37,10 @@ def extract_pdf(
 ) -> tuple[str, str]:
     """Extract text from PDF bytes.
 
-    Uses pdftotext as the primary engine. Automatically falls back to
-    pdfplumber if the PDF contains SMP Unicode characters (e.g. Mathematical
-    Italic fonts used by Nature/Cell journals) that Xpdf cannot handle.
+    Uses pdftotext (default reading-order mode). Pages where pdftotext reads
+    a two-column layout across both columns are re-extracted column by
+    column. An undecodable glyph is returned as U+FFFD, never guessed (the
+    earlier pdfplumber recovery fallback was retired 2026-09-24).
 
     Args:
         pdf_bytes: Raw PDF file content as bytes.

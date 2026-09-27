@@ -21,7 +21,7 @@ venv/
 # re-introduce. See LESSONS.md L-006 and /docpluck-cleanup check 0.
 #
 # The PUBLIC doc surface is exactly:
-#   README.md  docs/README.md  docs/NORMALIZATION.md
+#   README.md  CITATION.cff  CONTRIBUTING.md  docs/README.md  docs/NORMALIZATION.md
 #   docs/DESIGN.md  docs/BENCHMARKS*.md  CHANGELOG.md  LICENSE
 # Anything else under docs/ is internal by default.
 # =====================================================================

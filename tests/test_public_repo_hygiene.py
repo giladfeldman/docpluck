@@ -190,6 +190,10 @@ ALLOWED_ROOT_FILES = {
     # Public by explicit owner decision, 2026-08-06.
     "CLAUDE.md",
     "LESSONS.md",
+    # Standard open-source metadata, added 2026-09-27 with the README rewrite:
+    # citation metadata (GitHub's "Cite this repository") and contributor guide.
+    "CITATION.cff",
+    "CONTRIBUTING.md",
 }
 
 ALLOWED_DOCS = {
