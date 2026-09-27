@@ -211,8 +211,24 @@ def resplit_merged_columns(camelot: Any, tmp_path: str, ct: Any, layout: Any) ->
     ):
         record_fallback("camelot_column_resplit_refused", detail="row_glyphs_changed")
         return ct
+    # A split must create a column that HOLDS something. Measured 2026-09-27 over
+    # 251 papers: 10 of 17 firings only inserted a near-empty column (the band sat
+    # beside, not between, the content), which is noise in the rendered table.
+    # Each split must yield one more column populated in >= MIN_GAP_ROWS rows.
+    if _dense_columns(new) < _dense_columns(ct) + len(extra):
+        record_fallback("camelot_column_resplit_refused", detail="no_new_populated_column")
+        return ct
     record_fallback("camelot_column_resplit", detail=f"p{page}+{len(extra)}")
     return new
+
+
+def _dense_columns(ct: Any) -> int:
+    """Columns holding text in at least ``MIN_GAP_ROWS`` rows."""
+    df = ct.df
+    return sum(
+        1 for c in range(len(df.columns))
+        if sum(1 for r in range(len(df)) if str(df.iloc[r, c]).strip()) >= MIN_GAP_ROWS
+    )
 
 
 __all__ = ["merged_column_split_points", "resplit_merged_columns"]
