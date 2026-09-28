@@ -600,7 +600,6 @@ def artifact_path(scan: str, arm: Arm) -> Path:
     harness scratch output -- there is no fixed machine-local root.
     """
     import datetime as _dt
-
     import tempfile
 
     override = os.environ.get("DOCPLUCK_DIAG_OUT")
