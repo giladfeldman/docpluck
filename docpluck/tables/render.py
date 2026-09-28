@@ -24,9 +24,49 @@ tables (``kind == "structured"``) always have non-empty HTML containing
 from __future__ import annotations
 
 import html as _html
+import re
 
 from . import Cell
 from .cell_cleaning import cells_grid_to_html
+
+
+_THEAD_RE = re.compile(r"<thead>(.*?)</thead>", re.S)
+
+
+def header_rows_in_html(html: str | None) -> int | None:
+    """How many rows the table's own ``html`` puts in its ``<thead>``.
+
+    ``None`` when there is no html at all (a table with no grid); ``0`` when the
+    html has no ``<thead>``.
+    """
+    if not html:
+        return None
+    m = _THEAD_RE.search(html)
+    return m.group(1).count("<tr") if m else 0
+
+
+def sync_header_rows(tables: list) -> None:
+    """Set every table's ``header_rows`` to the header split its ``html`` used.
+
+    Until 2026-09-28 the field was written by each capture path from its own
+    guess -- Camelot hardcoded ``1``, the layout path ``1 if any is_header``, the
+    DOCX path ``n_header or 1`` -- and disagreed with the ``<thead>`` of the same
+    table's html (and with ``flatten_table``, which agrees with the html) on 5 of
+    22 comparable PDF tables and 8 of 122 DOCX tables. Deriving it from the html
+    at the one exit every path shares makes the field say what the output did.
+
+    On the DOCX path ``flatten._declared_header_rows`` reads this field as the
+    author's declared ceiling. The html split already applied that ceiling, so
+    the synced value is at most the declaration and at least what the heuristic
+    chose -- feeding it back as the ceiling yields the same split.
+    """
+    for t in tables or ():
+        n = header_rows_in_html(t.get("html"))
+        if n is None:
+            if t.get("cells"):
+                t["header_rows"] = 0
+            continue
+        t["header_rows"] = n
 
 
 def cells_to_html(cells: list[Cell], *, clean=None,

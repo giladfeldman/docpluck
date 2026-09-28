@@ -52,7 +52,7 @@ from .tables.captions import (
     caption_anchor_is_in_text_reference,
     find_caption_matches,
 )
-from .tables.render import cells_to_html
+from .tables.render import cells_to_html, sync_header_rows
 from .tables.whitespace import grid_is_body_prose
 from .resources import INCOMPLETE_METHOD_PIECE, RESOURCE_EXHAUSTED
 from .telemetry import fallback_scope, record_fallback
@@ -144,6 +144,8 @@ def extract_pdf_structured(
             _raw_text=_raw_text,
             _page_count=_page_count,
         )
+    # `header_rows` says what the html's <thead> did, on every path.
+    sync_header_rows(result.get("tables"))
     result["fallbacks"] = dict(fb.counters)
     result["fallback_details"] = fb.details
     # THE MACHINE RAN OUT, AND IT SHOWS IN `method`. `fallbacks` alone was not

@@ -117,6 +117,10 @@ class Table(TypedDict):
     camelot_flavor: Optional[str]
     n_rows: Optional[int]
     n_cols: Optional[int]
+    # How many rows `html` puts in its <thead> -- the header split this table's
+    # html (and `flatten_table`) actually used. 0 when the html has no header;
+    # None when there is no grid. Set at the structured-extraction exit by
+    # `tables.render.sync_header_rows`, never guessed per capture path.
     header_rows: Optional[int]
     cells: list[Cell]
     html: Optional[str]

@@ -22,6 +22,7 @@ from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult
 from .figures import Figure
 from .tables import Table
 from .tables.docx_tables import extract_tables_docx
+from .tables.render import sync_header_rows
 from .telemetry import fallback_scope
 
 
@@ -74,6 +75,7 @@ def extract_docx_structured(
         result = _extract_docx_structured(
             docx_bytes, max_input_bytes=max_input_bytes
         )
+    sync_header_rows(result.get("tables"))
     result["fallbacks"] = dict(fb.counters)
     result["fallback_details"] = fb.details
     return result
