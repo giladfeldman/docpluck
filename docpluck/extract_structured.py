@@ -1705,6 +1705,44 @@ def _row_has_wide_internal_gap(col_chars: list[dict]) -> bool:
     return False
 
 
+def _column_lines(page_obj, col_x0: float, col_x1: float) -> list[tuple[float, list[dict]]]:
+    """The printed lines of one column, as ``(top, chars)`` sorted top-down.
+
+    A char belongs to the column when its x-midpoint lies in ``[col_x0, col_x1)``.
+    Chars are grouped into a line by VERTICAL OVERLAP, not by ``round(top)``: a
+    glyph from a different font sits a point or two off its line's top, and
+    rounding filed it as a line of its own. Observed on
+    10.1016/j.evolhumbehav.2016.06.001 p4: the caption's ``α`` (a symbol-font
+    subset) has top 63.2 against its line's 64.6, so Table 1's caption was
+    rebuilt as ``Table 1 α Summary of ... Cronbach's for ...`` and the header
+    row's ``α`` (top 86.4 against 87.7) was read as one more caption line.
+
+    A char joins the current line when at least half its own height overlaps
+    the line's vertical extent. Consecutive printed lines never overlap by half
+    a glyph height (that would need leading below half the font size), so lines
+    cannot chain into each other.
+    """
+    chars = [
+        c for c in (page_obj.chars or ())
+        if col_x0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 < col_x1
+    ]
+    chars.sort(key=lambda c: float(c.get("top", 0.0)))
+    lines: list[list] = []  # [top, bottom, chars]
+    for c in chars:
+        top = float(c.get("top", 0.0))
+        bottom = float(c.get("bottom", top))
+        height = max(bottom - top, 0.1)
+        if lines:
+            cur = lines[-1]
+            overlap = min(bottom, cur[1]) - max(top, cur[0])
+            if overlap >= 0.5 * height:
+                cur[1] = max(cur[1], bottom)
+                cur[2].append(c)
+                continue
+        lines.append([top, bottom, [c]])
+    return [(ln[0], sorted(ln[2], key=lambda c: float(c.get("x0", 0.0)))) for ln in lines]
+
+
 def _caption_text_from_column(
     layout_doc,
     cap: CaptionMatch,
@@ -1735,18 +1773,10 @@ def _caption_text_from_column(
         if cb is None:
             return None
         ctop = cb[1]
-        rows: dict[int, list[dict]] = {}
-        for c in page_obj.chars or ():
-            rows.setdefault(round(float(c.get("top", 0.0))), []).append(c)
         out_lines: list[str] = []
-        for top_key in sorted(rows.keys()):
+        for top_key, col_chars in _column_lines(page_obj, col_x0, col_x1):
             if top_key < ctop - 1.0:
                 continue
-            col_chars = [
-                c for c in rows[top_key]
-                if col_x0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 < col_x1
-            ]
-            col_chars.sort(key=lambda c: float(c.get("x0", 0.0)))
             line = _join_chars_with_spaces(col_chars).strip()
             if not line:
                 if out_lines:
@@ -1766,7 +1796,17 @@ def _caption_text_from_column(
                 break
         if not out_lines:
             return None
-        snippet = re.sub(r"\s+", " ", " ".join(out_lines)).strip()
+        # A line ending in a hyphen after a letter, followed by a line opening
+        # with a letter, joins WITHOUT a space and KEEPS the hyphen -- the
+        # library's H1 convention (``normalize._fix_hyphenated_line_breaks``):
+        # ``self-`` + ``harm`` is ``self-harm``, never ``self- harm``.
+        joined = out_lines[0]
+        for nxt in out_lines[1:]:
+            if re.search(r"[A-Za-z]-$", joined) and nxt[:1].isalpha():
+                joined += nxt
+            else:
+                joined += " " + nxt
+        snippet = re.sub(r"\s+", " ", joined).strip()
         # Same caption cleanup as _extract_caption_text: drop soft-hyphen wrap
         # artifacts, strip leading orphan punctuation, ensure the label prefix.
         snippet = re.sub("­\\s+", "", snippet)
@@ -1823,22 +1863,12 @@ def _column_body_text(
         # one-row-down) caption row; start a little below its bottom so the
         # caption's own wrapped lines are not re-included as body.
         cap_bottom = cb[3]
-        rows: dict[int, list[dict]] = {}
-        for c in page_obj.chars or ():
-            rows.setdefault(round(float(c.get("top", 0.0))), []).append(c)
         out_lines: list[str] = []
-        for top_key in sorted(rows.keys()):
+        for top_key, col_chars in _column_lines(page_obj, col_x0, col_x1):
             if top_key <= cap_bottom + 1.0:
                 continue
             if top_key > cap_bottom + _COLUMN_BODY_MAX_HEIGHT_PT:
                 break
-            col_chars = [
-                c for c in rows[top_key]
-                if col_x0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 < col_x1
-            ]
-            if not col_chars:
-                continue
-            col_chars.sort(key=lambda c: float(c.get("x0", 0.0)))
             line = _join_chars_with_spaces(col_chars).strip()
             if line:
                 out_lines.append(line)
@@ -2585,6 +2615,19 @@ def _is_citation_cell(line: str) -> bool:
     return bool(_CITATION_CELL_RE.match(s) or _YEAR_ONLY_CELL_RE.match(s))
 
 
+# A lone statistic symbol set as its own column header: `p`, `t`, `d`, `n`,
+# `r`, `df`, or a Greek-led symbol (`η`, `ηp2`, `χ2`, `α`). Lowercase-leading,
+# so the title-wrap rule below would otherwise call it a wrapped title word --
+# but no English title wraps onto a line holding one such token alone (the one
+# single-letter lowercase English word, `a`, is a title-wrap tail word).
+# Observed: 10.1525/collabra.90203 Table 8 (p12) prints the header row
+# `F | p | BF01 | ηp2 | 95% CI`; pdftotext emits `F` and `p` on their own
+# lines, and the `p` line blocked the cell-run cut, so both joined the caption.
+_LONE_STAT_SYMBOL_RE = re.compile(
+    r"(?:[b-z]|df|[Ͱ-Ͽ][\w²³₀-₉]{0,3})"
+)
+
+
 def _is_table_header_like_short_line(line: str) -> bool:
     """True if ``line`` looks like a table column header or linearized
     cell token rather than a caption title (or a wrapped title line).
@@ -2610,6 +2653,8 @@ def _is_table_header_like_short_line(line: str) -> bool:
     # detector can't cut a real title.
     if len(words) > 3 or len(s) > 35:
         return False
+    if _LONE_STAT_SYMBOL_RE.fullmatch(s):
+        return True
     # Lowercase-leading short line → grammatical title continuation.
     if s[0].islower():
         return False

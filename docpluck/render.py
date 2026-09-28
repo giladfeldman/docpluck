@@ -5999,6 +5999,12 @@ def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
     """
     if not text or not caption:
         return -1
+    # ``text`` is the normalized body, whose ligatures ``normalize`` already
+    # decomposed with this same function; the caption comes from the table or
+    # figure record and still carries them (``coefﬁcients`` vs ``coefficients``
+    # in 10.1016/j.evolhumbehav.2016.06.001 Tables 4 and 6), so without this the
+    # anchor never matches and the table is exiled to the appendix.
+    caption = decompose_ligatures(caption)
 
     # Try 1: exact match (fast, common case).
     idx = text.find(caption)
