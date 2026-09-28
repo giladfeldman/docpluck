@@ -26,7 +26,7 @@ Known limitations:
       EVERY ONE is `ηp2`, `χ2` or `ρ` — precisely the effect-size and
       test-statistic symbols this library exists to deliver.
 
-  Verified end to end on `28_ImageMemorability.docx` (8 of its 9 spans are
+  Verified end to end on an unsubmitted manuscript (sha256 b89ce120; 8 of its 9 spans are
   `ηp2`):
 
       the document says   F(1,86) = 48.50, p < .001, ηp2 = .361.
@@ -62,7 +62,7 @@ from .telemetry import record_fallback
 # DISPLAY math is wrapped in `m:oMathPara`, and mammoth skips THAT element too —
 # so rewriting only the inner `m:oMath` leaves the replacement run stranded inside
 # an element mammoth still discards, and the equation is deleted exactly as before.
-# Measured 2026-08-15 (Fable review, reproduced): `42_StressExposureTraining.docx`,
+# Measured 2026-08-15 (Fable review, reproduced): an unsubmitted manuscript (sha256 1e21992c),
 # 1 of the 4 OMML papers in this fix's own corpus, defines `Excess Distance =
 # (W-S)/S` inside an `m:oMathPara` and lost it. The outer alternative is listed
 # FIRST so the whole paragraph object is replaced, not its inner equation.
@@ -139,7 +139,7 @@ def _linearize_omml(el) -> str:
         the document says   ratio = 1/2 of sample
         docpluck delivered  ratio = 12 of sample
 
-        `28_ImageMemorability.docx` span 9, `(Absent-Present)/Absent×100`
+        the b89ce120 manuscript's span 9, `(Absent-Present)/Absent×100`
         docpluck delivered  `[ Absent-PresentAbsent*100 ]`
 
     A fabricated `12` is worse than the deletion it replaced: the deletion left

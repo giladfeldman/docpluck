@@ -6,7 +6,7 @@ L-032), in the DOCX channel — and it was still shipping a day later.**
 `mammoth` has no model of `m:oMath` at all (grepped: zero references), so it
 skips the element as unrecognised markup. Measured end to end on a real paper:
 
-    28_ImageMemorability.docx says   F(1,86) = 48.50, p < .001, ηp2 = .361.
+    the eta manuscript says          F(1,86) = 48.50, p < .001, ηp2 = .361.
     docpluck delivered               F(1,86) = 48.50, p < .001, = .361.
 
 A bare `= .361` cannot be attributed to any statistic by any consumer. That is
@@ -35,6 +35,7 @@ is the whole point (`= .361` is only interpretable if its label precedes it).
 
 from __future__ import annotations
 
+import hashlib
 import io
 import sys
 import zipfile
@@ -49,12 +50,26 @@ from docpluck.extract_docx import _inline_omml_runs, extract_docx
 # A private corpus: its location is machine-local config, never written in this
 # public file (see tests/_local_corpora.py).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _local_corpora import local_corpus
+from _local_corpora import require_local_corpus
 
 # A PRIVATE sibling's internal corpus layout -- machine-local, never published.
-_DOCX_CORPUS = Path(local_corpus("docx_validation") or "<docx_validation corpus not configured>")
+# The two real manuscripts are unsubmitted, so they are located by CONTENT HASH,
+# never by filename (a filename is a manuscript title and this repo is public).
+# Unconfigured corpus -> skip; configured corpus without the file -> FAIL. Until
+# 2026-09-28 a missing file SKIPPED, and on the one machine that holds the
+# corpus the configured folder held neither file, so both real-paper checks
+# had been skipping while the suite reported green.
+_ETA_DOCX_SHA16 = "b89ce120e310c33d"      # 8 of its 9 OMML spans are partial eta squared
+_DISPLAY_DOCX_SHA16 = "1e21992c1e78ad34"  # defines Excess Distance in m:oMathPara
 
-_REAL = _DOCX_CORPUS / "28_ImageMemorability.docx"
+
+def _real_docx(sha16: str) -> bytes:
+    corpus = Path(require_local_corpus("docx_validation"))
+    for p in sorted(corpus.rglob("*.docx")):
+        data = p.read_bytes()
+        if hashlib.sha256(data).hexdigest().startswith(sha16):
+            return data
+    pytest.fail(f"no DOCX in the configured docx_validation corpus hashes to {sha16}")
 
 
 def _docx_with_body(body_xml: str) -> bytes:
@@ -156,14 +171,13 @@ def test_the_guard_is_LOAD_BEARING_not_decoration():
     assert "= .361" in text, "mammoth still emits the bare value, which is the defect"
 
 
-@pytest.mark.skipif(not _REAL.exists(), reason=f"corpus fixture missing: {_REAL.name}")
 def test_the_real_paper_recovers_all_eight_occurrences():
-    """`28_ImageMemorability.docx` — 8 of its 9 OMML spans are partial eta squared.
+    """The eta manuscript (sha256 b89ce120) — 8 of its 9 OMML spans are partial eta squared.
 
     See the block at the end of this file for the two defects this fix itself
     shipped with, both found by an independent review on 2026-08-15.
     """
-    text, _ = extract_docx(_REAL.read_bytes())
+    text, _ = extract_docx(_real_docx(_ETA_DOCX_SHA16))
     assert text.count("\u03b7p2") == 8
     assert "F(1,86) = 48.50, p < .001, \u03b7p2 = .361." in text
 
@@ -190,7 +204,7 @@ def test_display_math_is_not_deleted():
     """`m:oMathPara` -- mammoth skips THAT element too, so rewriting only the
     inner `m:oMath` left the replacement run stranded inside a discarded parent.
 
-    Real occurrence: `42_StressExposureTraining.docx`, one of the four OMML
+    Real occurrence: the display-math manuscript (sha256 1e21992c), one of the four OMML
     papers in this fix's own 26-paper measurement, defines
     `Excess Distance = (W-S)/S` in an `m:oMathPara` and lost it entirely.
     """
@@ -224,7 +238,7 @@ def test_a_fraction_never_fuses_into_a_fabricated_number():
 
 
 def test_a_compound_fraction_keeps_its_grouping():
-    """`28_ImageMemorability.docx` span 9 -- the one span outside the eight etas.
+    """The eta manuscript's span 9 -- the one span outside the eight etas.
 
     It reads `(Absent-Present)/Absent*100`; v2.4.131 delivered
     `Absent-PresentAbsent*100`, which reads as a single term and is not the
@@ -285,12 +299,6 @@ def test_an_empty_structure_emits_no_stray_operator():
     assert _inline_omml_runs(src) == src
 
 
-_REAL_DISPLAY = _DOCX_CORPUS / "42_StressExposureTraining.docx"
-
-
-@pytest.mark.skipif(
-    not _REAL_DISPLAY.exists(), reason=f"corpus fixture missing: {_REAL_DISPLAY.name}"
-)
 def test_the_real_display_math_paper_recovers_its_equation():
     """One of the four OMML papers in this fix's own 26-paper measurement.
 
@@ -298,7 +306,7 @@ def test_the_real_display_math_paper_recovers_its_equation():
     v2.4.131 delivered the surrounding prose and dropped the defining equation,
     so 1 in 4 of the fix's own positives was still broken after the fix landed.
     """
-    text, _ = extract_docx(_REAL_DISPLAY.read_bytes())
+    text, _ = extract_docx(_real_docx(_DISPLAY_DOCX_SHA16))
     assert "Excess Distance" in text
     assert "W-S" in text or "W\u2212S" in text, "the defining equation was deleted"
 

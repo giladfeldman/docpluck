@@ -59,8 +59,16 @@ def local_corpus(key: str) -> str | None:
         elif os.path.isfile(_CONFIG):
             with open(_CONFIG, encoding="utf-8") as fh:
                 data = json.load(fh)
-    except (OSError, ValueError):
+    except OSError:
         return None
+    except ValueError as exc:
+        # Malformed config is a configuration ERROR, not "not on this machine".
+        # Returning None here turned a mistyped Windows path (an unescaped
+        # backslash in the env JSON) into a silent skip -- measured 2026-09-28.
+        raise ValueError(
+            "machine-local corpus config is not valid JSON "
+            "($DOCPLUCK_LOCAL_CORPORA or tests/corpora.local.json)"
+        ) from exc
     val = data.get(key)
     if not val:
         return None
