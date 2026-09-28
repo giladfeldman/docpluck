@@ -14,7 +14,7 @@ authors:
 repository-code: "https://github.com/giladfeldman/docpluck"
 url: "https://docpluck.app"
 license: MIT
-version: "2.4.146"
+version: "2.4.147"
 date-released: "2026-09-28"
 keywords:
   - meta-science

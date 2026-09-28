@@ -75,7 +75,7 @@ Requires Python 3.10 or newer.
 pip install "docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git"
 ```
 
-To pin a release, append its tag: `...docpluck.git@v2.4.146`. The package is also on PyPI
+To pin a release, append its tag: `...docpluck.git@v2.4.147`. The package is also on PyPI
 (`pip install docpluck`); the GitHub tags are the release of record and PyPI can trail them,
 so check `pip index versions docpluck` if you need a specific version from PyPI.
 
@@ -372,7 +372,7 @@ default to off.
 If you use docpluck in research, cite the version you used (from `get_version_info()`):
 
 > Feldman, G. (2026). *docpluck: Text and statistic extraction from academic papers*
-> (Version 2.4.146) [Computer software]. https://github.com/giladfeldman/docpluck
+> (Version 2.4.147) [Computer software]. https://github.com/giladfeldman/docpluck
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff); GitHub's "Cite this repository"
 button reads it.

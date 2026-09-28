@@ -32,8 +32,8 @@ machine that runs the gates, which is the only machine where the gates exist.
 
 from __future__ import annotations
 
-import re
 import os
+import re
 import sys
 from pathlib import Path
 

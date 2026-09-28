@@ -1,75 +1,21 @@
 # Changelog
 
-## [2.4.146] - 2026-09-28 - normalization 1.9.69 - table extraction 2.4.17
+## [2.4.147] - 2026-09-28 - normalization 1.9.70 - table extraction 2.4.18
 
-**Public-repository cleanup. Nothing in the extraction pipeline changes: extracted,
-normalized and rendered text are byte-identical to 2.4.145.** This release also ships the README and API-reference rewrite
-(below). It removes internal references (private directory layouts, internal project and folder names, and
-citations of internal notes by file path) from code, comments, tests and documentation.
+Nineteen branches frozen since 2.4.145 (2.4.146 was a package-only release). Both normalized text and stored table
+output change, so `NORMALIZATION_VERSION` moves 1.9.69 -> 1.9.70 and
+`TABLE_EXTRACTION_VERSION` 2.4.17 -> 2.4.18 (one bump each for the release).
 
-### Changed — test support: every local location comes from an environment variable
+**What a consumer must check first.** Three changes remove a value docpluck used
+to supply, each because the page does not print it: `S5a`/`S5b` no longer guess a
+U+FFFD from context; a CI upper bound no longer gains a minus sign; body prose no
+longer ships as table cells under a real caption (`10.5465/amc.2022.0006`
+Table 1). Consumers pinning `NormalizationReport.steps_changed` will stop seeing
+`S5a_fffd_context_recovery` / `S5b_fffd_comparison_recovery` and may start seeing
+`W0s_operator_glyph_layout`. A consumer notice with the before -> after tokens
+accompanies this release.
 
-There is no default location for anything the test and gate code reads from the local
-machine. Three variables, one resolver each in `docpluck/testing/_root.py`:
-
-| variable | what it points at | unset |
-|---|---|---|
-| `ARTICLE_REPOSITORY` | the article repository (papers, by DOI) | one test fails and names the variable; every other paper-backed test skips with that reason |
-| `ARTICLE_FINDER_HOME` | the article-finder tool directory | the tests that call it skip |
-| `DOCPLUCK_SKILLS_DIR` | the maintainer's gate-skill directory (canary list) | the tests that read it skip |
-
-New public helpers: `docpluck.testing.article_finder_home()`, `project_skills_dir()`,
-`tool_problem()`. Machine-local configs (`tests/corpora.local.json`,
-`scripts/harness/sources.local.json`, `DOCPLUCK_LOCAL_CORPORA`, `DOCPLUCK_HARNESS_SOURCES`)
-must now give ABSOLUTE paths; a relative one raises instead of being joined onto a fixed
-root. `DOCPLUCK_HARNESS_SOURCES` entries are now `name|dir|glob|format` (a Windows path
-contains `:`). The harness scratch output defaults to the system temp directory.
-`tools/diag/docx_grid_integrity_scan.py --wide DIR` takes the directory to walk.
-
-**With `ARTICLE_REPOSITORY` unset, one test fails on purpose**
-(`test_corpus_manifest.py::test_the_custodian_is_reachable`), so a run that read no paper
-never reads as green; the other paper-backed tests are reported as skipped, not failed.
-
-### Changed — repository contents
-
-`CLAUDE.md` and `LESSONS.md` are no longer tracked (maintainer files; kept locally).
-`tests/test_public_repo_hygiene.py::test_no_internal_reference_in_tracked_files` fails on
-any reappearance of the removed references, in path and quoted-segment form, with planted
-positive and clean negative controls.
-
-### Documentation
-
-- The GitHub/PyPI `README.md` is now the full landing page: purpose and scientific basis,
-  install (extras and system programs), a quickstart that is executed by the docs gate, every
-  feature, the complete CLI, environment variables, output formats, limitations and how to
-  cite. `pyproject.toml` now publishes this file to PyPI (it published `docs/README.md`).
-- `docs/README.md` is now the API reference: the 15 previously undocumented public
-  functions (`extract_pdf_file`, `extract_pdf_layout`, `extract_docx_structured`,
-  `render_pdf_to_markdown`, `extract_to_dir`, ...), every parameter, and field-by-field
-  tables for every output type.
-- Corrected three stale claims: Ghostscript is not required (Camelot rasterizes through
-  pypdfium2); `extract_pdf` no longer falls back to pdfplumber for undecodable glyphs (retired
-  in 2.4.145, docstrings still said otherwise); `garbled` needs corroborating evidence, not
-  only a low common-word ratio.
-- New `CITATION.cff` and `CONTRIBUTING.md`.
-- New gate `scripts/check_docs_coverage.py` (pinned two-sided by
-  `tests/test_docs_coverage_gate.py`): fails when any public name, parameter, output field,
-  enum value, CLI option, environment variable or extra is missing from the docs, when the
-  changelog/citation versions disagree, or when the README quickstart does not run.
-
-### Changed — test support: the article repository is found through `ARTICLE_REPOSITORY` only
-
-`docpluck.testing` no longer falls back to a fixed directory under the home directory when
-`ARTICLE_REPOSITORY` is unset. The fallback published one machine's layout in the package
-that ships to PyPI. An unset or wrong variable is not silent:
-`tests/test_corpus_manifest.py::test_the_custodian_is_reachable` fails and names the cause,
-using the new `root_problem()`. Fourteen tests and diagnostic tools rebuilt the path
-themselves, two of them by counting parent directories up from the test file, which pointed
-elsewhere in any other checkout and skipped there silently. They now use the new
-`custody_path(*parts)`. `tests/test_article_repository_is_env_only.py` pins both changes.
-**Anyone running the corpus-backed suite must set `ARTICLE_REPOSITORY`.** Nothing in the
-extraction pipeline changes.
-## [Unreleased] - normalization 1.9.70
+### U+FFFD is no longer guessed from context (S5a / S5b retired)
 
 **U+FFFD is no longer guessed from context anywhere.** Normalize steps **S5a** (`<U+FFFD>2 = .04`
 -> `eta2 = .04`) and **S5b** (`<U+FFFD>N` -> `>=N` / `<=N`), and S5b's second call in the Markdown
@@ -138,7 +84,7 @@ everywhere as
 text and table cells both change for the papers above).
 ### Table notes reach `Table["footnote"]` on PDF paths
 
-**Not yet versioned: the version is assigned when this is released.** The stored
+**Table extraction 2.4.18.** The stored
 table output changes (a new non-null field value, and grid rows moved out), so
 `TABLE_EXTRACTION_VERSION` must move with this change's release.
 
@@ -244,6 +190,359 @@ then deleted a subsection heading and its paragraph. The body is not edited.
 * `camelot_extract.capture_quality` is now the single definition of
   `confidence` / `whitespace`, so a grid trimmed after construction is scored
   as if built that way.
+
+### Removed an unwired figure detector
+
+**No output changes.** `docpluck/figures/detect.py`
+(`find_figures`) had no production caller since 2026-05-09 — `extract_pdf_structured` builds
+every figure from its caption instead — and it carried a stale second copy of the table
+caption locator and of the caption chart-data trim. Measured before deleting, on four test
+papers (`find_figures` vs the live path): Nature figure-only **0 vs 5**, `efendic_2022_affect`
+**0 vs 5**, `jama_open_3` **0 vs 2**, `chan_feldman_2025_cogemo` **11 vs 10** — the extra one a
+second "Figure 10" on p13 whose caption line it could not locate, so it emitted its hard-coded
+placeholder box `(50, 100, width-50, 300)` as though measured. Wiring it in would have put
+invented geometry into a public field. No
+known downstream consumer imports it (searched for `find_figures` / `figures.detect`). Its chart-data-trim unit tests now run against the live copy
+(`tests/test_caption_chart_data_trim.py`, all passing unchanged). The `Figure` type now says
+in its docstring that `bbox` is **not computed** and is always `(0.0, 0.0, 0.0, 0.0)`,
+meaning "unknown" — it was always zeros, but nothing said so.
+
+### A machine that runs out of memory no longer changes the tables silently
+
+**What a consumer will see change:**
+
+- **On a healthy machine, nothing.** Same tables, same `method`, same `fallbacks`.
+- **Under memory or disk pressure that passes, the tables are now the normal ones.**
+  `fallbacks` gains `resource_retry` (one per retried call); `method` is unchanged.
+- **Under pressure that does not pass, the result is labelled.** `fallbacks` gains
+  `resource_exhausted` (detail = the step that degraded) and `method` ends in
+  `+incomplete:resource_exhausted`. Before, such a result had fewer or different
+  tables under a `method` byte-identical to a healthy run's.
+- `table_extraction_version` moves **2.4.16 -> 2.4.17**, because the stored `method`
+  string can now differ.
+
+**What happened.** The 2026-09-24 release A/B ran 135 papers through the service at
+three normalization levels. Tables do not depend on the level, yet 7-8 papers gave
+different `tables.json` across the three runs of the same PDF (e.g.
+10.15626/mp.2022.3108: page-10 tables from the region pass in one run, from auto-detect
+in another; 10.1038/s41598-023-50588-1: Table 4 "isolated" vs "structured"). 19 tests
+had been skipped under pytest-xdist for the same reason ("non-deterministic under
+parallel load").
+
+**It was memory, not CPU load, and not threads.** Measured, in order:
+
+- 12 simultaneous processes on 10.15626/mp.2022.3108 gave 12 byte-identical results.
+  CPU contention alone changes nothing.
+- The machine was out of commit ("the paging file is too small"; 3 MB of virtual
+  memory available, later 145 MB free on C:). A per-process memory cap (a Windows Job
+  Object, touching no other process) reproduces the variance on demand:
+  10.1038/s41598-023-50588-1 gives different tables at 700 MB and the normal ones at
+  1000 and 1500 MB; 10.1038/s41598-023-50460-2 loses its lattice tables at 640 and
+  680 MB and is normal at 720 and 760 MB, 2 runs each. In every degraded run `method`
+  was identical to the healthy one.
+- The failing step is Camelot's lattice pass: it rasterises each page and thresholds
+  it with OpenCV, which raises `cv2.error (-4: Insufficient memory)`.
+  `extract_tables_camelot` recorded `camelot_lattice_exception` and carried on with
+  the stream reading of every ruled table. The region-driven pass does the same per
+  page (`camelot_region_exception` -> `continue`), and a full disk does it one step
+  earlier (`OSError [Errno 28]` writing the temp PDF).
+
+**The fix** (`docpluck/resources.py`, new):
+
+- `is_resource_exhaustion(exc)` separates "the machine ran out" from "the document
+  failed", keyed on the error CODES the libraries define (`MemoryError`; `OSError`
+  ENOSPC/ENOMEM/EMFILE/ENFILE; Windows 8/14/112/1450/1455; `cv2.error` with
+  `code == cv2.Error.StsNoMem`), never on message text, and walks the
+  `__cause__`/`__context__` chain.
+- `call_with_resource_retry` wraps all four `camelot.read_pdf` calls: 4 attempts,
+  `gc.collect()` between them, 1/2/4 s backoff. It retries only exhaustion; a
+  document-caused exception propagates on the first attempt.
+- `record_fallback` now checks the exception being handled. If it is exhaustion, it
+  also records `resource_exhausted`. That covers every catch site in every channel at
+  once, including ones not written yet. `extract_pdf_structured` then labels `method`.
+- `note_if_exhausted` covers the handlers that record LATER, outside the `except`, where
+  the in-flight exception is already gone: `cell_geometry` (per table and per cell) and
+  `_camelot_flavor`. Found by a Sonnet review (tier 2: one provider, so a second model
+  rather than an independent vendor); an AST scan of the library then showed these
+  three were the only silent broad handlers on the table path (17 library-wide; the
+  rest are version probing, batch/CLI wrappers and temp-file cleanup).
+
+**What was verified, two-sided, on 10.1038/s41598-023-50460-2** (5 paired rounds, the
+pre-fix tree at ce7414d and the fixed tree run concurrently in each round; memory capped
+at 640 MB per process and lifted to 2500 MB right after the first Camelot failure, so the
+shortage ends as it does when another process frees memory):
+
+| arm | tables fingerprint | `method` | runs |
+|---|---|---|---|
+| pre-fix, pressure | `61da0d` (lattice tables lost) | unchanged from healthy | 5/5 |
+| fixed, pressure | `f67a82` (the healthy output), `resource_retry: 1` | unchanged | 5/5 |
+| both, no cap | `f67a82` | unchanged | 1/1 each |
+
+Under a cap that is never lifted, the fixed tree gives the same reduced tables as before,
+but now says so: `method` ends `+incomplete:resource_exhausted` and `fallbacks` carries
+`resource_exhausted` (10.1038/s41598-023-50588-1 at 700 MB). New tests:
+`tests/test_resource_exhaustion_is_never_silent.py` (23; the three end-to-end tests inject
+the failure into `camelot.read_pdf` on 10.1371/journal.pmed.1004323).
+
+The 19 `_skip_under_xdist` markers are removed
+(`test_rc_t_degenerate_table_real_pdf.py` x8, `test_rc_t_layer2_raw_text_real_pdf.py`
+x5, `test_tables_flatten_blank_header_recovery.py` x4,
+`test_tables_superheader_alignment_real_pdf.py` x2). Measured with the four files under
+`pytest -n 6`, each run inside one Windows job whose total memory is capped (workers
+inherit it):
+
+| job cap | pre-fix (markers removed) | fixed |
+|---|---|---|
+| 7000 MB (peak use ~4.9 GB, cap never reached) | 60 passed | 60 passed |
+| 3500 MB (below what 6 workers need at once) | 55 passed, 5 **worker crashes** | 53 passed, 7 **worker crashes** |
+
+So the markers were about memory, not parallelism. With enough memory, both trees pass
+in parallel. Under a shortage that never ends, no retry can help: in both trees every
+failure was a worker process crashing (`node down: Not properly terminated`), and none
+was a test getting quietly different tables. A crash turns the run red, so nothing
+wrong passes. What the fix adds is for the shortage that passes, which is the service's
+case: shown above, 5/5 retried to the normal output.
+
+**Not fixed here, and why:** at a 680 MB cap one run of the pre-fix code died with a
+native segmentation fault. A crash inside compiled code cannot be caught from Python,
+so the caller gets an error, not a wrong table. It was not traced to the service: the
+A/B's two failed requests for corpus paper `nature/nat_comms_3` (a timeout and a
+`ConnectionResetError`) look like it but were not reproduced.
+
+### Operator glyphs mislabelled as digits are corrected, on two independent signals only
+
+Some publishers draw `=` and `−` in a separate embedded font whose character map labels them `5`
+and `2`. docpluck now corrects these **only** when two independent signals agree — the declared
+font is an operator-only repertoire (<= 6 digit/punct codes beside a text font) and every
+rasterized sample of that (font, code) is a bar shape (one bar = minus, two bars = equals) — and
+only in a word whose every PDF occurrence carries the proven glyph. Otherwise the text passes
+through as declared and the refusal is counted.
+
+- `10.5465/amj.2016.1196` p15: `(b 5 20.04, SE 5 0.06, t 5 20.63, p 5 .528)` -> `(b = -0.04, SE =
+  0.06, t = -0.63, p = .528)`; a correlation-table cell `2.48**` -> `-.48**`.
+- `10.1177/0956797610362061` p3: `D22 log likelihood (LL) 5 13.2` -> `D-2 log likelihood (LL) =
+  13.2`.
+- Measured over 300 random repository papers: the correction fires in 3 (`10.1177/0956797610362061`,
+  `10.1098/rsos.181009`, `10.1098/rsos.181355`), each checked against the rasterized page and correct;
+  one false positive found during review (stacked-fraction digits in `10.1038/s41598-023-50588-1`) was
+  fixed before release.
+- `<` and `>` drawn by the same fonts are NOT corrected (not bar-shaped) — `p , .001` still needs
+  a consumer's own detection as `p < .001`.
+- New telemetry: `fallbacks` gains `operator_glyph_refused_in_text` /
+  `operator_glyph_refused_in_table` / `operator_glyph_recovered_in_table`;
+  `NormalizationReport.steps_changed` gains `W0s_operator_glyph_layout` with metric
+  `operator_glyphs_recovered`.
+- **Retrospective:** statistics consumers parsed in 2.4.145 or earlier from papers where this now
+  fires (the four named above) carried a wrong sign or a `5`-for-`=` token and should be re-extracted.
+
+### A super-header's merged column is split back apart, and its interval column is delivered
+
+A Camelot stream column merged under a spanning super-header ("Original" / "Replication") is now
+re-split, and flatten recognises a header like `η2p (90% CI)` as an estimate-with-interval column.
+On `10.1080/23743603.2021.1878340` (xiao 2021) Table 4, `< .010.240` becomes `< .01` and `0.240`
+in separate columns, and flatten now delivers the table's eta2 with its 90% CI (not delivered
+before). Measured over 251 papers (manifest + 150 random): 13 firings, 7 correct, 6 cosmetic on
+prose/caption pseudo-tables, 0 moved a value to the wrong row or column.
+
+### A super-header's column span is read from the page, not guessed from column count
+
+`flatten`'s arm binding on a parallel-arm table now reads each super-header's printed span
+(underline rule or centred label over vertical-ruled columns; both must agree; all labels or
+none) and records it as the header cell's `colspan`, instead of splitting arms into equal-width
+blocks by column count. A statistic column under no arm label gets its own record with no
+`group`, instead of being bound to the last arm.
+
+- `10.1525/collabra.90203` Table 10: `n` (170, 165, 159, 176, 173, 161) moves from the **Target
+  article** arm to the **Replication** arm, matching the page; the Target article column now has
+  no `n` and no fabricated df.
+- Same table: a wrapped sub-header inside a printed span ("High-cash gift group (n=382)" under
+  "Age 1 y") is now part of its arm instead of becoming a bogus separate arm with no age.
+- A continuation-row merge guard was also narrowed so a heading line is never merged onto a
+  complete data-value cell; this restores `F = 3.91` on collabra.90203 Table 8 (previously glued
+  into the next heading).
+- Corpus denominator (102-paper manifest, before/after in the same extraction): 15 tables change;
+  15/15 spans match the rasterized page; typed-statistic counts identical in every one. The
+  heading-merge guard changes 14 tables across 703; typed-statistic counts are identical in 13
+  and +1 (the restored `F = 3.91`).
+- `TABLE_EXTRACTION_VERSION` moves (stored `flatten` output and `html` header change); no
+  normalization change.
+
+### Rotated tables: furniture no longer ships as a table's content, and gridding is attempted first
+
+A table printed sideways now gains `content_status` (`cells` | `raw_text` | `not_captured:<reason>`,
+reasons `rotated_table`, `page_furniture_only`, `body_prose_overshoot`, `no_text_after_caption`).
+Where a rotated table is not gridded by Camelot, docpluck first attempts to read it as a real grid
+in its own frame (glyphs turned upright by their text matrix, gridded with the whitespace path's
+clustering and gates, `cell_geometry="whitespace_rotated"`); when gridding is refused it falls back
+to the table's own lines in reading order as `raw_text`, with lines drawn upright — running headers,
+page numbers, watermarks, prose beside it — dropped rather than included.
+
+- `10.1038/s41467-024-45528-0` Table 4 previously shipped `raw_text="Article"`; on the corpus
+  (102-paper manifest, 31/435 rotated table captions across 18 papers) it and one other table now
+  read `not_captured:rotated_table` once furniture is excluded.
+- With Camelot on, 3 of 31 rotated tables change: `nat_comms_4` Table 4 becomes a grid; two others
+  move to reading-order `raw_text`. With Camelot off, all 31 change: furniture-only lines are
+  removed (0 values lost, 0 lines added), 11 become grids, 20 become reading-order `raw_text`.
+- New fallbacks: `table_content_not_captured`, `rotated_table_upright_lines_dropped`,
+  `rotated_table_read`, `rotated_table_lines_not_read`, `rotated_table_read_exception`. Rendered
+  Markdown now shows `> Table content not captured (<reason>): ...` under a not-captured table's
+  caption.
+- Upright tables are unchanged in every field. `TABLE_EXTRACTION_VERSION` moves (stored output
+  changes); no normalization change. Consumers: branch on `content_status`, never on emptiness.
+
+### A caption label alone on its line no longer empties its table
+
+When a table's caption printed only `TABLE 2` on its own line, the body walk mistook the caption's
+title for body text and stopped immediately, shipping `raw_text=""`. The body now starts after the
+title, never crosses a page break, and never runs later than where the caption itself ended.
+
+- `10.5465/annals.2016.0011` Table 2 and `10.15626/mp.2022.3108` Table 10 previously shipped empty
+  and now carry their text.
+- Over 415 table captions across 102 papers: 18 previously-empty tables gain their text, 69 tables
+  gain their first header cells (e.g. `Rank`, `Characteristic`, `Variable`) that had fallen between
+  the caption and the body, and 0 values are removed.
+- `content_status` and `raw_text` only; `TABLE_EXTRACTION_VERSION` moves.
+
+### A right-column caption's region no longer swallows the whole page
+
+When a right-column caption shares its text row with the left column's body text, the caption's
+region previously started at the row's left edge and could expand to the whole page. The region's
+left edge now starts at the caption itself; top, bottom and right edges are unchanged.
+
+- `10.1002/pon.2046` (McLean et al. 2013) Table 4: the whole page had become Table 4's region and
+  Figure 2's legend was delivered in its place; the real table (13x7, six data rows) now comes back
+  exact, e.g. `CBS2 | 0.02 | 0.87 | 12.00 | 0.0015 | ns | ns`.
+- Table 3 of the same paper, previously shipped empty because one rotated download-notice glyph on
+  the caption row stretched its box, is also recovered by the same-shaped fix.
+- Across 103 papers, 6 caption regions move (all right-column captions sharing their line with left
+  text); the delivered table changes in 1 paper (pon.2046) and is byte-identical in the other 5.
+
+### Camelot's lattice pass, above 40 pages, reads only pages carrying a table caption
+
+Lattice rasterises every page at 300 dpi, and one lattice page-parse costs roughly 7.7x one stream
+page-parse. On `10.1098/rsos.250979` (72 pages), lattice was parsing 72 of 160 pages and consuming
+about 83% of Camelot's time. Above `LATTICE_FULL_SCAN_MAX_PAGES` (40), lattice now reads only pages
+that carry a Table caption; the cut is on the input, not the clock, so a given PDF always gets the
+same result regardless of machine load. Announced as `lattice_scope:<read>/<total>` in `method` and
+`camelot_lattice_limited_to_caption_pages` in `fallbacks`. At or below 40 pages the code path is
+unchanged.
+
+- Measured on rsos.250979: lattice page-parses fall from 72 to 16; all 16 delivered tables are
+  byte-identical, including ids.
+- `camelot_all_flavors_failed` no longer fires when both flavors simply return nothing on a page
+  with a text layer (an ordinary Camelot miss on a text PDF); it fires only behind an exception, or
+  when the document itself has no text layer at all.
+
+### Column crops now cut only through space no glyph occupies
+
+pdftotext keeps a glyph in an `-x/-y/-W/-H` crop whenever its advance box touches the crop
+boundary, so the column corrector's previous cut at the detector midline could duplicate a glyph
+it crossed; 2.4.145's character guard correctly refused such a page but then dropped the
+reordering entirely. The cut is now placed through one helper that finds an integer x no body word
+reaches, reading any row that crosses it as a full-width band above or below the columns.
+
+- Measured over 601 papers (500 random, seed 20260923, plus the 101-paper corpus): 146 pages are
+  now column-corrected, versus 103 before; every one is character-identical to raw pdftotext, none
+  lost, no other page changed. Reading order of all 56 changed pages was checked against the
+  rasterized page.
+- `10.1001/jamanetworkopen.2023.39337` p1 and `10.1109/access.2024.3358206` p14 are now
+  column-corrected; on the jamanetworkopen page, adjacent-line inversions against the AI
+  reading-order gold fall from 10 to 4.
+- Reading order on 43 more pages changes across the 601-paper sample than the prior arm; a consumer
+  notice for this is still owed (tracked as `d-21727e`).
+
+### Tooling and test-support
+
+- `tools/diag` scans can be run against a chosen copy of the library (`--specimen <path|git-ref>`,
+  repeatable) and in parallel (`--workers N`); every run prints the path it actually imported for
+  each arm and refuses to run if that path differs from the request. First adopter:
+  `a3_comma_lookahead_scan.py`. No library behaviour change.
+- The ESCIcheck regression papers (22 papers, previously read from a retired local PDF folder) now
+  resolve by DOI through the article custodian; a paper missing from custody now FAILS instead of
+  silently skipping. Corpus manifest grows from 102 to 124 papers.
+- Four load-flaky perf tests (`test_docx_extraction_under_1s`, `test_cli_structured`, and two
+  import-probe timeouts) now budget CPU seconds instead of wall-clock seconds, so they no longer
+  fail on a saturated machine that is simply queuing the process rather than running it slowly. The
+  CLI subprocess check keeps its 600s wall ceiling for the case where it is legitimately waiting on
+  `pdftotext` (bounded at 120s internally).
+- `scripts/verify_corpus.py --paper <DOI>` previously reported a skip reason (PDF drift, no PDF, no
+  baseline) and still exited 0 with nothing compared; it now prints "RESULT NOT COMPARED" and exits
+  1. Its debug-dump options no longer write extracted publication text into the repo's `tmp/`;
+  they write under the system temp directory.
+- `render.py`'s `removed_lines` telemetry now matches a surviving duplicate caption case-insensitively.
+  A case-only difference (`FIGURE 9.` vs `Figure 9.`) between a removed inline copy and its
+  surviving copy had been reported as a deleted statistic on `10.1109/access.2025.3645087`; after
+  the fix, `render_deletion_scan.py` reports 0 deletions across 28/28 papers.
+
+## [2.4.146] - 2026-09-28 - normalization 1.9.69 - table extraction 2.4.17
+
+**Public-repository cleanup. Nothing in the extraction pipeline changes: extracted,
+normalized and rendered text are byte-identical to 2.4.145.** This release also ships the README and API-reference rewrite
+(below). It removes internal references (private directory layouts, internal project and folder names, and
+citations of internal notes by file path) from code, comments, tests and documentation.
+
+### Changed — test support: every local location comes from an environment variable
+
+There is no default location for anything the test and gate code reads from the local
+machine. Three variables, one resolver each in `docpluck/testing/_root.py`:
+
+| variable | what it points at | unset |
+|---|---|---|
+| `ARTICLE_REPOSITORY` | the article repository (papers, by DOI) | one test fails and names the variable; every other paper-backed test skips with that reason |
+| `ARTICLE_FINDER_HOME` | the article-finder tool directory | the tests that call it skip |
+| `DOCPLUCK_SKILLS_DIR` | the maintainer's gate-skill directory (canary list) | the tests that read it skip |
+
+New public helpers: `docpluck.testing.article_finder_home()`, `project_skills_dir()`,
+`tool_problem()`. Machine-local configs (`tests/corpora.local.json`,
+`scripts/harness/sources.local.json`, `DOCPLUCK_LOCAL_CORPORA`, `DOCPLUCK_HARNESS_SOURCES`)
+must now give ABSOLUTE paths; a relative one raises instead of being joined onto a fixed
+root. `DOCPLUCK_HARNESS_SOURCES` entries are now `name|dir|glob|format` (a Windows path
+contains `:`). The harness scratch output defaults to the system temp directory.
+`tools/diag/docx_grid_integrity_scan.py --wide DIR` takes the directory to walk.
+
+**With `ARTICLE_REPOSITORY` unset, one test fails on purpose**
+(`test_corpus_manifest.py::test_the_custodian_is_reachable`), so a run that read no paper
+never reads as green; the other paper-backed tests are reported as skipped, not failed.
+
+### Changed — repository contents
+
+`CLAUDE.md` and `LESSONS.md` are no longer tracked (maintainer files; kept locally).
+`tests/test_public_repo_hygiene.py::test_no_internal_reference_in_tracked_files` fails on
+any reappearance of the removed references, in path and quoted-segment form, with planted
+positive and clean negative controls.
+
+### Documentation
+
+- The GitHub/PyPI `README.md` is now the full landing page: purpose and scientific basis,
+  install (extras and system programs), a quickstart that is executed by the docs gate, every
+  feature, the complete CLI, environment variables, output formats, limitations and how to
+  cite. `pyproject.toml` now publishes this file to PyPI (it published `docs/README.md`).
+- `docs/README.md` is now the API reference: the 15 previously undocumented public
+  functions (`extract_pdf_file`, `extract_pdf_layout`, `extract_docx_structured`,
+  `render_pdf_to_markdown`, `extract_to_dir`, ...), every parameter, and field-by-field
+  tables for every output type.
+- Corrected three stale claims: Ghostscript is not required (Camelot rasterizes through
+  pypdfium2); `extract_pdf` no longer falls back to pdfplumber for undecodable glyphs (retired
+  in 2.4.145, docstrings still said otherwise); `garbled` needs corroborating evidence, not
+  only a low common-word ratio.
+- New `CITATION.cff` and `CONTRIBUTING.md`.
+- New gate `scripts/check_docs_coverage.py` (pinned two-sided by
+  `tests/test_docs_coverage_gate.py`): fails when any public name, parameter, output field,
+  enum value, CLI option, environment variable or extra is missing from the docs, when the
+  changelog/citation versions disagree, or when the README quickstart does not run.
+
+### Changed — test support: the article repository is found through `ARTICLE_REPOSITORY` only
+
+`docpluck.testing` no longer falls back to a fixed directory under the home directory when
+`ARTICLE_REPOSITORY` is unset. The fallback published one machine's layout in the package
+that ships to PyPI. An unset or wrong variable is not silent:
+`tests/test_corpus_manifest.py::test_the_custodian_is_reachable` fails and names the cause,
+using the new `root_problem()`. Fourteen tests and diagnostic tools rebuilt the path
+themselves, two of them by counting parent directories up from the test file, which pointed
+elsewhere in any other checkout and skipped there silently. They now use the new
+`custody_path(*parts)`. `tests/test_article_repository_is_env_only.py` pins both changes.
+**Anyone running the corpus-backed suite must set `ARTICLE_REPOSITORY`.** Nothing in the
+extraction pipeline changes.
 
 ## [2.4.145] - 2026-09-25 - normalization 1.9.69 - table extraction 2.4.17
 
@@ -377,122 +676,6 @@ The whole-corpus harness check `table_parity` now counts captioned tables
 against `### Table` headings and candidates against their own heading. Before
 this it failed on every paper with a candidate (208 cells, each explained
 exactly by the candidate count), which buried the render deletion above.
-**Removed an unwired figure detector; no output changes.** `docpluck/figures/detect.py`
-(`find_figures`) had no production caller since 2026-05-09 — `extract_pdf_structured` builds
-every figure from its caption instead — and it carried a stale second copy of the table
-caption locator and of the caption chart-data trim. Measured before deleting, on four test
-papers (`find_figures` vs the live path): Nature figure-only **0 vs 5**, `efendic_2022_affect`
-**0 vs 5**, `jama_open_3` **0 vs 2**, `chan_feldman_2025_cogemo` **11 vs 10** — the extra one a
-second "Figure 10" on p13 whose caption line it could not locate, so it emitted its hard-coded
-placeholder box `(50, 100, width-50, 300)` as though measured. Wiring it in would have put
-invented geometry into a public field. No
-known downstream consumer imports it (searched for `find_figures` / `figures.detect`). Its chart-data-trim unit tests now run against the live copy
-(`tests/test_caption_chart_data_trim.py`, all passing unchanged). The `Figure` type now says
-in its docstring that `bbox` is **not computed** and is always `(0.0, 0.0, 0.0, 0.0)`,
-meaning "unknown" — it was always zeros, but nothing said so.
-## [Unreleased] - table extraction 2.4.17
-
-### A machine that runs out of memory no longer changes the tables silently
-
-**What a consumer will see change:**
-
-- **On a healthy machine, nothing.** Same tables, same `method`, same `fallbacks`.
-- **Under memory or disk pressure that passes, the tables are now the normal ones.**
-  `fallbacks` gains `resource_retry` (one per retried call); `method` is unchanged.
-- **Under pressure that does not pass, the result is labelled.** `fallbacks` gains
-  `resource_exhausted` (detail = the step that degraded) and `method` ends in
-  `+incomplete:resource_exhausted`. Before, such a result had fewer or different
-  tables under a `method` byte-identical to a healthy run's.
-- `table_extraction_version` moves **2.4.16 -> 2.4.17**, because the stored `method`
-  string can now differ.
-
-**What happened.** The 2026-09-24 release A/B ran 135 papers through the service at
-three normalization levels. Tables do not depend on the level, yet 7-8 papers gave
-different `tables.json` across the three runs of the same PDF (e.g.
-10.15626/mp.2022.3108: page-10 tables from the region pass in one run, from auto-detect
-in another; 10.1038/s41598-023-50588-1: Table 4 "isolated" vs "structured"). 19 tests
-had been skipped under pytest-xdist for the same reason ("non-deterministic under
-parallel load").
-
-**It was memory, not CPU load, and not threads.** Measured, in order:
-
-- 12 simultaneous processes on 10.15626/mp.2022.3108 gave 12 byte-identical results.
-  CPU contention alone changes nothing.
-- The machine was out of commit ("the paging file is too small"; 3 MB of virtual
-  memory available, later 145 MB free on C:). A per-process memory cap (a Windows Job
-  Object, touching no other process) reproduces the variance on demand:
-  10.1038/s41598-023-50588-1 gives different tables at 700 MB and the normal ones at
-  1000 and 1500 MB; 10.1038/s41598-023-50460-2 loses its lattice tables at 640 and
-  680 MB and is normal at 720 and 760 MB, 2 runs each. In every degraded run `method`
-  was identical to the healthy one.
-- The failing step is Camelot's lattice pass: it rasterises each page and thresholds
-  it with OpenCV, which raises `cv2.error (-4: Insufficient memory)`.
-  `extract_tables_camelot` recorded `camelot_lattice_exception` and carried on with
-  the stream reading of every ruled table. The region-driven pass does the same per
-  page (`camelot_region_exception` -> `continue`), and a full disk does it one step
-  earlier (`OSError [Errno 28]` writing the temp PDF).
-
-**The fix** (`docpluck/resources.py`, new):
-
-- `is_resource_exhaustion(exc)` separates "the machine ran out" from "the document
-  failed", keyed on the error CODES the libraries define (`MemoryError`; `OSError`
-  ENOSPC/ENOMEM/EMFILE/ENFILE; Windows 8/14/112/1450/1455; `cv2.error` with
-  `code == cv2.Error.StsNoMem`), never on message text, and walks the
-  `__cause__`/`__context__` chain.
-- `call_with_resource_retry` wraps all four `camelot.read_pdf` calls: 4 attempts,
-  `gc.collect()` between them, 1/2/4 s backoff. It retries only exhaustion; a
-  document-caused exception propagates on the first attempt.
-- `record_fallback` now checks the exception being handled. If it is exhaustion, it
-  also records `resource_exhausted`. That covers every catch site in every channel at
-  once, including ones not written yet. `extract_pdf_structured` then labels `method`.
-- `note_if_exhausted` covers the handlers that record LATER, outside the `except`, where
-  the in-flight exception is already gone: `cell_geometry` (per table and per cell) and
-  `_camelot_flavor`. Found by a Sonnet review (tier 2: one provider, so a second model
-  rather than an independent vendor); an AST scan of the library then showed these
-  three were the only silent broad handlers on the table path (17 library-wide; the
-  rest are version probing, batch/CLI wrappers and temp-file cleanup).
-
-**What was verified, two-sided, on 10.1038/s41598-023-50460-2** (5 paired rounds, the
-pre-fix tree at ce7414d and the fixed tree run concurrently in each round; memory capped
-at 640 MB per process and lifted to 2500 MB right after the first Camelot failure, so the
-shortage ends as it does when another process frees memory):
-
-| arm | tables fingerprint | `method` | runs |
-|---|---|---|---|
-| pre-fix, pressure | `61da0d` (lattice tables lost) | unchanged from healthy | 5/5 |
-| fixed, pressure | `f67a82` (the healthy output), `resource_retry: 1` | unchanged | 5/5 |
-| both, no cap | `f67a82` | unchanged | 1/1 each |
-
-Under a cap that is never lifted, the fixed tree gives the same reduced tables as before,
-but now says so: `method` ends `+incomplete:resource_exhausted` and `fallbacks` carries
-`resource_exhausted` (10.1038/s41598-023-50588-1 at 700 MB). New tests:
-`tests/test_resource_exhaustion_is_never_silent.py` (23; the three end-to-end tests inject
-the failure into `camelot.read_pdf` on 10.1371/journal.pmed.1004323).
-
-The 19 `_skip_under_xdist` markers are removed
-(`test_rc_t_degenerate_table_real_pdf.py` x8, `test_rc_t_layer2_raw_text_real_pdf.py`
-x5, `test_tables_flatten_blank_header_recovery.py` x4,
-`test_tables_superheader_alignment_real_pdf.py` x2). Measured with the four files under
-`pytest -n 6`, each run inside one Windows job whose total memory is capped (workers
-inherit it):
-
-| job cap | pre-fix (markers removed) | fixed |
-|---|---|---|
-| 7000 MB (peak use ~4.9 GB, cap never reached) | 60 passed | 60 passed |
-| 3500 MB (below what 6 workers need at once) | 55 passed, 5 **worker crashes** | 53 passed, 7 **worker crashes** |
-
-So the markers were about memory, not parallelism. With enough memory, both trees pass
-in parallel. Under a shortage that never ends, no retry can help: in both trees every
-failure was a worker process crashing (`node down: Not properly terminated`), and none
-was a test getting quietly different tables. A crash turns the run red, so nothing
-wrong passes. What the fix adds is for the shortage that passes, which is the service's
-case: shown above, 5/5 retried to the normal output.
-
-**Not fixed here, and why:** at a 680 MB cap one run of the pre-fix code died with a
-native segmentation fault. A crash inside compiled code cannot be caught from Python,
-so the caller gets an error, not a wrong table. It was not traced to the service: the
-A/B's two failed requests for corpus paper `nature/nat_comms_3` (a timeout and a
-`ConnectionResetError`) look like it but were not reproduced.
 
 ## [2.4.144] - 2026-09-23 - normalization 1.9.68 - table extraction 2.4.16
 

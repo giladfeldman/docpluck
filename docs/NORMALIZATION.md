@@ -475,6 +475,7 @@ consumers, not bookkeeping:
 | W0m | `β` extracted as `b`, proven by the layout font | **TYPOGRAPHIC** | the coefficient value is part of the identity |
 | W0p | a superscript footnote marker fused into a number (`2,5801`) | **TYPOGRAPHIC** | font size + baseline. Emits caret notation (`2,580^1`) — lossless, never deletion |
 | **W0q** | a CI upper bound whose minus is DETACHED (`[-0.58,  -  0.18]`) | **TYPOGRAPHIC** | new in v2.4.134 |
+| **W0s** | `=` / minus drawn by an operator-only font whose map says `5` / `2` (`t 5 20.63`) | **TYPOGRAPHIC, two origins** | declared font repertoire AND the rasterized glyph (a bar); both must agree, per word. New in v2.4.147; step key `W0s_operator_glyph_layout` |
 
 ### W0q — detached CI-upper minus (new in v2.4.134)
 
@@ -510,6 +511,9 @@ key is no longer emitted; the function is kept unwired as evidence.
 ```
 extract_pdf()
     ↓
+W0s operator glyph labelled as a digit (`5` for `=`, `2` for minus)  ← new v2.4.147;
+    runs FIRST, layout-gated; fires only where the declared font AND the
+    rasterized glyph (a bar) agree, else passes through and counts the refusal
 normalize_text(text, NormalizationLevel.academic)
     ↓
 C0  Line-final BACKSPACE strip   ← pre-S0, before F0 (see the pre-S0 table)
