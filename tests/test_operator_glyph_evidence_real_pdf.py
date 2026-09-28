@@ -121,3 +121,46 @@ def test_sci_rep_fraction_digits_are_not_proven_operators():
     pdf = require_corpus_pdf("nature/sci_rep_2.pdf")  # 10.1038/s41598-023-50588-1
     ev = extract_pdf_layout(pdf.read_bytes()).glyph_evidence
     assert ev is not None and ev.proven == {}
+
+
+# ── a raster failure: the evidence is missing, so nothing is corrected ──
+
+def _amj_layout():
+    from docpluck.extract_layout import extract_pdf_layout
+
+    pdf = require_corpus_pdf("aom/amj_1.pdf")
+    return extract_pdf_layout(pdf.read_bytes())
+
+
+def test_a_healthy_run_records_no_raster_failure():
+    # Control for the forced-failure test below: on a machine where pdftoppm
+    # works, no pair is unresolved BECAUSE rasterizing failed.
+    ev = _amj_layout().glyph_evidence
+    assert ev is not None and ev.proven
+    assert not [r for r in ev.unresolved.values() if r.startswith("raster_failed:")]
+
+
+def test_a_raster_failure_leaves_the_text_exactly_as_declared(monkeypatch):
+    """`pdftoppm` present but failing on the page: the rendered-ink signal is
+    missing, so W0s has one origin, not two, and must not fire -- the sentence
+    goes out as the file declares it, and the failure is named per pair."""
+    import docpluck.glyph_evidence as ge
+    from docpluck.normalize import NormalizationLevel, normalize_text
+
+    def _fail(*_a, **_k):
+        raise OSError("forced raster failure")
+
+    monkeypatch.setattr(ge, "_raster_shape", _fail)
+    layout = _amj_layout()
+    ev = layout.glyph_evidence
+    assert ev is not None
+    assert ev.proven == {}
+    reasons = {code: ev.unresolved.get((font, code)) for (font, code) in ev.unresolved}
+    assert reasons["2"] == "raster_failed:OSError"
+    assert reasons["5"] == "raster_failed:OSError"
+
+    declared = "(b 5 20.04, SE 5 0.06, t 5 20.63, p 5 .528)"
+    assert ge.apply_to_document_text(declared, layout) == (declared, 0, 0)
+    out, report = normalize_text(declared, NormalizationLevel.academic, layout=layout)
+    assert "W0s_operator_glyph_layout" not in report.steps_changed
+    assert "t 5 20.63" in out
