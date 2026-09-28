@@ -179,7 +179,10 @@ def _planted_tree(dst: Path) -> Path:
     planted = {
         "tools/planted_probe.py": "x = 1\n",
         "scripts/harness/planted_probe.py": "x = 1\n",
-        "CLAUDE.md": "planted\n",
+        # A root-level note. Not CLAUDE.md: since 2.4.146 .gitignore excludes that
+        # file, and hatchling honours .gitignore, so it could not reach the archive
+        # under either config and the control would prove nothing.
+        "PLANTED_NOTES.md": "planted\n",
         "docpluck/planted_notes.md": "planted\n",
     }
     for rel, body in planted.items():
@@ -210,5 +213,5 @@ def test_control_the_old_config_would_have_failed(tmp_path):
 
     bad = sdist_violations(_sdist_rel_names(_build("sdist", src, tmp_path / "out")))
     for rel in ("tools/planted_probe.py", "scripts/harness/planted_probe.py",
-                "CLAUDE.md", "docpluck/planted_notes.md"):
+                "PLANTED_NOTES.md", "docpluck/planted_notes.md"):
         assert rel in bad, f"{rel} was not flagged; flagged: {bad}"

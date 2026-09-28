@@ -45,7 +45,7 @@ all 9,988 PDFs in the article repository (110 carry U+FFFD):
 - `docpluck.normalize.recover_fffd_comparison_operators` is removed.
 - The three text channels now agree: the structured table-cell output never ran S5b.
 
-Record: communications/DECISION_2026-09-25_s5a_s5b_fffd_rewrites.md.
+Decided by the maintainer 2026-09-25.
 ### A CI upper bound is no longer given a minus sign the page does not print
 
 **What a consumer will see change:** a confidence interval printed as `r = -.43 [-0.52, 0.33]`

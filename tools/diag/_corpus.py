@@ -526,7 +526,8 @@ def add_specimen_arguments(parser) -> None:
     parser.add_argument(
         "--json", action="store_true",
         help="also write one JSON record per arm under "
-             "$VIBE_ROOT/_artifacts/docpluck-diag/<scan>/ (never inside the repo).",
+             "$DOCPLUCK_DIAG_OUT/<scan>/, default <system temp>/docpluck-diag/<scan>/ "
+             "(never inside the repo).",
     )
 
 
@@ -589,26 +590,21 @@ def run_arms(fn, items, requests: list[str] | None = None, workers: int = 1) -> 
 
 
 def artifact_path(scan: str, arm: Arm) -> Path:
-    """Where ``--json`` output goes: ``$VIBE_ROOT/_artifacts/docpluck-diag/<scan>/``.
+    """Where ``--json`` output goes: ``$DOCPLUCK_DIAG_OUT/<scan>/``, else
+    ``<system temp>/docpluck-diag/<scan>/``.
 
     Never inside this repository -- the records carry article text (context
     snippets), which lives only with the custodian or in scratch output outside
     any repo. ``DOCPLUCK_DIAG_OUT`` overrides the directory; an override inside
-    the repo is refused, and a missing VIBE_ROOT fails loudly.
+    the repo is refused. The default is the system temp directory, like the
+    harness scratch output -- there is no fixed machine-local root.
     """
     import datetime as _dt
 
+    import tempfile
+
     override = os.environ.get("DOCPLUCK_DIAG_OUT")
-    if override:
-        base = Path(override)
-    else:
-        vibe = Path(os.environ.get("VIBE_ROOT") or (Path.home() / "Vibe"))
-        if not vibe.is_dir():
-            raise CorpusUnavailable(
-                f"FATAL: VIBE_ROOT {vibe} does not exist, so there is nowhere outside "
-                "the repository to write the record. Set VIBE_ROOT or DOCPLUCK_DIAG_OUT."
-            )
-        base = vibe / "_artifacts" / "docpluck-diag"
+    base = Path(override) if override else Path(tempfile.gettempdir()) / "docpluck-diag"
     base = base.resolve()
     if _is_within(base, Path(_REPO_ROOT)):
         raise CorpusUnavailable(

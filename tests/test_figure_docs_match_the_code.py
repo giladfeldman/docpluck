@@ -33,6 +33,9 @@ from docpluck.tables.captions import CaptionMatch
 
 _REPO = Path(__file__).resolve().parents[1]
 _DOCS = ("CLAUDE.md", "LESSONS.md", "docs/DESIGN.md")
+# Maintainer files, untracked since 2.4.146: checked where they exist (the
+# maintainer's checkout), skipped in a clean clone. docs/DESIGN.md must exist.
+_LOCAL_ONLY = {"CLAUDE.md", "LESSONS.md"}
 
 _FIGURE_ROW = re.compile(r"^\|\s*(?:\*\*)?Figures\b|`figures/`", re.IGNORECASE)
 
@@ -66,6 +69,8 @@ def test_production_figure_bbox_is_the_uncomputed_placeholder():
 
 @pytest.mark.parametrize("rel", _DOCS)
 def test_every_figures_row_says_the_bbox_is_not_computed(rel):
+    if rel in _LOCAL_ONLY and not (_REPO / rel).is_file():
+        pytest.skip(f"{rel} is a maintainer file, not tracked in this repository")
     rows = _figure_rows(rel)
     assert rows, f"{rel}: found no architecture-table row describing figures -- the control failed"
     stale = [r for r in rows if "not computed" not in r.lower()]

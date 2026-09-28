@@ -32,6 +32,31 @@ import sys
 import time
 from pathlib import Path
 
+# THE REPO ROOT MUST GO ON sys.path FIRST, AND THE REASON IS A MEASURED DEFECT.
+# Python puts the SCRIPT'S OWN DIRECTORY at sys.path[0], not the cwd. This file
+# lives in tools/, so `py -3 tools/render_for_audit.py` put `tools/` first and
+# `import docpluck` fell through to site-packages — the INSTALLED RELEASE — while
+# the banner above says "render through docpluck HEAD" and canary-audit.sh
+# prints "rendering at HEAD (<sha>)".
+#
+# Measured 2026-08-29 on 10.1001/jamanetworkopen.2023.39337:
+#     installed 2.4.137  -> 10 stray running-head copies   59,991 chars
+#     working tree 2.4.138 ->  0 stray running-head copies  59,256 chars
+# The canary reported the release's defect as though it were the tree's, and the
+# tree's repair was invisible to it. Every canary verdict taken this way scored
+# the wrong artifact while naming the right sha.
+#
+# `python -c "import docpluck"` does NOT reproduce it — `-c` puts the cwd on the
+# path and resolves the tree. Only a SCRIPT FILE shows the difference, which is
+# why this survived: the obvious check measured a different thing.
+_REPO_ROOT = str(Path(__file__).resolve().parents[1])
+#
+# It sits HERE, above every module-level exit: with ARTICLE_FINDER_HOME unset the
+# script exits a few lines below, and a guard placed after that exit never ran
+# (the import probe then resolved site-packages; measured 2026-09-28).
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 # --- argparse first so --help works even if docpluck import fails ----------
 
 parser = argparse.ArgumentParser(
@@ -120,26 +145,6 @@ def sha256_bytes(b: bytes) -> str:
 
 # --- render through docpluck HEAD -----------------------------------------
 #
-# THE REPO ROOT MUST GO ON sys.path FIRST, AND THE REASON IS A MEASURED DEFECT.
-# Python puts the SCRIPT'S OWN DIRECTORY at sys.path[0], not the cwd. This file
-# lives in tools/, so `py -3 tools/render_for_audit.py` put `tools/` first and
-# `import docpluck` fell through to site-packages — the INSTALLED RELEASE — while
-# the banner above says "render through docpluck HEAD" and canary-audit.sh
-# prints "rendering at HEAD (<sha>)".
-#
-# Measured 2026-08-29 on 10.1001/jamanetworkopen.2023.39337:
-#     installed 2.4.137  -> 10 stray running-head copies   59,991 chars
-#     working tree 2.4.138 ->  0 stray running-head copies  59,256 chars
-# The canary reported the release's defect as though it were the tree's, and the
-# tree's repair was invisible to it. Every canary verdict taken this way scored
-# the wrong artifact while naming the right sha.
-#
-# `python -c "import docpluck"` does NOT reproduce it — `-c` puts the cwd on the
-# path and resolves the tree. Only a SCRIPT FILE shows the difference, which is
-# why this survived: the obvious check measured a different thing.
-_REPO_ROOT = str(Path(__file__).resolve().parents[1])
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
 
 try:
     import docpluck  # noqa: E402

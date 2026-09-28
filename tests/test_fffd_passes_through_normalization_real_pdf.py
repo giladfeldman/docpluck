@@ -21,7 +21,7 @@ the blank bracket before the DOI became ``<=`` or ``>=``; the rasterized page
 prints nothing there. A further 199 ``<U+FFFD>N`` sites in 92 papers were one
 ``>=`` away from the same fallback, and on the page they are as often an
 asterisk or an equals sign (``n = 100`` in 10.1287/mnsc.2023.03556) as an
-operator. Record: communications/DECISION_2026-09-25_s5a_s5b_fffd_rewrites.md.
+operator. Decided by the maintainer 2026-09-25.
 
 Every input below is a shape S5a/S5b used to rewrite. Each must now come out
 still carrying its U+FFFD and with no comparison operator invented beside it.

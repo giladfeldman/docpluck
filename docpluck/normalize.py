@@ -5770,8 +5770,8 @@ def recover_pua_glyphs(text: str) -> str:
 # fired 20 times in 6 papers: 15 correct, all in one paper (10.1371/journal.pmed.1004323),
 # and 5 wrong -- a HAL cover page's blank bracket before a DOI became `<=` / `>=`, via a
 # fallback that copied whichever operator the document used elsewhere. S5a never fired.
-# U+FFFD now passes through and is counted (quality `n_replacement_chars`). Record:
-# communications/DECISION_2026-09-25_s5a_s5b_fffd_rewrites.md.
+# U+FFFD now passes through and is counted (quality `n_replacement_chars`).
+# Decided by the maintainer 2026-09-25.
 
 
 def normalize_text(
