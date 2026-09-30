@@ -1794,7 +1794,13 @@ def _caption_text_from_column(
             # (``Class Class Class Class``, 12.5 pt below the title's last line).
             bottom = max(float(c.get("bottom", top_key)) for c in col_chars)
             height = bottom - top_key
-            if out_lines and prev_bottom is not None and top_key - prev_bottom > 0.6 * height:
+            # Except after a label printed ALONE on its line: `Table 3`, a gap,
+            # then the title (10.15626/mp.2022.3108 p7) is one caption.
+            if (
+                out_lines and prev_bottom is not None
+                and top_key - prev_bottom > 0.6 * height
+                and not _accumulated_is_label_only(" ".join(out_lines))
+            ):
                 break
             prev_bottom = bottom
             if out_lines and _COLUMN_CAPTION_STOP_RE.match(line):

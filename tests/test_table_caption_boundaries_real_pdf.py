@@ -107,3 +107,12 @@ def test_ieee_access_8_table2_caption_stops_at_the_blank_band():
     # sits 12.5 pt below the title's last line, with nothing between.
     r = extract_pdf_structured(require_corpus_pdf("ieee/ieee_access_8.pdf").read_bytes())
     assert _table(r, "Table 2")["caption"].endswith("during training for datasets used")
+
+
+def test_a_label_alone_on_its_line_keeps_its_title_across_the_gap():
+    # 10.15626/mp.2022.3108 p7: `Table 3`, a blank gap, then the title; Table 4
+    # sits beside it in the right column.
+    r = extract_pdf_structured(require_corpus_pdf("apa/chandrashekar_2023_mp.pdf").read_bytes())
+    assert _table(r, "Table 3")["caption"] == (
+        "Table 3 Study stimuli for the on conceptual replication of Johnson et al. (2002)"
+    )
