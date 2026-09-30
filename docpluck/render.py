@@ -5974,6 +5974,12 @@ def _rescue_title_from_layout(out: str, layout_doc: Optional[LayoutDoc]) -> str:
 _CAPTION_LINE_LOOKAHEAD = re.compile(r"\s+[A-Z]")
 
 
+# A bare section number on the LAST line of a section body: multi-level
+# (``5.4``, ``5.4.``) or single-level with its dot (``5.``). Not a bare integer,
+# which is far more often a page number or a cell value.
+_TRAILING_SECTION_NUMBER_RE = re.compile(r"\n[ \t]*(\d+(?:\.\d+){1,3}\.?|\d+\.)[ \t]*\Z")
+
+
 def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
     """Locate the char offset of a Table/Figure caption inside ``text``.
 
@@ -6214,12 +6220,25 @@ def _render_sections_to_markdown(
                 rest = body_text[len(heading_clean):]
                 if not rest or rest[0] in " \t\n:.;,":
                     body_text = rest.lstrip(" \t:.;,\n")
-        body_chunks: list[str] = [body_text]
         in_section = [
             (p_idx, kind, item)
             for p_idx, kind, item in placements
             if sec.char_start <= p_idx < sec.char_end and id(item) not in consumed
         ]
+        # A section body that ENDS with a bare section number (``5.4.``, ``5.``)
+        # carries the next heading's number, split from its title by pdftotext.
+        # Floats are appended at the end of the body, so without this they land
+        # between number and title and `_fold_orphan_*_numerals_into_headings`
+        # can no longer rejoin them (10.1017/jdm.2022.2: Figure 2 between
+        # ``5.4.`` and ``Discussion``). The number is moved after the floats;
+        # nothing is removed.
+        trailing_number = ""
+        if in_section:
+            m = _TRAILING_SECTION_NUMBER_RE.search(body_text)
+            if m:
+                trailing_number = m.group(1)
+                body_text = body_text[: m.start()].rstrip()
+        body_chunks: list[str] = [body_text]
         for p_idx, kind, item in in_section:
             consumed.add(id(item))
             label = item.get("label") or ("Table" if kind == "table" else "Figure")
@@ -6316,6 +6335,8 @@ def _render_sections_to_markdown(
                 body_chunks.append(f"\n### {label}\n")
                 if cap:
                     body_chunks.append(f"*{cap}*\n")
+        if trailing_number:
+            body_chunks.append(f"\n{trailing_number}")
         out_chunks.append("\n".join(body_chunks))
         out_chunks.append("\n\n")
 

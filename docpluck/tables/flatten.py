@@ -1899,9 +1899,16 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     # caption + footnote) — used to type a recovered estimate column (e.g.
     # a blank "d or dz [95% CI]" column ⇒ key `d`). Header text on the column
     # itself still wins; this only fills in when the column header is blank.
+    # The caption plus the header-like lines printed right below it: until
+    # 2026-09-28 the second rode inside the first (a lowercase `p` stopped the
+    # caption trim), and blank-column role recovery depends on it
+    # (10.1525/collabra.90203 Tables 8 and 9). Same input, now labelled.
+    cap_vocab = " ".join(
+        s for s in (table.get("caption"), table.get("header_text_below_caption")) if s
+    ) or None
     vocab_all = " ".join(
         [" ".join(hr) for hr in header_rows]
-        + [table.get("caption") or "", table.get("footnote") or ""]
+        + [cap_vocab or "", table.get("footnote") or ""]
     )
     effect_hint = _effect_type_for(vocab_all)
 
@@ -1917,7 +1924,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
             header,
             body,
             packed,
-            caption=table.get("caption"),
+            caption=cap_vocab,
             footnote=table.get("footnote"),
             vocab_all=vocab_all,
             effect_hint=effect_hint,
@@ -1936,7 +1943,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
             lbl_col = _table_label_col(data_rows, n_cols0)
             recovered = _recover_blank_roles(
                 header, data_rows, lbl_col,
-                table.get("caption"), table.get("footnote"),
+                cap_vocab, table.get("footnote"),
                 extra_vocab=vocab_all,
             )
             roles_override = recovered or None

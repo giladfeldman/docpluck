@@ -122,6 +122,10 @@ class Table(TypedDict):
     # None when there is no grid. Set at the structured-extraction exit by
     # `tables.render.sync_header_rows`, never guessed per capture path.
     header_rows: Optional[int]
+    # The header-like lines the text channel prints directly after the caption's
+    # title (column labels such as `F p BF01 95% CI`), kept because the grid may
+    # not have captured them. PDF only; None elsewhere or when there are none.
+    header_text_below_caption: Optional[str]
     cells: list[Cell]
     html: Optional[str]
     raw_text: str

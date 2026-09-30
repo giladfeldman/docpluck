@@ -871,6 +871,18 @@ def _extract_pdf_structured(
     except Exception as exc:   # never let a diagnostic break extraction
         record_fallback("symbol_font_scan_exception", detail=type(exc).__name__)
 
+    # The printed column-header lines that sit right after each table caption's
+    # title (see `_header_text_below_caption`) -- retained, never dropped.
+    cap_by_key = {
+        (c.label, c.page): c for c in captions if c.kind == "table"
+    }
+    for t in tables:
+        c = cap_by_key.get((t.get("label"), t.get("page")))
+        t["header_text_below_caption"] = (
+            _header_text_below_caption(rejoined, c, next_boundary_by_id.get(id(c)))
+            if c is not None else None
+        )
+
     return {
         "text": text_out,
         "method": "+".join(method_pieces),
@@ -2334,6 +2346,8 @@ def _caption_span(
     raw_text: str,
     cap: CaptionMatch,
     next_boundary: int | None = None,
+    *,
+    lone_symbols: bool = True,
 ) -> tuple[int, int, bool]:
     """Where the caption's text lies in ``raw_text``: ``(start, end,
     stopped_at_break)``. Split out of ``_extract_caption_text`` (2026-09-25) so
@@ -2419,10 +2433,46 @@ def _caption_span(
     # (>=3 consecutive header-like short lines) before flattening.
     if cap.kind == "table":
         region = raw_text[start:hard_end]
-        trimmed = _trim_table_caption_at_cell_region(region)
+        trimmed = _trim_table_caption_at_cell_region(region, lone_symbols=lone_symbols)
         if len(trimmed) < len(region):
             hard_end = start + len(trimmed)
     return start, hard_end, stopped_at_break
+
+
+def _header_text_below_caption(
+    raw_text: str,
+    cap: CaptionMatch,
+    next_boundary: int | None = None,
+) -> Optional[str]:
+    """Statistic column labels the caption USED to swallow, kept as their own field.
+
+    Until 2026-09-28 a lone lowercase statistic symbol on its own line (``p``)
+    stopped the caption's cell-run trim, so the table's printed column labels
+    rode inside the caption (10.1525/collabra.90203 Table 8: ``... Explicit
+    Learning F p``), and ``flatten_table`` recovered blank column roles from
+    them. The caption no longer carries them; when the grid also missed its
+    header row they would reach no field at all -- a deletion of printed text.
+
+    Exactly the text the trim now removes that it did not remove before
+    (the span between the two caption ends), reduced to its leading run of
+    statistic labels in ``flatten``'s own vocabulary (``_caption_token_role``),
+    so data values and row labels never land here. ``None`` when the caption
+    is unchanged by the fix or the span holds no statistic label.
+    """
+    if cap is None or cap.kind != "table":
+        return None
+    from .tables.flatten import _caption_token_role
+
+    new_end = _caption_span(raw_text, cap, next_boundary)[1]
+    old_end = _caption_span(raw_text, cap, next_boundary, lone_symbols=False)[1]
+    if old_end <= new_end:
+        return None
+    run: list[str] = []
+    for tok in raw_text[new_end:old_end].split():
+        if _caption_token_role(tok) is None and tok not in ("CI",):
+            break
+        run.append(tok)
+    return " ".join(run) if run else None
 
 
 def _caption_text_from_span(
@@ -2666,7 +2716,7 @@ _LONE_STAT_SYMBOL_RE = re.compile(
 )
 
 
-def _is_table_header_like_short_line(line: str) -> bool:
+def _is_table_header_like_short_line(line: str, *, lone_symbols: bool = True) -> bool:
     """True if ``line`` looks like a table column header or linearized
     cell token rather than a caption title (or a wrapped title line).
 
@@ -2691,7 +2741,7 @@ def _is_table_header_like_short_line(line: str) -> bool:
     # detector can't cut a real title.
     if len(words) > 3 or len(s) > 35:
         return False
-    if _LONE_STAT_SYMBOL_RE.fullmatch(s):
+    if lone_symbols and _LONE_STAT_SYMBOL_RE.fullmatch(s):
         return True
     # Lowercase-leading short line → grammatical title continuation.
     if s[0].islower():
@@ -2702,7 +2752,7 @@ def _is_table_header_like_short_line(line: str) -> bool:
     return True
 
 
-def _trim_table_caption_at_cell_region(region: str) -> str:
+def _trim_table_caption_at_cell_region(region: str, *, lone_symbols: bool = True) -> str:
     """Trim a raw TABLE caption region at the start of linearized cell content.
 
     pdftotext linearizes a table's cells as a run of short one-per-line
@@ -2756,7 +2806,8 @@ def _trim_table_caption_at_cell_region(region: str) -> str:
         and len(nonblank) >= 4
         and len(first.split()) >= 4
         and all(
-            _is_table_header_like_short_line(ln) for _, ln in nonblank[1:4]
+            _is_table_header_like_short_line(ln, lone_symbols=lone_symbols)
+            for _, ln in nonblank[1:4]
         )
     ):
         cut_line_idx = nonblank[1][0]
@@ -2768,7 +2819,10 @@ def _trim_table_caption_at_cell_region(region: str) -> str:
     # protected — the run can only start at the 3rd non-blank line.
     for j in range(2, len(nonblank) - 2):
         window = nonblank[j:j + 3]
-        if all(_is_table_header_like_short_line(ln) for _, ln in window):
+        if all(
+            _is_table_header_like_short_line(ln, lone_symbols=lone_symbols)
+            for _, ln in window
+        ):
             cut_line_idx = window[0][0]
             return "\n".join(lines[:cut_line_idx])
     return region
