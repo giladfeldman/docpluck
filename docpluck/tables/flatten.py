@@ -228,13 +228,38 @@ def _declared_header_rows(table: Table) -> int | None:
     mammoth's `<th>`, which mammoth sets from `w:tblHeader` alone, so a table
     with no `is_header` cell declared nothing and gets `None` here. Measured over
     the 19 DOCX in custody: 57 of 122 tables declare, 65 do not.
+
+    READ FROM THE CELLS, NOT FROM `header_rows` (2026-09-28). `header_rows` now
+    states the split the html used (`tables.render.sync_header_rows`), which is
+    counted AFTER the super-header fold. Fed back here as the ceiling it cut the
+    header to its folded size and pushed the second declared header row into
+    the body: measured on 66 real DOCX manuscripts, 9 of 415 tables gained a
+    spurious data row. The cells carry the declaration itself -- the DOCX path
+    sets `is_header` from mammoth's `<th>` -- so the count is rebuilt the way
+    `docx_tables._header_row_count` built it: leading rows whose every non-empty
+    cell is a header cell, capped at 3. A table with flagged cells but no fully
+    flagged leading row keeps the old ceiling of 1 (the former `n_header or 1`).
     """
     if (table.get("rendering") or "") != "markup":
         return None
-    if not any(c.get("is_header") for c in (table.get("cells") or ())):
+    cells = table.get("cells") or ()
+    if not any(c.get("is_header") for c in cells):
         return None
-    declared = int(table.get("header_rows") or 0)
-    return declared if declared >= 1 else None
+    rows: dict[int, list] = {}
+    for c in cells:
+        rows.setdefault(int(c.get("r", 0)), []).append(c)
+    declared = 0
+    for r in sorted(rows):
+        row = rows[r]
+        if r == declared and any(c.get("is_header") for c in row) and all(
+            c.get("is_header") or not (c.get("text") or "").strip() for c in row
+        ):
+            declared += 1
+            if declared >= 3:
+                break
+        else:
+            break
+    return declared or 1
 
 
 # ── Column-role classification ──────────────────────────────────────────────

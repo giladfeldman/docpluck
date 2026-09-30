@@ -1719,10 +1719,12 @@ def _column_lines(page_obj, col_x0: float, col_x1: float) -> list[tuple[float, l
     rebuilt as ``Table 1 α Summary of ... Cronbach's for ...`` and the header
     row's ``α`` (top 86.4 against 87.7) was read as one more caption line.
 
-    A char joins the current line when at least half its own height overlaps
-    the line's vertical extent. Consecutive printed lines never overlap by half
-    a glyph height (that would need leading below half the font size), so lines
-    cannot chain into each other.
+    A char joins the current line when the vertical overlap is at least half
+    the SMALLER of the char's height and the line's extent -- so a raised
+    superscript that opened the line still admits the full-size glyphs of its
+    own line (review 2026-09-28: a 6.5 pt superscript 2 pt above a 10 pt line
+    overlaps it by 4.5 pt, under half the 10 pt glyph). Consecutive printed
+    lines do not overlap at all under ordinary leading, so they cannot chain.
     """
     chars = [
         c for c in (page_obj.chars or ())
@@ -1737,7 +1739,7 @@ def _column_lines(page_obj, col_x0: float, col_x1: float) -> list[tuple[float, l
         if lines:
             cur = lines[-1]
             overlap = min(bottom, cur[1]) - max(top, cur[0])
-            if overlap >= 0.5 * height:
+            if overlap >= 0.5 * min(height, cur[1] - cur[0]):
                 cur[1] = max(cur[1], bottom)
                 cur[2].append(c)
                 continue
@@ -1777,8 +1779,15 @@ def _caption_text_from_column(
         ctop = cb[1]
         out_lines: list[str] = []
         prev_bottom: float | None = None
+        line_height = 0.0
+        min_gap: float | None = None
         for top_key, col_chars in _column_lines(page_obj, col_x0, col_x1):
-            if top_key < ctop - 1.0:
+            bottom = max(float(c.get("bottom", top_key)) for c in col_chars)
+            # Skip lines ABOVE the caption by their vertical CENTRE: a raised
+            # glyph (superscript marker, symbol-font subset) pulls a line's top
+            # above the caption line's own top, and a top test would drop the
+            # caption's first line (review 2026-09-28).
+            if (top_key + bottom) / 2.0 < ctop:
                 continue
             line = _join_chars_with_spaces(col_chars).strip()
             if not line:
@@ -1792,16 +1801,24 @@ def _caption_text_from_column(
             # OTHER page column happened to print a line inside it. Without this,
             # 10.48550/arxiv.2410.21901 Table 2 absorbed its header row
             # (``Class Class Class Class``, 12.5 pt below the title's last line).
-            bottom = max(float(c.get("bottom", top_key)) for c in col_chars)
-            height = bottom - top_key
+            # The band is judged against the caption's OWN spacing, so a
+            # double-spaced caption (author manuscripts: gaps of ~1 line height)
+            # is not cut after its first line: a gap ends the caption when it
+            # exceeds 1.2 line heights (the tallest line seen) AND 1.5x the
+            # smallest gap already inside the caption.
+            line_height = max(line_height, bottom - top_key)
+            gap = top_key - prev_bottom if prev_bottom is not None else None
             # Except after a label printed ALONE on its line: `Table 3`, a gap,
             # then the title (10.15626/mp.2022.3108 p7) is one caption.
+            label_only = _accumulated_is_label_only(" ".join(out_lines))
             if (
-                out_lines and prev_bottom is not None
-                and top_key - prev_bottom > 0.6 * height
-                and not _accumulated_is_label_only(" ".join(out_lines))
+                out_lines and gap is not None and not label_only
+                and gap > 1.2 * line_height
+                and (min_gap is None or gap > 1.5 * max(min_gap, 0.0))
             ):
                 break
+            if gap is not None and out_lines and not label_only:
+                min_gap = gap if min_gap is None else min(min_gap, gap)
             prev_bottom = bottom
             if out_lines and _COLUMN_CAPTION_STOP_RE.match(line):
                 break  # body / cell content begins

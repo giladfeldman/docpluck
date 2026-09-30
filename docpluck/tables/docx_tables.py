@@ -456,6 +456,10 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
             "content_status": content_status_for(cells, "\n".join("\t".join(r) for r in grid.rows)),
         })
 
+    # This function is public; its callers get the same honest `header_rows`
+    # as `extract_docx_structured` does.
+    from .render import sync_header_rows
+    sync_header_rows(tables)
     return tables, "mammoth"
 
 

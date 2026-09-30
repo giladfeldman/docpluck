@@ -63,8 +63,9 @@ def sync_header_rows(tables: list) -> None:
     for t in tables or ():
         n = header_rows_in_html(t.get("html"))
         if n is None:
-            if t.get("cells"):
-                t["header_rows"] = 0
+            # No html: 0 when there is a grid that rendered no table, None when
+            # there is no grid at all -- never a capture path's leftover guess.
+            t["header_rows"] = 0 if t.get("cells") else None
             continue
         t["header_rows"] = n
 
