@@ -1776,6 +1776,7 @@ def _caption_text_from_column(
             return None
         ctop = cb[1]
         out_lines: list[str] = []
+        prev_bottom: float | None = None
         for top_key, col_chars in _column_lines(page_obj, col_x0, col_x1):
             if top_key < ctop - 1.0:
                 continue
@@ -1784,6 +1785,18 @@ def _caption_text_from_column(
                 if out_lines:
                     break  # blank band after caption content → caption ends
                 continue
+            # A BLANK BAND ends the caption: a vertical gap of more than 60% of
+            # a line's height between this line and the last one. `_column_lines`
+            # yields only lines that have chars in THIS column, so the band must
+            # be measured -- the earlier round(top) keys saw it only when the
+            # OTHER page column happened to print a line inside it. Without this,
+            # 10.48550/arxiv.2410.21901 Table 2 absorbed its header row
+            # (``Class Class Class Class``, 12.5 pt below the title's last line).
+            bottom = max(float(c.get("bottom", top_key)) for c in col_chars)
+            height = bottom - top_key
+            if out_lines and prev_bottom is not None and top_key - prev_bottom > 0.6 * height:
+                break
+            prev_bottom = bottom
             if out_lines and _COLUMN_CAPTION_STOP_RE.match(line):
                 break  # body / cell content begins
             # A caption title line is continuous text; a GRID row splits the

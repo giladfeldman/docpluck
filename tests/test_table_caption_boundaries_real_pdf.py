@@ -100,3 +100,10 @@ def test_hurst_every_table_is_placed_in_the_body(hurst_bytes):
     assert "Tables (unlocated in body)" not in md
     # A wrapped caption keeps its hyphen and loses only the line break.
     assert "self- harm" not in md
+
+
+def test_ieee_access_8_table2_caption_stops_at_the_blank_band():
+    # 10.48550/arxiv.2410.21901 p5: the header row `Class Class Class Class`
+    # sits 12.5 pt below the title's last line, with nothing between.
+    r = extract_pdf_structured(require_corpus_pdf("ieee/ieee_access_8.pdf").read_bytes())
+    assert _table(r, "Table 2")["caption"].endswith("during training for datasets used")
