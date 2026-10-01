@@ -14,11 +14,12 @@ silently fall back to the existing pdfplumber path.
 
 from __future__ import annotations
 
+import functools
 import re
 import tempfile
 from typing import TYPE_CHECKING
 
-from docpluck.resources import call_with_resource_retry, note_if_exhausted
+from docpluck.resources import call_with_resource_retry, is_render_failure, note_if_exhausted
 from docpluck.tables import Cell, Table
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
@@ -27,6 +28,25 @@ from docpluck.tables.column_split import resplit_merged_columns
 from docpluck.tables.render import cells_to_html
 from docpluck.telemetry import record_fallback
 from docpluck.tempfiles import unlink_temp_pdf
+
+
+# The lattice raster comes from pdfium and nothing else (see the lattice call in
+# `extract_tables_camelot`). camelot-py 1.x/2.x accept both keywords and depend on
+# pypdfium2; the pyproject floor (>=0.11) predates them, so they are passed only
+# when this Camelot's Lattice parser declares them. Resolved on first use, so
+# importing docpluck never imports Camelot.
+@functools.lru_cache(maxsize=1)
+def _lattice_renderer_kwargs() -> tuple[tuple[str, object], ...]:
+    try:
+        import inspect
+
+        from camelot.parsers import Lattice
+        params = inspect.signature(Lattice.__init__).parameters
+    except Exception:  # noqa: BLE001 - no Camelot: the caller records that itself
+        return ()
+    if "backend" in params and "use_fallback" in params:
+        return (("backend", "pdfium"), ("use_fallback", False))
+    return ()
 
 # Patterns used to detect rows that look like running headers / page footers.
 # These are rows where the joined cell content matches one of:
@@ -972,6 +992,16 @@ def extract_tables_camelot(
                 # OpenCV -- the allocation that fails first under memory pressure
                 # (`cv2.error -4`, measured). Without the retry, a busy machine
                 # silently returned the stream reading of every ruled table.
+                #
+                # ONE RENDERER, AND A FAILED RENDER IS RETRIED (2026-10-01). Camelot
+                # rasterises with pdfium and, if that raises, silently re-renders
+                # the page with Ghostscript or Poppler -- a different raster, so
+                # possibly different ruled tables, with nothing in `method`. And
+                # pdfium reports a failed bitmap allocation as a plain
+                # `PdfiumError`, which the memory classifier cannot see. Pinned to
+                # pdfium with no fallback, a render failure raises here instead,
+                # is retried like a memory failure, and if it persists is named in
+                # `method` (`incomplete:camelot_lattice_exception`).
                 lattice_tables = call_with_resource_retry(
                     lambda: list(
                         camelot.read_pdf(
@@ -984,9 +1014,11 @@ def extract_tables_camelot(
                             strip_text="\n",
                             line_scale=40,
                             process_background=True,
+                            **dict(_lattice_renderer_kwargs()),
                         )
                     ),
                     what="camelot_lattice",
+                    retry_if=is_render_failure,
                 )
             except Exception as exc:
                 raised += 1

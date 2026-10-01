@@ -303,7 +303,18 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # 2026-09-27 on 10.1080/23743603.2021.1878340 p16 T4: the Latin-only, 95%-only
     # form left the column unclassified, which shifted the Original/Replication
     # arm boundary by one column and put the Replication F under Original.
-    ("est_ci", re.compile(r"[^\W\d_].*[\(\[]\s*\d{2}(?:\.\d)?\s*%?\s*C\.?\s*I", re.I)),
+    # The header can also JOIN the effect and the interval in words, with or
+    # without a level: "Cohen's d and CI", "d and 95% CI", "d & CI". Measured
+    # 2026-10-01 on 10.1177/01461672251327169 p11 Table 6, whose two
+    # "Cohen's d and CI" columns matched no role, so all 19 printed d values and
+    # their intervals reached consumers untyped. The joiner must sit between a
+    # leading word and a CI that ENDS the header, so "CI" alone, "Mean and SD"
+    # and an interval-only "95% CI" keep their roles.
+    ("est_ci", re.compile(
+        r"[^\W\d_].*[\(\[]\s*\d{2}(?:\.\d)?\s*%?\s*C\.?\s*I"
+        r"|^\s*[^\W\d_].*?\s(?:and|&|\+)\s+(?:\d{2}(?:\.\d)?\s*%\s*)?C\.?\s*I\.?\s*$",
+        re.I,
+    )),
     ("CI",    re.compile(r"^\s*(?:95\s*%?\s*)?CI(?:\s*\[?\s*lower\s*,?\s*upper\s*\]?)?\s*$", re.I)),
     ("CI_lo", re.compile(r"^\s*(?:lower|LL|lo|95\s*%?\s*lower)\s*$", re.I)),
     ("CI_hi", re.compile(r"^\s*(?:upper|UL|hi|95\s*%?\s*upper)\s*$", re.I)),
@@ -508,12 +519,38 @@ _CI_INLINE_RE = re.compile(
 )
 
 
+_SIGN_DASH_RE = re.compile(r"[–—]\s?(?=\.?\d)")
+
+
+def _fold_minus(s: str) -> str:
+    """Fold every glyph PRINTED AS A MINUS to an ASCII hyphen.
+
+    U+2212 always. An en or em dash only in SIGN position: directly before a
+    number and NOT after one. 10.1017/s1930297500009189 p.29 Table 17 prints
+    every minus as an en dash ("–1.44 [–2.17, –0.72]"), and the parsers below
+    read an en dash only as a range separator, so a typed column lost its signs
+    (d = 1.44, CI_lower = 0.02 for "[–0.02, 0.23]"). Between two numbers
+    ("-10.36–8.34", "0.20 – 0.38") the dash stays a range separator.
+    """
+    s = (s or "").replace("−", "-")
+    if "–" not in s and "—" not in s:
+        return s
+
+    def sign(m: re.Match) -> str:
+        before = s[: m.start()].rstrip()
+        if before and (before[-1].isdigit() or before[-1] in ".%)"):
+            return m.group(0)
+        return "-"
+
+    return _SIGN_DASH_RE.sub(sign, s)
+
+
 def _parse_number(s: str) -> Optional[float]:
     # Fold U+2212 MINUS SIGN → ASCII hyphen first (Camelot cells are NOT run
     # through normalize.py, so a negative test statistic / mean often arrives as
     # U+2212 and would otherwise fail the ASCII-only number regex — dropping a
     # valid negative value). Same fold the CI / signed-float parsers already do.
-    m = _NUM_RE.match((s or "").replace("−", "-"))
+    m = _NUM_RE.match(_fold_minus(s))
     if not m:
         return None
     try:
@@ -555,7 +592,7 @@ def _to_signed_float(s: str) -> Optional[float]:
     """First signed decimal in `s`, with U+2212 minus folded to ASCII."""
     if not s:
         return None
-    m = re.search(r"[-+]?\d*\.?\d+", s.replace("−", "-").replace("%", ""))
+    m = re.search(r"[-+]?\d*\.?\d+", _fold_minus(s).replace("%", ""))
     if not m:
         return None
     try:
@@ -648,7 +685,7 @@ def _parse_ci_cell(
     # (`_CI_INLINE_RE` + `float()`, ASCII-sign only) doesn't silently skip a
     # negative lower bound ("[−0.48, 0.15]" → must be (-0.48, 0.15), not
     # (0.48, 0.15)). The dash/hyphen branches already fold internally.
-    s = s.replace("−", "-")
+    s = _fold_minus(s)
     parens = _PAREN_RE.findall(s)
     for body in ([parens[-1]] if parens else []) + [s]:
         b = (body or "").strip().strip("[]")

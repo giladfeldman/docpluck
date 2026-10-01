@@ -281,7 +281,7 @@ def test_control_without_the_retry_the_same_fault_changes_the_tables(monkeypatch
         "the injected fault did not change the tables on this paper, so the "
         "retry test proves nothing here -- pick a paper where it does"
     )
-    assert degraded["method"].endswith("+" + INCOMPLETE_METHOD_PIECE)
+    assert INCOMPLETE_METHOD_PIECE in degraded["method"].split("+")
 
 
 def test_persistent_exhaustion_is_labelled_in_method(monkeypatch):
@@ -293,4 +293,4 @@ def test_persistent_exhaustion_is_labelled_in_method(monkeypatch):
     _fake_camelot_that_runs_out(monkeypatch, failures=resources.RETRY_ATTEMPTS)
     loaded = extract_pdf_structured(data)
     assert loaded["fallbacks"].get(RESOURCE_EXHAUSTED), loaded["fallbacks"]
-    assert loaded["method"].endswith("+" + INCOMPLETE_METHOD_PIECE), loaded["method"]
+    assert INCOMPLETE_METHOD_PIECE in loaded["method"].split("+"), loaded["method"]

@@ -132,7 +132,67 @@ def note_if_exhausted(exc: BaseException, *, where: str) -> None:
         record_fallback(RESOURCE_EXHAUSTED, detail=where)
 
 
-def call_with_resource_retry(fn: Callable[[], T], *, what: str) -> T:
+# A page render that failed and was retried (see :func:`is_render_failure`).
+RENDER_RETRY = "camelot_render_retry"
+
+
+def is_render_failure(exc: BaseException | None) -> bool:
+    """True if ``exc``, or anything in its chain, is a failure to RASTERISE a
+    page: pypdfium2's ``PdfiumError`` or Camelot's ``ImageConversionError``.
+
+    Measured 2026-10-01 (``tests/test_table_degradation_is_never_silent.py``):
+    when the allocation that fails under memory pressure is pdfium's page
+    bitmap, pypdfium2 raises a plain ``PdfiumError`` ("Failed to get bitmap
+    buffer") -- not a ``MemoryError`` -- so :func:`is_resource_exhaustion`
+    cannot see it, and the lattice pass was lost under a ``method`` identical to
+    a healthy run's. Keyed on the libraries' exception TYPES, looked up only if
+    already imported, never on message text.
+    """
+    types = tuple(
+        t for t in (
+            getattr(sys.modules.get("pypdfium2"), "PdfiumError", None),
+            getattr(sys.modules.get("camelot.backends.image_conversion"),
+                    "ImageConversionError", None),
+        ) if isinstance(t, type)
+    )
+    seen: set[int] = set()
+    while types and exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if isinstance(exc, types):
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
+def incomplete_method_pieces(counters: dict[str, int]) -> list[str]:
+    """The ``method`` pieces that say this result is not the full extraction.
+
+    * ``incomplete:resource_exhausted`` -- the machine ran out (kept as its own
+      piece: consumers match it literally).
+    * ``incomplete:<event>[,<event>...]`` -- every ``*_exception`` event the run
+      recorded. Each of those sites catches a failure and carries on with less
+      (a lost lattice pass, a skipped region), so the output differs from what
+      the same bytes give when the step succeeds. Until 2026-10-01 only the
+      resource-classified subset reached ``method``; a failure of any other
+      type changed the table set silently (ESCImate, 6 of 27 papers). Named
+      whatever the cause: a document-caused failure is stable run to run, so
+      its label is too.
+    """
+    pieces = []
+    if counters.get(RESOURCE_EXHAUSTED):
+        pieces.append(INCOMPLETE_METHOD_PIECE)
+    events = sorted(e for e, n in counters.items() if n and e.endswith("_exception"))
+    if events:
+        pieces.append("incomplete:" + ",".join(events))
+    return pieces
+
+
+def call_with_resource_retry(
+    fn: Callable[[], T],
+    *,
+    what: str,
+    retry_if: Callable[[BaseException], bool] | None = None,
+) -> T:
     """Call ``fn()``; if it fails for want of resources, release what we hold,
     wait, and try again, up to :data:`RETRY_ATTEMPTS` in total.
 
@@ -140,6 +200,11 @@ def call_with_resource_retry(fn: Callable[[], T], *, what: str) -> T:
     document-caused failure costs time and cannot change its answer. The last
     resource failure propagates too, so the caller's own handler still runs --
     and ``record_fallback`` in that handler records :data:`RESOURCE_EXHAUSTED`.
+
+    ``retry_if`` widens the retry to a further class a caller knows can be
+    transient (the lattice pass passes :func:`is_render_failure`), recorded as
+    :data:`RENDER_RETRY`. A document-caused one then costs the retries' time and
+    still propagates, to be named in ``method`` by the caller's handler.
 
     The wait can change latency, never output: every attempt runs the identical
     call on the identical input, and nothing is cut short when time runs out.
@@ -150,9 +215,14 @@ def call_with_resource_retry(fn: Callable[[], T], *, what: str) -> T:
         try:
             return fn()
         except Exception as exc:
-            if attempt >= RETRY_ATTEMPTS or not is_resource_exhaustion(exc):
+            if attempt >= RETRY_ATTEMPTS:
                 raise
-            record_fallback(RESOURCE_RETRY, detail=f"{what}:{type(exc).__name__}")
+            if is_resource_exhaustion(exc):
+                record_fallback(RESOURCE_RETRY, detail=f"{what}:{type(exc).__name__}")
+            elif retry_if is not None and retry_if(exc):
+                record_fallback(RENDER_RETRY, detail=f"{what}:{type(exc).__name__}")
+            else:
+                raise
         # Outside the handler, so the failed attempt's frames (which hold its
         # partial arrays and the traceback) are unreachable before collecting.
         gc.collect()

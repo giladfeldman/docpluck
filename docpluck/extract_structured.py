@@ -54,7 +54,7 @@ from .tables.captions import (
 )
 from .tables.render import cells_to_html, sync_header_rows
 from .tables.whitespace import grid_is_body_prose
-from .resources import INCOMPLETE_METHOD_PIECE, RESOURCE_EXHAUSTED
+from .resources import incomplete_method_pieces
 from .telemetry import fallback_scope, record_fallback
 
 
@@ -154,8 +154,11 @@ def extract_pdf_structured(
     # byte-identical to a healthy run's (measured, `docpluck/resources.py`).
     # Resource retries that SUCCEEDED do not reach here -- their output is the
     # quiet-machine output -- so this marks exactly the results that differ.
-    if fb.counters.get(RESOURCE_EXHAUSTED):
-        result["method"] = f"{result['method']}+{INCOMPLETE_METHOD_PIECE}"
+    # AND ANY OTHER CAUGHT FAILURE TOO (2026-10-01): a lattice pass lost to a
+    # pdfium render error was not resource-classified and changed 6 of
+    # ESCImate's 27 papers silently. See `incomplete_method_pieces`.
+    for piece in incomplete_method_pieces(fb.counters):
+        result["method"] = f"{result['method']}+{piece}"
     return result
 
 
