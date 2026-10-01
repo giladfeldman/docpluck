@@ -5974,10 +5974,37 @@ def _rescue_title_from_layout(out: str, layout_doc: Optional[LayoutDoc]) -> str:
 _CAPTION_LINE_LOOKAHEAD = re.compile(r"\s+[A-Z]")
 
 
-# A bare section number on the LAST line of a section body: multi-level
-# (``5.4``, ``5.4.``) or single-level with its dot (``5.``). Not a bare integer,
-# which is far more often a page number or a cell value.
-_TRAILING_SECTION_NUMBER_RE = re.compile(r"\n[ \t]*(\d+(?:\.\d+){1,3}\.?|\d+\.)[ \t]*\Z")
+# A bare MULTI-LEVEL section number (``5.4``, ``5.4.``) on the LAST line of a
+# section body. Single-level ``N.`` is NOT accepted on shape alone (it goes
+# through `_trailing_single_level_section_number`): census 2026-10-01 (125 papers,
+# each case checked against the page) found it promoting a running page number
+# (10.5334/irsp.945 ``43``), a sentence-final reference digit (10.1525/
+# collabra.57785 ``Table`` / ``8.``) and stray numerals into headings, while
+# every multi-level number it rejoined was printed with its heading.
+# Components are 1-2 digits and the first is non-zero, so a bare cell value
+# such as ``0.05`` never qualifies.
+_TRAILING_SECTION_NUMBER_RE = re.compile(r"\n[ \t]*([1-9]\d?(?:\.\d{1,2}){1,3}\.?)[ \t]*\Z")
+_TRAILING_SINGLE_LEVEL_NUMBER_RE = re.compile(r"\n[ \t]*([1-9]\d?)\.[ \t]*\Z")
+
+
+def _trailing_single_level_section_number(body_text: str, doc_text: str):
+    """A trailing single-level ``N.`` that the paper's own numbering vouches for.
+
+    Accepted only when the document prints a numbered SUBSECTION heading of
+    section N or of section N-1 (``3.1. Effect of condition`` vouches for a
+    trailing ``3.`` -- 10.1017/jdm.2023.15, where Table 1 otherwise splits
+    ``3.`` from ``Results``). A running page number (10.5334/irsp.945 ``43``),
+    a sentence-final reference digit (10.1525/collabra.57785 ``8.``) or a notes
+    item number (10.1177/19485506211056761 ``4.``) has no such subsection in a
+    paper whose headings are unnumbered, so it stays where pdftotext put it.
+    """
+    m = _TRAILING_SINGLE_LEVEL_NUMBER_RE.search(body_text)
+    if not m:
+        return None
+    n = int(m.group(1))
+    nums = "|".join(str(k) for k in (n, n - 1) if k >= 1)
+    sub = re.compile(r"(?m)^[ \t]*(?:#+ )?(?:" + nums + r")\.\d{1,2}\.?[ \t]+[A-Z][a-z]")
+    return m if sub.search(doc_text or "") else None
 
 
 def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
@@ -6225,7 +6252,7 @@ def _render_sections_to_markdown(
             for p_idx, kind, item in placements
             if sec.char_start <= p_idx < sec.char_end and id(item) not in consumed
         ]
-        # A section body that ENDS with a bare section number (``5.4.``, ``5.``)
+        # A section body that ENDS with a bare multi-level section number (``5.4.``)
         # carries the next heading's number, split from its title by pdftotext.
         # Floats are appended at the end of the body, so without this they land
         # between number and title and `_fold_orphan_*_numerals_into_headings`
@@ -6234,7 +6261,9 @@ def _render_sections_to_markdown(
         # nothing is removed.
         trailing_number = ""
         if in_section:
-            m = _TRAILING_SECTION_NUMBER_RE.search(body_text)
+            m = _TRAILING_SECTION_NUMBER_RE.search(body_text) or _trailing_single_level_section_number(
+                body_text, sectioned.normalized_text
+            )
             if m:
                 trailing_number = m.group(1)
                 body_text = body_text[: m.start()].rstrip()

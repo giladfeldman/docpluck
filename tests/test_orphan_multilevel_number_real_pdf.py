@@ -134,3 +134,35 @@ def test_orphan_multilevel_number_folded_in_render():
         "orphan multi-level number still stranded before a generic heading: "
         f"{md[leak.start():leak.start() + 48]!r}"
     )
+
+
+# ── The trailing-number move must not manufacture single-level headings ──
+#
+# `_render_sections_to_markdown` moves a section body's trailing bare number
+# after the floats it appends, so the multi-level folder can rejoin it with the
+# next heading. On single-level `N.` that move promoted text that is NOT a
+# section number into a heading (census 2026-10-01, 125 papers, every case
+# checked against the page):
+#   10.5334/irsp.945 p43       -- running page number `43` -> `## 43. Discussion`
+#   10.5334/irsp.946 p44       -- page number `31`         -> `## 31. References`
+#   10.1525/collabra.57785 p9  -- `... is in Table` / `8.` -> `## 8. Discussion`,
+#                                 pulling the digit out of its sentence
+#   10.1177/19485506211056761  -- a stray `4.`             -> `## 4. Author Contributions`
+# Every multi-level number the move rejoined was printed with its heading.
+
+def test_trailing_move_never_makes_a_page_number_a_heading():
+    for rel, bad in (
+        ("escicheck/xiao_2024_irsp.pdf", "## 43. Discussion"),
+        ("escicheck/chandrashekar_2024_irsp.pdf", "## 31. References"),
+        ("escicheck/chen_2023_collabra.pdf", "## 8. Discussion"),
+        ("apa/efendic_2022_affect.pdf", "## 4. Author Contributions"),
+    ):
+        md = render_pdf_to_markdown(require_corpus_pdf(rel).read_bytes())
+        assert bad not in md, f"{rel}: {bad!r} manufactured from a non-section number"
+
+
+def test_trailing_single_level_number_kept_when_the_paper_numbers_its_sections():
+    # 10.1017/jdm.2023.15 prints `3. Results` (with `3.1.` ... subsections);
+    # once Table 1 is placed at its caption it sits between `3.` and `Results`.
+    md = render_pdf_to_markdown(require_corpus_pdf("apa/jdm_.2023.15.pdf").read_bytes())
+    assert "## 3. Results" in md
