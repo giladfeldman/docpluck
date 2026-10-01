@@ -650,6 +650,7 @@ what `docpluck extract --structured` prints).
 | `whitespace` | `float \| None` | share of empty cells in the shipped grid, 0–100 |
 | `camelot_flavor` | `"stream"` \| `"lattice"` \| `None` | which Camelot parser won; `None` when not from Camelot |
 | `n_rows`, `n_cols`, `header_rows` | `int \| None` | grid dimensions; `header_rows` is how many rows the table's own `html` puts in `<thead>` (0 = no header row, `None` = no grid) |
+| `header_text_below_caption` | `str \| None` | the statistic column labels printed directly under the caption's title (e.g. `F p BF01 95% CI`), kept because the grid may have missed its header row; `None` when there are none, and always `None` on the DOCX path |
 | `cells` | `list[Cell]` | the grid |
 | `html` | `str \| None` | the table as HTML |
 | `raw_text` | `str` | the region's text as extracted |

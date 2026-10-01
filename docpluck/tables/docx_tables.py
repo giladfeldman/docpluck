@@ -434,6 +434,9 @@ def extract_tables_docx(docx_bytes: bytes) -> tuple[list[Table], str]:
             "n_rows": len(grid.rows),
             "n_cols": n_cols,
             "header_rows": n_header or 1,
+            # A PDF-text-channel field: a DOCX table declares its own header
+            # rows, so no column label can be stranded below the caption.
+            "header_text_below_caption": None,
             "cells": cells,
             # The SAME cleaning selection the cells were built with, and the
             # inferential CI repair off. Without both, `html` and

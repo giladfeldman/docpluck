@@ -42,6 +42,10 @@ def test_table_typed_dict_fields():
         # "not_captured:<reason>" (a real caption kept, its content not
         # captured: a rotated table, or only page furniture after the caption).
         "content_status",
+        # 2026-09-30: the statistic column labels printed right under the
+        # caption, which the caption used to swallow (collabra.90203 Table 8
+        # `F p`). PDF only; None on every other path.
+        "header_text_below_caption",
     }
     assert set(hints.keys()) == expected
 
