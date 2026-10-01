@@ -34,7 +34,7 @@ from docpluck.extract_structured import (
     extract_pdf_structured,
 )
 from docpluck.render import _locate_caption_anchor
-from docpluck.testing import require_corpus_pdf
+from docpluck.testing import CorpusPaperMissing, require_corpus_pdf
 
 from .conftest import pdf_available, pdf_path
 
@@ -80,7 +80,11 @@ def test_collabra_90203_table8_caption_stops_before_the_header_row():
 @pytest.fixture(scope="module")
 def hurst_bytes():
     if not pdf_available("articlerepo", _HURST):
-        pytest.skip("10.1016/j.evolhumbehav.2016.06.001 not held in the article repository")
+        # Fail, never skip: a missing paper must not read as a pass. conftest
+        # reports this as a skip ONLY when the repository itself is unconfigured.
+        raise CorpusPaperMissing(
+            "10.1016/j.evolhumbehav.2016.06.001 not held in the article repository"
+        )
     with open(pdf_path("articlerepo", _HURST), "rb") as fh:
         return fh.read()
 

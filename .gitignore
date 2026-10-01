@@ -46,6 +46,7 @@ FINDINGS_*
 TRIAGE_*
 TODO.md
 todo.md
+TODO-archive.md
 
 # --- Local convenience launcher (never public) ---
 # `start_app.bat` is a local shim that starts the application which wraps this

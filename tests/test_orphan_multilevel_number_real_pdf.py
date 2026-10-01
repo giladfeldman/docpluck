@@ -151,14 +151,16 @@ def test_orphan_multilevel_number_folded_in_render():
 # Every multi-level number the move rejoined was printed with its heading.
 
 def test_trailing_move_never_makes_a_page_number_a_heading():
-    for rel, bad in (
-        ("escicheck/xiao_2024_irsp.pdf", "## 43. Discussion"),
-        ("escicheck/chandrashekar_2024_irsp.pdf", "## 31. References"),
-        ("escicheck/chen_2023_collabra.pdf", "## 8. Discussion"),
-        ("apa/efendic_2022_affect.pdf", "## 4. Author Contributions"),
+    for rel, bad, real in (
+        ("escicheck/xiao_2024_irsp.pdf", "## 43. Discussion", "## Discussion"),
+        ("escicheck/chandrashekar_2024_irsp.pdf", "## 31. References", "## References"),
+        ("escicheck/chen_2023_collabra.pdf", "## 8. Discussion", "## Discussion"),
+        ("apa/efendic_2022_affect.pdf", "## 4. Author Contributions", "## Author Contributions"),
     ):
         md = render_pdf_to_markdown(require_corpus_pdf(rel).read_bytes())
         assert bad not in md, f"{rel}: {bad!r} manufactured from a non-section number"
+        # Presence, so the absence above cannot be satisfied by losing the section.
+        assert re.search(r"(?m)^" + re.escape(real) + r"$", md), f"{rel}: {real!r} heading lost"
 
 
 def test_trailing_single_level_number_kept_when_the_paper_numbers_its_sections():

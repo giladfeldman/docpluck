@@ -55,10 +55,11 @@ def sync_header_rows(tables: list) -> None:
     22 comparable PDF tables and 8 of 122 DOCX tables. Deriving it from the html
     at the one exit every path shares makes the field say what the output did.
 
-    On the DOCX path ``flatten._declared_header_rows`` reads this field as the
-    author's declared ceiling. The html split already applied that ceiling, so
-    the synced value is at most the declaration and at least what the heuristic
-    chose -- feeding it back as the ceiling yields the same split.
+    Nothing reads this field back as an input. ``flatten._declared_header_rows``
+    rebuilds the DOCX author's declaration from the cells' ``is_header`` flags
+    and must NOT be fed ``header_rows``: the synced value is counted after the
+    super-header fold, and feeding it back as the ceiling pushed a declared
+    header row into the body on 9 of 415 real DOCX tables (2026-09-28).
     """
     for t in tables or ():
         n = header_rows_in_html(t.get("html"))
