@@ -303,18 +303,10 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # 2026-09-27 on 10.1080/23743603.2021.1878340 p16 T4: the Latin-only, 95%-only
     # form left the column unclassified, which shifted the Original/Replication
     # arm boundary by one column and put the Replication F under Original.
-    # The header can also JOIN the effect and the interval in words, with or
-    # without a level: "Cohen's d and CI", "d and 95% CI", "d & CI". Measured
-    # 2026-10-01 on 10.1177/01461672251327169 p11 Table 6, whose two
-    # "Cohen's d and CI" columns matched no role, so all 19 printed d values and
-    # their intervals reached consumers untyped. The joiner must sit between a
-    # leading word and a CI that ENDS the header, so "CI" alone, "Mean and SD"
-    # and an interval-only "95% CI" keep their roles.
-    ("est_ci", re.compile(
-        r"[^\W\d_].*[\(\[]\s*\d{2}(?:\.\d)?\s*%?\s*C\.?\s*I"
-        r"|^\s*[^\W\d_].*?\s(?:and|&|\+)\s+(?:\d{2}(?:\.\d)?\s*%\s*)?C\.?\s*I\.?\s*$",
-        re.I,
-    )),
+    # (A header that JOINS an effect and its interval in words -- "Cohen's d
+    # and CI" -- is recognised in `_classify_column`, because it must also NAME
+    # an effect; see `_EFFECT_AND_CI_RE`.)
+    ("est_ci", re.compile(r"[^\W\d_].*[\(\[]\s*\d{2}(?:\.\d)?\s*%?\s*C\.?\s*I", re.I)),
     ("CI",    re.compile(r"^\s*(?:95\s*%?\s*)?CI(?:\s*\[?\s*lower\s*,?\s*upper\s*\]?)?\s*$", re.I)),
     ("CI_lo", re.compile(r"^\s*(?:lower|LL|lo|95\s*%?\s*lower)\s*$", re.I)),
     ("CI_hi", re.compile(r"^\s*(?:upper|UL|hi|95\s*%?\s*upper)\s*$", re.I)),
@@ -504,7 +496,27 @@ def _classify_column(header: str) -> Optional[str]:
     for role, pat in _ROLE_PATTERNS:
         if pat.match(h):
             return role
+    m = _EFFECT_AND_CI_RE.match(h)
+    if m and _names_an_effect(m.group(1)):
+        return "est_ci"
     return None
+
+
+# A header that JOINS an effect and its interval in words, with or without a
+# level: "Cohen's d and CI", "d and 95% CI", "Hedges' g and CI", "Original Effect
+# and CI". Measured 2026-10-01 on 10.1177/01461672251327169 p11 Table 6, whose two
+# "Cohen's d and CI" columns matched no role, so its d values and intervals
+# reached consumers untyped. The leading part must NAME an effect: a Sonnet
+# review the same day showed "M and CI" in a table with an F column would
+# otherwise be typed eta2 = <the mean> by the table-level effect hint.
+_EFFECT_AND_CI_RE = re.compile(
+    r"^\s*([^\W\d_].*?)\s+(?:and|&|\+)\s+(?:\d{2}(?:\.\d)?\s*%\s*)?C\.?\s*I\.?\s*$", re.I
+)
+_EFFECT_WORD_RE = re.compile(r"\beffects?\b|\bES\b", re.I)
+
+
+def _names_an_effect(lead: str) -> bool:
+    return _effect_type_for(lead) is not None or bool(_EFFECT_WORD_RE.search(lead))
 
 
 # ── Cell-value parsing ──────────────────────────────────────────────────────
@@ -519,28 +531,33 @@ _CI_INLINE_RE = re.compile(
 )
 
 
-_SIGN_DASH_RE = re.compile(r"[–—]\s?(?=\.?\d)")
+_SIGN_DASH_RE = re.compile(r"–(?=\.?\d)")
+# What may precede a minus: nothing (start of cell), an opening bracket, a list
+# or relation mark. A dash after a digit, a letter or a footnote marker is a
+# range or a separator, never a sign.
+_SIGN_CONTEXT = "[(,;:=<>±/"
 
 
 def _fold_minus(s: str) -> str:
     """Fold every glyph PRINTED AS A MINUS to an ASCII hyphen.
 
-    U+2212 always. An en or em dash only in SIGN position: directly before a
-    number and NOT after one. 10.1017/s1930297500009189 p.29 Table 17 prints
+    U+2212 always. An EN dash only in SIGN position: glued to the number that
+    follows it, at the start of the cell or after an opening bracket or a list /
+    relation mark (``_SIGN_CONTEXT``). 10.1017/s1930297500009189 p.29 Table 17 prints
     every minus as an en dash ("–1.44 [–2.17, –0.72]"), and the parsers below
     read an en dash only as a range separator, so a typed column lost its signs
     (d = 1.44, CI_lower = 0.02 for "[–0.02, 0.23]"). Between two numbers
-    ("-10.36–8.34", "0.20 – 0.38") the dash stays a range separator.
+    ("-10.36–8.34", "0.20 – 0.38", "0.20ᵃ–0.38") the dash stays a range
+    separator; an em dash ("— 0.35", a not-applicable placeholder) is never a
+    minus (Sonnet review, 2026-10-01).
     """
     s = (s or "").replace("−", "-")
-    if "–" not in s and "—" not in s:
+    if "–" not in s:
         return s
 
     def sign(m: re.Match) -> str:
         before = s[: m.start()].rstrip()
-        if before and (before[-1].isdigit() or before[-1] in ".%)"):
-            return m.group(0)
-        return "-"
+        return "-" if not before or before[-1] in _SIGN_CONTEXT else m.group(0)
 
     return _SIGN_DASH_RE.sub(sign, s)
 

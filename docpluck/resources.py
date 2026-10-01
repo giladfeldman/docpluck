@@ -62,6 +62,8 @@ RESOURCE_RETRY = "resource_retry"
 # What ``extract_pdf_structured`` appends to ``method`` when RESOURCE_EXHAUSTED
 # fired: the tables of this result are not the ones a quiet machine produces.
 INCOMPLETE_METHOD_PIECE = "incomplete:resource_exhausted"
+# Its partner in the `<stage>_failed` form the consumers classify as degraded.
+RESOURCES_FAILED_PIECE = "resources_failed:exhausted"
 
 _ERRNOS = frozenset({errno.ENOSPC, errno.ENOMEM, errno.EMFILE, errno.ENFILE})
 # Windows system error codes: ERROR_NOT_ENOUGH_MEMORY, ERROR_OUTOFMEMORY,
@@ -164,26 +166,37 @@ def is_render_failure(exc: BaseException | None) -> bool:
     return False
 
 
+# `*_exception` events whose site only REPORTS and changes no output, so they do
+# not make a result incomplete (Sonnet review, 2026-10-01).
+DIAGNOSTIC_ONLY_EVENTS = frozenset({"symbol_font_scan_exception"})
+
+
 def incomplete_method_pieces(counters: dict[str, int]) -> list[str]:
     """The ``method`` pieces that say this result is not the full extraction.
 
-    * ``incomplete:resource_exhausted`` -- the machine ran out (kept as its own
-      piece: consumers match it literally).
-    * ``incomplete:<event>[,<event>...]`` -- every ``*_exception`` event the run
-      recorded. Each of those sites catches a failure and carries on with less
-      (a lost lattice pass, a skipped region), so the output differs from what
-      the same bytes give when the step succeeds. Until 2026-10-01 only the
-      resource-classified subset reached ``method``; a failure of any other
-      type changed the table set silently (ESCImate, 6 of 27 papers). Named
-      whatever the cause: a document-caused failure is stable run to run, so
-      its label is too.
+    Written in the form the consumers already read: a ``+``-piece whose name
+    (before any ``:``) ends in ``_failed`` is "degraded" to ESCImate's table
+    guard and to Scimeto's parser; anything else reads as clean.
+
+    * ``<stage>_failed`` for every ``*_exception`` event the run recorded
+      (``camelot_lattice_exception`` -> ``camelot_lattice_failed``). Each of
+      those sites catches a failure and carries on with less (a lost lattice
+      pass, a skipped region), so the output differs from what the same bytes
+      give when the step succeeds. Until 2026-10-01 only the resource-classified
+      subset reached ``method``, and in a form the consumers read as clean;
+      ESCImate saw 6 of 27 papers change silently. Named whatever the cause: a
+      document-caused failure is stable run to run, so its label is too.
+    * ``incomplete:resource_exhausted`` (the literal 2.4.147 piece, kept) plus
+      ``resources_failed:exhausted`` when the machine ran out.
     """
     pieces = []
     if counters.get(RESOURCE_EXHAUSTED):
-        pieces.append(INCOMPLETE_METHOD_PIECE)
-    events = sorted(e for e, n in counters.items() if n and e.endswith("_exception"))
-    if events:
-        pieces.append("incomplete:" + ",".join(events))
+        pieces += [INCOMPLETE_METHOD_PIECE, RESOURCES_FAILED_PIECE]
+    pieces += [
+        e[: -len("_exception")] + "_failed"
+        for e in sorted(counters)
+        if counters[e] and e.endswith("_exception") and e not in DIAGNOSTIC_ONLY_EVENTS
+    ]
     return pieces
 
 

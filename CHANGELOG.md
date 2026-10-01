@@ -1,5 +1,53 @@
 # Changelog
 
+## [2.4.149] - 2026-10-01 - normalization 1.9.70 (unchanged) - table extraction 2.4.20
+
+Table output is now the same on a busy machine as on a quiet one, or says it is not; and two
+kinds of effect-size cell are typed correctly. Normalized text is unchanged.
+
+### A table pass that failed is named in `method`
+
+ESCImate ran 27 papers twice through a local service (v2.4.147) and 6 returned different table
+sets with nothing in `method` to say so. Reproduced: under memory pressure the ruled-table
+(Camelot lattice) pass is lost, and a run with a per-process memory cap gives exactly ESCImate's
+first-run numbers on all six (e.g. `10.1371/journal.pmed.1004323` 114 -> 103 flattened rows,
+`10.1525/collabra.77859` `region_pick:0+1` -> `1+0`). That path was labelled only when the failing
+allocation was OpenCV's. When it is pdfium's page bitmap, pypdfium2 raises a plain `PdfiumError`,
+which was not recognised as a memory failure; Camelot then either re-rendered the page with
+Ghostscript or Poppler (a different image, so possibly different ruled tables) or dropped the
+pass, and `method` stayed identical to a healthy run's.
+
+- Every `*_exception` event recorded during `extract_pdf_structured` is now named in `method` as
+  a `+<stage>_failed` piece (`camelot_lattice_exception` -> `camelot_lattice_failed`), whatever
+  its cause -- the form ESCImate's and Scimeto's table readers already read as
+  "degraded". On the 125-paper test manifest, 0 healthy runs carry one.
+- `+incomplete:resource_exhausted` (2.4.147) read as CLEAN to both of those readers, because it has
+  no `_failed` piece. It is kept, and now comes with `+resources_failed:exhausted`.
+- The lattice raster always comes from pdfium (`backend="pdfium", use_fallback=False`), and a
+  failed page render is retried like a memory failure (`camelot_render_retry` in `fallbacks`).
+- A failed glyph raster (`glyph_evidence`) is recorded as `glyph_raster_exception`.
+- On a healthy machine table output is unchanged: the library alone, serially, and the service
+  (3 runs, 2 concurrent requests) all gave byte-identical results on the six papers.
+
+### Effect-size columns headed "<effect> and CI"
+
+`10.1177/01461672251327169` Table 6 heads two columns "Cohen's d and CI" (`-1.00 [-1.10, -0.90]`).
+The combined estimate-and-interval rule required a bracketed level ("d [95% CI]"), so none of
+its d values or intervals were typed and ESCImate could not check the table's printed sign errors.
+A header that joins an effect and its interval in words now types the column, provided the
+leading part names an effect ("Cohen's d", "Hedges' g", "Effect"); "M and CI" does not.
+
+### An en dash printed as a minus keeps its sign
+
+`10.1017/s1930297500009189` (JDM 17(1)) prints every minus as an en dash. The table-row parser
+read an en dash only as a range separator, so `-1.44 [-2.17, -0.72]` became `d = 1.44` and
+Table 10's `[-0.21, 0.45]` became `CI_lower = 0.21`. An en dash glued to a number at the start of
+a cell or after `[ ( , ; : =` is now a minus; between two numbers it is still a range.
+
+Across the manifest, flatten output changes in 16 of 1,114 tables (8 papers; 59 rows gain or
+correct a typed value), each checked against the rendered page. The row label of a few rows that
+have no text label now follows the same rule as rows printed with a true minus.
+
 ## [2.4.148] - 2026-10-01 - normalization 1.9.70 (unchanged) - table extraction 2.4.19
 
 Table captions, `header_rows` and float placement. Normalized text is unchanged, so

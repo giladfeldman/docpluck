@@ -167,8 +167,10 @@ Batch runs get it per file in the `<stem>.json` sidecar.
 | `w0h_ambiguous_pairing_refused` / `w0m_…` | a repair was declined; the token is what the paper printed |
 | `camelot_table_*` / `region_grid_*` / `cells_grid_to_html_*` | a table or its rows were dropped by us |
 | `flatten_dropped_*` | a parsed statistic was dropped from the structured sidecar |
-| `resource_exhausted` | the MACHINE ran out of memory or disk and a step degraded because of it — this result is not the one a quiet machine gives for the same file. `method` also ends in `+incomplete:resource_exhausted`. Re-run it; do not archive it as the document's answer. The detail names the step that degraded |
+| `resource_exhausted` | the MACHINE ran out of memory or disk and a step degraded because of it — this result is not the one a quiet machine gives for the same file. `method` also carries the pieces `+incomplete:resource_exhausted` and (since 2.4.149) `+resources_failed:exhausted`. Re-run it; do not archive it as the document's answer. The detail names the step that degraded |
 | `resource_retry` | a step failed for want of memory/disk and was retried. On its own (no `resource_exhausted`) the retry succeeded and the output is the normal one |
+| any `*_exception` (`camelot_lattice_exception`, `camelot_region_exception`, `glyph_raster_exception`, ...) | a step FAILED and extraction carried on without it, so the tables are not the full extraction. Since 2.4.149 every such event is also named in `method` as a `+<stage>_failed` piece (`camelot_lattice_exception` -> `camelot_lattice_failed`), whatever the cause (a document failure repeats run to run; a machine failure does not). **Rule: a `method` with any piece whose name ends in `_failed` is not the full extraction.** On the 125-paper test manifest no healthy run carries one. `symbol_font_scan_exception` is excluded: that scan only reports |
+| `camelot_render_retry` | a page image for the ruled-table (lattice) pass failed to render and was retried. On its own the retry succeeded and the output is the normal one |
 
 Repairs are labelled by the **evidence** they rest on: *typographic* (something the renderer put on
 the page) is acted on; *inferential* (what a number ought to be) is properly your call, and where we
@@ -820,11 +822,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.148',            # docpluck itself
+# {'version': '2.4.149',            # docpluck itself
 #  'git_sha': '…',
 #  'normalize_version': '1.9.70',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
-#  'table_extraction_version': '2.4.19',
+#  'table_extraction_version': '2.4.20',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs

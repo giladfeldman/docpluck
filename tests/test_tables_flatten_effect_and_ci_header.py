@@ -38,12 +38,16 @@ def _table(rows):
 
 @pytest.mark.parametrize("header", [
     "Cohen’s d and CI", "Cohen's d and CI", "d and 95% CI", "d & CI", "Hedges' g and CI",
+    "Original Effect and CI", "Mean difference and CI",
 ])
 def test_effect_and_ci_header_is_a_combined_column(header):
     assert _classify_column(header) == "est_ci"
 
 
-@pytest.mark.parametrize("header", ["CI", "95% CI", "d", "Cohen’s d", "Interpretation", "Mean and SD"])
+# A joined header that names no EFFECT is not an effect column. Sonnet review
+# 2026-10-01: "M and CI" in a table with an F column was typed eta2 = 0.45 -- a mean.
+@pytest.mark.parametrize("header", ["CI", "95% CI", "d", "Cohen’s d", "Interpretation", "Mean and SD",
+                                    "M and CI", "n and CI", "Age and CI", "Mean and 95% CI", "Range and CI"])
 def test_other_headers_keep_their_role(header):
     assert _classify_column(header) != "est_ci"
 
@@ -99,7 +103,6 @@ def test_table6_real_pdf_carries_typed_d_and_ci():
     ("–1.44 [–2.17, –0.72]", -1.44, -2.17, -0.72),
     ("0.11 [–0.02, 0.23]", 0.11, -0.02, 0.23),
     ("–0.33 [–0.46, –0.20]", -0.33, -0.46, -0.20),
-    ("—0.65 [—0.79, —0.51]", -0.65, -0.79, -0.51),
 ])
 def test_dash_in_sign_position_is_a_minus(cell, d, lo, hi):
     rows = flatten_table(_table([["", "Cohen’s d and 95% CI"], ["Playing chess", cell]]))
@@ -130,3 +133,31 @@ def test_table17_real_pdf_keeps_en_dash_signs():
         pytest.approx(-0.46), pytest.approx(-0.20))
     assert by["Telling jokes"]["CI_lower"] == pytest.approx(-0.02)
     assert by["Using mouse"]["d"] == pytest.approx(1.18)
+
+
+def test_a_mean_and_ci_column_is_never_typed_as_an_effect():
+    # Sonnet review 2026-10-01, reproduced: eta2 = 0.45 from a mean.
+    rows = flatten_table(_table([
+        ["Condition", "M and CI", "F", "p"],
+        ["Control", "0.45 [0.30, 0.60]", "4.1", ".04"],
+    ]))
+    f = rows[0]["fields"]
+    assert "eta2" not in f and "d" not in f, f
+    assert f["F"] == pytest.approx(4.1)
+
+
+@pytest.mark.parametrize("cell,expected", [
+    ("— 0.35", None),          # em-dash "not applicable" placeholder beside a value
+    ("—0.35", None),           # em dash is never read as a minus
+])
+def test_a_placeholder_dash_is_not_a_minus(cell, expected):
+    from docpluck.tables.flatten import _parse_number
+
+    assert _parse_number(cell) == expected
+
+
+def test_a_range_after_a_footnote_marker_is_still_a_range():
+    from docpluck.tables.flatten import _parse_ci_cell
+
+    assert _parse_ci_cell("0.20ᵃ–0.38") == (0.20, 0.38)
+    assert _parse_ci_cell("[0.20* – 0.38]") == (0.20, 0.38)

@@ -114,9 +114,12 @@ def test_both_flavors_failing_is_named_in_the_method_string(paper_bytes, monkeyp
         f"so -- zero tables is indistinguishable from a paper that has none. "
         f"method={method}"
     )
-    assert "camelot_stream" not in method, (
+    # By PIECE: since 2.4.149 each failed parser is also named as a
+    # `camelot_stream_failed` piece, which says the opposite of `camelot_stream`.
+    assert "camelot_stream" not in method.split("+"), (
         f"method claims Camelot ran while both parsers were raising: {method}"
     )
+    assert "camelot_stream_failed" in method.split("+"), method
 
 
 def test_camelot_not_installed_is_named_too(paper_bytes, monkeypatch):

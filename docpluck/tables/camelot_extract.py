@@ -14,7 +14,6 @@ silently fall back to the existing pdfplumber path.
 
 from __future__ import annotations
 
-import functools
 import re
 import tempfile
 from typing import TYPE_CHECKING
@@ -34,19 +33,25 @@ from docpluck.tempfiles import unlink_temp_pdf
 # `extract_tables_camelot`). camelot-py 1.x/2.x accept both keywords and depend on
 # pypdfium2; the pyproject floor (>=0.11) predates them, so they are passed only
 # when this Camelot's Lattice parser declares them. Resolved on first use, so
-# importing docpluck never imports Camelot.
-@functools.lru_cache(maxsize=1)
-def _lattice_renderer_kwargs() -> tuple[tuple[str, object], ...]:
+# importing docpluck never imports Camelot, and cached only once it SUCCEEDS: a
+# probe that failed under memory pressure must not unpin lattice for the rest of
+# a long-lived process (Sonnet review, 2026-10-01).
+_LATTICE_RENDERER: dict[str, object] = {}
+
+
+def _lattice_renderer_kwargs() -> dict[str, object]:
+    if _LATTICE_RENDERER:
+        return dict(_LATTICE_RENDERER)
     try:
         import inspect
 
         from camelot.parsers import Lattice
         params = inspect.signature(Lattice.__init__).parameters
     except Exception:  # noqa: BLE001 - no Camelot: the caller records that itself
-        return ()
+        return {}
     if "backend" in params and "use_fallback" in params:
-        return (("backend", "pdfium"), ("use_fallback", False))
-    return ()
+        _LATTICE_RENDERER.update(backend="pdfium", use_fallback=False)
+    return dict(_LATTICE_RENDERER)
 
 # Patterns used to detect rows that look like running headers / page footers.
 # These are rows where the joined cell content matches one of:
@@ -1001,7 +1006,7 @@ def extract_tables_camelot(
                 # `PdfiumError`, which the memory classifier cannot see. Pinned to
                 # pdfium with no fallback, a render failure raises here instead,
                 # is retried like a memory failure, and if it persists is named in
-                # `method` (`incomplete:camelot_lattice_exception`).
+                # `method` (`camelot_lattice_failed`).
                 lattice_tables = call_with_resource_retry(
                     lambda: list(
                         camelot.read_pdf(
@@ -1014,7 +1019,7 @@ def extract_tables_camelot(
                             strip_text="\n",
                             line_scale=40,
                             process_background=True,
-                            **dict(_lattice_renderer_kwargs()),
+                            **_lattice_renderer_kwargs(),
                         )
                     ),
                     what="camelot_lattice",

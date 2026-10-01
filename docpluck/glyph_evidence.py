@@ -184,6 +184,17 @@ def classify_bar_shape(w: int, h: int, pixels: bytes) -> str | None:
     return None
 
 
+def _record_raster_failure(key: tuple[str, str], exc: BaseException) -> None:
+    """A glyph whose raster failed stays unresolved, so it is not repaired: the
+    output differs from a run where the raster worked. Recorded as an
+    ``*_exception`` event, which ``extract_pdf_structured`` names in ``method``
+    as ``glyph_raster_failed``
+    (Sonnet review, 2026-10-01: this site used to record nothing)."""
+    from .telemetry import record_fallback
+
+    record_fallback("glyph_raster_exception", detail=f"{key[0]}:{type(exc).__name__}")
+
+
 def _raster_shape(pdf_path: str, page: int, c: dict, workdir: str) -> str | None:
     scale = RASTER_DPI / 72.0
     x = int(float(c["x0"]) * scale)
@@ -241,6 +252,7 @@ def collect_glyph_evidence(pdf_bytes: bytes, layout: Any) -> GlyphEvidence:
                 except Exception as exc:  # noqa: BLE001 - evidence missing, not a crash
                     shapes.append(None)
                     ev.unresolved[key] = f"raster_failed:{type(exc).__name__}"
+                    _record_raster_failure(key, exc)
             if key in ev.unresolved:
                 continue
             if shapes and shapes[0] is not None and all(s == shapes[0] for s in shapes):
