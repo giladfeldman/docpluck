@@ -1,5 +1,62 @@
 # Changelog
 
+## [2.4.148] - 2026-10-01 - normalization 1.9.70 (unchanged) - table extraction 2.4.19
+
+Table captions, `header_rows` and float placement. Normalized text is unchanged, so
+`NORMALIZATION_VERSION` stays 1.9.70; stored table output changes, so
+`TABLE_EXTRACTION_VERSION` moves 2.4.18 -> 2.4.19. Measured on the 125-paper test manifest,
+v2.4.147 vs this release, after a base-vs-base control run showed zero run-to-run difference.
+
+**What a consumer must check first.** `Table["header_rows"]` changes meaning, captions get shorter,
+and one table loses four values that were wrong. A consumer notice with the before -> after tokens
+accompanies this release.
+
+### A table caption stops at its own header row
+
+Until now a lone statistic symbol on its own line (`p`) did not stop the caption, so the table's
+column labels rode inside it: `10.1525/collabra.90203` Table 8 was captioned `... Explicit Learning
+F p`. The caption now ends at the printed title. 16 of 1,114 manifest captions change, none for the
+worse; every removed word is still in the grid or in the new field below. Column-rebuilt captions
+group lines by vertical overlap, so a raised Greek glyph no longer lands on its own line
+(`10.1016/j.evolhumbehav.2016.06.001` Table 1: `Table 1 α Summary ... Cronbach's for ... HKSS. α`
+-> `Table 1 Summary ... Cronbach's α for ... HKSS.`), and a column caption ends at a measured blank
+band.
+
+**New field `Table["header_text_below_caption"]`** (`str | None`): the statistic column labels
+printed directly under the caption's title, kept because the grid may have missed its header row
+(collabra.90203 T8 `F p`, T9 `df F p BF01 95% CI`). `flatten_table` reads caption + this field, the
+same input it had before. `None` on the DOCX path and wherever there are none.
+
+### `header_rows` states the header split the html actually used
+
+`Table["header_rows"]` is now the number of rows the table's own `html` puts in `<thead>` (0 = no
+header row, `None` = no grid), on every path. Camelot used to write 1 regardless. 250 manifest
+tables change (1 -> 2: 159, 1 -> 3: 86, 0 -> 1..3: 5); field != thead went from 250 to 0. DOCX
+flatten output across 415 tables in 66 real manuscripts is identical to v2.4.147.
+
+### Four correlations that were means are no longer emitted
+
+`10.1037/pspp0000586` Table 9: v2.4.147's `flatten_table` emitted `r = 0.26, -0.47, 0.58, -0.85`
+for rows 5-8. On the printed page (p9, checked by two models) those are the rows' MEANS. The
+leaked caption text `Pearson's r p` had steered blank-column role recovery onto the M column. The
+rows now carry no `r` field.
+
+### Placement in the markdown
+
+The caption anchor decomposes ligatures (`coefﬁcients`), so tables and figures whose caption
+carried one now sit at their caption: tables in `## Tables (unlocated in body)` 196 -> 168,
+figures in `## Figures` 195 -> 189, none newly exiled. A trailing bare multi-level section number
+(`5.4.`) is moved after the floats appended to its section, so `### 5.4. Discussion` is still
+rejoined (`10.1017/jdm.2022.2`). A single-level `N.` is moved only when the paper prints a numbered
+subsection of N or N-1; without that guard a running page number became `## 43. Discussion`
+(`10.5334/irsp.945`) and the end of "...in Table 8." became `## 8. Discussion`
+(`10.1525/collabra.57785`). No numbered heading is lost relative to v2.4.147.
+
+### Tests
+
+The OMML real-manuscript DOCX checks fail instead of skip when a manuscript is missing, and
+locate it by content hash rather than by filename.
+
 ## [2.4.147] - 2026-09-28 - normalization 1.9.70 - table extraction 2.4.18
 
 Nineteen branches frozen since 2.4.145 (2.4.146 was a package-only release). Both normalized text and stored table
