@@ -78,17 +78,35 @@ _LINT_PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
 ]
 
 
+# A table's own numbered notes sit in the block printed under the table, which
+# opens with its "Note:" line or significance legend. FN is a footnote leaked
+# into PROSE, so a numbered line inside such a block is not one.
+# 10.1017/s1930297500009189 p469 Table 13: "2 See Table 9.2 ..." matches the
+# superscript on "Percentile estimate2" and sits under the table exactly as
+# rendered (page read 2026-10-02, confirmed by a second model); FN flagged it
+# every release since at least 2.4.126.
+_TABLE_NOTE_BLOCK_START = re.compile(
+    r"^\*?(?:Note[s]?\s*[.:]|[*∗†‡]+\s*p\s*[<≤=])", re.IGNORECASE
+)
+
+
 def lint_file(path: Path) -> list[tuple[int, str, str, str]]:
     """Return defects as (line_no, tag, description, line_text) tuples."""
     if not path.exists() or path.suffix != ".md":
         return []
     text = path.read_text(encoding="utf-8", errors="replace")
     defects: list[tuple[int, str, str, str]] = []
+    in_table_note_block = False
     for i, line in enumerate(text.split("\n"), start=1):
         stripped = line.strip()
         if not stripped:
+            in_table_note_block = False
             continue
+        if _TABLE_NOTE_BLOCK_START.match(stripped):
+            in_table_note_block = True
         for tag, pat, desc in _LINT_PATTERNS:
+            if tag == "FN" and in_table_note_block:
+                continue
             if pat.match(stripped):
                 defects.append((i, tag, desc, stripped[:120]))
                 break
