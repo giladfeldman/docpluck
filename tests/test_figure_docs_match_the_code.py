@@ -32,10 +32,12 @@ from docpluck.extract_structured import _figure_from_caption
 from docpluck.tables.captions import CaptionMatch
 
 _REPO = Path(__file__).resolve().parents[1]
-_DOCS = ("CLAUDE.md", "LESSONS.md", "docs/DESIGN.md")
-# Maintainer files, untracked since 2.4.146: checked where they exist (the
+# LESSONS.md left this list on 2026-10-02: it became a table-free index (no
+# architecture table left to check), so the control below failed on it by design.
+_DOCS = ("CLAUDE.md", "docs/DESIGN.md")
+# Maintainer file, untracked since 2.4.146: checked where it exists (the
 # maintainer's checkout), skipped in a clean clone. docs/DESIGN.md must exist.
-_LOCAL_ONLY = {"CLAUDE.md", "LESSONS.md"}
+_LOCAL_ONLY = {"CLAUDE.md"}
 
 _FIGURE_ROW = re.compile(r"^\|\s*(?:\*\*)?Figures\b|`figures/`", re.IGNORECASE)
 
