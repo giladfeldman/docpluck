@@ -57,7 +57,8 @@ Failure tags emitted (single-letter, easy to grep):
   D  = title has dropped/missing word(s) vs baseline (middle-of-title loss)
   S  = section count < expected
   H  = table missing html
-  C  = caption > 800 chars (boundary leak)
+  C  = a figure caption line holds a second caption start (boundary leak)
+  c  = a figure caption over 800 chars with no second label (WARN only)
   L  = output much shorter than baseline (<70%)
   J  = Jaccard < 0.6 (very different content)
 
@@ -328,6 +329,28 @@ _FIG_CAPTION_RE = re.compile(
     r"^\*Figure\s+\d+\.?\s+[^\n]*?\*\s*$",
     re.MULTILINE,
 )
+# Tag C (2026-10-02): a SECOND caption start inside one caption line -- the
+# Bug 4 leak itself (one figure's caption running into the next). It replaces
+# "caption > 800 chars", a length proxy that false-FAILed on 10.1038/
+# s41467-023-43885-w Fig. 5 (864 chars, correct against printed p7): Nature
+# legends are long by design. The second label must open a sentence and be
+# followed by a capitalised caption body, so "shown in Figure 3. The bars"
+# (an in-sentence reference) does not fire.
+# Most renders carry the label in a `### Figure N` heading and the caption on
+# the next line WITHOUT it (`*Mean ratings by condition.*`), which
+# _FIG_CAPTION_RE cannot see: on 2026-10-02 it read 14 of 116 figures in the
+# 28-paper corpus. This reads the caption line under every figure heading.
+_FIG_HEADING_CAPTION_RE = re.compile(
+    r"^###\s+Figure\s+\d+[^\n]*\n+(\*[^\n]+\*)[ \t]*$",
+    re.MULTILINE,
+)
+_SECOND_CAPTION_RE = re.compile(
+    # `|` is Nature's label separator ("Figure 2 | Survival ..."); a second
+    # label with no text after it ("Figure 1. Figure 2.") is a leak too; some
+    # journals print no separator at all ("Figure 2 Results of ...").
+    r"[.!?)\]]\s+(?:Figure|Fig\.|FIGURE|Table|TABLE)\s+\d+"
+    r"(?:\s*[.:|]\s*\*?\s*$|\s*[.:|]?\s+[A-Z])"
+)
 
 
 def _metrics(md: str) -> dict:
@@ -345,10 +368,15 @@ def _metrics(md: str) -> dict:
     table_html_blocks = _TABLE_HTML_RE.findall(md)
     # Caption length: longest "Figure N." caption stretch on a single line
     longest_fig_caption = 0
-    for m in _FIG_CAPTION_RE.finditer(md):
-        caption_text = m.group(0)
+    concatenated_captions = 0
+    caption_lines = {m.start(): m.group(0) for m in _FIG_CAPTION_RE.finditer(md)}
+    for m in _FIG_HEADING_CAPTION_RE.finditer(md):
+        caption_lines.setdefault(m.start(1), m.group(1))
+    for caption_text in caption_lines.values():
         if len(caption_text) > longest_fig_caption:
             longest_fig_caption = len(caption_text)
+        if _SECOND_CAPTION_RE.search(caption_text):
+            concatenated_captions += 1
 
     return {
         "title": title,
@@ -358,6 +386,7 @@ def _metrics(md: str) -> dict:
         "subsection_count": len(subsections),
         "table_html_count": len(table_html_blocks),
         "longest_fig_caption_chars": longest_fig_caption,
+        "concatenated_captions": concatenated_captions,
         "total_chars": len(md),
         "total_words": len(re.findall(r"\b[A-Za-z]+\b", md)),
     }
@@ -408,8 +437,12 @@ def _classify(name: str, md: str, spike_md: Optional[str]) -> tuple[str, dict, l
     table_heading_count = len(re.findall(r"^\s*###\s+Table\s+\d+", md, re.MULTILINE | re.IGNORECASE))
     if body_table_heading_count > 0 and m["table_html_count"] == 0:
         tags.append("H")
-    if m["longest_fig_caption_chars"] > 800:
+    if m["concatenated_captions"] > 0:
         tags.append("C")
+    elif m["longest_fig_caption_chars"] > 800:
+        # The old length rule, kept visible as a WARN: a caption that ran
+        # into body text (no second label) still shows up for a reader.
+        tags.append("c")
 
     char_ratio = None
     jaccard = None
@@ -431,7 +464,7 @@ def _classify(name: str, md: str, spike_md: Optional[str]) -> tuple[str, dict, l
 
     if not tags:
         status = "PASS"
-    elif set(tags) <= {"L"}:
+    elif set(tags) <= {"L", "c"}:
         status = "WARN"
     else:
         status = "FAIL"
@@ -546,7 +579,7 @@ def main() -> int:
     print(f"# Corpus verification — baseline {view}")
     print(f"# expected corpus: {len(expected)} papers (from article-finder, "
           f"not from a directory listing)")
-    print("# legend: T=title_truncated D=title_words_dropped S=few_sections H=missing_html C=caption_too_long L=much_shorter J=low_jaccard")
+    print("# legend: T=title_truncated D=title_words_dropped S=few_sections H=missing_html C=captions_concatenated c=caption_long(warn) L=much_shorter J=low_jaccard")
     print()
     print(f"{'STATUS':9} {'PAPER':40} {'TAGS':12} {'CHARS':>8} {'SECT':>5} {'TABS':>5} {'CAP':>6} {'RATIO':>6} {'JACC':>6}  TIME")
     print("-" * 113)
