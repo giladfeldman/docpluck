@@ -352,8 +352,16 @@ def check_glyph(out_dir: Path, fmt: str) -> dict:
     # "≥" signs) without introducing any.
     raw_p = out_dir / "raw.txt"
     if raw_p.is_file():
-        raw_after = set(_after_fffd(raw_p.read_text(encoding="utf-8", errors="replace")))
-        replacement = sum(1 for a in _after_fffd(text) if a not in raw_after)
+        raw_toks = _after_fffd(raw_p.read_text(encoding="utf-8", errors="replace"))
+        raw_after = {a for a in raw_toks if a}
+        # An empty token (U+FFFD then whitespace/markup) has no identity to match:
+        # exempt by COUNT, so one raw copy cannot excuse every rendered one
+        # (review 2026-10-03; tests/test_harness_glyph_check_fffd_attribution.py).
+        bare_allowed = sum(1 for a in raw_toks if not a)
+        rendered_toks = _after_fffd(text)
+        named = sum(1 for a in rendered_toks if a and a not in raw_after)
+        bare = sum(1 for a in rendered_toks if not a)
+        replacement = named + max(0, bare - bare_allowed)
     else:
         replacement = text.count(_FFFD)
     math_alnum = sum(1 for c in text if _MATH_ALNUM[0] <= ord(c) <= _MATH_ALNUM[1])

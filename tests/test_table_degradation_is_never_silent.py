@@ -75,6 +75,7 @@ def test_resource_exhaustion_reads_as_degraded_to_consumers():
     # consumers' guards (no `_failed` piece). The literal piece is kept.
     pieces = incomplete_method_pieces({"resource_exhausted": 1})
     assert "incomplete:resource_exhausted" in pieces
+    assert "resources_failed:exhausted" in pieces  # the literal the consumers read
     assert _degraded_for_consumers(pieces)
 
 
@@ -190,3 +191,20 @@ def test_a_transient_render_failure_gives_the_healthy_output(monkeypatch):
     assert (n, sha) == (n_ok, sha_ok)
     assert r["method"] == healthy["method"]
     assert r["fallbacks"].get("camelot_render_retry", 0) >= 1
+
+
+def test_a_failed_renderer_probe_is_recorded(monkeypatch):
+    # Review 2026-10-03 (rule 40): the probe's `except Exception: return {}` recorded
+    # nothing, so a failed probe left lattice UNPINNED (Camelot free to re-render with
+    # another program) with nothing in `method`. It must now fire an event that
+    # `incomplete_method_pieces` names as a `_failed` piece.
+    import camelot.parsers
+    from docpluck.telemetry import fallback_scope
+    from docpluck.tables import camelot_extract as ce
+
+    ce._LATTICE_RENDERER.clear()
+    monkeypatch.delattr(camelot.parsers, "Lattice")
+    with fallback_scope() as sink:
+        assert ce._lattice_renderer_kwargs() == {}
+    assert sink.counters.get("lattice_renderer_probe_exception") == 1
+    assert incomplete_method_pieces(dict(sink.counters)) == ["lattice_renderer_probe_failed"]

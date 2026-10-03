@@ -47,7 +47,11 @@ def _lattice_renderer_kwargs() -> dict[str, object]:
 
         from camelot.parsers import Lattice
         params = inspect.signature(Lattice.__init__).parameters
-    except Exception:  # noqa: BLE001 - no Camelot: the caller records that itself
+    except Exception as exc:  # noqa: BLE001 - recorded: lattice stays UNPINNED for this call
+        # Named in `method` as `lattice_renderer_probe_failed` (rule 40, review
+        # 2026-10-03): without it Camelot may re-render with another program and
+        # the table set differs from a healthy run's with nothing to say so.
+        record_fallback("lattice_renderer_probe_exception", detail=type(exc).__name__)
         return {}
     if "backend" in params and "use_fallback" in params:
         _LATTICE_RENDERER.update(backend="pdfium", use_fallback=False)
