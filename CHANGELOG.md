@@ -26,6 +26,9 @@ pass, and `method` stayed identical to a healthy run's.
 - The lattice raster always comes from pdfium (`backend="pdfium", use_fallback=False`), and a
   failed page render is retried like a memory failure (`camelot_render_retry` in `fallbacks`).
 - A failed glyph raster (`glyph_evidence`) is recorded as `glyph_raster_exception`.
+- A failed probe of Camelot's lattice renderer options (`_lattice_renderer_kwargs`) is recorded as
+  `lattice_renderer_probe_exception` and named `+lattice_renderer_probe_failed` in `method`: the
+  lattice pass then runs unpinned, so Camelot may re-render with another program.
 - On a healthy machine table output is unchanged: the library alone, serially, and the service
   (3 runs, 2 concurrent requests) all gave byte-identical results on the six papers.
 
