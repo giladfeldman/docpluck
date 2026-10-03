@@ -326,12 +326,36 @@ def check_table_parity(out_dir: Path, fmt: str) -> dict:
     return {"verdict": "pass", "tables_json": n_json, "html_tables": n_html}
 
 
+_FFFD = "�"
+_DASHES = str.maketrans({"–": "-", "—": "-", "−": "-"})
+
+
+_TOKEN_AFTER_FFFD = re.compile("�([^\\s<|]*)")
+
+
+def _after_fffd(text: str) -> list[str]:
+    """The token glued after each U+FFFD (up to whitespace or markup), dash-folded."""
+    return [m.group(1).translate(_DASHES) for m in _TOKEN_AFTER_FFFD.finditer(text)]
+
+
 def check_glyph(out_dir: Path, fmt: str) -> dict:
     target_p = out_dir / ("rendered.md" if fmt == "pdf" else "normalized.txt")
     if not target_p.is_file():
         return {"verdict": "skip", "reason": "target view missing"}
     text = target_p.read_text(encoding="utf-8", errors="replace")
-    replacement = text.count("�")
+    # Since 2026-09-24 an undecodable glyph PASSES THROUGH as U+FFFD (the
+    # pdfplumber recovery was retired; tests/test_extraction.py pins it). A
+    # U+FFFD the paper's own text layer carries is the file's, not ours: count
+    # only those whose following text never follows a U+FFFD in raw.txt. The
+    # table channel re-reads the same printed glyphs, so a render may hold MORE
+    # copies than raw (plos-med-1: 9 raw, 15 rendered, all the paper's own
+    # "≥" signs) without introducing any.
+    raw_p = out_dir / "raw.txt"
+    if raw_p.is_file():
+        raw_after = set(_after_fffd(raw_p.read_text(encoding="utf-8", errors="replace")))
+        replacement = sum(1 for a in _after_fffd(text) if a not in raw_after)
+    else:
+        replacement = text.count(_FFFD)
     math_alnum = sum(1 for c in text if _MATH_ALNUM[0] <= ord(c) <= _MATH_ALNUM[1])
     pua = sum(1 for c in text if _PUA[0] <= ord(c) <= _PUA[1])
     bad = replacement + math_alnum + pua
