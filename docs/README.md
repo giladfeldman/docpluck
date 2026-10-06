@@ -588,7 +588,7 @@ is recorded, not raised.
 `git_sha`, `git_state`, `level`, `out_dir`, `symbol_contract_version`, `sectioning_version`,
 `table_extraction_version`, `python_version`, `unicodedata_version`, `pdftotext_path`,
 `pdftotext_version`, `pdftotext_engine`, `poppler_version`, `pdfplumber_version`,
-`pdfminer_six_version`, `camelot_version`, `pypdfium2_version`, `opencv_version`,
+`pdfminer_six_version`, `pypdf_version`, `camelot_version`, `pypdfium2_version`, `opencv_version`,
 `mammoth_version`, `beautifulsoup4_version`, `lxml_version`, `n_total`, `n_ok`, `n_failed`,
 `elapsed_seconds` and `results`. `report.to_dict()` serialises it; `report.write_receipt(path)`
 writes it as JSON.
@@ -824,11 +824,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.150',            # docpluck itself
+# {'version': '2.4.151',            # docpluck itself
 #  'git_sha': '…',
 #  'normalize_version': '1.9.71',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
-#  'table_extraction_version': '2.4.21',
+#  'table_extraction_version': '2.4.22',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs
@@ -837,6 +837,7 @@ get_version_info()
 #  'poppler_version': '24.08.0',    # None when the engine is not poppler
 #  'pdfplumber_version': '0.11.9',  # PDF layout channel…
 #  'pdfminer_six_version': '…',     #   …and the text engine under it
+#  'pypdf_version': '6.14.2',       # glyph-name repair (in-memory PDF copy)
 #  'camelot_version': '2.0.0',      # tables…
 #  'pypdfium2_version': '5.9.0',    #   …and what lattice rasterizes through
 #  'opencv_version': '4.13.0.92',

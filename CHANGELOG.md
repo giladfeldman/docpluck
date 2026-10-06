@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.4.151] - 2026-10-06 - normalization 1.9.71 (unchanged) - table extraction 2.4.22
+
+A table whose caption sits in one column of a two-column page now delivers its values.
+Normalized text is unchanged.
+
+### What was wrong
+
+The caption shares its line with the other column's text, so the caption's box ran to the far
+margin. The table region built on that box swallowed the neighbouring column's prose and was
+rejected as body text. `10.1177/01461672251327169` Table 10 (p15) delivered the single word
+"Measure" and none of its values.
+
+### What changed
+
+- `docpluck/tables/detect.py`: the caption box's right edge is the first glyph of the row's
+  second text block, when that block begins after a gap of at least 12pt inside the page's
+  central band (35-65% of the width), i.e. where a column gutter can be. Any other gap never
+  counts.
+- Measured over 101 manifest papers, with the edge on and off: 12 firings, 2 tables changed,
+  both improved, 0 regressed.
+
+| Paper | Table | Before | After |
+|-------|-------|--------|-------|
+| `10.1177/01461672251327169` | 10 | raw text "Measure", 0 cells | 40-cell grid; all 21 values (7 rows x 3) match the page, minus signs intact |
+| `10.1177/00221465251343322` | 4 | unstructured text with body prose appended | 62-cell grid; all 36 values match the page. Three row labels print a lowercase n for a capital N ("none"), a layout-channel defect that predates this change and is queued |
+
+Known and unchanged: on these pages a caption's wrapped lines also arrive as the grid's first
+rows (both tables above, and Tables 3 and 5 of `10.1177/00221465251343322`, which this release
+does not touch). Queued.
+
+### Version receipt
+
+- `get_version_info()` and `ExtractionReport` gain `pypdf_version`. pypdf became a core
+  dependency in 2.4.150 (the glyph-name repair rewrites an in-memory copy of the PDF with it)
+  but its version was not reported, so a receipt could not say which pypdf produced a result.
+
 ## [2.4.150] - 2026-10-05 - normalization 1.9.71 - table extraction 2.4.21
 
 Statistics typeset in Linotype Pi fonts are now readable. Reported by ESCImate (urgent): an APA

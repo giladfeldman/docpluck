@@ -177,6 +177,7 @@ class ExtractionReport:
     poppler_version: Optional[str] = None
     pdfplumber_version: str = UNKNOWN
     pdfminer_six_version: str = UNKNOWN
+    pypdf_version: str = UNKNOWN
     camelot_version: str = UNKNOWN
     pypdfium2_version: str = UNKNOWN
     opencv_version: str = UNKNOWN

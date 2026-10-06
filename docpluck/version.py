@@ -100,6 +100,9 @@ _ENGINE_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
     # PDF text/layout channel.
     "pdfplumber_version": ("pdfplumber", ("pdfplumber",)),
     "pdfminer_six_version": ("pdfminer", ("pdfminer.six",)),
+    # Linotype Pi glyph-name repair (glyph_names.py) rewrites an in-memory copy
+    # of the PDF with pypdf before any channel reads it.
+    "pypdf_version": ("pypdf", ("pypdf",)),
     # Tables. pypdfium2 and OpenCV are not direct docpluck dependencies but
     # they decide what camelot's lattice flavor sees, so a change in either
     # changes captured tables under a fixed docpluck SHA.
@@ -453,7 +456,7 @@ def get_version_info() -> dict:
                                   claim.
 
     Plus one key per external Python engine (see :data:`_ENGINE_MODULES`):
-    ``pdfplumber_version``, ``pdfminer_six_version``, ``camelot_version``,
+    ``pdfplumber_version``, ``pdfminer_six_version``, ``pypdf_version``, ``camelot_version``,
     ``pypdfium2_version``, ``opencv_version``, ``mammoth_version``,
     ``beautifulsoup4_version``, ``lxml_version``. Each reports the version of
     the module already imported when there is one, else the installed

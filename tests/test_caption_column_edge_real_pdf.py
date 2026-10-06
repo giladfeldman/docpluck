@@ -3,7 +3,7 @@
 1. A CAPTION IN ONE TEXT COLUMN SHARES ITS y-ROW WITH THE NEIGHBOURING COLUMN.
    `_bbox_of_caption_line` took the row's whole x-extent, so on a two-column page a
    left-column caption's box ran to the right margin. 10.1177/01461672251327169 p15,
-   Table 10 (8 coefficient rows x 3 values, page-verified): the region swallowed the
+   Table 10 (7 coefficient rows x 3 values, page-verified): the region swallowed the
    right column's prose, the grid was rejected as body prose, and the table shipped
    only the word "Measure" -- every value lost. The box now stops where the second
    text block of the row begins (`_neighbour_block_edge`), which is NOT the end of
@@ -50,6 +50,8 @@ _IP_T10_ROWS = {
     "Satisfaction with life": ["−.18***", ".24***", ".05"],
     "Subjective happiness": ["−.28***", ".34***", ".10"],
     "Number of confidants": ["−.07", ".15**", ".02"],
+    # printed on two lines; the second line "(extension)" is its own grid row
+    "Social orientation scale": [".13**", ".01", ".02"],
 }
 
 
