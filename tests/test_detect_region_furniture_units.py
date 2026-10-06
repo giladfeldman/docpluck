@@ -58,17 +58,33 @@ def test_right_column_caption_box_starts_at_the_caption_not_the_row():
     assert x1 == max(g["x1"] for g in right)
 
 
-def test_caption_at_the_rows_first_glyph_keeps_the_whole_row():
-    # The left edge moves only when the caption starts AFTER a gap; a caption
-    # that begins the row keeps its box exactly as before, right edge included
-    # (the right-hand crop is the one reverted in 2026-08, register J14).
+def test_caption_at_the_rows_first_glyph_stops_at_the_neighbouring_block():
+    # The left edge moves only when the caption starts AFTER a gap. The right edge
+    # stops where the row's SECOND text block begins (the neighbouring column's
+    # first glyph), not at the end of the caption's own text: that crop is the one
+    # reverted in 2026-08 (register J14) for losing a stat column that sits right
+    # of a wrapped caption line, and this one keeps it. Before the neighbour-edge
+    # change the box ran to the far margin and swallowed the other column's prose
+    # (10.1177/01461672251327169 p15 Table 10).
     cap_glyphs = _glyphs("Table 2. Results", 58.0, 75.0)
     beside = _glyphs("right column prose", 320.0, 75.0)
     page = SimpleNamespace(chars=cap_glyphs + beside, width=595.3)
     cap = SimpleNamespace(line_text="Table 2. Results", label="Table 2")
     x0, _, x1, _ = detect._bbox_of_caption_line(page, cap)
     assert round(x0) == 58
-    assert x1 == max(g["x1"] for g in beside)
+    assert x1 == 320.0 - 1.0
+    # ...and it reaches PAST the caption's own text, so a stat column printed
+    # right of the caption's end (still left of the neighbour) is inside the box.
+    assert x1 > max(g["x1"] for g in cap_glyphs) + 100
+
+
+def test_caption_with_no_second_block_keeps_the_whole_row():
+    # No gap in the page's central band: nothing to clip to, box exactly as before.
+    row = _glyphs("Table 2. Results of a single full width caption line", 58.0, 75.0)
+    page = SimpleNamespace(chars=row, width=595.3)
+    cap = SimpleNamespace(line_text="Table 2. Results", label="Table 2")
+    _, _, x1, _ = detect._bbox_of_caption_line(page, cap)
+    assert x1 == max(g["x1"] for g in row)
 
 
 def test_inline_mention_after_a_word_space_is_not_a_block_start():
