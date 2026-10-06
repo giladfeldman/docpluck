@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from .telemetry import record_fallback
+from .glyph_names import repair_glyph_names
 from .tempfiles import unlink_temp_pdf
 from .version import resolve_pdftotext_executable
 
@@ -87,6 +88,11 @@ def extract_pdf(
     if pdftotext_timeout_seconds <= 0:
         raise ValueError("pdftotext_timeout_seconds must be > 0")
 
+    # Fonts with no ToUnicode map and Linotype glyph names (/H11005 ...) decode to
+    # the wrong character in every poppler build; read a copy that declares them.
+    # Ordinary PDFs come back as the same bytes (see docpluck/glyph_names.py).
+    pdf_bytes, glyph_report = repair_glyph_names(pdf_bytes)
+
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
@@ -106,6 +112,12 @@ def extract_pdf(
 
         text = result.stdout
         method = "pdftotext_default"
+        # Recorded, not silent: which fonts were remapped, and which H-named glyphs
+        # the table does not cover (those reach the text as the extractor emits them).
+        method += glyph_report.method_suffix
+        for _u in glyph_report.unmapped:  # glyph names + char count travel in the fallback detail
+            record_fallback("unmapped_glyph_font",
+                            detail=f"{_u['font']}:{','.join(_u['glyph_names'])}:chars={_u['char_count']}")
 
         # U+FFFD PASSES THROUGH AS PRINTED. A recovery used to live here: on >= 3
         # U+FFFD it ran pdfplumber over the whole document and either REPLACED the

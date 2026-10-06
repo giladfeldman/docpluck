@@ -109,6 +109,11 @@ def extract_pdf_layout(
     """
     import pdfplumber  # type: ignore
     import io
+    from .glyph_names import repair_glyph_names
+
+    # Same repair as extract_pdf: the layout channel feeds the table/figure/column
+    # paths, which would otherwise read "!" where the text channel now reads "=".
+    pdf_bytes, _ = repair_glyph_names(pdf_bytes)
 
     wanted: set[int] | None = None if pages is None else {int(i) for i in pages}
 

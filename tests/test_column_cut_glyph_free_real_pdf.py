@@ -74,10 +74,29 @@ def _pdf(doi: str) -> Path:
 
 
 def _raw_pages(pdf: Path) -> list[str]:
-    return subprocess.run(
-        [resolve_pdftotext_executable(), "-enc", "UTF-8", str(pdf), "-"],
-        capture_output=True, encoding="utf-8", errors="replace", check=True,
-    ).stdout.split("\f")
+    # The RAW read is of the PDF as extract_pdf reads it: a font with no ToUnicode
+    # and Linotype glyph names (/H11005 ...) is decoded first (glyph_names.py), so
+    # this paper's `=` `alpha` `>=` are real characters here too. Comparing against
+    # the un-repaired file would call that repair "characters gained and lost".
+    from docpluck.glyph_names import repair_glyph_names
+
+    blob = pdf.read_bytes()
+    fixed, _ = repair_glyph_names(blob)
+    if fixed is blob:
+        src, tmp = str(pdf), None
+    else:
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        tmp.write(fixed)
+        tmp.close()
+        src = tmp.name
+    try:
+        return subprocess.run(
+            [resolve_pdftotext_executable(), "-enc", "UTF-8", src, "-"],
+            capture_output=True, encoding="utf-8", errors="replace", check=True,
+        ).stdout.split("\f")
+    finally:
+        if tmp is not None:
+            Path(tmp.name).unlink(missing_ok=True)
 
 
 def _corrected(method: str) -> set[int]:
@@ -132,8 +151,11 @@ def test_a_page_already_in_reading_order_is_left_alone():
 
 def _old_cut_read(pdf: Path, page: int) -> str:
     """The pre-fix read: two full-height crops meeting at int(midline), in the
-    coordinates pdfplumber reported (no MediaBox shift)."""
-    b = pdf.read_bytes()
+    coordinates pdfplumber reported (no MediaBox shift). Read through the same
+    glyph-name repair as `_raw_pages`, so the two arms differ only in the cut."""
+    from docpluck.glyph_names import repair_glyph_names
+
+    b = repair_glyph_names(pdf.read_bytes())[0]
     lp = extract_pdf_layout(b, pages=[page - 1]).pages[page - 1]
     mid = int(_detect_2col_midline(list(lp.words), lp.width))
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:

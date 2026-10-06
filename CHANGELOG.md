@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.4.150] - 2026-10-05 - normalization 1.9.71 - table extraction 2.4.21
+
+Statistics typeset in Linotype Pi fonts are now readable. Reported by ESCImate (urgent): an APA
+paper (`10.1037/xge0000057`, JEP: General 2015) returned `F(2, 126) ! 4.04, p ! .02` and
+`t(126) ! &3.07, p ' .01`, so no statistic could be parsed (ESCImate: 0 found; 30 on the
+repaired text).
+
+### What was wrong
+
+Those fonts (Universal-GreekwithMathPi, MathematicalPi-One/-Six) carry no ToUnicode map; their
+encoding names glyphs `/H11005`, `/H9251`, ... which are not Adobe Glyph List names. poppler
+cannot map them: Linux builds emit the raw byte (`=` -> `!`, `<` -> `'`, minus -> `&`), the
+Windows build reads the digits as a hex code point (`=` -> U+2AFD).
+
+### What changed
+
+- `docpluck/glyph_names.py`: for a font with no ToUnicode and `/H<digits>` glyph names, a
+  ToUnicode map is added to an in-memory copy of the PDF from a table of glyph names verified
+  against 300 dpi page rasters (`=` `<` `>` `+` U+2212 U+00D7 U+2264 U+2265 U+2217 U+25A0,
+  alpha eta rho chi). The text, layout and Camelot table channels all read that copy, so the
+  result does not depend on the poppler build or its data directory. A PDF without such a font
+  is read exactly as before (same bytes, no rewrite).
+- rho is emitted as printed (U+03C1), never turned into a Latin p: the journal prints partial
+  eta-squared as eta-squared with a rho subscript.
+- `method` names what happened: `+linotype_pi_remapped:<font,...>` for decoded fonts and
+  `+unmapped_glyph_fonts:<font,...>` for H-named glyphs the table does not cover (left as the
+  extractor emits them; never guessed). The structured detail
+  (`font`, `glyph_names`, `char_count`) is `GlyphNameReport.unmapped`.
+
+- Each unmapped font also raises an `unmapped_glyph_font` fallback record carrying the font,
+  the glyph names and the character count, so a consumer reading the fallback list can tell
+  a reader that those symbols are unreliable.
+
+### Not covered
+
+A font whose glyph NAME is a real Adobe name but draws something else (`OurOwn-CJS` code 193 is
+named `/exclamdown` and draws an arrow). That needs a font-specific override and is queued.
+
 ## [2.4.149] - 2026-10-01 - normalization 1.9.70 (unchanged) - table extraction 2.4.20
 
 Table output is now the same on a busy machine as on a quiet one, or says it is not; and two

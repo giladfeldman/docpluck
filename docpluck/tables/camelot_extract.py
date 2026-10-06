@@ -18,6 +18,7 @@ import re
 import tempfile
 from typing import TYPE_CHECKING
 
+from docpluck.glyph_names import repair_glyph_names
 from docpluck.resources import call_with_resource_retry, is_render_failure, note_if_exhausted
 from docpluck.tables import Cell, Table
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
@@ -970,7 +971,7 @@ def extract_tables_camelot(
         return []
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(pdf_bytes)
+        tmp.write(repair_glyph_names(pdf_bytes)[0])  # Linotype Pi repair; docpluck/glyph_names.py
         tmp_path = tmp.name
 
     # How many flavors RAISED. A clean run that finds nothing on a PDF with no
@@ -1148,7 +1149,7 @@ def extract_tables_camelot_by_region(
         by_page.setdefault(int(spec["page"]), []).append(spec)
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(pdf_bytes)
+        tmp.write(repair_glyph_names(pdf_bytes)[0])  # Linotype Pi repair; docpluck/glyph_names.py
         tmp_path = tmp.name
 
     def _match_and_emit(specs: list[dict], tables: list) -> None:

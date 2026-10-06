@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docpluck"
-version = "2.4.149"
+version = "2.4.150"
 description = "PDF, DOCX, and HTML text extraction and normalization for academic papers"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,9 @@ classifiers = [
 ]
 dependencies = [
     "pdfplumber>=0.11.0",
+    # glyph_names.py (Linotype Pi repair) reads font dictionaries and writes the
+    # patched in-memory copy with pypdf; it used to arrive only through camelot-py.
+    "pypdf>=4.0",
     # Camelot is the table-extraction engine (per memory
     # `project_camelot_for_tables` — settled 2026-05-09 after a 5-library
     # bake-off). [cv] extra pulls in opencv-python which Camelot's lattice

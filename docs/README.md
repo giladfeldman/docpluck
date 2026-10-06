@@ -171,6 +171,8 @@ Batch runs get it per file in the `<stem>.json` sidecar.
 | `resource_retry` | a step failed for want of memory/disk and was retried. On its own (no `resource_exhausted`) the retry succeeded and the output is the normal one |
 | any `*_exception` (`camelot_lattice_exception`, `camelot_region_exception`, `glyph_raster_exception`, ...) | a step FAILED and extraction carried on without it, so the tables are not the full extraction. Since 2.4.149 every such event is also named in `method` as a `+<stage>_failed` piece (`camelot_lattice_exception` -> `camelot_lattice_failed`), whatever the cause (a document failure repeats run to run; a machine failure does not). **Rule: a `method` with any piece whose name ends in `_failed` is not the full extraction.** On the 125-paper test manifest no healthy run carries one. `symbol_font_scan_exception` is excluded: that scan only reports |
 | `camelot_render_retry` | a page image for the ruled-table (lattice) pass failed to render and was retried. On its own the retry succeeded and the output is the normal one |
+| `method` piece `+linotype_pi_remapped:<font,...>` (since 2.4.150) | those fonts carry no ToUnicode map and name their glyphs `/H11005`-style (Linotype Pi); the operators and Greek set in them (`=`, `<`, `>`, minus, alpha, eta, rho, chi, ...) were decoded from the font's own glyph names instead of arriving as `!`, `'`, `&`. rho is emitted as printed (partial eta-squared is typeset as eta-squared with a rho subscript) |
+| `method` piece `+unmapped_glyph_fonts:<font,...>` (since 2.4.150) | those fonts name glyphs `/H<digits>` that docpluck has no verified mapping for; those characters reach the text as the extractor emits them (wrong). Do not trust operators or Greek letters set in that font |
 
 Repairs are labelled by the **evidence** they rest on: *typographic* (something the renderer put on
 the page) is acted on; *inferential* (what a number ought to be) is properly your call, and where we
@@ -822,11 +824,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.149',            # docpluck itself
+# {'version': '2.4.150',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.70',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.71',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.5',   #   independently of the package version
-#  'table_extraction_version': '2.4.20',
+#  'table_extraction_version': '2.4.21',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs
@@ -936,6 +938,7 @@ Scope is **English-language articles written in US numeric convention** (`.` dec
 | Python | ≥ 3.10 | |
 | pdfplumber | ≥ 0.11.0 | Core pip dependency — installed automatically |
 | camelot-py[cv] | ≥ 0.11, < 3 | Core pip dependency — table detection; rasterizes through pypdfium2, so no Ghostscript needed |
+| pypdf | ≥ 4.0 | Core pip dependency (since 2.4.150) — `docpluck/glyph_names.py` adds a ToUnicode map to an in-memory copy of a PDF whose fonts name glyphs `/H11005`-style; the file on disk is never rewritten |
 | poppler-utils | any recent | System package — for `extract_pdf()` only |
 | mammoth | ≥ 1.8.0 | Optional (`[docx]`) — pure Python, no system deps |
 | beautifulsoup4 | ≥ 4.12.0 | Optional (`[html]`) — pure Python |
