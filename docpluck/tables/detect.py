@@ -152,6 +152,42 @@ def _normalize_for_char_match(s: str) -> str:
     return s.translate(_LIGATURE_FOLD).replace(" ", "").replace("\t", "").lower()
 
 
+
+# A caption that sits in ONE text column of a two-column page shares its y-row
+# with the neighbouring column's text, so the row's x-extent runs to the far
+# margin and the region built on it swallows the other column's prose
+# (10.1177/01461672251327169 p15: Table 10's box ran x=63-564, the grid was
+# rejected as body prose and the table delivered only its first label). The
+# neighbouring block's FIRST glyph is the typographic edge to clip to -- not the
+# end of the caption's own text, which is the crop that cost a stat column that
+# sits right of the caption's wrapped line (register J14). Fires only for a gap
+# at least this wide that lies in the page's central band.
+_COLUMN_GAP_PT: float = 12.0
+
+
+def _neighbour_block_edge(row_chars: list[dict], from_idx: int, page_width: float) -> float | None:
+    """x0 of the first glyph of a second text block on this x-sorted row, or None.
+
+    The second block begins after a horizontal gap of at least ``_COLUMN_GAP_PT``
+    that overlaps the page's central band (35-65% of the width), i.e. where a
+    column gutter can be. A gap elsewhere on the row (a tab stop, a justified
+    stretch near a margin) never counts."""
+    if page_width <= 0:
+        return None
+    lo, hi = page_width * 0.35, page_width * 0.65
+    prev = None
+    for c in row_chars[from_idx:]:
+        if not (c.get("text") or "").strip():
+            continue
+        if prev is not None:
+            gap = float(c.get("x0", 0.0)) - float(prev.get("x1", 0.0))
+            if gap >= _COLUMN_GAP_PT and float(prev.get("x1", 0.0)) <= hi and float(c.get("x0", 0.0)) >= lo:
+                return float(c.get("x0", 0.0))
+        prev = c
+    return None
+
+
+
 def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
     """Find the y-cluster of chars whose joined text contains the start of the caption line.
 
@@ -209,6 +245,7 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
     # a block are preferred; if none does, the first containing row is returned
     # exactly as before, so a caption this cannot place is placed as it was.
     first_containing: Bbox | None = None
+    _pw = float(getattr(page_obj, "width", 0.0) or 0.0)
     for top_key in sorted(rows.keys()):
         row_chars = sorted(rows[top_key], key=lambda c: c.get("x0", 0))
         joined = "".join(c.get("text", "") for c in row_chars)
@@ -221,6 +258,9 @@ def _bbox_of_caption_line(page_obj, cap: CaptionMatch) -> Bbox | None:
             top = min(c["top"] for c in row_chars)
             bottom = max(c["bottom"] for c in row_chars)
             block = _text_block_start(row_chars, target_prefix_norm)
+            _edge = _neighbour_block_edge(row_chars, block or 0, _pw)
+            if _edge is not None:
+                x1 = min(x1, _edge - 1.0)
             if block is not None:
                 # THE BOX STARTS WHERE THE CAPTION STARTS. When the caption opens
                 # a block after a column-sized gap, every glyph left of that gap
