@@ -1200,6 +1200,32 @@ def _pick_row_label(row: list[str]) -> tuple[str, int]:
     return (row[0].strip() if row else ""), 0
 
 
+def _promote_indented_label(row: list[str], label_cols: list[int]) -> list[str]:
+    """A row whose label is printed one or more columns right of the stub keeps
+    it as its label when the row is sliced into arms.
+
+    10.1177/01461672251327169 Table 6 (p11): "Overall negative: target article
+    (Study 3)" starts under the first data column, so its label column is empty;
+    each arm's slice then took its first non-number as the label, and the row's
+    d = -2.68 [-4.65, -0.68] was emitted under the label "<.01". The left-most
+    non-empty cell moves to the label column only when the label column is
+    empty and that cell is words, not a value (`—`, `<.01`, `n.s` stay values).
+    """
+    if not label_cols or any((row[i] or "").strip() for i in label_cols):
+        return row
+    for i, cell in enumerate(row):
+        s = (cell or "").strip()
+        if not s or i in label_cols:
+            continue
+        if _parse_number(s) is None and len(re.findall(r"[A-Za-z]{2,}", s)) >= 2:
+            out = list(row)
+            out[label_cols[0]] = s
+            out[i] = ""
+            return out
+        return row
+    return row
+
+
 def _est_label_from_header(h: str) -> str:
     """Effect label of a combined ``est_ci`` column — the header with its
     parenthesised CI marker stripped, e.g. ``Risk diff. (95% CI)`` →
@@ -2027,6 +2053,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
         # columns are prepended to each arm's own columns so role lookup and
         # the row label both work on the sliced sub-row.
         label_cols, groups = grouped
+        row = _promote_indented_label(row, label_cols)
         for glabel, gcols in groups:
             if not any((row[i] or "").strip() for i in gcols):
                 continue  # this arm is empty on this row — don't emit a stub

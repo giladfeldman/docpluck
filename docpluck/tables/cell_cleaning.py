@@ -649,10 +649,133 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                 return True
         return False
 
+    # A row that carries its OWN values is a row, whatever sits in its label
+    # column. 10.1177/01461672251327169 Table 6 (p11) prints "Overall negative:
+    # target article (Study 3)" starting one column right of the stub, with its
+    # own -21.4 / 8.7 / -5.99 / <.01; the prose merge glued the whole row into
+    # "Overall negative" above it (`69.64<br>Overall negative: target ...`,
+    # `-23.56<br>-21.4`), so neither row could be read. Two or more columns where
+    # this row AND the parent both hold a complete value, plus this row's words
+    # landing on a value of the parent, is two data rows. Words landing on the
+    # parent's words is a packed arm ("Separate" over "Joint", collabra.77859
+    # Table 2, p7), which flatten splits from the merged cell, so it still merges.
+    def _row_has_own_values(row: list[str], parent: list[str]) -> bool:
+        both = 0
+        words_on_value = False
+        for i in range(1, min(len(row), len(parent))):
+            v, p = (row[i] or "").strip(), (parent[i] or "").strip()
+            if _DATA_VALUE_CELL_RE.match(v) and _DATA_VALUE_CELL_RE.match(p):
+                both += 1
+            elif re.search(r"[A-Za-z]{2,}", v) and _DATA_VALUE_CELL_RE.match(p):
+                words_on_value = True
+        return both >= 2 and words_on_value
+
+    # A wrapped line starts lowercase; a row label or section label does not.
+    # The same table wraps its stub labels ("Thought about" / "enormous" /
+    # "workload", "Overall positive and" / "negative combined") and its
+    # Interpretation cells ("Signal; opposite" / "direction"); each wrapped line
+    # became a label-only row the renderer printed as a fake section heading,
+    # or a one-word row, leaving the real row's label cut short.
+    _LOWER_WORD_START = re.compile(r"[a-z][a-z]")
+
+    def _is_lowercase_wrap(s: str) -> bool:
+        s = (s or "").strip()
+        return bool(_LOWER_WORD_START.match(s)) and not re.search(r"\d", s)
+
+    # Only a wrap of a NUMERIC data row is trusted. In a text-only grid a
+    # lowercase line in the label column can as well be another column's text
+    # that Camelot assigned there, or the neighbouring column's prose
+    # (10.1080/02699931.2024.2434156 Table 6, p11, whose grid holds the body
+    # paragraph beside it); those grids keep their rows as captured.
+    def _is_data_row(parent: list[str]) -> bool:
+        return any(_DATA_VALUE_CELL_RE.match((c or "").strip()) for c in parent[1:])
+
+    def _text_cell_wrap(row: list[str], parent: list[str], label_ok: bool = False) -> bool:
+        """Every non-empty cell is a lowercase word wrap of a non-value text
+        cell directly above it (the label column only when ``label_ok``)."""
+        nz = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+        if not nz or not _is_data_row(parent):
+            return False
+        for i, s in nz:
+            if (i == 0 and not label_ok) or i >= len(parent) or not _is_lowercase_wrap(s):
+                return False
+            p = (parent[i] or "").strip()
+            if not p or not re.search(r"[A-Za-z]", p) or _DATA_VALUE_CELL_RE.match(p):
+                return False
+        return True
+
+    # A correlation matrix that stacks each coefficient over its CI and wraps
+    # its row label puts both second lines on one physical row:
+    # ["negative emotions", "", "", "", "[0.48, 0.60]"] under
+    # ["2—Prevalence estimates for", "54.9", "16.1", "—", "0.54***"]
+    # (10.1177/01461672251327169 Table 8, p13). Each bracket sits under a value
+    # of the row above and the label line is a lowercase wrap (or empty).
+    _CI_ONLY_RE = re.compile(r"^\[[^\]A-Za-z]*\d[^\]A-Za-z]*\]$")
+
+    def _stacked_ci_wrap(row: list[str], parent: list[str]) -> bool:
+        if not parent or not (parent[0] or "").strip():
+            return False
+        label = (row[0] or "").strip() if row else ""
+        if label and not _is_lowercase_wrap(label):
+            return False
+        cis = [(i, (c or "").strip()) for i, c in enumerate(row[1:], 1) if (c or "").strip()]
+        if not cis:
+            return False
+        for i, s in cis:
+            if not _CI_ONLY_RE.match(s) or i >= len(parent):
+                return False
+            if not _DATA_VALUE_CELL_RE.match((parent[i] or "").strip()):
+                return False
+        return True
+
+    # A label line followed by an unlabelled row that carries values is that
+    # row's label, not a wrap of the row above: joining it upward fused the
+    # next row's values into the row above (10.1016/j.jesp.2021.104154
+    # Table 9, p12: "-5.73 / 2.34" in one cell, measured 2026-10-07).
+    # Likewise when the next row is a new label alone ("(H2b) Across future
+    # outcomes:"): the legacy label merge glues that onto the row above, so a
+    # wrap joined upward first would carry it, and its values, into the wrong
+    # row (10.5334/irsp.946 p42).
+    def _labels_next_row(nxt: list[str] | None, new_label_too: bool = False) -> bool:
+        if not nxt:
+            return False
+        lead = (nxt[0] or "").strip()
+        rest = [(c or "").strip() for c in nxt[1:]]
+        if lead:
+            return new_label_too and not any(rest) and not _is_lowercase_wrap(lead)
+        return any(_DATA_VALUE_CELL_RE.match(c) for c in rest)
+
     out: list[list[str]] = []
-    for row in rows:
+    for row_i, row in enumerate(rows):
+        nxt = rows[row_i + 1] if row_i + 1 < len(rows) else None
         first = row[0].strip() if row else ""
         rest_has_content = any((c or "").strip() for c in row[1:])
+
+        if out and _stacked_ci_wrap(row, out[-1]):
+            parent = out[-1]
+            for i, cell in enumerate(row):
+                v = (cell or "").strip()
+                if v:
+                    parent[i] = parent[i].rstrip() + " " + v
+            continue
+
+        # Label AND a text cell wrapped on the same line ("Participated in" /
+        # "athletics" beside "Signal; opposite" / "direction"): the label joins
+        # its phrase with a space, the text cell keeps the line break.
+        if (
+            out
+            and first
+            and rest_has_content
+            and _text_cell_wrap(row, out[-1], label_ok=True)
+            and not _labels_next_row(nxt)
+        ):
+            parent = out[-1]
+            parent[0] = parent[0].rstrip() + " " + first
+            for i in range(1, min(len(row), len(parent))):
+                v = (row[i] or "").strip()
+                if v:
+                    parent[i] = parent[i] + _MERGE_SEPARATOR + v
+            continue
 
         if _is_section_row_label(row):
             # Don't merge — emit as a separate row so the renderer can
@@ -664,8 +787,12 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             out
             and not first
             and rest_has_content
-            and _looks_prose_like(row[1:])
+            and (
+                _looks_prose_like(row[1:])
+                or (_text_cell_wrap(row, out[-1]) and not _labels_next_row(nxt))
+            )
             and not _prose_onto_value(row, out[-1])
+            and not _row_has_own_values(row, out[-1])
         ):
             parent = out[-1]
             for i in range(min(len(row), len(parent))):
@@ -682,7 +809,18 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             out
             and first
             and not rest_has_content
-            and _prev_col0_is_wrap(out[-1])
+            and (
+                _prev_col0_is_wrap(out[-1])
+                or (
+                    _is_lowercase_wrap(first)
+                    # a sentence end is a note's wrapped line, not a label's
+                    # (10.1177/1948550619900570 Table 6, p7: "confidence interval.")
+                    and not first.rstrip().endswith(".")
+                    and (out[-1][0] or "").strip()
+                    and _is_data_row(out[-1])
+                    and not _labels_next_row(nxt, new_label_too=True)
+                )
+            )
         ):
             parent = out[-1]
             parent[0] = (

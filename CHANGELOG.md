@@ -2,7 +2,8 @@
 
 ## [2.4.151] - 2026-10-06 - normalization 1.9.71 (unchanged) - table extraction 2.4.22
 
-A table whose caption sits in one column of a two-column page now delivers its values.
+A table whose caption sits in one column of a two-column page now delivers its values. A text-only
+table closed by its own note keeps its whole body. Wrapped row labels and cells rejoin their row.
 Normalized text is unchanged.
 
 ### What was wrong
@@ -29,6 +30,59 @@ rejected as body text. `10.1177/01461672251327169` Table 10 (p15) delivered the 
 Known and unchanged: on these pages a caption's wrapped lines also arrive as the grid's first
 rows (both tables above, and Tables 3 and 5 of `10.1177/00221465251343322`, which this release
 does not touch). Queued.
+
+### A table closed by its own note keeps its whole body
+
+A table with no grid ships its text (`raw_text`). That text stopped at 1500 characters or at the
+first long sentence-shaped line, so a text-only table lost everything below its first questionnaire
+instruction. `10.1177/01461672251327169` Table 4 (p7) kept 1,015 of its ~4,500 characters and
+stopped after "DV1: prevalence and intensity of own emotional experiences".
+
+- `docpluck/extract_structured.py`: when the table's `Note.` line follows on the same page, before
+  the next caption, the body runs to the note. Inside the old 1500-character window the old walk is
+  unchanged, so the body only ever grows. Past it, the walk still stops at prose. A line inside a
+  quotation (a wrapped instrument item) does not count as prose. Two long lines that read as prose
+  together do count (column-wrapped prose from the other column, as in
+  `10.1016/j.jesp.2021.104154` Table 12, p14). The note paragraph is now kept whole.
+- Measured on all 595 table captions of the 125-paper manifest, comparing the new code and 2.4.150
+  on each one: 95 changed, in 42 papers. Every one only adds text; none is shorter.
+  - 43 add the rest of a note that used to be cut mid-sentence.
+  - 52 add rows or cells past the old cut-off.
+  - 8 of the added lines are page furniture (publisher "Downloaded from" and copyright lines). The
+    same kind is already present 70 times in 2.4.150 table text. Queued as its own item.
+
+### Wrapped rows rejoin their row (tables with a grid)
+
+- `docpluck/tables/cell_cleaning.py`, three rules, each only below a row that carries a number:
+  - A label line that starts in lowercase joins the label above ("Thought about" / "enormous" /
+    "workload").
+  - A lowercase line in a text column joins its cell ("Signal; opposite" / "direction").
+  - A CI printed under its coefficient joins it ("0.54*** [0.48, 0.60]").
+  - None fires when the next row is unlabelled and carries values (the line labels that row), or
+    when the line ends a sentence (a note's wrapped line).
+- A row that carries its own values, with its label text over a number of the row above, is no
+  longer glued into that row. `10.1177/01461672251327169` Table 6 "Overall negative: target article
+  (Study 3)" was fused into "Overall negative" (`69.64<br>Overall negative: …`, `−23.56<br>−21.4`).
+- `docpluck/tables/flatten.py`: a row whose label is printed right of the stub keeps it as its label
+  when sliced into arms. The target-article rows above flattened with the label "<.01".
+- Measured on every grid of the 125-paper manifest (1,041 tables), comparing these rules with
+  2.4.150 on the same cells: 82 tables changed and 0 statistic values were lost.
+  - 72 keep identical values.
+  - 9 only complete a row label, e.g. "Time in euglycemic" → "Time in euglycemic range, %".
+  - 1 gains values: `10.1177/01461672251327169` Table 6, 29 values that were lost to the fused rows.
+  - No word of cell text left any of the 64 changed HTML tables.
+
+| Paper | Table | Before (2.4.150) | After (2.4.151) |
+|-------|-------|------------------|-----------------|
+| `10.1177/01461672251327169` | 4 (p7) | flat list ends at "DV1: prevalence and intensity …" | every printed line through the last measure; checked on the page |
+| `10.1177/01461672251327169` | 6 (p11) | wrapped labels as fake section rows; target-article rows fused into "Overall" rows | whole labels; target-article rows separate with their own values (−21.4, 8.7, −5.99, 5, <.01, −2.68 [−4.65, −0.68]); every value matches the page |
+| `10.1177/01461672251327169` | 8 (p13) | labels cut ("2—Prevalence estimates for"); CI on its own row | whole labels; each coefficient with its CI; all 66 match the page |
+| `10.1177/01461672251327169` | 9 (p14) | "opposite" as a separate empty row x5 | "Signal; inconsistent opposite" in its cell |
+
+The four tables above were page-checked by a second model (Sonnet) against 110-dpi rasters: every
+value and label matches. Still unchanged in them: Table 4's items follow the PDF's text order for two
+side-by-side lists, and its note prints in the body above the table. Table 6's and Table 9's
+column-group headers sit on single columns.
 
 ### Version receipt
 
