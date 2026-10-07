@@ -816,6 +816,9 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                     # a sentence end is a note's wrapped line, not a label's
                     # (10.1177/1948550619900570 Table 6, p7: "confidence interval.")
                     and not first.rstrip().endswith(".")
+                    # a closing colon heads the sub-rows below it
+                    # (10.1371/journal.pmed.1004323 Table 1, p8: "specification:")
+                    and not first.rstrip().endswith(":")
                     and (out[-1][0] or "").strip()
                     and _is_data_row(out[-1])
                     and not _labels_next_row(nxt, new_label_too=True)

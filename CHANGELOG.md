@@ -58,8 +58,9 @@ stopped after "DV1: prevalence and intensity of own emotional experiences".
     "workload").
   - A lowercase line in a text column joins its cell ("Signal; opposite" / "direction").
   - A CI printed under its coefficient joins it ("0.54*** [0.48, 0.60]").
-  - None fires when the next row is unlabelled and carries values (the line labels that row), or
-    when the line ends a sentence (a note's wrapped line).
+  - None fires when the next row is unlabelled and carries values (the line labels that row),
+    when the line ends a sentence (a note's wrapped line), or when a label line ends in ":" (it
+    heads the rows below it).
 - A row that carries its own values, with its label text over a number of the row above, is no
   longer glued into that row. `10.1177/01461672251327169` Table 6 "Overall negative: target article
   (Study 3)" was fused into "Overall negative" (`69.64<br>Overall negative: …`, `−23.56<br>−21.4`).
@@ -68,7 +69,14 @@ stopped after "DV1: prevalence and intensity of own emotional experiences".
 - Measured on every grid of the 125-paper manifest (1,041 tables), comparing these rules with
   2.4.150 on the same cells: 82 tables changed and 0 statistic values were lost.
   - 72 keep identical values.
-  - 9 only complete a row label, e.g. "Time in euglycemic" → "Time in euglycemic range, %".
+  - 7 only complete a row label, e.g. "Time in euglycemic" → "Time in euglycemic range, %".
+  - 2 were wrong joins, found by the pre-push canary and checked on the page: a lowercase
+    sub-heading row ending in a colon, with no values, was glued onto the data row above
+    (`10.1371/journal.pmed.1004323` Table 1, p8: "Previous uterine surgery specification:";
+    Table 3, p10: "Anesthetic complication needing intervention if complication,
+    specification:"). A label line ending in ":" heads the rows below it, so it no longer joins
+    upward. Measured on 127 papers (1,487 grids), old rule against new: only these 2 tables
+    change, and both now match the page.
   - 1 gains values: `10.1177/01461672251327169` Table 6, 29 values that were lost to the fused rows.
   - No word of cell text left any of the 64 changed HTML tables.
 

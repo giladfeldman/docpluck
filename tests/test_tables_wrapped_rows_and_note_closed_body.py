@@ -238,3 +238,35 @@ def test_label_line_over_an_unlabelled_value_row_stays_that_rows_label():
     out = _merge_continuation_rows([r[:] for r in rows])
     assert out[0][2] == "161"
     assert out[1][0] == "temporary organ-donor condition."
+
+
+def test_a_colon_label_heads_the_rows_below_it():
+    # 10.1371/journal.pmed.1004323 Table 1 (p8) and Table 3 (p10): an indented
+    # "specification:" / "if complication, specification:" row with empty value
+    # cells introduces the sub-rows beneath it; it is not a wrap of the row above.
+    rows = [
+        ["Parity (median, IQR)", "1 (0–2)", "1 (0–2)"],
+        ["Previous uterine surgery", "18 (17.0%)", "24 (23.3%)"],
+        ["specification:", "", ""],
+        ["hysteroscopic myomectomy", "8/18 (44.4%)", "14/24 (58.3%)"],
+        ["other", "10/18 (55.6%)", "10/24 (41.7%)"],
+    ]
+    out = _merge_continuation_rows([r[:] for r in rows])
+    assert [r[0] for r in out] == [
+        "Parity (median, IQR)",
+        "Previous uterine surgery",
+        "specification:",
+        "hysteroscopic myomectomy",
+        "other",
+    ]
+    rows = [
+        ["Anesthetic complication needing intervention", "5 (4.7%)", "4 (4.0%)", "1.19 (0.33–4.31)", "1.00"],
+        ["if complication, specification:", "", "", "", ""],
+        ["desaturation", "3/5 (60.0%)", "1/4 (25.0%)", "", ""],
+    ]
+    out = _merge_continuation_rows([r[:] for r in rows])
+    assert [r[0] for r in out] == [
+        "Anesthetic complication needing intervention",
+        "if complication, specification:",
+        "desaturation",
+    ]
