@@ -24,7 +24,7 @@ rejected as body text. `10.1177/01461672251327169` Table 10 (p15) delivered the 
 | Paper | Table | Before | After |
 |-------|-------|--------|-------|
 | `10.1177/01461672251327169` | 10 | raw text "Measure", 0 cells | 40-cell grid; all 21 values (7 rows x 3) match the page, minus signs intact |
-| `10.1177/00221465251343322` | 4 | unstructured text with body prose appended | 62-cell grid; all 36 values match the page. Three row labels print a lowercase n for a capital N ("none"), a layout-channel defect that predates this change and is queued |
+| `10.1177/00221465251343322` | 4 | unstructured text with body prose appended | 62-cell grid; all 34 values (17 rows x 2) match the page. Three row labels print a lowercase n for a capital N ("none"), a layout-channel defect that predates this change and is queued |
 
 Known and unchanged: on these pages a caption's wrapped lines also arrive as the grid's first
 rows (both tables above, and Tables 3 and 5 of `10.1177/00221465251343322`, which this release
