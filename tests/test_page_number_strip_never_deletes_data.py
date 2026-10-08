@@ -127,11 +127,16 @@ def test_a_page_number_above_a_leftover_footer_is_caught_by_the_run_gate():
     pipeline whose other steps delete lines. See the note above
     `_HEADER_ZONE_LINES`.
     """
-    one_page = f"{chr(12)}{_body()}7\nJournal of Something, 2024\n"
+    # pdftotext sets a page number as its own block -- blank lines around it
+    # (measured on 10.1016/j.jesp.2009.12.010, every one of 495-499); since
+    # 2026-10-08 a bare integer glued between two text lines is not a page-number
+    # candidate (a footnote marker has that shape), so the fixture prints the
+    # measured shape.
+    one_page = f"{chr(12)}{_body()}\n7\n\nJournal of Something, 2024\n"
     assert "\n7\n" in _strip_standalone_page_numbers(one_page)
 
     run = "".join(
-        f"{chr(12)}{_body()}{n}\nJournal of Something, 2024\n" for n in (7, 8, 9)
+        f"{chr(12)}{_body()}\n{n}\n\nJournal of Something, 2024\n" for n in (7, 8, 9)
     )
     out = _strip_standalone_page_numbers(run)
     for n in (7, 8, 9):
@@ -180,7 +185,7 @@ def test_a_mid_page_pagination_run_is_still_stripped():
     pagination signature -- is stripped wherever it sits.
     """
     doc = "".join(
-        f"{chr(12)}{_body(12)}{n}\n{_body(12)}"
+        f"{chr(12)}{_body(12)}\n{n}\n\n{_body(12)}"  # its own block, as measured
         for n in (495, 496, 497, 498)
     )
     out = _strip_standalone_page_numbers(doc)

@@ -647,8 +647,241 @@ _PAGINATION_MIN_RUN = 3
 _PAGINATION_MIN_LINE_GAP = 20
 
 
-def _strip_standalone_page_numbers(t: str) -> str:
+# A bare page-number line, 1-4 digits (continuous-pagination journals print
+# 4-digit page numbers, e.g. Psychological Science 1174-1185).
+_PAGINATION_LINE_RE = re.compile(r"^(\f*)[ \t]*(\d{1,4})[ \t]*$")
+
+# The page-number offset must hold on at least this share of a document's
+# pages. Measured 2026-10-08 over 122 repository PDFs: the true offset covers
+# >= 0.33 of pages in every paper that has one (median 0.86), so 0.3 costs no
+# paper; it keeps a second pass, run on text whose page numbers are already
+# blank, from electing a chance offset among table integers.
+_PAGINATION_MIN_PAGE_SHARE = 0.3
+# A page of an English journal article holds roughly this many characters of
+# extracted text; used only as a floor on the page count (see the verdict).
+_CHARS_PER_PAGE = 4000
+
+
+@dataclass(frozen=True)
+class PaginationVerdict:
+    """Which bare-integer lines ARE page numbers, decided on the RAW text.
+
+    ``members`` maps a page-number value to ``(ordinals, total)``: ``total`` is
+    how many bare-integer lines carry that value in the raw text, ``ordinals``
+    which of them (in document order) are the page numbers. The strip step runs
+    much later, after earlier steps have consumed most form feeds, so it can no
+    longer ask "which page is this line on" -- it can only find the k-th
+    occurrence of a value again, and only trusts that while the count of
+    occurrences is unchanged.
+    """
+
+    members: dict[int, tuple[frozenset[int], int]]
+    # value -> the (previous, next) non-blank neighbour texts of each page-number
+    # line, used to find it again when the occurrence count has drifted.
+    context: dict[int, tuple[tuple[str, str], ...]] = field(default_factory=dict)
+
+    @property
+    def tokens(self) -> frozenset[str]:
+        return frozenset(str(v) for v in self.members)
+
+
+def _pagination_verdict(raw: str) -> PaginationVerdict | None:
+    """Decide pagination while the page breaks still exist.
+
+    ``None`` when the text carries no form feed at all (DOCX, HTML, caller
+    text): there is no page to reason about, and the legacy line-space rule is
+    kept for that channel unchanged.
+
+    The signature of pagination is ARITHMETIC: on page ``i`` the page number is
+    ``i + offset`` for one offset shared across the document. It is NOT
+    position -- pdftotext places a footer number mid-page in reading order on
+    two-column layouts (10.1525/collabra.24921: page 2's "3" is line 13 of 95).
+    So: elect the offset that the most pages carry (strictly more than any
+    other, and on >= ``_PAGINATION_MIN_RUN`` pages and
+    ``_PAGINATION_MIN_PAGE_SHARE`` of them), then take ONE line per page -- the
+    one with that value nearest a page edge, and none when two tie.
+
+    Replaces the line-space run as the deciding rule because that rule UNIONS
+    every +1 run 20+ lines apart, and table columns of small integers chain like
+    pages. Measured 2026-10-08, 122 random repository PDFs: the line-space rule
+    blanks 2,735 lines with 44 papers blanking more lines than they have pages
+    (>= 1,281 lines beyond the page count); this verdict selects 1,426 with
+    ZERO papers over. Page-verified on 10.1016/j.jesp.2010.02.007 p3: the old
+    rule deleted Table 1's raw data (6, 1, 7, 8, 9 ...) and Table 4's ranks;
+    the page number is 686, the only line this verdict takes there.
+    """
+    if PAGE_BREAK not in raw:
+        return None
+    pages = raw.split(PAGE_BREAK)
+    per_page: list[list[tuple[int, int, int]]] = []  # (line index, edge distance, value)
+    # EVERY bare-integer line per page (nonblank index -> value), elected or not:
+    # the ordinals below must count the same population the strip step counts.
+    all_bare: list[dict[int, int]] = []
+    for pg in pages:
+        all_lines = pg.split("\n")
+        nonblank_idx = [i for i, ln in enumerate(all_lines) if ln.strip()]
+        n = len(nonblank_idx)
+        cands = []
+        bare: dict[int, int] = {}
+        for k, i in enumerate(nonblank_idx):
+            m = _PAGINATION_LINE_RE.fullmatch(all_lines[i])
+            if not m:
+                continue
+            bare[k] = int(m.group(2))
+            # A page number is its own block: a blank line or the page edge on
+            # at least one side. A footnote marker set on its own line is glued
+            # between the prose it marks and its note (10.1016/j.jesp.2020.104052
+            # p2-7: markers 2-5, 7 happen to equal the page numbers there).
+            above = i == 0 or not all_lines[i - 1].strip()
+            below = i == len(all_lines) - 1 or not all_lines[i + 1].strip()
+            if above or below:
+                cands.append((k, min(k, n - 1 - k), int(m.group(2))))
+        per_page.append(cands)
+        all_bare.append(bare)
+    # A document can carry more than one pagination: an accepted manuscript
+    # numbered 1-10 followed by its supplement numbered 1-20
+    # (10.1016/j.jesp.2020.104052). Electing only the largest made a second pass
+    # elect the other once the first was blank -- non-idempotent. So every
+    # SEGMENT is elected: a run of >= _PAGINATION_MIN_RUN near-consecutive pages
+    # sharing one offset, longest first, on pages no longer segment claimed.
+    pages_by_offset: dict[int, list[int]] = collections.defaultdict(list)
+    for pi, cands in enumerate(per_page):
+        for off in sorted({v - pi for _k, _d, v in cands}):
+            pages_by_offset[off].append(pi)
+    segments: list[tuple[int, int, list[int]]] = []  # (-length, offset, pages)
+    for off, pis in pages_by_offset.items():
+        run = [pis[0]]
+        for pi in pis[1:] + [None]:
+            # One unnumbered page (a full-page figure, an opener) does not end
+            # a segment.
+            if pi is not None and pi <= run[-1] + 2:
+                run.append(pi)
+                continue
+            if len(run) >= _PAGINATION_MIN_RUN:
+                segments.append((-len(run), off, run))
+            if pi is not None:
+                run = [pi]
+    segments.sort()
+    offset_of: dict[int, int] = {}  # page index -> elected offset
+    covered = 0
+    for _neg, off, run in segments:
+        free = [pi for pi in run if pi not in offset_of]
+        if len(free) < _PAGINATION_MIN_RUN or len(free) != len(run):
+            continue  # overlaps an elected segment: not a pagination of its own
+        for pi in run:
+            offset_of[pi] = off
+        covered += len(run)
+    # The page count is the form feeds OR the text's volume, whichever is
+    # larger. Normalization keeps only some form feeds (10.1016/j.jesp.2020.104052:
+    # 31 in, 9 out), so on a second pass the form-feed count shrinks while the
+    # text does not, and footnote markers 2-5, 7 -- left alone on pass 1 -- read
+    # as half the "pages". At _CHARS_PER_PAGE no paper of the 122-paper sample
+    # loses its pagination (3,000 would cost one dense paper).
+    est_pages = max(len(pages), len(raw) / _CHARS_PER_PAGE)
+    if covered < _PAGINATION_MIN_PAGE_SHARE * est_pages:
+        return PaginationVerdict({})
+    chosen: dict[int, int] = {}  # page index -> nonblank line index
+    for pi, cands in enumerate(per_page):
+        if pi not in offset_of:
+            continue
+        hits = sorted((d, k) for k, d, v in cands if v == pi + offset_of[pi])
+        if len(hits) == 1 or (len(hits) > 1 and hits[0][0] < hits[1][0]):
+            chosen[pi] = hits[0][1]
+    # Ordinal of each chosen line among ALL bare lines of its value, in order,
+    # and its non-blank neighbours (across page breaks) for the drifted-count
+    # fallback in `_apply_pagination_verdict`.
+    flat = [ln for pg in pages for ln in pg.split("\n") if ln.strip()]
+    seen: collections.Counter[int] = collections.Counter()
+    ordinals: dict[int, set[int]] = collections.defaultdict(set)
+    context: dict[int, list[tuple[str, str]]] = collections.defaultdict(list)
+    pos = 0
+    for pi, (pg, by_k) in enumerate(zip(pages, all_bare)):
+        for k in range(sum(1 for ln in pg.split("\n") if ln.strip())):
+            if k in by_k:
+                v = by_k[k]
+                if chosen.get(pi) == k:
+                    ordinals[v].add(seen[v])
+                    prev = flat[pos - 1].strip() if pos > 0 else ""
+                    nxt = flat[pos + 1].strip() if pos + 1 < len(flat) else ""
+                    context[v].append((prev, nxt))
+                seen[v] += 1
+            pos += 1
+    return PaginationVerdict(
+        {v: (frozenset(o), seen[v]) for v, o in ordinals.items()},
+        {v: tuple(c) for v, c in context.items()},
+    )
+
+
+def _apply_pagination_verdict(t: str, verdict: PaginationVerdict) -> str:
+    """Blank the page-number lines ``verdict`` names, keeping their page breaks.
+
+    A value whose occurrence count in ``t`` no longer equals the raw count is
+    left alone and recorded (``pagination_verdict_stale``): some earlier step
+    removed or created such a line, so "the k-th occurrence" no longer names
+    the same line. Leaving a page number is cosmetic; blanking the wrong line
+    deletes a value.
+    """
+    if not verdict.members:
+        return t
+    lines = t.split("\n")
+    where: dict[int, list[int]] = collections.defaultdict(list)
+    for i, ln in enumerate(lines):
+        m = _PAGINATION_LINE_RE.fullmatch(ln)
+        if m:
+            where[int(m.group(2))].append(i)
+    def _neighbour(i: int, step: int) -> str:
+        j = i + step
+        while 0 <= j < len(lines):
+            s = lines[j].strip(PAGE_BREAK + " \t")
+            if s:
+                return s
+            j += step
+        return ""
+
+    for v, (ords, total) in verdict.members.items():
+        found = where.get(v, [])
+        if len(found) == total:
+            targets = [found[o] for o in ords]
+        else:
+            # The count drifted (an earlier step removed or created a line of
+            # this value), so "the k-th occurrence" no longer names the same
+            # line. Find each page number again by a neighbour it had in the raw
+            # text; only a UNIQUE match is taken. Without this a second pass,
+            # whose counts no longer drift, strips what the first pass skipped
+            # (10.1016/j.jesp.2020.104052, measured 2026-10-08).
+            # Normalization rewrites the neighbours too (line joins,
+            # dehyphenation, a stripped running header), so the test is
+            # containment of a short raw tail / head, not equality.
+            targets = []
+            for prev, nxt in verdict.context.get(v, ()):
+                tail, head = prev[-16:], nxt[:16]
+                hits = [
+                    i for i in found
+                    if (len(tail) >= 8 and tail in _neighbour(i, -1))
+                    or (len(head) >= 8 and head in _neighbour(i, 1))
+                ]
+                if len(hits) == 1:
+                    targets.append(hits[0])
+                else:
+                    record_fallback(
+                        "pagination_verdict_stale",
+                        detail=f"{v}: {len(found)} != {total}, {len(hits)} context hits",
+                    )
+        for i in targets:
+            lines[i] = page_break_residue(lines[i])
+    return "\n".join(lines)
+
+
+def _strip_standalone_page_numbers(
+    t: str, verdict: PaginationVerdict | None | bool = True
+) -> str:
     """Blank a line holding only a page number, keeping the page break.
+
+    2026-10-08: when the text is paginated the decision is
+    :func:`_pagination_verdict`'s, taken on the RAW text and passed in by the
+    caller (``verdict``); the default (``True``) computes it from ``t`` itself.
+    ``None`` -- no form feed anywhere -- keeps the line-space rule below for
+    that unpaginated channel, unchanged.
 
     A page NUMBER is furniture; a page BOUNDARY is structure (v1.9.57, L-052);
     and -- v1.9.59 -- a bare integer in the BODY of a page is neither of those.
@@ -705,6 +938,10 @@ def _strip_standalone_page_numbers(t: str) -> str:
        `P0_standalone_page_numbers` with metric `page_numbers_stripped`.
     3. *Is a "duplicate" really duplicated?* Not applicable; not a deduplication.
     """
+    if verdict is True:
+        verdict = _pagination_verdict(t)
+    if verdict is not None:
+        return _apply_pagination_verdict(t, verdict)
     lines = t.split("\n")
 
     # Every bare-integer line, by absolute line number.
@@ -5869,7 +6106,9 @@ def normalize_text(
 _VALUE_ONLY_LINE = re.compile(r"^[\[\(<>=+−-]*\s*\d[\d.,%*\s\]\)]*$")
 
 
-def _value_followed_fraction(lines: list[str], positions: list[int]) -> float:
+def _value_followed_fraction(
+    lines: list[str], positions: list[int], ignore: frozenset[str] = frozenset()
+) -> float:
     """Share of a repeated line's occurrences immediately followed by a VALUE.
 
     THE DISCRIMINATOR BETWEEN A TABLE ROW LABEL AND A PUBLISHER OVERLAY, and
@@ -5903,6 +6142,8 @@ def _value_followed_fraction(lines: list[str], positions: list[int]) -> float:
             nxt = lines[j].strip().strip(PAGE_BREAK).strip()
             if not nxt:
                 continue
+            if nxt in ignore:
+                continue  # a verified page number is not the value a label labels
             if _VALUE_ONLY_LINE.match(nxt):
                 hits += 1
             break
@@ -5964,6 +6205,10 @@ def _normalize_text(
     if layout is not None:
         report.page_offsets = layout.page_offsets
     t = text
+    # Pagination is decided HERE, while the page breaks still exist; the strip
+    # step far below and the repeated-line gate both read this one verdict.
+    _pagination = _pagination_verdict(text)
+    _page_number_tokens = _pagination.tokens if _pagination else frozenset()
 
     # ── W0s (2026-09-27, owner decision "B"): an OPERATOR GLYPH the text layer
     # labels as a digit. `10.5465/amj.2016.1196` draws `=` and `−` in a separate
@@ -6758,7 +7003,22 @@ def _normalize_text(
             # `repeated_line_stripped:watermark_every_page`.
             _coverage = distinct_pages / max(_total_pages, 1)
             if max_per_page == 1:
-                qualifies = True
+                # F1 (2026-10-08): a table ROW LABEL repeated once per page
+                # (a long table, or one table per page) is followed by its
+                # value; a running header is followed by prose -- or by the
+                # PAGE NUMBER, which is why verified page numbers are skipped.
+                # Census, 150 random repository PDFs: 102 lines taken by this
+                # arm in 66 papers; 34 are value-followed when page numbers
+                # count, 32 of them furniture ("Downloaded from ...",
+                # "Collabra: Psychology") followed by a page number, and 2 real
+                # row labels (10.1371/journal.pone.0285199 "Family income at age
+                # 10", "Household income (Per £1000)", 1.00 each).
+                _vf = _value_followed_fraction(
+                    lines, line_positions[s], ignore=_page_number_tokens
+                )
+                qualifies = _vf < _WATERMARK_MAX_VALUE_FOLLOWED
+                if not qualifies:
+                    record_fallback("repeated_line_kept_value_followed", detail=s[:120])
                 _arm = "once_per_page"
             else:
                 _per_page = collections.Counter(pages)
@@ -6980,7 +7240,7 @@ def _normalize_text(
     # interval and p-value behind it -- and it did so with no count at all,
     # which is the half of the defect this `_track` closes.
     before = t
-    t = _strip_standalone_page_numbers(t)
+    t = _strip_standalone_page_numbers(t, _pagination)
     # count = lines the helper blanked, one per page number. The helper BLANKS
     # matched lines rather than removing them (line count preserved by
     # construction — its docstring pins why), so a line-wise comparison is the
@@ -7952,7 +8212,10 @@ def _normalize_text(
         # or `-digit`.
         # The optional label group puts a page boundary BEFORE `p`, not between
         # `p` and `=` (keep_break_in_rejoin). It does not change what joins.
-        t = re.sub(r"(\S+?[ \t]*)?([<>]?=|[<>])\s*\n\s*\n\s*(?=[-.]?\d)",
+        # BOUNDED: an unbounded `\S+?` rescans a long token from every start
+        # position -- quadratic (test_normalize_scales_sub_quadratically_on_
+        # pathological_input: 0.94 s -> 4.79 s per doubling, 2026-10-08).
+        t = re.sub(r"(\S{1,24}?[ \t]*)?([<>]?=|[<>])\s*\n\s*\n\s*(?=[-.]?\d)",
                    keep_break_in_rejoin(r"\1\2 "), t)
         # Cycle 15 (v2.4.67) — cross-paragraph variant of the
         # (OR|CI|RR) → digit A1r join. Same JOIN-after-STRIP pattern as
