@@ -1,6 +1,6 @@
 """
 Edge case tests from cross-project lessons.
-Sources: ESCIcheck LESSONS.md, MetaESCI extraction report, PDFextractor LESSONS.md,
+Sources: ESCIcheck LESSONS.md, MetaESCI extraction report, the app service's LESSONS.md,
 MetaMisCitations LESSONS.md.
 """
 
@@ -129,7 +129,7 @@ class TestMetaESCIEdgeCases:
             assert result == raw, f"{raw!r} -> {result!r}"
 
 
-# ── From PDFextractor LESSONS.md ─────────────────────────────────────
+# ── From the app service's LESSONS.md ─────────────────────────────────────
 
 class TestPDFextractorLessons:
     def test_merged_f_statistics(self):

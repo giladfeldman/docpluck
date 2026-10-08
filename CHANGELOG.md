@@ -2644,10 +2644,10 @@ on the editable install would have been running that normalization and recording
 
 `get_version_info()` now returns **`git_state`** — `"clean"` / `"dirty"` / `"unknown"`, cached
 alongside `git_sha` so the two halves of one receipt cannot describe different moments. The
-vocabulary deliberately matches `PDFextractor/service/app/identity.py`, which had already had to
+vocabulary deliberately matches the app service's `identity.py`, which had already had to
 solve this at the service boundary *because the library did not offer it*.
 
-Raised by CONDUCTOR #4. Additive — no field removed or renamed.
+Raised by the cross-project coordinator. Additive — no field removed or renamed.
 
 ### Scope note for consumers
 
@@ -2878,7 +2878,7 @@ touch `extract_to_dir` / `ExtractionReport` / `get_version_info`: docpluck itsel
 (5 source files + 2 tests) — the sole consumer casualty. Explicitly **not** exposed, each with a
 two-sided control so the zero is a real zero: **Scimeto** references docpluck in 5+ Python
 files but touches none of the three symbols and reaches the library over the HTTP `/extract`
-endpoint; the **PDFextractor service** references docpluck in 4 files and calls none of the three.
+endpoint; the **app service** references docpluck in 4 files and calls none of the three.
 
 ### Also
 
@@ -3007,7 +3007,7 @@ floor — the property that makes docpluck worth fixing rather than replacing �
 
 > ### ⚠️ CHALLENGED 2026-08-28 — "papers regressed: 0" IS NOT CURRENTLY SUPPORTED
 >
-> A ScienceArena session (`sciencearena-6c`, relayed by CONDUCTOR #6) measured **`PMC13131283`
+> A ScienceArena session (`sciencearena-6c`) measured **`PMC13131283`
 > dropping 0.0306 on that arena's section metric** — a paper this row's "only two papers move
 > at all" does not contain. **`PMC13131283` IS in this population**: our own
 > our 2026-08-21 reply to ScienceArena (internal) scores it 0.3714 → 0.9245.
@@ -3994,7 +3994,7 @@ italic statistical symbols (`MyriadPro-LightIt`, 58 hits of italic *n*) are all 
 ### Found, measured, NOT repaired: `α` extracted as `a`, `=` extracted as `5`
 
 Validating the scan against a paper filed as a known NEGATIVE, the rasterized page refuted the
-label. `pdfextractor__aom__amj-1` prints *"processes (α = .93), we created a 4-item scale"* and the
+label. `aom__amj-1` prints *"processes (α = .93), we created a 4-item scale"* and the
 text layer delivers **`a5(.93)`** — `α` drawn by `AdvPS7DA6` (whole-document repertoire `D a b x`,
 the Adobe-Symbol Greek mapping) and `=` by `AdvOT463cc31e`. **A Cronbach's α ships today with both
 its name and its operator destroyed**, the same shape as the OMML deletion: an unlabelled number is
@@ -4681,7 +4681,7 @@ Publishing the verdict stays right; *acting* on it as though it described every 
 
 ### Diagnostics now ask the custodian for their corpus
 
-`tools/diag/_corpus.py` resolves the paper set through article-finder (`papers-with-view`, `corpus-query.py`) instead of globbing `PDFextractor/test-pdfs`, and every scan prints a `COVERAGE:` line naming what it measured. A denominator computed from the numerator can only ever report 100%; a glob that silently returns 40 files instead of 101 divides every count by the wrong N with nothing to show for it. New scans: `glyph_map_gap_scan.py` (which codepoints A5 leaves unmapped) and `locale_gate_blast_radius.py`.
+`tools/diag/_corpus.py` resolves the paper set through article-finder (`papers-with-view`, `corpus-query.py`) instead of globbing the app's `test-pdfs` folder, and every scan prints a `COVERAGE:` line naming what it measured. A denominator computed from the numerator can only ever report 100%; a glob that silently returns 40 files instead of 101 divides every count by the wrong N with nothing to show for it. New scans: `glyph_map_gap_scan.py` (which codepoints A5 leaves unmapped) and `locale_gate_blast_radius.py`.
 
 ## [2.4.127] - 2026-08-12
 
@@ -4817,7 +4817,7 @@ Swept all 283 commits with a new content-based detector: these 12 files, in 28 b
 
 ### `scripts/verify_corpus.py` — everything now comes from article-finder
 
-The expected paper set, each PDF, and each baseline. No directory glob, no `../PDFextractor` coupling, no `DOCPLUCK_SPIKE_BASELINE_DIR`, no `docs/superpowers/` default path.
+The expected paper set, each PDF, and each baseline. No directory glob, no sibling-app coupling, no `DOCPLUCK_SPIKE_BASELINE_DIR`, no `docs/superpowers/` default path.
 
 The coverage defect this fixes: the gate derived its corpus from `glob("*.md")` and printed `N / N` where N was *whatever it found*, so a half-present corpus reported a clean pass. The denominator now comes from `papers-with-view`, and three outcomes are kept distinct — nothing resolvable is a clean `SKIP` (exit 0), a shortfall is `PARTIAL COVERAGE` (exit 1), and only then per-paper PASS/WARN/FAIL.
 
@@ -4891,7 +4891,7 @@ Two wrong values on disk fell out of cross-model review of that change:
 
 `ExtractionFileResult` gains `n_replacement_chars` (U+FFFD) and `n_greek_chars`, both measured on the **normalized** text — exactly the bytes written to `<stem>.txt`. MetaESCI's G1/G2 acceptance gates re-scanned every written file for these. New public helpers `count_replacement_chars()` / `count_greek_chars()`; Greek covers U+0370–U+03FF and U+1F00–U+1FFF, and the matcher is compiled **from** the range table so the two cannot drift.
 
-The first implementation was a per-character Python loop: **60x slower** than the equivalent regex (29 ms vs 0.5 ms on a 50k-char paper — 247 s vs 4 s across MetaESCI's 8,431-document corpus). Replaced, with an exhaustive boundary test proving the regex and the range table agree on every codepoint around both blocks.
+The first implementation was a per-character Python loop: **60x slower** than the equivalent regex (29 ms vs 0.5 ms on a 50k-char paper — 247 s vs 4 s across a downstream 8,431-document corpus). Replaced, with an exhaustive boundary test proving the regex and the range table agree on every codepoint around both blocks.
 
 ### Dead code removed
 
@@ -5511,7 +5511,7 @@ New regression tests: `tests/test_normalize_f0_footnote_strip.py::test_f0_expose
 
 **Render: de-duplicate the table/figure label between heading and caption.** Every table/figure block was emitted as `### Table 1` immediately followed by `*Table 1. <desc>*` — the number printed twice. A final post-processor (`_dedupe_label_in_table_figure_caption`) now strips the redundant `Table N.` / `Figure N.` prefix from the italic caption when an immediately-preceding `### Table N` / `### Figure N` heading already carries it, yielding `### Table 1` + `*<desc>*`. The structured `caption` field returned by `extract_pdf_structured` is **unchanged** (verbatim printed caption, label still re-prefixed) — only the rendered markdown is de-duplicated. Runs LAST, after the caption-detecting passes (`_suppress_inline_duplicate_table_captions`, `_suppress_orphan_table_cell_text`) that key on the `Table N.` prefix, so their matching is unaffected (full render suite: 100 passed). New tests: `tests/test_render.py::test_dedupe_label_*` (table/figure positives, unlabeled/mismatched-number/no-heading negatives, idempotency).
 
-> **Cross-repo (ScienceArena, not this library):** the report's top-2 levers were adapter bugs in `MetaScienceProjects/ScienceArena` — `players/adapters/docpluck_library.py` hard-coded `footnotes: []` and called `normalize_text` **without `layout=`** (so F0 never ran and the body kept running-headers + footnotes the gold excludes), and `docpluck_tables.py` passed the caption verbatim. Those adapters were fixed to pass the layout, read `report.footnote_texts`, and strip the caption label — logic-verified against this library but **not** yet run in ScienceArena's own venv (docpluck is not installed there). See the verification write-up for details.
+> **Cross-repo (ScienceArena, not this library):** the report's top-2 levers were adapter bugs in the ScienceArena repository — `players/adapters/docpluck_library.py` hard-coded `footnotes: []` and called `normalize_text` **without `layout=`** (so F0 never ran and the body kept running-headers + footnotes the gold excludes), and `docpluck_tables.py` passed the caption verbatim. Those adapters were fixed to pass the layout, read `report.footnote_texts`, and strip the caption label — logic-verified against this library but **not** yet run in ScienceArena's own venv (docpluck is not installed there). See the verification write-up for details.
 
 ## [2.4.82] — 2026-06-08
 
@@ -5753,7 +5753,7 @@ Follow-ups (queued in `todo.md`, not blocking this ship): (a) thread `_layout_do
 
 ## [2.4.69] — 2026-05-22
 
-**Docs-only patch — domain cutover to `docpluck.app`.** `[project.urls]` Homepage now `https://docpluck.app`, Documentation now `https://docpluck.app/api-docs` (was GitHub tree URLs). Project-skill SKILL.md files updated to reference the canonical `docpluck.app` host. No code changes; `NORMALIZATION_VERSION` unchanged at 1.9.21. Push to PyPI to refresh package-page links — the GitHub repo is unchanged. See `PDFextractor/docs/superpowers/handoffs/2026-05-22-domain-cutover-docpluck-app-COMPLETED.md` for the cross-repo sweep.
+**Docs-only patch — domain cutover to `docpluck.app`.** `[project.urls]` Homepage now `https://docpluck.app`, Documentation now `https://docpluck.app/api-docs` (was GitHub tree URLs). Project-skill SKILL.md files updated to reference the canonical `docpluck.app` host. No code changes; `NORMALIZATION_VERSION` unchanged at 1.9.21. Push to PyPI to refresh package-page links — the GitHub repo is unchanged. The app repository received the same sweep.
 
 ## [2.4.68] — 2026-05-22
 
@@ -5769,7 +5769,7 @@ Tests added: `test_late_join_crosses_paragraph_for_ci_or_rr_hr`, `test_labeled_n
 
 ## [2.4.67] — 2026-05-22
 
-**Docs-only patch — domain cutover to `docpluck.app`.** `[project.urls]` Homepage now `https://docpluck.app`, Documentation now `https://docpluck.app/api-docs` (was GitHub tree URLs). No code changes; `NORMALIZATION_VERSION` unchanged at 1.9.21. Push to PyPI to refresh package-page links — the GitHub repo is unchanged. See `PDFextractor/docs/superpowers/handoffs/2026-05-22-domain-cutover-docpluck-app-COMPLETED.md` for the cross-repo sweep.
+**Docs-only patch — domain cutover to `docpluck.app`.** `[project.urls]` Homepage now `https://docpluck.app`, Documentation now `https://docpluck.app/api-docs` (was GitHub tree URLs). No code changes; `NORMALIZATION_VERSION` unchanged at 1.9.21. Push to PyPI to refresh package-page links — the GitHub repo is unchanged. The app repository received the same sweep.
 
 ## [2.4.66] — 2026-05-22
 
@@ -5979,7 +5979,7 @@ The harness Tier-D backlog still has open fail cells — 1 glyph (`plos_med_1`: 
 
 ## [2.4.55] — 2026-05-17
 
-**Cycle 2 (run 9, harness-gated) — a caption-only / isolated table rendered with no `### Table N` heading (table_parity, S1).** When `extract_pdf_structured` detects a table only by its caption — Camelot reconstructed no grid AND there is no linearized `raw_text` fallback (the table is a flat image, or sits on a page Camelot could not parse) — render.py emitted just the italic `*Table N. <caption>*` line, with no `### Table N` heading. The v2.4.2 rationale was that a bare heading "falsely promises structured content"; but dropping the heading hid the table from every structural view. A reader scanning `### Table` headings, and the verification harness's Tier-D `table_parity` check (the count of `### Table` headings must equal the count of tables in `tables.json`), both lost it — the check failed on 15 corpus documents (escicheck chan / chandrashekar / imada / jacobs / lee / wong / zhu / ziano-ppnumbing / ziano-mp; pdfextractor jama-open-5 / ar-royal-society / bjpsych-open-1 / ieee-access-5 / sci-rep-2 / sci-rep-3).
+**Cycle 2 (run 9, harness-gated) — a caption-only / isolated table rendered with no `### Table N` heading (table_parity, S1).** When `extract_pdf_structured` detects a table only by its caption — Camelot reconstructed no grid AND there is no linearized `raw_text` fallback (the table is a flat image, or sits on a page Camelot could not parse) — render.py emitted just the italic `*Table N. <caption>*` line, with no `### Table N` heading. The v2.4.2 rationale was that a bare heading "falsely promises structured content"; but dropping the heading hid the table from every structural view. A reader scanning `### Table` headings, and the verification harness's Tier-D `table_parity` check (the count of `### Table` headings must equal the count of tables in `tables.json`), both lost it — the check failed on 15 corpus documents (escicheck chan / chandrashekar / imada / jacobs / lee / wong / zhu / ziano-ppnumbing / ziano-mp; app corpus jama-open-5 / ar-royal-society / bjpsych-open-1 / ieee-access-5 / sci-rep-2 / sci-rep-3).
 
 Fix (v2.4.55) — render.py's in-section caption-only-table branch now emits `### {label}` + the italic caption, consistent with the appendix leftover-table path (which already emitted `### {label}` for a caption-only table — so the two paths were silently inconsistent). The `*{caption}*` italic line is kept immediately after the heading, so `_suppress_orphan_table_cell_text` still recognizes it and drops any linearized orphan cell-rows beneath. Keyed purely on the structural signature (an in-section table with a caption but no html/raw_text), not on paper identity.
 
@@ -6627,7 +6627,7 @@ tests to compare the points 14 Q. XIAO ET AL.*` — should be just
   etc.) — needs blank-after constraint relaxation per heading class
 - Frontend Markdown rendering quality (Rendered tab vs Tables tab UX
   per user 2026-05-14 directive) — outside library scope, fix lives in
-  `PDFextractor/frontend/`
+  the app's `frontend/`
 
 ### Versioning
 
@@ -6726,7 +6726,7 @@ isolated tables.
 
 The user's original "Rendered tab doesn't show tables as nicely as
 Tables tab" concern is a frontend rendering issue: how
-`PDFextractor/frontend/` renders the library's `<table>` HTML inside
+The app's `frontend/` renders the library's `<table>` HTML inside
 markdown (escaping, code-block fallback for `unstructured-table`,
 mobile UI parity, etc.). The library output itself is correct and
 matches the Tables tab's structured data 1:1.
@@ -7073,7 +7073,7 @@ Two pattern groups inside P1:
 - `tests/test_normalize_metadata_leak_real_pdf.py` — 13 contract tests on
   synthetic strings + 4 real-PDF integration tests (one per affected
   paper) exercising the public `render_pdf_to_markdown` entry point
-  against the actual fixtures in `../PDFextractor/test-pdfs/`.
+  against the actual fixtures in the app's `test-pdfs/` folder.
 - The truncated-affiliation test asserts the *full* `Department of
   Psychology, University of Minnesota` form is preserved unchanged
   (regression guard for the late-affiliations appendix).
@@ -7306,7 +7306,7 @@ empathy. We provided full analyses…") is excluded.
 
 - `docpluck/pyproject.toml` declared only `pdfplumber>=0.11.0` as a runtime dep.
 - `docpluck/tables/camelot_extract.py:276-278` swallows `ImportError` and returns `[]` if camelot can't be imported.
-- `PDFextractor/service/requirements.txt` only pins `docpluck[all]` plus FastAPI/uvicorn/etc — no `camelot-py`.
+- the app's `service/requirements.txt` only pins `docpluck[all]` plus FastAPI/uvicorn/etc — no `camelot-py`.
 - The Railway Dockerfile installs only `poppler-utils` + `git`. No Ghostscript (needed by Camelot's lattice flavor for line detection), no libgl1/libglib2.0-0 (needed by opencv-python which Camelot[cv] depends on).
 - The Camelot decision was settled 2026-05-09 (memory `project_camelot_for_tables`: "Stream flavor, MIT, replaces pdfplumber after 5-option bake-off") but the dependency was never added.
 
@@ -7315,8 +7315,8 @@ Diagnostic: local probe at v2.4.12 returns 5 structured + 4 isolated tables for 
 ### Fix
 
 1. **`docpluck/pyproject.toml`** — added `camelot-py[cv]>=0.11.0` as a hard runtime dependency. The `[cv]` extra pulls in opencv-python for Camelot's lattice line detection.
-2. **`PDFextractor/service/Dockerfile`** — added `ghostscript libgl1 libglib2.0-0` to the apt-get install. Ghostscript is required by Camelot lattice at runtime; libgl1/libglib2.0-0 are OpenCV's system deps.
-3. **`PDFextractor/service/app/main.py::/_diag`** — expanded to report `camelot_version`, `opencv_version`, and `ghostscript_binary` path. After this fix lands and the next /_diag probe runs, regressions of this class will surface immediately (an "NOT INSTALLED" string in the diag response).
+2. **the app's `service/Dockerfile`** — added `ghostscript libgl1 libglib2.0-0` to the apt-get install. Ghostscript is required by Camelot lattice at runtime; libgl1/libglib2.0-0 are OpenCV's system deps.
+3. **the app's `service/app/main.py::/_diag`** — expanded to report `camelot_version`, `opencv_version`, and `ghostscript_binary` path. After this fix lands and the next /_diag probe runs, regressions of this class will surface immediately (an "NOT INSTALLED" string in the diag response).
 
 ### Verification
 
@@ -7414,7 +7414,7 @@ The v2.4.6 `_suppress_orphan_table_cell_text` split input on `\n\n+` to identify
 
 ### Diagnostic added
 
-2. **`PDFextractor/service/app/main.py::/_diag`** — new endpoint that reports `docpluck.__version__`, the loaded `render.py` file path, and a presence-check for each v2.4.6+ post-processor. Used during diagnosis to confirm the library was correctly installed on prod (it was) — narrowing the bug to a behavioral mismatch rather than a stale-install issue.
+2. **the app's `service/app/main.py::/_diag`** — new endpoint that reports `docpluck.__version__`, the loaded `render.py` file path, and a presence-check for each v2.4.6+ post-processor. Used during diagnosis to confirm the library was correctly installed on prod (it was) — narrowing the bug to a behavioral mismatch rather than a stale-install issue.
 
 ### Bumps
 
@@ -7795,7 +7795,7 @@ Follow-up to v2.3.0. Closes the four remaining items from an internal handoff an
 
 ### Follow-up
 
-`PDFextractor/service/requirements.txt` pin bumped from `@v2.3.0` to `@v2.3.1`.
+the app's `service/requirements.txt` pin bumped from `@v2.3.0` to `@v2.3.1`.
 
 ---
 
@@ -7832,7 +7832,7 @@ Ports the splice-spike's Section F (cell-cleaning) helpers into the library, per
 
 ### App-repo follow-up
 
-`PDFextractor/service/requirements.txt` needs its git pin bumped from `@v2.2.0` to `@v2.3.0`; `/docpluck-deploy`'s pre-flight check 4 enforces this.
+the app's `service/requirements.txt` needs its git pin bumped from `@v2.2.0` to `@v2.3.0`; `/docpluck-deploy`'s pre-flight check 4 enforces this.
 
 ### Source
 
@@ -8452,7 +8452,7 @@ cross-format benchmarks.
   - `tests/test_benchmark_docx_html.py` — 15 ground-truth statistical passages survive
     extraction and normalization for both formats with rapidfuzz ≥ 90% matching.
     Idempotency, quality scoring, and performance verified.
-- **FastAPI service updates** (`PDFextractor/service/app/main.py`):
+- **FastAPI service updates** (the app's `service/app/main.py`):
   - File type detection (PDF, DOCX, HTML, HTM) with per-type magic-byte validation
   - Extraction routing to the correct engine
   - Response format adds `file_type` field; `pdf_hash` kept for backward compat

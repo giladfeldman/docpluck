@@ -35,8 +35,6 @@ requires_pdftotext = pytest.mark.skipif(
     shutil.which("pdftotext") is None, reason="pdftotext not installed"
 )
 
-# PDFextractor is docpluck's sibling repo — derive the path from this file so
-# the test is robust to where the tree is checked out.
 
 # Honest corpus-wide gate. The ratchet is the count of still-non-idempotent
 # papers in the strided sample below. Each idempotency cycle lowers it:

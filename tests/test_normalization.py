@@ -1,7 +1,7 @@
 """
 Tests for the 14-step normalization pipeline.
 Covers every step (S0-S9, A1-A5) with edge cases from ESCIcheck, MetaESCI,
-MetaMisCitations, and PDFextractor LESSONS.md.
+MetaMisCitations, and the app service's LESSONS.md.
 """
 
 from docpluck.normalize import normalize_text, NormalizationLevel

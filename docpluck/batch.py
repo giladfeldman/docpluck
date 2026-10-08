@@ -65,7 +65,7 @@ _GREEK_RANGES = ((0x0370, 0x03FF), (0x1F00, 0x1FFF))
 #: Compiled FROM :data:`_GREEK_RANGES` rather than written out, so the two
 #: cannot drift. A per-character Python loop over these ranges measured **60x
 #: slower** than the regex (29 ms vs 0.5 ms on a 50k-char paper — 247 s vs 4 s
-#: across MetaESCI's 8,431-document corpus), which is a real cost for a signal
+#: across a downstream 8,431-document corpus), which is a real cost for a signal
 #: computed on every file of every batch.
 _GREEK_RE = re.compile(
     "[" + "".join(f"\\u{lo:04X}-\\u{hi:04X}" for lo, hi in _GREEK_RANGES) + "]"

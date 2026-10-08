@@ -91,7 +91,7 @@ Before: "The eﬀect was signiﬁcant (p < .001)"
 After:  "The effect was significant (p < .001)"
 ```
 
-**Source:** PDFextractor Lesson 3 — ligatures in psychological literature.
+**Source:** app-service lesson 3 — ligatures in psychological literature.
 
 ---
 
@@ -165,7 +165,7 @@ Before: "p\u00A0<\u00A0.001 (N\u2009=\u200B1\u200924)"
 After:  "p < .001 (N = 1 24)"   → then trailing spaces collapsed
 ```
 
-**Source:** PDFextractor Lesson 6 (soft hyphen), ESCIcheck Lesson 9 (Unicode spaces).
+**Source:** app-service lesson 6 (soft hyphen), ESCIcheck Lesson 9 (Unicode spaces).
 
 ---
 

@@ -159,7 +159,7 @@ Found in **14 out of 50 test PDFs**, with up to 151 instances in a single paper 
 reasoning that justified it is the clearest example in this document of a mistake the project now
 has a hard rule against.
 
-~~MetaESCI analysis of 121,000 results found that 4.88% of p-values had dropped leading decimal
+~~A downstream analysis of 121,000 results found that 4.88% of p-values had dropped leading decimal
 points (`p = 484` for `p = .484`). Detection heuristic: a p-value > 1.0 and < 1000 with 2-3 digits
 is almost certainly a dropped decimal.~~
 

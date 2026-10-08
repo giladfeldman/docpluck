@@ -14,7 +14,7 @@ tree is edited reports ``clean`` forever.
 
 The SHA stays cached BY DESIGN and these tests do not touch it: it names the
 identity the process loaded, and its staleness class (``stale``) is handled at
-the app boundary (``PDFextractor`` ``service/app/identity.py``), a recorded
+the app boundary (the app's ``service/app/identity.py``), a recorded
 decision in ``_resolve_git_state``'s docstring. A frozen SHA beside a live
 ``dirty`` says exactly the true thing: the tree no longer matches the identity
 this process loaded.

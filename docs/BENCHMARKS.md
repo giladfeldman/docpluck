@@ -77,7 +77,7 @@ This false positive difference is what makes pymupdf4llm unsuitable for non-psyc
 
 ## Cross-Project Artifact Rates
 
-Artifact rates observed across real deployments. Sources: ESCIcheck (51 PDFs, ~475 statistical values), MetaESCI (8,456 PDFs, 121,000 results), MetaMisCitations (33 PDFs).
+Artifact rates observed across real deployments. Sources: ESCIcheck (51 PDFs, ~475 statistical values), a downstream meta-research corpus (8,456 PDFs, 121,000 results), MetaMisCitations (33 PDFs).
 
 ### Normalization artifacts (how often each pipeline step fires)
 
@@ -87,9 +87,9 @@ Artifact rates observed across real deployments. Sources: ESCIcheck (51 PDFs, ~4
 | Statistical line breaks (`p =\n0.001`) | **0.77%** | A1 | MetaESCI |
 | Column merge garbling | **0.65%** | Quality detection | MetaESCI |
 | Page footer in p-value (`p = 806 U.S.`) | **0.25%** | Partial S9 | MetaESCI |
-| Soft hyphen in words | Found in 14/50 test PDFs | S6 | PDFextractor corpus |
+| Soft hyphen in words | Found in 14/50 test PDFs | S6 | app test corpus |
 | SMP Unicode (Math Italic fonts) | Found in 2/50 test PDFs | ~~pdfplumber recovery~~ (retired 2026-09-24; U+FFFD now passes through, see below) | hosted-service test corpus |
-| Ligatures remaining after extraction | 27.6 avg per PDF | S3 | PDFextractor corpus |
+| Ligatures remaining after extraction | 27.6 avg per PDF | S3 | app test corpus |
 
 ### Statistical reporting artifacts (downstream consumer issues)
 
@@ -136,7 +136,7 @@ The test suite is actively expanded; use the repository CI as the current source
 |------|:-----:|---------|
 | `test_normalization.py` | 63 | Core normalization families plus edge-case coverage |
 | `test_quality.py` | 10 | Score ranges, garbled detection, confidence levels |
-| `test_edge_cases.py` | 30+ | Cross-project lessons (ESCIcheck, MetaESCI, PDFextractor, Unicode) |
+| `test_edge_cases.py` | 30+ | Cross-project lessons (ESCIcheck, MetaESCI, the app service, Unicode) |
 | `test_extraction.py` | 15+ | Real PDFs, U+FFFD pass-through, 8 citation styles (skips if no poppler) |
 | `test_extract_html.py` | 46 | Block/inline tree-walk, ChanORCID regression, whitespace, entities |
 | `test_extract_docx.py` | 18 | Mammoth integration, soft breaks, smart quotes, ligatures |

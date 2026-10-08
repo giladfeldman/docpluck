@@ -100,8 +100,8 @@ def test_no_sibling_private_project_paths_in_tracked_source():
     offenders: list[str] = []
     pattern = re.compile(
         r"""(?x)
-        [A-Za-z]:[/\\]{1,2}Users .* (CitationGuard|ESCIcheck|MetaESCI|ScienceArena|PDFextractor)
-      | /home/[a-z]+/ .* (CitationGuard|ESCIcheck|MetaESCI|ScienceArena|PDFextractor)
+        [A-Za-z]:[/\\]{1,2}Users[/\\] .* [/\\][A-Z][A-Za-z]+   # any project dir under a home;
+      | /home/[a-z]+/ .* /[A-Z][A-Za-z]+                     # naming the projects would leak them
         """
     )
     for path in _tracked_text_files():
@@ -181,7 +181,7 @@ def test_no_internal_reference_in_tracked_files():
         'root = Path.home() / "Vibe"',
         "os.environ.get('VIBE_ROOT')",
         "# measured on CitationGuard's corpus",
-        'p = base / "ArticleRepository" / "fulltext"',
+        'p = base / ARTICLE_DIR  # the ArticleRepository folder',
         "see communications/FINDINGS_2026-01-01.md",
         "~/.claude/skills/article-finder/find-pdf.py",
         'os.path.join(home, ".claude", "skills")',

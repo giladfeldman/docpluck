@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Cross-repo version-sync gate: docpluck library <-> docpluckapp service pin.
+"""Cross-repo version-sync gate: docpluck library <-> app service pin.
 
-The app (giladfeldman/docpluckapp) imports the library via a git pin in
+The app (the private app repository) imports the library via a git pin in
 ``service/requirements.txt``::
 
     docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git@v<VERSION>
@@ -26,7 +26,7 @@ A local script beats a workflow here for the reason the incident showed: it runs
 in a known order, on demand, with the result visible immediately — rather than
 in a race between two runners whose finish order nobody controls.
 
-Authoritative source of truth for the app pin is docpluckapp **origin/master**
+Authoritative source of truth for the app pin is the app's **origin/master**
 (that is what Railway deploys), NOT the local working-tree file — a stale local
 clone shows an old pin even when production is correctly synced. The script
 fetches origin/master and reads the pin from there; it falls back to the local
@@ -51,7 +51,7 @@ import re
 import subprocess
 from pathlib import Path
 
-# docpluckapp service/requirements.txt pin line, e.g.
+# the app's service/requirements.txt pin line, e.g.
 #   docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git@v2.4.95
 _PIN_RE = re.compile(
     r"docpluck\[all\]\s*@\s*git\+https://github\.com/giladfeldman/docpluck\.git@v?(\d+\.\d+\.\d+)"
@@ -158,13 +158,13 @@ def _lib_version(repo: Path) -> str | None:
 def _app_pin(app_repo: Path, allow_local_fallback: bool) -> tuple[str | None, str]:
     """Return (pin_version, source_description). Prefers origin/master."""
     rel = "service/requirements.txt"
-    # Authoritative: docpluckapp origin/master (what Railway deploys).
+    # Authoritative: the app's origin/master (what Railway deploys).
     _git(app_repo, "fetch", "origin", "--quiet")
     remote = _git(app_repo, "show", f"origin/master:{rel}")
     if remote:
         m = _PIN_RE.search(remote)
         if m:
-            return m.group(1), "docpluckapp origin/master (production-authoritative)"
+            return m.group(1), "app origin/master (production-authoritative)"
 
     # Fallback: local working tree — may be stale; only with explicit opt-in.
     local_file = app_repo / "service" / "requirements.txt"
@@ -322,7 +322,7 @@ def apply_fix(app_repo: Path, latest_tag: str, current_pin: str | None, push: bo
         if _git(app_repo, "push", "origin", "HEAD:master") is None:
             print("FAIL: git push failed — commit is local; push it yourself")
             return 1
-        print("pushed to docpluckapp master (Railway will redeploy)")
+        print("pushed to the app's master (Railway will redeploy)")
     else:
         print("NOT pushed (use --push, or push from the app repo yourself)")
     return 0

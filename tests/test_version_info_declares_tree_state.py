@@ -13,7 +13,7 @@ normalization and recording `git_sha: 9504ad9` for it. `dirty` appeared **zero
 times anywhere under `docpluck/`**, so nothing in the receipt could have said
 so.
 
-The `PDFextractor` service had already had to solve this at its own boundary
+The app service had already had to solve this at its own boundary
 (`service/app/identity.py`, `state = "dirty" if porcelain else "clean"`)
 *because the library did not offer it*. `git_state` uses that same vocabulary
 rather than a second spelling — one concept, one table, or the two receipts

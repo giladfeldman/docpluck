@@ -183,7 +183,7 @@ def _resolve_git_state() -> str:
     ``git_sha: 9504ad9`` for it, and nothing in the receipt could have told
     anyone. `dirty` appeared ZERO times anywhere under ``docpluck/``.
 
-    The vocabulary deliberately mirrors ``PDFextractor``'s
+    The vocabulary deliberately mirrors the app service's
     ``service/app/identity.py``, which already had to solve this at the service
     boundary because the library did not offer it. One concept, one table — a
     second spelling of the same state is how two receipts come to disagree.
