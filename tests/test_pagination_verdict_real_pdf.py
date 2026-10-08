@@ -71,3 +71,26 @@ def test_a_second_pass_elects_no_offset_from_table_integers():
     once, _ = normalize_text(raw, NormalizationLevel.academic)
     twice, _ = normalize_text(once, NormalizationLevel.academic)
     assert once == twice
+
+
+# Consult round 2026-10-08 (Sonnet, tier 2), findings 1 and 3, reproduced here.
+def test_a_row_label_followed_by_a_value_equal_to_a_page_token_is_still_value_followed():
+    """F1 guard: a verified page-number TOKEN must be skipped only where it sits
+    like a page number (set off by a blank line), never when it is glued under
+    a row label as that label's value."""
+    from docpluck.normalize import _value_followed_fraction
+
+    lines = ["Number of participants", "4", "Mean age", "", "Collabra: Psychology", "", "4", "", "Body."]
+    assert _value_followed_fraction(lines, [0], ignore=frozenset({"4"})) == 1.0
+    # ...while a running header followed (after a blank line) by its page number is not.
+    assert _value_followed_fraction(lines, [4], ignore=frozenset({"4"})) == 0.0
+
+
+def test_years_are_not_elected_as_four_digit_page_numbers():
+    """Finding 3: 2019 / 2020 / 2021 each as its own block on consecutive pages
+    (a year axis) satisfy the arithmetic; the later 4-digit rule already excludes
+    1900-2100 as years, and so does the verdict."""
+    body = "".join(f"Body sentence {i}.\n" for i in range(30))
+    raw = "".join(f"{body}\n{y}\n\n{body}\f" for y in (2019, 2020, 2021, 2022))
+    verdict = _pagination_verdict(raw)
+    assert verdict is not None and not verdict.members, verdict

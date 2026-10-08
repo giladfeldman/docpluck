@@ -734,7 +734,12 @@ def _pagination_verdict(raw: str) -> PaginationVerdict | None:
             # p2-7: markers 2-5, 7 happen to equal the page numbers there).
             above = i == 0 or not all_lines[i - 1].strip()
             below = i == len(all_lines) - 1 or not all_lines[i + 1].strip()
-            if above or below:
+            # A 4-digit value in 1900-2100 is a year as readily as a page
+            # number (a year axis, a "Year" column); the later 4-digit rule
+            # excludes that range too, so the verdict does not lose anything the
+            # pipeline used to strip (consult 2026-10-08, Sonnet finding 3).
+            year_like = 1900 <= int(m.group(2)) <= 2100
+            if (above or below) and not year_like:
                 cands.append((k, min(k, n - 1 - k), int(m.group(2))))
         per_page.append(cands)
         all_bare.append(bare)
@@ -6142,8 +6147,13 @@ def _value_followed_fraction(
             nxt = lines[j].strip().strip(PAGE_BREAK).strip()
             if not nxt:
                 continue
-            if nxt in ignore:
-                continue  # a verified page number is not the value a label labels
+            if nxt in ignore and j > i + 1:
+                # A verified page number set off by a blank line is not the
+                # value a label labels. Glued directly under the line it is that
+                # line's value, whatever its digits (consult 2026-10-08, Sonnet:
+                # a token set is values, not positions; `Number of participants`
+                # / `4` in a 12-page paper).
+                continue
             if _VALUE_ONLY_LINE.match(nxt):
                 hits += 1
             break
