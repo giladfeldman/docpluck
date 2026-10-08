@@ -1418,6 +1418,45 @@ _HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
+# A LABELLED statistic: `p = .031`, `N = 245`, `F(2, 42) = 5`, `β = .48`.
+# A verbose-mode fragment with no inline flags, so `render._STATISTICAL_CONTENT_RE`
+# can compose it -- one table for both questions. That predicate also counts any
+# decimal or percentage, which is right for a table cell and wrong for H0: a
+# masthead line is made of identifiers (`ASRXXX10.1177/0003...`) and dates.
+_LABELLED_STATISTIC_PATTERN = r"""(?:
+    \b(?:[MSDNnprtzFbd]|SD|SE|CI|OR|RR|HR|BF|df|chi2|eta2|beta)\s*
+        [=<>≤≥]\s*[-+−]?[\d.]     # a labelled statistic: N = 245
+  | \b[A-Za-z][A-Za-z0-9]*\s*\([^)]*\)\s*[=<>≤≥]\s*[-+−]?\d
+                                     # a bracketed statistic: F(2, 42) = 5
+  | [βχηρωΒΧΗΡΩ][²³₀-₉0-9]*\s*[=<>≤≥(]
+                                     # a Greek-labelled statistic: β = , χ²(1)
+)"""
+_LABELLED_STATISTIC_RE = re.compile(_LABELLED_STATISTIC_PATTERN, re.VERBOSE)
+
+# What an H0 banner line legitimately carries and a statistic test must not see:
+# a URL, a DOI, an e-mail address.
+_BANNER_IDENTIFIER_RE = re.compile(
+    r"https?://\S+|\bwww\.\S+|\b(?:doi:\s*)?10\.\d{4,9}/\S+|\S+@\S+"
+)
+
+
+def _banner_line_carries_statistic(line: str) -> bool:
+    """H0's deletion guard: does this banner-shaped line also carry a statistic?
+
+    Promised to ESCImate (2026-08-22, their §3): a rule that deletes a span must
+    first assert the span holds no published value. The guard sits on H0's LINE
+    deletion rather than on `_strip_furniture_controls`, because removing a
+    BACKSPACE cannot destroy a number -- deleting the line it was glued to can.
+
+    Measured before shipping over the 125-paper manifest: H0 drops 313 lines,
+    0 of which carry a labelled statistic, so the guard changes no current
+    output. The broader `_carries_statistical_content` would have kept 15 of
+    them, all furniture (journal mastheads, arXiv stamps) -- the reason this
+    asks the narrower question.
+    """
+    return bool(_LABELLED_STATISTIC_RE.search(_BANNER_IDENTIFIER_RE.sub(" ", line)))
+
+
 def _strip_document_header_banners(text: str) -> str:
     """H0: drop publisher/journal/repo banner lines in the document header zone.
 
@@ -1549,6 +1588,10 @@ def _strip_document_header_banners(text: str) -> str:
             if stripped and any(
                 p.match(stripped) for p in _HEADER_BANNER_PATTERNS
             ):
+                if _banner_line_carries_statistic(stripped):
+                    record_fallback("h0_banner_kept_statistic", detail=stripped[:120])
+                    out_lines.append(line)
+                    continue
                 dropped_any = True
                 keep_page_break(line, out_lines)
                 continue

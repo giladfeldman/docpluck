@@ -35,6 +35,7 @@ from .extract_structured import extract_pdf_structured
 from .telemetry import fallback_scope, record_fallback
 from .normalize import (
     NormalizationLevel,
+    _LABELLED_STATISTIC_PATTERN,
     _looks_like_running_header_or_footer,
     _rejoin_garbled_ocr_headers,
     decompose_ligatures,
@@ -4659,16 +4660,13 @@ _STATISTICAL_CONTENT_RE = re.compile(
     [-+−]?\d+[.,]\d+            # any decimal:      4.52   0,87   -1.13
   | (?<![\w.])\.\d+                  # leading-dot value: .006  .05
   | \d+\s*%                          # a percentage:     68 %
-  | \b(?:[MSDNnprtzFbd]|SD|SE|CI|OR|RR|HR|BF|df|chi2|eta2|beta)\s*
-        [=<>≤≥]\s*[-+−]?[\d.]     # a labelled statistic: N = 245
-  | \b[A-Za-z][A-Za-z0-9]*\s*\([^)]*\)\s*[=<>≤≥]\s*[-+−]?\d
-                                     # a bracketed statistic: F(2, 42) = 5
   | \b\d+\s*(?:×|x)\s*\d+       # a design:         2 x 3
-  | [βχηρωΒΧΗΡΩ][²³₀-₉0-9]*\s*[=<>≤≥(]
-                                     # a Greek-labelled statistic: β = , χ²(1)
   | \b(?:R|Z|Q|F|BF)[²³0-9₀-₉]*\s*[=<>≤≥(]
                                      # R² = , Z = , BF₁₀ = , F(
-    """
+  | """
+    # The labelled, bracketed and Greek-labelled arms live in normalize.py so
+    # H0's banner strip can ask the narrower question with the same table.
+    + _LABELLED_STATISTIC_PATTERN
 )
 # The Greek/`R²` arms were merged in from `_suppress_inline_duplicate_figure_
 # captions`, which carried its OWN second detector — one that knew β/χ²/η²/R²
