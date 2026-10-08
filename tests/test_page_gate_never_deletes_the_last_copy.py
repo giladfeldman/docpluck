@@ -608,7 +608,7 @@ def test_late_join_without_a_boundary_is_unchanged_by_the_label_group():
 
 
 def test_late_join_never_puts_the_boundary_inside_a_long_glued_token():
-    """Consult 2026-10-09 (Sonnet) finding 1: the bounded label `\S{1,24}?` could
+    """Consult 2026-10-09 (Sonnet) finding 1: the bounded label (1-24 non-space characters) could
     start mid-token when the glued run before `=` exceeds 24 characters, putting
     the form feed inside `1.25`."""
     out, _ = _norm("Values (M=1.25,SD=3.40,t(45)=2.10,p=\n\n" + PAGE_BREAK + ".25) were seen.\n")
