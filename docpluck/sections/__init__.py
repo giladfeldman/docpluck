@@ -27,6 +27,35 @@ def _detect_format(file_bytes: bytes) -> str:
     raise ValueError("Could not detect source format from bytes; pass source_format=")
 
 
+def _normalize_markup_text(text, hints, level, preserve_math_glyphs):
+    """Normalize a DOCX/HTML reconstruction and carry its hints to the result.
+
+    A hint whose whole span normalization deleted is dropped and recorded
+    (``sections_markup_hint_dropped``) rather than kept as an empty heading.
+    """
+    from dataclasses import replace
+
+    from ..normalize import normalize_text
+    from ..telemetry import record_fallback
+    from ._offsets import line_offset_mapper
+
+    normalized, _report = normalize_text(
+        text, level, preserve_math_glyphs=preserve_math_glyphs
+    )
+    if normalized == text:
+        return text, hints
+    to_norm = line_offset_mapper(text, normalized)
+    moved = []
+    for h in hints:
+        s = to_norm(h.char_start)
+        e = max(to_norm(h.char_end), s)
+        if s == e and h.char_end > h.char_start:
+            record_fallback("sections_markup_hint_dropped", detail=h.text[:80])
+            continue
+        moved.append(replace(h, char_start=s, char_end=e, text=normalized[s:e]))
+    return normalized, moved
+
+
 def extract_sections(
     file_bytes: bytes | None = None,
     *,
@@ -50,10 +79,13 @@ def extract_sections(
             and watermark patterns are calibrated against academic-normalized
             text, so lowering it will detect fewer sections.
 
-            **PDF only.** The DOCX and HTML branches reconstruct text from
-            markup and never call ``normalize_text``, so there is no level to
-            apply; passing a non-default level for those formats raises
-            ``ValueError`` rather than accepting an argument it would ignore.
+            Applies to PDF, DOCX and HTML bytes. Until 2026-10-08 the DOCX
+            and HTML branches never called ``normalize_text``, so their
+            ``normalized_text`` was the raw markup reconstruction (a U+2212
+            minus reached consumers as U+2212) and a non-default level raised.
+            They now normalize, and the markup hints' offsets are carried to
+            the normalized text (``sections/_offsets.py``). With ``text=``,
+            the caller's text is used as given and a non-default level raises.
             (v2.4.126 — the parameter previously existed one layer up, on
             ``render_pdf_to_markdown``, where it was accepted, documented as
             forwarded, and silently discarded.)
@@ -166,34 +198,23 @@ def extract_sections(
 
     _reject_raw_text_for_markup(fmt, _raw_text)
 
-    if fmt == "html":
-        _reject_unusable_level("HTML input")
-        from .annotators.html import annotate_html
+    if fmt in ("html", "docx"):
         from .core import partition_into_sections
-        reconstructed_text, hints = annotate_html(file_bytes)
-        sections = partition_into_sections(
-            reconstructed_text, hints, source_format="html"
+        if fmt == "html":
+            from .annotators.html import annotate_html
+            reconstructed_text, hints = annotate_html(file_bytes)
+        else:
+            from .annotators.docx import annotate_docx
+            reconstructed_text, hints = annotate_docx(file_bytes)
+        normalized, hints = _normalize_markup_text(
+            reconstructed_text, hints, level, preserve_math_glyphs
         )
+        sections = partition_into_sections(normalized, hints, source_format=fmt)
         return SectionedDocument(
             sections=sections,
-            normalized_text=reconstructed_text,
+            normalized_text=normalized,
             sectioning_version=SECTIONING_VERSION,
-            source_format="html",
-        )
-
-    if fmt == "docx":
-        _reject_unusable_level("DOCX input")
-        from .annotators.docx import annotate_docx
-        from .core import partition_into_sections
-        reconstructed_text, hints = annotate_docx(file_bytes)
-        sections = partition_into_sections(
-            reconstructed_text, hints, source_format="docx"
-        )
-        return SectionedDocument(
-            sections=sections,
-            normalized_text=reconstructed_text,
-            sectioning_version=SECTIONING_VERSION,
-            source_format="docx",
+            source_format=fmt,
         )
 
     raise NotImplementedError(

@@ -327,10 +327,17 @@ def test_the_sections_path_also_recovers_the_statistic_names():
     """`extract_sections(docx)` must not delete what `extract_docx` preserves."""
     from docpluck.sections import extract_sections
 
+    # Since 2026-10-08 this field IS normalized, so academic level spells the
+    # Greek name in ASCII exactly as the PDF path does (A5); the name must
+    # survive in that form, and verbatim when math glyphs are preserved.
     doc = extract_sections(_docx_with_body(_STAT_PARA), source_format="docx")
     text = doc.normalized_text
-    assert "\u03b7p2" in text, "the sections path still deletes the statistic's NAME"
+    assert "etap2 = .361" in text, "the sections path still deletes the statistic's NAME"
     assert ", = .361" not in text, "a bare unlabelled value must not be emitted"
+    kept = extract_sections(
+        _docx_with_body(_STAT_PARA), source_format="docx", preserve_math_glyphs=True
+    ).normalized_text
+    assert "\u03b7p2 = .361" in kept, kept
 
 
 def test_mammoth_was_announcing_the_deletion_all_along():
