@@ -575,3 +575,33 @@ def test_a_genuine_running_header_is_still_stripped_after_the_arm_is_gone():
     """TWO-SIDED. Removing the arm must not stop the once-per-page rule working."""
     out, _ = _norm(_paginated(_HEADER, 9))
     assert out.count(_HEADER) == 1
+
+
+# The late-join sites that anchor on the PREVIOUS token's comma or on an
+# operator. Before 2026-10-08 they re-emitted the boundary inside a statistic:
+# `2.34\f, 95% CI`, `p \f= .031` (Fable census: 5 of 994 boundaries).
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("The effect was reliable, t(28) = 2.34,\n\n" + PAGE_BREAK
+         + "95% CI [1.21, 3.40], in all samples.\n",
+         "t(28) = 2.34, " + PAGE_BREAK + "95% CI [1.21, 3.40]"),
+        ("The effect was reliable, F(1, 28) = 5.10,\n\n" + PAGE_BREAK
+         + "p = .031, in all samples.\n",
+         "F(1, 28) = 5.10, " + PAGE_BREAK + "p = .031"),
+        ("The effect was reliable, F(1, 28) = 5.10, p =\n\n" + PAGE_BREAK
+         + ".031, in all samples.\n",
+         "F(1, 28) = 5.10, " + PAGE_BREAK + "p = .031"),
+        ("The hazard ratio 95% CI\n\n" + PAGE_BREAK + "2.046 was large.\n",
+         "ratio " + PAGE_BREAK + "95% CI 2.046"),
+    ],
+)
+def test_late_join_puts_the_boundary_before_the_statistic_not_inside_it(text, expected):
+    out, _ = _norm(text)
+    assert out.count(PAGE_BREAK) == 1, out
+    assert expected in out, out
+
+
+def test_late_join_without_a_boundary_is_unchanged_by_the_label_group():
+    out, _ = _norm("The effect was reliable, F(1, 28) = 5.10, p <=\n\n.031, in all.\n")
+    assert "p <= .031" in out and PAGE_BREAK not in out, out

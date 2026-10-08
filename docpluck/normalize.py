@@ -432,7 +432,7 @@ def page_break_residue(line: str) -> str:
     return PAGE_BREAK * line.count(PAGE_BREAK)
 
 
-def keep_break_in_rejoin(template: str):
+def keep_break_in_rejoin(template: str, *, after: bool = False):
     """``re.sub`` replacement that REJOINS a token yet keeps its page boundary.
 
     The third form of the same promise, for the sites that repair a statistic
@@ -464,10 +464,21 @@ def keep_break_in_rejoin(template: str):
     not the count: it is that a rule which silently deletes structure is the
     class this release exists to close, and leaving two instances of it behind
     because they are rare is how the other seven survived.
+
+    WHERE "before the whole token" is depends on what the pattern anchors on.
+    A pattern that matches FROM the token's first character (``CI``, ``[``)
+    emits the boundary first. One anchored on the PREVIOUS token's trailing
+    comma (``2.34,`` + lookahead ``95% CI``) passes ``after=True``: the boundary
+    then lands after the rejoined separator, in front of the token the lookahead
+    names (``2.34, \\f95% CI``), not inside the number before it (``2.34\\f,``).
+    The operator site captures its label in the match for the same reason
+    (``\\fp = .25``, not ``p \\f= .25``).
     """
 
     def _repl(m: "re.Match[str]") -> str:
-        return page_break_residue(m.group(0)) + m.expand(template)
+        residue = page_break_residue(m.group(0))
+        joined = m.expand(template)
+        return joined + residue if after else residue + joined
 
     return _repl
 
@@ -7883,8 +7894,10 @@ def _normalize_text(
         # those tokens (test_column_bleed_too_many_fragments_ignored is
         # unaffected — its input has no leading `,`/`;`).
         # Clears korbmacher (2 papers) from the non-idempotent set.
-        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=\d+%\s*CI)", keep_break_in_rejoin(r"\1 "), t)
-        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=p\s*[<=>])", keep_break_in_rejoin(r"\1 "), t)
+        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=\d+%\s*CI)",
+                   keep_break_in_rejoin(r"\1 ", after=True), t)
+        t = re.sub(r"([,;])\s*\n\s*\n\s*(?=p\s*[<=>])",
+                   keep_break_in_rejoin(r"\1 ", after=True), t)
         # Cycle 13 (v2.4.65) — same shape, applied to `=/<>` → digit/dot
         # continuations. li-feldman-fox has `p =\n\n\x0cFox et al. (2005)...
         # \n\n38\n\n.25, OR = .96, 95%CI [.90, 1.03])` where A1's
@@ -7894,7 +7907,10 @@ def _normalize_text(
         # cleaned form. The lookahead `(?=[-\d.])` is the load-bearing
         # constraint — real paragraphs rarely START with a leading dot
         # or `-digit`.
-        t = re.sub(r"([=<>])\s*\n\s*\n\s*(?=[-.]?\d)", keep_break_in_rejoin(r"\1 "), t)
+        # The optional label group puts a page boundary BEFORE `p`, not between
+        # `p` and `=` (keep_break_in_rejoin). It does not change what joins.
+        t = re.sub(r"(\S+?[ \t]*)?([<>]?=|[<>])\s*\n\s*\n\s*(?=[-.]?\d)",
+                   keep_break_in_rejoin(r"\1\2 "), t)
         # Cycle 15 (v2.4.67) — cross-paragraph variant of the
         # (OR|CI|RR) → digit A1r join. Same JOIN-after-STRIP pattern as
         # cycles 12/13: A1 (single-newline form) runs BEFORE S9 strips
@@ -7916,7 +7932,8 @@ def _normalize_text(
         # an earlier line ends with `CI`/`OR`/`RR`/`HR` (e.g. Cochran et al.
         # in-text mentions of CIs preceding the bibliography start).
         t = re.sub(
-            r"(OR|CI|RR|HR)\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))",
+            # `95% ` is part of the label, so a boundary goes before it too.
+            r"((?:\d+%[ \t]*)?(?:OR|CI|RR|HR))\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))",
             keep_break_in_rejoin(r"\1 "),
             t,
         )
