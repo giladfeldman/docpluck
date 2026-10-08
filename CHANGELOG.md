@@ -1,5 +1,70 @@
 # Changelog
 
+## [2.4.152] - 2026-10-09 - normalization 1.9.72 - table extraction 2.4.22 (unchanged) - sectioning 1.2.6
+
+Page numbers are now decided while the page breaks still exist, so table integers, raw data and
+row labels that collided with the page-number sequence stop being deleted. DOCX and HTML
+`extract_sections(...).normalized_text` is now actually normalized. Placeholder-mode caption
+markers land on their own caption.
+
+### Page numbers no longer take table values with them (normalization 1.9.72)
+
+The page-number strip ran late, after most form feeds were gone, and blanked every chain of bare
+integers ascending by one with 20+ lines between them. Table columns of small integers chain the
+same way. Measured over 122 random repository PDFs: 2,735 lines blanked, 44 papers losing more
+lines than they have pages. On `10.1016/j.jesp.2010.02.007` (6 pages, printed 685-690) it blanked
+50 lines; 46 were Table 1's raw ratings and Table 4's ranks (page 3 checked on the rendered page).
+
+Now (`normalize._pagination_verdict`): on the raw text, a page-number line is a bare integer that is
+its own block and equals page index + one offset shared by a run of 3+ consecutive pages; one per
+page. The late step blanks exactly those lines. After: 0 of 122 papers over their page count;
+`jesp.2010.02.007` loses exactly 685-688. Text with no form feeds keeps the previous rule.
+
+| Paper | Before | After |
+|---|---|---|
+| `10.1016/j.jesp.2010.02.007` | 50 lines blanked incl. Table 1 data | 4 (the page numbers) |
+| `10.1525/collabra.80` | Table values 1, 2, 3 blanked | kept |
+| `10.1371/journal.pone.0285199` | row labels "Family income at age 10", "Household income (Per £1000)" cut to one copy each | all 8 / 6 copies kept |
+
+### Repeated table row labels are kept (normalization 1.9.72)
+
+The repeated-line strip removed any line printed once per page on 5+ pages. A long table's row
+label is that shape. A line whose next line is its value is now kept (recorded as
+`repeated_line_kept_value_followed`); verified page numbers do not count as values, so running
+headers followed by a page number are still removed. Census, 150 PDFs: 102 lines taken by that
+arm; 2 were row labels.
+
+### A page break inside a rejoined statistic moves in front of it (normalization 1.9.72)
+
+`2.34\f, 95% CI`, `p \f= .031`, `95% \fCI 2.046` now read `2.34, \f95% CI`, `\fp = .031`,
+`\f95% CI 2.046`. What joins is unchanged.
+
+### H0 keeps a banner-shaped line that carries a statistic
+
+Promised to ESCImate 2026-08-22. No current output changes (313 H0 drops in the 125-paper manifest,
+0 carry a labelled statistic).
+
+### DOCX/HTML sections are normalized (sectioning 1.2.6)
+
+`extract_sections(docx|html).normalized_text` was the raw markup text (U+2212 minus passed
+through; academic Greek transliteration not applied). It is now normalized at the requested level
+and headings are carried to the new offsets. Consumer-visible: `ηp2` reads `etap2` at academic
+level, as for PDFs; pass `preserve_math_glyphs=True` to keep glyphs.
+
+### Cross-checks
+
+Both normalization changes were reviewed by a second model (Sonnet, one provider) in two rounds;
+four of its findings reproduced and are fixed in this release (a page-number token glued under a
+row label counts as that label's value; 4-digit years are never page numbers; a long glued token
+keeps the boundary out of its numbers; a heading whose line normalization lengthened keeps its
+last character). One running header ("Frontiers in Psychology", `10.3389/fpsyg.2023.1138469`) now
+survives the repeated-line strip: the cost of never deleting a row label.
+
+### Placeholder markers land on their caption
+
+`table_text_mode="placeholder"` spliced 219 of 1,016 caption markers (31 of 125 papers) at
+shifted positions, e.g. over `ble 7\nS` instead of `Table 7`. Now 0 of 1,085.
+
 ## [2.4.151] - 2026-10-06 - normalization 1.9.71 (unchanged) - table extraction 2.4.22
 
 A table whose caption sits in one column of a two-column page now delivers its values. A text-only
