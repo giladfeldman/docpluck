@@ -297,11 +297,9 @@ def _extract_pdf_structured(
         ]
         captions.append(real[0] if real else group[0])
     captions.sort(key=lambda c: c.char_start)
-    # The captions' char_start/char_end refer to `rejoined`, not raw_text. For
-    # placeholder mode we need positions in raw_text — build a translation map.
-    # Since the rejoin only deletes whitespace runs, char positions in rejoined
-    # are <= positions in raw_text. We translate by re-finding the caption line
-    # in raw_text on demand.
+    # The captions' char_start/char_end refer to `rejoined`, not raw_text.
+    # Placeholder mode splices into raw_text, so it translates them through the
+    # offset map `_join_split_captions_mapped` builds (see `_apply_placeholder`).
 
     tables: list[Table] = []
     figures: list[Figure] = []
@@ -970,10 +968,47 @@ def _join_split_captions(text: str) -> str:
       - "Fig.\\n\\n2: bar" → "Figure 2: bar"
       - bare "T 1:" prefix → "Table 1:" (after the rejoin above)
     """
-    text = _SPLIT_CAPTION_RE.sub(r"\1 \2\3", text)
-    text = _T_PREFIX_RE.sub(r"Table \1\2", text)
-    text = _FIG_PREFIX_RE.sub(r"Figure \1\2", text)
-    return text
+    return _join_split_captions_mapped(text)[0]
+
+
+def _sub_mapped(
+    rx: re.Pattern[str], repl: str, text: str, to_src: list[int]
+) -> tuple[str, list[int]]:
+    """``rx.sub(repl, text)`` that also carries an output->source offset map.
+
+    ``to_src[i]`` is the source position of ``text[i]`` (length ``len(text)+1``,
+    the last entry mapping the end). Characters of a replacement map to the
+    start of the text they replaced; the position just after a replacement maps
+    to the end of it, so a span that covers a whole rewritten caption maps back
+    onto the whole original span.
+    """
+    out: list[str] = []
+    out_map: list[int] = []
+    pos = 0
+    for m in rx.finditer(text):
+        out.append(text[pos:m.start()])
+        out_map.extend(to_src[pos:m.start()])
+        rep = m.expand(repl)
+        out.append(rep)
+        out_map.extend([to_src[m.start()]] * len(rep))
+        pos = m.end()
+    out.append(text[pos:])
+    out_map.extend(to_src[pos:])  # includes the end-of-text entry
+    return "".join(out), out_map
+
+
+def _join_split_captions_mapped(text: str) -> tuple[str, list[int]]:
+    """`_join_split_captions`, plus a map from each rejoined offset to ``text``.
+
+    CaptionMatch offsets are offsets into the REJOINED shadow string; anything
+    that splices into the original text (placeholder mode) must translate them
+    through this map, or every marker after the first rejoin lands shifted.
+    """
+    to_src = list(range(len(text) + 1))
+    text, to_src = _sub_mapped(_SPLIT_CAPTION_RE, r"\1 \2\3", text, to_src)
+    text, to_src = _sub_mapped(_T_PREFIX_RE, r"Table \1\2", text, to_src)
+    text, to_src = _sub_mapped(_FIG_PREFIX_RE, r"Figure \1\2", text, to_src)
+    return text, to_src
 
 
 # A region's bottom is clipped this many points ABOVE the next same-page
@@ -4154,9 +4189,14 @@ def _apply_placeholder(raw_text: str, captions: list[CaptionMatch]) -> str:
     Without pdfplumber we don't know the exact bbox of the table region; we
     mark only the caption line itself. The marker is shorter than the caption
     line so total text length doesn't grow.
+
+    ``captions`` carry offsets into the rejoined shadow string, so the snippet
+    is read there and the splice positions are translated back to ``raw_text``
+    (they differ in length whenever a split caption was rejoined).
     """
     if not captions:
         return raw_text
+    rejoined, to_raw = _join_split_captions_mapped(raw_text)
     items = sorted(
         ((c.char_start, c.char_end, c) for c in captions),
         key=lambda item: item[0],
@@ -4171,14 +4211,15 @@ def _apply_placeholder(raw_text: str, captions: list[CaptionMatch]) -> str:
         )
     out = raw_text
     for start, end, cap in items:
-        snippet = _extract_caption_text(raw_text, cap, next_boundary_by_id.get(id(cap)))
+        snippet = _extract_caption_text(rejoined, cap, next_boundary_by_id.get(id(cap)))
         # Build "[Label: caption]" marker. Use the snippet (already cleaned).
         if cap.label and cap.label in snippet:
             desc = snippet[len(cap.label):].lstrip(" .:—–-,")
         else:
             desc = snippet
         marker = f"[{cap.label}: {desc[:120]}]" if desc else f"[{cap.label}]"
-        out = out[:start] + marker + out[end:]
+        raw_start, raw_end = to_raw[start], to_raw[end]
+        out = out[:raw_start] + marker + out[raw_end:]
     return out
 
 
