@@ -53,3 +53,14 @@ def test_identity_when_nothing_changes():
     s = "one\ntwo\nthree"
     m = line_offset_mapper(s, s)
     assert [m(i) for i in range(len(s) + 1)] == list(range(len(s) + 1))
+
+
+def test_a_hint_ending_at_its_line_end_follows_a_lengthened_line():
+    """Consult 2026-10-09 (Sonnet) finding 2: a ligature expansion lengthens the
+    heading line; an offset at the END of a source line must map to the end of
+    the normalized line, not to the same column."""
+    src = "Modiﬁcation of Procedure\nBody."
+    dst = "Modification of Procedure\nBody."
+    m = line_offset_mapper(src, dst)
+    end = src.index("\n")
+    assert dst[m(0):m(end)] == "Modification of Procedure"

@@ -52,7 +52,13 @@ def line_offset_mapper(src: str, dst: str) -> Callable[[int], int]:
         li = bisect.bisect_right(starts_a, offset) - 1
         j = to_line[li]
         if j >= 0:
-            return starts_b[j] + min(offset - starts_a[li], len(b[j]))
+            col = offset - starts_a[li]
+            if col >= len(a[li]):
+                # The END of a source line maps to the end of its counterpart,
+                # whose length normalization may have changed (a ligature
+                # expanded: consult 2026-10-09, Sonnet).
+                return starts_b[j] + len(b[j])
+            return starts_b[j] + min(col, len(b[j]))
         j = ~j
         return starts_b[j] if j < len(starts_b) else len(dst)
 

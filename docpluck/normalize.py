@@ -8225,7 +8225,11 @@ def _normalize_text(
         # BOUNDED: an unbounded `\S+?` rescans a long token from every start
         # position -- quadratic (test_normalize_scales_sub_quadratically_on_
         # pathological_input: 0.94 s -> 4.79 s per doubling, 2026-10-08).
-        t = re.sub(r"(\S{1,24}?[ \t]*)?([<>]?=|[<>])\s*\n\s*\n\s*(?=[-.]?\d)",
+        # The label must START a token (`(?<!\S)`): a glued run longer than the
+        # bound otherwise matched from mid-token and put the boundary inside
+        # `1.25` (consult 2026-10-09, Sonnet). Unmatched, the boundary falls
+        # back to the operator, as before 4a1471d.
+        t = re.sub(r"((?<!\S)\S{1,24}?[ \t]*)?([<>]?=|[<>])\s*\n\s*\n\s*(?=[-.]?\d)",
                    keep_break_in_rejoin(r"\1\2 "), t)
         # Cycle 15 (v2.4.67) — cross-paragraph variant of the
         # (OR|CI|RR) → digit A1r join. Same JOIN-after-STRIP pattern as
