@@ -44,6 +44,17 @@ arm; 2 were row labels.
 Promised to ESCImate 2026-08-22. No current output changes (313 H0 drops in the 125-paper manifest,
 0 carry a labelled statistic).
 
+### Three patterns no longer rescan a long token (normalization 1.9.72)
+
+The H0 banner guard's e-mail arm and the late CI/OR join's `95% ` prefix (both new in this
+release) retried from every character of a long token: 40,000 digits took 5.3 s through
+`normalize_text` (2.4.151: 0.04 s). Each now starts only at a token's first character. The
+labelled-statistic bracket arm `\([^)]*\)`, shared with the render cell classifier, scanned to the
+end of the line from every unclosed `a(` (160,000 characters: 15 s); it is now bounded at 200
+characters (longest real match over 125 corpus papers: 130; none exceed 200). Output is
+byte-identical on all 125 papers; a parenthesised group longer than 200 characters no longer
+counts as a labelled-statistic bracket.
+
 ### DOCX/HTML sections are normalized (sectioning 1.2.6)
 
 `extract_sections(docx|html).normalized_text` was the raw markup text (U+2212 minus passed
