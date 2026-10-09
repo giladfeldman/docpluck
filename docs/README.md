@@ -824,10 +824,10 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.151',            # docpluck itself
+# {'version': '2.4.152',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.71',   # in-repo pipeline versions, bumped
-#  'sectioning_version': '1.2.5',   #   independently of the package version
+#  'normalize_version': '1.9.72',   # in-repo pipeline versions, bumped
+#  'sectioning_version': '1.2.6',   #   independently of the package version
 #  'table_extraction_version': '2.4.22',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
