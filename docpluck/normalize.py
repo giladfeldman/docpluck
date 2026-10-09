@@ -1668,8 +1668,11 @@ _HEADER_BANNER_PATTERNS: list[re.Pattern[str]] = [
 _LABELLED_STATISTIC_PATTERN = r"""(?:
     \b(?:[MSDNnprtzFbd]|SD|SE|CI|OR|RR|HR|BF|df|chi2|eta2|beta)\s*
         [=<>≤≥]\s*[-+−]?[\d.]     # a labelled statistic: N = 245
-  | \b[A-Za-z][A-Za-z0-9]*\s*\([^)]*\)\s*[=<>≤≥]\s*[-+−]?\d
+  | \b[A-Za-z][A-Za-z0-9]*\s*\([^)]{0,200}\)\s*[=<>≤≥]\s*[-+−]?\d
                                      # a bracketed statistic: F(2, 42) = 5
+                                     # {0,200}: unbounded, a long `a(a(a(` line was
+                                     # quadratic (160k chars: 15s); the longest real
+                                     # match over 125 papers is 130 chars
   | [βχηρωΒΧΗΡΩ][²³₀-₉0-9]*\s*[=<>≤≥(]
                                      # a Greek-labelled statistic: β = , χ²(1)
 )"""

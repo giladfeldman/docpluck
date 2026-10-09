@@ -175,3 +175,17 @@ def test_late_join_and_banner_patterns_are_linear_on_a_long_token():
     for pattern, token in ((late_join, "9"), (_BANNER_IDENTIFIER_RE, "9"), (_BANNER_IDENTIFIER_RE, "a.")):
         text = "p = " + token * (40000 // len(token)) + " end"
         assert _elapsed(lambda: pattern.sub(" ", text)) < 0.1, (pattern.pattern, token)
+
+
+def test_labelled_statistic_bracket_arm_is_linear_on_unclosed_brackets():
+    r"""H0's statistic guard (and render's cell classifier) share this pattern.
+
+    The bracket arm `\([^)]*\)` scanned to the end of the line from every `a(`
+    with no `)` after it: 160,000 chars took 15s. Bounded at 200 chars (the longest
+    real match over 125 corpus papers is 130), a bracketed statistic still matches.
+    """
+    from docpluck.normalize import _LABELLED_STATISTIC_RE
+
+    assert _LABELLED_STATISTIC_RE.search("F(2, 42) = 5.31")
+    line = "a(" * 40000
+    assert _elapsed(lambda: _LABELLED_STATISTIC_RE.search(line)) < 0.2
