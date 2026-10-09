@@ -1676,9 +1676,11 @@ _LABELLED_STATISTIC_PATTERN = r"""(?:
 _LABELLED_STATISTIC_RE = re.compile(_LABELLED_STATISTIC_PATTERN, re.VERBOSE)
 
 # What an H0 banner line legitimately carries and a statistic test must not see:
-# a URL, a DOI, an e-mail address.
+# a URL, a DOI, an e-mail address. The e-mail arm starts only at a token's first
+# character: the leftmost match starts there anyway, and an unanchored `\S+@` retried
+# from every character of a long `@`-less token is quadratic (20,000 digits: 0.63s).
 _BANNER_IDENTIFIER_RE = re.compile(
-    r"https?://\S+|\bwww\.\S+|\b(?:doi:\s*)?10\.\d{4,9}/\S+|\S+@\S+"
+    r"https?://\S+|\bwww\.\S+|\b(?:doi:\s*)?10\.\d{4,9}/\S+|(?<!\S)\S+@\S+"
 )
 
 
@@ -8253,7 +8255,10 @@ def _normalize_text(
         # in-text mentions of CIs preceding the bibliography start).
         t = re.sub(
             # `95% ` is part of the label, so a boundary goes before it too.
-            r"((?:\d+%[ \t]*)?(?:OR|CI|RR|HR))\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))",
+            # `(?<!\d)`: the prefix starts at a number's first digit, where the
+            # leftmost match starts anyway; retried from every digit of a long
+            # run it was quadratic (20,000 digits: 0.86s).
+            r"((?:(?<!\d)\d+%[ \t]*)?(?:OR|CI|RR|HR))\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))",
             keep_break_in_rejoin(r"\1 "),
             t,
         )

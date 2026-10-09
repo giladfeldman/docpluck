@@ -83,8 +83,10 @@ def test_normalize_scales_sub_quadratically_on_pathological_input():
     from docpluck.normalize import NormalizationLevel, normalize_text
 
     level = NormalizationLevel("academic")
-    small = "p = " + "9" * 5000 + " end"
-    large = "p = " + "9" * 10000 + " end"
+    # 20k/40k, not 5k/10k: at 10k a quadratic step still finished under the 0.5s floor
+    # alone and only crossed it under -n 6 load (2.4.152 prep, two new patterns).
+    small = "p = " + "9" * 20000 + " end"
+    large = "p = " + "9" * 40000 + " end"
     t_small = _elapsed(lambda: normalize_text(small, level))
     t_large = _elapsed(lambda: normalize_text(large, level))
     # Linear => ~2x for a doubled input. The pre-fix pattern was ~4.6x per doubling.
@@ -149,3 +151,27 @@ def test_rsos_running_footer_still_stripped():
         "12 royalsocietypublishing.org/journal/rsos R. Soc. Open Sci. 8: 2011",
     ):
         assert rsos.sub("<S>", real) == "<S>", f"no longer stripped: {real!r}"
+
+
+def test_late_join_and_banner_patterns_are_linear_on_a_long_token():
+    r"""The two quadratic patterns found in 2.4.152 release QA, pinned one by one.
+
+    `(?:\d+%[ \t]*)?` in the CI/OR late join and `\S+@\S+` in H0's banner guard
+    both re-scanned a long token from every character: 20,000 digits took 0.86s and
+    0.63s, 40,000 digits 5.3s through `normalize_text`. Anchored to a token's first
+    character (where the leftmost match starts anyway) each pass is milliseconds.
+    """
+    import inspect
+    import re
+
+    from docpluck.normalize import _BANNER_IDENTIFIER_RE, _normalize_text
+
+    late_join_src = (
+        r"((?:(?<!\d)\d+%[ \t]*)?(?:OR|CI|RR|HR))\s*\n\s*\n\s*(?=\d+(?:\.\d|\d|[-*<>=,]))"
+    )
+    # The late join is an inline pattern: pin that this copy IS the shipped one.
+    assert late_join_src in inspect.getsource(_normalize_text)
+    late_join = re.compile(late_join_src)
+    for pattern, token in ((late_join, "9"), (_BANNER_IDENTIFIER_RE, "9"), (_BANNER_IDENTIFIER_RE, "a.")):
+        text = "p = " + token * (40000 // len(token)) + " end"
+        assert _elapsed(lambda: pattern.sub(" ", text)) < 0.1, (pattern.pattern, token)
