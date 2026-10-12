@@ -27,6 +27,7 @@ to v2.3.0 — v2.2.0 uses Camelot for table cells.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -46,6 +47,7 @@ from .normalize import (
     recover_minus_via_ci_pairing,
     recover_prose_two_for_minus,
     recover_pua_glyphs,
+    recover_semantic_hyphens_via_layout,
 )
 # NOT IMPORTED, DELIBERATELY: `recover_dropped_minus_via_ci_pairing` (W0g, 2026-09-08)
 # and `recover_times_interaction_glyph_in_prose` / `recover_times_design_notation` /
@@ -4799,6 +4801,54 @@ def _is_orphan_cell_paragraph(p: str) -> bool:
     return True
 
 
+_BARE_TABLE_LABEL_LINE_RE = re.compile(r"^Table\s+(\d+)$")
+_GRID_HEADING_RE = re.compile(r"^###\s+Table\s+(\d+)\b", re.MULTILINE)
+_GRID_NUMBER_RE = re.compile(r"-?(?:\d+(?:\.\d+)?|\.\d+)")
+_GRID_WORD_RE = re.compile(r"[A-Za-z]{2,}")
+
+
+def _grid_tokens(s: str) -> tuple:
+    s = s.replace("−", "-")
+    return (
+        Counter(_GRID_NUMBER_RE.findall(s)),
+        {w.lower() for w in _GRID_WORD_RE.findall(s)},
+    )
+
+
+def _structured_grid_tokens_by_label(text: str) -> dict:
+    """``{"1": (number multiset, word set)}`` for every structured ``<table>``
+    the render already placed under a ``### Table N`` heading. Several grids
+    under one label (a continued table) pool their tokens."""
+    import html as _html
+    pooled: dict = {}
+    for m in _GRID_HEADING_RE.finditer(text):
+        start = text.find("<table", m.end())
+        nxt = _GRID_HEADING_RE.search(text, m.end())
+        if start < 0 or (nxt and start > nxt.start()):
+            continue
+        end = text.find("</table>", start)
+        if end < 0:
+            continue
+        cells = _html.unescape(re.sub(r"<[^>]+>", " ", text[start:end]))
+        nums, words = _grid_tokens(cells)
+        if not nums:
+            continue
+        have = pooled.setdefault(m.group(1), (Counter(), set()))
+        have[0].update(nums)
+        have[1].update(words)
+    return pooled
+
+
+def _run_duplicated_in_grid(run_lines: list, grid: tuple) -> bool:
+    """True iff every number (with multiplicity) and every word of the run is
+    in the grid, and the run holds at least one number. A run the grid does
+    not fully cover is never treated as a copy."""
+    nums, words = _grid_tokens("\n".join(run_lines))
+    if not nums:
+        return False
+    return not (nums - grid[0]) and words <= grid[1]
+
+
 def _suppress_orphan_table_cell_text(text: str) -> str:
     """Suppress orphan cell-row text leaks after a plain-text Table caption.
 
@@ -4846,6 +4896,7 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
     #     like chan_feldman Table 1 — Hypothesis + Description).
     italic_re = re.compile(r"^\*Table\s+(\d+)[.:]\s+.{3,}\*\s*$")
     lines = text.split("\n")
+    grids = _structured_grid_tokens_by_label(text)
     out: list[str] = []
     i = 0
     while i < len(lines):
@@ -4858,14 +4909,25 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
             and _ORPHAN_TABLE_CAPTION_RE.match(stripped)
         )
         is_italic_caption = stripped and italic_re.match(stripped)
-        if is_plain_caption or is_italic_caption:
+        # A label alone on its line with the caption title on the next line
+        # (Elsevier: "Table 1" / "Practice variables and ..."). Only the
+        # duplicate-of-grid arm below may act on it: both caption lines are
+        # kept verbatim, so nothing is italicized or reshaped.
+        bare = _BARE_TABLE_LABEL_LINE_RE.match(stripped) if stripped else None
+        is_bare_label = bool(
+            bare
+            and bare.group(1) in grids
+            and i + 1 < len(lines)
+            and lines[i + 1].strip()
+        )
+        if is_plain_caption or is_italic_caption or is_bare_label:
             # Scan ahead for orphan-cell lines. Allow 0-1 blank lines
             # between orphans; stop on a second blank line or on the first
             # non-orphan (e.g. "Note: ..." caption tail, or the next prose
             # paragraph). No fixed line cap — academic stats tables can
             # have 30-100 orphan cell lines in a row (5x5 correlation
             # matrix + headers + group separators).
-            j = i + 1
+            j = i + 2 if is_bare_label else i + 1
             blank_run = 0
             orphans: list[int] = []
             while j < len(lines):
@@ -4885,6 +4947,41 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
                     j += 1
                     continue
                 break
+            # A run that the structured grid of the SAME table already holds,
+            # value for value, is a second copy of that table, not the only
+            # one: the text channel linearized the very cells the grid
+            # carries. It gives way to a labelled marker (retain and label:
+            # the values stay in the grid, the marker says where they went).
+            # Number coverage is a multiset test, word coverage a set test,
+            # so a single value the grid lacks keeps the whole run.
+            label_no = (bare or _ORPHAN_TABLE_CAPTION_RE.match(stripped.strip("*")) or italic_re.match(stripped))
+            label_no = label_no.group(1) if label_no else None
+            if (
+                len(orphans) >= 2
+                and label_no in grids
+                and _run_duplicated_in_grid([lines[k] for k in orphans], grids[label_no])
+            ):
+                # The caption is handled as the deletion arm below handles it:
+                # a plain caption is italicized, which is what lets
+                # `_suppress_inline_duplicate_table_captions` recognise it as
+                # the copy of the grid's own caption (ip_feldman Table 2 stayed
+                # as a mid-text caption without this; canary 2026-10-13).
+                if is_plain_caption:
+                    out.append(f"*{stripped}*")
+                else:
+                    out.extend(lines[i:(i + 2 if is_bare_label else i + 1)])
+                out.append("")
+                out.append(
+                    f"<!-- table-text-duplicate: the text-channel copy of Table {label_no} "
+                    f"({len(orphans)} lines) is omitted here; every value in it is in the "
+                    f"structured Table {label_no} -->"
+                )
+                i = orphans[-1] + 1
+                continue
+            if is_bare_label:
+                out.append(line)
+                i += 1
+                continue
             # v2.4.130 DELETION GUARD: a run holding any published quantity is
             # not furniture, and when Camelot failed on the table these lines
             # are the ONLY copy of those numbers in the output. Checked BEFORE
@@ -6097,9 +6194,20 @@ def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
     if label_clean:
         pieces.append(re.escape(label_clean))
         pieces.append(r"[\s.:]+")  # punctuation/whitespace after label
+    # A hyphen may differ between the two copies: the body's W0o restores a
+    # compound hyphen pdftotext dehyphenated away (`ViTbased` -> `ViT-based`)
+    # while the caption record keeps the glued form, or the reverse. Without
+    # tolerance the anchor misses and the float is exiled to the appendix
+    # (10.48550/arxiv.2406.11713 Table 12, measured 2026-10-12).
+    def _hyphen_tolerant(tok: str) -> str:
+        bare = tok.replace("-", "")
+        if not bare.isalpha() or len(bare) < 4:
+            return re.escape(tok)
+        return "-?".join(re.escape(c) for c in bare)
+
     pieces.extend(
         token if i == 0 else r"\s+" + token
-        for i, token in enumerate(re.escape(t) for t in prefix_tokens)
+        for i, token in enumerate(_hyphen_tolerant(t) for t in prefix_tokens)
     )
     pattern = re.compile("".join(pieces))
 
@@ -7335,5 +7443,13 @@ def _render_pdf_to_markdown(
     # label from a caption that sits directly under its ``### Table N`` heading.
     # Must follow the caption-detecting passes above that key on the prefix.
     md = _step(_report, "_dedupe_label_in_table_figure_caption", _dedupe_label_in_table_figure_caption, md)
+
+    # W0o on the assembled page: captions and table notes come from the table
+    # and figure records, which never passed through normalize's W0o, so a
+    # caption could keep `ViTbased` beside a body that now reads `ViT-based`.
+    # Same evidence and gate as the body pass; a no-op where the body pass
+    # already restored everything.
+    md = _step(_report, "recover_semantic_hyphens_via_layout",
+               recover_semantic_hyphens_via_layout, md, layout_doc)
 
     return md.rstrip() + "\n"

@@ -5247,6 +5247,96 @@ def _layout_superscript_fusions(layout) -> list[tuple[str, str]]:
     return out
 
 
+_W0O_INLINE_COMPOUND_RE = re.compile(
+    r"(?<![A-Za-z-])([A-Za-z]{2,})-([A-Za-z]{2,})(?![A-Za-z-])"
+)
+_W0O_WORD_STRIP = ".,;:()[]{}\"'“”‘’"
+
+
+def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
+    """W0o: restore a compound's hyphen that pdftotext's dehyphenation removed.
+
+    pdftotext joins a word broken across a line end and drops the hyphen. That
+    is right for a soft break (``experi-`` / ``ences``) and wrong for a compound
+    the page prints with a hyphen that happens to fall at a line end: ip_feldman
+    (10.1177/01461672251327169, p10) prints the heading ``Well-`` / ``Being`` and
+    the text channel says ``WellBeing``; the same paper prints ``well-being``
+    inline 61 times.
+
+    The decision is made from DOCUMENT-LEVEL WORD COUNTS, never from pairing a
+    line-end fragment with "the next line" -- pairing over pdfplumber lines
+    merges the two columns of a two-column page (measured 2026-08-05: 131 pairs,
+    26 correct, target absent). A glued token ``AB`` in the text is restored to
+    ``A-B`` only when all of these hold:
+
+    * the text prints ``A-B`` inline (not across a line break) at least once --
+      the paper's own spelling;
+    * the LAYOUT channel holds ``AB`` as a whole word ZERO times, so the paper
+      never prints it glued (the text channel's glued forms are the artifacts
+      under repair, so counting them would be circular);
+    * the layout holds at least as many line-end fragments ``A-`` as the text
+      holds glued ``AB`` -- every glued copy has a hyphenated line end to come from;
+    * the glued copy is not part of a URL or DOI (``10.1109/ROMAN.2016``).
+
+    A document that prints the word glued even once keeps every glued copy
+    (``preregistration``: 4 printed glued, 1 hyphenated -> untouched). Measured
+    over the 101-PDF manifest on 2026-10-12; see CHANGELOG.
+    """
+    if not text or layout is None:
+        return text
+    attest: collections.Counter = collections.Counter()
+    for m in _W0O_INLINE_COMPOUND_RE.finditer(text):
+        attest[(m.group(1).lower(), m.group(2).lower())] += 1
+    if not attest:
+        return text
+    words: collections.Counter = collections.Counter()
+    frags: collections.Counter = collections.Counter()
+    for page in getattr(layout, "pages", ()) or ():
+        for w in getattr(page, "words", ()) or ():
+            s = (w.get("text") or "").strip(_W0O_WORD_STRIP)
+            if not s:
+                continue
+            words[s.lower()] += 1
+            if s.endswith("-") and len(s) > 2:
+                frags[s[:-1].lower()] += 1
+    if not words:
+        record_fallback("w0o_layout_has_no_words")
+        return text
+    for (a, b), _n in attest.items():
+        glued = a + b
+        if words[glued]:
+            continue
+        pat = re.compile(r"(?<![A-Za-z-])(" + re.escape(a) + r")(" + re.escape(b) + r")(?![A-Za-z-])", re.I)
+        sites = [
+            m for m in pat.finditer(text)
+            if not _w0o_in_url(text, m.start(), m.end())
+        ]
+        if not sites or frags[a] < len(sites):
+            continue
+        out, last = [], 0
+        for m in sites:
+            out.append(text[last:m.start()])
+            out.append(m.group(1) + "-" + m.group(2))
+            last = m.end()
+        out.append(text[last:])
+        text = "".join(out)
+        if counter is not None:
+            counter[0] += len(sites)
+    return text
+
+
+def _w0o_in_url(text: str, start: int, end: int) -> bool:
+    """Is text[start:end] inside a whitespace-delimited token that is a URL/DOI?"""
+    lo = start
+    while lo > 0 and not text[lo - 1].isspace():
+        lo -= 1
+    hi = end
+    while hi < len(text) and not text[hi].isspace():
+        hi += 1
+    token = text[lo:hi].lower()
+    return "/" in token or "www." in token or "@" in token
+
+
 def recover_superscript_via_layout(text: str, layout) -> str:
     """W0p: never fuse a typographically-superscript digit into the number.
 
@@ -6543,6 +6633,17 @@ def _normalize_text(
         before = t
         t = recover_superscript_via_layout(t, dropped_minus_layout)
         report._track("W0p_superscript_layout", before, t, "superscript_markers_split")
+
+        # ── W0o (2026-10-12): a compound hyphen pdftotext dehyphenated away ──
+        # `Well-` / `Being` at a line end comes out `WellBeing`. Restored only
+        # when the paper prints `well-being` inline, never prints it glued (by
+        # the layout channel's word count), and has a line-end `well-` fragment
+        # for every glued copy. See recover_semantic_hyphens_via_layout.
+        before = t
+        _w0o_n = [0]
+        t = recover_semantic_hyphens_via_layout(t, dropped_minus_layout, _w0o_n)
+        report._track("W0o_semantic_hyphen_layout", before, t,
+                      "semantic_hyphens_restored", count=_w0o_n[0])
 
     # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
     # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a

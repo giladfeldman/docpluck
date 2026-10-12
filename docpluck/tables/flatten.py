@@ -1245,6 +1245,7 @@ def _flatten_one_row(
     group: Optional[str] = None,
     roles_override: Optional[dict[int, str]] = None,
     effect_hint: Optional[str] = None,
+    level_context: Optional[str] = None,
 ) -> FlattenedRow:
     row_label, label_col = _pick_row_label(row)
 
@@ -1494,12 +1495,18 @@ def _flatten_one_row(
         fields["p"] = role_nums["p"]
         if "p_op" in role_vals:
             fields["p_op"] = role_vals["p_op"]
+    ci_level, ci_kind = _interval_level(header, group)
+    if ci_level is None and level_context:
+        ci_level, ci_kind = _interval_level([level_context], None)
     if "CI_lower" in role_nums:
         fields["CI_lower"] = role_nums["CI_lower"]
         fields["CI_upper"] = role_nums["CI_upper"]
+        if ci_level is not None:
+            fields["CI_level"] = ci_level
 
     sentence = _assemble_sentence(
-        row_label, role_vals, role_nums, df_val, df1_val, df2_val, group
+        row_label, role_vals, role_nums, df_val, df1_val, df2_val, group,
+        ci_label=_interval_label(ci_level, ci_kind),
     )
 
     return FlattenedRow(
@@ -1513,6 +1520,40 @@ def _flatten_one_row(
         sentence=sentence,
         fields=fields,
     )
+
+
+# The interval level and kind as the TABLE prints them ("90% CI", "95% credible
+# interval", "99% HDI"). The sentence used to say "95% CI" whatever the table
+# printed, so a 90% interval read as a 95% one -- and a CI-vs-p check judging a
+# 90% interval at alpha = .05 accuses a paper of an inconsistency it does not
+# have. Only the table's own header (and super-header arm) is read; a level the
+# table never states is not supplied.
+_INTERVAL_LEVEL_RE = re.compile(
+    r"(\d{2}(?:\.\d+)?)\s*%\s*"
+    r"(CIs?\b|C\.I\.|conf\w*|CrIs?\b|cred\w*|HDIs?\b|HPD\w*)",
+    re.IGNORECASE,
+)
+
+
+def _interval_level(header: list[str], group: Optional[str]) -> tuple:
+    """``(level, kind)`` when the header states exactly one interval level,
+    else ``(None, None)``. ``kind`` is ``"CI"``, ``"CrI"`` or ``"HDI"``."""
+    found = set()
+    for h in list(header or []) + [group or ""]:
+        for m in _INTERVAL_LEVEL_RE.finditer(h or ""):
+            word = m.group(2).lower()
+            kind = "CrI" if word.startswith(("cri", "cred")) else (
+                "HDI" if word.startswith(("hdi", "hpd")) else "CI")
+            found.add((float(m.group(1)), kind))
+    if len(found) != 1:
+        return None, None
+    return next(iter(found))
+
+
+def _interval_label(level: Optional[float], kind: Optional[str]) -> str:
+    if level is None:
+        return "CI"
+    return f"{_fmt_num(level)}% {kind}"
 
 
 def _fmt_num(x: float) -> str:
@@ -1532,6 +1573,7 @@ def _assemble_sentence(
     df1: Optional[float],
     df2: Optional[float],
     group: Optional[str] = None,
+    ci_label: str = "CI",
 ) -> str:
     """Produce a flattened APA-style sentence from the parsed cells.
 
@@ -1543,7 +1585,8 @@ def _assemble_sentence(
       * ``chi2`` + ``df`` + ``n`` → ``χ²(df, N = n) = value``
       * ``M`` + ``SD``            → ``M = m, SD = sd`` (joint)
       * ``p_op`` + ``p``          → ``p {op} {value}``
-      * ``CI_lower`` + ``CI_upper`` → ``95% CI [lo, hi]``
+      * ``CI_lower`` + ``CI_upper`` → ``{ci_label} [lo, hi]`` (``95% CI`` only
+        when the table prints 95%; a bare ``CI`` when it states no level)
 
     `group` (a super-header arm such as ``ITT`` / ``PP``) is appended to the
     row label so parallel-group rows stay distinguishable.
@@ -1615,11 +1658,11 @@ def _assemble_sentence(
             # The raw CI cell may already carry its own brackets/parens —
             # strip them so the sentence renders one set, not "[[...]]".
             ci_txt = role_vals["CI"].strip().strip("[]()").strip()
-            parts.append(f"95% CI [{ci_txt}]")
+            parts.append(f"{ci_label} [{ci_txt}]")
         else:
             lo = _fmt_num(role_nums["CI_lower"])
             hi = _fmt_num(role_nums["CI_upper"])
-            parts.append(f"95% CI [{lo}, {hi}]")
+            parts.append(f"{ci_label} [{lo}, {hi}]")
 
     eff_label = _strip_fold_sentinels(row_label)
     if group:
@@ -1909,6 +1952,7 @@ def _flatten_packed_arms(
                 group=glabel,
                 roles_override=recovered,
                 effect_hint=effect_hint,
+                level_context=" ".join(s for s in (caption, footnote) if s),
             )
         )
     return out
@@ -1991,6 +2035,9 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
         + [cap_vocab or "", table.get("footnote") or ""]
     )
     effect_hint = _effect_type_for(vocab_all)
+    # Where an interval level stated outside the column's own header is read
+    # from (every header row, the caption, the note): "95% CI" in a note.
+    level_context = vocab_all
 
     # Packed parallel-arm table (Separate/Joint values space-joined inside each
     # cell). Detected only when there are no column-groups; handled by its own
@@ -2045,6 +2092,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
                     table_id, page, label, row_idx, header, row,
                     roles_override=roles_override,
                     effect_hint=effect_hint,
+                    level_context=level_context,
                 )
             )
             continue
@@ -2063,6 +2111,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
                 _flatten_one_row(
                     table_id, page, label, row_idx, sub_header, sub_row,
                     group=glabel, effect_hint=effect_hint,
+                    level_context=level_context,
                 )
             )
 

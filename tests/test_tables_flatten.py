@@ -195,7 +195,11 @@ class TestMajumderEffectSizeCI:
     def test_ci_from_lower_upper_columns(self):
         rows = flatten_table(self._table())
         assert "d = 0.04" in rows[0]["sentence"]
-        assert "95% CI [-0.19, 0.27]" in rows[0]["sentence"]
+        # The table prints no interval level, so the sentence states none
+        # (it used to assert "95%" whatever the table printed).
+        assert "CI [-0.19, 0.27]" in rows[0]["sentence"]
+        assert "95%" not in rows[0]["sentence"]
+        assert "CI_level" not in rows[0]["fields"]
 
     def test_ci_fields_populated(self):
         f = flatten_table(self._table())[0]["fields"]
