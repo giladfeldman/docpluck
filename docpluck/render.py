@@ -2242,6 +2242,28 @@ _ABS_AFFIL_COMPANION_RE = re.compile(
 )
 
 
+# An affiliation MARKER printed on its own line ("2", "3", "†"). Since 2.4.152 the
+# page-number strip no longer deletes these, so the remnant can open with one
+# (10.15626/MP.2022.3108: "2" / "3" / "Department of Philosophy, ..."). A marker
+# counts as remnant only when the next content line (other markers and blanks
+# skipped) is an affiliation line or its companion note -- never on its own.
+_ABS_AFFIL_MARKER_RE = re.compile(r"^\s*(?:\d{1,2}|[*†‡§¶]+)\s*$")
+
+
+def _is_abstract_zone_remnant_line(lines: list[str], k: int) -> bool:
+    if _is_affiliation_line(lines[k]) is True or _ABS_AFFIL_COMPANION_RE.match(lines[k]):
+        return True
+    if not _ABS_AFFIL_MARKER_RE.match(lines[k]):
+        return False
+    nxt = k + 1
+    while nxt < len(lines) and (not lines[nxt].strip() or _ABS_AFFIL_MARKER_RE.match(lines[nxt])):
+        nxt += 1
+    return nxt < len(lines) and (
+        _is_affiliation_line(lines[nxt]) is True
+        or bool(_ABS_AFFIL_COMPANION_RE.match(lines[nxt]))
+    )
+
+
 def _strip_abstract_zone_affiliation_remnant(text: str) -> str:
     """Strip an affiliation line (+ joint-authors/corresponding-author companion)
     that the `## Abstract` heading boundary orphaned as the first content of the
@@ -2254,11 +2276,12 @@ def _strip_abstract_zone_affiliation_remnant(text: str) -> str:
     for i, line in enumerate(lines):
         if line.strip() != "## Abstract":
             continue
-        # First non-blank line after `## Abstract` must be an affiliation line.
+        # First non-blank line after `## Abstract` must be an affiliation line
+        # (or a marker introducing one).
         j = i + 1
         while j < n and not lines[j].strip():
             j += 1
-        if j >= n or _is_affiliation_line(lines[j]) is not True:
+        if j >= n or not _is_abstract_zone_remnant_line(lines, j):
             break  # real prose (or nothing) follows — leave the Abstract alone
         # Collect the remnant run: affiliation lines + interior blanks + optional
         # companion note, until the abstract BODY prose begins.
@@ -2270,15 +2293,12 @@ def _strip_abstract_zone_affiliation_remnant(text: str) -> str:
                 nxt = k + 1
                 while nxt < n and not lines[nxt].strip():
                     nxt += 1
-                if nxt < n and (
-                    _is_affiliation_line(lines[nxt]) is True
-                    or _ABS_AFFIL_COMPANION_RE.match(lines[nxt])
-                ):
+                if nxt < n and _is_abstract_zone_remnant_line(lines, nxt):
                     run.append(k)
                     k += 1
                     continue
                 break
-            if _is_affiliation_line(lines[k]) is True or _ABS_AFFIL_COMPANION_RE.match(lines[k]):
+            if _is_abstract_zone_remnant_line(lines, k):
                 run.append(k)
                 k += 1
             else:
@@ -4406,9 +4426,13 @@ def _fold_orphan_arabic_numerals_into_headings(text: str) -> str:
     """
     if not text:
         return text
+    # Never into a front-matter heading: an Abstract or Keywords block is not a
+    # numbered section (0 of 47 ground-truth readings with either heading number
+    # it), so a bare digit above one is an affiliation marker (10.1037/pspp0000586:
+    # "2" -> "## 2. Abstract" once 2.4.152 stopped deleting it as a page number).
     pattern = re.compile(
         r"(?m)^(\d{1,2})\.?[ \t]*\n(?:[ \t]*\n)+"
-        r"(?P<head>## (?!\s*\d{1,2}[.\s])[^\n]+)"
+        r"(?P<head>## (?!\s*\d{1,2}[.\s])(?!(?i:abstract|keywords)\b)[^\n]+)"
     )
 
     def repl(m: re.Match) -> str:

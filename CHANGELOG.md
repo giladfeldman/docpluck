@@ -44,6 +44,16 @@ arm; 2 were row labels.
 Promised to ESCImate 2026-08-22. No current output changes (313 H0 drops in the 125-paper manifest,
 0 carry a labelled statistic).
 
+### Kept affiliation markers do not reshape the Abstract (render)
+
+Bare affiliation markers ("2", "3" on their own line) are no longer deleted as page numbers, so
+two render passes now account for them: a marker followed by an affiliation line is part of the
+affiliation remnant stripped from the start of `## Abstract`, and an orphan number is never folded
+into an Abstract or Keywords heading (0 of 47 ground-truth readings with either heading number it).
+Without this, 4 of 125 manifest papers rendered affiliation lines under `## Abstract` or a
+`## 2. Abstract` heading. Over all 125 renders: those 4 Abstracts match 2.4.151, one more heading
+is corrected (10.1016/j.jesp.2022.104372), and 120 renders are unchanged.
+
 ### Three patterns no longer rescan a long token (normalization 1.9.72)
 
 The H0 banner guard's e-mail arm and the late CI/OR join's `95% ` prefix (both new in this
