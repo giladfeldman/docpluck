@@ -1,5 +1,65 @@
 # Changelog
 
+## [2.4.153] - 2026-10-13 - normalization 1.9.73 - table extraction 2.4.23 - sectioning 1.2.6 (unchanged)
+
+A compound hyphen that pdftotext removed at a line end is restored. A table's one-value-per-line
+text copy gives way to a labelled marker when its structured grid holds every value of it. A
+flattened table sentence states the interval level the table prints instead of always "95% CI".
+
+### Compound hyphens restored (normalization 1.9.73, W0o)
+
+pdftotext joins `self-` / `reported` at a line end into `selfreported`. That is right for a
+syllable break and wrong for a compound. `AB` becomes `A-B` only when all hold:
+
+- the paper prints `A-B` inline at least once;
+- no layout word holds `AB` in any hyphen-free stretch of letters (ligatures folded), so the paper
+  never prints it glued. A PDF without space glyphs yields one long token such as
+  `...derivefromnonmoral`; the glued word is found inside it;
+- the line-end `A-` fragments in the layout cover every glued site of every compound starting `A`;
+- the site is not in a URL, DOI or e-mail token, and no second compound claims the same letters.
+
+Over 101 manifest PDFs: 313 restorations (387 before the glued-inside-a-token and fragment-pooling
+guards, which give up the rest rather than risk a wrong hyphen). 16 of the earlier firings, one per paper, were checked on the rendered page:
+all 16 print the compound with a hyphen (one borderline: a paper printing both `sub-bands` and
+`subband`). The same pass runs on the assembled render, where captions and table notes appear.
+Caption anchoring tolerates a hyphen difference between the body and the table record.
+
+| Paper | Before | After |
+|---|---|---|
+| `10.1177/01461672251327169` heading | `WellBeing` | `Well-Being` |
+| `10.1017/jdm.2022.2` p4 (prints `decision-` / `making`) | `decisionmaking` | `decisionmaking` (kept: its space-less layout token `judgmentanddecisionmaking` blocks the restore; fails closed) |
+| `10.1016/j.jesp.2020.103977` p9 (prints `nonmoral`) | `nonmoral` | `nonmoral` (kept) |
+
+### A table's text copy gives way to its grid (render)
+
+The body often carries a second, one-value-per-line copy of a table that the render also places as
+a structured `<table>` under `### Table N`. When every number (with multiplicity; a dash after a
+letter, digit or dot is a range, not a sign), every operator or marker (`< > = ± * ∗ × ≈ ≠ + † ‡ § ≤ ≥ %`)
+and every word (any letter run, one letter and Greek included) of the copy is in the grid of the
+same table, and at least 3 of its numbers have a decimal point or 3+ digits, the copy becomes:
+
+`<!-- table-text-duplicate: N lines of Table N's text-channel copy omitted here; every value in those lines is in the structured Table N. Other loose lines of this table, if any, were not verified and are kept -->`
+
+Only grids that survive the later phantom-table strip count. Over 101 manifest PDFs: 64 markers in
+30 papers, 4,565 numbers removed from body text; an independent check (difflib on the two renders)
+finds 0 numbers lost from the output. 23 body caption lines are absorbed into a run; each survives as
+`### Table N` plus the caption text above the grid.
+
+### Flattened rows state the table's own interval level (table extraction 2.4.23)
+
+The flattened sentence said `95% CI [lo, hi]` whatever the table printed. It now uses the level the
+table states (column header, super-header arm, caption or note): `90% CI`, `95% CrI`, `99% HDI`;
+no level or two different levels gives a bare `CI`. New field `fields.CI_level` (float) only when
+the level is stated. Over 10,713 manifest rows: 69 rows in 6 papers change, 59 to `CI` and 10 to
+`90% CI` (`10.1080/23743603.2021.1878340` Table 4 prints "η2p (90% CI)").
+
+### Verification
+
+Tier-2 cross-model review (Sonnet) in three rounds. Reproduced and fixed: two wrong hyphens
+(`nonmoral` and `multimodal`, both printed glued, checked on the page), one line-end fragment
+licensing several compounds, two compounds rewriting one glued span, and labels, Greek letters and
+symbols left out of the duplicate coverage test.
+
 ## [2.4.152] - 2026-10-09 - normalization 1.9.72 - table extraction 2.4.22 (unchanged) - sectioning 1.2.6
 
 Page numbers are now decided while the page breaks still exist, so table integers, raw data and

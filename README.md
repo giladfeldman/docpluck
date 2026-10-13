@@ -75,7 +75,7 @@ Requires Python 3.10 or newer.
 pip install "docpluck[all] @ git+https://github.com/giladfeldman/docpluck.git"
 ```
 
-To pin a release, append its tag: `...docpluck.git@v2.4.152`. The package is also on PyPI
+To pin a release, append its tag: `...docpluck.git@v2.4.153`. The package is also on PyPI
 (`pip install docpluck`); the GitHub tags are the release of record and PyPI can trail them,
 so check `pip index versions docpluck` if you need a specific version from PyPI.
 
