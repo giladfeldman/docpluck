@@ -118,6 +118,28 @@ def _numeric_tokens(s: str) -> list[str]:
     return _NUMERIC_TOKEN_RE.findall(s)
 
 
+# A table-text-duplicate marker (v2.4.153) replaces a text copy of a table whose
+# structured grid holds every value. Such a line is not lost, but the grid sits
+# elsewhere, so the "survives near the same position" rule cannot see it. It is
+# folded out only when every numeric token of the line (this scan's tokenizer,
+# never the render's) is in the emitted <table> blocks, and is counted and
+# printed separately so the fold is never silent.
+_DUPLICATE_MARKER = "<!-- table-text-duplicate:"
+_FOLDED_KEY = "__folded_yields_to_grid__"
+_TABLE_BLOCK_RE = re.compile(r"<table\b.*?</table>", re.DOTALL | re.IGNORECASE)
+
+
+def _dash_fold(s: str) -> str:
+    return s.replace("−", "-").replace("–", "-")
+
+
+def _yields_to_grid(lines: list[str], after: str) -> bool:
+    """All of the step's removed lines together (with multiplicity) are in the tables."""
+    grid = Counter(_numeric_tokens(_dash_fold(" ".join(_TABLE_BLOCK_RE.findall(after)))))
+    need = Counter(_numeric_tokens(_dash_fold("\n".join(lines))))
+    return bool(need) and not (need - grid)
+
+
 def _is_reportable(line: str) -> bool:
     stripped = line.strip()
     if not stripped or _FURNITURE_RE.match(stripped):
@@ -276,6 +298,10 @@ def _instrument(record: dict[str, list[str]]):
         out = original(report, name, fn, md, *a, **k)
         if isinstance(md, str) and isinstance(out, str) and out != md:
             lost = _deleted_lines(md, out)
+            if lost and _DUPLICATE_MARKER in out:
+                if _yields_to_grid(lost, out):
+                    record.setdefault(_FOLDED_KEY, []).extend(lost)
+                    lost = []
             if lost:
                 record.setdefault(name, []).extend(lost)
         return out
@@ -316,6 +342,7 @@ def main() -> int:
     print(f"SCANNING {len(corpus)} papers for render-chain content deletion\n")
 
     total_deleted = 0
+    total_folded = 0
     papers_hit = 0
     skipped_non_english: list[str] = []
     errors: list[tuple[str, str]] = []
@@ -342,6 +369,10 @@ def main() -> int:
             skipped_non_english.append(f"{key} [{lang}]")
             continue
 
+        folded = per_step.pop(_FOLDED_KEY, [])
+        if folded:
+            total_folded += len(folded)
+            print(f"-- {key}  {len(folded)} line(s) yielded to their grid (every number in an emitted <table>)")
         deleted = [(step, line) for step, lines in per_step.items() for line in lines]
         if not deleted:
             continue
@@ -364,6 +395,7 @@ def main() -> int:
     print(f"PAPERS LOSING CONTENT   {papers_hit}")
     print(f"NUMERIC LINES DELETED   {total_deleted}")
     print(f"DISTINCT TOKENS LOST    {len(token_counter)}")
+    print(f"YIELDED TO GRID         {total_folded} (table-text-duplicate; every number in an emitted table; not counted as lost)")
     if step_counter:
         print("\nBY STEP (which post-processor removed the line):")
         for step, n in step_counter.most_common():
