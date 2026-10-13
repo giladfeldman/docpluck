@@ -57,6 +57,7 @@ def _flatten_grid(header, body, *, label="Table", caption=None, footnote=None):
         _flatten_one_row(
             "T", 1, label, i, header, row,
             roles_override=override, effect_hint=hint,
+            level_context=vocab_all,  # as flatten_table passes it (v2.4.153)
         )
         for i, row in enumerate(body)
     ]

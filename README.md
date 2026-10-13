@@ -372,7 +372,7 @@ default to off.
 If you use docpluck in research, cite the version you used (from `get_version_info()`):
 
 > Feldman, G. (2026). *docpluck: Text and statistic extraction from academic papers*
-> (Version 2.4.152) [Computer software]. https://github.com/giladfeldman/docpluck
+> (Version 2.4.153) [Computer software]. https://github.com/giladfeldman/docpluck
 
 Machine-readable metadata is in [CITATION.cff](CITATION.cff); GitHub's "Cite this repository"
 button reads it.

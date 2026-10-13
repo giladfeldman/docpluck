@@ -2,7 +2,7 @@
 `## ` back to `### `, keyed on a parallel-prefix `### ` sibling (v2.4.110).
 
 The 2026-07-03 canary AI-verify found ip_feldman_2025_pspb rendering
-`## Prevalence Estimates Associations with WellBeing (Replication)` as a
+`## Prevalence Estimates Associations with Well-Being (Replication)` as a
 top-level `## ` when the gold has it as `### ` — a Results subsection SIBLING to
 `### Prevalence Estimate Errors` and `### Intensity Estimate Errors`. It is 7
 words, above the ≤6-word `### ` promoter's window, so the 5-12-word `## `
@@ -40,9 +40,9 @@ def test_ip_feldman_results_subsection_demoted_to_h3():
     pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf")
     md = render_pdf_to_markdown(pdf.read_bytes())
     # The target is now a subsection.
-    assert "### Prevalence Estimates Associations with WellBeing" in md
-    assert "## Prevalence Estimates Associations with WellBeing" not in md.replace(
-        "### Prevalence Estimates Associations with WellBeing", ""
+    assert "### Prevalence Estimates Associations with Well-Being" in md
+    assert "## Prevalence Estimates Associations with Well-Being" not in md.replace(
+        "### Prevalence Estimates Associations with Well-Being", ""
     )
     # Its parallel siblings stay `### `.
     assert "### Prevalence Estimate Errors" in md
