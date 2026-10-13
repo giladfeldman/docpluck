@@ -5326,9 +5326,13 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
     sites = [
         m for a, ms in by_prefix.items() if len(ms) <= frags[a] for m in ms
     ]
+    # Two compounds splitting the same letters (`re-sent`, `res-ent`) can both
+    # claim one glued span; which split the page meant is unknowable, so
+    # neither fires (consult round 3, Sonnet, 2026-10-13).
+    claims = collections.Counter(m.start() for m in sites)
+    sites = sorted((m for m in sites if claims[m.start()] == 1), key=lambda m: m.start())
     if not sites:
         return text
-    sites.sort(key=lambda m: m.start())
     out, last = [], 0
     for m in sites:
         out.append(text[last:m.start()])

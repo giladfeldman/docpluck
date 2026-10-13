@@ -80,3 +80,11 @@ def test_a_star_or_times_marker_the_grid_lacks_keeps_the_copy():
     for mark in ("∗", "×", "≈", "+"):
         out = _suppress_orphan_table_cell_text(_doc(f"Effort{mark}\nHelp\nSSRT\n\n3.10\n2.77\n211.74"))
         assert "table-text-duplicate" not in out, mark
+
+
+def test_a_range_with_an_en_dash_or_hyphen_reads_as_two_numbers():
+    # Consult round 3 (Sonnet, 2026-10-13): `2008–2013` (grid) and `2008-2013`
+    # (body) must tokenize alike, with no negative 2013.
+    for s in ("2008–2013", "2008-2013"):
+        assert sorted(_grid_tokens(s)[0].elements()) == ["2008", "2013"], s
+    assert sorted(_grid_tokens("x -3.84")[0].elements()) == ["-3.84"]

@@ -79,6 +79,15 @@ def test_one_line_end_fragment_licenses_one_site_across_compounds():
     assert recover_semantic_hyphens_via_layout(text, lay, None) == text
 
 
+def test_two_splits_of_one_glued_span_are_ambiguous_and_neither_fires():
+    # Consult round 3 (Sonnet, 2026-10-13): `re-sent` and `res-ent` both match
+    # the glued `resent`; pooled under different prefixes, both fired on one
+    # span and the text read `re-sentres-ent`.
+    text = "a re-sent and res-ent; then resent here."
+    lay = _layout("re-sent", "res-ent", "re-", "res-", "x")
+    assert recover_semantic_hyphens_via_layout(text, lay, None) == text
+
+
 def test_a_doi_is_never_hyphenated():
     # 10.5465/annals.2018.0057 cites `10.1109/ROMAN.2016.7745155` and elsewhere
     # prints the conference name RO-MAN; the DOI itself has no hyphen.
