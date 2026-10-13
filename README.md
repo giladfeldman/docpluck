@@ -245,7 +245,7 @@ fingerprints the text buffer the offsets index into.
 
 `flatten_tables_for_paper(tables)` (or `flatten_table(table)` for one) turns each body row of
 each table into a `FlattenedRow`: its table, page, row label, header, cells, an English sentence
-(`"Importance: t(741) = 3.93, p < .001, d = 0.29"`) and parsed `fields`. This is the input
+(`"Importance: t(741) = 3.93, p < .001, d = 0.29"`) and parsed `fields`. A confidence interval is stated at the level the table prints (`90% CI`, `95% CrI`; a bare `CI` when none is stated), and `fields["CI_level"]` carries that level when present. This is the input
 format for downstream statistics checkers; the CLI writes it as JSON Lines with
 `render --tables-jsonl`. `render_flattened_inline(rows, table_id=...)` renders rows back as a
 Markdown block.

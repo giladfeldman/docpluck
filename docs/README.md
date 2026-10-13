@@ -498,6 +498,12 @@ figures), so **if you run statistical checks on these rows, decide explicitly wh
 with `uncaptioned_candidate`** — they are included so that real statistics are not lost,
 and labelled so that you can filter them.
 
+**The flattened sentence states the interval level the table prints** (table extraction 2.4.23):
+`90% CI [lo, hi]`, `95% CrI [...]`, `99% HDI [...]`, read from the column header, a super-header arm,
+the caption or a note. When the table states no level, or two different levels, the sentence says a
+bare `CI` (it no longer assumes 95%). `fields["CI_level"]` (float, e.g. `90.0`) is present only when an interval was parsed and
+the level is stated; absence means the table did not say.
+
 **Parallel-arm tables carry `group`** in `fields` (`"Original"` / `"Replication"`, `"ITT"` /
 `"PP"`). Which columns belong to which arm is read from the page — a rule drawn under each
 arm label, or vertical rules between arms with the label centred over its columns — and
@@ -558,6 +564,13 @@ The whole paper as Markdown: title, section headings, body text with Greek lette
 glyphs as printed, tables as HTML under their captions, figure captions, and a separate
 "Uncaptioned table candidates (unverified)" section. `flatten_tables_inline=True` adds a
 readable one-sentence-per-row block below each table, bounded by HTML-comment markers.
+
+When the body carries a second, one-value-per-line copy of a table that the render also places as a
+structured `<table>`, and every number, operator and word of that copy is in the grid, the copy is
+replaced by `<!-- table-text-duplicate: N lines of Table N's text-channel copy omitted here; every
+value in those lines is in the structured Table N. Other loose lines of this table, if any, were not
+verified and are kept -->`. Nothing is lost: the values remain in the grid. Search for the marker to
+find every place this happened.
 
 Pass a `RenderReport()` as `report` to learn what the post-processing did:
 

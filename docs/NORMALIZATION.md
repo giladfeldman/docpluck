@@ -476,6 +476,7 @@ consumers, not bookkeeping:
 | W0p | a superscript footnote marker fused into a number (`2,5801`) | **TYPOGRAPHIC** | font size + baseline. Emits caret notation (`2,580^1`) — lossless, never deletion |
 | **W0q** | a CI upper bound whose minus is DETACHED (`[-0.58,  -  0.18]`) | **TYPOGRAPHIC** | new in v2.4.134 |
 | **W0s** | `=` / minus drawn by an operator-only font whose map says `5` / `2` (`t 5 20.63`) | **TYPOGRAPHIC, two origins** | declared font repertoire AND the rasterized glyph (a bar); both must agree, per word. New in v2.4.147; step key `W0s_operator_glyph_layout` |
+| **W0t** | a compound hyphen pdftotext dehyphenated away at a line end (`Well-` / `Being` -> `WellBeing`) | **TYPOGRAPHIC** (layout word counts) | new in v1.9.73 / v2.4.153; layout-gated; step key `W0t_semantic_hyphen_layout`. Restores `A-B` only when the paper prints `A-B` inline, no layout word holds `AB` in a hyphen-free stretch, and the layout has at least as many `A-` line-end fragments as the text has glued sites of every restored compound starting `A`; never inside a URL or DOI. A paper that prints the word glued even once keeps every glued copy |
 
 ### W0q — detached CI-upper minus (new in v2.4.134)
 
@@ -542,7 +543,8 @@ W0  glyph-recovery family (see the section above for each step's EVIDENCE class)
     [W0i / W0k / W0l WERE HERE — unwired in 2.4.140/141 as a FILE LIE;
      a printed digit 3 is never rewritten to a multiplication sign]
     W0q  ← new v2.4.134: detached CI-upper minus, body-prose channel
-    W0h, W0m, W0p  (layout-gated — only when `layout=` is supplied)
+    W0h, W0m, W0p, W0t  (layout-gated — only when `layout=` is supplied;
+    W0t is new v2.4.153: compound-hyphen restore, step key W0t_semantic_hyphen_layout)
     W0e
 A4  CI delimiter harmonization
 A5  Math symbol and Greek letter normalization
