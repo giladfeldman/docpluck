@@ -1,4 +1,4 @@
-"""W0o: a compound hyphen that pdftotext's dehyphenation removed is restored.
+"""W0t: a compound hyphen that pdftotext's dehyphenation removed is restored.
 
 ip_feldman (10.1177/01461672251327169, p10) prints the heading ``Well-`` /
 ``Being`` across a line end; pdftotext joins it to ``WellBeing``. The same paper

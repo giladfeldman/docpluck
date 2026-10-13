@@ -6212,7 +6212,7 @@ def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
     if label_clean:
         pieces.append(re.escape(label_clean))
         pieces.append(r"[\s.:]+")  # punctuation/whitespace after label
-    # A hyphen may differ between the two copies: the body's W0o restores a
+    # A hyphen may differ between the two copies: the body's W0t restores a
     # compound hyphen pdftotext dehyphenated away (`ViTbased` -> `ViT-based`)
     # while the caption record keeps the glued form, or the reverse. Without
     # tolerance the anchor misses and the float is exiled to the appendix
@@ -7462,8 +7462,8 @@ def _render_pdf_to_markdown(
     # Must follow the caption-detecting passes above that key on the prefix.
     md = _step(_report, "_dedupe_label_in_table_figure_caption", _dedupe_label_in_table_figure_caption, md)
 
-    # W0o on the assembled page: captions and table notes come from the table
-    # and figure records, which never passed through normalize's W0o, so a
+    # W0t on the assembled page: captions and table notes come from the table
+    # and figure records, which never passed through normalize's W0t, so a
     # caption could keep `ViTbased` beside a body that now reads `ViT-based`.
     # Same evidence and gate as the body pass; a no-op where the body pass
     # already restored everything.

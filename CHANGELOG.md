@@ -6,7 +6,7 @@ A compound hyphen that pdftotext removed at a line end is restored. A table's on
 text copy gives way to a labelled marker when its structured grid holds every value of it. A
 flattened table sentence states the interval level the table prints instead of always "95% CI".
 
-### Compound hyphens restored (normalization 1.9.73, W0o)
+### Compound hyphens restored (normalization 1.9.73, W0t)
 
 pdftotext joins `self-` / `reported` at a line end into `selfreported`. That is right for a
 syllable break and wrong for a compound. `AB` becomes `A-B` only when all hold:
