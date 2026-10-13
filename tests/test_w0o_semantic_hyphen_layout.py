@@ -58,6 +58,27 @@ def test_more_glued_copies_than_line_end_fragments_is_refused():
     assert recover_semantic_hyphens_via_layout(text, lay, None) == text
 
 
+def test_a_glued_word_inside_a_longer_layout_token_is_never_touched():
+    # 10.1016/j.jesp.2020.103977 p9 prints the reference "derive from nonmoral"
+    # (rasterized 2026-10-13); its PDF has no space glyphs there, so pdfplumber
+    # returns one token `...derivefromnonmoral`, never `nonmoral` alone. The
+    # paper also prints `non-moral` inline and has unrelated `non-` line ends.
+    # Consult round 2 (Sonnet, 2026-10-13) finding 2.
+    text = "a non-moral view. Patterns of moral judgment derive from nonmoral ones"
+    lay = _layout("non-moral", "Patternsofmoraljudgmentderivefromnonmoral", "non-", "verbal")
+    assert recover_semantic_hyphens_via_layout(text, lay, None) == text
+
+
+def test_one_line_end_fragment_licenses_one_site_across_compounds():
+    # 10.5465/amj.2016.1196: self-concept (2 glued) and self-regulation (1 glued)
+    # against 2 `self-` line ends. A fragment cannot license two sites, so the
+    # prefix is refused as a whole. Consult round 2 (Sonnet, 2026-10-13) finding 1.
+    text = ("self-concept and self-regulation inline; selfconcept, selfconcept "
+            "and selfregulation glued")
+    lay = _layout("self-concept", "self-regulation", "self-", "concept", "self-", "regulation")
+    assert recover_semantic_hyphens_via_layout(text, lay, None) == text
+
+
 def test_a_doi_is_never_hyphenated():
     # 10.5465/annals.2018.0057 cites `10.1109/ROMAN.2016.7745155` and elsewhere
     # prints the conference name RO-MAN; the DOI itself has no hyphen.

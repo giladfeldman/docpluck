@@ -64,3 +64,19 @@ def test_a_range_is_not_a_negative():
     assert nums == {"12": 1, "15": 1}
     nums, _, _ = _grid_tokens("b = -.32")
     assert "-.32" in nums
+
+
+def test_a_greek_or_single_letter_label_the_grid_lacks_keeps_the_copy():
+    # Consult round 2 (Sonnet, 2026-10-13) finding 11: `[A-Za-z]{2,}` never
+    # compared `β`, `η`, `p`, `F`, so a statistic label only the copy carries
+    # could be deleted with it.
+    for label in ("β", "p", "η2p"):
+        out = _suppress_orphan_table_cell_text(_doc(f"Effort\nHelp\nSSRT\n{label}\n\n3.10\n2.77\n211.74"))
+        assert "table-text-duplicate" not in out, label
+
+
+def test_a_star_or_times_marker_the_grid_lacks_keeps_the_copy():
+    # `∗` (U+2217) is korbmacher's footnote star; `×` an interaction term.
+    for mark in ("∗", "×", "≈", "+"):
+        out = _suppress_orphan_table_cell_text(_doc(f"Effort{mark}\nHelp\nSSRT\n\n3.10\n2.77\n211.74"))
+        assert "table-text-duplicate" not in out, mark

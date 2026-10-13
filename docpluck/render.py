@@ -4806,10 +4806,12 @@ _GRID_HEADING_RE = re.compile(r"^###\s+Table\s+(\d+)\b", re.MULTILINE)
 # A leading minus only where it cannot be a range dash: `12-15` is 12 and 15,
 # not 12 and -15 (consult 2026-10-13).
 _GRID_NUMBER_RE = re.compile(r"(?:(?<![\w.])-)?(?:\d+(?:\.\d+)?|\.\d+)")
-_GRID_WORD_RE = re.compile(r"[A-Za-z]{2,}")
+# Any letter run, one letter included: `p`, `F`, `d` and Greek `β` `η` label the
+# statistic a number is (consult round 2, Sonnet, 2026-10-13, finding 11).
+_GRID_WORD_RE = re.compile(r"[^\W\d_]+")
 # Operators and significance / footnote markers carry meaning the numbers do not
 # (`p < .05` vs `p > .05`), so they must be covered too.
-_GRID_SYMBOL_RE = re.compile(r"[<>=±*†‡§≤≥%]")
+_GRID_SYMBOL_RE = re.compile(r"[<>=±*∗×≈≠+†‡§≤≥%]")
 
 
 def _grid_tokens(s: str) -> tuple:
@@ -4824,8 +4826,13 @@ def _grid_tokens(s: str) -> tuple:
 def _structured_grid_tokens_by_label(text: str) -> dict:
     """``{"1": (number multiset, word set)}`` for every structured ``<table>``
     the render already placed under a ``### Table N`` heading. Several grids
-    under one label (a continued table) pool their tokens."""
+    under one label (a continued table) pool their tokens.
+
+    Only grids that survive ``_strip_phantom_camelot_tables`` (a later pass)
+    count: a text copy must never yield to a grid the render then deletes
+    (consult round 2, Sonnet, 2026-10-13, finding 18)."""
     import html as _html
+    text = _strip_phantom_camelot_tables(text)
     pooled: dict = {}
     for m in _GRID_HEADING_RE.finditer(text):
         start = text.find("<table", m.end())

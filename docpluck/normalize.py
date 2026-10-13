@@ -5251,6 +5251,9 @@ _W0O_INLINE_COMPOUND_RE = re.compile(
     r"(?<![A-Za-z-])([A-Za-z]{2,})-([A-Za-z]{2,})(?![A-Za-z-])"
 )
 _W0O_WORD_STRIP = ".,;:()[]{}\"'“”‘’"
+# A hyphen-free run of letters inside a layout word: `above-averageeffect`
+# holds `above` and `averageeffect`, never `aboveaverage`.
+_W0O_LAYOUT_STRETCH_RE = re.compile(r"[a-z]+")
 
 
 def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
@@ -5271,11 +5274,14 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
 
     * the text prints ``A-B`` inline (not across a line break) at least once --
       the paper's own spelling;
-    * the LAYOUT channel holds ``AB`` as a whole word ZERO times, so the paper
-      never prints it glued (the text channel's glued forms are the artifacts
-      under repair, so counting them would be circular);
+    * no LAYOUT word holds ``AB`` anywhere inside a hyphen-free stretch, so the
+      paper never prints it glued (the text channel's glued forms are the
+      artifacts under repair, so counting them would be circular). Inside, not
+      equal: a PDF without space glyphs gives one token
+      ``derivefromnonmoral`` (10.1016/j.jesp.2020.103977 p9 prints "nonmoral");
     * the layout holds at least as many line-end fragments ``A-`` as the text
-      holds glued ``AB`` -- every glued copy has a hyphenated line end to come from;
+      holds glued sites of EVERY restored compound starting ``A`` -- one line
+      end licenses one site, never one per compound;
     * the glued copy is not part of a URL or DOI (``10.1109/ROMAN.2016``).
 
     A document that prints the word glued even once keeps every glued copy
@@ -5289,40 +5295,49 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
         attest[(m.group(1).lower(), m.group(2).lower())] += 1
     if not attest:
         return text
-    words: collections.Counter = collections.Counter()
+    stretches: list = []
     frags: collections.Counter = collections.Counter()
     for page in getattr(layout, "pages", ()) or ():
         for w in getattr(page, "words", ()) or ():
             s = (w.get("text") or "").strip(_W0O_WORD_STRIP)
             if not s:
                 continue
-            words[s.lower()] += 1
+            # NFKC folds ligatures (`ﬁ` -> `fi`) so `selfﬁnancing` still matches.
+            stretches.extend(
+                _W0O_LAYOUT_STRETCH_RE.findall(unicodedata.normalize("NFKC", s).lower())
+            )
             if s.endswith("-") and len(s) > 2:
                 frags[s[:-1].lower()] += 1
-    if not words:
+    if not stretches:
         record_fallback("w0o_layout_has_no_words")
         return text
+    layout_letters = "\n".join(stretches)
+    by_prefix: dict = collections.defaultdict(list)
     for (a, b), _n in attest.items():
-        glued = a + b
-        if words[glued]:
+        if a + b in layout_letters:
             continue
         pat = re.compile(r"(?<![A-Za-z-])(" + re.escape(a) + r")(" + re.escape(b) + r")(?![A-Za-z-])", re.I)
         sites = [
             m for m in pat.finditer(text)
             if not _w0o_in_url(text, m.start(), m.end())
         ]
-        if not sites or frags[a] < len(sites):
-            continue
-        out, last = [], 0
-        for m in sites:
-            out.append(text[last:m.start()])
-            out.append(m.group(1) + "-" + m.group(2))
-            last = m.end()
-        out.append(text[last:])
-        text = "".join(out)
-        if counter is not None:
-            counter[0] += len(sites)
-    return text
+        if sites:
+            by_prefix[a].extend(sites)
+    sites = [
+        m for a, ms in by_prefix.items() if len(ms) <= frags[a] for m in ms
+    ]
+    if not sites:
+        return text
+    sites.sort(key=lambda m: m.start())
+    out, last = [], 0
+    for m in sites:
+        out.append(text[last:m.start()])
+        out.append(m.group(1) + "-" + m.group(2))
+        last = m.end()
+    out.append(text[last:])
+    if counter is not None:
+        counter[0] += len(sites)
+    return "".join(out)
 
 
 def _w0o_in_url(text: str, start: int, end: int) -> bool:
