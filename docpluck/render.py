@@ -4803,8 +4803,13 @@ def _is_orphan_cell_paragraph(p: str) -> bool:
 
 _BARE_TABLE_LABEL_LINE_RE = re.compile(r"^Table\s+(\d+)$")
 _GRID_HEADING_RE = re.compile(r"^###\s+Table\s+(\d+)\b", re.MULTILINE)
-_GRID_NUMBER_RE = re.compile(r"-?(?:\d+(?:\.\d+)?|\.\d+)")
+# A leading minus only where it cannot be a range dash: `12-15` is 12 and 15,
+# not 12 and -15 (consult 2026-10-13).
+_GRID_NUMBER_RE = re.compile(r"(?:(?<![\w.])-)?(?:\d+(?:\.\d+)?|\.\d+)")
 _GRID_WORD_RE = re.compile(r"[A-Za-z]{2,}")
+# Operators and significance / footnote markers carry meaning the numbers do not
+# (`p < .05` vs `p > .05`), so they must be covered too.
+_GRID_SYMBOL_RE = re.compile(r"[<>=±*†‡§≤≥%]")
 
 
 def _grid_tokens(s: str) -> tuple:
@@ -4812,6 +4817,7 @@ def _grid_tokens(s: str) -> tuple:
     return (
         Counter(_GRID_NUMBER_RE.findall(s)),
         {w.lower() for w in _GRID_WORD_RE.findall(s)},
+        Counter(_GRID_SYMBOL_RE.findall(s)),
     )
 
 
@@ -4830,23 +4836,27 @@ def _structured_grid_tokens_by_label(text: str) -> dict:
         if end < 0:
             continue
         cells = _html.unescape(re.sub(r"<[^>]+>", " ", text[start:end]))
-        nums, words = _grid_tokens(cells)
+        nums, words, syms = _grid_tokens(cells)
         if not nums:
             continue
-        have = pooled.setdefault(m.group(1), (Counter(), set()))
+        have = pooled.setdefault(m.group(1), (Counter(), set(), Counter()))
         have[0].update(nums)
         have[1].update(words)
+        have[2].update(syms)
     return pooled
 
 
 def _run_duplicated_in_grid(run_lines: list, grid: tuple) -> bool:
-    """True iff every number (with multiplicity) and every word of the run is
-    in the grid, and the run holds at least one number. A run the grid does
-    not fully cover is never treated as a copy."""
-    nums, words = _grid_tokens("\n".join(run_lines))
-    if not nums:
+    """True iff every number and every operator/marker (with multiplicity) and
+    every word of the run is in the grid, and the run is SPECIFIC enough that
+    coverage cannot be coincidence: at least 3 of its numbers carry a decimal
+    point or 3+ digits. A run of small integers (Likert points, counts) is
+    covered by chance by any large grid, so it is never treated as a copy."""
+    nums, words, syms = _grid_tokens("\n".join(run_lines))
+    specific = sum(n for v, n in nums.items() if "." in v or len(v.lstrip("-")) >= 3)
+    if specific < 3:
         return False
-    return not (nums - grid[0]) and words <= grid[1]
+    return not (nums - grid[0]) and not (syms - grid[2]) and words <= grid[1]
 
 
 def _suppress_orphan_table_cell_text(text: str) -> str:
@@ -4972,9 +4982,10 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
                     out.extend(lines[i:(i + 2 if is_bare_label else i + 1)])
                 out.append("")
                 out.append(
-                    f"<!-- table-text-duplicate: the text-channel copy of Table {label_no} "
-                    f"({len(orphans)} lines) is omitted here; every value in it is in the "
-                    f"structured Table {label_no} -->"
+                    f"<!-- table-text-duplicate: {len(orphans)} lines of Table {label_no}'s "
+                    f"text-channel copy omitted here; every value in those lines is in the "
+                    f"structured Table {label_no}. Other loose lines of this table, if any, "
+                    f"were not verified and are kept -->"
                 )
                 i = orphans[-1] + 1
                 continue
