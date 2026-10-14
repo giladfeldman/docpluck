@@ -1172,15 +1172,30 @@ def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
     # If ANY super-row cell exceeds 80 chars AND contains a comma-
     # then-lowercase or an unmatched open paren, DROP the super-row
     # rather than fold it. Real super-headers never look this way.
-    if any(
-        len((cell or "").strip()) > 80
-        and (
+    def _is_prose(cell: str) -> bool:
+        return len((cell or "").strip()) > 80 and bool(
             re.search(r",\s*[a-z]", cell or "")
             or ("(" in (cell or "") and (cell or "").count("(") > (cell or "").count(")"))
         )
-        for cell in sup
-    ):
-        return [sub] + header_rows[2:]
+
+    prose_cols = [i for i, cell in enumerate(sup) if _is_prose(cell)]
+    if prose_cols:
+        # Prose ONLY in the stub column, beside at least two short labels, is
+        # a caption line that leaked into the header's first cell -- not a
+        # reason to drop the labels beside it. 10.1525/collabra.74820 Table 2
+        # lost all five "Model k: <scale>" group labels this way, and flatten
+        # then kept only the last model's statistics per row (ESCImate,
+        # 2026-10-14). The stub cell is blanked; the labels fold as usual.
+        others = [c for i, c in enumerate(sup) if i and (c or "").strip()]
+        if (
+            prose_cols == [0]
+            and len(others) >= 2
+            and all(len(c.strip()) <= 60 and not _is_prose(c) for c in others)
+        ):
+            sup = [""] + list(sup[1:])
+            header_rows = [sup] + header_rows[1:]
+        else:
+            return [sub] + header_rows[2:]
     n = max(len(sup), len(sub))
     sup += [""] * (n - len(sup))
     sub += [""] * (n - len(sub))

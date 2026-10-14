@@ -629,11 +629,15 @@ class TestA4_CIDelimiterEdgeCases:
     def test_semicolon_in_parens(self):
         assert "(0.12, 0.45)" in norm("(0.12; 0.45)")
 
+    # Braces become brackets only after CI wording (d-a6101d): a bare brace pair
+    # is set notation on 10.1038/s41562-026-02417-4 p35. See
+    # tests/test_a4_braces_only_for_intervals.py.
     def test_curly_to_square(self):
-        assert "[0.12, 0.45]" in norm("{0.12, 0.45}")
+        assert "[0.12, 0.45]" in norm("95% CI {0.12, 0.45}")
+        assert "{0.12, 0.45}" in norm("the set {0.12, 0.45}")
 
     def test_curly_semicolon_to_square_comma(self):
-        assert "[0.12, 0.45]" in norm("{0.12; 0.45}")
+        assert "[0.12, 0.45]" in norm("95% CI {0.12; 0.45}")
 
     def test_negative_lower_bound(self):
         assert "[-0.23, 0.67]" in norm("[-0.23; 0.67]")

@@ -24,7 +24,9 @@ from docpluck.tables import Cell, Table
 from docpluck.tables.captions import CAPTION_PIPE_SEPARATOR
 from docpluck.tables.cell_cleaning import repair_cells
 from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
+from docpluck.tables.bottom_extend import extend_to_table_bottom
 from docpluck.tables.column_split import resplit_merged_columns
+from docpluck.tables.dropped_glyphs import restore_dropped_signs
 from docpluck.tables.render import cells_to_html
 from docpluck.telemetry import record_fallback
 from docpluck.tempfiles import unlink_temp_pdf
@@ -1056,6 +1058,15 @@ def extract_tables_camelot(
         out: list[Table] = []
         for idx, ct in enumerate(tables_obj):
             ct = resplit_merged_columns(camelot, tmp_path, ct, layout)
+            # Camelot's area detection can stop above the table's last rows
+            # (an indented sub-block breaks its edges); re-read appends them.
+            # AFTER the re-split: the split is decided on the rows Camelot
+            # found, so appending rows never changes a column decision
+            # (10.1186 bmc-pub-health-2 Table 3 split its header otherwise).
+            ct = extend_to_table_bottom(camelot, tmp_path, ct)
+            # A minus drawn in a TeX/MathTime symbol font is missing from
+            # Camelot's text lines; the page's text layer still holds it.
+            restore_dropped_signs(ct, layout)
             td = _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold,
                                         layout=layout)
             if td is not None:
@@ -1174,8 +1185,12 @@ def extract_tables_camelot_by_region(
             used_s.add(si)
             used_t.add(ti)
             spec = specs[si]
+            ct = extend_to_table_bottom(
+                camelot, tmp_path, resplit_merged_columns(camelot, tmp_path, tables[ti], layout)
+            )
+            restore_dropped_signs(ct, layout)
             td = _camelot_table_to_dict(
-                resplit_merged_columns(camelot, tmp_path, tables[ti], layout), 0,
+                ct, 0,
                 accuracy_threshold=accuracy_threshold,
                 id_prefix="region_t",
                 label=spec.get("label"),
@@ -1185,6 +1200,9 @@ def extract_tables_camelot_by_region(
             )
             if td is not None:
                 td["id"] = f"region_{spec['key']}"
+                appended = getattr(ct, "_docpluck_appended_cells", 0)
+                if appended:
+                    td["_appended_cells"] = appended  # read and removed by the picker
                 out[spec["key"]] = td
 
     out: dict[str, Table] = {}

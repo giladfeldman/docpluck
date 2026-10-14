@@ -23,8 +23,11 @@ What we emit: per body row, a `FlattenedRow` dict with
     fidelity levels so consumers pick what they trust.
   * `fields`   — structured dict of recognized statistical quantities
     (`t`, `df`, `F`, `df1`, `df2`, `r`, `n`, `p_op`, `p`, `d`, `eta2`, `BF01`,
-    `est`, `M`, `SD`, `CI_lower`, `CI_upper`, and `group` for a parallel-arm
-    row's arm label). Empty dict when nothing is recognized.
+    `est`, `M`, `SD`, `CI_lower`, `CI_upper`, `CI_level` with `CI_kind`
+    (`CI` / `CrI` / `HDI`), `group` for a
+    parallel-arm row's arm label, and `p_text`, the p number exactly as the
+    cell prints it, e.g. ".050" beside `p` = 0.05). Empty dict when nothing is
+    recognized.
 
 Canonical contract: docpluck always emits these records as a sidecar
 `<paper>.tables.jsonl` next to the rendered `.md`. The `render_pdf_to_markdown`
@@ -574,6 +577,16 @@ def _parse_number(s: str) -> Optional[float]:
         return float(m.group(1))
     except ValueError:
         return None
+
+
+def _p_printed(s: str) -> Optional[str]:
+    """The p-value's number exactly as the cell prints it (``.050``), read by the
+    same parse as ``_parse_p_cell``. A JSON number loses the printed precision
+    (``.050`` -> 0.05), and a consumer judging p within half a unit of the last
+    printed decimal needs it (ESCImate, 2026-10-09)."""
+    txt = (s or "").strip().lstrip("p").strip().lstrip(":=").strip()
+    m = _P_OP_RE.match(txt)
+    return m.group(2) if m else None
 
 
 def _parse_p_cell(s: str) -> tuple[Optional[str], Optional[float]]:
@@ -1296,6 +1309,9 @@ def _flatten_one_row(
                 role_nums["p"] = p
                 if op:
                     role_vals["p_op"] = op
+                printed = _p_printed(raw)
+                if printed:
+                    role_vals["p_text"] = printed
         elif role == "df_pair":
             m = _DF_PAIR_RE.match(raw)
             if m:
@@ -1495,6 +1511,8 @@ def _flatten_one_row(
         fields["p"] = role_nums["p"]
         if "p_op" in role_vals:
             fields["p_op"] = role_vals["p_op"]
+        if "p_text" in role_vals:
+            fields["p_text"] = role_vals["p_text"]
     ci_level, ci_kind = _interval_level(header, group)
     if ci_level is None and level_context:
         ci_level, ci_kind = _interval_level([level_context], None)
@@ -1503,6 +1521,9 @@ def _flatten_one_row(
         fields["CI_upper"] = role_nums["CI_upper"]
         if ci_level is not None:
             fields["CI_level"] = ci_level
+            # CI / CrI / HDI: a credible interval is not graded as a confidence
+            # interval (ESCImate, 2026-10-14).
+            fields["CI_kind"] = ci_kind
 
     sentence = _assemble_sentence(
         row_label, role_vals, role_nums, df_val, df1_val, df2_val, group,
@@ -1682,9 +1703,77 @@ def _assemble_sentence(
 # ── Public entry points ─────────────────────────────────────────────────────
 
 
+def _top_row_arm_cols(grid: list[list[str]]) -> set[int]:
+    """Columns of the grid's top row that hold a label standing ALONE: the row
+    has no row label, at least two labels, and the cell under each label is
+    empty -- the shape of a super-header row printed above wrapped sub-headers.
+    Empty when the top row is not of that shape."""
+    if len(grid) < 2:
+        return set()
+    top, below = grid[0], grid[1]
+    if (top[0] or "").strip():
+        return set()
+    cols = {i for i, c in enumerate(top) if (c or "").strip()}
+    if len(cols) < 2:
+        return set()
+    if any(i < len(below) and (below[i] or "").strip() for i in cols):
+        return set()
+    return cols
+
+
+def _arms_by_role_repeat(
+    header: list[str], labels: list[int]
+) -> Optional[tuple[list[int], list[tuple[str, list[int]]]]]:
+    """Arm boundaries for CENTRED super-header labels, from the sub-headers.
+
+    A centred label lands in a middle column of its span, so its column is not
+    the arm's first column. Parallel arms repeat their sub-header roles
+    (``t-stat p d`` ... ``t-stat df p d``): an arm ends just before the first
+    column whose statistic role already occurred in it, and the first arm reaches
+    back from its label over role-typed columns until a role repeats or an
+    untyped column (the row labels) starts. Returns ``None`` -- keep the old
+    grouping -- unless every arm contains its own label column."""
+    n = len(header)
+    roles = [_classify_column(h) for h in header]
+    # first arm reaches back from its label
+    seen = {roles[labels[0]]} - {None}
+    start = labels[0]
+    for c in range(labels[0] - 1, 0, -1):
+        if not roles[c] or roles[c] in seen:
+            break
+        seen.add(roles[c])
+        start = c
+    bounds: list[int] = []  # first column of arms 2..k
+    for j in range(len(labels) - 1):
+        lo, hi = labels[j], labels[j + 1]
+        if j:
+            seen = {roles[c] for c in range(bounds[-1], lo + 1) if roles[c]}
+        b = None
+        for c in range(lo + 1, hi + 1):
+            if roles[c] and roles[c] in seen:
+                b = c
+                break
+            if roles[c]:
+                seen.add(roles[c])
+        if b is None:
+            return None
+        bounds.append(b)
+    last = max((c for c in range(n) if roles[c]), default=n - 1)
+    edges = [start] + bounds + [last + 1]
+    groups = []
+    for j, s in enumerate(labels):
+        cols = list(range(edges[j], edges[j + 1]))
+        if s not in cols:
+            return None
+        groups.append(((header[s].split(_MERGE_SEPARATOR, 1)[0]).strip(), cols))
+    in_arm = {c for _, cols in groups for c in cols}
+    return [i for i in range(n) if i not in in_arm], groups
+
+
 def _detect_column_groups(
     header: list[str],
     spans: dict[int, int] | None = None,
+    arm_cols: set[int] | None = None,
 ) -> Optional[tuple[list[int], list[tuple[str, list[int]]]]]:
     """Detect parallel column groups from a folded super-header.
 
@@ -1698,6 +1787,20 @@ def _detect_column_groups(
     pre-existing single-row path). Keyed on the structural fold signature, not
     on any column text — general across publishers."""
     starts = [i for i, h in enumerate(header) if _MERGE_SEPARATOR in (h or "")]
+    # A folded cell is EITHER a super-header label over its sub-header OR one
+    # column's own header wrapped onto several lines ("Actual / prevalence /
+    # average"); both carry the sentinel. When the grid's top row holds labels
+    # standing alone over empty cells (`_top_row_arm_cols`), only those columns
+    # start an arm -- 10.1177/01461672251327169 p11 Table 6 otherwise made six
+    # "arms" of four wrapped headers plus two real ones and paired the item-level
+    # t/df with the participant-level d (d-bc33a3).
+    if arm_cols is not None and len(arm_cols) >= 2:
+        kept = [i for i in starts if i in arm_cols]
+        if len(kept) >= 2 and len(kept) < len(starts):
+            by_roles = _arms_by_role_repeat(header, kept)
+            if by_roles is not None:
+                return by_roles
+        starts = kept
     if len(starts) < 2:
         return None
     n = len(header)
@@ -2013,7 +2116,9 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
         if c["r"] == top_r and int(c.get("colspan") or 1) > 1
         and (table.get("rendering") or "") != "markup"
     }
-    grouped = _detect_column_groups(header, printed_spans or None)
+    grouped = _detect_column_groups(
+        header, printed_spans or None, _top_row_arm_cols(grid) or None
+    )
 
     # Blank-header column-role recovery (non-grouped tables only — grouped
     # tables already resolve roles per arm). When the grid header leaves stat

@@ -1065,17 +1065,20 @@ class TestFullPipeline:
 # ── A4 Enhanced: curly braces, spacing, paren semicolons ─────────────
 
 class TestA4_Enhanced:
+    # Since 2.4.154 (d-a6101d) braces become brackets only after CI wording; a
+    # bare brace pair is set notation (10.1038/s41562-026-02417-4 p35 `d ∈ {1, 2}`).
     def test_curly_braces_to_square_brackets(self):
-        """European CI: {0.45, 0.89} → [0.45, 0.89]"""
-        assert "[0.45, 0.89]" in norm("{0.45, 0.89}")
+        """95% CI {0.45, 0.89} → [0.45, 0.89]; a bare {0.45, 0.89} stays a set"""
+        assert "[0.45, 0.89]" in norm("95% CI {0.45, 0.89}")
+        assert "{0.45, 0.89}" in norm("values {0.45, 0.89}")
 
     def test_curly_braces_with_semicolon(self):
-        """{0.45; 0.89} → [0.45, 0.89]"""
-        assert "[0.45, 0.89]" in norm("{0.45; 0.89}")
+        """CI {0.45; 0.89} → [0.45, 0.89]"""
+        assert "[0.45, 0.89]" in norm("CI {0.45; 0.89}")
 
     def test_curly_braces_negative(self):
-        """{-0.12, 0.34} → [-0.12, 0.34]"""
-        assert "[-0.12, 0.34]" in norm("{-0.12, 0.34}")
+        """confidence interval {-0.12, 0.34} → [-0.12, 0.34]"""
+        assert "[-0.12, 0.34]" in norm("confidence interval {-0.12, 0.34}")
 
     def test_bracket_spacing_compact(self):
         """[0.45,0.89] → [0.45, 0.89]"""

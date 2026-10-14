@@ -502,7 +502,17 @@ and labelled so that you can filter them.
 `90% CI [lo, hi]`, `95% CrI [...]`, `99% HDI [...]`, read from the column header, a super-header arm,
 the caption or a note. When the table states no level, or two different levels, the sentence says a
 bare `CI` (it no longer assumes 95%). `fields["CI_level"]` (float, e.g. `90.0`) is present only when an interval was parsed and
-the level is stated; absence means the table did not say.
+the level is stated, together with `fields["CI_kind"]` (`"CI"`, `"CrI"` or `"HDI"`, table extraction 2.4.24) so a
+credible interval is not graded as a confidence interval; absence means the table did not say.
+
+**The printed p-value travels with the parsed one** (table extraction 2.4.24): `fields["p_text"]` is the
+p number exactly as the cell prints it (`".050"`, `".001"` for `< .001`), beside the numeric
+`fields["p"]` (0.05), so a consumer can judge p within half a unit of the last printed decimal.
+
+**Arms are bound to the group header that spans them** (table extraction 2.4.24): a header that wraps
+onto several lines ("Actual / prevalence / average") is one column's header, not a group; only labels
+standing alone on the top header row start an arm, and when those labels are centred an arm ends where
+its sub-header roles start repeating (`t p d` ... `t df p d`).
 
 **Parallel-arm tables carry `group`** in `fields` (`"Original"` / `"Replication"`, `"ITT"` /
 `"PP"`). Which columns belong to which arm is read from the page — a rule drawn under each
@@ -837,11 +847,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.153',            # docpluck itself
+# {'version': '2.4.154',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.73',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.74',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.6',   #   independently of the package version
-#  'table_extraction_version': '2.4.23',
+#  'table_extraction_version': '2.4.24',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs

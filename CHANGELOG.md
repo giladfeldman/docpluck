@@ -1,5 +1,96 @@
 # Changelog
 
+## [2.4.154] - 2026-10-14 - normalization 1.9.74 - table extraction 2.4.24 - sectioning 1.2.6 (unchanged)
+
+Tables reach their last printed row, keep minus signs drawn in a math font, keep side-by-side
+tables apart, and bind each column to the group header that spans it. Braces become brackets only
+for a confidence interval. `compute_quality_score` now sees statistics a font broke. Flattened rows
+carry the printed p-value and the interval kind.
+
+### A table grid reaches its last printed row (table extraction 2.4.24)
+
+Camelot's stream parser takes a table's area from aligned text edges; an indented sub-block or a
+label-only row breaks the edges and the grid stops early. On 10.1177/00031224241252079 p12 Table 1
+the four education rows, `Individuals` (4,972 / 2,101 / 2,871) and `Observations` (461,253 /
+197,097 / 264,156) were in no cell. Rows directly under a grid are now appended when they are rows
+of values: within 1.6 row pitches, inside the grid's x-range, at most one label starting in the
+first column, each value centred in a different column of the grid's own, at least one a number
+(a lone unlabelled number is a chart tick and stops it). Camelot re-reads the extended area with
+the grid's own column separators and the result is kept only if every original row comes back
+cell for cell. Measured over the 101-PDF manifest: 46 firings in 33 papers before the column
+re-split ordering fix; examples checked on the page: ASR Table 1, 10.15626/mp.2022.3108 Tables 7, 8
+(interaction rows) and 9 (Part 2 rows), JAMA Network Open Table 1 rows, regression `R2` / `F` /
+`Observations` rows.
+
+### A minus sign Camelot dropped is put back (table extraction 2.4.24)
+
+A minus drawn in a TeX/MathTime symbol font (`MTSY`, `MTSYN`, `CMSY10`) is read by pdftotext and
+pdfplumber but missing from Camelot's text lines, so the grid published the value as positive.
+A minus-like glyph the page's text layer holds directly left of a cell's number, on its baseline,
+inside no Camelot text line, is inserted unchanged. Upright pages only. 57 cells in 4 manifest
+papers; every table firing checked on the page.
+
+| Paper | Cell | Before | After |
+|---|---|---|---|
+| 10.1098/rsos.140072 p7 Table 3 | submission estimate / t | `0.03` / `1.93` | `−0.03` / `−1.93` |
+| 10.1093/sf/soaf022 p12 | Cutpoint 1 | `73.57`, `84.97`, `93.98` | `−73.57`, `−84.97`, `−93.98` |
+
+### Side-by-side tables are kept apart (table extraction 2.4.24)
+
+The caption-label search stripped spaces from the label (`table1`) but not from the page row, so a
+PDF that draws its spaces as glyphs never located either label. On 10.1186/s12916-023-03146-5 p6,
+Table 1 and Table 2 were both delivered as the same merged 23 x 7 grid; each is now its own grid
+and matches the page. On 10.1016/j.jesp.2021.104154 p12, Tables 9 and 10 (side by side) were one
+110 x 14 grid; they are now 28 x 7 and 25 x 5. A label with a word right before it (`summarized in
+Table 2.`) is a reference, not a caption, and is ignored (the same paper's p6 otherwise looked
+side-by-side and Table 2's grid reached no table).
+
+Rows appended to a caption-region grid never let it displace the page-wide grid on their own: a
+wider region grid wins only as before (at least 60% of the incumbent's cells without the appended
+rows) or with at least as many cells (10.1186/s12889-023-17078-5 Table 3 otherwise lost its
+complete 50 x 5 grid to a 34 x 6 grid with a split header).
+
+### Group headers bind the columns they span (flatten)
+
+A header that wraps over several lines (`Actual / prevalence / average`) was folded with the same
+marker as a group header, so flatten built six "groups" on 10.1177/01461672251327169 Table 6 and
+paired the item-level `t = -4.30, df = 5` with the participant-level `d = -1.44`. Only labels standing
+alone on the grid's top row now start an arm, and a centred label's arm ends where its sub-header
+roles repeat. Participant t = -35.02 now pairs with d = -1.44; item t = -4.30, df = 5 with d = -1.76.
+7 of 692 manifest tables change grouping; 0 values lost.
+
+A super-header row is no longer dropped when only its stub cell is leaked caption prose:
+10.1525/collabra.74820 Table 2 keeps its five `Model k` groups (it delivered only the last model's
+t per row).
+
+### New flattened fields
+
+- `fields["p_text"]`: the p number exactly as printed (`".050"` beside `p` = 0.05); 456 manifest rows.
+- `fields["CI_kind"]`: `"CI"`, `"CrI"` or `"HDI"`, present exactly when `CI_level` is; 412 rows.
+
+### Captions
+
+A four-line caption region now stops at its header lines (the title-line rule required five):
+10.1001/jamanetworkopen.2023.39337 Table 1 no longer ends `... Participantsa Participant group
+Characteristic Age, y`.
+
+### Normalization 1.9.74
+
+- A4 turns braces into brackets only after `CI` / `C.I.` / `confidence interval(s)`. `d ∈ {1, 2}`
+  (10.1038/s41562-026-02417-4 p35) and `y ∈ {0, 1}` (ieee-access-7) are sets and stay sets;
+  `confidence interval was {−.18, −.01}` (10.1016/j.jesp.2011.08.004) still becomes `[-.18, -.01]`.
+- H0b joins `article` / `info` into `article info` when the layout prints the letter-spaced label on
+  one baseline (3 JESP 2009 papers).
+- W0t: a line-end fragment the text still prints hyphenated licenses no glued copy (a dropped space
+  could otherwise borrow it). 0 of 306 manifest restorations change.
+
+### Quality score
+
+`compute_quality_score` counts residual C0 control characters (glyphs with no Unicode) as a
+corruption signal and reports `statistics_without_operator` / `statistics_with_operator`;
+`statistics_damaged` (at least 1 in 4 statistics operator-less, e.g. `F(1, 350) 5 27.7` on
+10.5465/amj.2016.1196) costs 30 points. 12 of 101 manifest renders change score; 1 changes band.
+
 ## [2.4.153] - 2026-10-13 - normalization 1.9.73 - table extraction 2.4.23 - sectioning 1.2.6 (unchanged)
 
 A compound hyphen that pdftotext removed at a line end is restored. A table's one-value-per-line
