@@ -780,6 +780,7 @@ def _camelot_table_to_dict(
         # read exactly like "this document had no rotated pages".
         record_fallback("camelot_cell_geometry_refused", detail=geometry_reason)
 
+    restored_signs = set(getattr(ct, "_docpluck_restored_signs", ()) or ())
     cells: list[Cell] = []
     for r, row_cells in enumerate(row_matrix):
         raw_r = keep_rows[r]
@@ -789,17 +790,18 @@ def _camelot_table_to_dict(
             bbox = ZERO_BBOX
             if geometry is not None and raw_r < len(geometry) and c < len(geometry[raw_r]):
                 bbox = geometry[raw_r][c]
-            cells.append(
-                {
-                    "r": r,
-                    "c": c,
-                    "rowspan": 1,
-                    "colspan": 1,
-                    "text": text,
-                    "is_header": (r == 0),
-                    "bbox": bbox,
-                }
-            )
+            cell: Cell = {
+                "r": r,
+                "c": c,
+                "rowspan": 1,
+                "colspan": 1,
+                "text": text,
+                "is_header": (r == 0),
+                "bbox": bbox,
+            }
+            if (raw_r, c) in restored_signs:
+                cell["restored"] = "sign"  # tables/dropped_glyphs.py
+            cells.append(cell)
 
     # Region-driven path only: apply the prose-contamination + caption-absorption
     # guard. A caption-anchored region extends a fixed distance from the caption,

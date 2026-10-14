@@ -15,10 +15,10 @@ the four education rows, `Individuals` (4,972 / 2,101 / 2,871) and `Observations
 197,097 / 264,156) were in no cell. Rows directly under a grid are now appended when they are rows
 of values: within 1.6 row pitches, inside the grid's x-range, at most one label starting in the
 first column, each value centred in a different column of the grid's own, at least one a number
-(a lone unlabelled number is a chart tick and stops it). Camelot re-reads the extended area with
+(a lone unlabelled number is a chart tick and stops it), and each value overlaps the text already
+printed in its column (a panel below with its own layout is not appended). Camelot re-reads the extended area with
 the grid's own column separators and the result is kept only if every original row comes back
-cell for cell. Measured over the 101-PDF manifest: 46 firings in 33 papers before the column
-re-split ordering fix; examples checked on the page: ASR Table 1, 10.15626/mp.2022.3108 Tables 7, 8
+cell for cell. Measured over the 101-PDF manifest: 45 firings in 32 papers; examples checked on the page: ASR Table 1, 10.15626/mp.2022.3108 Tables 7, 8
 (interaction rows) and 9 (Part 2 rows), JAMA Network Open Table 1 rows, regression `R2` / `F` /
 `Observations` rows.
 
@@ -27,8 +27,13 @@ re-split ordering fix; examples checked on the page: ASR Table 1, 10.15626/mp.20
 A minus drawn in a TeX/MathTime symbol font (`MTSY`, `MTSYN`, `CMSY10`) is read by pdftotext and
 pdfplumber but missing from Camelot's text lines, so the grid published the value as positive.
 A minus-like glyph the page's text layer holds directly left of a cell's number, on its baseline,
-inside no Camelot text line, is inserted unchanged. Upright pages only. 57 cells in 4 manifest
-papers; every table firing checked on the page.
+inside no Camelot text line, is inserted unchanged, and the cell carries `"restored": "sign"` so a
+consumer can tell it from a printed value. Upright pages only, and only when the two coordinate
+frames agree on the page; a dash glued on its left to a digit, letter or closing bracket is an
+operator or range and is left alone; the number must occur once at a token start in its cell.
+57 cells in 4 manifest papers before those guards; every table firing checked on the page. In the
+six manifest papers where Camelot drops such a minus, none is dropped mid-line, so no table is
+left with mixed signs.
 
 | Paper | Cell | Before | After |
 |---|---|---|---|
@@ -57,7 +62,18 @@ marker as a group header, so flatten built six "groups" on 10.1177/0146167225132
 paired the item-level `t = -4.30, df = 5` with the participant-level `d = -1.44`. Only labels standing
 alone on the grid's top row now start an arm, and a centred label's arm ends where its sub-header
 roles repeat. Participant t = -35.02 now pairs with d = -1.44; item t = -4.30, df = 5 with d = -1.76.
-7 of 692 manifest tables change grouping; 0 values lost.
+7 of 692 manifest tables change grouping; 0 values lost. When fewer than two top-row labels
+carry the fold, the previous grouping is kept.
+
+### Cross-model review
+
+A tier-2 review (Sonnet, one provider) of the committed diff asked whether any change can return a
+wrong value. Acted on: the sign repair's frame check, operator guard, token-start anchoring and
+`restored` marker; the column-content check on appended rows; the grouping fallback; the picker
+bookkeeping key removed from every table. Measured and not acted on: mid-line dropped minus signs
+(0 in the corpus); a 24-character CI window that could still convert `CI of the labels y ∈ {0, 1}`
+(the 101 manifest PDFs hold one brace pair in their raw text, the set `y ∈ {0, 1}`, and none after
+CI wording).
 
 A super-header row is no longer dropped when only its stub cell is leaked caption prose:
 10.1525/collabra.74820 Table 2 keeps its five `Model k` groups (it delivered only the last model's

@@ -6,8 +6,12 @@ from typing import get_type_hints
 def test_cell_typed_dict_fields():
     from docpluck.tables import Cell
     hints = get_type_hints(Cell)
-    expected = {"r", "c", "rowspan", "colspan", "text", "is_header", "bbox"}
+    expected = {"r", "c", "rowspan", "colspan", "text", "is_header", "bbox",
+                # 2.4.154: present only on a cell repaired from the page's text
+                # layer ("sign"); optional, so no producer is required to emit it.
+                "restored"}
     assert set(hints.keys()) == expected
+    assert Cell.__optional_keys__ == frozenset({"restored"})
 
 
 def test_table_typed_dict_fields():

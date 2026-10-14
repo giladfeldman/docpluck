@@ -509,6 +509,11 @@ credible interval is not graded as a confidence interval; absence means the tabl
 p number exactly as the cell prints it (`".050"`, `".001"` for `< .001`), beside the numeric
 `fields["p"]` (0.05), so a consumer can judge p within half a unit of the last printed decimal.
 
+**A restored sign is marked on its cell** (table extraction 2.4.24): when a minus the page prints
+(drawn in a TeX/MathTime symbol font) was missing from Camelot's text, docpluck puts it back from
+the page's own text layer and the cell carries `"restored": "sign"`. A printed value never carries
+the key, so a consumer can decline to publish from a repaired cell.
+
 **Arms are bound to the group header that spans them** (table extraction 2.4.24): a header that wraps
 onto several lines ("Actual / prevalence / average") is one column's header, not a group; only labels
 standing alone on the top header row start an arm, and when those labels are centred an arm ends where

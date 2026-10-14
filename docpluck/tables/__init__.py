@@ -76,7 +76,7 @@ def content_status_for(cells, raw_text, not_captured_reason: str = "no_text_afte
 
 
 
-class Cell(TypedDict):
+class _CellFields(TypedDict):
     r: int
     c: int
     rowspan: int
@@ -88,6 +88,14 @@ class Cell(TypedDict):
     text: str
     is_header: bool
     bbox: tuple[float, float, float, float]
+
+
+class Cell(_CellFields, total=False):
+    # Present only on a cell docpluck repaired from the page's own text layer:
+    # "sign" = a minus the page prints that Camelot's text lines dropped
+    # (`tables/dropped_glyphs.py`, 2.4.154). A consumer can tell it from a
+    # printed value and decline to publish from it.
+    restored: str
 
 
 class Table(TypedDict):

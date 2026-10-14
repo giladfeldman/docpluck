@@ -885,6 +885,8 @@ def _extract_pdf_structured(
             _header_text_below_caption(rejoined, c, next_boundary_by_id.get(id(c)))
             if c is not None else None
         )
+        # Picker bookkeeping never reaches a consumer, whichever path built t.
+        t.pop("_appended_cells", None)
 
     return {
         "text": text_out,

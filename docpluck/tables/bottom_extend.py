@@ -27,7 +27,9 @@ pitch are read. Directly under the grid, a band of lines continues the table whe
   centred in a different one of the grid's own columns, at least one of them a
   number (short, carrying a digit, or a lone dash / slash placeholder) and any
   text value at most ``MAX_TEXT_CELL_CHARS`` long; with no label, at least two
-  value lines. A one-line band (a sub-heading row such as ``Partner's
+  value lines. Each value must also overlap the x-extent of the text already
+  printed in its column (a panel below with its own column layout does not;
+  tier-2 review, Sonnet, 2026-10-14). A one-line band (a sub-heading row such as ``Partner's
   education`` or ``Interaction term:``) is taken only when it starts in the
   first column and the band after it qualifies.
 
@@ -107,7 +109,23 @@ def _grid_is_numeric(ct: Any) -> bool:
     return with_digit * 2 > len(body)
 
 
-def _band_is_value_row(band: list[Any], cols: list) -> bool:
+def _column_extents(ct: Any, cols: list, y0: float) -> dict[int, tuple[float, float]]:
+    """x-extent of the text already printed in each column of the grid (lines
+    inside the grid's box), so an appended value must sit where that column's
+    values sit -- not merely somewhere inside Camelot's column interval."""
+    ext: dict[int, list[float]] = {}
+    for tl in getattr(ct, "textlines", None) or ():
+        if not _text(tl) or (tl.y0 + tl.y1) / 2.0 < y0:
+            continue
+        ci = _col_of((tl.x0 + tl.x1) / 2.0, cols)
+        if ci is None:
+            continue
+        e = ext.setdefault(ci, [tl.x0, tl.x1])
+        e[0], e[1] = min(e[0], tl.x0), max(e[1], tl.x1)
+    return {k: (v[0], v[1]) for k, v in ext.items()}
+
+
+def _band_is_value_row(band: list[Any], cols: list, extents: dict | None = None) -> bool:
     first_right = float(cols[0][1]) - X_TOLERANCE_PT
     # the row label starts in the first column; it may run past that column's
     # edge (a long label) but never into a value
@@ -132,6 +150,13 @@ def _band_is_value_row(band: list[Any], cols: list) -> bool:
         ci = _col_of((tl.x0 + tl.x1) / 2.0, cols)
         if ci is None or ci == 0 or ci in seen:
             return False
+        if extents is not None:
+            # a value must overlap the printed content of its column (a panel
+            # below with its own column layout does not; tier-2 review, Sonnet,
+            # 2026-10-14)
+            lo, hi = extents.get(ci, (None, None))
+            if lo is None or tl.x1 < lo - X_TOLERANCE_PT or tl.x0 > hi + X_TOLERANCE_PT:
+                return False
         seen.add(ci)
     return numeric >= 1
 
@@ -161,13 +186,14 @@ def continuation_bottom(ct: Any) -> float | None:
     prev_cy = (float(rows[-1][0]) + float(rows[-1][1])) / 2.0
     accepted_bottom: float | None = None
     pending: list[Any] | None = None  # a one-line band waiting for its next band
+    extents = _column_extents(ct, cols, y0)
     for band in _bands(lines, tol=pitch / 2.0):
         cy = (band[0].y0 + band[0].y1) / 2.0
         if prev_cy - cy > MAX_GAP_PITCHES * pitch:
             break
         if any(tl.x0 < x0 - X_TOLERANCE_PT or tl.x1 > x1 + X_TOLERANCE_PT for tl in band):
             break
-        if _band_is_value_row(band, cols):
+        if _band_is_value_row(band, cols, extents):
             members = band + (pending or [])
             accepted_bottom = min(tl.y0 for tl in members)
             pending = None

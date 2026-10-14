@@ -64,3 +64,15 @@ def test_top_row_arm_cols_shape():
     assert _top_row_arm_cols([["", "A", "B"], ["x", "M", "SD"]]) == set()
     # a top row that carries the row label is not a super-header row
     assert _top_row_arm_cols([["Item", "A", "B"], ["", "", ""]]) == set()
+
+
+def test_restriction_never_removes_an_existing_grouping():
+    """Top row with two standalone labels, but only ONE of them carries the fold marker
+    (the other is folded into a different column): the old grouping is kept, never
+    replaced by no grouping (tier-2 review, Sonnet, 2026-10-14)."""
+    from docpluck.tables.cell_cleaning import _MERGE_SEPARATOR as S
+    from docpluck.tables.flatten import _detect_column_groups
+    header = ["Item", f"A{S}t", "p", f"B{S}t", "p"]
+    old = _detect_column_groups(header)
+    assert old is not None
+    assert _detect_column_groups(header, None, {1, 2}) == old

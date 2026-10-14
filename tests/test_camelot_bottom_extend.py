@@ -56,3 +56,36 @@ def test_rows_already_captured_are_unchanged(table1):
     assert inc and inc[0][1:] == ["40,237.22", "35,291.24", "49,455.63", "41,090.54",
                                   "33,259.02", "28,359.31"]
     assert table1.get("n_cols") == 7
+
+
+def _fake_ct(lines):
+    """A Camelot-shaped table: 3 rows of a 3-column grid at y 300-270 (bottom-up)."""
+    from types import SimpleNamespace
+
+    import pandas as pd
+
+    def tl(x0, x1, y0, text):
+        return SimpleNamespace(x0=x0, x1=x1, y0=y0, y1=y0 + 8.0, get_text=lambda t=text: t + "\n")
+
+    body = [tl(50, 90, 292, "Age"), tl(150, 170, 292, "34.1"), tl(250, 270, 292, "4.5"),
+            tl(50, 90, 282, "Income"), tl(150, 170, 282, "40.2"), tl(250, 270, 282, "3.3"),
+            tl(50, 90, 272, "Order"), tl(150, 170, 272, "1.97"), tl(250, 270, 272, ".75")]
+    df = pd.DataFrame([["Age", "34.1", "4.5"], ["Income", "40.2", "3.3"], ["Order", "1.97", ".75"]])
+    return SimpleNamespace(flavor="stream", rows=[(300, 290), (290, 280), (280, 270)],
+                           cols=[(40, 120), (120, 220), (220, 320)], _bbox=(40, 270, 320, 300),
+                           textlines=body + [tl(*a) for a in lines], df=df)
+
+
+def test_continuation_rows_aligned_with_the_columns_are_taken():
+    from docpluck.tables.bottom_extend import continuation_bottom
+    ct = _fake_ct([(50, 90, 262, "Partner"), (152, 168, 262, "2.00"), (252, 268, 262, ".76")])
+    assert continuation_bottom(ct) == 262
+
+
+def test_a_panel_with_its_own_column_layout_is_not_taken():
+    """`Panel B:` then values printed where the grid has no values (x 180-210, 290-310):
+    centred inside Camelot's broad column intervals, but not under its printed columns."""
+    from docpluck.tables.bottom_extend import continuation_bottom
+    ct = _fake_ct([(50, 100, 262, "Panel B:"), (50, 90, 252, "Wage"),
+                   (185, 205, 252, "2.31"), (290, 310, 252, "0.44")])
+    assert continuation_bottom(ct) is None

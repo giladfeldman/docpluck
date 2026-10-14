@@ -28,6 +28,23 @@ of the paper.
 
 Upright pages only: Camelot reports a sideways page in a rotated frame (cell
 geometry trap T5), so a rotated table is left as it was.
+
+Guards added after the tier-2 review (Sonnet, 2026-10-14):
+
+* the two coordinate frames must agree: the first glyph of sampled Camelot text
+  lines must stand at the same place in the layout (a page whose crop origin
+  shifts one frame against the other repairs nothing);
+* a dash glued on its left to a digit, a letter or a closing bracket is an
+  operator or a range (`2.1-3.4`, `x - 1`), never a sign;
+* the line's text must occur exactly once at the start of a token in the cell
+  (`1.5 x 10 5`: the exponent's `5` is not the `5` of `1.5`);
+* every repaired cell is recorded (``ct._docpluck_restored_signs``) and the
+  emitted cell carries ``restored: "sign"``, so a consumer can tell a restored
+  sign from a printed one.
+
+Measured on the six manifest papers where Camelot drops a minus: no table cell
+loses one in the MIDDLE of a text line (the repair would not reach it); the
+dropped minus always opens the number's own line.
 """
 
 from __future__ import annotations
@@ -37,6 +54,9 @@ from typing import Any
 MINUS_LIKE = frozenset({"−", "-", "–", "—"})
 ADJACENT_PT = 1.5
 PAGE_SIZE_TOLERANCE_PT = 2.0
+FRAME_SAMPLE = 12
+FRAME_AGREE = 0.8
+_OPEN_LEFT = frozenset("([{,;:=<>")
 
 
 def _text(tl: Any) -> str:
@@ -63,6 +83,49 @@ def restore_dropped_signs(ct: Any, layout: Any) -> int:
         return 0
 
 
+def _frames_agree(lines: list, chars: list, height: float) -> bool:
+    """Do Camelot's frame and the layout's describe the same page? The first
+    glyph of each sampled text line must stand where the layout has that glyph."""
+    sample = [tl for tl in lines if _text(tl)][:FRAME_SAMPLE]
+    if not sample:
+        return False
+    hits = 0
+    for tl in sample:
+        ch0 = _text(tl)[0]
+        for c in chars:
+            if c.get("text") != ch0:
+                continue
+            if abs(float(c["x0"]) - tl.x0) <= 1.0 and tl.y0 - 1.0 <= height - (float(c["top"]) + float(c["bottom"])) / 2.0 <= tl.y1 + 1.0:
+                hits += 1
+                break
+    return hits >= FRAME_AGREE * len(sample)
+
+
+def _glued_on_left(sign: dict, chars: list) -> bool:
+    """A digit, letter or closing bracket touching the sign on its left: the
+    dash is a range or an operator, not a sign."""
+    size = float(sign.get("size") or 0.0) or 8.0
+    for c in chars:
+        t = c.get("text") or ""
+        if not t.strip() or c is sign:
+            continue
+        if abs(float(c["bottom"]) - float(sign["bottom"])) > 0.5 * size:
+            continue
+        gap = float(sign["x0"]) - float(c["x1"])
+        if -0.5 <= gap < 0.5 * size and (t[-1].isalnum() or t[-1] in ")]}"):
+            return True
+    return False
+
+
+def _token_start_positions(cell: str, text: str) -> list[int]:
+    out, i = [], cell.find(text)
+    while i >= 0:
+        if i == 0 or cell[i - 1].isspace() or cell[i - 1] in _OPEN_LEFT:
+            out.append(i)
+        i = cell.find(text, i + 1)
+    return out
+
+
 def _restore(ct: Any, layout: Any) -> int:
     if layout is None or getattr(ct, "rotation", ""):
         return 0
@@ -82,14 +145,18 @@ def _restore(ct: Any, layout: Any) -> int:
     if (abs(float(pdf_size[0]) - width) > PAGE_SIZE_TOLERANCE_PT
             or abs(float(pdf_size[1]) - height) > PAGE_SIZE_TOLERANCE_PT):
         return 0
-    signs = [c for c in (getattr(page_obj, "chars", None) or ()) if c.get("text") in MINUS_LIKE]
+    chars = list(getattr(page_obj, "chars", None) or ())
+    signs = [c for c in chars if c.get("text") in MINUS_LIKE]
     if not signs:
         return 0
     lines = [tl for tl in (getattr(ct, "textlines", None) or ()) if _text(tl)]
+    if not _frames_agree(lines, chars, height):
+        return 0
     cols = list(getattr(ct, "cols", None) or ())
     rows = list(getattr(ct, "rows", None) or ())
     df = ct.df
-    restored = 0
+    restored: set = set(getattr(ct, "_docpluck_restored_signs", ()) or ())
+    n = 0
     for c in signs:
         cx = (float(c["x0"]) + float(c["x1"])) / 2.0
         cy = height - (float(c["top"]) + float(c["bottom"])) / 2.0  # bottom-up
@@ -105,14 +172,22 @@ def _restore(ct: Any, layout: Any) -> int:
         text = _text(tl)
         if not (text[0].isdigit() or (text[0] == "." and text[1:2].isdigit())):
             continue
+        if _glued_on_left(c, chars):
+            continue
         ci = _index((tl.x0 + tl.x1) / 2.0, cols, descending=False)
         ri = _index((tl.y0 + tl.y1) / 2.0, rows, descending=True)
         if ci is None or ri is None or ri >= len(df) or ci >= len(df.columns):
             continue
         cell = str(df.iloc[ri, ci])
-        pos = cell.find(text)
-        if pos < 0 or (pos > 0 and cell[pos - 1] in MINUS_LIKE):
+        starts = _token_start_positions(cell, text)
+        if len(starts) != 1:
+            continue
+        pos = starts[0]
+        if pos > 0 and cell[pos - 1] in MINUS_LIKE:
             continue
         df.iloc[ri, ci] = cell[:pos] + c["text"] + cell[pos:]
-        restored += 1
-    return restored
+        restored.add((ri, ci))
+        n += 1
+    if n:
+        ct._docpluck_restored_signs = restored
+    return n

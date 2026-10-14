@@ -1800,7 +1800,11 @@ def _detect_column_groups(
             by_roles = _arms_by_role_repeat(header, kept)
             if by_roles is not None:
                 return by_roles
-        starts = kept
+            starts = kept
+        # Fewer than two top-row labels carry the fold: the restriction has
+        # nothing to stand on, so the grouping stays what it was (tier-2
+        # review, Sonnet, 2026-10-14: restricting to <2 starts returned no
+        # grouping at all, the last-arm-wins shape this change exists to end).
     if len(starts) < 2:
         return None
     n = len(header)
