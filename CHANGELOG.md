@@ -31,9 +31,11 @@ inside no Camelot text line, is inserted unchanged, and the cell carries `"resto
 consumer can tell it from a printed value. Upright pages only, and only when the two coordinate
 frames agree on the page; a dash glued on its left to a digit, letter or closing bracket is an
 operator or range and is left alone; the number must occur once at a token start in its cell.
-57 cells in 4 manifest papers before those guards; every table firing checked on the page. In the
-six manifest papers where Camelot drops such a minus, none is dropped mid-line, so no table is
-left with mixed signs.
+57 cells in 4 manifest papers before those guards; every table firing checked on the page. A
+glyph-count census over all 101 manifest PDFs (182,883 table text lines on pages that carry a
+minus-like glyph: layout glyphs inside each Camelot line vs the line's own text) finds no table
+value that loses its minus mid-line (the 53 differing lines are prose, furniture, or a neighbouring
+cell's dash), so no table is left with mixed signs; the frame check suppresses 0 repairs.
 
 | Paper | Cell | Before | After |
 |---|---|---|---|
@@ -71,7 +73,8 @@ A tier-2 review (Sonnet, one provider) of the committed diff asked whether any c
 wrong value. Acted on: the sign repair's frame check, operator guard, token-start anchoring and
 `restored` marker; the column-content check on appended rows; the grouping fallback; the picker
 bookkeeping key removed from every table. Measured and not acted on: mid-line dropped minus signs
-(0 in the corpus); a 24-character CI window that could still convert `CI of the labels y ∈ {0, 1}`
+(0 table values over all 101 PDFs, glyph-count census; a round-2 check of the fixes found no new
+wrong-value path); a 24-character CI window that could still convert `CI of the labels y ∈ {0, 1}`
 (the 101 manifest PDFs hold one brace pair in their raw text, the set `y ∈ {0, 1}`, and none after
 CI wording).
 
