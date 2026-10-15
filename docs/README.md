@@ -399,7 +399,11 @@ Compute extraction quality metrics.
         "ligatures_remaining": 0,   # count of ff/fi/fl ligature chars not yet expanded
         "garbled_chars": 0,         # count of U+FFFD replacement characters
         "non_ascii_ratio": 0.031,   # fraction of non-ASCII characters
-        "has_corruption_signal": False,  # any U+FFFD, > 20% non-ASCII, or >= 20 ligatures
+        "has_corruption_signal": False,  # any U+FFFD, > 20% non-ASCII, >= 20 ligatures, or a C0 control char
+        "residual_control_chars": 0,     # (2.4.154) C0 control characters left in the text (glyphs with no Unicode)
+        "statistics_without_operator": 0,  # (2.4.154) statistics printed with no operator, e.g. "F(1, 350) 5 27.7"
+        "statistics_with_operator": 41,    # (2.4.154) statistics printed with their operator
+        "statistics_damaged": False,     # (2.4.154) operator-less statistics are >= 1 in 4 of all; costs 30 points
     }
 }
 ```
