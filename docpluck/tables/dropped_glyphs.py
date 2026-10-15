@@ -51,6 +51,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from docpluck.telemetry import record_fallback
+
 MINUS_LIKE = frozenset({"−", "-", "–", "—"})
 ADJACENT_PT = 1.5
 PAGE_SIZE_TOLERANCE_PT = 2.0
@@ -62,7 +64,8 @@ _OPEN_LEFT = frozenset("([{,;:=<>")
 def _text(tl: Any) -> str:
     try:
         return (tl.get_text() or "").strip()
-    except Exception:
+    except Exception as exc:
+        record_fallback("dropped_glyphs_text_exception", detail=type(exc).__name__)
         return ""
 
 
@@ -79,7 +82,8 @@ def restore_dropped_signs(ct: Any, layout: Any) -> int:
     number that Camelot dropped. Returns how many were restored; never raises."""
     try:
         return _restore(ct, layout)
-    except Exception:
+    except Exception as exc:
+        record_fallback("dropped_glyphs_restore_exception", detail=type(exc).__name__)
         return 0
 
 

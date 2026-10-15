@@ -55,6 +55,8 @@ from __future__ import annotations
 from statistics import median
 from typing import Any
 
+from docpluck.telemetry import record_fallback
+
 MAX_GAP_PITCHES = 1.6
 X_TOLERANCE_PT = 2.0
 MIN_COLS = 3
@@ -66,7 +68,8 @@ _PLACEHOLDERS = {"-", "–", "—", "/", "−"}
 def _text(tl: Any) -> str:
     try:
         return (tl.get_text() or "").strip()
-    except Exception:
+    except Exception as exc:
+        record_fallback("bottom_extend_text_exception", detail=type(exc).__name__)
         return ""
 
 
@@ -98,7 +101,8 @@ def _col_of(x: float, cols: list) -> int | None:
 def _grid_is_numeric(ct: Any) -> bool:
     try:
         rows = ct.df.values.tolist()
-    except Exception:
+    except Exception as exc:
+        record_fallback("bottom_extend_grid_unreadable", detail=type(exc).__name__)
         return False
     # rows with something beside the label: caption lines a caption-anchored
     # region carries in its first column do not dilute the count
@@ -234,5 +238,6 @@ def extend_to_table_bottom(camelot: Any, tmp_path: str, ct: Any) -> Any:
             1 for row in new_rows[len(old_rows):] for cell in row if str(cell).strip()
         )
         return new[0]
-    except Exception:
+    except Exception as exc:
+        record_fallback("bottom_extend_exception", detail=type(exc).__name__)
         return ct
