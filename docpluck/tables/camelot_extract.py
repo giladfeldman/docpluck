@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import tempfile
+import threading
 from typing import TYPE_CHECKING
 
 from docpluck.glyph_names import repair_glyph_names
@@ -41,6 +42,34 @@ from docpluck.tempfiles import unlink_temp_pdf
 # a long-lived process (Sonnet review, 2026-10-01).
 _LATTICE_RENDERER: dict[str, object] = {}
 
+# PDFium is not thread-safe: no two threads may call into it at the same time,
+# not even on different documents. A server that runs extractions in a thread
+# pool (the app's service does) rendered lattice pages concurrently, and the
+# render failed with ImageConversionError: in the 2026-10-15 corpus run at 6
+# parallel requests, 271 of 405 runs lost their lattice pass
+# (`camelot_lattice_failed`) and fell back to stream, whose grid differs
+# (10.1109/ACCESS.2025.3622038 Table 1 took two rows of caption prose and was
+# then deleted from the render). Camelot lattice on that page in 6 threads:
+# 3 to 5 of 6 calls failed unlocked, 6 of 6 succeeded with this lock. Only the
+# render is serialized; line detection and parsing still run in parallel.
+_PDFIUM_LOCK = threading.Lock()
+
+
+def _locked_pdfium_backend(base: type) -> object:
+    """An instance of Camelot's pdfium backend whose renders hold `_PDFIUM_LOCK`."""
+
+    class _LockedPdfiumBackend(base):
+        def convert(self, *args, **kwargs):
+            with _PDFIUM_LOCK:
+                return super().convert(*args, **kwargs)
+
+        if hasattr(base, "to_array"):
+            def to_array(self, *args, **kwargs):
+                with _PDFIUM_LOCK:
+                    return super().to_array(*args, **kwargs)
+
+    return _LockedPdfiumBackend()
+
 
 def _lattice_renderer_kwargs() -> dict[str, object]:
     if _LATTICE_RENDERER:
@@ -50,6 +79,8 @@ def _lattice_renderer_kwargs() -> dict[str, object]:
 
         from camelot.parsers import Lattice
         params = inspect.signature(Lattice.__init__).parameters
+        if "backend" in params and "use_fallback" in params:
+            from camelot.backends.pdfium_backend import PdfiumBackend
     except Exception as exc:  # noqa: BLE001 - recorded: lattice stays UNPINNED for this call
         # Named in `method` as `lattice_renderer_probe_failed` (rule 40, review
         # 2026-10-03): without it Camelot may re-render with another program and
@@ -57,7 +88,7 @@ def _lattice_renderer_kwargs() -> dict[str, object]:
         record_fallback("lattice_renderer_probe_exception", detail=type(exc).__name__)
         return {}
     if "backend" in params and "use_fallback" in params:
-        _LATTICE_RENDERER.update(backend="pdfium", use_fallback=False)
+        _LATTICE_RENDERER.update(backend=_locked_pdfium_backend(PdfiumBackend), use_fallback=False)
     return dict(_LATTICE_RENDERER)
 
 # Patterns used to detect rows that look like running headers / page footers.

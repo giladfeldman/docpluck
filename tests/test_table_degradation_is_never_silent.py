@@ -97,7 +97,11 @@ def test_a_failed_renderer_probe_is_not_cached(monkeypatch):
     monkeypatch.delattr(camelot.parsers, "Lattice")
     assert ce._lattice_renderer_kwargs() == {}
     monkeypatch.setattr(camelot.parsers, "Lattice", real, raising=False)
-    assert ce._lattice_renderer_kwargs() == {"backend": "pdfium", "use_fallback": False}
+    from camelot.backends.pdfium_backend import PdfiumBackend
+
+    kwargs = ce._lattice_renderer_kwargs()
+    assert kwargs["use_fallback"] is False
+    assert isinstance(kwargs["backend"], PdfiumBackend)  # pdfium, behind the render lock
 
 
 def test_a_failed_glyph_raster_is_recorded(monkeypatch, tmp_path):

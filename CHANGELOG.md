@@ -7,6 +7,18 @@ tables apart, and bind each column to the group header that spans it. Braces bec
 for a confidence interval. `compute_quality_score` now sees statistics a font broke. Flattened rows
 carry the printed p-value and the interval kind.
 
+### Lattice pages render one at a time (thread safety)
+
+PDFium, which renders the page image Camelot's lattice pass reads ruling lines from, is not
+thread-safe. A server that runs extractions in a thread pool rendered pages concurrently and the
+render failed (`ImageConversionError`), so the table set fell back to stream and differed from a run
+of the same paper alone; `method` said `camelot_lattice_failed`. In the corpus run at 6 parallel
+requests (before this fix; 2.4.153 fails the same way), 271 of 405 runs (91 of 135 papers) lost their lattice pass;
+10.1109/ACCESS.2025.3622038 Table 1 then carried two rows of caption prose and was deleted from the
+render. The render now holds one process-wide lock (line detection and parsing still run in
+parallel). Same 6 papers at 6 parallel requests: 0 lattice failures, all 3 tables of that paper
+rendered. Single-request output is unchanged.
+
 ### A table grid reaches its last printed row (table extraction 2.4.24)
 
 Camelot's stream parser takes a table's area from aligned text edges; an indented sub-block or a
