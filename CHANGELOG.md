@@ -1,6 +1,32 @@
 # Changelog
 
-## [2.4.154] - 2026-10-14 - normalization 1.9.74 - table extraction 2.4.24 - sectioning 1.2.6 (unchanged)
+## [2.4.154] - 2026-10-23 - normalization 1.9.75 - table extraction 2.4.25 - sectioning 1.2.6 (unchanged)
+
+The 2026-10-14 notes below are part of this release; the two sections directly below were added on 2026-10-23.
+
+### Alternating running heads leave the body (normalization)
+
+The layout-aware strip compared each page's topmost line exactly and required it on more than
+half the pages. A head with its page number fused into the same line ("Disease, Self-Perception,
+and Behavior 441") never repeats exactly, and alternating heads (title on even pages, authors on
+odd ones) sit on half the pages or fewer, so neither was removed: on 10.1177/0956797610361706 both
+reached the rendered body (4 and 3 copies). A second detector now compares the line with its page
+number removed and also accepts a line on at least 3/4 of one parity's pages. Because that signal
+is weaker than an exact repeat, a line it finds is removed only where it sits within the first or
+last three lines of a page; elsewhere it is kept (a figure's axis title can match the running head,
+10.1177/0956797618780353). The original exact rule is unchanged. On 224 test papers every line the
+change removes is a running head, a running footer or a "Downloaded from" stamp.
+
+### Page numbers and chart axes no longer save a duplicate table candidate (table extraction)
+
+An uncaptioned table candidate is set aside when every line of it is already in the page's text,
+unless it carries a statistic. A page number or a chart's axis scale counted as a statistic, so a
+grid made of a running head, a page number and a body line was kept as a table (10.1177/0956797610361706
+pages 3, 4 and 7). A bare number that is its page's first or last line, and a column of four or more
+evenly spaced numbers that decrease down the page (a vertical axis), are now ignored by that check.
+A rising run of numbers is a table's item numbering and still counts. Every candidate set aside is
+recorded in `fallbacks`.
+
 
 Tables reach their last printed row, keep minus signs drawn in a math font, keep side-by-side
 tables apart, and bind each column to the group header that spans it. Braces become brackets only
