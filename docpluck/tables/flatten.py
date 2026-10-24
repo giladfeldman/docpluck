@@ -144,7 +144,8 @@ def _alnum_key(s: str) -> str:
 
 
 def _drop_leading_caption_rows(
-    grid: list[list[str]], label: Optional[str], caption: Optional[str]
+    grid: list[list[str]], label: Optional[str], caption: Optional[str],
+    record: bool = True,
 ) -> list[list[str]]:
     """Blank the table's own label and caption lines at the top of its grid, and
     drop the rows that leaves empty.
@@ -190,7 +191,7 @@ def _drop_leading_caption_rows(
         i += 1
     kept = [r for idx, r in enumerate(out)
             if idx < start or idx >= i or any((c or "").strip() for c in r)]
-    if len(kept) != len(grid):
+    if record and len(kept) != len(grid):
         record_fallback("flatten_skipped_caption_rows", detail=f"{label}: {len(grid) - len(kept)}")
     return kept
 
@@ -2224,7 +2225,7 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
     return rows
 
 
-def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
+def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[FlattenedRow]:
     """Flatten a structured `Table` into per-row `FlattenedRow` records.
 
     Returns ``[]`` for tables with no usable cells or fewer than 2 rows
@@ -2235,7 +2236,9 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     if not cells:
         return []
     grid = _cells_to_grid(cells)
-    grid = _drop_leading_caption_rows(grid, table.get("label"), table.get("caption"))
+    grid = _drop_leading_caption_rows(
+        grid, table.get("label"), table.get("caption"), record=_allow_groups
+    )
     header_rows, body = _clean_grid(grid, _declared_header_rows(table))
     if not header_rows or not body:
         return []
@@ -2260,7 +2263,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     }
     grouped = _detect_column_groups(
         header, printed_spans or None, _top_row_arm_cols(grid) or None
-    )
+    ) if _allow_groups else None
 
     # Blank-header column-role recovery (non-grouped tables only — grouped
     # tables already resolve roles per arm). When the grid header leaves stat
@@ -2362,6 +2365,16 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
                 )
             )
 
+    # A grouping that bound no statistic in any arm did nothing but repeat each
+    # row once per "arm" -- often under the first word of a wrapped header taken
+    # for an arm label (10.5465/amle.2017.0488 p13 Table 5: "Academic" / "Book" /
+    # "WoS" from "Academic Source" / "Book Citations" / "WoS Citations"). Such a
+    # table is flattened as an ungrouped one: one record per row.
+    if grouped is not None and out and not any(
+        k != "group" for r in out for k in (r.get("fields") or {})
+    ):
+        record_fallback("flatten_untyped_grouping_dropped", detail=f"{label}: {len(out)} records")
+        return _flatten_table_rows(table, _allow_groups=False)
     return out
 
 
