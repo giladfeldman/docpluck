@@ -1942,13 +1942,27 @@ def _detect_column_groups(
     def _arm_label(i: int) -> str:
         return (header[i].split(_MERGE_SEPARATOR, 1)[0]).strip()
 
+    def _sub_header(i: int) -> str:
+        parts = header[i].split(_MERGE_SEPARATOR, 1)
+        return _alnum_key(parts[1] if len(parts) > 1 else "")
+
+    # Only when the sub-headers differ (M then SD): the same label over two
+    # columns with the SAME sub-header ("d" and "d") is two comparisons, and one
+    # arm would keep one d and drop the other.
     deduped: list[int] = []
+    run_subs: set[str] = set()
     prev = None
     for i in starts:
-        if prev is not None and i == prev + 1 and deduped and _arm_label(i) == _arm_label(deduped[-1]):
+        if (
+            prev is not None and i == prev + 1 and deduped
+            and _arm_label(i) == _arm_label(deduped[-1])
+            and _sub_header(i) not in run_subs
+        ):
+            run_subs.add(_sub_header(i))
             prev = i
             continue
         deduped.append(i)
+        run_subs = {_sub_header(i)}
         prev = i
     starts = deduped
     # A folded cell is EITHER a super-header label over its sub-header OR one

@@ -78,3 +78,14 @@ def test_a_label_repeated_over_each_column_of_its_span_is_one_arm():
         {"group": "Controllability", "M": 3.62, "SD": 1.25},
         {"group": "Certainty", "M": 1.85, "SD": 1.16},
     ], [r["fields"] for r in out]
+
+
+def test_repeated_labels_over_repeated_subheaders_stay_apart():
+    # Corpus escicheck/majumder_2024_jdm.pdf p6 Table 2: the same label over
+    # two columns that each carry the SAME sub-header is two comparisons, not
+    # one arm -- merging them would keep one d and drop the other.
+    rows = [["", "Comparison", "Comparison"],
+            ["Item", "d", "d"],
+            ["ingroup", "0.29", "0.01"]]
+    out = _flat(rows)
+    assert sorted(r["fields"].get("d") for r in out) == [0.01, 0.29], [r["fields"] for r in out]
