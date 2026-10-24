@@ -136,6 +136,41 @@ _FUNCTION_WORD_AFTER = re.compile(
 )
 
 
+# A CRediT contribution line: "<role>: <names>". Two of the 14 CRediT roles
+# start with a canonical heading word ("Funding acquisition", "Methodology"),
+# and the canonical passes used to cut that word out of the line: the render
+# printed "acquisition: Julia F. ..." (10.1371/journal.pmed.1004323).
+_CREDIT_ROLE_LINE = re.compile(
+    r"(?i)[ \t]*(?:"
+    r"conceptuali[sz]ation|data[ \t]+curation|formal[ \t]+analysis|"
+    r"funding[ \t]+acquisition|investigation|methodology|"
+    r"project[ \t]+administration|resources|software|supervision|"
+    r"validation|visuali[sz]ation|writing\b[^:\n]{0,40}"
+    r")[ \t]*:[ \t]*\S"
+)
+# "Funding acquisition:" at a line start is a contribution line on its own;
+# no section is titled that, so it needs no list context.
+_CREDIT_COMPOUND_ROLE_LINE = re.compile(r"(?i)[ \t]*funding[ \t]+acquisition[ \t]*:")
+
+
+def _is_credit_role_line(text: str, line_start: int) -> bool:
+    """True when the line at ``line_start`` is a CRediT contribution line.
+
+    A single-word role ("Methodology: J. Smith.") counts only inside a list:
+    another role line must start within the three non-blank lines before or
+    after it, so a lone "Methodology: ..." label elsewhere keeps its heading.
+    """
+    if _CREDIT_COMPOUND_ROLE_LINE.match(text, line_start):
+        return True
+    if not _CREDIT_ROLE_LINE.match(text, line_start):
+        return False
+    before = [ln for ln in text[max(0, line_start - 1500):line_start].split("\n") if ln.strip()]
+    line_end = text.find("\n", line_start)
+    after_text = "" if line_end == -1 else text[line_end + 1:line_end + 1 + 1500]
+    after = [ln for ln in after_text.split("\n") if ln.strip()]
+    return any(_CREDIT_ROLE_LINE.match(ln) for ln in before[-3:] + after[:3])
+
+
 def _next_nonblank_line(text: str, after_pos: int) -> str | None:
     """Return the next non-blank line of text starting after `after_pos`,
     or None if no such line exists."""
@@ -501,6 +536,13 @@ def annotate_text(text: str) -> list[BlockHint]:
         heading_end = start + len(heading_text)
         after_heading = text[heading_end:]
 
+        # A CRediT contribution line ("Funding acquisition: J. Smith.") is
+        # body content of the Author Contributions section, not a heading.
+        # Recorded in seen_offsets so Pass 1b / Pass 3 cannot re-admit it.
+        if _is_credit_role_line(text, line_start):
+            seen_offsets.add(start)
+            continue
+
         # (a) Preceded by blank line or at start-of-doc.
         preceded_by_blank = False
         if line_start == 0:
@@ -620,6 +662,9 @@ def annotate_text(text: str) -> list[BlockHint]:
         # 1a's match didn't fire (different regex anchors) but Pass 1b's
         # does.
         line_start_1b = text.rfind("\n", 0, start) + 1
+        if _is_credit_role_line(text, line_start_1b):
+            seen_offsets.add(start)
+            continue
         if not _prior_paragraph_is_sentence_terminated(text, line_start_1b):
             seen_offsets.add(start)
             continue
