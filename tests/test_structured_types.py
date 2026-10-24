@@ -50,8 +50,12 @@ def test_table_typed_dict_fields():
         # caption, which the caption used to swallow (collabra.90203 Table 8
         # `F p`). PDF only; None on every other path.
         "header_text_below_caption",
+        # 2.4.155: present only on a grid that opens with a printed
+        # "TABLE N (Continued)" head -- the label it continues. Optional.
+        "continuation_of",
     }
     assert set(hints.keys()) == expected
+    assert Table.__optional_keys__ == frozenset({"continuation_of"})
 
 
 def test_table_kind_literal_values():

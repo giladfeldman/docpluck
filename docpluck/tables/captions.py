@@ -198,7 +198,45 @@ def _page_for_offset(offset: int, page_offsets: list[int]) -> int:
     return max(idx + 1, 1)
 
 
+# The head a journal prints on the 2nd..nth page of a table that runs over pages:
+# "TABLE 6 (Continued)", "Table 3 (continued)", "TABLE 12. Continued",
+# "Table A1 (Cont.)". `TABLE_CAPTION_RE` deliberately does not match it (it is
+# not the table's caption), so the grid under it reached consumers as an
+# unlabelled candidate.
+_CONTINUED_HEAD_RE = re.compile(
+    r"^\s*(?:TABLE|Table)\s+(?P<num>[A-Z]?\d+[a-z]?)\s*[.:]?\s*"
+    r"\(?\s*(?:continued|cont(?:'d|d)?\.?)\s*\)?\s*$",
+    re.IGNORECASE,
+)
+
+
+def printed_continuation_label(cells) -> "tuple[str, str] | None":
+    """``("Table 6", "TABLE 6 (Continued)")`` when a grid OPENS with a printed
+    continuation head, else None.
+
+    Only the first one or two non-empty rows are read, and the head must be all
+    they hold (it may be split across the two, "TABLE 6" over "(Continued)", as
+    Camelot emits it). A grid that opens with anything else -- its own title, a
+    running head, a data row -- is not a continuation by this test.
+    """
+    rows: dict[int, list[tuple[int, str]]] = {}
+    for c in cells or ():
+        t = (c.get("text") or "").strip()
+        if t:
+            rows.setdefault(c.get("r", 0), []).append((c.get("c", 0), t))
+    if not rows:
+        return None
+    texts = [" ".join(t for _, t in sorted(rows[r])) for r in sorted(rows)[:2]]
+    for k in (1, 2):
+        head = " ".join(texts[:k])
+        m = _CONTINUED_HEAD_RE.match(head)
+        if m:
+            return f"Table {m.group('num')}", re.sub(r"\s+", " ", head.strip())
+    return None
+
+
 __all__ = [
+    "printed_continuation_label",
     "TABLE_CAPTION_RE",
     "FIGURE_CAPTION_RE",
     "CaptionMatch",

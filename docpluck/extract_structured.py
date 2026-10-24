@@ -51,6 +51,7 @@ from .tables.captions import (
     CaptionMatch,
     caption_anchor_is_in_text_reference,
     find_caption_matches,
+    printed_continuation_label,
 )
 from .tables.render import cells_to_html, sync_header_rows
 from .tables.whitespace import grid_is_body_prose
@@ -778,6 +779,18 @@ def _extract_pdf_structured(
             continue
         if _candidate_is_page_masthead(ct, page):
             record_fallback("camelot_candidate_is_page_masthead", detail=f"p{page}")
+            continue
+        # A grid that OPENS with the page's own "TABLE N (Continued)" head is the
+        # continuation of Table N, not an unverified candidate: the page names
+        # it. Labelled with that table, `matched`, and marked `continuation_of`
+        # so a consumer can join or tell it from the table's first page.
+        cont = printed_continuation_label(ct.get("cells"))
+        if cont is not None:
+            ct["label"], ct["caption"] = cont
+            ct["caption_status"] = "matched"
+            ct["continuation_of"] = cont[0]
+            record_fallback("camelot_candidate_is_printed_continuation", detail=f"p{page} {cont[0]}")
+            tables.append(ct)
             continue
         n_uncaptioned += 1
         ct["id"] = f"u{n_uncaptioned}"

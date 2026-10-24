@@ -22,7 +22,10 @@ TableKind = Literal["structured", "isolated"]
 TableRendering = Literal["lattice", "whitespace", "isolated", "markup"]
 
 # How sure docpluck is that this is a CAPTIONED table (2026-09-24).
-#   "matched"               -- paired with a detected "Table N" caption.
+#   "matched"               -- paired with a detected "Table N" caption, or
+#                              (2.4.155) a grid that opens with the page's own
+#                              printed "TABLE N (Continued)" head; such a table
+#                              also carries `continuation_of`.
 #   "none_found"            -- no caption, but the table itself is certain: the
 #                              file DECLARES it (a DOCX `w:tbl`).
 #   "uncaptioned_candidate" -- a PDF grid Camelot found on a page where no
@@ -98,7 +101,7 @@ class Cell(_CellFields, total=False):
     restored: str
 
 
-class Table(TypedDict):
+class _TableFields(TypedDict):
     id: str
     label: Optional[str]
     page: int
@@ -154,6 +157,13 @@ class Table(TypedDict):
     # See `content_status_for` above. Never absent: a table with no cells and no
     # text must say WHY, or it reads as a table that was simply empty.
     content_status: str
+
+
+class Table(_TableFields, total=False):
+    # Present only on a grid that opens with a printed "TABLE N (Continued)"
+    # head (2.4.155): the label of the table it continues, equal to `label`.
+    # Absent on every other table, so no producer is required to emit it.
+    continuation_of: str
 
 
 __all__ = [
