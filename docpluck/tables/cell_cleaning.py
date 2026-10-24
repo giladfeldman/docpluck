@@ -49,7 +49,6 @@ from docpluck.normalize import (
     recover_corrupted_minus_signs,
     recover_dropped_minus_ci_upper_in_text,
     recover_pua_glyphs,
-    recover_times_interaction_glyph,
 )
 
 
@@ -1014,12 +1013,25 @@ _DATA_VALUE_CELL_RE = re.compile(
 _DF_PAIR_CELL_RE = re.compile(r"^\d+,\s*\d+$")
 
 
+def _is_data_value_cell(cell: str) -> bool:
+    """A data value, or -- for a cell the continuation merge joined -- one data
+    value per joined line. Measured 2026-10-24 on 10.1080/23743603.2021.1878340
+    Table 2: two printed rows per product (items A and C) merge into one row
+    whose cells read ``.001`` + ``< .001``; judged as one string they matched no
+    value pattern, the merged data row passed as a header row, and its product
+    disappeared from the records."""
+    if _MERGE_SEPARATOR not in cell:
+        return bool(_DATA_VALUE_CELL_RE.match(cell))
+    parts = [x.strip() for x in cell.split(_MERGE_SEPARATOR) if x.strip()]
+    return bool(parts) and all(_DATA_VALUE_CELL_RE.match(x) for x in parts)
+
+
 def _is_header_like_row(row: list[str]) -> bool:
     """Heuristic: a row that looks like part of a header rather than data."""
     nonempty = [c.strip() for c in row if (c or "").strip()]
     if not nonempty:
         return False
-    numeric = sum(1 for c in nonempty if _DATA_VALUE_CELL_RE.match(c))
+    numeric = sum(1 for c in nonempty if _is_data_value_cell(c))
     if numeric / len(nonempty) > 0.3:
         return False
     avg_len = sum(len(c) for c in nonempty) / len(nonempty)

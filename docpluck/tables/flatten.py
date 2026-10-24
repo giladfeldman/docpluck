@@ -525,6 +525,10 @@ def _names_an_effect(lead: str) -> bool:
 # ── Cell-value parsing ──────────────────────────────────────────────────────
 
 
+# A word of two or more letters before the interval's opening bracket, after
+# the leading number: "95%CI scarf: [55-72%]". A plain estimate cell has at most
+# a single superscript letter there ("0.25a [..]").
+_WORDED_INTERVAL_RE = re.compile(r"^\s*[-+−–]?\d*\.?\d+[^\[(]*?[A-Za-z]{2,}[^\[(]*[\[(]")
 _NUM_RE = re.compile(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
 _P_OP_RE = re.compile(r"^\s*([<>=]+)?\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
 # Comma-separated CI bounds. Allow a leading-dot decimal (APA omits the leading
@@ -1377,6 +1381,13 @@ def _flatten_one_row(
             # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)"
             # or "0.76 [.50, 1.02]".
             est = _parse_leading_number(raw)
+            if est is not None and _WORDED_INTERVAL_RE.search(raw):
+                # "95%CI scarf: [55-72%]" names its interval in words; its
+                # leading "95" is the interval's level, not an estimate
+                # (10.1525/collabra.77859 Table 1, Preference row). Neither the
+                # estimate nor the bracket is this column's effect size.
+                est = None
+                raw = ""
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
                 if (
@@ -1994,8 +2005,14 @@ def _detect_packed_arms(
         k = len(toks)
         if not (2 <= k <= 4):
             continue
-        if not all(re.fullmatch(r"[A-Za-z][A-Za-z.\-]*", t) for t in toks):
-            continue  # arm labels are alphabetic words ("Separate", "Joint")
+        if not all(
+            re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.\-]*", t) and re.search(r"[A-Za-z]", t)
+            for t in toks
+        ):
+            # Arm labels are words ("Separate", "Joint") or condition codes with a
+            # letter ("1A", "1C" -- 10.1080/23743603.2021.1878340 Table 3); a
+            # token with no letter is a value, not an arm.
+            continue
         splittable = sum(
             1
             for ci in range(n)
