@@ -1076,6 +1076,38 @@ def _strip_folio(text: str) -> str:
     return head if len(head) >= 4 and re.search(r"[A-Za-z]", head) else text.strip()
 
 
+def _folio_number(text: str) -> int | None:
+    """The page number `_strip_folio` would remove, or None."""
+    t = text.strip()
+    if _strip_folio(t) == t:
+        return None
+    m = re.match(r"^(\d{1,4})\s", t) or re.search(r"\s(\d{1,4})$", t)
+    return int(m.group(1)) if m else None
+
+
+# A line that carries a statistic or a comparison is never a running head for the
+# weaker rules below, however often it repeats: a significance legend ("Note.
+# * p < .05, ** p < .01") on alternate pages has exactly the recto/verso shape
+# (review 2026-10-24). A DOI's dotted digits are NOT matched -- a DOI is the
+# commonest thing in a running head (see the note in _f0_strip_running_and_footnotes).
+_STATISTIC_SHAPE_RE = re.compile(r"[<=>\u2264\u2265]|%|\b[pPtFrdN]\s*\(")
+
+
+def _numbers_are_folios(pairs: list[tuple[int, int | None]]) -> bool:
+    """True when the numbers stripped from one head can be page numbers.
+
+    Page numbers are distinct and rise with the page. "Study 1" on three pages
+    and "Study 2" on three more fold to the same "Study", but their numbers
+    repeat, so they are headings, not one head with a folio (review 2026-10-24).
+    """
+    nums = [(i, n) for i, n in sorted(pairs) if n is not None]
+    if len(nums) > 1 and len({n for _, n in nums}) == 1:
+        return True  # one constant number ("... 63(3) 2015"): part of the line itself
+    if len({n for _, n in nums}) != len(nums):
+        return False
+    return all(b[1] > a[1] for a, b in zip(nums, nums[1:]))
+
+
 def _detect_repeating_lines(layout, *, position: str) -> set[str]:
     """Return text lines that appear at the top (or bottom) of >=50% of pages."""
     if len(layout.pages) < 2:
@@ -1116,7 +1148,7 @@ def _detect_running_heads(layout, *, position: str) -> set[str]:
     """
     if len(layout.pages) < 2:
         return set()
-    pages_of: dict[str, list[int]] = {}
+    seen: dict[str, list[tuple[int, int | None]]] = {}
     for page in layout.pages:
         if not page.spans:
             continue
@@ -1124,17 +1156,27 @@ def _detect_running_heads(layout, *, position: str) -> set[str]:
         span = y_sorted[-1] if position == "top" else y_sorted[0]
         c = _strip_folio(span.text)
         if c:
-            pages_of.setdefault(c, []).append(page.page_index)
-    n_pages = len(layout.pages)
-    threshold = n_pages // 2 + 1
-    out = {line for line, idx in pages_of.items() if len(idx) >= threshold}
-    for line, idx in pages_of.items():
+            seen.setdefault(c, []).append((page.page_index, _folio_number(span.text)))
+    threshold = len(layout.pages) // 2 + 1
+    # parity slots come from the pages actually present: a page subset need not
+    # run 0..n-1
+    present = [p.page_index for p in layout.pages]
+    out: set[str] = set()
+    for line, pairs in seen.items():
+        if _STATISTIC_SHAPE_RE.search(line) or not _numbers_are_folios(pairs):
+            continue
+        idx = [i for i, _ in pairs]
+        if len(idx) >= threshold:
+            out.add(line)
+            continue
+        later = [i for i in idx if i >= 1]
         parities = {i % 2 for i in idx}
-        if len(idx) < 3 or len(parities) != 1:
+        # three pages AFTER the first: page 1 is front matter, not the pattern
+        if len(later) < 3 or len(parities) != 1:
             continue
         parity = parities.pop()
-        slots = [i for i in range(1, n_pages) if i % 2 == parity]
-        if slots and len([i for i in idx if i >= 1]) * 4 >= len(slots) * 3:
+        slots = [i for i in present if i >= 1 and i % 2 == parity]
+        if slots and len(later) * 4 >= len(slots) * 3:
             out.add(line)
     return out
 
@@ -1287,17 +1329,22 @@ def _f0_strip_running_and_footnotes(
 
     # Content segments that are among the first or last _EDGE_LINES non-blank
     # lines of their pdftotext page -- the only places an edge_keys line goes.
+    # Never on the first page: there a line equal to the running head is the
+    # article's title (review 2026-10-24).
     at_page_edge: set[int] = set()
     if edge_keys:
         page_lines: list[int] = []
+        page_no = 0
         for idx in range(0, len(segments), 2):
             if segments[idx].strip():
                 page_lines.append(idx)
             sep = segments[idx + 1] if idx + 1 < len(segments) else PAGE_BREAK
             if sep == PAGE_BREAK:
-                at_page_edge.update(page_lines[:_EDGE_LINES])
-                at_page_edge.update(page_lines[-_EDGE_LINES:])
+                if page_no > 0:
+                    at_page_edge.update(page_lines[:_EDGE_LINES])
+                    at_page_edge.update(page_lines[-_EDGE_LINES:])
                 page_lines = []
+                page_no += 1
 
     # NOTE — a CONTAINMENT arm was written here and REVERTED. The two channels
     # do not agree where a line ends (pdfplumber groups a footer into one span;

@@ -2128,12 +2128,16 @@ def _line_found_in_page(line: str, page_words: str) -> bool:
 # figure's axis scale ("4.3 4.2 ... 3.3" + the axis title) was kept although every
 # line of it is on the page (10.1177/0956797610361706 p3, p4, p7). Two shapes are
 # set aside before the veto and the word count -- nothing else changes:
-#   FOLIO  a cell that is one bare integer AND is a whole line among the first or
-#          last three non-blank lines of the page's own text: the page number.
-#   AXIS   >= 4 cells of one column, each one bare number, with one constant
-#          step in row order that DEcreases down the page: a y-axis scale, not
-#          measurements (measured values are not evenly spaced; three values are
-#          too few to tell; a rising run is a table's item numbering).
+#   FOLIO  the ONE cell of the grid that is a bare ASCII integer, sits in the
+#          grid's first or last row, AND is a whole line among the first or last
+#          three non-blank lines of the page's own text: the page number. Two
+#          such cells, or one inside the grid, are counts (review 2026-10-24).
+#   AXIS   >= 4 cells of one column, each one bare number, most (>= 4, >= half)
+#          standing ALONE in their row, with one constant step in row order that DEcreases down the
+#          page: a y-axis scale, not measurements (measured values are not
+#          evenly spaced; three values are too few to tell; a rising run is a
+#          table's item numbering; a number with its label beside it -- a year,
+#          a Likert key -- is data).
 _BARE_NUMBER_RE = re.compile(r"[-\u2212]?\d+(?:\.\d+)?")
 _AXIS_MIN_TICKS = 4
 
@@ -2143,10 +2147,15 @@ def _folio_cells(cells: list, page_text: Optional[str]) -> set[int]:
         return set()
     edge = [ln.strip() for ln in page_text.splitlines() if ln.strip()]
     edge = set(edge[:3] + edge[-3:])
-    return {
-        i for i, c in enumerate(cells)
-        if (t := (c.get("text") or "").strip()).isdigit() and len(t) <= 4 and t in edge
-    }
+    rows = [c.get("r", 0) for c in cells if (c.get("text") or "").strip()]
+    if not rows:
+        return set()
+    outer = {min(rows), max(rows)}
+    digits = [i for i, c in enumerate(cells)
+              if re.fullmatch(r"[0-9]{1,4}", (c.get("text") or "").strip())]
+    hits = [i for i in digits
+            if cells[i].get("r", 0) in outer and (cells[i].get("text") or "").strip() in edge]
+    return set(hits) if len(hits) == 1 else set()
 
 
 def _axis_scale_cells(cells: list) -> set[int]:
@@ -2155,9 +2164,15 @@ def _axis_scale_cells(cells: list) -> set[int]:
         t = (c.get("text") or "").strip()
         if _BARE_NUMBER_RE.fullmatch(t):
             by_col.setdefault(c.get("c", 0), []).append((c.get("r", 0), i, float(t.replace("\u2212", "-"))))
+    filled_per_row: dict[int, int] = {}
+    for c in cells:
+        if (c.get("text") or "").strip():
+            filled_per_row[c.get("r", 0)] = filled_per_row.get(c.get("r", 0), 0) + 1
     out: set[int] = set()
     for vals in by_col.values():
-        if len(vals) < _AXIS_MIN_TICKS:
+        alone = [v for v in vals if filled_per_row.get(v[0], 0) == 1]
+        # the axis title may share one tick's row (10.1177/0956797610361706 p4)
+        if len(alone) < _AXIS_MIN_TICKS or len(alone) * 2 < len(vals):
             continue
         vals.sort()
         steps = {round(b[2] - a[2], 6) for a, b in zip(vals, vals[1:])}

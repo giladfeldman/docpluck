@@ -14,18 +14,24 @@ reached the rendered body (4 and 3 copies). A second detector now compares the l
 number removed and also accepts a line on at least 3/4 of one parity's pages. Because that signal
 is weaker than an exact repeat, a line it finds is removed only where it sits within the first or
 last three lines of a page; elsewhere it is kept (a figure's axis title can match the running head,
-10.1177/0956797618780353). The original exact rule is unchanged. On 224 test papers every line the
-change removes is a running head, a running footer or a "Downloaded from" stamp.
+10.1177/0956797618780353), and never on page 1, where such a line is the title. The page numbers
+removed from a head must be distinct and rise with the page ("Study 1" / "Study 2" headings are not a
+head), the alternating rule needs three pages after page 1, and a line carrying a statistic or a
+comparison ("Note. * p < .05") is never taken. The original exact rule is unchanged. On 225 corpus
+papers, 117 change and every line removed is a running head, a running footer or a "Downloaded from"
+stamp; no line is added.
 
 ### Page numbers and chart axes no longer save a duplicate table candidate (table extraction)
 
 An uncaptioned table candidate is set aside when every line of it is already in the page's text,
 unless it carries a statistic. A page number or a chart's axis scale counted as a statistic, so a
 grid made of a running head, a page number and a body line was kept as a table (10.1177/0956797610361706
-pages 3, 4 and 7). A bare number that is its page's first or last line, and a column of four or more
-evenly spaced numbers that decrease down the page (a vertical axis), are now ignored by that check.
-A rising run of numbers is a table's item numbering and still counts. Every candidate set aside is
-recorded in `fallbacks`.
+pages 3, 4 and 7). Two shapes are now ignored by that check: the grid's single bare page number (in
+its first or last row, and one of its page's first or last lines), and a column of four or more evenly
+spaced numbers that decrease down the page with most standing alone in their row (a vertical axis).
+Counts, item numbers, years or a Likert key with labels beside them still count as data. On 125
+corpus papers, 66 candidates in 11 papers are now set aside, all page furniture; each is recorded in
+`fallbacks`.
 
 
 Tables reach their last printed row, keep minus signs drawn in a math font, keep side-by-side

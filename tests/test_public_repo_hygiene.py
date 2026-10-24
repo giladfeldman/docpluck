@@ -144,6 +144,7 @@ INTERNAL_REFERENCE = re.compile(
     | ["']\.claude["']              # ... and as a quoted path segment
     | \b(INBOX|OUTBOX|HANDOFF|FINDINGS|TRIAGE|BRIEF|DECISION|ADJUDICATION|REPLY_TO|NOTICE|MEMO)_
       [A-Za-z0-9_-]*20\d\d          # a dated correspondence FILE cited by name
+    | \bM-[a-z]+-[a-z]+-\d{8}T     # a message id from the correspondence queue
     """
 )
 INTERNAL_REFERENCE_EXEMPT = {".gitignore", "tests/test_public_repo_hygiene.py"}
