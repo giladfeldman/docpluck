@@ -88,3 +88,41 @@ def test_a_range_with_an_en_dash_or_hyphen_reads_as_two_numbers():
     for s in ("2008–2013", "2008-2013"):
         assert sorted(_grid_tokens(s)[0].elements()) == ["2008", "2013"], s
     assert sorted(_grid_tokens("x -3.84")[0].elements()) == ["-3.84"]
+
+
+# The copy is followed, after a blank line, by the next numbered section and
+# its body, with no second blank line between them (Elsevier "Table N" alone on
+# its line; 10.1016/j.evolhumbehav.2016.06.001 Table 1). The scan ran on into
+# the heading and the first prose line, coverage failed on their words, and the
+# whole 52-line column dump stayed in the body.
+_TAIL = (
+    "\n\n2.2.3. Life History\n"
+    "Life strategies were measured using the Mini-K (Figueredo et al.,\n"
+    "2006) and the scale described above, which was used before."
+)
+
+
+def test_a_covered_copy_ending_at_a_numbered_section_becomes_a_marker():
+    doc = (
+        "Body text before.\n\nTable 1\nPractice variables.\n"
+        "Effort\nHelp\nSSRT\n\nMean\nSD\n\n3.10\n2.77\n211.74\n\n.72\n.75\n64.07"
+        + _TAIL + "\n\n\n" + GRID
+    )
+    out = _suppress_orphan_table_cell_text(doc)
+    assert "table-text-duplicate" in out
+    assert out.count("211.74") == 1
+    # Everything from the section heading on is kept, verbatim.
+    assert _TAIL.strip() in out
+
+
+def test_a_partial_cut_needs_a_section_or_prose_after_it():
+    # An uncovered VALUE after the blank line is more of the table, not the
+    # next section: no partial cut, the whole copy stays.
+    doc = (
+        "Body text before.\n\nTable 1\nPractice variables.\n"
+        "Effort\nHelp\nSSRT\n\n3.10\n2.77\n211.74\n\n9.99\n8.88"
+        + _TAIL + "\n\n\n" + GRID
+    )
+    out = _suppress_orphan_table_cell_text(doc)
+    assert "table-text-duplicate" not in out
+    assert "9.99" in out and out.count("211.74") == 2

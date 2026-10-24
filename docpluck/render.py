@@ -330,8 +330,15 @@ def _promote_numbered_subsection_headings(text: str) -> str:
         return text
     lines = text.split("\n")
     out: list[str] = []
+    in_fence = False
     for line in lines:
-        m = _NUMBERED_SUBSECTION_HEADING_RE.match(line)
+        # A fenced block is verbatim: an `unstructured-table` fence whose raw
+        # text runs past its table must not grow headings inside it.
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        m = None if in_fence else _NUMBERED_SUBSECTION_HEADING_RE.match(line)
         if not m:
             out.append(line)
             continue
@@ -2906,6 +2913,26 @@ def _raw_text_is_single_column(raw_text: str) -> bool:
     return frac_wide >= 0.25
 
 
+_TABLE_CAPTION_START_RE = re.compile(r"^Table\s+\d+[A-Za-z]?(?:\s*$|[.:]\s)")
+
+
+def _in_table_caption_block(lines: list, i: int, max_back: int = 80) -> bool:
+    """True when line ``i`` sits in a blank-free block that a table caption
+    opens (``Table 2`` alone, or ``Table 2.`` / ``Table 2:`` + title): the
+    text channel's copy of a table, whose row-group labels ("Anger subscale")
+    are cells, not subsections. Prose that mentions a table ("Table 2 shows")
+    does not open such a block."""
+    k = i - 1
+    while k >= 0 and i - k <= max_back:
+        s = lines[k].strip()
+        if not s:
+            return False
+        if _TABLE_CAPTION_START_RE.match(s):
+            return True
+        k -= 1
+    return False
+
+
 def _promote_isolated_titlecase_subsection_headings(
     text: str, *, is_single_column: bool = False
 ) -> str:
@@ -2936,8 +2963,18 @@ def _promote_isolated_titlecase_subsection_headings(
     lines = text.split("\n")
     n = len(lines)
     out: list[str] = []
+    in_fence = False
     for i, line in enumerate(lines):
         stripped = line.strip()
+        # A fenced block is verbatim (the `unstructured-table` fence holds a
+        # table's raw cell text): its row-group labels are not headings.
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if in_fence:
+            out.append(line)
+            continue
         # Skip lines that already carry structural markup.
         if not stripped or stripped.startswith(("#", "*", "_", "<", ">", "|", "`", "-", "+")):
             out.append(line)
@@ -3044,6 +3081,7 @@ def _promote_isolated_titlecase_subsection_headings(
                 is_single_column
                 and _prev_is_clean_boundary
                 and not _is_single_col_relaxation_fragment(stripped)
+                and not _in_table_caption_block(lines, i)
             ):
                 out.append(line)
                 continue
@@ -4907,6 +4945,40 @@ def _run_duplicated_in_grid(run_lines: list, grid: tuple) -> bool:
     return not (nums - grid[0]) and not (syms - grid[2]) and words <= grid[1]
 
 
+_NUMBERED_SECTION_LINE_RE = re.compile(r"^\d+(?:\.\d+)+\.?\s+[A-Z]")
+
+
+def _grid_covered_orphan_prefix(lines: list, orphans: list, grid: tuple) -> list:
+    """The orphan run to test against the grid, cut back to where the table ends.
+
+    The post-caption scan stops only at a non-cell line or a second blank line,
+    so a column dump followed by ``\\n\\n2.2.3. Life History\\nLife strategies
+    were measured ...`` runs on into that heading and the prose under it (both
+    are short enough to pass as cells), and the copy then fails the coverage
+    test on their words. Returns the whole run when it is covered (or when no
+    cut applies); otherwise the longest prefix that (a) ends at a blank line,
+    (b) is covered by the grid, and (c) is followed by a line that is NOT more
+    table -- a numbered section heading, or a line that is not cell-like. An
+    uncovered value after the cut is more of the same table, so it keeps the
+    whole run: a table is never half-suppressed.
+    """
+    if _run_duplicated_in_grid([lines[k] for k in orphans], grid):
+        return orphans
+    for c in range(len(orphans) - 1, 1, -1):
+        prev_k, next_k = orphans[c - 1], orphans[c]
+        if not any(not lines[k].strip() for k in range(prev_k + 1, next_k)):
+            continue  # not a blank-line boundary
+        nxt = lines[next_k].strip()
+        if not (_NUMBERED_SECTION_LINE_RE.match(nxt) or not _is_orphan_cell_paragraph(nxt)):
+            continue
+        if _run_duplicated_in_grid([lines[k] for k in orphans[:c]], grid):
+            return orphans[:c]
+        # The longest blank-bounded prefix ending before the section is the
+        # one that matters; a shorter one would leave table lines behind.
+        return orphans
+    return orphans
+
+
 def _suppress_orphan_table_cell_text(text: str) -> str:
     """Suppress orphan cell-row text leaks after a plain-text Table caption.
 
@@ -5014,6 +5086,8 @@ def _suppress_orphan_table_cell_text(text: str) -> str:
             # so a single value the grid lacks keeps the whole run.
             label_no = (bare or _ORPHAN_TABLE_CAPTION_RE.match(stripped.strip("*")) or italic_re.match(stripped))
             label_no = label_no.group(1) if label_no else None
+            if label_no in grids and len(orphans) >= 2:
+                orphans = _grid_covered_orphan_prefix(lines, orphans, grids[label_no])
             if (
                 len(orphans) >= 2
                 and label_no in grids
@@ -6736,7 +6810,7 @@ def _dedupe_label_in_table_figure_caption(text: str) -> str:
 # render channel was the ONLY one of the three with no version of its own, so a
 # render change had nowhere to be recorded except the package number. It has one
 # now, and `RenderReport` carries it.
-RENDER_VERSION = "1.0.2"  # v1.0.2 (v2.4.134): the render channel becomes a telemetry CONSUMER, not just a producer. `render_pdf_to_markdown` calls `extract_pdf_structured` and `extract_sections` internally and DISCARDED both of their reports, so every fallback recorded beneath the function that produces the user-visible .md - a table dropped by the likeness gate, a repair refused as ambiguous, a symbol font flagged as corrupt - was invisible to every caller. Found by an independent review of the very release whose headline was that telemetry now reaches consumers, which is the same defect one layer up for the third time. The public name is now a thin wrapper holding a `fallback_scope` (a `with` block, so an exception mid-chain cannot leak a sink into the next render in this context) and the chain moved to `_render_pdf_to_markdown`; `RenderReport` gains `fallbacks` / `fallback_details`. NOTE the rename broke `tools/diag/render_deletion_scan.py`, which scrapes that function's source for `_step(_report, ...)` calls - and it REFUSED TO RUN rather than report a clean zero, which is the instrument guard built one release earlier working exactly as designed against the session that wrote it. # v1.0.1 (v2.4.132): removed_lines compares stripped-to-stripped and treats a reflow (a line merged into a longer one) as survival — the two instrument defects that made the repaired deletion gate report 84 false positives on its first genuine run; `_carries_statistical_content` absorbs the Greek/R²/BF arms from the figure-caption suppressor's private duplicate detector (one concept, one table) and gains the integer-valued Greek case `χ2(1) = 4` that matched NEITHER half; `_AFFIL_CITATION_RE` gains three structural citation markers (bracketed reference number, arXiv id, DOI) after a numbered bibliography was stripped as an author-affiliation block on 10.48550/arxiv.2406.11713 — the class the guard's own comment says it was written to prevent, walked back in through a citation style neither APA-shaped arm covered; `_strip_phantom_camelot_tables` inspects `<th>` as well as `<td>`; `_rescue_title_from_layout` is wrapped in `_step` (it deletes, and was the one chain step invisible to RenderReport); `report=` is the public spelling of the telemetry parameter. # v1.0.0 (v2.4.130): the chain gains telemetry for the first time.
+RENDER_VERSION = "1.0.3"  # v1.0.3 (v2.4.155): an acknowledgment / previous-version note left in the front zone is labelled as a blockquote; a text copy of a table ending at a numbered section is matched against its grid up to that section; no heading promoter writes inside a fenced block; a table caption block's row labels are not promoted to subsections. Previous: v1.0.2 (v2.4.134): the render channel becomes a telemetry CONSUMER, not just a producer. `render_pdf_to_markdown` calls `extract_pdf_structured` and `extract_sections` internally and DISCARDED both of their reports, so every fallback recorded beneath the function that produces the user-visible .md - a table dropped by the likeness gate, a repair refused as ambiguous, a symbol font flagged as corrupt - was invisible to every caller. Found by an independent review of the very release whose headline was that telemetry now reaches consumers, which is the same defect one layer up for the third time. The public name is now a thin wrapper holding a `fallback_scope` (a `with` block, so an exception mid-chain cannot leak a sink into the next render in this context) and the chain moved to `_render_pdf_to_markdown`; `RenderReport` gains `fallbacks` / `fallback_details`. NOTE the rename broke `tools/diag/render_deletion_scan.py`, which scrapes that function's source for `_step(_report, ...)` calls - and it REFUSED TO RUN rather than report a clean zero, which is the instrument guard built one release earlier working exactly as designed against the session that wrote it. # v1.0.1 (v2.4.132): removed_lines compares stripped-to-stripped and treats a reflow (a line merged into a longer one) as survival — the two instrument defects that made the repaired deletion gate report 84 false positives on its first genuine run; `_carries_statistical_content` absorbs the Greek/R²/BF arms from the figure-caption suppressor's private duplicate detector (one concept, one table) and gains the integer-valued Greek case `χ2(1) = 4` that matched NEITHER half; `_AFFIL_CITATION_RE` gains three structural citation markers (bracketed reference number, arXiv id, DOI) after a numbered bibliography was stripped as an author-affiliation block on 10.48550/arxiv.2406.11713 — the class the guard's own comment says it was written to prevent, walked back in through a citation style neither APA-shaped arm covered; `_strip_phantom_camelot_tables` inspects `<th>` as well as `<td>`; `_rescue_title_from_layout` is wrapped in `_step` (it deletes, and was the one chain step invisible to RenderReport); `report=` is the public spelling of the telemetry parameter. # v1.0.0 (v2.4.130): the chain gains telemetry for the first time.
 
 
 def removed_lines(before: str, after: str) -> list:
