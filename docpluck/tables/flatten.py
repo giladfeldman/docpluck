@@ -137,6 +137,62 @@ def _cells_to_grid(cells: list[Cell]) -> list[list[str]]:
     return grid
 
 
+def _alnum_key(s: str) -> str:
+    return re.sub(r"[^0-9a-z]", "", (s or "").lower())
+
+
+def _drop_leading_caption_rows(
+    grid: list[list[str]], label: Optional[str], caption: Optional[str]
+) -> list[list[str]]:
+    """Blank the table's own label and caption lines at the top of its grid, and
+    drop the rows that leaves empty.
+
+    A capture region that starts at the caption puts ``Table 3`` and the title
+    line(s) in the grid's first rows (10.1016/j.jesp.2021.104154 p6 Table 3), and
+    the header split then took ``Table 3`` as the column header: every column
+    went untyped. Only the TOP of the grid is read, and only when its first
+    non-empty row carries the label itself; after that a cell is blanked only
+    when it is a whole line of the caption (>= 12 letters/digits, found verbatim
+    in the caption once case, spacing and punctuation are ignored) or the
+    "(Continued)" of a continuation head. Scanning
+    stops at the first row with no such cell, so a header word that merely
+    appears in the caption ("Condition") is never touched.
+    """
+    lab = _alnum_key(label or "")
+    if not grid or not lab:
+        return grid
+    cap = _alnum_key(caption or "")
+    out = [list(r) for r in grid]
+    start = next((i for i, r in enumerate(out) if any((c or "").strip() for c in r)), None)
+    if start is None:
+        return grid
+    if not any(_alnum_key(c) == lab for c in out[start]):
+        return grid
+    i = start
+    while i < len(out) and i < start + 4:
+        row = out[i]
+        hit = False
+        for j, c in enumerate(row):
+            k = _alnum_key(c)
+            if not k:
+                continue
+            if k == lab or (len(k) >= 12 and cap and k in cap) or k in (
+                "continued", "cont", "contd",
+            ) or (
+                cap and k.startswith(lab) and len(k) > len(lab) and k in cap
+            ):
+                row[j] = ""
+                hit = True
+        if not hit:
+            break
+        i += 1
+    kept = [r for idx, r in enumerate(out)
+            if idx < start or idx >= i or any((c or "").strip() for c in r)]
+    if len(kept) != len(grid):
+        record_fallback("flatten_skipped_caption_rows", detail=f"{label}: {len(grid) - len(kept)}")
+    return kept
+
+
 def _clean_grid(
     grid: list[list[str]],
     declared_header_rows: int | None = None,
@@ -293,6 +349,10 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("eta2",  re.compile(r"^\s*(?:η\s*²?|η2|eta[\s\-]?(?:square|sq|2)?(?:_?p)?)\s*$", re.I)),
     ("M",     re.compile(r"^\s*(?:M|mean)\s*$", re.I)),
     ("SD",    re.compile(r"^\s*(?:SD|std\.?\s*dev\.?|standard\s+deviation)\s*$", re.I)),
+    # Mann-Whitney U and a z statistic (10.1016/j.jesp.2021.104154 Tables 3 and 5
+    # print "U  z  p"): untyped, a U-test table reached consumers with no fields.
+    ("U",     re.compile(r"^\s*(?:U|Mann[\s\-]?Whitney\s*U)\s*$")),
+    ("z",     re.compile(r"^\s*[zZ](?:[\s\-]?(?:value|score|stat(?:istic)?))?\s*$")),
     ("n",     re.compile(r"^\s*n\s*$", re.I)),
     ("N",     re.compile(r"^\s*N\s*$")),
     # est_ci: a *combined* effect-and-interval column whose header carries an
@@ -572,7 +632,19 @@ def _fold_minus(s: str) -> str:
 _EST_OP_RE = re.compile(r"^\s*(<=|>=|≤|≥|<|>)\s*(?=[-+−–]?\.?\d)")
 # The statistics whose printed operator is carried as `<key>_op`. `p` keeps its
 # own long-standing `p_op` contract and is not in this set.
-_OP_FIELDS = ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est", "BF01")
+_OP_FIELDS = ("t", "F", "chi2", "U", "z", "r", "d", "eta2", "M", "SD", "est", "BF01")
+
+
+# A footnote / significance mark printed after a value: "-1.48a", "9.84 a",
+# "3.67***", "2.10†". One lowercase letter or a run of mark glyphs, nothing more,
+# so "2.0 ab" or a word is never read as a marked number.
+_VALUE_MARK_RE = re.compile(r"(?:\s?[a-z]|\s*[*∗†‡§¶#]+)$")
+
+
+def _strip_value_mark(s: str) -> str:
+    """The cell without a trailing footnote / significance mark (see above)."""
+    s = _strip_fold_sentinels(s or "")
+    return _VALUE_MARK_RE.sub("", s).strip()
 
 
 def _split_leading_op(s: str) -> tuple[Optional[str], str]:
@@ -1408,6 +1480,14 @@ def _flatten_one_row(
                 role_nums["CI_upper"] = hi
         else:
             n = _parse_number(raw)
+            if n is None:
+                # A value carrying a footnote / significance mark ("-1.48a",
+                # "3.67***") was refused outright, so the row lost its t or d.
+                bare = _strip_value_mark(raw)
+                if bare != raw:
+                    n = _parse_number(bare)
+                    if n is not None:
+                        role_vals[role] = bare
             if n is None and role in _OP_FIELDS:
                 op, rest = _split_leading_op(raw)
                 if op:
@@ -1531,7 +1611,7 @@ def _flatten_one_row(
     fields: dict[str, object] = {}
     if group:
         fields["group"] = group
-    for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est", "BF01"):
+    for k in ("t", "F", "chi2", "U", "z", "r", "d", "eta2", "M", "SD", "est", "BF01"):
         if k in role_nums:
             fields[k] = role_nums[k]
             # The printed inequality, when there is one (additive: absent on a
@@ -1685,6 +1765,11 @@ def _assemble_sentence(
         else:
             parts.append(f"χ² {eq('chi2')} {chi_val}")
 
+    if "U" in role_nums:
+        parts.append(f"U {eq('U')} {role_vals['U']}")
+    if "z" in role_nums:
+        parts.append(f"z {eq('z')} {role_vals['z']}")
+
     if "r" in role_nums:
         if "n" in role_nums:
             try:
@@ -1809,7 +1894,15 @@ def _arms_by_role_repeat(
             return None
         groups.append(((header[s].split(_MERGE_SEPARATOR, 1)[0]).strip(), cols))
     in_arm = {c for _, cols in groups for c in cols}
-    return [i for i in range(n) if i not in in_arm], groups
+    outside = [i for i in range(n) if i not in in_arm]
+    # A STATISTIC column under neither label is no arm's: shared into each arm it
+    # typed 10.1177/01461672251327169 Table 6's "Prevalence estimate mean" as the
+    # Item-level analysis's M. Same rule as the printed-span path in
+    # `_detect_column_groups`: it becomes its own record with no group.
+    row_stats = [i for i in outside if roles[i]]
+    if row_stats:
+        groups.append(("", row_stats))
+    return [i for i in outside if i not in row_stats], groups
 
 
 def _detect_column_groups(
@@ -2140,6 +2233,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     if not cells:
         return []
     grid = _cells_to_grid(cells)
+    grid = _drop_leading_caption_rows(grid, table.get("label"), table.get("caption"))
     header_rows, body = _clean_grid(grid, _declared_header_rows(table))
     if not header_rows or not body:
         return []
