@@ -1034,7 +1034,16 @@ def _is_header_like_row(row: list[str]) -> bool:
     nonempty = [c.strip() for c in row if (c or "").strip()]
     if not nonempty:
         return False
-    numeric = sum(1 for c in nonempty if _DATA_VALUE_CELL_RE.match(c))
+    # A cell the continuation merge stacked ("−3.23 (993.46)" over "−3.50
+    # (997.65)", joined by the merge separator) is data when every stacked part
+    # is: whole, it matched nothing, so 10.1080/23743603.2021.1878340 p13 Table 2's
+    # first stacked data row read as a third header row and its values became
+    # group names.
+    numeric = sum(
+        1 for c in nonempty
+        if all(_DATA_VALUE_CELL_RE.match(p.strip())
+               for p in c.split(_MERGE_SEPARATOR) if p.strip())
+    )
     if numeric / len(nonempty) > 0.3:
         return False
     avg_len = sum(len(c) for c in nonempty) / len(nonempty)
