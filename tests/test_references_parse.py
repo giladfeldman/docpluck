@@ -33,104 +33,104 @@ def _fields(raw: str) -> dict:
 CASES = [
     (
         "apa",
-        "Ardent, H., Velmor, B., & Van Kestrel, A. (1998). Forecasting choices from earlier choices: "
-        "Repeated deciding or a matter of routine? Journal of Applied Social Psychology, 28, 1355-1374.",
-        dict(families=["Ardent", "Velmor", "Van Kestrel"], year="1998",
-             title="Forecasting choices from earlier choices: Repeated deciding or a matter of routine?",
-             container="Journal of Applied Social Psychology", volume="28", pages=("1355", "1374")),
+        ("Ardent, H., Velmor, B., & Van Kestrel, A. (1998). Forecasting choices from earlier choices: "
+        "Repeated deciding or a matter of routine? Journal of Applied Social Psychology, 28, 1355-1374."),
+        {"families": ["Ardent", "Velmor", "Van Kestrel"], "year": "1998",
+             "title": "Forecasting choices from earlier choices: Repeated deciding or a matter of routine?",
+             "container": "Journal of Applied Social Psychology", "volume": "28", "pages": ("1355", "1374")},
     ),
     (
         "apa_doi_issue_suffix",
-        "Brisk, D. (2020a). How analysts can stop misleading themselves. Nature, 584(7819), 9. "
-        "https://doi.org/10.1234/d41586-020-00000-1",
-        dict(families=["Brisk"], year="2020", suffix="a", container="Nature", volume="584", issue="7819",
-             pages=("9", None), doi="10.1234/d41586-020-00000-1"),
+        ("Brisk, D. (2020a). How analysts can stop misleading themselves. Nature, 584(7819), 9. "
+        "https://doi.org/10.1234/d41586-020-00000-1"),
+        {"families": ["Brisk"], "year": "2020", "suffix": "a", "container": "Nature", "volume": "584", "issue": "7819",
+             "pages": ("9", None), "doi": "10.1234/d41586-020-00000-1"},
     ),
     (
         "vancouver_et_al",
-        "Cobb SS, Halvard R, Narain K, et al. Global patterns of a heart rhythm disorder: a Burden "
-        "of Disease 2010 Study. Circulation. 2014;129:837-47.",
-        dict(families=["Cobb", "Halvard", "Narain"], et_al=True, year="2014", container="Circulation",
-             volume="129", pages=("837", "47")),
+        ("Cobb SS, Halvard R, Narain K, et al. Global patterns of a heart rhythm disorder: a Burden "
+        "of Disease 2010 Study. Circulation. 2014;129:837-47."),
+        {"families": ["Cobb", "Halvard", "Narain"], "et_al": True, "year": "2014", "container": "Circulation",
+             "volume": "129", "pages": ("837", "47")},
     ),
     (
         "ama_doi",
-        "Pell WJ, Dorn MD, Bunt CR. Relationship between household income and childhood "
-        "injuries. J Urban Health. 2001;78(1):141-151. doi:10.1234/jurban/78.1.141",
-        dict(families=["Pell", "Dorn", "Bunt"], year="2001",
-             title="Relationship between household income and childhood injuries",
-             container="J Urban Health", volume="78", issue="1", pages=("141", "151"),
-             doi="10.1234/jurban/78.1.141"),
+        ("Pell WJ, Dorn MD, Bunt CR. Relationship between household income and childhood "
+        "injuries. J Urban Health. 2001;78(1):141-151. doi:10.1234/jurban/78.1.141"),
+        {"families": ["Pell", "Dorn", "Bunt"], "year": "2001",
+             "title": "Relationship between household income and childhood injuries",
+             "container": "J Urban Health", "volume": "78", "issue": "1", "pages": ("141", "151"),
+             "doi": "10.1234/jurban/78.1.141"},
     ),
     (
         "nature",
-        "Dunmore, T. M. et al. Complications seen in hospital patients with a viral illness. "
-        "Lancet 398, 223-237 (2021).",
-        dict(families=["Dunmore"], et_al=True, year="2021", container="Lancet", volume="398",
-             pages=("223", "237")),
+        ("Dunmore, T. M. et al. Complications seen in hospital patients with a viral illness. "
+        "Lancet 398, 223-237 (2021)."),
+        {"families": ["Dunmore"], "et_al": True, "year": "2021", "container": "Lancet", "volume": "398",
+             "pages": ("223", "237")},
     ),
     (
         "ieee_initials_first",
-        'A. B. Smith, C. D. Jones, and E. Brown, "A title here," IEEE Trans. Pattern Anal., vol. 12, no. 3, '
-        "pp. 45-67, 2020.",
-        dict(families=["Smith", "Jones", "Brown"], year="2020", title="A title here", volume="12", issue="3",
-             pages=("45", "67")),
+        ('A. B. Smith, C. D. Jones, and E. Brown, "A title here," IEEE Trans. Pattern Anal., vol. 12, no. 3, '
+        "pp. 45-67, 2020."),
+        {"families": ["Smith", "Jones", "Brown"], "year": "2020", "title": "A title here", "volume": "12", "issue": "3",
+             "pages": ("45", "67")},
     ),
     (
         "ieee_article_number",
-        'Yarrow W, Zell D, Penn L, Zhou C, and Holt L, "A comparison of several spread models," '
-        "Epidemics, vol. 37, Dec. 2021, Art. no. 100501.",
-        dict(families=["Yarrow", "Zell", "Penn", "Zhou", "Holt"], year="2021", container="Epidemics",
-             volume="37", pages=("100501", None)),
+        ('Yarrow W, Zell D, Penn L, Zhou C, and Holt L, "A comparison of several spread models," '
+        "Epidemics, vol. 37, Dec. 2021, Art. no. 100501."),
+        {"families": ["Yarrow", "Zell", "Penn", "Zhou", "Holt"], "year": "2021", "container": "Epidemics",
+             "volume": "37", "pages": ("100501", None)},
     ),
     (
         "royal_society_bare_year",
-        "Gorse JL. 2005 A social network in the brain: themes and variations. "
-        "Horm. Behav. 48, 11-22. (doi:10.1234/j.yhbeh.2005.00.001)",
-        dict(families=["Gorse"], year="2005", volume="48", pages=("11", "22"),
-             doi="10.1234/j.yhbeh.2005.00.001"),
+        ("Gorse JL. 2005 A social network in the brain: themes and variations. "
+        "Horm. Behav. 48, 11-22. (doi:10.1234/j.yhbeh.2005.00.001)"),
+        {"families": ["Gorse"], "year": "2005", "volume": "48", "pages": ("11", "22"),
+             "doi": "10.1234/j.yhbeh.2005.00.001"},
     ),
     (
         "aom_colon_pages",
-        "Ambrose, T. M. 2020. Novelty, machine learning, and a world of surprises. "
-        "Academy of Management Discoveries, 6: 351-354.",
-        dict(families=["Ambrose"], year="2020", container="Academy of Management Discoveries", volume="6",
-             pages=("351", "354")),
+        ("Ambrose, T. M. 2020. Novelty, machine learning, and a world of surprises. "
+        "Academy of Management Discoveries, 6: 351-354."),
+        {"families": ["Ambrose"], "year": "2020", "container": "Academy of Management Discoveries", "volume": "6",
+             "pages": ("351", "354")},
     ),
     (
         "asa_full_names_quoted_title",
-        'Albrecht, Silke, and Anette Fassbinder. 2017. "The Interplay of Work and Home Paths over the Life '
-        'Course." American Journal of Sociology 122(5):1448-84 (https://doi.org/10.1234/691128).',
-        dict(families=["Albrecht", "Fassbinder"], year="2017",
-             title="The Interplay of Work and Home Paths over the Life Course",
-             container="American Journal of Sociology", volume="122", issue="5", pages=("1448", "84"),
-             doi="10.1234/691128"),
+        ('Albrecht, Silke, and Anette Fassbinder. 2017. "The Interplay of Work and Home Paths over the Life '
+        'Course." American Journal of Sociology 122(5):1448-84 (https://doi.org/10.1234/691128).'),
+        {"families": ["Albrecht", "Fassbinder"], "year": "2017",
+             "title": "The Interplay of Work and Home Paths over the Life Course",
+             "container": "American Journal of Sociology", "volume": "122", "issue": "5", "pages": ("1448", "84"),
+             "doi": "10.1234/691128"},
     ),
     (
         "title_with_question_and_subtitle",
-        "Alder D (2006). Is the old epidemic over? Long-term effects of early exposure in "
-        "a later population. Journal of Political Economy, 114, 672-712.",
-        dict(families=["Alder"], year="2006", container="Journal of Political Economy", volume="114",
-             pages=("672", "712")),
+        ("Alder D (2006). Is the old epidemic over? Long-term effects of early exposure in "
+        "a later population. Journal of Political Economy, 114, 672-712."),
+        {"families": ["Alder"], "year": "2006", "container": "Journal of Political Economy", "volume": "114",
+             "pages": ("672", "712")},
     ),
     (
         "apa_chapter",
-        "Abernathy, K. L., & Varga, M. (2020). The reliability of attentional capture paradigms. In P. Delacroix & "
-        "V. Kowalczyk (Eds.), The Handbook of Sleep and Memory (pp. 265-285). Guilford Press.",
-        dict(families=["Abernathy", "Varga"], year="2020", title="The reliability of attentional capture paradigms",
-             container="The Handbook of Sleep and Memory", pages=("265", "285")),
+        ("Abernathy, K. L., & Varga, M. (2020). The reliability of attentional capture paradigms. In P. Delacroix & "
+        "V. Kowalczyk (Eds.), The Handbook of Sleep and Memory (pp. 265-285). Guilford Press."),
+        {"families": ["Abernathy", "Varga"], "year": "2020", "title": "The reliability of attentional capture paradigms",
+             "container": "The Handbook of Sleep and Memory", "pages": ("265", "285")},
     ),
     (
         "organisation_author",
         "American Psychological Association. (2019). Implicit bias measurement in the field. Technical report.",
-        dict(families=["American Psychological Association"], year="2019",
-             title="Implicit bias measurement in the field"),
+        {"families": ["American Psychological Association"], "year": "2019",
+             "title": "Implicit bias measurement in the field"},
     ),
     (
         "particles_kept",
-        "van der Berg, P., de la Cruz, J. M., & Jablonski, F. (2022). Boundary conditions of moral licensing. "
-        "Psychological Science, 147(7), 609-635.",
-        dict(families=["van der Berg", "de la Cruz", "Jablonski"], year="2022", volume="147", issue="7"),
+        ("van der Berg, P., de la Cruz, J. M., & Jablonski, F. (2022). Boundary conditions of moral licensing. "
+        "Psychological Science, 147(7), 609-635."),
+        {"families": ["van der Berg", "de la Cruz", "Jablonski"], "year": "2022", "volume": "147", "issue": "7"},
     ),
 ]
 

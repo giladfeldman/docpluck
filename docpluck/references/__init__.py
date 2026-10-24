@@ -24,7 +24,14 @@ from typing import Literal
 from .link import duplicate_groups, link_citations
 from .parse import parse_reference
 from .split import densest_entry_run, entry_density, split_entries
-from .types import Citation, CitationAnalysis, CitationKind, Reference, ReferenceAuthor, ReferenceStyle
+from .types import (
+    Citation,
+    CitationAnalysis,
+    CitationKind,
+    Reference,
+    ReferenceAuthor,
+    ReferenceStyle,
+)
 
 #: Bump when entry splitting, field parsing or citation linking changes output.
 REFERENCES_VERSION = "1.0.0"
