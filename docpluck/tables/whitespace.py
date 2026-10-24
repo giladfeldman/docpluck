@@ -95,6 +95,7 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
 
     body_height = _modal_word_height(words)
     header_row_is_header = _row_is_header(rows[0], body_height)
+    spaced = _word_spacer(layout, region)
 
     cells: list[Cell] = []
     for r, row_words in enumerate(rows):
@@ -109,7 +110,7 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
                 if x_left <= (w["x0"] + w["x1"]) / 2 <= x_right
             ]
             in_cell.sort(key=lambda w: w["x0"])
-            text = _normalize_cell_text(" ".join(w.get("text", "") for w in in_cell))
+            text = _normalize_cell_text(" ".join(spaced(w) for w in in_cell))
             cells.append({
                 "r": r,
                 "c": c,
@@ -132,6 +133,52 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
         record_fallback("whitespace_grid_failed_clean_gate", detail=region.label or "?")
         return []
     return repair_cells(cells, layout=layout)
+
+
+def _word_spacer(layout: LayoutDoc, region: CandidateRegion):
+    """``f(word) -> text``: the word's text with the word spaces its glyph gaps print.
+
+    ``page.words`` comes from pdfplumber's ``extract_words()`` with a FIXED 3pt
+    x-tolerance, so on a PDF that draws no space glyphs a whole line of small type
+    is one "word" (10.1001/jamanetworkopen.2023.39337 Table 1:
+    ``Table1.BaselineCharacteristicsoftheStudyParticipantsa``). The glyphs are
+    re-split at ``WORD_GAP_RATIO`` of the font size -- the measured rule the
+    rotated path uses -- and the pieces of each word joined with spaces.
+
+    Only spaces can change. A word whose pieces do not concatenate back to its
+    own text exactly (any glyph order or membership doubt) keeps its text, and so
+    does every word when the split cannot run. Column and row decisions are made
+    on the original words before this is applied, so the grid's shape is
+    untouched.
+    """
+    try:
+        from pdfplumber.utils.text import WordExtractor
+
+        chars = sorted(
+            (c for c in chars_in_bbox(layout, bbox=region.bbox, page=region.page)
+             if c.get("text") and c.get("size")),
+            key=lambda c: (round(c["top"]), c["x0"]),
+        )
+        fine = [w for w, _ in WordExtractor(x_tolerance_ratio=WORD_GAP_RATIO).iter_extract_tuples(chars)]
+    except Exception as exc:  # noqa: BLE001 - recorded; words keep extract_words' text
+        record_fallback("whitespace_word_split_unavailable", detail=type(exc).__name__)
+        return lambda w: w.get("text", "")
+
+    def spaced(w: dict) -> str:
+        text = w.get("text", "")
+        pieces = sorted(
+            (
+                f for f in fine
+                if w["x0"] - 0.5 <= (f["x0"] + f["x1"]) / 2 <= w["x1"] + 0.5
+                and w["top"] - 1.0 <= (f["top"] + f["bottom"]) / 2 <= w["bottom"] + 1.0
+            ),
+            key=lambda f: f["x0"],
+        )
+        if len(pieces) < 2 or "".join(f["text"] for f in pieces) != text:
+            return text
+        return " ".join(f["text"] for f in pieces)
+
+    return spaced
 
 
 def char_whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell]:
