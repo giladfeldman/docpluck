@@ -49,7 +49,7 @@ _ENTRY_START = re.compile(
     rf"^(?:"
     rf"{_SURNAME}(?:\s{_SURNAME})?,\s+(?:[A-Z]|{_LETTER})"     # Surname, I. / Surname, Given
     rf"|{_SURNAME}(?:\s{_SURNAME})?\s+[A-Z]{{1,4}}[,.](?:\s|$)"  # Surname IJ,
-    rf"|{_SURNAME}(?:\s{_SURNAME})?\s+[A-Z]{{1,4}}(?:\s+(?:and|&)\s|\s*\()"  # Surname IJ and / Surname IJ (2020)
+    rf"|{_SURNAME}(?:\s{_SURNAME})?\s+[A-Z]{{1,4}}(?:-[A-Z])?(?:\s+(?:and|&)\s|\s*\()"  # Surname IJ and / Surname J-P (2020)
     rf"|(?:[A-Z]\.\s?-?){{1,3}}\s?{_SURNAME}"                  # I. J. Surname
     rf"|[A-Z][\w&'’\-]*(?:\s+(?:of|for|and|&|the|on|de|des|der|für|[A-Z][\w&'’\-]*)){{0,8}}[.,(]"  # organisation
     rf")"
@@ -100,6 +100,8 @@ _INLINE_NUM = re.compile(
     # the NEXT entry's number printed at the end of this entry's last line
     # ("... PMID: 28140125 2."); a volume after a comma ("Journal, 41.") is not cut
     r"|(?<=[.)\]\d])\s+(?=\d{1,3}\.$)"
+    # BMJ: "... 1834-40. 4 Smith AB, Jones C." -- a bare number before a Vancouver name
+    r"|(?<=[.)\]\d])\s+(?=\d{1,3}\s+[A-ZÀ-Þ][\w'’\-]+(?:\s[A-ZÀ-Þ]?[\w'’\-]+)?\s[A-Z]{1,3}[,.])"
 )
 
 
@@ -387,6 +389,9 @@ def densest_entry_run(text: str, *, min_entries: int = 5) -> tuple[int, int] | N
 _TAIL_CUT = re.compile(r"(?<=[.)\]\d])\s+(?=[A-ZÀ-Þ•])")
 
 
+_VOLUME_PAGES = re.compile(r"\d+\s*\(\d+\)|\d+\s*[:;,]\s*\d+")
+
+
 def _trim_last(entries: list[RawEntry], text: str) -> list[RawEntry]:
     """Cut back matter (publisher notes, author biographies) off the last entry.
 
@@ -409,6 +414,10 @@ def _trim_last(entries: list[RawEntry], text: str) -> list[RawEntry]:
     for m in _TAIL_CUT.finditer(last.text):
         head, rest = last.text[:m.start()], last.text[m.end():]
         if len(rest) <= limit:
+            break
+        # what follows reads like more entries (years plus volume / page
+        # numbers), not like back matter: the entries ran together, keep them
+        if len(_YEAR.findall(rest)) >= 3 and len(_VOLUME_PAGES.findall(rest)) >= 3:
             break
         if not _YEAR.search(head):
             continue
@@ -439,7 +448,9 @@ def split_entries(text: str) -> list[RawEntry]:
             # the sequence reading collapsed (a block of numbers yields one entry)
             detached = _split_detached(lines)
             if 2 * len(numbered) < len(detached):
-                return _trim_last(detached, text)
+                # the numbers may also be note numbers above an author-year list
+                author_year = _split_author_year(lines)
+                return _trim_last(author_year if len(author_year) >= len(detached) else detached, text)
         return _trim_last(numbered, text)
     if style == "author_year":
         return _trim_last(_split_author_year(lines), text)

@@ -466,3 +466,36 @@ def test_numbers_next_to_their_entries_win_over_a_detached_reading_that_splits_m
     refs = parse_references(text)
     assert [r.number for r in refs] == [1, 2, 3, 4]
     assert [r.container for r in refs][:3] == ["Hydrology Letters", "Road Research", "Bridge Science"]
+
+
+def test_an_author_year_list_after_a_block_of_note_numbers_is_read_as_author_year():
+    text = ("References\n1.\n\n2.\n\n3.\n\n4.\n\n"
+            "Lund KP, & Ortiz M (2012). Rivers in spring. Hydrology Letters, 1, 8. 10.1186/2193-9039-1-8\n"
+            "Quinn J-P (2004). Roads in autumn. Road Research, 6, 253-279.\n"
+            "Ashby TN (1980). Bridges and the people who build them. Washington.\n"
+            "Bexley H, & Tallis P (2016). Lakes. Lake Letters, 53, 1453-1476.\n"
+            "Morrow I (2011). Wells. Well Science, 2011, 420714.\n")
+    refs = parse_references(text)
+    assert [r.authors[0].family for r in refs] == ["Lund", "Quinn", "Ashby", "Bexley", "Morrow"]
+
+
+def test_bmj_entries_run_together_are_split_and_not_trimmed_as_back_matter():
+    text = ("References\n1 Lund K, Ortiz M. Rivers in spring. J Hydrol 2019; 62: 56-76.\n"
+            "2 Quinn P. Roads in autumn. Road Res 1988; 319(25): 1635-8.\n"
+            "3 Ashby TN. Bridges. Bridge Sci 2007; 357(18): 1834-40. 4 Bexley H, Tallis P. Lakes and the people "
+            "who live by them. Lake Lett 1999; 14(1): 27-34. 5 Morrow I. Wells in the hills. Well Sci 2004; "
+            "24(2): 105-12. 6 Fenwick R, Quell D. Ponds. Pond Res 2010; 304(5): 563-4. 7 Orwin C. Brooks. "
+            "Brook Lett 2012; 8(1): 1-9.\n")
+    refs = parse_references(text)
+    assert [r.number for r in refs] == [1, 2, 3, 4, 5, 6, 7]
+    assert refs[-1].authors[0].family == "Orwin"
+
+
+def test_entries_run_into_the_last_entry_are_not_cut_off_as_back_matter():
+    text = ("References\n1. Lund K, Ortiz M. Rivers in spring. J Hydrol 2019; 62: 56-76.\n"
+            "2. Quinn P. Roads in autumn. Road Res 1988; 319(25): 1635-8.\n"
+            "3. Ashby TN. Bridges. Bridge Sci 2007; 357(18): 1834-40. Morrow I. Wells in the hills. Well Sci "
+            "2004; 24(2): 105-12. Fenwick R, Quell D. Ponds. Pond Res 2010; 304(5): 563-4. Orwin C. Brooks. "
+            "Brook Lett 2012; 8(1): 1-9.\n")
+    refs = parse_references(text)
+    assert refs[-1].raw_text.endswith("Brook Lett 2012; 8(1): 1-9.")
