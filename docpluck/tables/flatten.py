@@ -565,6 +565,26 @@ def _fold_minus(s: str) -> str:
     return _SIGN_DASH_RE.sub(sign, s)
 
 
+# A printed inequality in front of an estimate: "< 0.001 [0.000, 0.004]",
+# "> 1.20", "≤ .05". Only the p column used to keep its operator (`p_op`); every
+# other statistic lost it and a bound reached consumers as an equality
+# (10.1080/23743603.2021.1878340 p16 Table 4: "< 0.001" became eta2 = 0.001).
+_EST_OP_RE = re.compile(r"^\s*(<=|>=|≤|≥|<|>)\s*(?=[-+−–]?\.?\d)")
+# The statistics whose printed operator is carried as `<key>_op`. `p` keeps its
+# own long-standing `p_op` contract and is not in this set.
+_OP_FIELDS = ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est", "BF01")
+
+
+def _split_leading_op(s: str) -> tuple[Optional[str], str]:
+    """``("<", "0.001 [0.000, 0.004]")`` for a cell that opens with an inequality,
+    ``(None, s)`` otherwise. ``<=`` / ``>=`` are reported as ``≤`` / ``≥``."""
+    m = _EST_OP_RE.match(s or "")
+    if not m:
+        return None, s
+    op = {"<=": "≤", ">=": "≥"}.get(m.group(1), m.group(1))
+    return op, s[m.end():]
+
+
 def _parse_number(s: str) -> Optional[float]:
     # Fold U+2212 MINUS SIGN → ASCII hyphen first (Camelot cells are NOT run
     # through normalize.py, so a negative test statistic / mean often arrives as
@@ -1325,9 +1345,10 @@ def _flatten_one_row(
         elif role == "est":
             # A recovered point-estimate column (its interval is a sibling CI
             # column). Bare value, no inline interval.
-            est = _parse_number(raw)
+            est_op, est_raw = _split_leading_op(raw)
+            est = _parse_number(est_raw)
             if est is None:
-                est = _to_signed_float(raw)
+                est = _to_signed_float(est_raw)
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
                 # DOMAIN GUARD. Whenever the η²p key came from anywhere but the
@@ -1356,11 +1377,14 @@ def _flatten_one_row(
                 ):
                     eff_key = "est"
                 role_nums[eff_key] = est
-                role_vals[eff_key] = raw
+                role_vals[eff_key] = est_raw.strip() if est_op else raw
+                if est_op:
+                    role_vals[eff_key + "_op"] = est_op
         elif role == "est_ci":
             # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)"
             # or "0.76 [.50, 1.02]".
-            est = _parse_leading_number(raw)
+            est_op, est_raw = _split_leading_op(raw)
+            est = _parse_leading_number(est_raw)
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
                 if (
@@ -1371,8 +1395,10 @@ def _flatten_one_row(
                     eff_key = "est"
                 role_nums[eff_key] = est
                 role_vals[eff_key] = (
-                    re.split(r"[\[(]", raw, maxsplit=1)[0].strip() or _fmt_num(est)
+                    re.split(r"[\[(]", est_raw, maxsplit=1)[0].strip() or _fmt_num(est)
                 )
+                if est_op:
+                    role_vals[eff_key + "_op"] = est_op
                 if eff_key == "est":
                     role_vals["est_label"] = _est_label_from_header(header[ci])
             # The estimate anchors the CI sign when the bounds are hyphen-glued.
@@ -1382,6 +1408,13 @@ def _flatten_one_row(
                 role_nums["CI_upper"] = hi
         else:
             n = _parse_number(raw)
+            if n is None and role in _OP_FIELDS:
+                op, rest = _split_leading_op(raw)
+                if op:
+                    n = _parse_number(rest)
+                    if n is not None:
+                        role_vals[role] = rest.strip()
+                        role_vals[role + "_op"] = op
             if n is not None:
                 role_nums[role] = n
 
@@ -1436,6 +1469,7 @@ def _flatten_one_row(
                         detail=f"r={role_nums['r']}")
         role_nums.pop("r")
         role_vals.pop("r", None)
+        role_vals.pop("r_op", None)
     if "p" in role_nums and not (0.0 <= role_nums["p"] <= 1.0):
         record_fallback("flatten_dropped_out_of_domain_field",
                         detail=f"p={role_nums['p']}")
@@ -1500,6 +1534,10 @@ def _flatten_one_row(
     for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est", "BF01"):
         if k in role_nums:
             fields[k] = role_nums[k]
+            # The printed inequality, when there is one (additive: absent on a
+            # printed equality, so every existing reader sees the same record).
+            if role_vals.get(k + "_op"):
+                fields[k + "_op"] = role_vals[k + "_op"]
     for k in ("n", "N"):
         if k in role_nums:
             v = role_nums[k]
@@ -1617,48 +1655,52 @@ def _assemble_sentence(
     """
     parts: list[str] = []
 
+    def eq(k: str) -> str:
+        # The relation the cell prints: "=" unless it printed an inequality.
+        return role_vals.get(k + "_op") or "="
+
     if "est" in role_nums:
         est_label = role_vals.get("est_label", "") or "estimate"
         est_txt = role_vals.get("est", _fmt_num(role_nums["est"]))
-        parts.append(f"{est_label} = {est_txt}")
+        parts.append(f"{est_label} {eq('est')} {est_txt}")
 
     if "t" in role_nums:
         if df is not None:
-            parts.append(f"t({_fmt_num(df)}) = {role_vals['t']}")
+            parts.append(f"t({_fmt_num(df)}) {eq('t')} {role_vals['t']}")
         else:
-            parts.append(f"t = {role_vals['t']}")
+            parts.append(f"t {eq('t')} {role_vals['t']}")
 
     if "F" in role_nums:
         if df1 is not None and df2 is not None:
-            parts.append(f"F({_fmt_num(df1)}, {_fmt_num(df2)}) = {role_vals['F']}")
+            parts.append(f"F({_fmt_num(df1)}, {_fmt_num(df2)}) {eq('F')} {role_vals['F']}")
         else:
-            parts.append(f"F = {role_vals['F']}")
+            parts.append(f"F {eq('F')} {role_vals['F']}")
 
     if "chi2" in role_nums:
         chi_val = role_vals["chi2"]
         if df is not None and "n" in role_nums:
-            parts.append(f"χ²({_fmt_num(df)}, N = {role_vals['n']}) = {chi_val}")
+            parts.append(f"χ²({_fmt_num(df)}, N = {role_vals['n']}) {eq('chi2')} {chi_val}")
         elif df is not None:
-            parts.append(f"χ²({_fmt_num(df)}) = {chi_val}")
+            parts.append(f"χ²({_fmt_num(df)}) {eq('chi2')} {chi_val}")
         else:
-            parts.append(f"χ² = {chi_val}")
+            parts.append(f"χ² {eq('chi2')} {chi_val}")
 
     if "r" in role_nums:
         if "n" in role_nums:
             try:
                 df_r = int(role_nums["n"]) - 2
-                parts.append(f"r({df_r}) = {role_vals['r']}")
+                parts.append(f"r({df_r}) {eq('r')} {role_vals['r']}")
             except (TypeError, ValueError):
-                parts.append(f"r = {role_vals['r']}")
+                parts.append(f"r {eq('r')} {role_vals['r']}")
         else:
-            parts.append(f"r = {role_vals['r']}")
+            parts.append(f"r {eq('r')} {role_vals['r']}")
 
     if "M" in role_nums and "SD" in role_nums:
-        parts.append(f"M = {role_vals['M']}, SD = {role_vals['SD']}")
+        parts.append(f"M {eq('M')} {role_vals['M']}, SD {eq('SD')} {role_vals['SD']}")
     elif "M" in role_nums:
-        parts.append(f"M = {role_vals['M']}")
+        parts.append(f"M {eq('M')} {role_vals['M']}")
     elif "SD" in role_nums:
-        parts.append(f"SD = {role_vals['SD']}")
+        parts.append(f"SD {eq('SD')} {role_vals['SD']}")
 
     if "p" in role_nums:
         op = role_vals.get("p_op", "=")
@@ -1668,11 +1710,11 @@ def _assemble_sentence(
         parts.append(f"p {op} {p_txt}")
 
     if "d" in role_nums:
-        parts.append(f"d = {role_vals['d']}")
+        parts.append(f"d {eq('d')} {role_vals['d']}")
     if "eta2" in role_nums:
-        parts.append(f"η² = {role_vals['eta2']}")
+        parts.append(f"η² {eq('eta2')} {role_vals['eta2']}")
     if "BF01" in role_nums:
-        parts.append(f"BF01 = {role_vals['BF01']}")
+        parts.append(f"BF01 {eq('BF01')} {role_vals['BF01']}")
 
     if "CI_lower" in role_nums and "CI_upper" in role_nums:
         if "CI" in role_vals:
