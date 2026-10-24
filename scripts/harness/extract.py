@@ -223,6 +223,27 @@ def _save_views(out_dir: Path, analyze: dict) -> list[str]:
     return written
 
 
+def _is_current(prev: dict, src_sha1: str | None, service_identity: str | None) -> bool:
+    """True only when ``prev`` was produced by the build the service runs NOW.
+
+    A bare presence check let outputs from an old library version be skipped
+    forever (false green, R-0004). The version string alone was not enough
+    either: an unreleased version keeps its number across many commits, so an
+    output from an earlier commit passed as current. The key is the full
+    identity (version/sha/state). A dirty tree can change without its identity
+    changing, so it never reuses an output. No known identity -> never skip.
+    """
+    ident = prev.get("docpluck_identity")
+    return (
+        prev.get("status") == "ok"
+        and prev.get("source_sha1") == src_sha1
+        and ident is not None
+        and service_identity is not None
+        and ident == service_identity
+        and not service_identity.endswith("/dirty")
+    )
+
+
 def _process(
     doc: dict,
     level: str,
@@ -230,7 +251,7 @@ def _process(
     *,
     force: bool,
     timeout: int,
-    service_version: str | None = None,
+    service_identity: str | None = None,
 ) -> dict:
     """Extract one (document, level). Returns its _meta record."""
     base_url, token = cfg
@@ -241,18 +262,7 @@ def _process(
 
     if not force and meta_path.is_file():
         prev = json.loads(meta_path.read_text(encoding="utf-8"))
-        if (
-            prev.get("status") == "ok"
-            and prev.get("source_sha1") == src_sha1
-            # Extracted by the build the service is running RIGHT NOW. A bare
-            # presence check here let outputs from an old library version be
-            # skipped forever — the harness then "verified" a stale build
-            # (false green, R-0004). No known version to compare against →
-            # never skip.
-            and prev.get("docpluck_version") is not None
-            and service_version is not None
-            and prev.get("docpluck_version") == service_version
-        ):
+        if _is_current(prev, src_sha1, service_identity):
             prev["skipped"] = True
             return prev
 
@@ -283,6 +293,7 @@ def _process(
         meta["views"] = _save_views(out_dir, analyze)
         meta["status"] = "ok"
         meta["docpluck_version"] = (analyze.get("metadata") or {}).get("docpluck_version")
+        meta["docpluck_identity"] = (analyze.get("metadata") or {}).get("docpluck_identity")
         meta["service_total_ms"] = (analyze.get("metadata") or {}).get(
             "total_extraction_time_ms"
         )
@@ -306,6 +317,7 @@ def run(
     cfg = service_config()
     health = service_health(cfg[0])
     service_version = health.get("docpluck_version")
+    service_identity = health.get("docpluck_identity")
     print(
         f"service {cfg[0]} · docpluck {service_version} · "
         f"{len(docs)} docs × {len(levels)} levels = {len(docs) * len(levels)} extractions"
@@ -318,7 +330,7 @@ def run(
             futs = {
                 ex.submit(
                     _process, d, lv, cfg,
-                    force=force, timeout=timeout, service_version=service_version,
+                    force=force, timeout=timeout, service_identity=service_identity,
                 ): (d, lv)
                 for d, lv in jobs
             }
@@ -329,7 +341,7 @@ def run(
                 _log(done, len(jobs), m)
     else:
         for d, lv in jobs:
-            m = _process(d, lv, cfg, force=force, timeout=timeout, service_version=service_version)
+            m = _process(d, lv, cfg, force=force, timeout=timeout, service_identity=service_identity)
             results.append(m)
             done += 1
             _log(done, len(jobs), m)
