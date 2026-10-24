@@ -645,9 +645,37 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             v = (c or "").strip()
             if not v or not re.search(r"[A-Za-z]", v) or i >= len(parent):
                 continue
-            if _DATA_VALUE_CELL_RE.match((parent[i] or "").strip()):
+            p = (parent[i] or "").strip()
+            # A df pair ("1, 114") is a complete value too: collabra.90203
+            # Table 9 (p13) glued its next section heading onto one.
+            if _DATA_VALUE_CELL_RE.match(p) or _DF_PAIR_CELL_RE.match(p):
                 return True
         return False
+
+    # A spanning section heading is not the second line of a column label.
+    # 10.1525/collabra.90203 Table 9 (p13) prints the column header
+    # "df | F | p | BF01 | eta2p | 95% CI" over a heading "Identifiability main
+    # effect, without joint [S1] *" that starts in column 1; the prose merge
+    # glued the heading onto "df", so no column read as df. The shape: the
+    # parent is a row of >= 3 short labels with no value and an empty stub, the
+    # row is ONE cell of several words that lands on one of those labels. A
+    # two-line column label ("Underfilled" over "M (SD)") is short and keeps
+    # joining; so does a wrapped prose cell (its parent cell is not a label row).
+    def _heading_under_label_row(row: list[str], parent: list[str]) -> bool:
+        if not parent or (parent[0] or "").strip():
+            return False
+        labels = [(p or "").strip() for p in parent[1:] if (p or "").strip()]
+        if len(labels) < 3 or any(
+            len(p) > 12 or _DATA_VALUE_CELL_RE.match(p) for p in labels
+        ):
+            return False
+        nz = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+        if len(nz) != 1:
+            return False
+        i, v = nz[0]
+        if i == 0 or i >= len(parent) or not (parent[i] or "").strip():
+            return False
+        return len(v.split()) >= 4 and len(v) > 3 * len(parent[i].strip())
 
     # A row that carries its OWN values is a row, whatever sits in its label
     # column. 10.1177/01461672251327169 Table 6 (p11) prints "Overall negative:
@@ -793,6 +821,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             )
             and not _prose_onto_value(row, out[-1])
             and not _row_has_own_values(row, out[-1])
+            and not _heading_under_label_row(row, out[-1])
         ):
             parent = out[-1]
             for i in range(min(len(row), len(parent))):
@@ -979,6 +1008,10 @@ _DATA_VALUE_CELL_RE = re.compile(
     r")$",
     re.I,
 )
+
+
+# An F test's degrees-of-freedom pair as printed in a "df" column: "1, 114".
+_DF_PAIR_CELL_RE = re.compile(r"^\d+,\s*\d+$")
 
 
 def _is_header_like_row(row: list[str]) -> bool:

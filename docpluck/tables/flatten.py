@@ -1292,6 +1292,22 @@ def _flatten_one_row(
     # effect was named, and only after the value passes η²'s [0, 1] range guard.
     eta2_inferred = _infer_anova_eta2_hint(roles, header, effect_hint)
     effect_hint_eff = effect_hint or ("eta_squared_partial" if eta2_inferred else None)
+    # The η²p header can be drawn as vector art, so the page holds no text for
+    # it at all and the column's header cell is blank while every other column
+    # is labelled (10.1525/collabra.90203 Table 9, p13: "df F p BF01 [art] 95%
+    # CI"). The blank-role recovery stays off for a labelled table, so that
+    # column used to reach no field. When the η²p signature above holds and
+    # exactly ONE data column is unlabelled, it is the estimate column; the
+    # value still passes η²'s [0, 1] domain before it is typed.
+    if eta2_inferred and not roles_override:
+        blank_cols = [
+            ci for ci in range(len(header))
+            if ci != label_col and ci not in roles and not (header[ci] or "").strip()
+        ]
+        if len(blank_cols) == 1 and blank_cols[0] < len(row):
+            v = _parse_number((row[blank_cols[0]] or "").strip())
+            if v is not None and 0.0 <= v <= 1.0:
+                roles[blank_cols[0]] = "est"
 
     # Pull per-role values out of the body row.
     role_vals: dict[str, str] = {}
@@ -1380,6 +1396,12 @@ def _flatten_one_row(
             if lo is not None and hi is not None:
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
+        elif role == "df" and _DF_PAIR_RE.match(raw):
+            # A column headed "df" in an F-test table prints the PAIR "1, 114"
+            # (10.1525/collabra.90203 Table 9); `_parse_number` reads neither.
+            m = _DF_PAIR_RE.match(raw)
+            role_nums["df1"] = float(m.group(1))
+            role_nums["df2"] = float(m.group(2))
         else:
             n = _parse_number(raw)
             if n is not None:
