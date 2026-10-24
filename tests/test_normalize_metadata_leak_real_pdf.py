@@ -150,7 +150,7 @@ def test_p0_preserves_full_affiliation_with_place():
     assert "Department of Psychology, University of Minnesota" in out
 
 
-def test_p1_strips_we_thank_acknowledgments_paragraph():
+def test_p1_keeps_we_thank_acknowledgments_paragraph():
     text = (
         "Intro.\n\n"
         "We wish to thank our editor Jill Perry-Smith and three anonymous "
@@ -159,7 +159,10 @@ def test_p1_strips_we_thank_acknowledgments_paragraph():
         "Intro continues." + "\n\nbody. " * 200
     )
     out = _strip_frontmatter_metadata_leaks(text)
-    assert "We wish to thank our editor" not in out
+    # Retain, never delete: an acknowledgment is the authors' content. P1
+    # used to drop the matching LINE, which on a wrapped note left the rest
+    # of the note stranded mid-Introduction (amj_1, amle_1).
+    assert "We wish to thank our editor" in out
     assert "Intro." in out
     assert "Intro continues." in out
 
@@ -177,7 +180,7 @@ def test_p1_preserves_we_thank_body_prose_without_acknowledgment_keywords():
     assert "We thank participants for completing the survey." in out
 
 
-def test_p1_strips_previous_version_note():
+def test_p1_keeps_previous_version_note():
     text = (
         "Intro.\n\n"
         "A previous version of this article was presented at the meetings "
@@ -185,7 +188,7 @@ def test_p1_strips_previous_version_note():
         "Body." + "\n\nbody. " * 200
     )
     out = _strip_frontmatter_metadata_leaks(text)
-    assert "A previous version of this article was presented" not in out
+    assert "A previous version of this article was presented" in out
 
 
 def test_p1_strips_creative_commons_license_block():
@@ -283,17 +286,26 @@ def test_xiao_2021_crsp_supplemental_and_truncated_affil_real_pdf():
 
 def test_amj_1_acknowledgments_leak_real_pdf():
     md = _maybe_render("aom/amj_1.pdf")
-    # The "We wish to thank our editor Jill Perry-Smith..." line that
-    # pdftotext inlines mid-Introduction must be stripped.
-    assert "We wish to thank our editor Jill Perry-Smith" not in md
+    # The acknowledgment note pdftotext inlines mid-Introduction is kept
+    # WHOLE and labelled as a blockquote. It used to lose its first line
+    # ("We wish to thank our editor Jill Perry-Smith and three") while the
+    # rest ("anonymous reviewers for ...") stayed in the body unlabelled.
+    assert "> We wish to thank our editor Jill Perry-Smith and three" in md
+    assert "\nanonymous reviewers for their insightful" not in md
+    # The note's last line is inside the same labelled block.
+    assert "> jbs.cam.ac.uk." in md
     # The body must still be there.
     assert "negative feedback" in md.lower()
 
 
 def test_amle_1_acknowledgments_and_previous_version_real_pdf():
     md = _maybe_render("aom/amle_1.pdf")
-    assert "We thank Steven Charlier" not in md
-    assert "A previous version of this article was presented" not in md
+    # Both notes are kept whole and labelled; their wrapped continuation
+    # lines are no longer stranded in the Introduction.
+    assert "> We thank Steven Charlier" in md
+    assert "> A previous version of this article was presented" in md
+    assert "\nManagement Education and Development (MED) Plenary" not in md
+    assert "\nhighly constructive feedback that allowed us" not in md
     # Body integrity.
     assert "scholarly impact" in md.lower()
 
@@ -652,3 +664,78 @@ def test_ip_feldman_received_revision_accepted_stripped_real_pdf():
     # Body integrity — the keywords and Introduction must survive intact.
     assert "## Keywords" in md
     assert "## Introduction" in md
+
+
+# ── Acknowledgment / previous-version notes: retain and label ─────────────
+
+
+def test_p1_note_is_isolated_from_the_body_line_above():
+    # A note glued to the body with a single newline becomes its own
+    # paragraph, so the render can label it without labelling body prose.
+    text = (
+        "The introduction sentence ends here.\n"
+        "We thank Steven Charlier and three reviewers for offering\n"
+        "highly constructive feedback.\n\n"
+        "Body." + "\n\nbody. " * 200
+    )
+    out = _strip_frontmatter_metadata_leaks(text)
+    assert (
+        "The introduction sentence ends here.\n\n"
+        "We thank Steven Charlier and three reviewers for offering\n"
+        "highly constructive feedback."
+    ) in out
+
+
+def test_render_labels_front_zone_note_as_blockquote():
+    from docpluck.render import _label_frontmatter_note_paragraphs
+
+    md = (
+        "## Introduction\n\n"
+        "Body paragraph.\n\n"
+        "We thank Steven Charlier and three reviewers for offering\n"
+        "highly constructive feedback.\n"
+        "A previous version of this article was presented at the\n"
+        "MED Plenary.\n\n"
+        "More body."
+    )
+    out = _label_frontmatter_note_paragraphs(md)
+    assert (
+        "> We thank Steven Charlier and three reviewers for offering\n"
+        "> highly constructive feedback.\n"
+        "> A previous version of this article was presented at the\n"
+        "> MED Plenary."
+    ) in out
+    assert "\nBody paragraph.\n" in out and out.endswith("\n\nMore body.")
+
+
+def test_render_note_label_skips_body_prose_and_late_sections():
+    from docpluck.render import _label_frontmatter_note_paragraphs
+
+    # No acknowledgment keyword: body prose, not a note.
+    md = "Intro.\n\nWe thank participants for completing the survey.\n\nEnd."
+    assert _label_frontmatter_note_paragraphs(md) == md
+    # Past the front zone: the real Acknowledgments section is not touched.
+    late = "Intro.\n\n" + "Body sentence. " * 1200 + (
+        "\n\n## Acknowledgments\n\nWe wish to thank our reviewers for feedback.\n"
+    )
+    assert _label_frontmatter_note_paragraphs(late) == late
+
+
+def test_p0_strips_aom_copyright_footer_wrap_tail():
+    # The AOM copyright footer wraps; P0 removed its first line only and the
+    # second stayed in the body ("written permission. Users may print ...").
+    text = (
+        "Body line one.\n\n"
+        "Copyright of the Academy of Management, all rights reserved. Contents "
+        "may not be copied, emailed, posted to a listserv, or otherwise "
+        "transmitted without the copyright holder's express\n"
+        "written permission. Users may print, download, or email articles for "
+        "individual use only.\n\n"
+        "Body line two."
+    )
+    out = _strip_page_footer_lines(text)
+    assert "written permission. Users may print" not in out
+    assert "Body line one." in out and "Body line two." in out
+    # Two-sided: prose that merely mentions written permission is kept.
+    prose = "Participants gave written permission. Users may print the form.\n"
+    assert _strip_page_footer_lines(prose) == prose

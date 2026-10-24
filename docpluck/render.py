@@ -36,6 +36,8 @@ from .extract_structured import extract_pdf_structured
 from .telemetry import fallback_scope, record_fallback
 from .normalize import (
     NormalizationLevel,
+    _FRONTMATTER_LEAK_MAX_PARA_CHARS,
+    _FRONTMATTER_NOTE_PARA_PATTERNS,
     _LABELLED_STATISTIC_PATTERN,
     _looks_like_running_header_or_footer,
     _rejoin_garbled_ocr_headers,
@@ -4327,6 +4329,45 @@ def _demote_inline_footnotes_to_blockquote(text: str) -> str:
     return "".join(paragraphs)
 
 
+def _label_frontmatter_note_paragraphs(text: str) -> str:
+    """Label an authors' first-page note that pdftotext inlined into the body.
+
+    Normalization's P1 keeps an acknowledgment / "a previous version of this
+    article was presented at" note (it used to delete the note's first line
+    and strand the rest) and sets it off as its own paragraph. Here that
+    paragraph becomes a ``> `` blockquote, every line of it, so the reader
+    sees the whole note and sees that it is not Introduction prose.
+
+    Same patterns and the same front-zone gate as P1 (paragraph must START in
+    the first ``max(8000, len // 6)`` characters), so the real
+    Acknowledgments section at the end of a paper is never touched.
+    """
+    if not text:
+        return text
+    cutoff = max(8000, len(text) // 6)
+    parts = re.split(r"(\n\n+)", text)
+    pos = 0
+    changed = False
+    for idx, part in enumerate(parts):
+        start = pos
+        pos += len(part)
+        if idx % 2 or start >= cutoff:
+            continue
+        stripped = part.strip()
+        if not stripped or len(stripped) > _FRONTMATTER_LEAK_MAX_PARA_CHARS:
+            continue
+        if stripped[:1] in "#>|<!`":
+            continue
+        first = stripped.split("\n", 1)[0].strip()
+        if not any(p.match(first) for p in _FRONTMATTER_NOTE_PARA_PATTERNS):
+            continue
+        parts[idx] = "\n".join(
+            "> " + ln.strip() if ln.strip() else ln for ln in part.split("\n")
+        )
+        changed = True
+    return "".join(parts) if changed else text
+
+
 _STUDY_SUBSECTION_RE = re.compile(
     r"^Study\s+\d+\s+"
     r"(?:Design(?:\s+and\s+Findings)?|Results(?:\s+and\s+Findings)?|"
@@ -7174,6 +7215,7 @@ def _render_pdf_to_markdown(
     md = _step(_report, "_join_multiline_caption_paragraphs", _join_multiline_caption_paragraphs, md)
     md = _step(_report, "_suppress_orphan_table_cell_text", _suppress_orphan_table_cell_text, md)
     md = _step(_report, "_demote_inline_footnotes_to_blockquote", _demote_inline_footnotes_to_blockquote, md)
+    md = _step(_report, "_label_frontmatter_note_paragraphs", _label_frontmatter_note_paragraphs, md)
     md = _step(_report, "_promote_study_subsection_headings", _promote_study_subsection_headings, md)
     md = _step(_report, "_demote_false_single_word_headings", _demote_false_single_word_headings, md)
     # HALLUC-HEAD-1: demote a `## <CRediT-role>` heading (e.g. `## Methodology`)
