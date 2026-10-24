@@ -151,6 +151,26 @@ def partition_into_sections(
         coalesced_markers.append(m)
     markers = coalesced_markers
 
+    # A numbered reference list printed with NO heading (some materials-science
+    # journals print "[1] A. B. Carter, ..." straight after the Keywords /
+    # Received: lines). Without a marker the whole bibliography stayed in the
+    # keywords section. Only when no references heading was found anywhere, and
+    # only in the last two thirds of the text, so a numbered list in the body
+    # cannot qualify on position; the entry-shape test does the rest.
+    if not any(m.label is SectionLabel.references for m in markers):
+        from ._reference_entries import find_unheaded_reference_list
+        ref_start = find_unheaded_reference_list(text, len(text) // 3)
+        if ref_start is not None and ref_start not in {m.char_start for m in markers}:
+            markers.append(_Marker(
+                char_start=ref_start,
+                label=SectionLabel.references,
+                confidence=Confidence.medium,
+                detected_via=DetectedVia.text_pattern_fallback,
+                heading_text=None,
+                label_suffix_index=None,
+            ))
+            markers.sort(key=lambda m: m.char_start)
+
     if not markers:
         sole = Section(
             label="unknown",
