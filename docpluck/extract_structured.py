@@ -2301,6 +2301,13 @@ def _find_caption_for_table(
         for c in same_page:
             if c.number == hint:
                 return c
+        # The grid names itself and Table N's caption on this page is already
+        # paired: it is NOT some other table. Falling through to token overlap is
+        # how a grid gets another table's caption (10.1016/j.jesp.2021.104154 p6,
+        # before its bare "Table N" row was read as a hint). Left unpaired, it is
+        # deduplicated against the kept Table N or kept as a candidate below.
+        if any(c.page == page and c.number == hint for c in captions):
+            return None
     if len(same_page) == 1:
         return same_page[0]
     # Score each caption by token overlap with the camelot table content

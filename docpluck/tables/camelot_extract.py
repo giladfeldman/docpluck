@@ -129,6 +129,7 @@ _CAPTION_ROW_PATTERN = re.compile(
 
 # Same anchor as ``_CAPTION_ROW_PATTERN`` but capturing the integer table number,
 # for the caption-marker pairing hint (see ``_leading_table_caption_number``).
+_BARE_TABLE_LABEL_ROW = re.compile(r"^\s*Table\s+(\d+)\s*$", re.IGNORECASE)
 _TABLE_CAPTION_NUMBER_PATTERN = re.compile(
     r"^\s*Table\s+(\d+)(?:\.\d+)?(?:\s*[.:]|" + CAPTION_PIPE_SEPARATOR + ")",
     re.IGNORECASE,
@@ -253,8 +254,16 @@ def _leading_table_caption_number(rows: list[list[str]]) -> int | None:
     row, terminated by ``.``/``:``) is the same one already trusted to DROP these
     rows, so an inline back-reference like ``see Table 2`` mid-row does not match.
     Returns the FIRST such number found.
+
+    A row that is the bare label and nothing else (``Table 2``, Elsevier prints
+    the label alone on its line and the title on the next) is the same identity
+    signal; without it 10.1016/j.jesp.2021.104154 p6 paired its Table 2 grid with
+    the Table 1 caption. Identity only: that row is not dropped here.
     """
     for row in rows[:3]:
+        bare = _BARE_TABLE_LABEL_ROW.match(_row_joined(row))
+        if bare:
+            return int(bare.group(1))
         m = _TABLE_CAPTION_NUMBER_PATTERN.match(_row_joined(row))
         if m:
             try:
