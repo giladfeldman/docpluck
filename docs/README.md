@@ -618,7 +618,7 @@ is recorded, not raised.
 
 **`ExtractionReport`** — the reproducibility receipt: `docpluck_version`, `normalize_version`,
 `git_sha`, `git_state`, `level`, `out_dir`, `symbol_contract_version`, `sectioning_version`,
-`table_extraction_version`, `python_version`, `unicodedata_version`, `pdftotext_path`,
+`table_extraction_version`, `references_version`, `python_version`, `unicodedata_version`, `pdftotext_path`,
 `pdftotext_version`, `pdftotext_engine`, `poppler_version`, `pdfplumber_version`,
 `pdfminer_six_version`, `pypdf_version`, `camelot_version`, `pypdfium2_version`, `opencv_version`,
 `mammoth_version`, `beautifulsoup4_version`, `lxml_version`, `n_total`, `n_ok`, `n_failed`,
@@ -641,6 +641,82 @@ writes it as JSON.
 
 `count_replacement_chars(text)` and `count_greek_chars(text)` compute the two counts on any
 text.
+
+### `extract_references(file_bytes=None, *, text=None, source_format=None, normalization_level=None) → tuple[Reference, ...]`
+
+The document's bibliography, one parsed `Reference` per entry. Deterministic, pure-Python
+heuristics over the `references` section(s) that `extract_sections` finds (no model, no
+external service). When no section is labelled `references`, or the one found holds fewer
+than three entries, the longest run of entry-opening lines in the document is used instead.
+
+Entry splitting handles numbered lists (`[12]`, `12.`, `12)`, a number alone on its line),
+entries that extraction ran together onto one line, numbered lists whose two columns were
+read out of order, and author-year lists whose entries wrap across lines (hanging indents are
+not visible in extracted text and are never relied on).
+
+**`Reference`** (a frozen dataclass; `.to_dict()` gives JSON):
+
+| field | meaning |
+|---|---|
+| `reference_id` | the printed number for a numbered list (`"12"`), else `"r<n>"` in list order |
+| `raw_text` | the entry as printed, line breaks joined, list number removed |
+| `number` | printed list number, or `None` |
+| `authors` | tuple of `ReferenceAuthor(family, given)`; an organisation author has `given=None` |
+| `et_al` | the author list ends with "et al." or an ellipsis |
+| `year`, `year_suffix` | `"2020"` and `"a"` for "2020a"; `year` is `None` for "n.d." |
+| `title` | article or chapter title (book title for a book) |
+| `container` | journal, or the book a chapter is in |
+| `volume`, `issue`, `first_page`, `last_page` | as printed (`last_page` is `"47"` in `837-47`; `first_page` may be an article number) |
+| `doi`, `url`, `pmid` | identifiers; the DOI is bare and lower-cased |
+| `char_start`, `char_end` | offsets of the entry in `extract_sections(...).normalized_text` |
+
+Every parsed field is `None` when the entry does not print it or the parser could not place
+it; nothing is invented.
+
+- `parse_reference` — `parse_reference(raw, *, reference_id="r1", number=None, char_start=0, char_end=None)`
+  parses one entry string.
+- `parse_references` — `parse_references(text, *, offset=0)` splits and parses a references
+  section's text (`offset` is added to the entry offsets).
+
+### `extract_citations(file_bytes=None, *, text=None, source_format=None, normalization_level=None) → CitationAnalysis`
+
+The bibliography plus every in-text citation, each linked to the entries it cites.
+
+```python
+from docpluck import extract_citations
+
+a = extract_citations(pdf_bytes)
+a.style                       # "numbered" | "author_year" | None
+for c in a.citations:
+    print(c.marker_text, c.kind, c.reference_ids, c.unresolved)
+a.uncited_reference_ids       # entries no citation points at
+a.orphan_citations            # marker texts that resolve to nothing
+a.duplicate_reference_groups  # one work listed twice (same DOI, or same title + year + first author)
+```
+
+**`CitationAnalysis`** fields: `references`, `citations`, `style`, `uncited_reference_ids`,
+`orphan_citations`, `duplicate_reference_groups`, `text` (the normalized text the citation
+offsets index), `references_version`.
+
+**`Citation`** fields: `marker_text`, `char_start`, `char_end`, `kind`, `reference_ids` (every
+entry the citation cites: `[3-6]` cites four, `(Smith, 2019; Lee, 2020)` two) and
+`unresolved` (the parts that match no entry; a citation with empty `reference_ids` is an
+orphan). `kind` is one of `numeric_bracket`, `numeric_paren`, `numeric_superscript`,
+`author_year`.
+
+Forms recognised: `[1]`, `[1-3]`, `[1, 4]`, `[1]-[3]`; superscripts that extraction glues to
+the word (`stroke3-6`, `care,5`) and parenthesised numbers `(2-4)`, both only when the
+bibliography is numbered and the paper does not cite in brackets; APA and Chicago author-year
+parentheticals with several works, a/b suffixes, prefixes and page locators
+(`(e.g., Smith & Lee, 2020a, b; Park et al. 2019, p. 4)`); narrative `Smith and Lee (2020)`;
+and a bare `Smith 2020` only when it resolves to an entry. Author-year citations resolve by
+first-author surname + year (+ suffix), using the second author or "et al." to choose between
+same-surname, same-year entries.
+
+`link_citations(text, references, *, exclude_spans=())` runs the linking step on any text
+(pass the bibliography's span in `exclude_spans`). `ReferenceStyle` values: `numbered`,
+`author_year`. `REFERENCES_VERSION` is bumped whenever splitting, parsing or linking output
+changes; it is also in `get_version_info()` as `references_version`.
 
 ### `get_version_info() → dict`
 
@@ -861,6 +937,7 @@ get_version_info()
 #  'normalize_version': '1.9.75',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.6',   #   independently of the package version
 #  'table_extraction_version': '2.4.25',
+#  'references_version': '1.0.0',
 #  'python_version': '3.14.5',      # the interpreter…
 #  'unicodedata_version': '16.0.0', #   …and its Unicode database
 #  'pdftotext_path': 'C:/…/pdftotext.EXE',  # the exact binary extraction runs

@@ -80,6 +80,7 @@ class TestVersionInfoCompleteness:
         "normalize_version",
         "sectioning_version",
         "table_extraction_version",
+        "references_version",
     }
     INTERPRETER_KEYS = {
         "python_version",
@@ -185,6 +186,7 @@ class TestVersionInfoCompleteness:
             "NORMALIZATION_VERSION": "normalize_version",
             "SECTIONING_VERSION": "sectioning_version",
             "TABLE_EXTRACTION_VERSION": "table_extraction_version",
+            "REFERENCES_VERSION": "references_version",
             "SYMBOL_CONTRACT_VERSION": "symbol_contract_version",
         }
         exported = {n for n in docpluck.__all__ if n.endswith("_VERSION")}

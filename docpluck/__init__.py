@@ -99,6 +99,20 @@ from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extr
 # docs/BENCHMARKS_docx_engines_2026-09.md.
 from .extract_docx_structured import extract_docx_structured
 from .render import RenderReport, render_pdf_to_markdown
+# Reference entries and in-text citation linking (v2.4.155). Additive: nothing
+# else reads it, and it reads only extract_sections' output.
+from .references import (
+    REFERENCES_VERSION,
+    Citation,
+    CitationAnalysis,
+    Reference,
+    ReferenceAuthor,
+    extract_citations,
+    extract_references,
+    link_citations,
+    parse_reference,
+    parse_references,
+)
 
 __version__ = "2.4.154"
 __author__ = "Gilad Feldman"
@@ -154,6 +168,17 @@ __all__ = [
     "flatten_table",
     "flatten_tables_for_paper",
     "render_flattened_inline",
+    # References and citations (v2.4.155)
+    "extract_references",
+    "extract_citations",
+    "parse_reference",
+    "parse_references",
+    "link_citations",
+    "Reference",
+    "ReferenceAuthor",
+    "Citation",
+    "CitationAnalysis",
+    "REFERENCES_VERSION",
     # Markdown rendering (v2.2)
     "render_pdf_to_markdown",
     # v2.4.130: opt-in telemetry for the markdown post-process chain.
