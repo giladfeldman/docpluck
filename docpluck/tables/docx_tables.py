@@ -52,7 +52,6 @@ import re
 from typing import Optional
 
 from . import Cell, Table, content_status_for
-from .captions import TABLE_CAPTION_RE
 from .cell_cleaning import (
     decompose_ligatures,
     destyle_math_alphanumeric,
