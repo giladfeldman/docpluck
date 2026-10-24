@@ -299,6 +299,10 @@ After:  "t(28.7) = 2.43, p = .021"
 
 **Source:** MetaESCI extraction report, ESCIcheck Phase 2B.
 
+**A1r — second pass after the header/footer strip.** In `academic` mode the same joins are applied again
+after S9/R3, using only horizontal whitespace around the newline, so a run that S9 or R3 left as `p`, one
+newline, `= .05` is joined, while a real blank-line paragraph break is never crossed.
+
 ---
 
 ### A2, A3, A3a, A3c, A3d, W0n — ALL RETIRED (v2.4.129 / v2.4.130, 2026-08-14)
@@ -370,6 +374,16 @@ L-026/L-029/L-031/L-032.**
 Before: "95% CI [-0.78; -0.67]"
 After:  "95% CI [-0.78, -0.67]"
 ```
+
+**A4a — middle period to comma, only where the bracket is a confidence interval.** Some PDFs render the
+comma of an interval as a period, so `[0.25.0.54]` reaches the text and a downstream parser cannot tell
+it from a decimal continuation. A4a rewrites `[a.b.c.d]` / `(a.b.c.d)` to `[a.b, c.d]` only when the text
+just before the bracket establishes an interval: the words `CI`, `C.I.` or `confidence interval` within 24
+characters, or a decimal estimate directly before it (`d=0.39[0.25.0.54]`). A four-component section
+reference such as `(3.2.2.1)` has neither and is left alone.
+
+**Braces.** `{lower, upper}` becomes `[lower, upper]` only when `CI` or `confidence interval` stands within
+24 characters before the brace; elsewhere a brace is set notation (`d ∈ {1, 2}`) and is kept.
 
 ---
 
