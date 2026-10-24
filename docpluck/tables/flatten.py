@@ -26,7 +26,9 @@ What we emit: per body row, a `FlattenedRow` dict with
     `est`, `M`, `SD`, `CI_lower`, `CI_upper`, `CI_level` with `CI_kind`
     (`CI` / `CrI` / `HDI`), `group` for a
     parallel-arm row's arm label, and `p_text`, the p number exactly as the
-    cell prints it, e.g. ".050" beside `p` = 0.05). Empty dict when nothing is
+    cell prints it, e.g. ".050" beside `p` = 0.05), Mann-Whitney `U` and `z`,
+    and `<key>_op` (`eta2_op`, `d_op`, ...) beside a statistic whose cell prints
+    an inequality ("< 0.001"), absent otherwise. Empty dict when nothing is
     recognized.
 
 Canonical contract: docpluck always emits these records as a sidecar
