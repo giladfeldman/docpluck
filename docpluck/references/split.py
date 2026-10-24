@@ -213,8 +213,10 @@ def _split_numbered(lines: list[_Line]) -> list[RawEntry]:
             else:
                 # Two columns read across interleave the sequence ("11.", "28.",
                 # "12.", "29."): a number whose predecessor is already an entry
-                # continues a chain.
-                starts = follows_last or (n - 1) in used
+                # continues a chain. One missing link is allowed: an entry whose
+                # number was not read (an organisation author after a bare BMJ
+                # number) must not end the chain.
+                starts = follows_last or (n - 1) in used or (n - 2) in used
         if starts:
             entries.append((n, [ln]))
             used.add(n)

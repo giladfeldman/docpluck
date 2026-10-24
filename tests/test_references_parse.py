@@ -499,3 +499,14 @@ def test_entries_run_into_the_last_entry_are_not_cut_off_as_back_matter():
             "Brook Lett 2012; 8(1): 1-9.\n")
     refs = parse_references(text)
     assert refs[-1].raw_text.endswith("Brook Lett 2012; 8(1): 1-9.")
+
+
+def test_a_numbered_entry_with_an_organisation_author_does_not_break_the_sequence():
+    # columns read out of order (1, 4, 5, 2, 3), then entry 6 is an organisation the
+    # BMJ number reader does not take; 7 and 8 must still start entries
+    e = {n: f"{n} Lund{n} K, Ortiz M. Rivers {n}. J Hydrol 2019; {n}: 56-76.\n" for n in range(1, 9)}
+    e[6] = "6 World Rivers Organization. River guidance. Geneva: WRO, 2023.\n"
+    text = "References\n" + "".join(e[n] for n in (1, 4, 5, 2, 3, 6, 7, 8))
+    refs = parse_references(text)
+    assert [r.number for r in refs] == [1, 4, 5, 2, 3, 7, 8]
+    assert "World Rivers Organization" in refs[4].raw_text  # kept, inside the previous entry
