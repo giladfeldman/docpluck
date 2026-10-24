@@ -12,8 +12,10 @@ Public API (re-exported from ``docpluck``):
 Deterministic, pure-Python heuristics over docpluck's own sectioned text; no
 model and no external service. The bibliography is the document's
 ``references`` section(s) as :func:`docpluck.extract_sections` finds them; when
-no section is labelled ``references``, the text after the last line that reads
-as a references heading is used.
+those hold fewer than three entries, the candidates are the text after each
+references heading line (to the end of its section, or of the next one) and
+every run of entry-opening lines, and the one with the most entries that parse
+with authors and a year is used.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from typing import Literal
 
 from .link import duplicate_groups, link_citations
 from .parse import parse_reference
-from .split import densest_entry_run, entry_density, split_entries
+from .split import entry_density, entry_runs, split_entries
 from .types import (
     Citation,
     CitationAnalysis,
@@ -130,14 +132,19 @@ def _references_spans(doc) -> list[tuple[int, int]]:
         candidates.append((h.end(), section_end(h.start(), 1)))
     for a, _b in spans:
         candidates.append((a, section_end(a, 1)))
-    run = densest_entry_run(text)
-    if run is not None:
-        candidates.append(run)
-    for a, b in candidates:
-        n = len(split_entries(text[a:b]))
+    candidates += entry_runs(text)
+    # Rank by entries that READ as references (authors and a year parsed), not by
+    # raw pieces: a block of numbered notes splits into as many pieces as a list.
+    best_n = _readable(text, spans)
+    for a, b in dict.fromkeys(candidates):
+        n = _readable(text, [(a, b)])
         if n > best_n:
             best, best_n = [(a, b)], n
     return best
+
+
+def _readable(text: str, spans: list[tuple[int, int]]) -> int:
+    return sum(1 for a, b in spans for r in parse_references(text[a:b]) if r.authors and r.year)
 
 
 def _from_document(file_bytes, text, source_format, normalization_level):

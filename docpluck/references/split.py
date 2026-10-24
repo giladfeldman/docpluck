@@ -358,33 +358,44 @@ def _opens_entry(line: str) -> bool:
     return bool(_PAREN_YEAR.match(after) or _BARE_YEAR.match(after))
 
 
-def densest_entry_run(text: str, *, min_entries: int = 5) -> tuple[int, int] | None:
-    """The longest stretch of ``text`` made of entry-opening lines (gaps of at
-    most three other lines between them), for when no references section was
-    found or the one found holds no entries. Returns ``(start, end)`` or None."""
+def entry_runs(text: str, *, min_entries: int = 5) -> list[tuple[int, int]]:
+    """Every stretch of ``text`` made of entry-opening lines (gaps of at most
+    three other lines between them) holding at least ``min_entries`` openers,
+    as ``(start, end)``. A run also ends where the openers change kind (list
+    numbers vs author names): numbered notes next to an author-year list are
+    two runs, not one."""
     lines = _lines(text)
-    best: tuple[int, int, int] | None = None  # (count, first index, last index)
+    runs: list[tuple[int, int, int]] = []  # (count, first index, last index)
     run_first = None
+    kind = None
     count = gap = 0
+    last_i = -1
     for i, ln in enumerate(lines):
         if _opens_entry(ln.text):
-            if run_first is None or gap > 3:
-                run_first, count = i, 0
+            k = "num" if _NUM_START.match(ln.text) else "name"
+            if run_first is None or gap > 3 or k != kind:
+                if run_first is not None:
+                    runs.append((count, run_first, last_i))
+                run_first, count, kind = i, 0, k
             count += 1
             gap = 0
-            if best is None or count > best[0]:
-                best = (count, run_first, i)
+            last_i = i
         else:
             gap += 1
-    if best is None or best[0] < min_entries:
-        return None
-    _, a, b = best
-    # carry the last entry's continuation lines (up to three)
-    end_idx = b
-    while end_idx + 1 < len(lines) and end_idx + 1 <= b + 3 and not _HEADING.match(lines[end_idx + 1].text) \
-            and not _ENDS_ENTRY.search(lines[end_idx].text):
-        end_idx += 1
-    return lines[a].start, lines[end_idx].end
+    if run_first is not None:
+        runs.append((count, run_first, last_i))
+    out = []
+    for count, a, b in runs:
+        if count < min_entries:
+            continue
+        # carry the last entry's continuation lines (up to three)
+        end_idx = b
+        while (end_idx + 1 < len(lines) and end_idx + 1 <= b + 3
+               and not _HEADING.match(lines[end_idx + 1].text)
+               and not _ENDS_ENTRY.search(lines[end_idx].text)):
+            end_idx += 1
+        out.append((count, lines[a].start, lines[end_idx].end))
+    return [(a, b) for _c, a, b in out]
 
 
 #: A place the last entry could end: after ".", ")", "]" or a digit, before a capital.

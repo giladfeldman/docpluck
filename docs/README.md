@@ -647,12 +647,17 @@ text.
 The document's bibliography, one parsed `Reference` per entry. Deterministic, pure-Python
 heuristics over the `references` section(s) that `extract_sections` finds (no model, no
 external service). When no section is labelled `references`, or the one found holds fewer
-than three entries, the longest run of entry-opening lines in the document is used instead.
+than three entries, the candidates are the text after each references heading line (also one
+run into its first entry, or filed under the next section) and every run of entry-opening
+lines; the one with the most entries that parse with authors and a year is used.
 
-Entry splitting handles numbered lists (`[12]`, `12.`, `12)`, a number alone on its line),
-entries that extraction ran together onto one line, numbered lists whose two columns were
-read out of order, and author-year lists whose entries wrap across lines (hanging indents are
-not visible in extracted text and are never relied on).
+Entry splitting handles numbered lists (`[12]`, `12.`, `12)`, a number alone on its line, a
+bare `12 Smith AB` number, the next entry's number printed at the end of a line, numbers
+printed in blocks apart from their entries — those entries are numbered only when the blocks
+cover exactly 1..N), entries that extraction ran together onto one line, numbered lists whose
+two columns were read out of order, and author-year lists whose entries wrap across lines
+(hanging indents are not visible in extracted text and are never relied on). Back matter
+glued to the last entry (a publisher's note, author biographies) is cut off.
 
 **`Reference`** (a frozen dataclass; `.to_dict()` gives JSON):
 

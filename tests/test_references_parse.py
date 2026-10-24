@@ -510,3 +510,18 @@ def test_a_numbered_entry_with_an_organisation_author_does_not_break_the_sequenc
     refs = parse_references(text)
     assert [r.number for r in refs] == [1, 4, 5, 2, 3, 7, 8]
     assert "World Rivers Organization" in refs[4].raw_text  # kept, inside the previous entry
+
+
+def test_the_list_chosen_is_the_one_whose_entries_read_as_references():
+    from docpluck.references import _references_spans
+
+    notes = "".join(f"{n}. See the appendix table {n} for the river counts.\n" for n in range(1, 11))
+    refs_text = "".join(
+        f"Lund{c}, P., & Ortiz, M. (20{10 + i}). River study {c}. Hydrology Letters, {i + 1}, {i}1-{i}9.\n"
+        for i, c in enumerate("ABCDEF"))
+    text = ("Introduction\n\nRivers matter (LundA & Ortiz, 2010).\n\nNotes\nReferences\n" + notes
+            + "\nAppendix\n\nTable A1 shows river depths.\n\n" + refs_text)
+    doc = _fake_doc(text, [("introduction", "Introduction"), ("notes", "Notes"), ("appendix", "Appendix")])
+    (a, b), = _references_spans(doc)
+    got = parse_references(text[a:b], offset=a)
+    assert [r.authors[0].family for r in got] == [f"Lund{c}" for c in "ABCDEF"]
