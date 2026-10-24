@@ -132,7 +132,7 @@ def _references_spans(doc) -> list[tuple[int, int]]:
         candidates.append((h.end(), section_end(h.start(), 1)))
     for a, _b in spans:
         candidates.append((a, section_end(a, 1)))
-    candidates += entry_runs(text)
+    candidates += entry_runs(text) + entry_runs(text, split_kinds=True)
     # Rank by entries that READ as references (authors and a year parsed), not by
     # raw pieces: a block of numbered notes splits into as many pieces as a list.
     best_n = _readable(text, spans)

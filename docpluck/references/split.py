@@ -358,12 +358,13 @@ def _opens_entry(line: str) -> bool:
     return bool(_PAREN_YEAR.match(after) or _BARE_YEAR.match(after))
 
 
-def entry_runs(text: str, *, min_entries: int = 5) -> list[tuple[int, int]]:
+def entry_runs(text: str, *, min_entries: int = 5, split_kinds: bool = False) -> list[tuple[int, int]]:
     """Every stretch of ``text`` made of entry-opening lines (gaps of at most
     three other lines between them) holding at least ``min_entries`` openers,
-    as ``(start, end)``. A run also ends where the openers change kind (list
-    numbers vs author names): numbered notes next to an author-year list are
-    two runs, not one."""
+    as ``(start, end)``. With ``split_kinds`` a run also ends where the openers
+    change kind (list numbers vs author names), so numbered notes next to an
+    author-year list are two runs; without it a numbered list whose wrapped
+    lines open like author names stays one run."""
     lines = _lines(text)
     runs: list[tuple[int, int, int]] = []  # (count, first index, last index)
     run_first = None
@@ -373,7 +374,7 @@ def entry_runs(text: str, *, min_entries: int = 5) -> list[tuple[int, int]]:
     for i, ln in enumerate(lines):
         if _opens_entry(ln.text):
             k = "num" if _NUM_START.match(ln.text) else "name"
-            if run_first is None or gap > 3 or k != kind:
+            if run_first is None or gap > 3 or (split_kinds and k != kind):
                 if run_first is not None:
                     runs.append((count, run_first, last_i))
                 run_first, count, kind = i, 0, k

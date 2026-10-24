@@ -525,3 +525,18 @@ def test_the_list_chosen_is_the_one_whose_entries_read_as_references():
     (a, b), = _references_spans(doc)
     got = parse_references(text[a:b], offset=a)
     assert [r.authors[0].family for r in got] == [f"Lund{c}" for c in "ABCDEF"]
+
+
+def test_a_numbered_list_whose_wrapped_lines_open_like_names_stays_one_run():
+    from docpluck.references import _references_spans
+
+    # every other entry wraps its author list: the wrapped line opens like an author-year entry
+    entries = "".join(
+        f"{n}. Lund{n} K, Ortiz M, Quinn P, Ashby T,"
+        + (f"\nBexley H, Tallis P. 2008 Rivers {n}." if n % 2 else f" Bexley H. 2008 Rivers {n}.")
+        + f" Hydrol. Lett. {n}, 1-9.\n"
+        for n in range(1, 11))
+    text = "Introduction\n\nRivers matter [1].\n\nAppendix\n\nTable A1 shows river depths.\n\n" + entries
+    doc = _fake_doc(text, [("introduction", "Introduction"), ("appendix", "Appendix")])
+    (a, b), = _references_spans(doc)
+    assert [r.number for r in parse_references(text[a:b], offset=a)] == list(range(1, 11))
