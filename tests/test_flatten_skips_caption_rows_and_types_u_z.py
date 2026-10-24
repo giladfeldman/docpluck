@@ -86,3 +86,19 @@ def test_continuation_head_rows_are_skipped():
     out = _flat(rows, caption="TABLE 6 (Continued)", label="Table 6")
     assert out[0]["header"] == ["Rank", "Source", "d"], out[0]["header"]
     assert [r["fields"].get("d") for r in out] == [0.4, 0.1]
+
+
+def test_a_caption_line_split_across_cells_is_skipped_whole():
+    # Corpus apa/chandrashekar_2023_mp.pdf p10 Table 8: the title line is split
+    # into a short cell ("Summary of") and the rest; the short cell alone is
+    # too short to be called a caption line, the joined row is one.
+    rows = [["Table 8", "", "", ""],
+            ["Summary of", "the replication results of Extension 2 based on logistic", "", ""],
+            ["regression analysis", "", "", ""],
+            ["", "Model 1", "", "Model 2"],
+            ["Predictor", "Z", "p", "Z"],
+            ["Intercept", "5.11", "<.001", "1.79"]]
+    out = _flat(rows, caption="Table 8 Summary of the replication results of Extension 2 "
+                              "based on logistic regression analysis", label="Table 8")
+    assert {r["fields"].get("group") for r in out} <= {"Model 1", "Model 2"}, \
+        [(r["row_label"], r["fields"]) for r in out]

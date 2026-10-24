@@ -64,3 +64,17 @@ def test_real_citation_table_is_one_record_per_row():
     t5 = [r for r in rows if r["label"] == "Table 5"]
     assert t5 and not any("group" in r["fields"] for r in t5), \
         sorted({r["fields"].get("group") for r in t5}, key=str)
+
+
+def test_a_label_repeated_over_each_column_of_its_span_is_one_arm():
+    # A descriptive table whose spanning label is
+    # repeated into every column it covers ("Controllability" over M and over
+    # SD). Each arm keeps its M with its SD.
+    rows = [["", "Controllability", "Controllability", "Certainty", "Certainty"],
+            ["Item", "M", "SD", "M", "SD"],
+            ["1. Heart attack", "3.62", "1.25", "1.85", "1.16"]]
+    out = _flat(rows)
+    assert [r["fields"] for r in out] == [
+        {"group": "Controllability", "M": 3.62, "SD": 1.25},
+        {"group": "Certainty", "M": 1.85, "SD": 1.16},
+    ], [r["fields"] for r in out]

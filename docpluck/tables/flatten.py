@@ -157,7 +157,8 @@ def _drop_leading_caption_rows(
     non-empty row carries the label itself; after that a cell is blanked only
     when it is a whole line of the caption (>= 12 letters/digits, found verbatim
     in the caption once case, spacing and punctuation are ignored) or the
-    "(Continued)" of a continuation head. Scanning
+    "(Continued)" of a continuation head; a row whose cells, joined, form such a
+    line is blanked whole. Scanning
     stops at the first row with no such cell, so a header word that merely
     appears in the caption ("Condition") is never touched.
     """
@@ -175,6 +176,15 @@ def _drop_leading_caption_rows(
     while i < len(out) and i < start + 4:
         row = out[i]
         hit = False
+        # A caption line Camelot split across cells ("Summary of" | "the
+        # replication results ..."): each piece may be too short to call a
+        # caption line, the joined row is one.
+        joined = "".join(_alnum_key(c) for c in row)
+        if i > start and cap and len(joined) >= 12 and joined in cap:
+            for j in range(len(row)):
+                row[j] = ""
+            i += 1
+            continue
         for j, c in enumerate(row):
             k = _alnum_key(c)
             if not k:
@@ -1925,6 +1935,22 @@ def _detect_column_groups(
     pre-existing single-row path). Keyed on the structural fold signature, not
     on any column text — general across publishers."""
     starts = [i for i, h in enumerate(header) if _MERGE_SEPARATOR in (h or "")]
+    # A spanning label repeated into EVERY column of its span ("Controllability"
+    # over M and again over SD) is one arm, not one arm per column: a start
+    # directly after a start with the same label continues that arm. Without
+    # this each column became its own record and M was parted from its SD.
+    def _arm_label(i: int) -> str:
+        return (header[i].split(_MERGE_SEPARATOR, 1)[0]).strip()
+
+    deduped: list[int] = []
+    prev = None
+    for i in starts:
+        if prev is not None and i == prev + 1 and deduped and _arm_label(i) == _arm_label(deduped[-1]):
+            prev = i
+            continue
+        deduped.append(i)
+        prev = i
+    starts = deduped
     # A folded cell is EITHER a super-header label over its sub-header OR one
     # column's own header wrapped onto several lines ("Actual / prevalence /
     # average"); both carry the sentinel. When the grid's top row holds labels
