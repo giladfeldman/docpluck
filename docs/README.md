@@ -521,7 +521,9 @@ p number exactly as the cell prints it (`".050"`, `".001"` for `< .001`), beside
 `p_op`, unchanged. Also new in 2.4.26: Mann-Whitney `fields["U"]` and `fields["z"]`; a value printed
 with a footnote or significance mark (`-1.48a`, `3.67***`) is parsed (the mark stays in `raw_cells`);
 a statistic column printed under no group header is emitted as its own record with no `group`
-rather than typed into every arm.
+rather than typed into every arm; a group label repeated over each column of its span (`M`, `SD`)
+is one arm; and a grouping under which no column yields a typed value is flattened one record per
+row with no `group` (those per-arm records carried only the row label and the group name).
 
 **A restored sign is marked on its cell** (table extraction 2.4.24): when a minus the page prints
 (drawn in a TeX/MathTime symbol font) was missing from Camelot's text, docpluck puts it back from
