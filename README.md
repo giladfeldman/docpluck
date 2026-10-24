@@ -223,6 +223,14 @@ of interest, data availability, author contributions), references, appendix, sup
 material and footnotes. `SECTIONING_VERSION` versions the algorithm; `sectioning_text_id`
 fingerprints the text buffer the offsets index into.
 
+### Body text without the bibliography
+
+`extract_pdf_body(pdf_bytes)` returns `(body, report)`: the layout-aware normalized text with
+the reference list removed (headed, German `Literatur`, or an unheaded numbered list), and
+`body_scope_text(text)` does the same cut on text you already have. A references section ends
+where its entry-shaped lines end, so body text placed after the bibliography is kept.
+`report.removed` lists every span taken out. Nothing else changes.
+
 ### Tables and figures
 
 `extract_pdf_structured(pdf_bytes, *, thorough=False, table_text_mode="raw")` and

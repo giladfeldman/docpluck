@@ -471,6 +471,51 @@ that canonical label — `methods`, `methods_2`, ...), `doc.get(label)` (exact l
 `data_availability`, `author_contributions`, `references`, `appendix`, `supplementary`,
 `footnotes`, `study_n_header`, `unknown`.
 
+### `extract_pdf_body(pdf_bytes, level=NormalizationLevel.academic) → tuple[str, BodyScopeReport]`
+
+The document text **without its reference list**: what the authors wrote as running text,
+for text comparison, readability, search or language-model input. It runs the layout-aware
+text path (`extract_pdf` + `extract_pdf_layout` + `normalize_text(layout=...)`, which already
+strips running heads and moves page footnotes out of the body) and then removes the
+bibliography.
+
+```python
+from docpluck import extract_pdf_body, body_scope_text
+
+with open("paper.pdf", "rb") as f:
+    body, report = extract_pdf_body(f.read())
+
+report.references_found          # True when a reference list was found and removed
+[(r.label, r.char_start, r.char_end) for r in report.removed]
+report.kept_after_references     # body text found inside a references section, kept
+report.footnote_texts            # the footnotes the layout pass moved out of the body
+
+# The same cut on text you already have (normalize_text output, with or without layout=):
+body, report = body_scope_text(normalized_text)
+```
+
+What is removed: every section the sectioner labels `references` (a headed bibliography, a
+German `Literatur` list, or an unheaded numbered list of reference entries), and runs of
+reference entries that continue under a back-matter heading the column order dropped into
+the list (`references_continued`). Nothing else: front matter, acknowledgments, funding and
+appendices stay, because dropping every non-body section was measured to cost more body
+text than it saved. A references section ends where its entry-shaped lines end, so body
+paragraphs or figure captions that the linearised text places after the bibliography are
+kept and listed in `kept_after_references`.
+
+Additive: no other output changes. Without pdfplumber the text is normalized without
+`layout=` (running heads and footnotes stay in) and the `body_scope_no_layout` fallback is
+recorded. Measured on 30 held-out biomedical papers of a public text-extraction benchmark,
+scored with that benchmark's own scorer: text score .878 → .955, precision .811 → .948,
+recall .969 → .964 (26 papers up, 0 down).
+
+**`BodyScopeReport`**: `removed` (tuple of `RemovedSpan`: `label`, `char_start`, `char_end`,
+`heading_text`; offsets index the text that was passed in, for `extract_pdf_body` the
+layout-aware text before its footnote appendix), `kept_after_references` (tuple of
+`(char_start, char_end)`), `references_found`, `source_chars`, `body_scope_version`,
+`footnote_texts` and `normalization` (the `NormalizationReport`; `extract_pdf_body` only).
+Algorithm version: `BODY_SCOPE_VERSION`.
+
 ### `flatten_tables_for_paper(tables) → list[FlattenedRow]`
 
 Turn structured tables into one record per cell-with-a-statistic, in document order —

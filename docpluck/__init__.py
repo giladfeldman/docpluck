@@ -99,6 +99,7 @@ from .extract_structured import TABLE_EXTRACTION_VERSION, StructuredResult, extr
 # docs/BENCHMARKS_docx_engines_2026-09.md.
 from .extract_docx_structured import extract_docx_structured
 from .render import RenderReport, render_pdf_to_markdown
+from .body import BODY_SCOPE_VERSION, BodyScopeReport, body_scope_text, extract_pdf_body
 
 __version__ = "2.4.154"
 __author__ = "Gilad Feldman"
@@ -123,6 +124,11 @@ __all__ = [
     "NORMALIZATION_VERSION",
     # Quality
     "compute_quality_score",
+    # Body scope (v2.4.155): the text without its reference list
+    "extract_pdf_body",
+    "body_scope_text",
+    "BodyScopeReport",
+    "BODY_SCOPE_VERSION",
     # Batch
     "ExtractionFileResult",
     "ExtractionReport",
