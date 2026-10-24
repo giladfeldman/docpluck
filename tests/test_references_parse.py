@@ -456,3 +456,13 @@ def test_list_numbers_alone_on_their_lines_next_to_each_entry():
     refs = parse_references(text)
     assert [r.number for r in refs] == [1, 2, 3, 4]
     assert [r.authors[0].family for r in refs] == ["Lund", "Quinn", "Ashby", "Bexley"]
+
+
+def test_numbers_next_to_their_entries_win_over_a_detached_reading_that_splits_more():
+    # the wrapped journal line opens like an entry; read as a detached list it would be split off
+    text = ("References\n1.\n\nLund K, Ortiz M. Rivers in spring.\nHydrology Letters. 2009; 29:12-23.\n\n2.\n\n"
+            "Quinn P. Roads in autumn.\nRoad Research. 2017; 95:301-10.\n\n3.\n\n"
+            "Ashby TN. Bridges.\nBridge Science. 2020; 117:18-28.\n\n4.\n\nBexley H. Lakes. Lake Lett. 2001; 4:1-9.\n")
+    refs = parse_references(text)
+    assert [r.number for r in refs] == [1, 2, 3, 4]
+    assert [r.container for r in refs][:3] == ["Hydrology Letters", "Road Research", "Bridge Science"]

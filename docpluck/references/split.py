@@ -434,9 +434,11 @@ def split_entries(text: str) -> list[RawEntry]:
         numbered = _split_numbered(lines)
         if _detached_numbers(lines):
             # numbers alone on their lines either sit next to their entries (the
-            # sequence splitter reads that) or come in blocks apart from them
+            # sequence splitter reads that) or come in blocks apart from them; the
+            # detached reading splits at every entry-like line, so it wins only when
+            # the sequence reading collapsed (a block of numbers yields one entry)
             detached = _split_detached(lines)
-            if len(detached) > len(numbered):
+            if 2 * len(numbered) < len(detached):
                 return _trim_last(detached, text)
         return _trim_last(numbered, text)
     if style == "author_year":
