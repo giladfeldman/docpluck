@@ -192,18 +192,32 @@ def extract_pdf(
             # left-then-right re-extraction is a pure reorder of the same words.
             # Pages without a clean gutter (embedded full-width table, single
             # column) are left untouched — an honest partial; the per-band Step 2
-            # closes those. Default OFF ⇒ byte-identical legacy path (ship dark,
-            # validate against the AI golds, then flip the default).
+            # closes those.
+            # ON BY DEFAULT since v2.4.155, behind the region plan
+            # (`extract_columns._column_region_plan`): a page whose body is not
+            # one flow of two prose columns (a table across the gutter, two
+            # two-column blocks stacked apart or in different type) keeps
+            # pdftotext's order, and a full-width table above or below the
+            # columns is read in place. Every
+            # page the default changes over the 125-paper corpus manifest was
+            # read against its raster. `=0` (or false/off/no) restores the
+            # legacy path.
             general_correct = (
-                os.environ.get("DOCPLUCK_COLUMN_CORRECT_GENERAL", "0") == "1"
+                os.environ.get("DOCPLUCK_COLUMN_CORRECT_GENERAL", "1")
+                .strip().lower() not in ("0", "false", "off", "no")
             )
             # RC-1 Step 2 (v2.4.90): per-band region-aware re-extraction for the
             # table-bearing / mixed-layout pages the whole-page corrector (Step 1)
             # cannot reach. Applied as a FALLBACK inside the splice only when the
             # whole-page path returns "" for a flagged page, and only under the
-            # SAME unconditional word-preservation guard. Default OFF ⇒ the
-            # legacy path is byte-identical (ship dark; validate vs AI golds, then
-            # flip the default once Step 1 + Step 2 are jointly verified).
+            # SAME unconditional word-preservation guard. Default OFF, and it
+            # stays off: measured over the 125-paper corpus manifest (reading
+            # order against an independent OCR of each page) it made 42 pages
+            # worse and 34 better. Its bands misread two shapes — a row with
+            # text on one side only is taken as full width and splits a column
+            # flow, and a table row with an empty middle is taken as two
+            # columns — and no gate on its output kept the gains without the
+            # losses; it needs a redesign, not a narrower gate.
             banded_correct = (
                 os.environ.get("DOCPLUCK_COLUMN_CORRECT_BANDED", "0") == "1"
             )
@@ -247,6 +261,15 @@ def extract_pdf(
                     rotation_pages=rotation_pages,
                     edge_trimmed_pages=sorted(
                         set(inversion_pages) | set(rotation_pages)
+                    ),
+                    # A general-interleave page is reordered only when both
+                    # sides of its gutter read as prose (not a table whose
+                    # middle column lines up with the gutter, not two stacked
+                    # two-column regions). Inversion / rotation pages keep the
+                    # correction they had before this gate.
+                    prose_pages=sorted(
+                        set(flagged_pages)
+                        - set(inversion_pages) - set(rotation_pages)
                     ),
                 )
                 if corrected and corrected != text and changed:
