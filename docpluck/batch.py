@@ -169,6 +169,7 @@ class ExtractionReport:
     symbol_contract_version: str = UNKNOWN
     sectioning_version: str = UNKNOWN
     table_extraction_version: str = UNKNOWN
+    references_version: str = UNKNOWN
     python_version: str = UNKNOWN
     unicodedata_version: str = UNKNOWN
     pdftotext_path: str = UNKNOWN
