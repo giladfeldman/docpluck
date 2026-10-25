@@ -35,3 +35,21 @@ def test_a_plain_estimate_interval_cell_is_still_read(t1_records):
     exp = [r["fields"] for r in t1_records if r["row_label"] == "Expensive" and "d" in r["fields"]]
     assert exp and exp[0]["d"] == 1.91
     assert (exp[0]["CI_lower"], exp[0]["CI_upper"]) == (1.57, 2.23)
+
+
+def test_a_merged_estimate_cell_is_not_worded():
+    """The continuation merge joins lines with a sentinel whose letters are not
+    words: 10.1177/17470218241255916 Table 7 (p14, raster checked 2026-10-25)
+    prints 0.79 [0.68, 0.89] for problem 1's replication, and the merged cell
+    must still give d = 0.79."""
+    from docpluck.extract_structured import extract_pdf_structured
+    from docpluck.tables.flatten import flatten_table
+
+    p = custody_path("fulltext", "10.1177__17470218241255916.pdf")
+    t = next(
+        t
+        for t in extract_pdf_structured(p.read_bytes())["tables"]
+        if t.get("label") == "Table 7" and t.get("page") == 14
+    )
+    ds = [r["fields"].get("d") for r in flatten_table(t) if r["fields"].get("group") == "Replication"]
+    assert 0.79 in ds, ds

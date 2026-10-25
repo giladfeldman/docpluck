@@ -80,3 +80,37 @@ def test_alphanumeric_arm_labels_give_one_record_per_arm(xiao_tables):
     rs_a = by[("Running shoes", "1A")]
     assert (rs_a.get("t"), rs_a.get("df"), rs_a.get("d")) == (18.30, 501, 0.82)
     assert by[("Bicycles", "1C")].get("t") == -4.29
+
+
+def test_space_separated_values_count_as_data():
+    """Once Camelot's appended values keep their separator ("52.96 36.06" rather
+    than "52.9636.06", which happened to match the value pattern), a cell of
+    space-separated values must still count as data."""
+    row = ["Kogut and", "F(1,108)", "F(1,108)", "52.96 36.06", "29.95 45.37", "2.75 2.85"]
+    assert _is_header_like_row(row) is False
+
+
+def test_a_study_row_is_not_the_header_jdm_table2():
+    """10.1017/jdm.2024.31 Table 2 (p6, raster checked 2026-10-25): the first
+    study row prints F(1,108); the replication rows print F(1, 926) and
+    F(3,1827). Taken as the header, the first row's df went onto every record."""
+    from docpluck.extract_structured import extract_pdf_structured
+    from docpluck.tables.flatten import flatten_table
+
+    p = custody_path("fulltext", "10.1017__jdm.2024.31.pdf")
+    t = next(
+        t
+        for t in extract_pdf_structured(p.read_bytes())["tables"]
+        if t.get("label") == "Table 2" and t.get("page") == 6
+    )
+    for r in flatten_table(t):
+        if (r["row_label"] or "").startswith("Replication"):
+            assert (r.get("fields") or {}).get("df2") != 108, r["fields"]
+
+
+def test_a_thousands_grouped_count_is_one_value_not_two():
+    """"177 709" is one count with a thin-space thousands separator
+    (10.1001/jamanetworkopen.2023.21102 Table 1 'No.' row), not two values; the
+    space-separated rule must not reclassify that header-band row."""
+    row = ["No.", "177 709", "19 606", "64 901", "58 736", "34 466"]
+    assert _is_header_like_row(row) is True

@@ -1021,9 +1021,29 @@ def _is_data_value_cell(cell: str) -> bool:
     value pattern, the merged data row passed as a header row, and its product
     disappeared from the records."""
     if _MERGE_SEPARATOR not in cell:
-        return bool(_DATA_VALUE_CELL_RE.match(cell))
+        return _is_value_or_values(cell)
     parts = [x.strip() for x in cell.split(_MERGE_SEPARATOR) if x.strip()]
-    return bool(parts) and all(_DATA_VALUE_CELL_RE.match(x) for x in parts)
+    return bool(parts) and all(_is_value_or_values(x) for x in parts)
+
+
+def _is_value_or_values(text: str) -> bool:
+    """One data value, or two or more space-separated ones ("52.96 36.06"). The
+    second form is what a cell holding two printed columns' values looks like
+    once Camelot's appended textlines keep their separator
+    (`camelot_cell_join`); glued, "52.9636.06" happened to match the value
+    pattern, and separating it must not turn a data row into a header row
+    (10.1017/jdm.2024.31 Table 2, measured 2026-10-25)."""
+    if _DATA_VALUE_CELL_RE.match(text):
+        return True
+    if _THOUSANDS_GROUPED_RE.match(text):
+        # "177 709" is ONE count printed with a thin-space thousands separator;
+        # it is left exactly as the single-value test judged it before.
+        return False
+    toks = text.split()
+    return len(toks) >= 2 and all(_DATA_VALUE_CELL_RE.match(t) for t in toks)
+
+
+_THOUSANDS_GROUPED_RE = re.compile(r"^\d{1,3}(?:\s\d{3})+$")
 
 
 def _is_header_like_row(row: list[str]) -> bool:

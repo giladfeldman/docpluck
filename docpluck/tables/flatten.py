@@ -1381,7 +1381,7 @@ def _flatten_one_row(
             # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)"
             # or "0.76 [.50, 1.02]".
             est = _parse_leading_number(raw)
-            if est is not None and _WORDED_INTERVAL_RE.search(raw):
+            if est is not None and _WORDED_INTERVAL_RE.search(_strip_fold_sentinels(raw)):
                 # "95%CI scarf: [55-72%]" names its interval in words; its
                 # leading "95" is the interval's level, not an estimate
                 # (10.1525/collabra.77859 Table 1, Preference row). Neither the
