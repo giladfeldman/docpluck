@@ -188,7 +188,7 @@ def test_no_internal_reference_in_tracked_files():
         "~/.claude/skills/article-finder/find-pdf.py",
         'os.path.join(home, ".claude", "skills")',
         "filed in `INBOX_FROM_SCIMETO_2026-08-21.md` §1",
-        "# A4 braces become brackets only after CI wording (d-a6101d).",
+        "# A4 braces become brackets only after CI wording (d-0a1b2c).",
     ],
 )
 def test_the_internal_reference_pattern_fires(planted):
