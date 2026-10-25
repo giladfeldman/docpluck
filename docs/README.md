@@ -652,8 +652,7 @@ run into its first entry, or filed under the next section) and every run of entr
 lines; the one with the most entries that parse with authors and a year is used.
 
 Entry splitting handles numbered lists (`[12]`, `12.`, `12)`, a number alone on its line, a
-bare `12 Smith AB` number, the next entry's number printed at the end of a line, numbers
-printed in blocks apart from their entries — those entries are numbered only when the blocks
+bare `12 Smith AB` number, numbers printed in blocks apart from their entries — those entries are numbered only when the blocks
 cover exactly 1..N), entries that extraction ran together onto one line, numbered lists whose
 two columns were read out of order, and author-year lists whose entries wrap across lines
 (hanging indents are not visible in extracted text and are never relied on). Back matter
