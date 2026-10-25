@@ -1,4 +1,4 @@
-"""compute_quality_score sees statistics the font broke (d-ac50fc).
+"""compute_quality_score sees statistics the font broke.
 
 10.5465/amj.2016.1196 draws `=` in a font whose character map says `5`: the text reads
 `F(1, 350) 5 27.7`, `F(2, 350) 5 298...`, `t(231) 5 0.54` -- all three of its

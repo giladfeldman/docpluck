@@ -1,4 +1,4 @@
-"""Each column belongs to the group header that spans it (d-bc33a3).
+"""Each column belongs to the group header that spans it.
 
 10.1177/01461672251327169 p11, Table 6, checked on the rasterized page 2026-10-14
 (the page is printed sideways). "Participant-level analyses" spans Error mean |

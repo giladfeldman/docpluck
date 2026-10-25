@@ -18,7 +18,7 @@ COMMON_WORDS = {
 
 LIGATURE_CHARS = set("\ufb00\ufb01\ufb02\ufb03\ufb04\ufb05\ufb06")
 
-# TYPOGRAPHIC DAMAGE THE WORD COUNT CANNOT SEE (d-ac50fc). A paper can read as
+# TYPOGRAPHIC DAMAGE THE WORD COUNT CANNOT SEE. A paper can read as
 # fluent English while its statistics are broken: the common-word ratio does not
 # move when only operators and symbols are lost. Two signals, both read off the
 # text without interpreting any value:

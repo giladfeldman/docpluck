@@ -1,4 +1,4 @@
-"""A caption region of exactly four lines still stops at its header lines (d-5410ed).
+"""A caption region of exactly four lines still stops at its header lines.
 
 10.1001/jamanetworkopen.2023.39337 p6 (checked 2026-10-14): pdftotext gives
 "Table 1. Baseline Characteristics of the Study Participantsa" then the header lines

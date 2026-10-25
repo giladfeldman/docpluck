@@ -1,5 +1,5 @@
 """Regression test for the CI-UPPER-BOUND DETACHED-minus reattachment (B7 / GLYPH)
-— and for the RETIREMENT of its inferential arm (2.4.146, d-a4ceab / DP-17).
+— and for the RETIREMENT of its inferential arm (2.4.146, DP-17).
 
 Primary source, rasterized and read 2026-09-27 (``pdftoppm -png -r 300 -f 13
 -l 13``), ``10.1080/02699931.2024.2434156`` (Chan & Feldman 2025) p13, Table 9,

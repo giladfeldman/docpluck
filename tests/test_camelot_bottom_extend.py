@@ -1,4 +1,4 @@
-"""A Camelot stream grid must reach the end of its printed table (d-15267e).
+"""A Camelot stream grid must reach the end of its printed table.
 
 10.1177/00031224241252079 (am_sociol_rev_4) p12, Table 1 "Descriptive Statistics",
 checked on the rasterized page 2026-10-14. The table is printed sideways and ends with

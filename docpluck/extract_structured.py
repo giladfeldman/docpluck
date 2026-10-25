@@ -1142,7 +1142,7 @@ def _label_x_midpoint(page_obj, cap: CaptionMatch) -> Optional[float]:
     # removed ("table1"), and a PDF that draws its spaces as glyphs gave a row
     # reading "Table 1 Participant ..." in which neither label was ever found,
     # so side-by-side tables shared one merged grid (10.1186/s12916-023-03146-5
-    # p6, d-d4b785).
+    # p6).
     row = sorted(
         (
             c for c in chars
@@ -3073,7 +3073,7 @@ def _trim_table_caption_at_cell_region(region: str, *, lone_symbols: bool = True
     # cell-run FALLBACK only. With five here, a caption whose region ends at a
     # blank line after three header lines was never trimmed:
     # 10.1001/jamanetworkopen.2023.39337 Table 1 shipped "... Participantsa
-    # Participant group Characteristic Age, y" (d-5410ed).
+    # Participant group Characteristic Age, y".
     if len(nonblank) < 4:
         # Too few lines to confidently locate a cell run — leave as-is.
         return region

@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.4.155] - unreleased - normalization 1.9.78 - table extraction 2.4.26 - sectioning 1.2.8 - references 1.0.0 (new) - body scope 1.0.0 (new)
+## [2.4.155] - 2026-10-25 - normalization 1.9.78 - table extraction 2.4.26 - sectioning 1.2.8 - references 1.0.0 (new) - body scope 1.0.0 (new)
 
 ### Two-column pages are read column by column by default (normalization)
 
@@ -1072,7 +1072,7 @@ reaches, reading any row that crosses it as a full-width band above or below the
   column-corrected; on the jamanetworkopen page, adjacent-line inversions against the AI
   reading-order gold fall from 10 to 4.
 - Reading order on 43 more pages changes across the 601-paper sample than the prior arm; a consumer
-  notice for this is still owed (tracked as `d-21727e`).
+  notice for this is still owed.
 
 ### Tooling and test-support
 

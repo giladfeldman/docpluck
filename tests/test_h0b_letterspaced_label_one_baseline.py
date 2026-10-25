@@ -1,5 +1,5 @@
 """H0b joins a letter-spaced label pdftotext split in two when the layout prints it on
-one baseline (d-091f68).
+one baseline.
 
 10.1016/j.jesp.2009.12.011 p1 (raster checked 2026-10-14) prints the Elsevier box label
 "A R T I C L E   I N F O" on ONE line, beside "A B S T R A C T". pdftotext emits

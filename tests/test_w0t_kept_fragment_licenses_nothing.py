@@ -1,4 +1,4 @@
-"""W0t: a line-end fragment the text still prints hyphenated licenses no glued copy (d-d68442).
+"""W0t: a line-end fragment the text still prints hyphenated licenses no glued copy.
 
 The licence rule is "one layout line-end fragment `A-` per glued text site". A fragment
 pdftotext did NOT dehyphenate (the text still reads `well-` / `being`) produced no glued

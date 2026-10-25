@@ -145,6 +145,7 @@ INTERNAL_REFERENCE = re.compile(
     | \b(INBOX|OUTBOX|HANDOFF|FINDINGS|TRIAGE|BRIEF|DECISION|ADJUDICATION|REPLY_TO|NOTICE|MEMO)_
       [A-Za-z0-9_-]*20\d\d          # a dated correspondence FILE cited by name
     | \bM-[a-z]+-[a-z]+-\d{8}T     # a message id from the correspondence queue
+    | \bd-[0-9a-f]{6}\b             # an id from the maintainer's private issue ledger
     """
 )
 INTERNAL_REFERENCE_EXEMPT = {".gitignore", "tests/test_public_repo_hygiene.py"}
@@ -187,6 +188,7 @@ def test_no_internal_reference_in_tracked_files():
         "~/.claude/skills/article-finder/find-pdf.py",
         'os.path.join(home, ".claude", "skills")',
         "filed in `INBOX_FROM_SCIMETO_2026-08-21.md` §1",
+        "# A4 braces become brackets only after CI wording (d-a6101d).",
     ],
 )
 def test_the_internal_reference_pattern_fires(planted):
@@ -203,6 +205,8 @@ def test_the_internal_reference_pattern_fires(planted):
         "vibe coding",  # lower-case prose is not the portfolio root
         "INBOX_",  # a bare prefix with no dated file name
         "docpluck/testing/_root.py",
+        "Cohen's d-values and the d-family",  # not a six-hex-digit id
+        "a d-1234567 serial",  # seven characters: not the ledger's id shape
     ],
 )
 def test_the_internal_reference_pattern_spares_clean_text(clean):

@@ -10,7 +10,7 @@ estimate-containment arithmetic. So the one case carrying real typographic
 evidence was adjudicated as though it had none, and the register's Plan Step D
 (keep the dash, retire the arithmetic) was never implemented.
 
-## Why the arithmetic WAS retired (2.4.146, d-a4ceab / DP-17)
+## Why the arithmetic WAS retired (2.4.146, DP-17)
 
 It was kept on 2026-08-15 on the claim that ``chan_feldman_2025_cogemo``
 (``10.1080/02699931.2024.2434156``) Table 9 row 2bii publishes ``−0.33``. That

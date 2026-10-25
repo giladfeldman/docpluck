@@ -1,4 +1,4 @@
-"""A4 turns braces into brackets only when the braces hold a confidence interval (d-a6101d).
+"""A4 turns braces into brackets only when the braces hold a confidence interval.
 
 Both shapes measured on rasterized pages, 2026-10-14:
 

@@ -5671,7 +5671,7 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
     # A line-end fragment the TEXT still prints hyphenated (`well-` / `being`
     # left for S7) produced no glued copy, so it licenses none: without this a
     # glued token from elsewhere -- a space pdftotext dropped in a printed
-    # `well being` -- could borrow its licence (d-d68442, consult r2 finding 7).
+    # `well being` -- could borrow its licence (consult r2 finding 7).
     def _licences(a: str) -> int:
         kept = len(re.findall(r"(?<![A-Za-z-])" + re.escape(a) + r"-[ \t]*\n", text, re.I))
         return frags[a] - kept
@@ -6069,7 +6069,7 @@ def recover_beta_via_layout(text: str, layout) -> str:
     return text
 
 
-# ── RETIRED 2.4.146 (d-a4ceab): `recover_dropped_minus_ci_upper` below has NO
+# ── RETIRED 2.4.146: `recover_dropped_minus_ci_upper` below has NO
 # production call site. It decides INFERENTIALLY (estimate-containment
 # arithmetic), and on 10.1080/02699931.2024.2434156 p13 Table 9 row 2bii — the
 # very row its comment below cites — the rasterized page prints
@@ -6196,8 +6196,8 @@ def recover_dropped_minus_ci_upper_in_text(text: str, _counter: list[int] | None
       re-read 2026-09-27) prints ``r = -.43  [−0.52, 0.33]`` — no minus on the
       upper bound — while Table 8 on the SAME page prints ``[−.52, −.33]``.
       The row is the authors' own typo, and the arithmetic was fabricating a
-      minus the page does not print, silently correcting the paper (DP-17,
-      d-a4ceab). Flagging an interval that looks wrong is ESCImate's and
+      minus the page does not print, silently correcting the paper (DP-17).
+      Flagging an interval that looks wrong is ESCImate's and
       Scimeto's job; they hold the parsed statistic and have a UI. Pinned by
       tests/test_ci_upper_evidence_is_declared.py and
       tests/test_dropped_minus_ci_upper_recovery_real_pdf.py.
@@ -8292,7 +8292,7 @@ def _normalize_text(
         # Curly braces → square brackets, ONLY for a confidence interval. Braces
         # are set notation far more often than an interval: 10.1038/s41562-026-
         # 02417-4 p35 prints "a shift factor d ∈ {1, 2}" (two scenarios) and this
-        # arm published "d ∈ [1, 2]", a continuum (d-a6101d, raster 2026-10-14).
+        # arm published "d ∈ [1, 2]", a continuum (raster 2026-10-14).
         # The interval reading needs the words that say so just before the brace
         # -- "confidence interval was {−.18, −.01}" (10.1016/j.jesp.2011.08.004
         # p93) -- read from a bounded window, never the whole prefix.

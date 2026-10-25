@@ -2009,7 +2009,7 @@ def _detect_column_groups(
     # standing alone over empty cells (`_top_row_arm_cols`), only those columns
     # start an arm -- 10.1177/01461672251327169 p11 Table 6 otherwise made six
     # "arms" of four wrapped headers plus two real ones and paired the item-level
-    # t/df with the participant-level d (d-bc33a3).
+    # t/df with the participant-level d.
     if arm_cols is not None and len(arm_cols) >= 2:
         kept = [i for i in starts if i in arm_cols]
         if len(kept) >= 2 and len(kept) < len(starts):

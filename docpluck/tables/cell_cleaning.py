@@ -454,7 +454,7 @@ def _recover_ci_upper_in_grid_row(row: list[str]) -> list[str]:
         # sign. A bound with no dash is passed through as printed, even when
         # the row's estimate "should" make it negative: that inference was
         # retired after it fabricated a minus the page does not print
-        # (10.1080/02699931.2024.2434156 p13 Table 9 row 2bii, d-a4ceab).
+        # (10.1080/02699931.2024.2434156 p13 Table 9 row 2bii).
         # The estimate cell to the left is kept only as SCOPE (a statistic
         # row), not as evidence.
         if not m.group(2):

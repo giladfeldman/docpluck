@@ -1,4 +1,4 @@
-"""Side-by-side captions are found when the PDF draws its spaces as glyphs (d-d4b785).
+"""Side-by-side captions are found when the PDF draws its spaces as glyphs.
 
 10.1186/s12916-023-03146-5 p6 prints Table 1 (left column) and Table 2 (right column)
 side by side on one caption line, checked on the page 2026-10-14. The PDF carries SPACE

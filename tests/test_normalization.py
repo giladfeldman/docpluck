@@ -1065,7 +1065,7 @@ class TestFullPipeline:
 # ── A4 Enhanced: curly braces, spacing, paren semicolons ─────────────
 
 class TestA4_Enhanced:
-    # Since 2.4.154 (d-a6101d) braces become brackets only after CI wording; a
+    # Since 2.4.154 braces become brackets only after CI wording; a
     # bare brace pair is set notation (10.1038/s41562-026-02417-4 p35 `d ∈ {1, 2}`).
     def test_curly_braces_to_square_brackets(self):
         """95% CI {0.45, 0.89} → [0.45, 0.89]; a bare {0.45, 0.89} stays a set"""
