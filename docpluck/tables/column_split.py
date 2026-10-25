@@ -168,6 +168,7 @@ def resplit_merged_columns(camelot: Any, tmp_path: str, ct: Any, layout: Any) ->
     Stream tables only: a lattice grid takes its columns from ruled lines, not
     from text extent, so it cannot merge this way.
     """
+    from docpluck.tables.camelot_cell_join import stream_read_scope
     from docpluck.telemetry import record_fallback
 
     if (getattr(ct, "flavor", "") or "") != "stream":
@@ -185,12 +186,13 @@ def resplit_merged_columns(camelot: Any, tmp_path: str, ct: Any, layout: Any) ->
     x0, y0, x1, y1 = (float(v) for v in bbox)
     seps = sorted({round(float(c[0]), 2) for c in ct.cols[1:]} | {round(s, 2) for s in extra})
     try:
-        tables = list(camelot.read_pdf(
-            tmp_path, pages=str(page), flavor="stream",
-            table_areas=[f"{x0},{y1},{x1},{y0}"],
-            columns=[",".join(f"{s:.2f}" for s in seps)],
-            split_text=False, strip_text="\n", suppress_stdout=True,
-        ))
+        with stream_read_scope():  # the first read's reader, see camelot_cell_join
+            tables = list(camelot.read_pdf(
+                tmp_path, pages=str(page), flavor="stream",
+                table_areas=[f"{x0},{y1},{x1},{y0}"],
+                columns=[",".join(f"{s:.2f}" for s in seps)],
+                split_text=False, strip_text="\n", suppress_stdout=True,
+            ))
     except Exception as exc:  # noqa: BLE001 - the original grid is still valid
         record_fallback("camelot_column_resplit_exception", detail=type(exc).__name__)
         return ct

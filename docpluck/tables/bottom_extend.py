@@ -55,6 +55,7 @@ from __future__ import annotations
 from statistics import median
 from typing import Any
 
+from docpluck.tables.camelot_cell_join import stream_read_scope
 from docpluck.telemetry import record_fallback
 
 MAX_GAP_PITCHES = 1.6
@@ -219,11 +220,12 @@ def extend_to_table_bottom(camelot: Any, tmp_path: str, ct: Any) -> Any:
         x0, _y0, x1, y1 = (float(v) for v in ct._bbox)
         cols = list(ct.cols)
         seps = ",".join(f"{float(c[1]):.2f}" for c in cols[:-1])
-        new = list(camelot.read_pdf(
-            tmp_path, pages=str(ct.page), flavor="stream", strip_text="\n",
-            table_areas=[f"{x0:.2f},{y1:.2f},{x1:.2f},{bottom - 1.0:.2f}"],
-            columns=[seps], suppress_stdout=True,
-        ))
+        with stream_read_scope():  # the first read's reader, see camelot_cell_join
+            new = list(camelot.read_pdf(
+                tmp_path, pages=str(ct.page), flavor="stream", strip_text="\n",
+                table_areas=[f"{x0:.2f},{y1:.2f},{x1:.2f},{bottom - 1.0:.2f}"],
+                columns=[seps], suppress_stdout=True,
+            ))
         if len(new) != 1:
             return ct
         old_rows = ct.df.values.tolist()

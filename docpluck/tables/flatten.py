@@ -598,6 +598,10 @@ def _names_an_effect(lead: str) -> bool:
 # ── Cell-value parsing ──────────────────────────────────────────────────────
 
 
+# A word of two or more letters before the interval's opening bracket, after
+# the leading number: "95%CI scarf: [55-72%]". A plain estimate cell has at most
+# a single superscript letter there ("0.25a [..]").
+_WORDED_INTERVAL_RE = re.compile(r"^\s*[-+−–]?\d*\.?\d+[^\[(]*?[A-Za-z]{2,}[^\[(]*[\[(]")
 _NUM_RE = re.compile(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
 _P_OP_RE = re.compile(r"^\s*([<>=]+)?\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
 # Comma-separated CI bounds. Allow a leading-dot decimal (APA omits the leading
@@ -1401,6 +1405,22 @@ def _flatten_one_row(
     # effect was named, and only after the value passes η²'s [0, 1] range guard.
     eta2_inferred = _infer_anova_eta2_hint(roles, header, effect_hint)
     effect_hint_eff = effect_hint or ("eta_squared_partial" if eta2_inferred else None)
+    # The η²p header can be drawn as vector art, so the page holds no text for
+    # it at all and the column's header cell is blank while every other column
+    # is labelled (10.1525/collabra.90203 Table 9, p13: "df F p BF01 [art] 95%
+    # CI"). The blank-role recovery stays off for a labelled table, so that
+    # column used to reach no field. When the η²p signature above holds and
+    # exactly ONE data column is unlabelled, it is the estimate column; the
+    # value still passes η²'s [0, 1] domain before it is typed.
+    if eta2_inferred and not roles_override:
+        blank_cols = [
+            ci for ci in range(len(header))
+            if ci != label_col and ci not in roles and not (header[ci] or "").strip()
+        ]
+        if len(blank_cols) == 1 and blank_cols[0] < len(row):
+            v = _parse_number((row[blank_cols[0]] or "").strip())
+            if v is not None and 0.0 <= v <= 1.0:
+                roles[blank_cols[0]] = "est"
 
     # Pull per-role values out of the body row.
     role_vals: dict[str, str] = {}
@@ -1474,6 +1494,14 @@ def _flatten_one_row(
             # or "0.76 [.50, 1.02]".
             est_op, est_raw = _split_leading_op(raw)
             est = _parse_leading_number(est_raw)
+            if est is not None and _WORDED_INTERVAL_RE.search(_strip_fold_sentinels(raw)):
+                # "95%CI scarf: [55-72%]" names its interval in words; its
+                # leading "95" is the interval's level, not an estimate
+                # (10.1525/collabra.77859 Table 1, Preference row). Neither the
+                # estimate nor the bracket is this column's effect size.
+                est = None
+                est_op, est_raw = None, ""
+                raw = ""
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
                 if (
@@ -1495,6 +1523,12 @@ def _flatten_one_row(
             if lo is not None and hi is not None:
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
+        elif role == "df" and _DF_PAIR_RE.match(raw):
+            # A column headed "df" in an F-test table prints the PAIR "1, 114"
+            # (10.1525/collabra.90203 Table 9); `_parse_number` reads neither.
+            m = _DF_PAIR_RE.match(raw)
+            role_nums["df1"] = float(m.group(1))
+            role_nums["df2"] = float(m.group(2))
         else:
             n = _parse_number(raw)
             if n is None:
@@ -2180,8 +2214,14 @@ def _detect_packed_arms(
         k = len(toks)
         if not (2 <= k <= 4):
             continue
-        if not all(re.fullmatch(r"[A-Za-z][A-Za-z.\-]*", t) for t in toks):
-            continue  # arm labels are alphabetic words ("Separate", "Joint")
+        if not all(
+            re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.\-]*", t) and re.search(r"[A-Za-z]", t)
+            for t in toks
+        ):
+            # Arm labels are words ("Separate", "Joint") or condition codes with a
+            # letter ("1A", "1C" -- 10.1080/23743603.2021.1878340 Table 3); a
+            # token with no letter is a value, not an arm.
+            continue
         splittable = sum(
             1
             for ci in range(n)
@@ -2331,7 +2371,19 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
         if c["r"] == top_r and int(c.get("colspan") or 1) > 1
         and (table.get("rendering") or "") != "markup"
     }
-    grouped = _detect_column_groups(
+    # PACKED ARMS ARE DECIDED FIRST, from the body. `_detect_column_groups` reads
+    # the `_MERGE_SEPARATOR` sentinel as a folded SUPER-header, but the same
+    # sentinel is written by the continuation merge for a single column's
+    # two-line header ("Underfilled" over "M (SD)"). Measured 2026-09-26 on
+    # 10.1525/collabra.77859 Table 2: once Camelot's dropped header line was
+    # recovered (tables/camelot_row_ties.py), two such columns read as arms
+    # "Underfilled"/"Overfilled", the fallback grouping handed t, p, df and d to
+    # the last one, and every record lost its t, p and df. The packed-arm
+    # signature is in the BODY -- the same k arm names on every data row and
+    # k-splittable data cells -- and cannot be produced by a header, so when it
+    # is present the arms are the rows' own and a header grouping is not.
+    packed = _detect_packed_arms(header, body)
+    grouped = None if packed is not None else _detect_column_groups(
         header, printed_spans or None, _top_row_arm_cols(grid) or None
     ) if _allow_groups else None
 
@@ -2360,9 +2412,8 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
     level_context = vocab_all
 
     # Packed parallel-arm table (Separate/Joint values space-joined inside each
-    # cell). Detected only when there are no column-groups; handled by its own
-    # split-then-flatten path so each arm becomes its own typed record.
-    packed = _detect_packed_arms(header, body) if grouped is None else None
+    # cell), detected above; handled by its own split-then-flatten path so each
+    # arm becomes its own typed record.
     if packed is not None:
         return _flatten_packed_arms(
             table_id,

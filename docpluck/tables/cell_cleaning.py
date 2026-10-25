@@ -49,7 +49,6 @@ from docpluck.normalize import (
     recover_corrupted_minus_signs,
     recover_dropped_minus_ci_upper_in_text,
     recover_pua_glyphs,
-    recover_times_interaction_glyph,
 )
 
 
@@ -692,9 +691,37 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             v = (c or "").strip()
             if not v or not re.search(r"[A-Za-z]", v) or i >= len(parent):
                 continue
-            if _DATA_VALUE_CELL_RE.match((parent[i] or "").strip()):
+            p = (parent[i] or "").strip()
+            # A df pair ("1, 114") is a complete value too: collabra.90203
+            # Table 9 (p13) glued its next section heading onto one.
+            if _DATA_VALUE_CELL_RE.match(p) or _DF_PAIR_CELL_RE.match(p):
                 return True
         return False
+
+    # A spanning section heading is not the second line of a column label.
+    # 10.1525/collabra.90203 Table 9 (p13) prints the column header
+    # "df | F | p | BF01 | eta2p | 95% CI" over a heading "Identifiability main
+    # effect, without joint [S1] *" that starts in column 1; the prose merge
+    # glued the heading onto "df", so no column read as df. The shape: the
+    # parent is a row of >= 3 short labels with no value and an empty stub, the
+    # row is ONE cell of several words that lands on one of those labels. A
+    # two-line column label ("Underfilled" over "M (SD)") is short and keeps
+    # joining; so does a wrapped prose cell (its parent cell is not a label row).
+    def _heading_under_label_row(row: list[str], parent: list[str]) -> bool:
+        if not parent or (parent[0] or "").strip():
+            return False
+        labels = [(p or "").strip() for p in parent[1:] if (p or "").strip()]
+        if len(labels) < 3 or any(
+            len(p) > 12 or _DATA_VALUE_CELL_RE.match(p) for p in labels
+        ):
+            return False
+        nz = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+        if len(nz) != 1:
+            return False
+        i, v = nz[0]
+        if i == 0 or i >= len(parent) or not (parent[i] or "").strip():
+            return False
+        return len(v.split()) >= 4 and len(v) > 3 * len(parent[i].strip())
 
     # A row that carries its OWN values is a row, whatever sits in its label
     # column. 10.1177/01461672251327169 Table 6 (p11) prints "Overall negative:
@@ -841,6 +868,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             )
             and not _prose_onto_value(row, out[-1])
             and not _row_has_own_values(row, out[-1])
+            and not _heading_under_label_row(row, out[-1])
         ):
             parent = out[-1]
             for i in range(min(len(row), len(parent))):
@@ -1029,21 +1057,49 @@ _DATA_VALUE_CELL_RE = re.compile(
 )
 
 
+# An F test's degrees-of-freedom pair as printed in a "df" column: "1, 114".
+_DF_PAIR_CELL_RE = re.compile(r"^\d+,\s*\d+$")
+
+
+def _is_data_value_cell(cell: str) -> bool:
+    """A data value, or -- for a cell the continuation merge joined -- one data
+    value per joined line. Measured 2026-10-24 on 10.1080/23743603.2021.1878340
+    Table 2: two printed rows per product (items A and C) merge into one row
+    whose cells read ``.001`` + ``< .001``; judged as one string they matched no
+    value pattern, the merged data row passed as a header row, and its product
+    disappeared from the records."""
+    if _MERGE_SEPARATOR not in cell:
+        return _is_value_or_values(cell)
+    parts = [x.strip() for x in cell.split(_MERGE_SEPARATOR) if x.strip()]
+    return bool(parts) and all(_is_value_or_values(x) for x in parts)
+
+
+def _is_value_or_values(text: str) -> bool:
+    """One data value, or two or more space-separated ones ("52.96 36.06"). The
+    second form is what a cell holding two printed columns' values looks like
+    once Camelot's appended textlines keep their separator
+    (`camelot_cell_join`); glued, "52.9636.06" happened to match the value
+    pattern, and separating it must not turn a data row into a header row
+    (10.1017/jdm.2024.31 Table 2, measured 2026-10-25)."""
+    if _DATA_VALUE_CELL_RE.match(text):
+        return True
+    if _THOUSANDS_GROUPED_RE.match(text):
+        # "177 709" is ONE count printed with a thin-space thousands separator;
+        # it is left exactly as the single-value test judged it before.
+        return False
+    toks = text.split()
+    return len(toks) >= 2 and all(_DATA_VALUE_CELL_RE.match(t) for t in toks)
+
+
+_THOUSANDS_GROUPED_RE = re.compile(r"^\d{1,3}(?:\s\d{3})+$")
+
+
 def _is_header_like_row(row: list[str]) -> bool:
     """Heuristic: a row that looks like part of a header rather than data."""
     nonempty = [c.strip() for c in row if (c or "").strip()]
     if not nonempty:
         return False
-    # A cell the continuation merge stacked ("−3.23 (993.46)" over "−3.50
-    # (997.65)", joined by the merge separator) is data when every stacked part
-    # is: whole, it matched nothing, so 10.1080/23743603.2021.1878340 p13 Table 2's
-    # first stacked data row read as a third header row and its values became
-    # group names.
-    numeric = sum(
-        1 for c in nonempty
-        if all(_DATA_VALUE_CELL_RE.match(p.strip())
-               for p in c.split(_MERGE_SEPARATOR) if p.strip())
-    )
+    numeric = sum(1 for c in nonempty if _is_data_value_cell(c))
     if numeric / len(nonempty) > 0.3:
         return False
     avg_len = sum(len(c) for c in nonempty) / len(nonempty)
