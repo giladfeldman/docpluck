@@ -7,6 +7,7 @@ child whose behaviour is known: one that only computes, one that only waits.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
@@ -27,7 +28,8 @@ def test_child_cpu_is_readable_and_moves_on_this_platform():
     """A reader that always returned 0 or None would disable every budget."""
     if sys.platform != "win32" and not sys.platform.startswith("linux"):
         pytest.skip("CPU time is read on Windows and Linux; elsewhere the wall fallback applies")
-    proc = subprocess.Popen(_BUSY)
+    exe, extra_env = cpu_budget.python_for_children()
+    proc = subprocess.Popen([exe, *_BUSY[1:]], env={**os.environ, **extra_env})
     try:
         time.sleep(1.5)
         cpu = cpu_budget._child_cpu_seconds(proc)

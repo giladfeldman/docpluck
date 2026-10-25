@@ -71,6 +71,32 @@ def cpu_seconds(fn: Callable[[], object], *, repeat: int = 5) -> float:
 # --- a child process ----------------------------------------------------------
 
 
+def python_for_children() -> tuple[str, dict[str, str]]:
+    """The interpreter a measured child should run, and the env it needs.
+
+    On Windows a virtual environment's ``python.exe`` is a launcher that starts
+    the base interpreter as ITS child, so the process a test can measure is the
+    launcher, which burns no CPU: a child spinning for 1.5 s read as 0.016 s of
+    CPU, and no budget could ever fire. The base interpreter, given the
+    launcher's ``__PYVENV_LAUNCHER__``, runs as that same virtual environment in
+    ONE process. Outside a Windows venv this is ``sys.executable`` unchanged.
+    """
+    base = getattr(sys, "_base_executable", sys.executable)
+    if sys.platform == "win32" and os.path.normcase(base) != os.path.normcase(sys.executable):
+        return base, {"__PYVENV_LAUNCHER__": sys.executable}
+    return sys.executable, {}
+
+
+def _direct(cmd: list[str], popen_kwargs: dict) -> list[str]:
+    """``cmd`` with a venv launcher swapped for the interpreter it would start."""
+    if not cmd or os.path.normcase(str(cmd[0])) != os.path.normcase(sys.executable):
+        return cmd
+    exe, extra_env = python_for_children()
+    if extra_env:
+        popen_kwargs["env"] = {**(popen_kwargs.get("env") or os.environ), **extra_env}
+    return [exe, *cmd[1:]]
+
+
 def _child_cpu_seconds(proc: subprocess.Popen) -> float | None:
     """User + kernel CPU seconds of ``proc`` itself, or None if unreadable here.
 
@@ -138,6 +164,7 @@ def run_with_cpu_budget(
     start = time.monotonic()
     popen_kwargs.setdefault("text", True)
     popen_kwargs.setdefault("encoding", "utf-8")
+    cmd = _direct(list(cmd), popen_kwargs)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **popen_kwargs)
     last_cpu = -1.0
     last_progress = start
