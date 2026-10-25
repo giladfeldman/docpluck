@@ -52,9 +52,10 @@ def _text(t) -> str:
 # ---- one paper, both arms ---------------------------------------------------
 # 10.1001/jamanetworkopen.2023.16111: the journal masthead + a section heading is
 # gridded on p2 and p8 (furniture), and a real "Outcome / beta (95% CI)" results
-# grid on p7 has no caption. pdftotext prints that results grid word for word, so
+# grid on p7 (printed as Table 3; rasterized 2026-10-24) was unpaired. pdftotext
+# prints that results grid word for word, so
 # "the words are on the page" alone WOULD drop it -- the statistics veto is what
-# keeps it.
+# keeps it. (Since 2.4.26 that grid is paired with its Table 3 caption.)
 
 @pytest.fixture(scope="module")
 def jama_open_11():
@@ -72,12 +73,17 @@ def test_masthead_grids_are_deduplicated_and_recorded(jama_open_11):
 
 
 def test_a_results_grid_the_page_text_repeats_is_still_kept(jama_open_11):
-    kept = [t for t in _candidates(jama_open_11) if "95% CI" in _text(t) and t["page"] == 7]
+    # The grid is Table 3's own: since table extraction 2.4.26 it is paired with
+    # that caption (its cells open with the caption's last line, "for People Who
+    # Remained Abstinent ...") instead of standing as an uncaptioned candidate
+    # while a copy of Table 2's grid carried the Table 3 label. Kept either way.
+    kept = [t for t in jama_open_11["tables"] if "95% CI" in _text(t) and t["page"] == 7]
     assert kept, (
-        "the uncaptioned beta (95% CI) results grid on p7 was dropped -- a "
+        "the beta (95% CI) results grid on p7 was dropped -- a "
         "statistical table is not a duplicate because pdftotext linearized it. "
-        f"candidates: {[(t['id'], t['page'], _text(t)[:60]) for t in _candidates(jama_open_11)]}"
+        f"tables: {[(t['id'], t['page'], _text(t)[:60]) for t in jama_open_11['tables']]}"
     )
+    assert [t.get("label") for t in kept] == ["Table 3"], [(t["id"], t.get("label")) for t in kept]
 
 
 # ---- real uncaptioned tables named by the release review: all must stay -------

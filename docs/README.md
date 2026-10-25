@@ -65,7 +65,7 @@ Filter on it; do not infer it from `label`.
 
 | value | meaning |
 |---|---|
-| `matched` | paired with a detected `Table N` caption |
+| `matched` | paired with a detected `Table N` caption, or (table extraction 2.4.26) a grid that opens with the page's own printed `TABLE N (Continued)` head: such a table also carries `continuation_of` (= its `label`), and its `caption` is that printed head |
 | `none_found` | no caption, but the table itself is certain — the file declares it (a DOCX `w:tbl`) |
 | `uncaptioned_candidate` | a PDF grid found on a page where no caption matched it. **Kept, not discarded** — it may be a real uncaptioned table, or text laid out in columns (a title block, a running header, the inside of a figure). `label` and `caption` are `None`; the id starts with `u`. Rendered Markdown shows these in a separate "Uncaptioned table candidates (unverified)" section. A grid that is demonstrably a copy of its own page's running text — no cell carries a statistic, and every line is found on that page of `text` — is not kept a second time; each such skip is counted in `fallbacks` as `camelot_candidate_is_page_running_text` (page in `fallback_details`); likewise a page-1 grid without statistics that the body's masthead test would strip (`camelot_candidate_is_page_masthead`). A grid with statistics is always kept, even when `text` repeats it word for word. |
 
@@ -558,6 +558,18 @@ credible interval is not graded as a confidence interval; absence means the tabl
 p number exactly as the cell prints it (`".050"`, `".001"` for `< .001`), beside the numeric
 `fields["p"]` (0.05), so a consumer can judge p within half a unit of the last printed decimal.
 
+**A printed inequality travels with its statistic** (table extraction 2.4.26): a cell printed
+`< 0.001 [0.000, 0.004]` in an eta-squared column gives `fields["eta2"]` = 0.001 **and**
+`fields["eta2_op"]` = `"<"`, and the sentence reads `η² < 0.001`. Every typed statistic
+(`t`, `F`, `chi2`, `U`, `z`, `r`, `d`, `eta2`, `M`, `SD`, `est`, `BF01`) gets a `<key>_op`
+(`<`, `>`, `≤`, `≥`) only when its cell prints one; absent on a printed equality. `p` keeps its own
+`p_op`, unchanged. Also new in 2.4.26: Mann-Whitney `fields["U"]` and `fields["z"]`; a value printed
+with a footnote or significance mark (`-1.48a`, `3.67***`) is parsed (the mark stays in `raw_cells`);
+a statistic column printed under no group header is emitted as its own record with no `group`
+rather than typed into every arm; a group label repeated over each column of its span (`M`, `SD`)
+is one arm; and a grouping under which no column yields a typed value is flattened one record per
+row with no `group` (those per-arm records carried only the row label and the group name).
+
 **A restored sign is marked on its cell** (table extraction 2.4.24): when a minus the page prints
 (drawn in a TeX/MathTime symbol font) was missing from Camelot's text, docpluck puts it back from
 the page's own text layer and the cell carries `"restored": "sign"`. A printed value never carries
@@ -817,6 +829,7 @@ what `docpluck extract --structured` prints).
 | `raw_text` | `str` | the region's text as extracted |
 | `cell_geometry` | `str \| None` | whether `cells[].bbox` is real — see the table under [Structured extraction](#structured-extraction-v20) |
 | `caption_status` | `"matched"` \| `"none_found"` \| `"uncaptioned_candidate"` | how sure docpluck is this is a captioned table |
+| `continuation_of` | `str` (optional key) | present only on a grid that opens with a printed `TABLE N (Continued)` head: the label of the table it continues |
 
 ### `Cell`
 
@@ -985,7 +998,7 @@ get_version_info()
 #  'git_sha': '…',
 #  'normalize_version': '1.9.77',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.8',   #   independently of the package version
-#  'table_extraction_version': '2.4.25',
+#  'table_extraction_version': '2.4.26',
 #  'references_version': '1.0.0',
 #  'body_scope_version': '1.0.0',
 #  'python_version': '3.14.5',      # the interpreter…

@@ -484,6 +484,49 @@ def _recover_ci_upper_in_grid_row(row: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+# A cell holding nothing but a MINUS SIGN (U+2212 only: a hyphen, en dash or em
+# dash alone in a cell is the usual not-applicable placeholder, never a sign).
+_LONE_MINUS = "−"
+# An unsigned printed number, optionally starred or footnote-marked: the only
+# kind of cell a detached minus may be given back to.
+_UNSIGNED_NUMBER_CELL_RE = re.compile(r"^\d*\.?\d+(?:[*∗†‡]+|[a-z])?$")
+
+
+def _attach_detached_sign_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Give a row of lone minus signs back to the numbers they belong to.
+
+    A minus set in a symbol font a point or two off the digits' baseline comes
+    out of the table backend as a ROW of its own (10.1093/sf/soaf022 p17 Table 5:
+    ``75.52`` / ``−`` / ``(40.58)``, where the page prints ``−75.52`` over
+    ``(40.58)``). Left alone, the continuation merge folds the standard-error
+    row onto the lone sign and renders ``−(40.58)`` -- a sign the page puts on
+    the estimate, moved onto its standard error.
+
+    The sign row joins the ADJACENT row (above first, then below) in which every
+    one of its columns holds an unsigned number; a minus is never prefixed to a
+    parenthesis, a bracket or a word. When no neighbour qualifies the row is kept
+    as captured (and ``_is_fragment_continuation`` refuses to fold onto it).
+    """
+    out = [list(r) for r in rows]
+    gone: set[int] = set()
+    for i, row in enumerate(out):
+        nz = [j for j, c in enumerate(row) if (c or "").strip()]
+        if not nz or any((row[j] or "").strip() != _LONE_MINUS for j in nz):
+            continue
+        for k in (i - 1, i + 1):
+            if k < 0 or k >= len(out) or k in gone:
+                continue
+            nb = out[k]
+            if all(j < len(nb) and _UNSIGNED_NUMBER_CELL_RE.match((nb[j] or "").strip())
+                   for j in nz):
+                for j in nz:
+                    nb[j] = _LONE_MINUS + nb[j].strip()
+                gone.add(i)
+                record_fallback("table_detached_minus_row_reattached", detail=f"{len(nz)} cells")
+                break
+    return [r for i, r in enumerate(out) if i not in gone]
+
+
 def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
     """Merge rows where the first column is empty INTO the previous row.
 
@@ -613,6 +656,10 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
         # only ever CONTINUE an existing cell, never invent a new column.
         for i, _ in nz:
             if i >= len(parent) or not (parent[i] or "").strip():
+                return False
+            # A lone minus is a detached sign, not a value to continue: folding
+            # "(40.58)" onto it printed "−(40.58)" (see _attach_detached_sign_rows).
+            if parent[i].strip() == _LONE_MINUS:
                 return False
         return True
 
@@ -745,6 +792,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             return new_label_too and not any(rest) and not _is_lowercase_wrap(lead)
         return any(_DATA_VALUE_CELL_RE.match(c) for c in rest)
 
+    rows = _attach_detached_sign_rows(rows)
     out: list[list[str]] = []
     for row_i, row in enumerate(rows):
         nxt = rows[row_i + 1] if row_i + 1 < len(rows) else None
@@ -986,7 +1034,16 @@ def _is_header_like_row(row: list[str]) -> bool:
     nonempty = [c.strip() for c in row if (c or "").strip()]
     if not nonempty:
         return False
-    numeric = sum(1 for c in nonempty if _DATA_VALUE_CELL_RE.match(c))
+    # A cell the continuation merge stacked ("−3.23 (993.46)" over "−3.50
+    # (997.65)", joined by the merge separator) is data when every stacked part
+    # is: whole, it matched nothing, so 10.1080/23743603.2021.1878340 p13 Table 2's
+    # first stacked data row read as a third header row and its values became
+    # group names.
+    numeric = sum(
+        1 for c in nonempty
+        if all(_DATA_VALUE_CELL_RE.match(p.strip())
+               for p in c.split(_MERGE_SEPARATOR) if p.strip())
+    )
     if numeric / len(nonempty) > 0.3:
         return False
     avg_len = sum(len(c) for c in nonempty) / len(nonempty)

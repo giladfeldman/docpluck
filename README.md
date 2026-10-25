@@ -253,7 +253,7 @@ where its entry-shaped lines end, so body text placed after the bibliography is 
 
 `flatten_tables_for_paper(tables)` (or `flatten_table(table)` for one) turns each body row of
 each table into a `FlattenedRow`: its table, page, row label, header, cells, an English sentence
-(`"Importance: t(741) = 3.93, p < .001, d = 0.29"`) and parsed `fields`. A confidence interval is stated at the level the table prints (`90% CI`, `95% CrI`; a bare `CI` when none is stated), and `fields["CI_level"]` carries that level when present, with `fields["CI_kind"]` (`CI`, `CrI` or `HDI`); `fields["p_text"]` carries the p-value exactly as printed (`".050"` beside `p` = 0.05). This is the input
+(`"Importance: t(741) = 3.93, p < .001, d = 0.29"`) and parsed `fields`. A confidence interval is stated at the level the table prints (`90% CI`, `95% CrI`; a bare `CI` when none is stated), and `fields["CI_level"]` carries that level when present, with `fields["CI_kind"]` (`CI`, `CrI` or `HDI`); `fields["p_text"]` carries the p-value exactly as printed (`".050"` beside `p` = 0.05); a printed inequality on any other statistic travels as `<key>_op` (`fields["eta2_op"]` = `"<"` for `< 0.001`). This is the input
 format for downstream statistics checkers; the CLI writes it as JSON Lines with
 `render --tables-jsonl`. `render_flattened_inline(rows, table_id=...)` renders rows back as a
 Markdown block.

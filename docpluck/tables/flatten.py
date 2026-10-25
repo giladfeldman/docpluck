@@ -26,7 +26,9 @@ What we emit: per body row, a `FlattenedRow` dict with
     `est`, `M`, `SD`, `CI_lower`, `CI_upper`, `CI_level` with `CI_kind`
     (`CI` / `CrI` / `HDI`), `group` for a
     parallel-arm row's arm label, and `p_text`, the p number exactly as the
-    cell prints it, e.g. ".050" beside `p` = 0.05). Empty dict when nothing is
+    cell prints it, e.g. ".050" beside `p` = 0.05), Mann-Whitney `U` and `z`,
+    and `<key>_op` (`eta2_op`, `d_op`, ...) beside a statistic whose cell prints
+    an inequality ("< 0.001"), absent otherwise. Empty dict when nothing is
     recognized.
 
 Canonical contract: docpluck always emits these records as a sidecar
@@ -135,6 +137,73 @@ def _cells_to_grid(cells: list[Cell]) -> list[list[str]]:
         if grid[c["r"]][c["c"]] == "":
             grid[c["r"]][c["c"]] = (c.get("text") or "").strip()
     return grid
+
+
+def _alnum_key(s: str) -> str:
+    return re.sub(r"[^0-9a-z]", "", (s or "").lower())
+
+
+def _drop_leading_caption_rows(
+    grid: list[list[str]], label: Optional[str], caption: Optional[str],
+    record: bool = True,
+) -> list[list[str]]:
+    """Blank the table's own label and caption lines at the top of its grid, and
+    drop the rows that leaves empty.
+
+    A capture region that starts at the caption puts ``Table 3`` and the title
+    line(s) in the grid's first rows (10.1016/j.jesp.2021.104154 p6 Table 3), and
+    the header split then took ``Table 3`` as the column header: every column
+    went untyped. Only the TOP of the grid is read, and only when its first
+    non-empty row carries the label itself; after that a cell is blanked only
+    when it is a whole line of the caption (>= 12 letters/digits, found verbatim
+    in the caption once case, spacing and punctuation are ignored) or the
+    "(Continued)" of a continuation head; a row whose cells, joined, form such a
+    line is blanked whole. Scanning
+    stops at the first row with no such cell, so a header word that merely
+    appears in the caption ("Condition") is never touched.
+    """
+    lab = _alnum_key(label or "")
+    if not grid or not lab:
+        return grid
+    cap = _alnum_key(caption or "")
+    out = [list(r) for r in grid]
+    start = next((i for i, r in enumerate(out) if any((c or "").strip() for c in r)), None)
+    if start is None:
+        return grid
+    if not any(_alnum_key(c) == lab for c in out[start]):
+        return grid
+    i = start
+    while i < len(out) and i < start + 4:
+        row = out[i]
+        hit = False
+        # A caption line Camelot split across cells ("Summary of" | "the
+        # replication results ..."): each piece may be too short to call a
+        # caption line, the joined row is one.
+        joined = "".join(_alnum_key(c) for c in row)
+        if i > start and cap and len(joined) >= 12 and joined in cap:
+            for j in range(len(row)):
+                row[j] = ""
+            i += 1
+            continue
+        for j, c in enumerate(row):
+            k = _alnum_key(c)
+            if not k:
+                continue
+            if k == lab or (len(k) >= 12 and cap and k in cap) or k in (
+                "continued", "cont", "contd",
+            ) or (
+                cap and k.startswith(lab) and len(k) > len(lab) and k in cap
+            ):
+                row[j] = ""
+                hit = True
+        if not hit:
+            break
+        i += 1
+    kept = [r for idx, r in enumerate(out)
+            if idx < start or idx >= i or any((c or "").strip() for c in r)]
+    if record and len(kept) != len(grid):
+        record_fallback("flatten_skipped_caption_rows", detail=f"{label}: {len(grid) - len(kept)}")
+    return kept
 
 
 def _clean_grid(
@@ -293,6 +362,10 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("eta2",  re.compile(r"^\s*(?:η\s*²?|η2|eta[\s\-]?(?:square|sq|2)?(?:_?p)?)\s*$", re.I)),
     ("M",     re.compile(r"^\s*(?:M|mean)\s*$", re.I)),
     ("SD",    re.compile(r"^\s*(?:SD|std\.?\s*dev\.?|standard\s+deviation)\s*$", re.I)),
+    # Mann-Whitney U and a z statistic (10.1016/j.jesp.2021.104154 Tables 3 and 5
+    # print "U  z  p"): untyped, a U-test table reached consumers with no fields.
+    ("U",     re.compile(r"^\s*(?:U|Mann[\s\-]?Whitney\s*U)\s*$")),
+    ("z",     re.compile(r"^\s*[zZ](?:[\s\-]?(?:value|score|stat(?:istic)?))?\s*$")),
     ("n",     re.compile(r"^\s*n\s*$", re.I)),
     ("N",     re.compile(r"^\s*N\s*$")),
     # est_ci: a *combined* effect-and-interval column whose header carries an
@@ -563,6 +636,38 @@ def _fold_minus(s: str) -> str:
         return "-" if not before or before[-1] in _SIGN_CONTEXT else m.group(0)
 
     return _SIGN_DASH_RE.sub(sign, s)
+
+
+# A printed inequality in front of an estimate: "< 0.001 [0.000, 0.004]",
+# "> 1.20", "≤ .05". Only the p column used to keep its operator (`p_op`); every
+# other statistic lost it and a bound reached consumers as an equality
+# (10.1080/23743603.2021.1878340 p16 Table 4: "< 0.001" became eta2 = 0.001).
+_EST_OP_RE = re.compile(r"^\s*(<=|>=|≤|≥|<|>)\s*(?=[-+−–]?\.?\d)")
+# The statistics whose printed operator is carried as `<key>_op`. `p` keeps its
+# own long-standing `p_op` contract and is not in this set.
+_OP_FIELDS = ("t", "F", "chi2", "U", "z", "r", "d", "eta2", "M", "SD", "est", "BF01")
+
+
+# A footnote / significance mark printed after a value: "-1.48a", "9.84 a",
+# "3.67***", "2.10†". One lowercase letter or a run of mark glyphs, nothing more,
+# so "2.0 ab" or a word is never read as a marked number.
+_VALUE_MARK_RE = re.compile(r"(?:\s?[a-z]|\s*[*∗†‡§¶#]+)$")
+
+
+def _strip_value_mark(s: str) -> str:
+    """The cell without a trailing footnote / significance mark (see above)."""
+    s = _strip_fold_sentinels(s or "")
+    return _VALUE_MARK_RE.sub("", s).strip()
+
+
+def _split_leading_op(s: str) -> tuple[Optional[str], str]:
+    """``("<", "0.001 [0.000, 0.004]")`` for a cell that opens with an inequality,
+    ``(None, s)`` otherwise. ``<=`` / ``>=`` are reported as ``≤`` / ``≥``."""
+    m = _EST_OP_RE.match(s or "")
+    if not m:
+        return None, s
+    op = {"<=": "≤", ">=": "≥"}.get(m.group(1), m.group(1))
+    return op, s[m.end():]
 
 
 def _parse_number(s: str) -> Optional[float]:
@@ -1261,6 +1366,10 @@ def _flatten_one_row(
     level_context: Optional[str] = None,
 ) -> FlattenedRow:
     row_label, label_col = _pick_row_label(row)
+    # A row whose "label" is itself a marked value ("0.17***") is a line of
+    # values Camelot split off its labelled row: its marked values are not
+    # typed (they would be published under a number, not a variable).
+    label_is_value = _parse_number(_strip_value_mark((row_label or "").strip())) is not None
 
     # Find the F-with-df regex by role name so the list-ordering can shift
     # without breaking the lookup.
@@ -1325,9 +1434,10 @@ def _flatten_one_row(
         elif role == "est":
             # A recovered point-estimate column (its interval is a sibling CI
             # column). Bare value, no inline interval.
-            est = _parse_number(raw)
+            est_op, est_raw = _split_leading_op(raw)
+            est = _parse_number(est_raw)
             if est is None:
-                est = _to_signed_float(raw)
+                est = _to_signed_float(est_raw)
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
                 # DOMAIN GUARD. Whenever the η²p key came from anywhere but the
@@ -1356,11 +1466,14 @@ def _flatten_one_row(
                 ):
                     eff_key = "est"
                 role_nums[eff_key] = est
-                role_vals[eff_key] = raw
+                role_vals[eff_key] = est_raw.strip() if est_op else raw
+                if est_op:
+                    role_vals[eff_key + "_op"] = est_op
         elif role == "est_ci":
             # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)"
             # or "0.76 [.50, 1.02]".
-            est = _parse_leading_number(raw)
+            est_op, est_raw = _split_leading_op(raw)
+            est = _parse_leading_number(est_raw)
             if est is not None:
                 eff_key = _effect_key(header[ci], effect_hint_eff)
                 if (
@@ -1371,8 +1484,10 @@ def _flatten_one_row(
                     eff_key = "est"
                 role_nums[eff_key] = est
                 role_vals[eff_key] = (
-                    re.split(r"[\[(]", raw, maxsplit=1)[0].strip() or _fmt_num(est)
+                    re.split(r"[\[(]", est_raw, maxsplit=1)[0].strip() or _fmt_num(est)
                 )
+                if est_op:
+                    role_vals[eff_key + "_op"] = est_op
                 if eff_key == "est":
                     role_vals["est_label"] = _est_label_from_header(header[ci])
             # The estimate anchors the CI sign when the bounds are hyphen-glued.
@@ -1382,6 +1497,21 @@ def _flatten_one_row(
                 role_nums["CI_upper"] = hi
         else:
             n = _parse_number(raw)
+            if n is None:
+                # A value carrying a footnote / significance mark ("-1.48a",
+                # "3.67***") was refused outright, so the row lost its t or d.
+                bare = _strip_value_mark(raw)
+                if bare != raw and not label_is_value:
+                    n = _parse_number(bare)
+                    if n is not None:
+                        role_vals[role] = bare
+            if n is None and role in _OP_FIELDS:
+                op, rest = _split_leading_op(raw)
+                if op:
+                    n = _parse_number(rest)
+                    if n is not None:
+                        role_vals[role] = rest.strip()
+                        role_vals[role + "_op"] = op
             if n is not None:
                 role_nums[role] = n
 
@@ -1436,6 +1566,7 @@ def _flatten_one_row(
                         detail=f"r={role_nums['r']}")
         role_nums.pop("r")
         role_vals.pop("r", None)
+        role_vals.pop("r_op", None)
     if "p" in role_nums and not (0.0 <= role_nums["p"] <= 1.0):
         record_fallback("flatten_dropped_out_of_domain_field",
                         detail=f"p={role_nums['p']}")
@@ -1497,9 +1628,13 @@ def _flatten_one_row(
     fields: dict[str, object] = {}
     if group:
         fields["group"] = group
-    for k in ("t", "F", "chi2", "r", "d", "eta2", "M", "SD", "est", "BF01"):
+    for k in ("t", "F", "chi2", "U", "z", "r", "d", "eta2", "M", "SD", "est", "BF01"):
         if k in role_nums:
             fields[k] = role_nums[k]
+            # The printed inequality, when there is one (additive: absent on a
+            # printed equality, so every existing reader sees the same record).
+            if role_vals.get(k + "_op"):
+                fields[k + "_op"] = role_vals[k + "_op"]
     for k in ("n", "N"):
         if k in role_nums:
             v = role_nums[k]
@@ -1617,48 +1752,57 @@ def _assemble_sentence(
     """
     parts: list[str] = []
 
+    def eq(k: str) -> str:
+        # The relation the cell prints: "=" unless it printed an inequality.
+        return role_vals.get(k + "_op") or "="
+
     if "est" in role_nums:
         est_label = role_vals.get("est_label", "") or "estimate"
         est_txt = role_vals.get("est", _fmt_num(role_nums["est"]))
-        parts.append(f"{est_label} = {est_txt}")
+        parts.append(f"{est_label} {eq('est')} {est_txt}")
 
     if "t" in role_nums:
         if df is not None:
-            parts.append(f"t({_fmt_num(df)}) = {role_vals['t']}")
+            parts.append(f"t({_fmt_num(df)}) {eq('t')} {role_vals['t']}")
         else:
-            parts.append(f"t = {role_vals['t']}")
+            parts.append(f"t {eq('t')} {role_vals['t']}")
 
     if "F" in role_nums:
         if df1 is not None and df2 is not None:
-            parts.append(f"F({_fmt_num(df1)}, {_fmt_num(df2)}) = {role_vals['F']}")
+            parts.append(f"F({_fmt_num(df1)}, {_fmt_num(df2)}) {eq('F')} {role_vals['F']}")
         else:
-            parts.append(f"F = {role_vals['F']}")
+            parts.append(f"F {eq('F')} {role_vals['F']}")
 
     if "chi2" in role_nums:
         chi_val = role_vals["chi2"]
         if df is not None and "n" in role_nums:
-            parts.append(f"χ²({_fmt_num(df)}, N = {role_vals['n']}) = {chi_val}")
+            parts.append(f"χ²({_fmt_num(df)}, N = {role_vals['n']}) {eq('chi2')} {chi_val}")
         elif df is not None:
-            parts.append(f"χ²({_fmt_num(df)}) = {chi_val}")
+            parts.append(f"χ²({_fmt_num(df)}) {eq('chi2')} {chi_val}")
         else:
-            parts.append(f"χ² = {chi_val}")
+            parts.append(f"χ² {eq('chi2')} {chi_val}")
+
+    if "U" in role_nums:
+        parts.append(f"U {eq('U')} {role_vals['U']}")
+    if "z" in role_nums:
+        parts.append(f"z {eq('z')} {role_vals['z']}")
 
     if "r" in role_nums:
         if "n" in role_nums:
             try:
                 df_r = int(role_nums["n"]) - 2
-                parts.append(f"r({df_r}) = {role_vals['r']}")
+                parts.append(f"r({df_r}) {eq('r')} {role_vals['r']}")
             except (TypeError, ValueError):
-                parts.append(f"r = {role_vals['r']}")
+                parts.append(f"r {eq('r')} {role_vals['r']}")
         else:
-            parts.append(f"r = {role_vals['r']}")
+            parts.append(f"r {eq('r')} {role_vals['r']}")
 
     if "M" in role_nums and "SD" in role_nums:
-        parts.append(f"M = {role_vals['M']}, SD = {role_vals['SD']}")
+        parts.append(f"M {eq('M')} {role_vals['M']}, SD {eq('SD')} {role_vals['SD']}")
     elif "M" in role_nums:
-        parts.append(f"M = {role_vals['M']}")
+        parts.append(f"M {eq('M')} {role_vals['M']}")
     elif "SD" in role_nums:
-        parts.append(f"SD = {role_vals['SD']}")
+        parts.append(f"SD {eq('SD')} {role_vals['SD']}")
 
     if "p" in role_nums:
         op = role_vals.get("p_op", "=")
@@ -1668,11 +1812,11 @@ def _assemble_sentence(
         parts.append(f"p {op} {p_txt}")
 
     if "d" in role_nums:
-        parts.append(f"d = {role_vals['d']}")
+        parts.append(f"d {eq('d')} {role_vals['d']}")
     if "eta2" in role_nums:
-        parts.append(f"η² = {role_vals['eta2']}")
+        parts.append(f"η² {eq('eta2')} {role_vals['eta2']}")
     if "BF01" in role_nums:
-        parts.append(f"BF01 = {role_vals['BF01']}")
+        parts.append(f"BF01 {eq('BF01')} {role_vals['BF01']}")
 
     if "CI_lower" in role_nums and "CI_upper" in role_nums:
         if "CI" in role_vals:
@@ -1767,7 +1911,15 @@ def _arms_by_role_repeat(
             return None
         groups.append(((header[s].split(_MERGE_SEPARATOR, 1)[0]).strip(), cols))
     in_arm = {c for _, cols in groups for c in cols}
-    return [i for i in range(n) if i not in in_arm], groups
+    outside = [i for i in range(n) if i not in in_arm]
+    # A STATISTIC column under neither label is no arm's: shared into each arm it
+    # typed 10.1177/01461672251327169 Table 6's "Prevalence estimate mean" as the
+    # Item-level analysis's M. Same rule as the printed-span path in
+    # `_detect_column_groups`: it becomes its own record with no group.
+    row_stats = [i for i in outside if roles[i]]
+    if row_stats:
+        groups.append(("", row_stats))
+    return [i for i in outside if i not in row_stats], groups
 
 
 def _detect_column_groups(
@@ -1787,6 +1939,36 @@ def _detect_column_groups(
     pre-existing single-row path). Keyed on the structural fold signature, not
     on any column text — general across publishers."""
     starts = [i for i, h in enumerate(header) if _MERGE_SEPARATOR in (h or "")]
+    # A spanning label repeated into EVERY column of its span ("Controllability"
+    # over M and again over SD) is one arm, not one arm per column: a start
+    # directly after a start with the same label continues that arm. Without
+    # this each column became its own record and M was parted from its SD.
+    def _arm_label(i: int) -> str:
+        return (header[i].split(_MERGE_SEPARATOR, 1)[0]).strip()
+
+    def _sub_header(i: int) -> str:
+        parts = header[i].split(_MERGE_SEPARATOR, 1)
+        return _alnum_key(parts[1] if len(parts) > 1 else "")
+
+    # Only when the sub-headers differ (M then SD): the same label over two
+    # columns with the SAME sub-header ("d" and "d") is two comparisons, and one
+    # arm would keep one d and drop the other.
+    deduped: list[int] = []
+    run_subs: set[str] = set()
+    prev = None
+    for i in starts:
+        if (
+            prev is not None and i == prev + 1 and deduped
+            and _arm_label(i) == _arm_label(deduped[-1])
+            and _sub_header(i) not in run_subs
+        ):
+            run_subs.add(_sub_header(i))
+            prev = i
+            continue
+        deduped.append(i)
+        run_subs = {_sub_header(i)}
+        prev = i
+    starts = deduped
     # A folded cell is EITHER a super-header label over its sub-header OR one
     # column's own header wrapped onto several lines ("Actual / prevalence /
     # average"); both carry the sentinel. When the grid's top row holds labels
@@ -1852,6 +2034,32 @@ def _detect_column_groups(
     # previously-grouped table stays byte-identical unless this strictly corrects
     # its alignment (a left-aligned super-header already at the block start yields
     # the identical grouping). General, keyed on structure, not paper id. (DP-5.)
+    # THE SUB-HEADERS REPEAT. When the columns after the row-label columns are
+    # one run of sub-headers printed once per arm ("Estimate | Z | p | OR [95%
+    # CI]" twice) and each arm label sits inside its own repetition, each
+    # repetition is that arm -- wherever the centred label landed. Without this
+    # a typed first column of the run ("Z") stopped the label-column scan,
+    # the blocks no longer divided evenly, and the literal fallback shared the
+    # first arm's Z with both arms (apa/chandrashekar_2023_mp p10 Table 8).
+    k_arms = len(starts)
+    sub_keys = [_alnum_key((h or "").split(_MERGE_SEPARATOR)[-1]) for h in header]
+    for left in range(1, starts[0] + 1):
+        width = n - left
+        if width % k_arms or width // k_arms < 2:
+            continue
+        blk = width // k_arms
+        runs = [sub_keys[left + j * blk: left + (j + 1) * blk] for j in range(k_arms)]
+        if not all(run == runs[0] for run in runs) or not any(
+            _classify_column(header[i]) for i in range(left, left + blk)
+        ):
+            continue
+        if not all(left + j * blk <= s < left + (j + 1) * blk for j, s in enumerate(starts)):
+            continue
+        return list(range(left)), [
+            (_arm_label(s), list(range(left + j * blk, left + (j + 1) * blk)))
+            for j, s in enumerate(starts)
+        ]
+
     def _is_label_col(i: int) -> bool:
         return i not in starts and not _classify_column(header[i])
 
@@ -2087,7 +2295,7 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
     return rows
 
 
-def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
+def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[FlattenedRow]:
     """Flatten a structured `Table` into per-row `FlattenedRow` records.
 
     Returns ``[]`` for tables with no usable cells or fewer than 2 rows
@@ -2098,6 +2306,9 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     if not cells:
         return []
     grid = _cells_to_grid(cells)
+    grid = _drop_leading_caption_rows(
+        grid, table.get("label"), table.get("caption"), record=_allow_groups
+    )
     header_rows, body = _clean_grid(grid, _declared_header_rows(table))
     if not header_rows or not body:
         return []
@@ -2122,7 +2333,7 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
     }
     grouped = _detect_column_groups(
         header, printed_spans or None, _top_row_arm_cols(grid) or None
-    )
+    ) if _allow_groups else None
 
     # Blank-header column-role recovery (non-grouped tables only — grouped
     # tables already resolve roles per arm). When the grid header leaves stat
@@ -2224,6 +2435,16 @@ def _flatten_table_rows(table: Table) -> list[FlattenedRow]:
                 )
             )
 
+    # A grouping that bound no statistic in any arm did nothing but repeat each
+    # row once per "arm" -- often under the first word of a wrapped header taken
+    # for an arm label (10.5465/amle.2017.0488 p13 Table 5: "Academic" / "Book" /
+    # "WoS" from "Academic Source" / "Book Citations" / "WoS Citations"). Such a
+    # table is flattened as an ungrouped one: one record per row.
+    if grouped is not None and out and not any(
+        k != "group" for r in out for k in (r.get("fields") or {})
+    ):
+        record_fallback("flatten_untyped_grouping_dropped", detail=f"{label}: {len(out)} records")
+        return _flatten_table_rows(table, _allow_groups=False)
     return out
 
 

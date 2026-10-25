@@ -76,3 +76,30 @@ def test_restriction_never_removes_an_existing_grouping():
     old = _detect_column_groups(header)
     assert old is not None
     assert _detect_column_groups(header, None, {1, 2}) == old
+
+
+def test_a_statistic_column_under_no_group_is_bound_to_neither(rows):
+    """'Prevalence estimate mean' is printed under neither group header. It was
+    shared into every arm, so each Item-level record carried M = the prevalence
+    estimate (47.41 for "Had fight/argument") as if the item analysis reported it.
+    It is now its own record with no group, like the printed-span path does."""
+    item = _group(rows, "Had fight/argument", "Item-level analysis")
+    assert all("M" not in f for f in item), item
+    part = _group(rows, "Had fight/argument", "Participant-level analyses")
+    assert len(part) == 1 and part[0].get("M") == -23.63 and part[0].get("SD") == 23.54, part
+    own = [f for lab, f in rows if lab == "Had fight/argument" and "group" not in f]
+    assert own and own[0].get("M") == 47.41, own
+
+
+def test_role_repeat_grouping_keeps_unspanned_stats_apart():
+    from docpluck.tables.cell_cleaning import _MERGE_SEPARATOR as S
+    from docpluck.tables.flatten import _detect_column_groups
+    # Shape of Table 6: a mean printed before the arms, then the first arm's own
+    # mean / SD / t (its centred label lands on p), then the second arm.
+    # The wrapped headers carry the fold marker too, as in the real grid.
+    header = ["Item", f"Prev{S}mean", f"Error{S}mean", f"Error{S}SD", "t", f"A{S}p", "d",
+              "t", f"B{S}p", "d"]
+    label_cols, groups = _detect_column_groups(header, None, {5, 8})
+    names = [g for g, _ in groups]
+    assert names[:2] == ["A", "B"], groups
+    assert ("", [1]) in groups and label_cols == [0], (label_cols, groups)

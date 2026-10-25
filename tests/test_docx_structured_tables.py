@@ -197,7 +197,10 @@ class TestResultShapeIsAdditive:
 
         res = extract_docx_structured(_docx_with_stats_table())
         assert res["tables"], "no table extracted from a document with one table"
-        declared = set(Table.__annotations__)
+        # The REQUIRED keys: `__annotations__` holds only the class's own
+        # annotations, so once `Table` gained an optional subclass key it would
+        # have compared against that key alone.
+        declared = set(Table.__required_keys__)
         got = set(res["tables"][0])
         assert declared <= got, f"Table fields missing from the DOCX path: {declared - got}"
 
