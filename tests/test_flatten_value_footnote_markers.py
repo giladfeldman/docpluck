@@ -35,3 +35,21 @@ def test_trailing_markers_do_not_drop_the_value():
 def test_words_are_not_markers():
     out = _fields([["Item", "t", "p"], ["A", "n.s", ".50"], ["B", "2.0 ab cd", ".04"]])
     assert "t" not in out[0]["fields"] and "t" not in out[1]["fields"]
+
+
+def test_a_marked_value_on_a_row_without_its_label_is_not_typed():
+    # Corpus chicago-ad/demography_6.pdf p28 Table 1: Camelot splits a row's
+    # starred values onto a line of their own, without the row's label. The
+    # first value then stands as the row label ("0.17***") and typing the next
+    # one would publish M = 0.20 under a number instead of a variable.
+    from docpluck.tables.flatten import flatten_table
+    rows = [["Variable", "Mean", "SD"],
+            ["", "0.17***", "0.20***"],
+            ["Age", "65.20***", "1.10"]]
+    cells = [{"r": r, "c": c, "rowspan": 1, "colspan": 1, "text": t, "is_header": r == 0,
+              "bbox": (0.0, 0.0, 0.0, 0.0)} for r, row in enumerate(rows) for c, t in enumerate(row) if t]
+    out = flatten_table({"id": "t1", "label": "Table 1", "page": 1, "cells": cells,
+                         "caption": "Table 1 Sample", "kind": "structured"})
+    by = {r["row_label"]: r["fields"] for r in out}
+    assert by.get("0.17***", {}) == {}, by
+    assert by["Age"] == {"M": 65.2, "SD": 1.1}, by

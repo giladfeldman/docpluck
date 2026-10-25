@@ -1366,6 +1366,10 @@ def _flatten_one_row(
     level_context: Optional[str] = None,
 ) -> FlattenedRow:
     row_label, label_col = _pick_row_label(row)
+    # A row whose "label" is itself a marked value ("0.17***") is a line of
+    # values Camelot split off its labelled row: its marked values are not
+    # typed (they would be published under a number, not a variable).
+    label_is_value = _parse_number(_strip_value_mark((row_label or "").strip())) is not None
 
     # Find the F-with-df regex by role name so the list-ordering can shift
     # without breaking the lookup.
@@ -1497,7 +1501,7 @@ def _flatten_one_row(
                 # A value carrying a footnote / significance mark ("-1.48a",
                 # "3.67***") was refused outright, so the row lost its t or d.
                 bare = _strip_value_mark(raw)
-                if bare != raw:
+                if bare != raw and not label_is_value:
                     n = _parse_number(bare)
                     if n is not None:
                         role_vals[role] = bare
