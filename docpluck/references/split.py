@@ -100,34 +100,12 @@ _INLINE_NUM = re.compile(
     # BMJ: "... 1834-40. 4 Smith AB, Jones C." -- a bare number before a Vancouver name
     r"|(?<=[.)\]\d])\s+(?=\d{1,3}\s+[A-ZÀ-Þ][\w'’\-]+(?:\s[A-ZÀ-Þ]?[\w'’\-]+)?\s[A-Z]{1,3}[,.])"
 )
-#: the NEXT entry's number printed at the end of this entry's last line
-#: ("... PMID: 28140125 2."). A volume ends lines the same way ("J Pers. 12."),
-#: so these are cut only when the line-end numbers count up 2, 3, 4, ...
-_TRAIL_NUM = re.compile(r"(?<=[.)\]\d])\s+(?=(\d{1,3})\.$)")
-
-
-def _trailing_sequence(lines: list[_Line]) -> bool:
-    nums = [int(m.group(1)) for ln in lines if (m := _TRAIL_NUM.search(ln.text))]
-    run = best = 0
-    for k, n in enumerate(nums):
-        run = run + 1 if k and n == nums[k - 1] + 1 else 1
-        best = max(best, run)
-    return best >= 3
 
 
 def _explode(lines: list[_Line]) -> list[_Line]:
     out: list[_Line] = []
-    trailing = _trailing_sequence(lines)
     for ln in lines:
-        if _NUMBERS_ONLY.match(ln.text):
-            # "1. 2." -- one line per list number
-            for m in re.finditer(r"\[?\d{1,4}[\].)]?", ln.text):
-                out.append(_Line(m.group(), ln.start + m.start(), ln.start + m.end(), ln.blank_before))
-            continue
         cuts = [m.end() for m in _INLINE_NUM.finditer(ln.text)]
-        if trailing:
-            cuts += [m.end() for m in _TRAIL_NUM.finditer(ln.text)]
-            cuts.sort()
         if not cuts:
             out.append(ln)
             continue
@@ -209,7 +187,20 @@ def entry_density(text: str) -> float:
     return hits / len(lines)
 
 
+def _one_number_per_line(lines: list[_Line]) -> list[_Line]:
+    """ "1. 2." -> "1.", "2.": a line holding only list numbers, one line each."""
+    out: list[_Line] = []
+    for ln in lines:
+        if _NUMBERS_ONLY.match(ln.text) and len(re.findall(r"\d{1,4}", ln.text)) > 1:
+            for m in re.finditer(r"\[?\d{1,4}[\].)]?", ln.text):
+                out.append(_Line(m.group(), ln.start + m.start(), ln.start + m.end(), ln.blank_before))
+        else:
+            out.append(ln)
+    return out
+
+
 def _split_numbered(lines: list[_Line]) -> list[RawEntry]:
+    lines = _one_number_per_line(lines)
     entries: list[tuple[int | None, list[_Line]]] = []
     last: int | None = None
     used: set[int] = set()
