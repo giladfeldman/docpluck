@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from ..blocks import BlockHint
-from ..taxonomy import HEADING_TO_LABEL, lookup_canonical_label
+from ..taxonomy import HEADING_TO_LABEL, SectionLabel, lookup_canonical_label
 
 # Build alternation regex from all canonical heading variants, longest first.
 _CANONICAL_VARIANTS = sorted(
@@ -250,6 +250,15 @@ def _is_fully_isolated_heading(text: str, line_start: int, heading_end: int) -> 
     return False
 
 
+# After the word "Appendix": " 2. Participant ..." (a numbered appendix label
+# followed by its title) and " 5A. " / " 5B: " (a lettered panel of appendix 5).
+_APPENDIX_NUMBERED_LABEL = re.compile(r"[ \t]+\d{1,2}[.:][ \t]+[A-Z]")
+_APPENDIX_PANEL_LABEL = re.compile(r"[ \t]+(\d{1,2})[A-Za-z][.:]")
+
+# The first entry of a numbered reference list: "[1] ", "[1]. ", "1. ", "1) ".
+_FIRST_REFERENCE_ENTRY = re.compile(r"^\s*(?:\[1\]\.?|1[.)])\s+\S")
+
+
 def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolated: bool) -> bool:
     """A heading that was line-isolated and is followed by a tiny next line is
     likely a table row label (e.g., CRediT author-contribution table rows).
@@ -297,6 +306,20 @@ def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolate
         return False
     if len(next_line) <= 5:
         return True
+
+    # A references heading whose next line is the first numbered reference
+    # entry ("[1]. Hartmann KL, ...", "1. Becker T, ...") is the bibliography's
+    # heading, whatever sits above it. Elsevier back matter prints an
+    # abbreviation list (short blank-separated "RT" / "reaction time"
+    # lines) straight above "References"; the column-header sibling check below
+    # read those lines as table header cells and rejected the heading, so the
+    # whole reference list stayed inside the preceding appendix section.
+    heading_line_start = text.rfind("\n", 0, heading_end - 1) + 1
+    if (
+        lookup_canonical_label(text[heading_line_start:heading_end]) is SectionLabel.references
+        and _FIRST_REFERENCE_ENTRY.match(next_line)
+    ):
+        return False
 
     # v2.4.24 (cycle 9): table-COLUMN-header detection. If the heading is
     # PRECEDED by 2+ short standalone-line "noun phrase" siblings (each
@@ -583,6 +606,24 @@ def annotate_text(text: str) -> list[BlockHint]:
         if followed_by_function_word:
             continue
 
+        # Numbered appendix labels ("Appendix 2. Exclusions by condition
+        # ...", "Appendix 5A. Distribution of ..."). A labelled appendix opens a
+        # section whatever its previous paragraph ended with (a table's last
+        # cell has no full stop, and the label was rejected or admitted on
+        # that accident). A lettered panel ("5A", "5B") of an appendix whose
+        # own "Appendix 5" heading came earlier is a figure inside it, never a
+        # new appendix.
+        labelled_appendix = False
+        if heading_text.lower() == "appendix":
+            panel = _APPENDIX_PANEL_LABEL.match(after_heading)
+            if panel and re.search(
+                rf"(?im)^[ \t]*appendix[ \t]+{panel.group(1)}[ \t]*(?:\n|[.:])",
+                text[:line_start],
+            ):
+                seen_offsets.add(start)
+                continue
+            labelled_appendix = bool(_APPENDIX_NUMBERED_LABEL.match(after_heading))
+
         if not (preceded_by_blank or followed_by_capital or at_end_of_line):
             continue
 
@@ -597,7 +638,7 @@ def annotate_text(text: str) -> list[BlockHint]:
         # is weak and needs corroboration.  Adding to seen_offsets BEFORE
         # the continue ensures Pass 1b (which would otherwise re-admit
         # "Funding" via _CANONICAL_AFTER_BLANK) also respects the rejection.
-        if preceded_by_blank and not (followed_by_capital or at_end_of_line):
+        if preceded_by_blank and not (followed_by_capital or at_end_of_line or labelled_appendix):
             if not (
                 _prior_paragraph_is_sentence_terminated(text, line_start)
                 or _is_numbered_subtitle_heading(text, line_start, start, heading_end)

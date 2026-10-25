@@ -78,7 +78,12 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
     frozenset({"introduction", "background", "introduction and background"}):
         SectionLabel.introduction,
     frozenset({"literature review", "review of literature", "related work",
-               "theoretical background", "theory"}): SectionLabel.literature_review,
+               "theoretical background", "theory",
+               # "LITERATURE SURVEY" (engineering / biomedical-imaging papers):
+               # without it the heading matched the bare "literature" variant
+               # of references, and the whole body after it was filed as the
+               # bibliography.
+               "literature survey", "review of the literature"}): SectionLabel.literature_review,
     frozenset({"method", "methods", "materials and methods", "materials & methods",
                "experimental procedures",
                # Short-format papers (JESP FlashReports, brief replication
@@ -146,7 +151,11 @@ HEADING_TO_LABEL: dict[frozenset[str], SectionLabel] = {
         SectionLabel.author_contributions,
     frozenset({"references", "bibliography", "works cited", "literature cited",
                "literature", "cited literature", "reference list",
-               "list of references", "cited references"}): SectionLabel.references,
+               "list of references", "cited references",
+               # German-language journals.
+               # Missing until 2.4.155, so a German paper's bibliography stayed
+               # inside whatever section preceded it.
+               "literatur", "literaturverzeichnis"}): SectionLabel.references,
     frozenset({"appendix", "appendices", "appendix a", "appendix b",
                "appendix c", "appendix d"}): SectionLabel.appendix,
     frozenset({"supplementary", "supplementary material",
