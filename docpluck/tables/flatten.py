@@ -2030,6 +2030,32 @@ def _detect_column_groups(
     # previously-grouped table stays byte-identical unless this strictly corrects
     # its alignment (a left-aligned super-header already at the block start yields
     # the identical grouping). General, keyed on structure, not paper id. (DP-5.)
+    # THE SUB-HEADERS REPEAT. When the columns after the row-label columns are
+    # one run of sub-headers printed once per arm ("Estimate | Z | p | OR [95%
+    # CI]" twice) and each arm label sits inside its own repetition, each
+    # repetition is that arm -- wherever the centred label landed. Without this
+    # a typed first column of the run ("Z") stopped the label-column scan,
+    # the blocks no longer divided evenly, and the literal fallback shared the
+    # first arm's Z with both arms (apa/chandrashekar_2023_mp p10 Table 8).
+    k_arms = len(starts)
+    sub_keys = [_alnum_key((h or "").split(_MERGE_SEPARATOR)[-1]) for h in header]
+    for left in range(1, starts[0] + 1):
+        width = n - left
+        if width % k_arms or width // k_arms < 2:
+            continue
+        blk = width // k_arms
+        runs = [sub_keys[left + j * blk: left + (j + 1) * blk] for j in range(k_arms)]
+        if not all(run == runs[0] for run in runs) or not any(
+            _classify_column(header[i]) for i in range(left, left + blk)
+        ):
+            continue
+        if not all(left + j * blk <= s < left + (j + 1) * blk for j, s in enumerate(starts)):
+            continue
+        return list(range(left)), [
+            (_arm_label(s), list(range(left + j * blk, left + (j + 1) * blk)))
+            for j, s in enumerate(starts)
+        ]
+
     def _is_label_col(i: int) -> bool:
         return i not in starts and not _classify_column(header[i])
 

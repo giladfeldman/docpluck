@@ -89,3 +89,17 @@ def test_repeated_labels_over_repeated_subheaders_stay_apart():
             ["ingroup", "0.29", "0.01"]]
     out = _flat(rows)
     assert sorted(r["fields"].get("d") for r in out) == [0.01, 0.29], [r["fields"] for r in out]
+
+
+def test_centred_arm_labels_over_repeated_subheaders_bind_their_own_columns():
+    # Corpus apa/chandrashekar_2023_mp.pdf p10 Table 8: "Model 1" / "Model 2"
+    # sit centred over Estimate | Z | p | OR [95% CI], printed twice. Each arm
+    # is one repetition of the sub-header run; the first arm's Z is not shared.
+    rows = [["", "", "", "Model 1", "", "", "", "Model 2", ""],
+            ["Predictor", "", "", "", "", "", "", "", ""],
+            ["", "Estimate", "Z", "p", "OR [95% CI]", "Estimate", "Z", "p", "OR [95% CI]"],
+            ["Intercept", "0.72 (0.14)", "5.11", "<.001", "2.05 [1.56, 2.71]",
+             "0.28 (0.16)", "1.79", "0.072", "1.33 [0.97, 1.81]"]]
+    out = _flat(rows, header_rows=3)
+    got = {r["fields"].get("group"): (r["fields"].get("z"), r["fields"].get("p")) for r in out}
+    assert got == {"Model 1": (5.11, 0.001), "Model 2": (1.79, 0.072)}, [r["fields"] for r in out]
