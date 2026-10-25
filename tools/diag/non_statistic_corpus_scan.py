@@ -99,10 +99,14 @@ _ALNUM = re.compile(r"[^0-9A-Za-z]")
 # URL carrying a U+200B ZERO WIDTH SPACE does not resolve, and folding them to
 # ASCII is what makes the link work.
 _DASHES = dict.fromkeys(
-    [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212, 0x00AD, 0x2043], "-"
+    [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212, 0x2043], "-"
 )
+# U+00AD SOFT HYPHEN is invisible and S6 deletes it (normalize.py replaces it with
+# the empty string), so it folds to nothing. Folding it to "-" reported a URL whose
+# soft hyphens were stripped as "rewritten" on 10.1177/0956797617751898 and
+# 10.1177/0956797619848351, which made this gate exit 1 on a healthy tree.
 _INVISIBLE = dict.fromkeys(
-    [0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2060, 0xFEFF], None
+    [0x00AD, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2060, 0xFEFF], None
 )
 # Ligatures likewise: a PDF that encodes `/files/` with U+FB01 gives a URL that
 # does not resolve, and expanding it is the fix, not the bug. Measured instance:
