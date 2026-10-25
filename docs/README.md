@@ -901,13 +901,13 @@ docpluck render FILE [--level none|standard|academic]
 
 ## Environment variables
 
-All default to off; set to `1` to enable.
+All default to off (set to `1` to enable) except `DOCPLUCK_COLUMN_CORRECT_GENERAL`, which is on unless set to `0`.
 
 | variable | effect |
 |---|---|
 | `DOCPLUCK_FALLBACK_LOG` | print each fallback event to standard error as it is recorded |
 | `DOCPLUCK_DISABLE_CAMELOT` | do not run Camelot; tables come only from the non-Camelot capture paths |
-| `DOCPLUCK_COLUMN_CORRECT_GENERAL` | experimental: two-column re-ordering on more pages, still only with a clean central gutter and every word preserved |
+| `DOCPLUCK_COLUMN_CORRECT_GENERAL` | on by default (`0` turns it off): two-column re-ordering of interleaved pages, only with a clean central gutter and every word preserved; a full-width table above or below the columns is read in place, and a page that is a table across the gutter, or two-column blocks stacked apart or in different type, keeps its order |
 | `DOCPLUCK_COLUMN_CORRECT_BANDED` | experimental: per-band re-extraction for mixed-layout pages the whole-page corrector skips |
 | `DOCPLUCK_RCT_L2_BYPASS` | diagnostic: turns off two table-region guards so their effect can be measured |
 
@@ -996,7 +996,7 @@ from docpluck import get_version_info
 get_version_info()
 # {'version': '2.4.154',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.77',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.78',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.8',   #   independently of the package version
 #  'table_extraction_version': '2.4.26',
 #  'references_version': '1.0.0',

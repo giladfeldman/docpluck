@@ -75,7 +75,8 @@ _LINE_Y_TOLERANCE = 5.0
 
 def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2,
                               pdf_bytes: bytes | None = None,
-                              allow_gutter_fallback: bool = False) -> str:
+                              allow_gutter_fallback: bool = False,
+                              require_prose: bool = False) -> str:
     """Re-extract a single page's text via column-aware ordering.
 
     Strategy: detect the column midline via word-center histogram on the
@@ -97,6 +98,14 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
             reading-order-inversion path (callers pass True only for pages the
             inversion detector flagged, and only under the word-preservation
             guard) so the legacy column-interleave path stays byte-identical.
+        require_prose: when True, a gutter-strip midline is used only when
+            `_column_region_plan` finds a safe reading of the page: one pair of
+            prose columns, or pairs of columns stacked with tables / blocks
+            that are read full width in place. Otherwise the page falls back to
+            the legacy histogram detector and its own table gate, exactly as if
+            the gutter had not been found. Passed for the general-interleave
+            pages, not for the reference-inversion and rotation pages, whose
+            correction predates this plan.
 
     Returns:
         The page text in left-then-right column order. Empty string if the
@@ -136,6 +145,7 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
     # reference list), which is exactly the O5 reading-order-inversion case.
     gutter_gated = False
     midline_x = None
+    region_plan: list | None = []
     if allow_gutter_fallback:
         # Inversion path: the full-height gutter strip is the STRONGER 2-column
         # discriminator on banded reference pages (table stacked above a
@@ -146,6 +156,21 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
         # histogram 327 (off, near the gutter) → gutter 297 (the true column
         # boundary), bilateral gate would otherwise reject the CRediT table.
         midline_x = _detect_2col_midline_gutter(all_words, page_width, page_height)
+        if midline_x is not None and require_prose and pdf_bytes is not None:
+            # Which parts of the page are a pair of prose columns. None: no
+            # safe reading, so the gutter is not used and the page goes to the
+            # legacy detector below, exactly as if no gutter had been found.
+            g_ox = (getattr(page, "origin", None) or (0.0, 0.0))[0]
+            c_words = _crop_space_words(page)
+            shape = _column_cut_layout(c_words, page_width, hint_x=midline_x - g_ox)
+            if shape is not None:
+                region_plan = _column_region_plan(
+                    c_words, shape[0], shape[1],
+                    math.inf if shape[2] < 0 else shape[2])
+                if region_plan is None:
+                    record_fallback("column_gutter_not_prose",
+                                    detail=f"p{page_index + 1}")
+                    midline_x = None
         if midline_x is not None:
             gutter_gated = True
     if midline_x is None:
@@ -213,7 +238,8 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
         # cut layout just refused.
         return _crop_and_extract(pdf_bytes, page_index, midline_x - ox,
                                  page_width, page_height,
-                                 _crop_space_words(page))
+                                 _crop_space_words(page),
+                                 regions=region_plan if gutter_gated else None)
 
     # Without the PDF bytes there is nothing to crop: word-join approach (no
     # inter-word spacing fix).
@@ -226,9 +252,320 @@ def extract_page_text_columns(layout_doc, page_index: int, column_count: int = 2
     return left_text + "\n\n" + right_text
 
 
+# ── Region plan for the general left-then-right reorder ──
+#
+# A clean vertical gutter is not proof that the page is ONE pair of prose
+# columns. Measured over the 125-paper corpus manifest (per-page reading order
+# scored against an independent OCR of each page, then every changed page read
+# against its raster), the whole-page reorder broke three shapes of page:
+#   * a TABLE whose empty middle column lines up with the gutter — a full-page
+#     table, a landscape table, a three-column supplementary table: read left
+#     half then right half, no table row survives;
+#   * a full-width table, figure or block STACKED above or below two columns
+#     of text (a descriptive-statistics table under the Results, an author
+#     note in two small columns under the body): the reorder ran the left half
+#     of the block into the left column and the right half into the right;
+#   * two two-column blocks stacked one above the other (a reference list
+#     above a boxed block of back matter, a two-column figure caption above
+#     the body): the reorder ran the lower block's left half up into the
+#     upper block.
+# Reading every changed page also showed what must NOT split a page: a band
+# with text on one side only (a heading, a figure, a column that runs on
+# below the other), two headings level by chance, a table set inside one
+# column beside prose.
+# `_column_region_plan` cuts the body at full-width blank bands and decides
+# for each piece whether it is two prose columns, a table across the gutter,
+# or something one-sided or too small to tell, which joins the column flow
+# next to it. It returns how to read the body: [] = one flow of two columns
+# (the plain whole-page read); a list of regions read top to bottom (columns
+# left then right, a table above or below them full width); or None = no
+# safe reading (a table across the page, two-column blocks stacked apart or
+# in different type) — the caller then keeps pdftotext's own order. The page
+# does not say whether stacked blocks are one flow or two, so they are never
+# guessed at.
+
+# A gap this wide (pt) inside one side of a text row separates table cells; a
+# justified prose line's widest word space is a few points.
+_TABLE_CELL_GAP = 10.0
+# A side whose rows are mostly cell-separated is a table, not a text column.
+_TABLE_SIDE_FRACTION = 0.5
+# Rows with cell gaps on BOTH sides at once: a table spanning the gutter.
+_SPANNING_TABLE_ROWS = 10
+_SPANNING_TABLE_FRACTION = 0.3
+# A pair of columns has at least this many rows on each side.
+_MIN_COLUMN_ROWS = 2
+# A prose side: at least this many rows, and this share of them run across at
+# least this share of the side's width (paragraph ends and headings fall short).
+_PROSE_MIN_ROWS = 5
+_PROSE_LINE_FILL = 0.8
+_PROSE_FULL_FRACTION = 0.6
+# A prose side whose lines mostly start on the same line (within this many pt)
+# as a row of the table side is one table across the gutter (a wrapped cell).
+_ROW_ALIGN_TOL = 1.0
+_ALIGNED_ROW_FRACTION = 0.5
+# Fewer word-like tokens than this on a side: a column of numbers.
+_MIN_SIDE_ALPHA = 0.3
+# A side split by its own blank vertical strip (no row crosses it, and at
+# least this many rows hold text on both sides of it) is two table columns:
+# a prose column's full lines cross every strip inside it.
+_SUBCOLUMN_STRIP = 8
+_SUBCOLUMN_MIN_ROWS = 1
+# A full-width blank band at least this many line heights tall separates two
+# regions of the page.
+_REGION_GAP_LINES = 1.0
+# Two pairs of prose columns in the same type size, separated by a band this
+# tall and each holding this many rows a side, are independent stacked
+# regions — or one column flow that skips the band. Nothing on the page says
+# which, so the page keeps its original order.
+_STACK_GAP_LINES = 2.0
+_STACK_MIN_ROWS = 4
+# Line pitches (median distance between successive lines) further apart than
+# this are different type: a caption or note block against body text. Pitch,
+# not word height: a word's box height follows its glyphs ("profile" with an
+# ascender and a descender is taller than "were" in the same font), and in a
+# caption set in two columns one side measured 8.5pt and the other 7pt.
+_SAME_SIZE_RATIO = 1.05
+
+# A word-like token: starts with two letters.
+_ALPHA_TOKEN = r"^[^\W\d_]{2,}"
+
+
+def _max_gap(ws: list[dict]) -> float:
+    ws = sorted(ws, key=lambda w: w["x0"])
+    return max((b["x0"] - a["x1"] for a, b in zip(ws, ws[1:])), default=0.0)
+
+
+def _has_subcolumns(side_rows: list[list[dict]]) -> bool:
+    """A blank vertical strip inside one side that every row respects, with
+    text on both sides of it in several rows: the side holds table columns.
+    A prose column's lines run across its whole width, so they cross any
+    interior strip."""
+    words = [w for ws in side_rows for w in ws]
+    if not words:
+        return False
+    x0 = min(w["x0"] for w in words)
+    x1 = max(w["x1"] for w in words)
+    lo, hi = int(x0 + 0.1 * (x1 - x0)), int(x1 - 0.1 * (x1 - x0))
+    if hi - lo < _SUBCOLUMN_STRIP:
+        return False
+    crossed = [False] * (hi - lo + 1)
+    for w in words:
+        for x in range(max(lo, int(w["x0"])), min(hi, int(w["x1"])) + 1):
+            crossed[x - lo] = True
+    run = 0
+    for i, c in enumerate(crossed):
+        run = 0 if c else run + 1
+        if run >= _SUBCOLUMN_STRIP:
+            sx0, sx1 = lo + i - run + 1, lo + i
+            both = sum(1 for ws in side_rows
+                       if any(w["x1"] < sx0 for w in ws)
+                       and any(w["x0"] > sx1 for w in ws))
+            if both >= _SUBCOLUMN_MIN_ROWS:
+                return True
+    return False
+
+
+def _side_is_tabular(side_rows: list[list[dict]]) -> bool:
+    import re
+    gappy = sum(1 for ws in side_rows if _max_gap(ws) >= _TABLE_CELL_GAP)
+    if gappy >= _TABLE_SIDE_FRACTION * len(side_rows):
+        return True
+    toks = [w for ws in side_rows for w in ws]
+    alpha = sum(1 for w in toks if re.match(_ALPHA_TOKEN, w["text"]))
+    if alpha < _MIN_SIDE_ALPHA * len(toks):
+        return True
+    return _has_subcolumns(side_rows)
+
+
+def _side_is_prose(side_rows: list[list[dict]]) -> bool:
+    """Most lines run across the side's full width: a text column, not a
+    stack of short labels or cells."""
+    if len(side_rows) < _PROSE_MIN_ROWS:
+        return False
+    x0 = min(w["x0"] for ws in side_rows for w in ws)
+    x1 = max(w["x1"] for ws in side_rows for w in ws)
+    if x1 <= x0:
+        return False
+    full = sum(1 for ws in side_rows
+               if (max(w["x1"] for w in ws) - min(w["x0"] for w in ws))
+               >= _PROSE_LINE_FILL * (x1 - x0))
+    return full >= _PROSE_FULL_FRACTION * len(side_rows)
+
+
+def _region_kind(words: list[dict], cut_x: float) -> str:
+    """'cols' (two columns of text), 'table' (one table across the gutter),
+    'one' (text on one side only), 'thin' (one line on a side) or 'weak'
+    (neither a table nor two prose columns).
+
+    A table on ONE side next to a prose column is a table set inside that
+    column, so the region is still a pair of columns."""
+    rows: dict[int, tuple[list, list]] = defaultdict(lambda: ([], []))
+    for w in words:
+        side = 0 if (w["x0"] + w["x1"]) / 2 < cut_x else 1
+        rows[int(round(w["top"] / _LINE_Y_TOLERANCE))][side].append(w)
+    sides = [[r[s] for r in rows.values() if r[s]] for s in (0, 1)]
+    if not sides[0] or not sides[1]:
+        return "one"
+    if min(len(sides[0]), len(sides[1])) < _MIN_COLUMN_ROWS:
+        # A line side by side: a running head or footer, or two headings
+        # that happen to share a band. Not evidence of a table across it.
+        return "thin"
+    tabular = [_side_is_tabular(sr) for sr in sides]
+    if tabular[0] and tabular[1]:
+        return "table"
+    if not tabular[0] and not tabular[1] and not (
+            _side_is_prose(sides[0]) and _side_is_prose(sides[1])):
+        # Neither side a table, not both prose: labels, a figure, a short
+        # band, or a table whose header rows cross its own columns.
+        return "weak"
+    if tabular[0] or tabular[1]:
+        table_side, prose_side = (sides[0], sides[1]) if tabular[0] else (sides[1], sides[0])
+        if not _side_is_prose(prose_side):
+            # A table on one side, something short on the other: may be one
+            # table, may be two columns' contents sharing a band.
+            return "weak"
+        # A table's wide text column (a "Summary" cell that wraps) also reads
+        # as prose, but its lines sit on the table's rows. A column of prose
+        # beside a table set in the other column runs at its own line pitch.
+        table_tops = [min(w["top"] for w in ws) for ws in table_side]
+        aligned = sum(1 for ws in prose_side
+                      if any(abs(min(w["top"] for w in ws) - t) <= _ROW_ALIGN_TOL
+                             for t in table_tops))
+        if aligned >= _ALIGNED_ROW_FRACTION * len(prose_side):
+            return "table"
+    spanning = sum(1 for l, r in rows.values()
+                   if l and r and _max_gap(l) >= _TABLE_CELL_GAP
+                   and _max_gap(r) >= _TABLE_CELL_GAP)
+    if (spanning >= _SPANNING_TABLE_ROWS
+            or spanning >= max(2, _SPANNING_TABLE_FRACTION * len(rows))):
+        return "table"
+    return "cols"
+
+
+def _side_words(words: list[dict], cut_x: float, side: int) -> list[dict]:
+    return [w for w in words if ((w["x0"] + w["x1"]) / 2 >= cut_x) == bool(side)]
+
+
+def _type_measure(ws: list[dict]) -> float:
+    """Median line pitch of a block; its median word height when it has fewer
+    than two lines spaced like text."""
+    import statistics
+    tops = sorted({round(w["top"], 1) for w in ws})
+    h = statistics.median(w["bottom"] - w["top"] for w in ws)
+    steps = [b - a for a, b in zip(tops, tops[1:]) if 0.5 * h < b - a < 2.5 * h]
+    return statistics.median(steps) if steps else h
+
+
+def _same_size(a: list[dict], b: list[dict]) -> bool:
+    """Type measures within `_SAME_SIZE_RATIO` (one side empty: no)."""
+    if not a or not b:
+        return False
+    sa, sb = _type_measure(a), _type_measure(b)
+    return max(sa, sb) / max(min(sa, sb), 1e-6) < _SAME_SIZE_RATIO
+
+
+def _rows_per_side(words: list[dict], cut_x: float) -> tuple[int, int]:
+    left = {int(round(w["top"] / _LINE_Y_TOLERANCE)) for w in words
+            if (w["x0"] + w["x1"]) / 2 < cut_x}
+    right = {int(round(w["top"] / _LINE_Y_TOLERANCE)) for w in words
+             if (w["x0"] + w["x1"]) / 2 >= cut_x}
+    return len(left), len(right)
+
+
+def _column_region_plan(words: list[dict], cut_x: float,
+                        body_top: float = 0.0,
+                        body_bottom: float = math.inf):
+    """How to read the body of a page cut at ``cut_x`` (see the block comment
+    above): ``[]``, a list of ``(kind, y_top, y_bottom)`` regions with kind
+    ``"cols"`` or ``"full"``, or ``None``. Only words whose vertical centre
+    lies in ``[body_top, body_bottom]`` are the body (the furniture bands
+    above and below are read full width by the caller)."""
+    import statistics
+    body = [w for w in words if w.get("upright", True)
+            and body_top <= (w["top"] + w["bottom"]) / 2 <= body_bottom]
+    if not body:
+        return []
+    line_h = statistics.median(w["bottom"] - w["top"] for w in body)
+    body.sort(key=lambda w: w["top"])
+    groups: list[list[dict]] = [[body[0]]]
+    gaps: list[float] = []
+    reach = body[0]["bottom"]
+    for w in body[1:]:
+        if w["top"] - reach >= _REGION_GAP_LINES * line_h:
+            gaps.append(w["top"] - reach)
+            groups.append([])
+        groups[-1].append(w)
+        reach = max(reach, w["bottom"])
+
+    kinds = [_region_kind(g, cut_x) for g in groups]
+    if "cols" not in kinds:
+        return None
+    # Bands with text on one side only, or too little to classify, are part
+    # of the column flow (a heading or figure in one column, a column that
+    # runs on below the other, two headings level by chance) — unless they
+    # touch a table across the gutter, whose caption or notes they then are.
+    i = 0
+    while i < len(kinds):
+        if kinds[i] in ("one", "weak", "thin"):
+            j = i
+            while j < len(kinds) and kinds[j] in ("one", "weak", "thin"):
+                j += 1
+            touch = (i > 0 and kinds[i - 1] == "table") or (
+                j < len(kinds) and kinds[j] == "table")
+            # A single line at the top or bottom of the body (a running head
+            # or footer the furniture cut missed) is read full width, where
+            # it stands.
+            edge = (i == 0 or j == len(kinds)) and all(
+                max(_rows_per_side(groups[k], cut_x)) <= 1 for k in range(i, j))
+            for k in range(i, j):
+                kinds[k] = "table" if (touch or edge) else "flow"
+            i = j
+        else:
+            i += 1
+    # [kind, words, words that set the type size]; flow bands join the
+    # column region next to them and take no part in the size comparison.
+    merged: list[list] = []
+    for gap, kind, g in zip([0.0] + gaps, kinds, groups):
+        prev = merged[-1] if merged else None
+        sized = [] if kind == "flow" else list(g)
+        kind = "cols" if kind == "flow" else kind
+        if prev is not None and prev[0] == "cols" and kind == "cols":
+            if prev[2] and sized:
+                same = [_same_size(_side_words(prev[2], cut_x, s),
+                                   _side_words(sized, cut_x, s)) for s in (0, 1)]
+                if all(same):
+                    if (gap >= _STACK_GAP_LINES * line_h
+                            and min(_rows_per_side(prev[2], cut_x)) >= _STACK_MIN_ROWS
+                            and min(_rows_per_side(sized, cut_x)) >= _STACK_MIN_ROWS):
+                        return None
+                elif not any(same):
+                    # Both columns change type size across a blank band: a
+                    # block of notes under the body, or the column flow moving
+                    # on to back matter. The page does not say which.
+                    return None
+            # Same type, or one column carrying on in the same type (the
+            # other changing, e.g. a table then its notes): one column flow.
+            prev[1] += g
+            prev[2] += sized
+            continue
+        if prev is not None and prev[0] == "table" and kind == "table":
+            prev[1] += g
+            prev[2] += sized
+            continue
+        merged.append([kind, list(g), sized])
+    if not any(k == "cols" for k, _, _ in merged):
+        return None
+    if len(merged) == 1:
+        return []
+    return [("cols" if k == "cols" else "full",
+             min(w["top"] for w in ws), max(w["bottom"] for w in ws))
+            for k, ws, _ in merged]
+
+
 def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
                        page_width: float, page_height: float,
-                       words: list[dict] | None = None) -> str:
+                       words: list[dict] | None = None,
+                       regions: list | None = None) -> str:
     """Crop each column and run pdftotext to preserve proper word spacing.
 
     pdfplumber's `extract_text()` on tight-kerned PDFs (JAMA Open et al.)
@@ -250,6 +587,9 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
 
     ``words`` must be in crop space (`_crop_space_words`). Returns "" when the
     page has no glyph-free cut or a crop failed — caller falls back.
+
+    ``regions`` (from `_column_region_plan`, non-empty) reads the body region
+    by region instead of as one pair of columns.
     """
     if words is None:
         return ""
@@ -257,6 +597,9 @@ def _crop_and_extract(pdf_bytes: bytes, page_index: int, midline_x: float,
     if shape is None:
         record_fallback("column_extract_no_glyph_free_cut", detail=f"p{page_index + 1}")
         return ""
+    if regions:
+        return _read_stacked_regions(pdf_bytes, page_index, shape, regions,
+                                     page_width, page_height)
     parts = _read_column_regions(pdf_bytes, page_index, shape, page_width,
                                  page_height, label="column_extract")
     if parts is None:
@@ -511,6 +854,7 @@ def splice_column_corrected_pages(
     changed_out: list | None = None,
     rotation_pages: Iterable[int] | None = None,
     edge_trimmed_pages: Iterable[int] | None = None,
+    prose_pages: Iterable[int] | None = None,
 ) -> str:
     """Splice column-aware re-extracted text into flagged pages of raw_text.
 
@@ -552,6 +896,8 @@ def splice_column_corrected_pages(
         edge_trimmed_pages: 1-indexed pages that may fall back to
             ``extract_page_text_edge_trimmed`` when the whole-page read is
             empty or refused. Same guards.
+        prose_pages: 1-indexed pages whose gutter-strip read must also pass
+            the prose gate (``require_prose``): the general-interleave pages.
 
     Returns:
         Rewritten raw_text with flagged pages' content replaced. Pages whose
@@ -564,6 +910,7 @@ def splice_column_corrected_pages(
     b_pages = set(banded_pages or ())
     r_pages = set(rotation_pages or ())
     e_pages = set(edge_trimmed_pages or ())
+    p_pages = set(prose_pages or ())
     if not pages_set or not offsets:
         return raw_text
 
@@ -581,6 +928,7 @@ def splice_column_corrected_pages(
             rewritten = extract_page_text_columns(
                 layout_doc, page_idx, column_count=2, pdf_bytes=pdf_bytes,
                 allow_gutter_fallback=(page_number_1idx in gf_pages),
+                require_prose=(page_number_1idx in p_pages),
             )
             # RC-1 Step 2 (v2.4.90): when the whole-page corrector can't reach a
             # page (a table/banner row crosses the gutter, or a few stray rows
@@ -1464,18 +1812,28 @@ def _column_cut_layout(words: list[dict], page_width: float,
     # "	", 720pt of advance from x=68 at y~767, far below the watermark —
     # reached into a full-height margin crop as well as the bottom band and
     # came out twice.
+    # Rotated words INSIDE the upright text's span (a figure's axis title)
+    # are body content and stay in the column crops; only the ones beyond
+    # it are the margin. Counting the axis title as margin text vetoed the
+    # margin crop (psychooncology_1 p8: "% showing change" at x~59), and
+    # pdftotext, reading the watermark inside the right column's crop, put
+    # the column's opening table caption after it, at the end of the page.
     margin: tuple[int, int, int, int] | None = None
     if rotated:
         ux0 = min(w["x0"] for w in words)
         ux1 = max(w["x1"] for w in words)
-        rx0 = min(w["x0"] for w in rotated)
-        rx1 = max(w["x1"] for w in rotated)
-        ry0 = max(0, math.floor(min(w["top"] for w in rotated)) - 1)
-        ry1 = math.ceil(max(w["bottom"] for w in rotated)) + 1
-        if rx0 > ux1:
-            margin = (int((ux1 + rx0) / 2.0), math.ceil(page_width), ry0, ry1)
-        elif rx1 < ux0:
-            margin = (0, int((rx1 + ux0) / 2.0), ry0, ry1)
+        beyond_r = [w for w in rotated if w["x0"] > ux1]
+        beyond_l = [w for w in rotated if w["x1"] < ux0]
+        side = beyond_r if len(beyond_r) >= len(beyond_l) else beyond_l
+        if side:
+            rx0 = min(w["x0"] for w in side)
+            rx1 = max(w["x1"] for w in side)
+            ry0 = max(0, math.floor(min(w["top"] for w in side)) - 1)
+            ry1 = math.ceil(max(w["bottom"] for w in side)) + 1
+            if side is beyond_r:
+                margin = (int((ux1 + rx0) / 2.0), math.ceil(page_width), ry0, ry1)
+            else:
+                margin = (0, int((rx1 + ux0) / 2.0), ry0, ry1)
     return mid, cut_top, cut_bot, margin
 
 
@@ -1520,6 +1878,59 @@ def _read_column_regions(pdf_bytes: bytes, page_index: int, shape,
     if margin is None:
         parts.append("")
     return tuple(parts)  # type: ignore[return-value]
+
+
+def _read_stacked_regions(pdf_bytes: bytes, page_index: int, shape, regions,
+                          page_width: float, page_height: float) -> str:
+    """Read a `_column_cut_layout` shape whose body `_column_region_plan` split
+    into regions: the top band, then each region top to bottom — a pair of
+    columns left then right, anything else full width — then the bottom band
+    and the margin. Region cuts fall in the middle of the full-width blank
+    bands that separate the regions, so no glyph lies on one. "" when a crop
+    did not run, or a column of a column region came back empty."""
+    import tempfile
+
+    mid, cut_top, cut_bot, margin = shape
+    bottom = page_height if cut_bot < 0 else cut_bot
+    x_lo, x_hi = 0.0, page_width
+    if margin is not None:
+        if margin[0] > mid:
+            x_hi = margin[0]
+        else:
+            x_lo = margin[1]
+    edges = [float(cut_top)]
+    for (_, _, y_bot), (_, y_top, _) in zip(regions, regions[1:]):
+        edges.append(float(int((y_bot + y_top) / 2.0)))
+    edges.append(float(bottom))
+    crops: list[tuple[str, tuple[float, float, float, float]]] = [
+        ("band", (x_lo, 0.0, x_hi, cut_top))]
+    for (kind, _, _), top, bot in zip(regions, edges, edges[1:]):
+        if kind == "cols":
+            crops.append(("left", (x_lo, top, mid, bot)))
+            crops.append(("right", (mid, top, x_hi, bot)))
+        else:
+            crops.append(("full", (x_lo, top, x_hi, bot)))
+    crops.append(("band", (x_lo, bottom, x_hi, page_height)))
+    if margin is not None:
+        crops.append(("band", (margin[0], margin[2], margin[1], margin[3])))
+    tmp_path = ""
+    parts: list[str] = []
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        for role, box in crops:
+            got = _pdftotext_crop(tmp_path, page_index, *box, label="column_extract")
+            if got is None:
+                return ""
+            if role in ("left", "right") and not got:
+                record_fallback("column_extract_empty_column",
+                                detail=f"p{page_index + 1}:region")
+                return ""
+            parts.append(got)
+    finally:
+        unlink_temp_pdf(tmp_path)
+    return "\n\n".join(p for p in parts if p)
 
 
 def extract_page_text_edge_trimmed(layout_doc, page_index: int,

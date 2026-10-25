@@ -322,13 +322,13 @@ Options for `render`:
 ## Configuration
 
 docpluck reads no configuration files. These environment variables change behaviour; all
-default to off.
+default to off except `DOCPLUCK_COLUMN_CORRECT_GENERAL`, which is on unless set to `0`.
 
 | variable | effect when set to `1` |
 |---|---|
 | `DOCPLUCK_FALLBACK_LOG` | print every fallback event to standard error as it happens |
 | `DOCPLUCK_DISABLE_CAMELOT` | skip Camelot; tables then come only from the non-Camelot paths |
-| `DOCPLUCK_COLUMN_CORRECT_GENERAL` | experimental: apply two-column re-ordering to more pages (still gated on a clean central gutter and on every word surviving) |
+| `DOCPLUCK_COLUMN_CORRECT_GENERAL` | on by default; `0` turns it off. Re-orders a two-column page that pdftotext interleaved, left column then right, only when the page has a clean central gutter and every word survives. A full-width table above or below the columns is read in place; a page that is a table across the gutter, or two-column blocks stacked apart or in different type, keeps its order |
 | `DOCPLUCK_COLUMN_CORRECT_BANDED` | experimental: per-band re-extraction for mixed-layout pages the whole-page corrector skips |
 | `DOCPLUCK_RCT_L2_BYPASS` | diagnostic only: disables two table-region guards, for measuring their effect |
 

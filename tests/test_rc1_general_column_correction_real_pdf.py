@@ -17,11 +17,12 @@ pages — the dominant defect on two-column APA papers (TRIAGE 2026-06-08).
 The fix (general, keyed on a STRUCTURAL SIGNATURE — a clean full-height central
 gutter + a word-preserving reorder, never paper identity): when
 ``DOCPLUCK_COLUMN_CORRECT_GENERAL=1`` the general-interleave flagged pages join
-the inversion pages under BOTH safeties. Default OFF ⇒ the legacy path is
-byte-identical (ship dark, validate against AI golds, then flip the default).
+the inversion pages under BOTH safeties. It shipped dark (default OFF) and was
+turned ON by default in v2.4.155, behind the prose gate (see
+``test_column_prose_gate.py``); ``=0`` turns the general path off again.
 
 These tests assert the two invariants that make the flag safe to flip:
-  1. Flag OFF: byte-identical legacy behaviour (no general column-correction).
+  1. Flag OFF: no general column-correction, deterministic output.
   2. Flag ON: corrects strictly MORE pages, and every corrected page is a PURE
      REORDER — the document's substantial-word multiset is unchanged (rules
      0a/0b: no text dropped, none invented).
@@ -41,8 +42,10 @@ from docpluck.testing import require_corpus_pdf
 
 
 # Two-column corpus papers whose general-interleave pages have a clean gutter
-# (so the flag corrects them) — both already exercised as iterate canaries.
-_STEMS = ["chan_feldman_2025_cogemo", "chandrashekar_2023_mp"]
+# (so the flag corrects them). chandrashekar_2023_mp was the second until
+# v2.4.155: its flagged pages carry tables and figures the region plan does not
+# read safely, so the general path now leaves them as they were.
+_STEMS = ["chan_feldman_2025_cogemo", "ip_feldman_2025_pspb"]
 
 _FLAG = "DOCPLUCK_COLUMN_CORRECT_GENERAL"
 
@@ -57,10 +60,11 @@ def _corrected_pages(method: str) -> set[int]:
 
 @pytest.mark.parametrize("stem", _STEMS)
 def test_flag_off_is_legacy_byte_identical(stem: str, monkeypatch):
-    """With the flag unset, the general path must NOT fire and extraction must
-    be deterministic (the dark default cannot change v2.4.81 output)."""
+    """With the flag set to 0, the general path must NOT fire and extraction
+    must be deterministic (the opt-out restores the legacy output). The flag
+    is ON by default since v2.4.155."""
     pdf = require_corpus_pdf(f"apa/{stem}.pdf")
-    monkeypatch.delenv(_FLAG, raising=False)
+    monkeypatch.setenv(_FLAG, "0")
     b = pdf.read_bytes()
     text_a, method_a = extract_pdf(b)
     text_b, _ = extract_pdf(b)
@@ -68,7 +72,7 @@ def test_flag_off_is_legacy_byte_identical(stem: str, monkeypatch):
     # These papers carry no O5 reference-inversion, so flag-off corrects nothing.
     assert _corrected_pages(method_a) == set(), (
         f"{stem}: general column-correction fired with the flag OFF "
-        f"(method={method_a!r}) — the dark default must be byte-identical legacy."
+        f"(method={method_a!r}) — the opt-out must be byte-identical legacy."
     )
 
 
@@ -81,7 +85,7 @@ def test_flag_on_corrects_more_pages_preserving_words(stem: str, monkeypatch):
     pdf = require_corpus_pdf(f"apa/{stem}.pdf")
     b = pdf.read_bytes()
 
-    monkeypatch.delenv(_FLAG, raising=False)
+    monkeypatch.setenv(_FLAG, "0")
     text_off, method_off = extract_pdf(b)
 
     monkeypatch.setenv(_FLAG, "1")
