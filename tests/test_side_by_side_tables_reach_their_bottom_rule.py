@@ -45,3 +45,17 @@ def test_table9_reaches_its_last_row(chen_p12):
     assert "9.26" not in txt and "4.95" not in txt
     # the note below the bottom rule is not a row
     assert "Bolded options" not in txt and "Options and numbers" not in txt
+
+
+def test_rules_between_row_groups_do_not_end_the_table():
+    """10.48550/arxiv.2410.21901 Table 3 (p5, right column; raster checked
+    2026-10-25) rules off each network's two rows but draws no closing rule
+    under the last group (ViT L: 88.44, 90.03). The last rule is therefore not
+    the table's bottom, and the table must keep that group."""
+    from docpluck.extract_structured import extract_pdf_structured
+    from docpluck.testing.corpus import custody_path
+
+    p = custody_path("fulltext", "10.48550__arxiv.2410.21901.pdf")
+    t = next(t for t in extract_pdf_structured(p.read_bytes())["tables"] if t.get("label") == "Table 3")
+    txt = " ".join(c["text"] for c in t.get("cells") or [])
+    assert "88.44" in txt and "90.03" in txt, txt[-300:]

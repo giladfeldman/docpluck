@@ -1295,6 +1295,33 @@ def _column_table_bottom(
 _COLUMN_RULE_MIN_SPAN: float = 0.8
 
 
+def _table_row_below(page_obj, *, col_x0: float, col_x1: float, y: float) -> bool:
+    """True when the first text line just below ``y`` in the column is a TABLE
+    ROW: two or more runs of glyphs separated by more than 1.5 font sizes. A
+    rule with a row under it separates row groups rather than closing the
+    table (10.48550/arxiv.2410.21901 Table 3 rules off each network's rows and
+    draws no closing rule); a note or body line under a closing rule is one
+    run of ordinary word spacing."""
+    chars = [
+        c for c in (page_obj.chars or ())
+        if col_x0 <= (float(c.get("x0", 0.0)) + float(c.get("x1", 0.0))) / 2.0 < col_x1
+        and y < float(c.get("top", 0.0)) <= y + 14.0
+        and (c.get("text") or "").strip()
+    ]
+    if not chars:
+        return False
+    first = min(float(c["top"]) for c in chars)
+    line = sorted(
+        (c for c in chars if float(c["top"]) - first <= 2.0), key=lambda c: float(c["x0"])
+    )
+    runs = 1
+    for a, b in zip(line, line[1:]):
+        size = max(float(a.get("size", 0.0) or 0.0), 1.0)
+        if float(b["x0"]) - float(a["x1"]) > 1.5 * size:
+            runs += 1
+    return runs >= 2
+
+
 def _column_bottom_rule(
     page_obj,
     *,
@@ -1512,11 +1539,17 @@ def _region_driven_capture(
             # stream column detection to 1 column (chandrashekar Table 4 → 19×1
             # instead of the 10×2 LeBel grid). Clip the bottom at the blank band
             # between the table and that prose so Camelot sees only the grid.
-            # A RULED side-by-side table states its own bottom (see
-            # `_column_bottom_rule`); that wins over both the search band and the
-            # blank-gap guess, up to the next caption in the same column.
-            rule_bottom = None
+            # A RULED side-by-side table can reach below that gap (see
+            # `_column_bottom_rule`): the rule may only EXTEND the bottom, up to
+            # the next caption in the same column, never shorten it -- a table
+            # that rules off its row groups but draws no closing rule ends below
+            # its last rule (10.48550/arxiv.2410.21901 Table 3, ViT L group).
             if col is not None:
+                col_bottom = _column_table_bottom(
+                    page_obj, col_x0=x0, col_x1=x1, top=top, bottom=bottom
+                )
+                if col_bottom is not None and top < col_bottom < bottom:
+                    bottom = col_bottom
                 limit = page_height
                 for nxt in caps_sorted[i + 1:]:
                     nxt_top = cap_top_td.get(id(nxt))
@@ -1528,21 +1561,21 @@ def _region_driven_capture(
                 rule_bottom = _column_bottom_rule(
                     page_obj, col_x0=x0, col_x1=x1, top=top, limit=limit
                 )
-                if rule_bottom is not None and rule_bottom > top + 5.0:
-                    if abs(rule_bottom + 1.0 - bottom) > 1.0:
-                        record_fallback(
-                            "region_side_by_side_bottom_at_rule",
-                            detail=f"p{page}:{c.label}:{bottom:.0f}->{rule_bottom + 1.0:.0f}",
-                        )
+                if rule_bottom is not None and _table_row_below(
+                    page_obj, col_x0=x0, col_x1=x1, y=rule_bottom
+                ):
+                    # The last rule separates row groups; the last group runs on
+                    # below it to the column's next blank gap.
+                    group_end = _column_table_bottom(
+                        page_obj, col_x0=x0, col_x1=x1, top=rule_bottom, bottom=limit
+                    )
+                    rule_bottom = group_end - 1.0 if group_end is not None else None
+                if rule_bottom is not None and rule_bottom + 1.0 > bottom + 1.0:
+                    record_fallback(
+                        "region_side_by_side_bottom_at_rule",
+                        detail=f"p{page}:{c.label}:{bottom:.0f}->{rule_bottom + 1.0:.0f}",
+                    )
                     bottom = rule_bottom + 1.0
-                else:
-                    rule_bottom = None
-            if col is not None and rule_bottom is None:
-                col_bottom = _column_table_bottom(
-                    page_obj, col_x0=x0, col_x1=x1, top=top, bottom=bottom
-                )
-                if col_bottom is not None and top < col_bottom < bottom:
-                    bottom = col_bottom
             # Clip bottom at the next same-page caption that sits below this one.
             # A SIDE-BY-SIDE sibling (a caption assigned to a DIFFERENT column)
             # must be skipped — it is beside, not below, so clipping at its top
