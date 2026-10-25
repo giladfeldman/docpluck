@@ -110,7 +110,7 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
                 if x_left <= (w["x0"] + w["x1"]) / 2 <= x_right
             ]
             in_cell.sort(key=lambda w: w["x0"])
-            text = _normalize_cell_text(" ".join(spaced(w) for w in in_cell))
+            text = _normalize_cell_text(" ".join(w["text"] for w in in_cell))
             cells.append({
                 "r": r,
                 "c": c,
@@ -119,6 +119,7 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
                 "text": text,
                 "is_header": is_header,
                 "bbox": (x_left, row_top, x_right, row_bot),
+                _SPACED_KEY: _normalize_cell_text(" ".join(spaced(w) for w in in_cell)),
             })
     # Gates on RAW, repair on the way out — never the other order. See
     # `_repaired_view`.
@@ -132,7 +133,16 @@ def whitespace_cells(layout: LayoutDoc, *, region: CandidateRegion) -> list[Cell
         # skipped on every run.
         record_fallback("whitespace_grid_failed_clean_gate", detail=region.label or "?")
         return []
+    # The word spaces are a repair too, so they go on AFTER the gates: the gates'
+    # prose and header tests were calibrated on the squeezed text, and judging the
+    # spaced text instead rejected whole grids (10.5465/amle.2017.0488 Tables 2,
+    # 3, 8, 9, 11, 12 with Camelot off, measured 2026-10-24).
+    for cell in cells:
+        cell["text"] = cell.pop(_SPACED_KEY, cell["text"])
     return repair_cells(cells, layout=layout)
+
+
+_SPACED_KEY = "_docpluck_spaced_text"
 
 
 def _word_spacer(layout: LayoutDoc, region: CandidateRegion):

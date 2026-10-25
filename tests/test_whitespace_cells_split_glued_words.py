@@ -50,3 +50,28 @@ def test_no_character_is_lost_or_added(jama_tables_camelot_off):
     t1 = next(t for t in jama_tables_camelot_off if t.get("label") == "Table 1")
     squeezed = {re.sub(r"\s+", "", c["text"]) for c in t1["cells"]}
     assert "Table1.BaselineCharacteristicsoftheStudyParticipantsa" in squeezed
+
+
+def test_spacing_does_not_change_which_grids_are_kept():
+    """The gates judge the squeezed text; spacing is applied after them. Judged
+    on the spaced text, 10.5465/amle.2017.0488 lost six whitespace grids
+    (Tables 2, 3, 8, 9, 11, 12) with Camelot off."""
+    import os
+
+    from docpluck.extract_structured import extract_pdf_structured
+
+    prior = os.environ.get("DOCPLUCK_DISABLE_CAMELOT")
+    os.environ["DOCPLUCK_DISABLE_CAMELOT"] = "1"
+    try:
+        p = custody_path("fulltext", "10.5465__amle.2017.0488.pdf")
+        tables = extract_pdf_structured(p.read_bytes())["tables"]
+    finally:
+        if prior is None:
+            os.environ.pop("DOCPLUCK_DISABLE_CAMELOT", None)
+        else:
+            os.environ["DOCPLUCK_DISABLE_CAMELOT"] = prior
+    by = {t.get("label"): t for t in tables}
+    for label in ("Table 2", "Table 3"):
+        t = by[label]
+        assert t.get("cells"), label
+        assert t.get("cell_geometry") == "whitespace_native", label
