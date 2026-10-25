@@ -170,6 +170,7 @@ class ExtractionReport:
     sectioning_version: str = UNKNOWN
     table_extraction_version: str = UNKNOWN
     references_version: str = UNKNOWN
+    body_scope_version: str = UNKNOWN
     python_version: str = UNKNOWN
     unicodedata_version: str = UNKNOWN
     pdftotext_path: str = UNKNOWN

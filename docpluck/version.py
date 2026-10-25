@@ -13,7 +13,7 @@ therefore covers four classes of input, and every one of them must be here:
 1. **docpluck's own version** — ``version``, ``git_sha``.
 2. **In-repo pipeline versions** that are bumped independently of the package
    version — ``normalize_version``, ``sectioning_version``,
-   ``table_extraction_version``, ``references_version``. Any future ``*_VERSION`` constant added to the
+   ``table_extraction_version``, ``references_version``, ``body_scope_version``. Any future ``*_VERSION`` constant added to the
    package belongs here on the same commit that introduces it.
 3. **The interpreter** — ``python_version`` and ``unicodedata_version``.
    ``normalize.py`` calls ``unicodedata.normalize`` (NFC and NFKC), so the
@@ -416,6 +416,8 @@ def get_version_info() -> dict:
         table_extraction_version: ``TABLE_EXTRACTION_VERSION`` from ``extract_structured.py``.
         references_version:       ``REFERENCES_VERSION`` from ``references/`` (entry
                                   splitting, field parsing, citation linking).
+        body_scope_version:       ``BODY_SCOPE_VERSION`` from ``body.py`` (which
+                                  sections ``extract_pdf_body`` keeps as body text).
         git_sha:                  Git SHA of the docpluck checkout, or ``"unknown"``.
         git_state:                ``"clean"``, ``"dirty"`` or ``"unknown"``. **Read it
                                   with ``git_sha``, never instead of it** — under an
@@ -474,6 +476,7 @@ def get_version_info() -> dict:
     from .sections import SECTIONING_VERSION
     from .extract_structured import TABLE_EXTRACTION_VERSION
     from .references import REFERENCES_VERSION
+    from .body import BODY_SCOPE_VERSION
 
     pdftotext_version, pdftotext_engine = _resolve_pdftotext()
 
@@ -488,6 +491,7 @@ def get_version_info() -> dict:
         "sectioning_version": SECTIONING_VERSION,
         "table_extraction_version": TABLE_EXTRACTION_VERSION,
         "references_version": REFERENCES_VERSION,
+        "body_scope_version": BODY_SCOPE_VERSION,
         "git_sha": _resolve_git_sha(),
         "git_state": _resolve_git_state(),
         "python_version": platform.python_version(),
