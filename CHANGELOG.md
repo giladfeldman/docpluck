@@ -1,5 +1,84 @@
 # Changelog
 
+## [2.4.155] - unreleased - normalization 1.9.78 - table extraction 2.4.26 - sectioning 1.2.8 - references 1.0.0 (new) - body scope 1.0.0 (new)
+
+### Two-column pages are read column by column by default (normalization)
+
+The reorder of interleaved two-column pages (`DOCPLUCK_COLUMN_CORRECT_GENERAL`) is now ON by
+default; set it to `0` for the previous order. Before reordering, the page body is cut into bands at
+full-width blank gaps. A full-width table above or below the columns is read in place. A page that is
+a table across the gutter, or two two-column blocks stacked apart or set in different type, keeps
+pdftotext's order. Headings, figures and tables set inside one column stay in that column's flow. The
+column crops also give a rotated margin watermark its own crop when a figure carries a rotated axis
+title, so a column's opening caption is no longer pushed to the end of the page.
+
+Measured over the 125-paper corpus manifest, on against off: 188 of 2,786 pages change, in 55 papers.
+Every changed page holds the same words (one page joins a name pdftotext had split). 128 of the 188
+pages move at most four lines (running heads and footers). Of the 60 pages that are real reorders, a
+random sample of 12 (one per paper) was judged blind against the rendered page: the new order was
+better on all 12, and two head-only control pages read the same either way. The reorder adds about
+0.4 s per paper. `DOCPLUCK_COLUMN_CORRECT_BANDED` stays off. Some pages the reorder could improve are
+left in pdftotext's order because their layout is ambiguous.
+
+### Body text without the reference list, and reference parsing (new)
+
+- `extract_pdf_body()` returns layout-aware normalized text with the footnotes moved out
+  (`report.footnote_texts`) and the reference list removed; `body_scope_text()` does the removal on
+  normalized text you already have. `BodyScopeReport.removed` holds every span taken out. Without
+  pdfplumber the layout pass is skipped and recorded as the `body_scope_no_layout` fallback.
+- `docpluck.references` (new): `extract_references()` splits the bibliography into entries and parses
+  authors, year, title, container, volume, issue, pages and DOI across APA, Vancouver/AMA, Nature,
+  IEEE, Harvard, AOM, ASA and Chicago styles; `extract_citations()` / `link_citations()` find in-text
+  citations and link them to entries. Both accept file bytes or text. Additive: nothing else reads it.
+- `get_version_info()` reports `references_version` and `body_scope_version`.
+
+### Sections (sectioning 1.2.8)
+
+References are found under a German "Literatur" heading, as an unheaded numbered list of entries, and
+under a "References" heading that follows an abbreviation list. "Literature Survey" is a literature
+review, not the bibliography. A numbered appendix label opens its appendix whatever the previous
+paragraph ended with; a lettered panel ("Appendix 5A.") stays inside its appendix. A CRediT
+contribution line ("Methodology: ...") is never a canonical heading.
+
+### Text cleanup (normalization 1.9.76-1.9.77)
+
+A bare year left behind by a running head (AOM verso heads "2020   Kim and Kim   585") is dropped
+when it opens at least three pages and a quarter of them; year cells in tables are untouched. Page
+footnotes set only slightly smaller than the body (9 pt under 10 pt) are now found. An
+acknowledgment or previous-version note in the front matter is kept, as its own paragraph, instead of
+losing its first line. The wrapped second line of the AOM copyright footer is dropped.
+
+### Tables (table extraction 2.4.26)
+
+- Camelot's stream reader no longer drops a text line lying exactly on a row boundary, and the two
+  rows such a tie split are joined again. Two values Camelot appended into one cell keep a space
+  between them (`.7* .6***`).
+- Side-by-side tables reach their ruled bottom instead of stopping at the first blank gap; a rule
+  between row groups does not end the table.
+- A grid opening with a printed "TABLE N (Continued)" is labelled Table N, `caption_status`
+  "matched", with the new optional key `continuation_of`. A grid whose first row is its own bare
+  "Table N" label is paired with Table N's caption, never with a caption whose number contradicts it.
+- A minus Camelot emits as its own row joins its number. A section heading under a column-header row
+  stays its own row; a data row merged from two printed rows is not taken for the header.
+- The upright whitespace grid keeps the word spaces the page prints when the PDF draws no space glyph.
+
+### Flattened rows
+
+- New typed fields: Mann-Whitney `U`, `z`, and `<key>_op` carrying a printed inequality on a typed
+  statistic (for t, F, chi2, U, z, r, d, eta2, M, SD, est, BF01). A `df` cell printing "2, 40" yields
+  `df1`/`df2`; an F table's one unlabelled effect column is read as eta2 within [0, 1]; packed arms may
+  carry labels like "1A"; values with footnote or significance marks parse.
+- The grid's own label and caption rows are no longer emitted as data. A column grouping under which
+  no column yields a typed value gives one record per row, not one per group. On the corpus manifest
+  the record count falls from 14,712 to 10,728 while records with a typed value rise from 1,692 to
+  1,963; the removed records carried no typed value. A label repeated over each column of its span is
+  one arm; arms bind by their repeated sub-header run.
+- Wrong typed values the old grids produced are gone: glued df/chi-square columns read as t
+  (10.1098/rsos.250367 Table 10), "95%CI" read as d = 95 (10.1525/collabra.77859 Table 1), a
+  header-derived df copied onto every row.
+- Consumers: no field is renamed or removed. Rows a consumer drops as an original-study comparison
+  column are unchanged on the corpus manifest (47 before, 47 after).
+
 ## [2.4.154] - 2026-10-23 - normalization 1.9.75 - table extraction 2.4.25 - sectioning 1.2.6 (unchanged)
 
 The 2026-10-14 notes below are part of this release; the two sections directly below were added on 2026-10-23.
