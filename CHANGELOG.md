@@ -48,6 +48,11 @@ footnotes set only slightly smaller than the body (9 pt under 10 pt) are now fou
 acknowledgment or previous-version note in the front matter is kept, as its own paragraph, instead of
 losing its first line. The wrapped second line of the AOM copyright footer is dropped.
 
+An "Author Biographies" (or "About the Authors") heading now ends the reference list. Before, the
+academic-level reference join ran past it and glued the heading, and sometimes the first biography,
+onto the line before. With the new column order this hit the last reference itself
+(10.1177/19485506211056761). Measured on the 125-paper corpus: 5 papers change, all at that heading.
+
 ### Tables (table extraction 2.4.26)
 
 - Camelot's stream reader no longer drops a text line lying exactly on a row boundary, and the two

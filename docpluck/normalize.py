@@ -250,7 +250,10 @@ _REFS_HEADER = re.compile(
 _REFS_END = re.compile(
     r"\n\s*(Acknowledg|Funding|Author\s+contribution|Supplementary|Appendix|"
     r"Conflict\s+of\s+interest|Competing\s+interest|Notes|Data\s+availability|"
-    r"Ethics\s+statement|Author's?\s+(note|disclosure))\b",
+    r"Ethics\s+statement|Author's?\s+(note|disclosure)|"
+    # SAGE prints author biographies straight after the last reference;
+    # without these the span ran on and R3 glued the heading onto that entry.
+    r"Authors?'?s?\s+Biograph(y|ies)|About\s+the\s+Authors?)\b",
     re.IGNORECASE,
 )
 _REF_START_VANCOUVER = re.compile(r"^\d{1,3}\.\s+[A-Z]")
