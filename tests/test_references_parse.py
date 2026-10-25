@@ -379,10 +379,11 @@ def test_detached_list_numbers_that_do_not_cover_the_list_number_nothing():
 def test_a_list_number_printed_at_the_end_of_the_previous_entry():
     text = ("References\n1.\n\nLund K, Ortiz M. Rivers in spring. J Hydrol. 2009; 29:12-23. PMID: 1234567 2.\n\n"
             "Quinn P. Roads in autumn. Road Res. 2017; 95:301-10. 3.\n\n"
-            "Ashby TN. Bridges. Bridge Sci. 2020; 117:18-28.\n")
+            "Ashby TN. Bridges. Bridge Sci. 2020; 117:18-28. 4.\n\n"
+            "Bexley H. Lakes. Lake Lett. 2001; 4:1-9.\n")
     refs = parse_references(text)
-    assert [r.number for r in refs] == [1, 2, 3]
-    assert [r.authors[0].family for r in refs] == ["Lund", "Quinn", "Ashby"]
+    assert [r.number for r in refs] == [1, 2, 3, 4]
+    assert [r.authors[0].family for r in refs] == ["Lund", "Quinn", "Ashby", "Bexley"]
     assert (refs[0].volume, refs[0].first_page, refs[0].pmid) == ("29", "12", "1234567")
 
 
@@ -540,3 +541,13 @@ def test_a_numbered_list_whose_wrapped_lines_open_like_names_stays_one_run():
     doc = _fake_doc(text, [("introduction", "Introduction"), ("appendix", "Appendix")])
     (a, b), = _references_spans(doc)
     assert [r.number for r in parse_references(text[a:b], offset=a)] == list(range(1, 11))
+
+
+def test_volumes_ending_lines_are_not_read_as_the_next_entry_number():
+    # author-year entries wrapped so that lines end in a volume number ("... Psychol. 12.")
+    text = ("References\nLund, K., & Ortiz, M. (2019). Rivers in spring. J. Hydrol. Psychol.\n12.\n"
+            "Quinn, P. (2017). Roads in autumn. Road Res. Lett. 47.\n"
+            "Ashby, T. N. (2020). Bridges. Bridge Sci. 3.\n"
+            "Bexley, H. (2001). Lakes. Lake Lett. 88.\n")
+    refs = parse_references(text)
+    assert [r.authors[0].family for r in refs] == ["Lund", "Quinn", "Ashby", "Bexley"]
