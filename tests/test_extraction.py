@@ -32,7 +32,10 @@ class TestExtractPdf:
         content = self._read("apa", "chan_feldman_2025_cogemo.pdf")
         text, method = extract_pdf(content)
         assert not text.startswith("ERROR:")
-        assert method == "pdftotext_default"
+        # Since v2.4.155 the general two-column reorder is on by default and names the
+        # pages it reordered; the engine itself is unchanged.
+        import re
+        assert re.fullmatch(r"pdftotext_default(\+column_corrected:\d+(,\d+)*)?", method), method
         assert len(text) > 10_000
         assert "significant" in text.lower() or "p <" in text or "p=" in text
 

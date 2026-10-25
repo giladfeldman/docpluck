@@ -83,6 +83,7 @@ the full step ordering, and G5c2 runs LAST in `academic` precisely so it sees se
 from __future__ import annotations
 
 import functools
+import os
 import re
 
 import pytest
@@ -158,13 +159,27 @@ def test_the_detector_fires_on_the_measured_positives_and_not_on_the_correct_lay
         )
 
 
+# The stacked layout above is pdftotext's reading order. Since v2.4.155 the general
+# two-column reorder is on by default, and on these four papers it reads each column whole,
+# so the stray numbers (footnote markers of the other column) no longer sit above the
+# heading and G5c2 has nothing to rejoin. The tests that guard G5c2 itself therefore run
+# on pdftotext's order (`general="0"`), where its input still exists; the default order is
+# asserted separately below.
 @functools.lru_cache(maxsize=None)
-def _norm_twice(corpus: str, name: str) -> tuple[str, str]:
+def _norm_twice(corpus: str, name: str, general: str = "0") -> tuple[str, str]:
     # Cached: three tests x four papers is twelve extract-plus-two-normalize runs of the
     # same four PDFs, and each is seconds. The cache is keyed on the inputs and the
     # pipeline is pure, so this changes timing only.
-    with open(require_corpus_pdf(f"{corpus}/{name}"), "rb") as fh:
-        raw, _ = extract_pdf(fh.read())
+    saved = os.environ.get("DOCPLUCK_COLUMN_CORRECT_GENERAL")
+    os.environ["DOCPLUCK_COLUMN_CORRECT_GENERAL"] = general
+    try:
+        with open(require_corpus_pdf(f"{corpus}/{name}"), "rb") as fh:
+            raw, _ = extract_pdf(fh.read())
+    finally:
+        if saved is None:
+            os.environ.pop("DOCPLUCK_COLUMN_CORRECT_GENERAL", None)
+        else:
+            os.environ["DOCPLUCK_COLUMN_CORRECT_GENERAL"] = saved
     assert raw and len(raw) > 20000, f"{name}: extraction returned {len(raw or '')} chars -- vacuous"
     once, _ = normalize_text(raw, NormalizationLevel.academic)
     twice, _ = normalize_text(once, NormalizationLevel.academic)
@@ -215,4 +230,25 @@ def test_the_headings_g5c2_correctly_rejoined_are_still_rejoined(corpus, name, s
         )
         assert lookup_canonical_label(real) is not None, (
             f"{name}: {real!r} no longer resolves to a canonical section label"
+        )
+
+
+@pytest.mark.parametrize("corpus,name,stacked", _PAPERS)
+def test_the_default_column_order_keeps_each_heading_resolvable(corpus, name, stacked):
+    """THE DEFAULT PATH. With the column reorder on, each heading the stacked forms name is
+    still present as a heading that resolves, no line carries two numbers, and a second
+    normalization changes nothing. Measured 2026-10-25: on all four papers the heading
+    arrives without the stray number (e.g. efendic: "Kingdom.\n\nReferences"), so the
+    numbered form is not expected here, only a resolvable heading line."""
+    once, twice = _norm_twice(corpus, name, "1")
+    assert once == twice, f"{name}: not idempotent on the default column order"
+    found = _STACKED_HEADING_NUMBERS.findall(once)
+    assert not found, f"{name}: stacked heading numbers on the default order: {found[:4]}"
+    lines = {ln.strip() for ln in once.splitlines()}
+    for form in stacked:
+        heading = form.split(". ", 2)[-1]  # "3. 6. References" -> "References"
+        hits = [ln for ln in lines if ln == heading or re.fullmatch(r"\d{1,2}\. " + re.escape(heading), ln)]
+        assert hits, f"{name}: no heading line {heading!r} on the default column order"
+        assert all(lookup_canonical_label(h) is not None for h in hits), (
+            f"{name}: {hits!r} does not resolve to a canonical section label"
         )
