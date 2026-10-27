@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+Three fixes from a check of 10 psychology papers docpluck had never processed, each read against
+the rasterized pages by two models.
+
+- **Digit ranges split across a line keep their hyphen (normalization, new step W0u).** pdftotext
+  drops a line-end hyphen even between digits, so `pp. 101-` / `125)` came out `pp. 101125`
+  (10.1111/jasp.12453, pp. 24 and 29). The hyphen is restored when the layout channel prints the
+  `101-` fragment and a word opening with `125`, and never prints `101125`. Layout-aware paths only
+  (render, structured, body); `normalize_text` without a layout is unchanged.
+- **A data row printed as `M = x, SD = y` is no longer read as a header row (tables).** The first
+  row of 10.1177/0956797615601103 Table 1 (p4) went into the header, so every flattened record of the
+  table carried the Age values as its column labels and the Age row was lost.
+- **A row label wrapped before its `×` joins its row (tables).** `Feeling Respected` / `× Culture`
+  (10.1177/0956797615612694 Table 1, p5) became a main-effect row plus an empty group heading, so the
+  interaction coefficients were published under the main effect.
+
 ## [2.4.155] - 2026-10-25 - normalization 1.9.78 - table extraction 2.4.26 - sectioning 1.2.8 - references 1.0.0 (new) - body scope 1.0.0 (new)
 
 ### Two-column pages are read column by column by default (normalization)

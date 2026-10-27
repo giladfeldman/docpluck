@@ -756,6 +756,15 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
         s = (s or "").strip()
         return bool(_LOWER_WORD_START.match(s)) and not re.search(r"\d", s)
 
+    # An interaction term wrapped before its operator: "Feeling Respected" /
+    # "× Culture" (10.1177/0956797615612694 Table 1, p5, measured 2026-10-27).
+    # No variable name begins with "×", so the line can only end the label above.
+    _TIMES_WRAP = re.compile(r"×\s*[A-Za-z]")
+
+    def _is_interaction_wrap(s: str) -> bool:
+        s = (s or "").strip()
+        return bool(_TIMES_WRAP.match(s)) and not re.search(r"\d", s)
+
     # Only a wrap of a NUMERIC data row is trusted. In a text-only grid a
     # lowercase line in the label column can as well be another column's text
     # that Camelot assigned there, or the neighbouring column's prose
@@ -887,6 +896,11 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             and not rest_has_content
             and (
                 _prev_col0_is_wrap(out[-1])
+                or (
+                    _is_interaction_wrap(first)
+                    and (out[-1][0] or "").strip()
+                    and _is_data_row(out[-1])
+                )
                 or (
                     _is_lowercase_wrap(first)
                     # a sentence end is a note's wrapped line, not a label's
@@ -1083,6 +1097,8 @@ def _is_value_or_values(text: str) -> bool:
     (10.1017/jdm.2024.31 Table 2, measured 2026-10-25)."""
     if _DATA_VALUE_CELL_RE.match(text):
         return True
+    if _DESCRIPTIVE_ASSIGNMENT_CELL_RE.match(text):
+        return True
     if _THOUSANDS_GROUPED_RE.match(text):
         # "177 709" is ONE count printed with a thin-space thousands separator;
         # it is left exactly as the single-value test judged it before.
@@ -1092,6 +1108,16 @@ def _is_value_or_values(text: str) -> bool:
 
 
 _THOUSANDS_GROUPED_RE = re.compile(r"^\d{1,3}(?:\s\d{3})+$")
+
+# A descriptive-statistic VALUE printed as assignments: "M = 68.33, SD = 10.48".
+# A header names the statistic ("M", "M (SD)"); it never assigns it a number, so
+# such a cell is data. Limited to the location/spread family -- a sub-header row
+# "n = 45 | n = 50" does print an assignment and stays a header. Measured
+# 2026-10-27 on 10.1177/0956797615601103 Table 1 (p4): the first data row
+# "Age (years) | M = 68.33, SD = 10.48 | ..." passed as a second header row.
+_DESCRIPTIVE_ASSIGNMENT_CELL_RE = re.compile(
+    r"^(?:(?:M|SD|SE|SEM|Mdn|IQR)\s*=\s*[-−–]?\d*\.?\d+%?\s*[,;]?\s*)+$"
+)
 
 
 def _is_header_like_row(row: list[str]) -> bool:

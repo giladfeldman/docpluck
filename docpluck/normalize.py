@@ -5700,6 +5700,78 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
     return "".join(out)
 
 
+_W0U_FRAG_RE = re.compile(r"^(\d{1,6})-$")
+_W0U_LEAD_DIGITS_RE = re.compile(r"^(\d{1,6})(?!\d)")
+_W0U_DIGIT_RUN_RE = re.compile(r"\d+")
+_W0U_GLUED_RE = re.compile(r"(?<![\d.,\-–—])\d{2,12}(?![\d]|[.,]\d)")
+
+
+def recover_numeric_range_hyphens_via_layout(text: str, layout, counter=None) -> str:
+    """W0u: restore a digit-range hyphen that pdftotext's dehyphenation removed.
+
+    pdftotext joins a line ending in a hyphen to the next line and drops the
+    hyphen even between digits: 10.1111/jasp.12453 prints the reference page
+    ranges ``(pp. 101-`` / ``125)`` (p24) and ``pp. 1-`` / ``36)`` (p29), and the
+    text channel says ``pp. 101125`` and ``pp. 136`` -- wrong numbers with
+    nothing to show it. pdfplumber's words keep the ``101-`` fragment.
+
+    The same document-level gate as W0t (no line pairing). A glued digit run
+    ``AB`` in the text becomes ``A-B`` only when:
+
+    * the layout holds a word that is exactly the line-end fragment ``A-``;
+    * the layout holds a word OPENING with exactly the digits ``B`` (the next
+      line's first word, e.g. ``125).``);
+    * the layout never holds ``AB`` as a digit run, so the page never prints it;
+    * exactly one split of the glued run satisfies the above;
+    * the text holds no more glued sites for ``A`` than the layout holds ``A-``
+      fragments; and the run is not inside a URL or DOI.
+    """
+    if not text or layout is None:
+        return text
+    frags: collections.Counter = collections.Counter()
+    starts: set = set()
+    runs: set = set()
+    for page in getattr(layout, "pages", ()) or ():
+        for w in getattr(page, "words", ()) or ():
+            raw = (w.get("text") or "").strip()
+            if not raw:
+                continue
+            runs.update(_W0U_DIGIT_RUN_RE.findall(raw))
+            s = raw.strip(_W0O_WORD_STRIP)
+            m = _W0U_FRAG_RE.match(s)
+            if m and not ("/" in raw or "www." in raw):
+                frags[m.group(1)] += 1
+            m = _W0U_LEAD_DIGITS_RE.match(raw.lstrip(_W0O_WORD_STRIP))
+            if m:
+                starts.add(m.group(1))
+    if not frags or not starts:
+        return text
+    by_frag: dict = collections.defaultdict(list)
+    for m in _W0U_GLUED_RE.finditer(text):
+        tok = m.group(0)
+        if tok in runs or _w0o_in_url(text, m.start(), m.end()):
+            continue
+        splits = [
+            k for k in range(1, len(tok))
+            if tok[:k] in frags and tok[k:] in starts
+        ]
+        if len(splits) == 1:
+            by_frag[tok[: splits[0]]].append((m, splits[0]))
+    sites = [s for a, ss in by_frag.items() if len(ss) <= frags[a] for s in ss]
+    if not sites:
+        return text
+    sites.sort(key=lambda s: s[0].start())
+    out, last = [], 0
+    for m, k in sites:
+        out.append(text[last:m.start()])
+        out.append(m.group(0)[:k] + "-" + m.group(0)[k:])
+        last = m.end()
+    out.append(text[last:])
+    if counter is not None:
+        counter[0] += len(sites)
+    return "".join(out)
+
+
 def _w0o_in_url(text: str, start: int, end: int) -> bool:
     """Is text[start:end] inside a whitespace-delimited token that is a URL/DOI?"""
     lo = start
@@ -7027,6 +7099,16 @@ def _normalize_text(
         t = recover_semantic_hyphens_via_layout(t, dropped_minus_layout, _w0o_n)
         report._track("W0t_semantic_hyphen_layout", before, t,
                       "semantic_hyphens_restored", count=_w0o_n[0])
+
+        # ── W0u (2026-10-27): a digit-range hyphen pdftotext dehyphenated away ─
+        # `pp. 101-` / `125)` at a line end comes out `pp. 101125`. Restored only
+        # when the layout prints the `101-` fragment and a word opening `125`, and
+        # never prints `101125`. See recover_numeric_range_hyphens_via_layout.
+        before = t
+        _w0u_n = [0]
+        t = recover_numeric_range_hyphens_via_layout(t, dropped_minus_layout, _w0u_n)
+        report._track("W0u_numeric_range_hyphen_layout", before, t,
+                      "numeric_range_hyphens_restored", count=_w0u_n[0])
 
     # ── W0e: recover Adobe-Symbol-font glyphs surfaced as PUA codepoints ─
     # pdftotext/mammoth emit a Symbol-font glyph with no ToUnicode CMap as a
