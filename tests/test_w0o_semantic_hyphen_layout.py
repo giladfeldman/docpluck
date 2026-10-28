@@ -106,7 +106,9 @@ def test_ip_feldman_well_being_real_pdf():
     from docpluck.extract_layout import extract_pdf_layout
 
     pdf = require_corpus_pdf("apa/ip_feldman_2025_pspb.pdf").read_bytes()
-    raw, _ = extract_pdf(pdf)
+    # extract_pdf restores these itself since 2.4.156 (from pdftotext's own
+    # words); opt out so this test still measures W0t on the layout channel.
+    raw, _ = extract_pdf(pdf, restore_line_end_hyphens=False)
     layout = extract_pdf_layout(pdf)
     plain, _ = normalize_text(raw, NormalizationLevel.academic)
     fixed, report = normalize_text(

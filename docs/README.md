@@ -65,7 +65,8 @@ Filter on it; do not infer it from `label`.
 
 | value | meaning |
 |---|---|
-| `matched` | paired with a detected `Table N` caption, or (table extraction 2.4.26) a grid that opens with the page's own printed `TABLE N (Continued)` head: such a table also carries `continuation_of` (= its `label`), and its `caption` is that printed head |
+| `matched` | paired with a detected `Table N` caption, or (table extraction 2.4.26) a grid that opens with the page's own printed `TABLE N (Continued)` head: such a table also carries `continuation_of` (= its `label`), and its `caption` is that printed head. Since 2.4.156 also a grid under such a head printed above it (outside the grid), when the grid also passes the `continuation` geometry test below |
+| `continuation` | (2.4.156) a grid with no caption and no printed continued head that continues the table ending the previous page: it is the topmost grid on its page, the previous page's lowest grid is a labelled table, and both have the same column count and horizontal extent. `label` and `continuation_of` name that table; `caption` is `None`. Linked by layout, not verified by a printed caption. Rendered as `### Table N (continued, page P)` after the table's earlier page |
 | `none_found` | no caption, but the table itself is certain — the file declares it (a DOCX `w:tbl`) |
 | `uncaptioned_candidate` | a PDF grid found on a page where no caption matched it. **Kept, not discarded** — it may be a real uncaptioned table, or text laid out in columns (a title block, a running header, the inside of a figure). `label` and `caption` are `None`; the id starts with `u`. Rendered Markdown shows these in a separate "Uncaptioned table candidates (unverified)" section. A grid that is demonstrably a copy of its own page's running text — no cell carries a statistic, and every line is found on that page of `text` — is not kept a second time; each such skip is counted in `fallbacks` as `camelot_candidate_is_page_running_text` (page in `fallback_details`); likewise a page-1 grid without statistics that the body's masthead test would strip (`camelot_candidate_is_page_masthead`). A grid with statistics is always kept, even when `text` repeats it word for word. |
 
@@ -210,7 +211,7 @@ The full schema of every field is under [Output schemas](#output-schemas) below.
 
 ## API Reference
 
-### `extract_pdf(pdf_bytes, *, sections=None, max_input_bytes=None, pdftotext_timeout_seconds=120) → tuple[str, str]`
+### `extract_pdf(pdf_bytes, *, sections=None, max_input_bytes=None, pdftotext_timeout_seconds=120, restore_line_end_hyphens=True) → tuple[str, str]`
 
 Extract text from PDF bytes.
 
@@ -219,6 +220,7 @@ Extract text from PDF bytes.
 - `sections` — optional list of section labels (`["abstract", "methods"]`); only those sections' text is returned, in document order. Labels are `SectionLabel` values.
 - `max_input_bytes` — optional size cap; a larger input raises `ValueError`
 - `pdftotext_timeout_seconds` — timeout for the `pdftotext` subprocess
+- `restore_line_end_hyphens` — default `True`. pdftotext drops a real hyphen that falls at a line end (`Self-` / `Compassion` → `SelfCompassion`, `pp. 101-` / `125` → `101125`, `10.3233/NHA-` / `170036` → `NHA170036`). One extra `pdftotext -bbox` pass on the same file supplies the page words, and the layout-gated steps W0v, W0t and W0u restore the hyphen only where the paper's own words prove it (see NORMALIZATION.md). About +10–16% extraction time, measured on three papers. If the pass fails, the text is returned as pdftotext joined it and `line_end_hyphen_words_unavailable` is recorded. `False` gives pdftotext's text unchanged.
 
 **Returns:** `(text, method)` tuple where:
 - `text` — Extracted plain text. Check `text.startswith("ERROR:")` for failure.
@@ -540,7 +542,7 @@ md = render_flattened_inline(rows, table_id="T1", label="Table 1")
 `flatten_table` handles a single `Table` when you do not want the whole paper.
 
 **Every row carries `caption_status`** — the source table's (see the table above):
-`matched`, `none_found`, or `uncaptioned_candidate`. Rows from an `uncaptioned_candidate`
+`matched`, `continuation`, `none_found`, or `uncaptioned_candidate`. Rows from an `uncaptioned_candidate`
 table come from a grid no caption claimed. Roughly half of those are real statistical
 tables and half are page furniture (running headers, title blocks, the insides of
 figures), so **if you run statistical checks on these rows, decide explicitly what to do
@@ -557,6 +559,30 @@ credible interval is not graded as a confidence interval; absence means the tabl
 **The printed p-value travels with the parsed one** (table extraction 2.4.24): `fields["p_text"]` is the
 p number exactly as the cell prints it (`".050"`, `".001"` for `< .001`), beside the numeric
 `fields["p"]` (0.05), so a consumer can judge p within half a unit of the last printed decimal.
+
+**Every typed number carries its printed text**: each record has
+`fields_raw`, keyed like `fields`, holding the number token exactly as the cell prints it
+(`fields_raw["t"]` = `"-1.40"` beside `fields["t"]` = -1.4; `fields_raw["p"]` = `".050"`;
+`fields_raw["CI_lower"]` = `".80"`). A key is present only when its token parses back to exactly
+the value in `fields`: a value docpluck repaired (a minus sign restored from the page's text layer)
+has no printed token and is absent. Marks and operators are not part of the token (`"4.50"` for a
+cell printed `4.50*`; the operator is in `<key>_op`). A `count` keeps its printed thousands
+separators (`fields_raw["count"]` = `"66,471"`). `fields_raw` is `{}` when nothing is typed.
+
+**Two-number cells are typed on stated evidence only**: `M (SD)` gives `fields["M"]` and
+`fields["SD"]`; `b (SE)` gives `fields["est"]` and `fields["SE"]`; `n (%)` gives `fields["count"]`
+(int) and `fields["pct"]`; a cell printing `59%` gives `fields["pct"]`; `M = 68.3, SD = 10.5` gives
+`M` and `SD`; `0.76 [0.50, 1.02]` gives `est` and the interval when the table names an interval.
+What the parentheses hold is never read from the cell's shape alone: it must be stated by the cell
+itself, the row label (`Age, mean (SD)`, `Female, No. (%)`), the column header (`M (SD)`), or the
+table's header rows, caption or note (`Data are means (standard deviations)`), and the table must
+state no competing reading (standard errors, medians, IQR, ranges, test statistics in parentheses).
+A mean or coefficient typed on the note's word alone must print a decimal point (`12 (48)` under a
+"means (SD)" note is not typed). Each such column of a row becomes its own record with
+`fields["group"]` = that column's header lines, so two arms' means are never merged into one record;
+the row's other typed columns (`t`, `p`) stay in one record without `group`. A single pair column
+with no arm label of its own joins the row's record. With no evidence the record keeps `fields`
+`{}` and the values stay in `raw_cells`.
 
 **A printed inequality travels with its statistic** (table extraction 2.4.26): a cell printed
 `< 0.001 [0.000, 0.004]` in an eta-squared column gives `fields["eta2"]` = 0.001 **and**
@@ -828,8 +854,8 @@ what `docpluck extract --structured` prints).
 | `html` | `str \| None` | the table as HTML |
 | `raw_text` | `str` | the region's text as extracted |
 | `cell_geometry` | `str \| None` | whether `cells[].bbox` is real — see the table under [Structured extraction](#structured-extraction-v20) |
-| `caption_status` | `"matched"` \| `"none_found"` \| `"uncaptioned_candidate"` | how sure docpluck is this is a captioned table |
-| `continuation_of` | `str` (optional key) | present only on a grid that opens with a printed `TABLE N (Continued)` head: the label of the table it continues |
+| `caption_status` | `"matched"` \| `"continuation"` \| `"none_found"` \| `"uncaptioned_candidate"` | how sure docpluck is this is a captioned table |
+| `continuation_of` | `str` (optional key) | present only on a later page of a table that runs over pages (a printed `TABLE N (Continued)` head, or `caption_status` `continuation`): the label of the table it continues |
 
 ### `Cell`
 
@@ -861,7 +887,8 @@ what `docpluck extract --structured` prints).
 | `header` | `list[str]` | column headers |
 | `raw_cells` | `list[str]` | the row's cells, same length as `header` |
 | `sentence` | `str` | the row as an English sentence, e.g. `"Importance: t(741) = 3.93, p < .001, d = 0.29"` |
-| `fields` | `dict` | parsed statistical values (may be empty) |
+| `fields` | `dict` | parsed statistical values (may be empty); descriptive cells add `M`, `SD`, `SE`, `count` (int), `pct` and a per-column `group` (see "Two-number cells" above) |
+| `fields_raw` | `dict[str, str]` | for each typed number in `fields`, the token the cell prints (`"-1.40"`, `".050"`); keyed like `fields`, may be empty |
 | `caption_status` | `str` | the source table's `caption_status` |
 
 `render_flattened_inline(records, *, table_id, label=None, version=None)` renders one table's

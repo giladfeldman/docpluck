@@ -80,3 +80,30 @@ def test_jasp_12453_reference_ranges_survive_the_render():
     assert "pp. 101-125" in md
     assert "pp. 1-36" in md
     assert "101125" not in md
+
+
+def test_a_superscript_the_text_glued_is_not_a_range():
+    # 10.1038/s41467-023-43885-w p6 prints "(~10^6 bacteria" with a raised 6.
+    # pdftotext's text glues it to "(~106"; its words keep "(~10" and "6"
+    # apart, and the page has an unrelated line-end "10-" ("10- and 11-hours").
+    # Adjacent words that spell the glued run explain it without a hyphen.
+    text = "concentration (~106 bacteria). Again 10- and 11-hours later"
+    lay = _layout("concentration", "(~10", "6", "bacteria).", "Again", "10-", "and", "11-hours")
+    assert recover_numeric_range_hyphens_via_layout(text, lay, None) == text
+
+
+def test_s41467_023_43885_w_superscript_exponent_survives_extract_pdf():
+    from docpluck.extract import extract_pdf
+    from docpluck.testing.corpus import custody_path
+
+    p = custody_path("fulltext", "10.1038__s41467-023-43885-w.pdf")
+    text, _ = extract_pdf(p.read_bytes())
+    assert "(~10-6" not in text
+
+
+def test_a_run_glued_from_three_adjacent_words_is_not_a_range():
+    # Second-model consult (2026-10-27): `10` + raised `6` + raised `3` glue to
+    # `1063` in the text; the two-word rule alone saw `106` and `63`, not `1063`.
+    text = "about 1063 cells. Again 10- and 63 more"
+    lay = _layout("about", "10", "6", "3", "cells.", "Again", "10-", "and", "63", "more")
+    assert recover_numeric_range_hyphens_via_layout(text, lay, None) == text

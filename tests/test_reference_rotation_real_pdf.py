@@ -115,9 +115,15 @@ def test_chen_reference_list_now_runs_gregory_then_gross(chen):
 
 @pytest.mark.parametrize("fixture, pages", [("chen", (19, 20)), ("maier", (18, 19, 20))])
 def test_corrected_pages_are_sorted_and_word_identical(fixture, pages, request):
-    pdf, (text, method) = request.getfixturevalue(fixture)
+    pdf, (full_text, full_method) = request.getfixturevalue(fixture)
+    # The REORDER is measured on its own: extract_pdf's later line-end hyphen
+    # restore (2.4.156) puts back hyphens pdftotext dropped (`metaanalysis` ->
+    # `meta-analysis`), which the raw pdftotext page lacks by construction.
+    text, method = extract_pdf(pdf.read_bytes(), restore_line_end_hyphens=False)
+    assert method == full_method
     raw_pages = _raw_pdftotext(pdf).split("\f")
     out_pages = text.split("\f")
+    full_pages = full_text.split("\f")
     m = re.search(r"column_corrected:([\d,]+)", method)
     corrected = {int(x) for x in m.group(1).split(",")} if m else set()
     for p in pages:
@@ -127,6 +133,9 @@ def test_corrected_pages_are_sorted_and_word_identical(fixture, pages, request):
         # ...and not a character: the word multiset is blind to digits and
         # one-letter initials (see the digit-duplication test below).
         assert _char_multiset(out_pages[p - 1]) == _char_multiset(raw_pages[p - 1])
+        # The default path differs from the reorder by inserted hyphens only.
+        assert full_pages[p - 1].replace("-", "") == out_pages[p - 1].replace("-", "")
+        assert not (_char_multiset(out_pages[p - 1]) - _char_multiset(full_pages[p - 1]))
         keys = _reference_entry_keys(out_pages[p - 1])
         assert _longest_sorted_run(keys) >= 0.75 * len(keys), (
             f"{fixture} p{p}: {''.join(keys)}")

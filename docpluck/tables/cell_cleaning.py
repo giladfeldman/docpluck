@@ -828,7 +828,30 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             return new_label_too and not any(rest) and not _is_lowercase_wrap(lead)
         return any(_DATA_VALUE_CELL_RE.match(c) for c in rest)
 
+    # A lowercase start is evidence of a wrapped line only in a table whose own
+    # row labels are capitalised. 10.1098/rsos.250908 Table 15 (p22) labels
+    # every row in lowercase ("homosexuality", "global warming") and its
+    # sub-headings too ("liberal change", no values): the wrap join glued the
+    # heading onto the row above ("monogamy liberal change"). In such a table a
+    # lowercase line joins only a label that visibly breaks off ("... in",
+    # "... and", "... -").
+    def _labels_are_lowercase(grid: list[list[str]]) -> bool:
+        labs = [
+            (r[0] or "").strip() for r in grid
+            if r and (r[0] or "").strip() and _is_data_row(r)
+        ]
+        if len(labs) < 3:
+            return False
+        # A lowercase WORD ("global warming"), not an enumerator ("a. Virgin
+        # rat", 10.1016/j.jesp.2021.104154 Table 12).
+        return 2 * sum(1 for s in labs if _LOWER_WORD_START.match(s)) > len(labs)
+
+    def _label_breaks_off(label: str) -> bool:
+        s = (label or "").strip()
+        return bool(s) and bool(_WRAP_PUNCT_END.search(s) or _CONJUNCTION_END.search(s))
+
     rows = _attach_detached_sign_rows(rows)
+    lowercase_labels = _labels_are_lowercase(rows)
     out: list[list[str]] = []
     for row_i, row in enumerate(rows):
         nxt = rows[row_i + 1] if row_i + 1 < len(rows) else None
@@ -912,6 +935,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                     and (out[-1][0] or "").strip()
                     and _is_data_row(out[-1])
                     and not _labels_next_row(nxt, new_label_too=True)
+                    and (not lowercase_labels or _label_breaks_off(out[-1][0]))
                 )
             )
         ):
@@ -1099,6 +1123,8 @@ def _is_value_or_values(text: str) -> bool:
         return True
     if _DESCRIPTIVE_ASSIGNMENT_CELL_RE.match(text):
         return True
+    if _ESTIMATE_BRACKET_CI_CELL_RE.match(text):
+        return True
     if _THOUSANDS_GROUPED_RE.match(text):
         # "177 709" is ONE count printed with a thin-space thousands separator;
         # it is left exactly as the single-value test judged it before.
@@ -1120,6 +1146,17 @@ _DESCRIPTIVE_ASSIGNMENT_CELL_RE = re.compile(
 )
 
 
+# An estimate printed with its bracketed interval: "2.26 [2.08, 2.46]*". A
+# header names the statistic ("HR [95% CI]", letters inside or before the
+# bracket); it never prints a number before an all-numeric interval. Measured
+# 2026-10-27 on 10.1177/0956797615601103 Table 3 (p6), whose first data row
+# "Age | 2.26 [2.08, 2.46]* | ..." passed as a third header row.
+_ESTIMATE_BRACKET_CI_CELL_RE = re.compile(
+    r"^[<>=]?\s*[-−–]?\d*\.?\d+[*∗†‡]{0,3}\s*"
+    r"\[[^\]A-Za-z]*\d[^\]A-Za-z]*\][*∗†‡]{0,3}$"
+)
+
+
 def _is_header_like_row(row: list[str]) -> bool:
     """Heuristic: a row that looks like part of a header rather than data."""
     nonempty = [c.strip() for c in row if (c or "").strip()]
@@ -1132,6 +1169,34 @@ def _is_header_like_row(row: list[str]) -> bool:
     if avg_len > 30:
         return False
     return True
+
+
+def _header_row_count(merged: list[list[str]], n_cols: int) -> int:
+    """How many of ``merged``'s top rows form the header (1 to 3).
+
+    A header-like row below the first extends the header. In a grid that holds
+    no data value anywhere below its first row, "header-like" separates nothing
+    (every row is short words), so there a row extends the header only while
+    the row above it is not yet a complete row -- a sparse spanner ("Outcome &")
+    over the column row still joins. 10.1177/19485506211056761 Table 1 (p2)
+    prints one header row over four rows of words; the heuristic took the first
+    two of them into the header.
+    """
+    text_only = not any(
+        _is_data_value_cell((c or "").strip())
+        for row in merged[1:] for c in row if (c or "").strip()
+    )
+    n_header = 1
+    for k in range(1, min(3, len(merged))):
+        if _is_group_separator(merged[k], n_cols):
+            break
+        if not _is_header_like_row(merged[k]):
+            break
+        if text_only and all((c or "").strip() for c in merged[k - 1][:n_cols]) \
+                and len(merged[k - 1]) >= n_cols:
+            break
+        n_header = k + 1
+    return n_header
 
 
 def _is_group_separator(row: list[str], n_cols: int) -> bool:
@@ -1560,14 +1625,7 @@ def cells_grid_to_html(
                         detail=f"{before_sig}->{len(merged)}")
         return ""
 
-    n_header = 1
-    for k in range(1, min(3, len(merged))):
-        if _is_group_separator(merged[k], n_cols):
-            break
-        if _is_header_like_row(merged[k]):
-            n_header = k + 1
-        else:
-            break
+    n_header = _header_row_count(merged, n_cols)
     # A header count the SOURCE FILE declares out-ranks the heuristic, downward
     # only -- the same rule and the same direction as `flatten._clean_grid`.
     # THIS SITE EXISTS BECAUSE THE REPAIR MUST REACH EVERY CHANNEL. Teaching only

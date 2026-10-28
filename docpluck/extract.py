@@ -17,6 +17,7 @@ that breaks statistical pattern matching. Default mode correctly reconstructs
 reading order. Verified on 50 PDFs across 8 citation styles — see BENCHMARKS.md.
 """
 
+import html
 import os
 import re
 import subprocess
@@ -35,6 +36,7 @@ def extract_pdf(
     sections: list[str] | None = None,
     max_input_bytes: int | None = None,
     pdftotext_timeout_seconds: int = 120,
+    restore_line_end_hyphens: bool = True,
 ) -> tuple[str, str]:
     """Extract text from PDF bytes.
 
@@ -68,6 +70,18 @@ def extract_pdf(
             ``len(pdf_bytes)`` exceeds it, a ValueError is raised.
         pdftotext_timeout_seconds: Timeout for the pdftotext subprocess.
             Default 120 seconds preserves current behavior.
+
+    Line-end hyphens:
+        restore_line_end_hyphens: pdftotext drops the hyphen of a line ending
+            in ``-`` when it joins the line to the next, even a real one
+            (``Self-`` / ``Compassion`` -> ``SelfCompassion``, ``pp. 101-`` /
+            ``125`` -> ``pp. 101125``). When True (default), a second pdftotext
+            pass (``-bbox``, the page's own words, which keep ``Self-``) feeds
+            the document-level gates of ``normalize``'s W0t (compounds) and
+            W0u (digit ranges); a glued token is re-hyphenated only where
+            those gates allow. False returns pdftotext's join unchanged. If the
+            word pass fails, the text is returned unrepaired and the event
+            ``line_end_hyphen_words_unavailable`` is recorded.
 
     Requires:
         pdftotext binary (from poppler-utils) on PATH.
@@ -280,6 +294,11 @@ def extract_pdf(
             record_fallback("column_correction_exception", detail=exc_name)
             method = f"{method}+column_correction_failed:{exc_name}"
 
+        if restore_line_end_hyphens:
+            text = _restore_line_end_hyphens(
+                text, tmp_path, pdftotext_timeout_seconds
+            )
+
         if sections is not None:
             from .sections import extract_sections
             # The pair THIS call just produced, rather than a second identical
@@ -304,6 +323,67 @@ def extract_pdf(
         # is not fixed"; there were five sites, and this was one of the three the
         # sweep never looked at. See `docpluck/tempfiles.py`.
         unlink_temp_pdf(tmp_path)
+
+
+_BBOX_PAGE_SPLIT_RE = re.compile(r"<page\b[^>]*>")
+_BBOX_WORD_RE = re.compile(r"<word\b[^>]*>([^<]*)</word>")
+
+
+def _bbox_word_layout(bbox_html: str):
+    """Read ``pdftotext -bbox`` output into the minimal word layout W0t/W0u use.
+
+    Returns an object with ``.pages``, each page holding ``.words`` as a list of
+    ``{"text": ...}`` dicts in pdftotext's order. Only the word TEXT is kept:
+    the two gates count words document-wide and never pair lines, so
+    coordinates are not needed.
+    """
+    from types import SimpleNamespace
+
+    pages = []
+    for chunk in _BBOX_PAGE_SPLIT_RE.split(bbox_html)[1:]:
+        words = [{"text": html.unescape(w)} for w in _BBOX_WORD_RE.findall(chunk)]
+        pages.append(SimpleNamespace(words=words))
+    return SimpleNamespace(pages=pages)
+
+
+def _restore_line_end_hyphens(text: str, pdf_path: str, timeout: int) -> str:
+    """Re-hyphenate compounds and digit ranges pdftotext joined at a line end.
+
+    Uses the page's own words from ``pdftotext -bbox`` (same engine and file as
+    the text, so a word the text prints glued mid-line is glued in the words
+    too) and the gates of ``normalize.recover_doi_hyphens_via_layout`` (W0v),
+    ``recover_semantic_hyphens_via_layout`` (W0t) and
+    ``recover_numeric_range_hyphens_via_layout`` (W0u), in normalize's order. Measured on
+    2026-10-27: one extra pdftotext run, about the cost of the first.
+    """
+    from .normalize import (
+        recover_doi_hyphens_via_layout,
+        recover_numeric_range_hyphens_via_layout,
+        recover_semantic_hyphens_via_layout,
+    )
+
+    try:
+        result = subprocess.run(
+            [resolve_pdftotext_executable(), "-bbox", "-enc", "UTF-8", pdf_path, "-"],
+            capture_output=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except Exception as exc:  # timeout, missing binary: keep the text as joined
+        record_fallback("line_end_hyphen_words_unavailable", detail=type(exc).__name__)
+        return text
+    if result.returncode != 0:
+        record_fallback("line_end_hyphen_words_unavailable",
+                        detail=f"returncode={result.returncode}")
+        return text
+    layout = _bbox_word_layout(result.stdout)
+    if not layout.pages:
+        record_fallback("line_end_hyphen_words_unavailable", detail="no_pages")
+        return text
+    text = recover_doi_hyphens_via_layout(text, layout)
+    text = recover_semantic_hyphens_via_layout(text, layout)
+    return recover_numeric_range_hyphens_via_layout(text, layout)
 
 
 def extract_pdf_file(path: Union[str, Path]) -> tuple[str, str]:

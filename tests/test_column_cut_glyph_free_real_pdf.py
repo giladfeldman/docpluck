@@ -120,7 +120,11 @@ REENABLED = [
 @pytest.mark.parametrize("doi, page", REENABLED)
 def test_reenabled_page_is_corrected_and_character_identical(doi, page):
     pdf = _pdf(doi)
-    text, method = extract_pdf(pdf.read_bytes())
+    # The REORDER is measured on its own: extract_pdf's later line-end hyphen
+    # restore (W0v/W0t/W0u, 2.4.156) puts back hyphens pdftotext dropped, which
+    # the raw pdftotext page lacks by construction. Its effect is pinned
+    # separately below as hyphen insertions only.
+    text, method = extract_pdf(pdf.read_bytes(), restore_line_end_hyphens=False)
     assert page in _corrected(method), f"{doi} p{page} not corrected: {method}"
     out = text.split("\f")[page - 1]
     raw = _raw_pages(pdf)[page - 1]
@@ -128,6 +132,14 @@ def test_reenabled_page_is_corrected_and_character_identical(doi, page):
         f"{doi} p{page}: +{dict(_char_multiset(out) - _char_multiset(raw))} "
         f"-{dict(_char_multiset(raw) - _char_multiset(out))}")
     assert out.split() != raw.split(), "a no-op is not a reorder"
+    # The default path: the same reordered page, plus inserted hyphens only.
+    full, full_method = extract_pdf(pdf.read_bytes())
+    assert full_method == method
+    restored = full.split("\f")[page - 1]
+    added = _char_multiset(restored) - _char_multiset(out)
+    assert not (_char_multiset(out) - _char_multiset(restored)), f"{doi} p{page}: restore removed text"
+    assert set(added) <= {"-"}, f"{doi} p{page}: restore added {dict(added)}"
+    assert restored.replace("-", "") == out.replace("-", "")
 
 
 def test_a_page_already_in_reading_order_is_left_alone():

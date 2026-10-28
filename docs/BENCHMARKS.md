@@ -425,7 +425,7 @@ The smoke test asserts only that detected counts fall within ±2 of the manifest
 - `extract_pdf_structured(pdf_bytes)` never raises — graceful degradation to empty `tables=[]`, `figures=[]` on extraction failures.
 - Every `kind="structured"` table emits non-empty cells, non-null HTML, and a confidence ∈ [0.4, 0.95].
 - Every `kind="isolated"` table has empty cells, null HTML, null confidence, and non-empty `raw_text`.
-- `extract_pdf()` output is byte-identical to v1.6.x on all 12 fixtures (snapshot-based).
+- `extract_pdf()` output is pinned by a sha256 per fixture on all 12 fixtures (`tests/snapshots/checksums.json`). It is no longer byte-identical to v1.6.x: the pins were re-set after intended changes, each checked line by line first (2.4.155 two-column reading order on 9 fixtures; 2.4.156 restored line-end hyphens on 11 fixtures, 88 lines, every one a hyphen insertion).
 
 ### Deferred to v2.1
 

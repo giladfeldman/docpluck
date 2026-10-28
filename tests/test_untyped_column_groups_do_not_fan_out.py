@@ -34,12 +34,30 @@ def test_wrapped_header_words_are_not_arms():
 
 
 def test_untyped_model_columns_are_one_record_per_row():
+    # Untyped cells (no statement of what the parentheses hold): one record.
+    rows = [["", "Creativity", "", "Task", ""],
+            ["", "Model 1", "Model 2", "Model 1", "Model 2"],
+            ["Variables", "Value", "Value", "Value", "Value"],
+            ["Gender", "-0.09 (0.14)", "-0.08 (0.13)", "-0.05 (0.17)", "-0.09 (0.15)"]]
+    out = _flat(rows, header_rows=3)
+    assert [r["row_label"] for r in out] == ["Gender"], [(r["row_label"], r["fields"]) for r in out]
+
+
+def test_b_se_model_columns_are_one_typed_record_each():
+    # "b (SE)" states the pair, so each model column binds an estimate and its
+    # SE and is its own record, labelled with its column's own header. (The
+    # spanning outcome label reaches only the column it was folded into.)
     rows = [["", "Creativity", "", "Task", ""],
             ["", "Model 1", "Model 2", "Model 1", "Model 2"],
             ["Variables", "b (SE)", "b (SE)", "b (SE)", "b (SE)"],
             ["Gender", "-0.09 (0.14)", "-0.08 (0.13)", "-0.05 (0.17)", "-0.09 (0.15)"]]
     out = _flat(rows, header_rows=3)
-    assert [r["row_label"] for r in out] == ["Gender"], [(r["row_label"], r["fields"]) for r in out]
+    assert [(r["row_label"], r["fields"]) for r in out] == [
+        ("Gender", {"group": "Creativity Model 1", "est": -0.09, "SE": 0.14}),
+        ("Gender", {"group": "Model 2", "est": -0.08, "SE": 0.13}),
+        ("Gender", {"group": "Task Model 1", "est": -0.05, "SE": 0.17}),
+        ("Gender", {"group": "Model 2", "est": -0.09, "SE": 0.15}),
+    ]
 
 
 def test_typed_arms_still_split():

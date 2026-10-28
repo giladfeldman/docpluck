@@ -142,6 +142,7 @@ After:  "r(261) = -0.73, 95% CI [-0.78, -0.67]"
 
 **Removed (invisible):**
 - `\u00AD` (soft hyphen) → `""` — **critical**: invisible but breaks text search; found in 14/50 test PDFs
+  - **Except (S0h, v2.4.156):** when U+00AD is the document's printed hyphen glyph (at least 20 U+00AD between word characters, at least 3 of them between two digits since a hyphenation hint never splits a number, and a hyphen (U+002D, U+2010, U+2011) there no more than a tenth as often; 10.1126/science.aac4716 has 315 and 0), every U+00AD becomes `-` before any other step (`1359\u00AD1366` -> `1359-1366`, `\u00AD0.327` -> `-0.327`). Step key `S0h_soft_hyphen_is_hyphen_glyph`, count `soft_hyphens_as_hyphen`.
 - `\u200B` (zero-width space) → `""`
 - `\u200C` (zero-width non-joiner) → `""`
 - `\u200D` (zero-width joiner) → `""`
@@ -491,6 +492,8 @@ consumers, not bookkeeping:
 | **W0q** | a CI upper bound whose minus is DETACHED (`[-0.58,  -  0.18]`) | **TYPOGRAPHIC** | new in v2.4.134 |
 | **W0s** | `=` / minus drawn by an operator-only font whose map says `5` / `2` (`t 5 20.63`) | **TYPOGRAPHIC, two origins** | declared font repertoire AND the rasterized glyph (a bar); both must agree, per word. New in v2.4.147; step key `W0s_operator_glyph_layout` |
 | **W0t** | a compound hyphen pdftotext dehyphenated away at a line end (`Well-` / `Being` -> `WellBeing`) | **TYPOGRAPHIC** (layout word counts) | new in v1.9.73 / v2.4.153; layout-gated; step key `W0t_semantic_hyphen_layout`. Restores `A-B` only when the paper prints `A-B` inline, no layout word holds `AB` in a hyphen-free stretch, and the layout has at least as many `A-` line-end fragments as the text has glued sites of every restored compound starting `A`; never inside a URL or DOI. A paper that prints the word glued even once keeps every glued copy |
+| **W0u** | a page or number range whose hyphen pdftotext dropped at a line end (`pp. 101-` / `125` -> `101125`) | **TYPOGRAPHIC** (layout word counts) | new in v2.4.156; step key `W0u_numeric_range_hyphen_layout`. Restores `A-B` only when the layout has a line-end word exactly `A-`, a word starting with `B`, the split is unique, no layout word holds the glued digits, and the token is not in a URL; adjacent all-digit words (a raised exponent, `10` + `6`) count as one printed run |
+| **W0v** | a hyphen inside a DOI dropped at a line end (`10.3233/NHA-` / `170036` -> `NHA170036`) | **TYPOGRAPHIC** (layout word counts) | new in v2.4.156; DOIs only (a URL host is left alone). Restores the hyphen only when the layout holds the DOI head ending in `-`, a matching continuation word, the glued form is never printed, and at most one site per fragment |
 
 ### W0q — detached CI-upper minus (new in v2.4.134)
 
@@ -533,6 +536,7 @@ normalize_text(text, NormalizationLevel.academic)
     ↓
 C0  Line-final BACKSPACE strip   ← pre-S0, before F0 (see the pre-S0 table)
 S0  SMP Mathematical Italic → ASCII
+S0h U+00AD that is the document's printed hyphen -> `-` (v2.4.156; document-level gate)
 S1  Encoding validation
 S2  Accent recombination
 S3  Ligature expansion
@@ -541,6 +545,8 @@ S5  Dash and minus normalization
     [S5a / S5b WERE HERE — U+FFFD rewritten to `eta` / `>=` / `<=` from the
      surrounding text; retired 2026-09-25, U+FFFD now passes through]
 S6  Whitespace and invisible character normalization
+S6u URL / DOI broken across a line rejoined without a space (v2.4.156; refuses a
+    comma, a list number, a second URL, a bare number under a web URL, and prose)
 S7  Hyphenation repair
 S8  Mid-sentence line break joining
 A1  Statistical line break repair  ← before S9 (prevents page number stripping)
@@ -557,8 +563,13 @@ W0  glyph-recovery family (see the section above for each step's EVIDENCE class)
     [W0i / W0k / W0l WERE HERE — unwired in 2.4.140/141 as a FILE LIE;
      a printed digit 3 is never rewritten to a multiplication sign]
     W0q  ← new v2.4.134: detached CI-upper minus, body-prose channel
-    W0h, W0m, W0p, W0t  (layout-gated — only when `layout=` is supplied;
-    W0t is new v2.4.153: compound-hyphen restore, step key W0t_semantic_hyphen_layout)
+    W0h, W0m, W0p, W0v, W0t, W0u  (layout-gated — only when `layout=` is supplied;
+    W0t is new v2.4.153: compound-hyphen restore, step key W0t_semantic_hyphen_layout;
+    W0u / W0v are new v2.4.156: digit-range and DOI line-end hyphens;
+    since v2.4.156 extract_pdf ALSO runs W0v + W0t + W0u on its own output, fed by the
+    page words of `pdftotext -bbox`, so normalize_text(extract_pdf(...)) gets them
+    without a layout; W0t also restores a 3+-part compound joined after an inner
+    hyphen, e.g. `intent-totreat` -> `intent-to-treat`)
     W0e
 A4  CI delimiter harmonization
 A5  Math symbol and Greek letter normalization

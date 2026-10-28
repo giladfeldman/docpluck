@@ -260,8 +260,14 @@ class TestG5d2RealPdfRegression:
         # one continuous sentence matching the gold, not split across a blank
         # line as an orphan fragment.
         md = _maybe_render("apa/ip_feldman_2025_pspb.pdf")
-        assert "The calculated effect sizes are summarized in the Supplemental Materials." in md, (
-            "effect-sizes sentence should be rejoined into one continuous line"
+        # 2.4.156: the sectioner no longer takes the wrapped "Supplemental
+        # Materials." for a heading at all, so the sentence keeps the page's
+        # own line break inside one paragraph (a markdown soft break) instead
+        # of being demoted and rejoined. Same sentence, one paragraph.
+        flat = " ".join(md.split())
+        assert "The calculated effect sizes are summarized in the Supplemental Materials." in flat, (
+            "effect-sizes sentence should be one continuous sentence"
         )
+        assert "summarized in the\n\n" not in md
         # No orphan bare "Supplemental Materials" line surrounded by blanks.
         assert "\n\nSupplemental Materials\n\n" not in md

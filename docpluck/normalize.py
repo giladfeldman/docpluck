@@ -107,6 +107,26 @@ _WATERMARK_PATTERNS = [
         r"\s+on\s+\d{1,2}/\d{1,2}/\d{4}",
         re.IGNORECASE,
     ),
+    # Sage's older download stamp: host, "at <institution>", and a written-out
+    # US date ("Downloaded from pss.sagepub.com at UNIV OF LETHBRIDGE on
+    # October 30, 2015", 10.1177/0956797615601103). The month-name date anchors
+    # the end, as the patterns above anchor theirs.
+    re.compile(
+        r"Downloaded\s+from\s+[\w.-]+\.\w{2,}\s+at\s+[^\n]{1,100}?\s+on\s+"
+        r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
+        r"\s+\d{1,2},\s+\d{4}",
+    ),
+    # The APA PsycNET side-margin watermark, printed sideways on every page
+    # (10.1037/a0012616, 10.1037/0278-6133.15.3.167). Two fixed sentences of
+    # boilerplate, each removed only as the whole sentence.
+    re.compile(
+        r"This\s+document\s+is\s+copyrighted\s+by\s+the\s+American\s+Psychological\s+"
+        r"Association\s+or\s+one\s+of\s+its\s+allied\s+publishers\."
+    ),
+    re.compile(
+        r"This\s+article\s+is\s+intended\s+solely\s+for\s+the\s+personal\s+use\s+of\s+the\s+"
+        r"individual\s+user\s+and\s+is\s+not\s+to\s+be\s+disseminated\s+broadly\."
+    ),
     re.compile(r"Provided\s+by\s+[\w\s.,&-]+\s+on\s+\d{4}-\d{2}-\d{2}", re.IGNORECASE),
     re.compile(r"This\s+article\s+is\s+protected\s+by\s+copyright\.[^\n]*", re.IGNORECASE),
     # RSOS running-footer artifact glued onto body text:
@@ -1667,6 +1687,141 @@ def _looks_like_ref_start(line: str) -> bool:
 _BARE_REF_NUM_RE = re.compile(r"^(\d{1,3})\.\s*$")
 
 
+_LAYOUT_REF_NUM_RE = re.compile(r"^(\d{1,3})\.$")
+_NUMBERED_REF_LEAD_RE = re.compile(r"^(\d{1,3})\.\s+\S")
+
+# An APA entry whose author the name patterns above cannot read -- a group
+# author ("Public Health Oregon. (2015).", "U.S. Centers for Disease Control and
+# Prevention. (2015)."), a bare surname ("Ladewski (2010).") or a spelled-out
+# first name ("LaRiccia, Michael V. (2005).") -- still opens with a capital and
+# reaches its "(YEAR). Title" within the first 90 characters, with no other
+# parenthesis before it. R3 used to glue each onto the entry above
+# (10.1111/jasp.12453 p28, 10.1016/j.jesp.2012.10.011 p5,
+# 10.1016/j.jesp.2013.11.010 p8, 10.1177/0956797615601103 p9). Used only when
+# the entry above already ends like a finished entry (see `_entry_is_complete`),
+# so a line inside an entry that is still mid-sentence never qualifies.
+# A line that opens with a lone initial ("G. (2015).", "P., Shoots-Reinhard,
+# B., ...") is the wrapped tail of an author list, not a new entry
+# (10.1525/collabra.77608 references); "U.S. Centers ..." is not a lone initial.
+# An author part carries no digits and the "(YEAR)." is followed by the title:
+# a wrapped journal line ending in its year ("Lancet Psychiatry 7, 875-882
+# (2020).", Nature style, 10.1038/s41467-023-42320-4) is not an entry start.
+_REF_START_AUTHOR_YEAR_ANY = re.compile(
+    r"^(?![A-Z]\.(?:,|\s+[A-Z]\.|\s*\())"
+    r"[A-Z][^()\n\d]{0,90}?\((?:1[6-9]|20)\d{2}[a-z]?\)\.\s+\S"
+)
+
+
+def _entry_is_complete(entry: str) -> bool:
+    """The entry so far ends as an APA entry ends: a full stop or closing
+    parenthesis, or a DOI / URL (no terminal punctuation, but a token with
+    a slash)."""
+    e = entry.rstrip()
+    if not e:
+        return False
+    if e[-1] in ".)":
+        return True
+    last = e.rsplit(None, 1)[-1]
+    return "/" in last
+
+
+def _ref_key(s: str) -> str:
+    return re.sub(r"[\W_]+", "", s.lower())[:16]
+
+
+def _layout_reference_number_starts(layout) -> "dict[int, list[str]]":
+    """``{n: [key, ...]}``: for every word ``n.`` the page sets at the left of a
+    line with text beside it (on its baseline, within 40 pt), the normalised
+    first words of that text -- the opening of entry ``n``. A number with a
+    word to its LEFT on the same baseline is inside running text and skipped.
+    """
+    out: "dict[int, list[str]]" = {}
+    for pg in getattr(layout, "pages", ()) or ():
+        ws = pg.words or ()
+        for w in ws:
+            m = _LAYOUT_REF_NUM_RE.match(w.get("text", ""))
+            if not m:
+                continue
+            top, x0, x1 = w["top"], w["x0"], w["x1"]
+            row = [v for v in ws if v is not w and abs(v["top"] - top) <= 2.5]
+            if any(v["x1"] <= x0 + 0.5 and x0 - v["x1"] < 40 for v in row):
+                continue
+            right = sorted((v for v in row if v["x0"] >= x1 - 0.5), key=lambda v: v["x0"])
+            if not right or right[0]["x0"] - x1 >= 40:
+                continue
+            key = _ref_key(" ".join(v["text"] for v in right[:4]))
+            if len(key) >= 5:
+                out.setdefault(int(m.group(1)), []).append(key)
+    return out
+
+
+def _pair_reference_numbers_via_layout(refs_text: str, layout) -> tuple[str, int]:
+    """Re-attach reference numbers that pdftotext streamed as their own column.
+
+    Royal Society (and similar) bibliographies set each number in a column of
+    its own; pdftotext emits the numbers as a block of bare ``N.`` lines apart
+    from the entries, and the entries' wrapped lines are indistinguishable from
+    entry starts in the text alone, so pairing numbers with LINES renumbers the
+    list (10.1098/rsos.240120 pp20-24: "4. Ecol. Prog. Ser."). The page geometry
+    says which text line each number sits beside: that line opens entry N.
+
+    Each entry line in text order is matched against the next few expected
+    numbers' opening words (a pointer, so repeated authors cannot jump the
+    order); a match is prefixed ``N. ``. A bare ``N.`` line is then removed
+    only when N was attached AND the line sits in a block of bare numbers (or
+    is the only bare line for N), so a wrapped "article\\n1." tail stays text.
+    Returns the text and the number of entries paired.
+    """
+    lines = refs_text.split("\n")
+    bare = [(i, int(m.group(1))) for i, ln in enumerate(lines)
+            if (m := _BARE_REF_NUM_RE.match(ln.strip()))]
+    if len(bare) < 3 or layout is None:
+        return refs_text, 0
+    starts = _layout_reference_number_starts(layout)
+    bare_nums = {n for _, n in bare}
+    expected = sorted(n for n in starts if n in bare_nums)
+    if len(expected) < 3:
+        return refs_text, 0
+    bare_idx = {i for i, _ in bare}
+    attached: set[int] = set()
+    ptr = 0
+    for i, ln in enumerate(lines):
+        if i in bare_idx or ptr >= len(expected):
+            continue
+        key = _ref_key(ln)
+        if len(key) < 5:
+            continue
+        for k in range(ptr, min(ptr + 3, len(expected))):
+            n = expected[k]
+            if any(key.startswith(s[: len(key)]) and s.startswith(key[: len(s)]) for s in starts[n]):
+                lines[i] = f"{n}. {ln.lstrip()}"
+                attached.add(n)
+                ptr = k + 1
+                break
+    if not attached:
+        return refs_text, 0
+
+    def _in_block(idx: int) -> bool:
+        for step in (-1, 1):
+            j = idx + step
+            while 0 <= j < len(lines) and not lines[j].strip():
+                j += step
+            if j in bare_idx:
+                return True
+        return False
+
+    removed: set[int] = set()
+    for i, n in bare:
+        if n in attached and _in_block(i):
+            lines[i] = ""
+            removed.add(n)
+    for i, n in bare:
+        if n in attached and n not in removed and sum(1 for _, m in bare if m == n) == 1:
+            lines[i] = ""
+            removed.add(n)
+    return "\n".join(lines), len(attached)
+
+
 def _pair_two_column_bibliography(refs_text: str) -> str:
     """Pair a column of bare `N.` lines with the column of entry lines that
     follows it. Used when pdftotext streams a 2-column bibliography as
@@ -2268,11 +2423,11 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
         re.IGNORECASE,
     ),
     re.compile(r"^This is an open access article distributed under.*$", re.IGNORECASE),
-    # PMC supplementary-material footer.
-    re.compile(
-        r"^ELECTRONIC SUPPLEMENTARY MATERIAL\b.*$",
-        re.IGNORECASE,
-    ),
+    # PMC supplementary-material footer, printed in capitals. Case-SENSITIVE:
+    # with IGNORECASE it deleted every body line that wrapped to open with
+    # "electronic supplementary material, table S6), but rather, ..."
+    # (10.1098/rsos.240120 p15, p18).
+    re.compile(r"^ELECTRONIC SUPPLEMENTARY MATERIAL\b.*$"),
     # Running-header lines with "| <page>" or "<page> Author et al.".
     re.compile(r"^\S(?:[^|\n]{2,80})\|\s*\d{1,4}\s*$"),
     re.compile(r"^\d{1,4}\s+[A-ZÀ-ÿ][^\n]{1,60}\s+et al\.?\s*$"),
@@ -2466,8 +2621,10 @@ _PAGE_FOOTER_LINE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"^rsos\.royalsocietypublishing\.org\s*$"),
     re.compile(r"^www\.nature\.com/(?:naturecommunications|scientificreports)\s*$"),
     re.compile(r"^Vol\.:\(\d{10,}\)\s*$"),  # "Vol.:(0123456789)" Springer marker
-    # v2.4.7: standalone ORCID URL lines.
-    re.compile(r"^https?://orcid\.org/\d{4}-\d{4}-\d{4}-[0-9X]{4}\s*$"),
+    # A standalone ORCID URL line is NOT furniture: it is an author's identifier
+    # (a Sage "ORCID iDs" back-matter section prints one under each name). It
+    # was stripped here from v2.4.7 until 2.4.156, leaving that section a list
+    # of bare names (10.1177/01461672251327169 p18). Data, so it is kept.
     # v2.4.8: Academy of Management copyright footer (recurs on every AOM
     # journal — AMC, AMD, AMJ, AMLE, AMP, Annals; 9 papers in corpus).
     re.compile(
@@ -3246,6 +3403,86 @@ _P0Y_PAGE_TOP_YEAR = re.compile(r"\f((?:19|20)\d\d)[ \t]*(?=\n|$)")
 _P0Y_MIN_PAGES = 3
 
 
+# ── P0t (2.4.156) ───────────────────────────────────────────────────────
+# A RUNNING TITLE: the article's own title (often cut short with "...") printed
+# at the top of every recto page. P0r only removes lines of known furniture
+# SHAPES, and a title has none; P0q's repeated-line strip refuses it by design,
+# because its caption guards keep any line holding a "(YEAR)" or reading as a
+# 7-word sentence. So 10.1525/collabra.77608's "Revisiting the Links Between
+# Numeracy and Decision Making: Replication Registered Report of Peters et al.
+# (2006) With an..." stayed on most pages, between and inside sentences -- and
+# a consumer read its "Peters et al. (2006)" as a citation.
+#
+# P0t RUNS AFTER P0q and only sees what P0q left: a line P0q took is down to
+# its one surviving copy and cannot reach the floor here. It keeps every P0q
+# guard that is about SHAPE rather than content:
+#   * the furniture floor -- on at least `_P0T_MIN_PAGES` (= P0q's 5) pages and
+#     a quarter of the document;
+#   * the header-above-title contract (2026-09-01) -- a line printed twice on
+#     ANY page, page 1 included, is not a running head and nothing is taken;
+#   * per-line telemetry -- `running_title_stripped` per copy taken, with the
+#     line, and `running_title_kept_on_page_1` naming the line whose content
+#     survives.
+# What replaces P0q's caption guards is a second, independent signal: CONTENT.
+# The line's first five words must be five consecutive words of page 1's
+# opening, where the title is printed, and the line must be the first or last
+# line of the pages it is counted on. Page 1 is never touched, so the title
+# itself always survives there (rule 0g: a copy demonstrably survives). A table
+# header repeated over a long table's pages fails the content test; a sentence
+# of the title quoted in the body fails the position test.
+_P0T_MIN_PAGES = 5
+_P0T_WORD = re.compile(r"[A-Za-z0-9]+")
+
+
+def _strip_page_top_running_title(text: str) -> tuple[str, dict[str, int]]:
+    """P0t: remove the running title from pages 2 onward.
+
+    Returns the text and, per removed line, how many copies were taken.
+    """
+    if PAGE_BREAK not in text:
+        return text, {}
+    pages = text.split(PAGE_BREAK)
+    edge_counts: dict[str, int] = {}
+    for pg in pages[1:]:
+        lines = [ln.strip() for ln in pg.split("\n") if ln.strip()]
+        for ln in {lines[0], lines[-1]} if lines else ():
+            if 20 <= len(ln) <= 200:
+                edge_counts[ln] = edge_counts.get(ln, 0) + 1
+    title_words = [w.lower() for w in _P0T_WORD.findall(pages[0][:1500])]
+    title_grams = {tuple(title_words[i:i + 5]) for i in range(len(title_words) - 4)}
+    heads = set()
+    for ln, n in edge_counts.items():
+        if n < _P0T_MIN_PAGES or n * 4 < len(pages):
+            continue
+        words = [w.lower() for w in _P0T_WORD.findall(ln)]
+        if not (len(words) >= 5 and tuple(words[:5]) in title_grams):
+            continue
+        # Header-above-title contract: two copies on one page -> not furniture.
+        if any(sum(1 for x in pg.split("\n") if x.strip() == ln) >= 2 for pg in pages):
+            continue
+        heads.add(ln)
+    if not heads:
+        return text, {}
+    removed: dict[str, int] = {}
+    out_pages = [pages[0]]
+    for pg in pages[1:]:
+        kept = []
+        for i, ln in enumerate(pg.split("\n")):
+            s = ln.strip()
+            if s in heads:
+                removed[s] = removed.get(s, 0) + 1
+                if i == 0:
+                    # The page opened with the title: leave the line empty, so
+                    # a heading below it keeps the blank line that the section
+                    # detector reads as "a heading starts here"
+                    # (10.1525/collabra.77608 "Discussion", "Replication: ...").
+                    kept.append("")
+                continue
+            kept.append(ln)
+        out_pages.append("\n".join(kept))
+    return PAGE_BREAK.join(out_pages), removed
+
+
 def _strip_page_top_running_year(text: str) -> str:
     """P0y: drop a bare year that opens >= 3 pages (and >= 1/4 of them)."""
     if PAGE_BREAK not in text:
@@ -3345,6 +3582,16 @@ _FRONTMATTER_NOTE_PARA_PATTERNS: list[re.Pattern[str]] = [
         r"(?:presented|published)\b",
         re.IGNORECASE,
     ),
+    # APA corresponding-author note ("Correspondence concerning this article
+    # should be addressed to <name>, <address>. E-mail: ..."). The authors'
+    # contact data, so retained and labelled like the notes above. P1 deleted
+    # its first line, stranding the address lines mid-Introduction
+    # (10.1037/a0012616 p1, 10.1037/0278-6133.15.3.167 p1).
+    re.compile(
+        r"^Correspondence\s+concerning\s+this\s+article\s+should\s+be\s+"
+        r"addressed\s+to\b",
+        re.IGNORECASE,
+    ),
 ]
 
 # Publisher / correspondence furniture: P1 still drops the matching line.
@@ -3355,15 +3602,6 @@ _FRONTMATTER_LEAK_PARA_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"^This\s+work\s+is\s+licensed\s+under\s+(?:a\s+|the\s+)?"
         r"Creative\s+Commons\b",
-        re.IGNORECASE,
-    ),
-    # APA-style standalone corresponding-author paragraph (when not already
-    # caught by P0's "CONTACT <name>" single-line rule because the
-    # serialization put it on its own bounded paragraph rather than a one-
-    # line "Corresponding Author:" header).
-    re.compile(
-        r"^Correspondence\s+concerning\s+this\s+article\s+should\s+be\s+"
-        r"addressed\s+to\b",
         re.IGNORECASE,
     ),
     # 2026-05-25 (Cluster C, ip_feldman finding #1): name-led corresponding-
@@ -3640,6 +3878,146 @@ def _rejoin_space_broken_compounds(text: str) -> str:
     for pat in _DEHYPHEN_PATTERNS:
         text = pat.sub(lambda m: re.sub(r"\s+", "", m.group(0)), text)
     return text
+
+
+# S6u: the pieces a URL or DOI can be cut into at a line end.
+# A scheme cut before its `//`: `http` / `s://doi.org`, `https:` / `//doi.org`.
+_URL_SCHEME_PARTS = frozenset({"http", "https", "http:", "https:", "http:/", "https:/"})
+# A bare DOI with its registrant complete (`10.1177/...`); `10.5` alone is a number.
+_URL_BARE_DOI_RE = re.compile(r"10\.\d{4,9}/")
+# The next line's first token, when it is a URL continuation: URL characters only,
+# no comma, no quote, opening on a character a new word or list item never opens with
+# here (`.45.3.513` and `_2` continue a DOI; `(`, `[` and `-` open new material).
+_URL_CONTINUATION_RE = re.compile(r"[A-Za-z0-9._][A-Za-z0-9._~:/?#\[\]@!$&()*+;=%<>\\-]*")
+_URL_LIST_NUMBER_RE = re.compile(r"\d{1,3}\.")
+_URL_SECTION_NUMBER_RE = re.compile(r"\d+(?:\.\d+)+\.?")
+_URL_INITIALISM_RE = re.compile(r"(?:[A-Z]\.){2,4}")
+_URL_OPENERS = "([<\"'"
+_URL_NEW_TOKEN_STARTS = ("http://", "https://", "www.", "doi:")
+
+
+def _url_head(line: str) -> str | None:
+    """The URL/DOI token a line ends with, or None. Lower-cased."""
+    toks = line.rsplit(None, 1)
+    if not toks:
+        return None
+    tok = toks[-1].lstrip(_URL_OPENERS).lower()
+    if not tok:
+        return None
+    if tok in _URL_SCHEME_PARTS:
+        return tok
+    # A closing bracket, comma or semicolon ends the token: `(https://osf.io/x)`.
+    if tok[-1] in ",;)]>\"'" or (tok[-1] == "." and len(tok) > 1 and tok[-2] in ")]"):
+        return None
+    if (
+        "://" in tok
+        or tok.startswith("www.")
+        or (tok.startswith("doi:") and len(tok) > 4)
+        or "doi.org/" in tok
+        or _URL_BARE_DOI_RE.match(tok)
+    ):
+        return tok
+    return None
+
+
+def _url_continues(head: str, nxt: str) -> bool:
+    """Is ``nxt`` (the next line) the rest of the URL/DOI ``head`` was cut from?"""
+    if not nxt or nxt[0] in " \t\f":
+        return False
+    parts = nxt.split(None, 1)
+    if not parts:
+        return False
+    cont, rest = parts[0], (parts[1] if len(parts) > 1 else "")
+    if head in _URL_SCHEME_PARTS:
+        joined = (head + cont).lower()
+        return (
+            joined.startswith(("http://", "https://"))
+            and len(joined) > len("https://")
+            and _URL_CONTINUATION_RE.fullmatch(joined.split("//", 1)[1]) is not None
+        )
+    if not _URL_CONTINUATION_RE.fullmatch(cont):
+        return False
+    # A second URL on the next line is a new token (`orcid.org/...-8421` /
+    # `http://orcid.org/...`, 10.1080/02699931.2024.2434156).
+    # A head that is still only a scheme (`http://` / `www.ncbi...`) takes it.
+    host_open = "://" in head and "/" not in head.split("://", 1)[1]
+    if cont.lower().startswith(_URL_NEW_TOKEN_STARTS) and not (
+        host_open and head.endswith("://") and cont.lower().startswith("www.")
+    ):
+        return False
+    # A bare number below a web address is as likely a footnote number or a page
+    # number as the address's tail (10.5465/amd.2023.0106: `.../vc` / `3`); only
+    # a DOI, whose suffix is often all digits, takes one.
+    is_doi = _URL_BARE_DOI_RE.search(head) is not None
+    if cont.isdigit() and not is_doi:
+        return False
+    # A second DOI on the next line (a DOI list): a fresh `10.NNNN/` or `doi.org/`
+    # opens a new token unless the head is the bare resolver (`https://doi.org/`).
+    # A head still in its host (`http://dx.` / `doi.org/...`, `https://` /
+    # `doi.org/...`) takes a resolver host as its rest.
+    if (
+        (_URL_BARE_DOI_RE.match(cont)
+         or (cont.lower().startswith(("doi.org/", "dx.doi.org/")) and not host_open))
+        and not head.endswith(("doi.org/", "doi:"))
+    ):
+        return False
+    if _URL_LIST_NUMBER_RE.fullmatch(cont):
+        return False
+    # An initialism opening the next line ("U.S. Centers for Disease Control",
+    # the next reference below a complete DOI, 10.1177/0956797615601103 p9) is
+    # a word, not the DOI's tail.
+    if _URL_INITIALISM_RE.fullmatch(cont):
+        return False
+    # A numbered heading below a web address (`2.1` / `Methods`). A DOI tail can
+    # look the same (`10.1016/j.jesp.2013.0` / `2.009`), so this is for web URLs.
+    if (rest or not is_doi) and _URL_SECTION_NUMBER_RE.fullmatch(cont):
+        return False
+    has_digit = any(c.isdigit() for c in cont)
+    if not (has_digit or any(c in "./_-" for c in cont[:-1])):
+        return False
+    # More words follow: the token must carry URL punctuation inside it, so a
+    # sentence opening `H1 predicted` or `2SLS estimates` is never swallowed.
+    if rest and not any(c in "/._-" for c in cont[:-1]):
+        return False
+    return True
+
+
+def _rejoin_broken_urls(text: str) -> str:
+    """S6u: join a URL or DOI that a line break cut, with no space.
+
+    pdftotext breaks a long URL wherever the line ends: 10.1525/collabra.77608
+    prints ``https://doi.org/10.1126/science.aac4716`` and the text channel says
+    ``https://doi.org/10.1126/science.a`` / ``ac4716``; the host itself is cut
+    in nine of its references (``https://doi.or`` / ``g/...``, ``http`` /
+    ``s://...``). Every later line join (S8 and the late re-joins) put a space
+    there, so the DOI no longer resolved.
+
+    A line is joined to the next only when BOTH hold:
+
+    * the line ends in a URL/DOI token: one containing ``://``, opening
+      ``www.``, ``doi:`` or a DOI ``10.NNNN/``, or a scheme cut before its
+      ``//`` (``http``, ``https:``); a token closed by a bracket, comma or
+      semicolon has ended;
+    * the next line, directly below (no blank line, no page break), opens with
+      a token of URL characters only (no comma, no quote) that carries a digit
+      or inner punctuation, is not a list number (``10.``), and, when more text
+      follows it on the line, holds a ``/`` or both letters and digits.
+
+    So a complete DOI followed by the next reference (``Fedorov, V.``), a
+    word, a list number or a page number keeps its break. Runs at every level:
+    the cut is an extraction artifact, never content.
+    """
+    if not text or ("://" not in text and "10." not in text and "http" not in text):
+        return text
+    lines = text.split("\n")
+    out = [lines[0]]
+    for line in lines[1:]:
+        head = _url_head(out[-1])
+        if head is not None and _url_continues(head, line):
+            out[-1] = out[-1].rstrip(" \t") + line
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 _NUMBERED_HEADING_ORPHAN_RE = re.compile(r"^\s*(\d{1,2}(?:\.\d{1,2}){0,3}\.?)\s*$")
@@ -5595,8 +5973,55 @@ def _layout_superscript_fusions(layout) -> list[tuple[str, str]]:
     return out
 
 
+_S0H_SHY_INTERIOR_RE = re.compile(r"(?<=[^\W_])\u00AD(?=[^\W_])")
+# U+002D and the Unicode hyphens S5 later folds into it (U+2010, U+2011).
+_S0H_HYPHEN_INTERIOR_RE = re.compile(r"(?<=[^\W_])[-\u2010\u2011](?=[^\W_])")
+# At least this many word-internal U+00AD before the glyph is called at all.
+_S0H_MIN_SHY = 20
+# U+00AD between two digits: a hyphenation hint never splits a number, so this
+# is a printed range dash or minus (`1359<U+00AD>1366`).
+_S0H_SHY_DIGITS_RE = re.compile(r"(?<=\d)\u00AD(?=\d)")
+_S0H_MIN_SHY_DIGITS = 3
+
+
+def _soft_hyphen_is_the_hyphen_glyph(text: str) -> bool:
+    """Is U+00AD this document's printed hyphen rather than an invisible break hint?
+
+    True when the text holds at least ``_S0H_MIN_SHY`` U+00AD between two word
+    characters and a hyphen (U+002D, or U+2010 / U+2011, which S5 folds into it
+    later) sits between word characters no more than a tenth as often. A
+    typeset paper prints hyphens (compounds, ranges, DOIs) that way, so an
+    invisible soft hyphen there is outnumbered many times over (125-paper
+    corpus manifest, pdftotext, 2026-10-27: the most word-internal U+00AD in
+    any paper was 6, beside 214 word-internal U+002D). A document whose font
+    maps its hyphen glyph to U+00AD has the opposite profile
+    (10.1126/science.aac4716: 315 and 0).
+
+    It must also hold at least ``_S0H_MIN_SHY_DIGITS`` U+00AD between two
+    digits. A text whose every long word carries a hyphenation hint (HTML
+    ``&shy;``, a CMS, Word optional hyphens) can have many word-internal U+00AD
+    and few hyphens, but a hint never splits a number; a printed hyphen glyph
+    does sit in page ranges (science.aac4716: ``1359<U+00AD>1366``, 34 such
+    sites). The floors (20 and 3) make a short text too little evidence: a
+    second-model consult built a 5-site passing case from 3 hinted words and 2
+    hint-split numbers.
+    """
+    if "\u00AD" not in text:
+        return False
+    shy = len(_S0H_SHY_INTERIOR_RE.findall(text))
+    if shy < _S0H_MIN_SHY:
+        return False
+    if len(_S0H_SHY_DIGITS_RE.findall(text)) < _S0H_MIN_SHY_DIGITS:
+        return False
+    return len(_S0H_HYPHEN_INTERIOR_RE.findall(text)) * 10 <= shy
+
+
 _W0O_INLINE_COMPOUND_RE = re.compile(
     r"(?<![A-Za-z-])([A-Za-z]{2,})-([A-Za-z]{2,})(?![A-Za-z-])"
+)
+# A compound of three or more letter parts, each at least two letters.
+_W0T_MULTI_COMPOUND_RE = re.compile(
+    r"(?<![A-Za-z-])[A-Za-z]{2,}(?:-[A-Za-z]{2,}){2,}(?![A-Za-z-])"
 )
 _W0O_WORD_STRIP = ".,;:()[]{}\"'“”‘’"
 # A hyphen-free run of letters inside a layout word: `above-averageeffect`
@@ -5635,15 +6060,25 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
     A document that prints the word glued even once keeps every glued copy
     (``preregistration``: 4 printed glued, 1 hyphenated -> untouched). Measured
     over the 101-PDF manifest on 2026-10-12; see CHANGELOG.
+
+    The same gates apply to a compound of three or more parts broken after an
+    inner hyphen (10.1037/a0012616: ``intent-to-`` / ``treat`` ->
+    ``intent-totreat``): the whole compound printed inline, the glued variant
+    in no layout word, one ``intent-to-`` fragment per glued copy.
+
+    ``extract_pdf`` also calls this, with the words of ``pdftotext -bbox`` as
+    the layout, so the plain text path is repaired without pdfplumber.
     """
     if not text or layout is None:
         return text
     attest: collections.Counter = collections.Counter()
     for m in _W0O_INLINE_COMPOUND_RE.finditer(text):
         attest[(m.group(1).lower(), m.group(2).lower())] += 1
-    if not attest:
+    multi = {m.group(0).lower() for m in _W0T_MULTI_COMPOUND_RE.finditer(text)}
+    if not attest and not multi:
         return text
     stretches: list = []
+    layout_words: list = []
     frags: collections.Counter = collections.Counter()
     for page in getattr(layout, "pages", ()) or ():
         for w in getattr(page, "words", ()) or ():
@@ -5651,9 +6086,9 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
             if not s:
                 continue
             # NFKC folds ligatures (`ﬁ` -> `fi`) so `selfﬁnancing` still matches.
-            stretches.extend(
-                _W0O_LAYOUT_STRETCH_RE.findall(unicodedata.normalize("NFKC", s).lower())
-            )
+            folded = unicodedata.normalize("NFKC", s).lower()
+            stretches.extend(_W0O_LAYOUT_STRETCH_RE.findall(folded))
+            layout_words.append(folded)
             if s.endswith("-") and len(s) > 2:
                 frags[s[:-1].lower()] += 1
     if not stretches:
@@ -5669,8 +6104,31 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
             m for m in pat.finditer(text)
             if not _w0o_in_url(text, m.start(), m.end())
         ]
-        if sites:
-            by_prefix[a].extend(sites)
+        by_prefix[a].extend((m.start(), m.end(), m.group(1) + "-" + m.group(2)) for m in sites)
+    # A compound of three or more parts (`intent-to-treat`) printed inline and
+    # broken at a line end after one of its inner hyphens (`intent-to-` /
+    # `treat` -> `intent-totreat`). Same three conditions, on the whole
+    # compound: printed inline, the glued variant in no layout word, and one
+    # line-end fragment (`intent-to-`) per glued copy, the licence shared with
+    # the two-part pass above.
+    if multi:
+        layout_joined = "\n".join(layout_words)
+        for comp in multi:
+            parts = comp.split("-")
+            for j in range(1, len(parts)):
+                head = "-".join(parts[:j])
+                if not frags[head]:
+                    continue
+                glued = "-".join(parts[: j - 1] + [parts[j - 1] + parts[j]] + parts[j + 1:])
+                if glued in layout_joined:
+                    continue
+                pat = re.compile(r"(?<![A-Za-z-])" + re.escape(glued) + r"(?![A-Za-z-])", re.I)
+                k = len(head)
+                by_prefix[head].extend(
+                    (m.start(), m.end(), m.group(0)[:k] + "-" + m.group(0)[k:])
+                    for m in pat.finditer(text)
+                    if not _w0o_in_url(text, m.start(), m.end())
+                )
     # A line-end fragment the TEXT still prints hyphenated (`well-` / `being`
     # left for S7) produced no glued copy, so it licenses none: without this a
     # glued token from elsewhere -- a space pdftotext dropped in a printed
@@ -5680,20 +6138,20 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
         return frags[a] - kept
 
     sites = [
-        m for a, ms in by_prefix.items() if len(ms) <= _licences(a) for m in ms
+        m for a, ms in by_prefix.items() if ms and len(ms) <= _licences(a) for m in ms
     ]
     # Two compounds splitting the same letters (`re-sent`, `res-ent`) can both
     # claim one glued span; which split the page meant is unknowable, so
     # neither fires (consult round 3, Sonnet, 2026-10-13).
-    claims = collections.Counter(m.start() for m in sites)
-    sites = sorted((m for m in sites if claims[m.start()] == 1), key=lambda m: m.start())
+    claims = collections.Counter(st for st, _e, _r in sites)
+    sites = sorted((s for s in sites if claims[s[0]] == 1), key=lambda s: s[0])
     if not sites:
         return text
     out, last = [], 0
-    for m in sites:
-        out.append(text[last:m.start()])
-        out.append(m.group(1) + "-" + m.group(2))
-        last = m.end()
+    for st, en, rep in sites:
+        out.append(text[last:st])
+        out.append(rep)
+        last = en
     out.append(text[last:])
     if counter is not None:
         counter[0] += len(sites)
@@ -5703,6 +6161,7 @@ def recover_semantic_hyphens_via_layout(text: str, layout, counter=None) -> str:
 _W0U_FRAG_RE = re.compile(r"^(\d{1,6})-$")
 _W0U_LEAD_DIGITS_RE = re.compile(r"^(\d{1,6})(?!\d)")
 _W0U_DIGIT_RUN_RE = re.compile(r"\d+")
+_W0U_HEAD_RUN_RE = re.compile(r"^(\d+)")
 _W0U_GLUED_RE = re.compile(r"(?<![\d.,\-–—])\d{2,12}(?![\d]|[.,]\d)")
 
 
@@ -5713,7 +6172,8 @@ def recover_numeric_range_hyphens_via_layout(text: str, layout, counter=None) ->
     hyphen even between digits: 10.1111/jasp.12453 prints the reference page
     ranges ``(pp. 101-`` / ``125)`` (p24) and ``pp. 1-`` / ``36)`` (p29), and the
     text channel says ``pp. 101125`` and ``pp. 136`` -- wrong numbers with
-    nothing to show it. pdfplumber's words keep the ``101-`` fragment.
+    nothing to show it. The layout's words keep the ``101-`` fragment
+    (pdfplumber's on the layout paths; ``pdftotext -bbox`` in ``extract_pdf``).
 
     The same document-level gate as W0t (no line pairing). A glued digit run
     ``AB`` in the text becomes ``A-B`` only when:
@@ -5721,7 +6181,10 @@ def recover_numeric_range_hyphens_via_layout(text: str, layout, counter=None) ->
     * the layout holds a word that is exactly the line-end fragment ``A-``;
     * the layout holds a word OPENING with exactly the digits ``B`` (the next
       line's first word, e.g. ``125).``);
-    * the layout never holds ``AB`` as a digit run, so the page never prints it;
+    * the layout never holds ``AB`` as a digit run, so the page never prints it
+      -- counting the digits of two ADJACENT words as one run, so a raised
+      exponent the text glues on (``(~10`` + ``6`` -> ``(~106``) is not taken
+      for a range;
     * exactly one split of the glued run satisfies the above;
     * the text holds no more glued sites for ``A`` than the layout holds ``A-``
       fragments; and the run is not inside a URL or DOI.
@@ -5732,11 +6195,30 @@ def recover_numeric_range_hyphens_via_layout(text: str, layout, counter=None) ->
     starts: set = set()
     runs: set = set()
     for page in getattr(layout, "pages", ()) or ():
+        prev_tail = ""
         for w in getattr(page, "words", ()) or ():
             raw = (w.get("text") or "").strip()
             if not raw:
                 continue
             runs.update(_W0U_DIGIT_RUN_RE.findall(raw))
+            # Two ADJACENT words whose digits the text glues without a hyphen:
+            # a raised exponent `(~10` + `6` (10.1038/s41467-023-43885-w p6
+            # prints 10^6) reads `(~106` in the text. That glued run is
+            # explained by the page without any dropped hyphen, so it counts as
+            # printed (consult, Sonnet, 2026-10-27).
+            # A chain of three or more (`10` `6` `3` -> `1063`) is followed
+            # through every all-digit word in between.
+            head = _W0U_HEAD_RUN_RE.match(raw)
+            joined = ""
+            if prev_tail and head:
+                joined = prev_tail + head.group(1)
+                runs.add(joined)
+            if joined and raw.isdigit():
+                prev_tail = joined
+            else:
+                # Trailing digits by slicing, not a `\d+$` search (quadratic
+                # on a long digit run).
+                prev_tail = raw[len(raw.rstrip("0123456789")):]
             s = raw.strip(_W0O_WORD_STRIP)
             m = _W0U_FRAG_RE.match(s)
             if m and not ("/" in raw or "www." in raw):
@@ -5766,6 +6248,85 @@ def recover_numeric_range_hyphens_via_layout(text: str, layout, counter=None) ->
         out.append(text[last:m.start()])
         out.append(m.group(0)[:k] + "-" + m.group(0)[k:])
         last = m.end()
+    out.append(text[last:])
+    if counter is not None:
+        counter[0] += len(sites)
+    return "".join(out)
+
+
+_W0V_DOI_START_RE = re.compile(r"(?<![\d.])10\.\d{4,9}/")
+_W0V_OPENERS = "([<\"'"
+
+
+def recover_doi_hyphens_via_layout(text: str, layout, counter=None) -> str:
+    """W0v: restore a hyphen inside a DOI that pdftotext's dehyphenation removed.
+
+    pdftotext joins a line ending in a hyphen to the next line and drops the
+    hyphen, inside a DOI too: 10.1001/jamanetworkopen.2023.39337 prints
+    ``doi:10.3233/NHA-`` / ``170036`` (p11, ref 5) and the text channel says
+    ``10.3233/NHA170036``, a DOI that does not resolve; 10.1080/02699931.2024.
+    2434156 loses three the same way (``10.1007/s11031-`` / ``006-9025-x``).
+    W0t and W0u skip URL and DOI tokens; pdfplumber's words keep the fragment.
+
+    Document-level, like W0u (no line pairing). A DOI head ``D`` (``10.NNNN/``
+    and the suffix up to the line-end hyphen) glued to a continuation ``R`` in
+    the text becomes ``D-R`` only when:
+
+    * the layout holds a word ending ``D-`` (the line-end fragment);
+    * the layout holds a word that opens with ``R``, or that ``R`` opens with
+      (a PDF without space glyphs gives one word per line);
+    * no layout word holds ``D`` glued to a letter or digit, so the page never
+      prints it unhyphenated;
+    * the text holds no more glued sites of ``D`` than the layout holds
+      fragments.
+
+    DOIs only. A URL host broken at a line end (``http://creativecom-`` /
+    ``mons.org``, 10.1525/collabra.77608) carries a typesetter's hyphen that is
+    no part of the address, and nothing on the page tells the two apart.
+    """
+    if not text or layout is None or "10." not in text:
+        return text
+    frags: collections.Counter = collections.Counter()
+    words: list = []
+    for page in getattr(layout, "pages", ()) or ():
+        for w in getattr(page, "words", ()) or ():
+            raw = (w.get("text") or "").strip()
+            if not raw:
+                continue
+            words.append(raw.lstrip(_W0V_OPENERS))
+            if raw.endswith("-"):
+                starts = list(_W0V_DOI_START_RE.finditer(raw))
+                if starts:
+                    head = raw[starts[-1].start():-1]
+                    if len(head) > starts[-1].end() - starts[-1].start():
+                        frags[head] += 1
+    if not frags:
+        return text
+    sites: list = []
+    for head, n in frags.items():
+        glued = re.compile(re.escape(head) + r"[A-Za-z0-9]")
+        if any(glued.search(w) for w in words):
+            continue
+        found = []
+        for m in re.finditer(r"(?<![\d.])" + re.escape(head) + r"(?=[A-Za-z0-9])", text):
+            run_end = m.end()
+            while run_end < len(text) and not text[run_end].isspace():
+                run_end += 1
+            cont = text[m.end():run_end].rstrip(".,;)]")
+            if cont and any(
+                w.startswith(cont) or (len(w) >= 4 and cont.startswith(w)) for w in words
+            ):
+                found.append(m.end())
+        if found and len(found) <= n:
+            sites.extend(found)
+    if not sites:
+        return text
+    sites.sort()
+    out, last = [], 0
+    for pos in sites:
+        out.append(text[last:pos])
+        out.append("-")
+        last = pos
     out.append(text[last:])
     if counter is not None:
         counter[0] += len(sites)
@@ -6759,7 +7320,11 @@ def _normalize_text(
     t = text
     # Pagination is decided HERE, while the page breaks still exist; the strip
     # step far below and the repeated-line gate both read this one verdict.
-    _pagination = _pagination_verdict(text)
+    # Decided on the text S6u will hand on: a DOI continuation line `22`
+    # (`collabra.371` / `22`) is a bare-integer line in the raw text and is gone
+    # after S6u, so a verdict counted on the raw text goes stale for page 22 and
+    # leaves the real page number in (10.1525/collabra.77608 pages 5 and 22).
+    _pagination = _pagination_verdict(_rejoin_broken_urls(text))
     _page_number_tokens = _pagination.tokens if _pagination else frozenset()
 
     # ── W0s (2026-09-27, owner decision "B"): an OPERATOR GLYPH the text layer
@@ -6796,6 +7361,23 @@ def _normalize_text(
     # Then NFC-compose to merge base+combining into precomposed (Fö → Förster
     # only works if Fö is precomposed; NFC handles the Potočnik case).
     t = unicodedata.normalize("NFC", t)
+
+    # ── S0h (2026-10-27): U+00AD that IS the document's printed hyphen ──
+    # S6 strips U+00AD as an invisible soft hyphen. Some PDFs map their visible
+    # hyphen-minus glyph to U+00AD: 10.1126/science.aac4716 prints
+    # `1359-1366`, `high-powered`, R's `<-` and table values `-0.327`, and
+    # pdftotext gives every one as U+00AD (315 word-internal, zero U+002D), so
+    # the strip produced `13591366` and `0.327`. Decided per DOCUMENT, never
+    # per site: a real invisible soft hyphen (`Amer<U+00AD>ican`, printed
+    # `American`) sits in documents that print U+002D for their hyphens. See
+    # `_soft_hyphen_is_the_hyphen_glyph`.
+    before = t
+    _s0h_n = 0
+    if _soft_hyphen_is_the_hyphen_glyph(t):
+        _s0h_n = t.count("\u00AD")
+        t = t.replace("\u00AD", "-")
+    report._track("S0h_soft_hyphen_is_hyphen_glyph", before, t,
+                  "soft_hyphens_as_hyphen", count=_s0h_n)
 
     # ── C0: line-final BACKSPACE strip (NORMALIZATION_VERSION 1.9.58) ───
     # Runs BEFORE F0 on purpose. `_key()` has discarded this character since
@@ -7089,6 +7671,17 @@ def _normalize_text(
         t = recover_superscript_via_layout(t, dropped_minus_layout)
         report._track("W0p_superscript_layout", before, t, "superscript_markers_split")
 
+        # ── W0v (2026-10-27): a hyphen inside a DOI pdftotext dehyphenated away ─
+        # `doi:10.3233/NHA-` / `170036` at a line end comes out `NHA170036`.
+        # Restored only when the layout prints the DOI fragment ending `-` and a
+        # word opening with the continuation, and never prints the DOI glued.
+        # See recover_doi_hyphens_via_layout.
+        before = t
+        _w0v_n = [0]
+        t = recover_doi_hyphens_via_layout(t, dropped_minus_layout, _w0v_n)
+        report._track("W0v_doi_hyphen_layout", before, t,
+                      "doi_hyphens_restored", count=_w0v_n[0])
+
         # ── W0t (2026-10-12): a compound hyphen pdftotext dehyphenated away ──
         # `Well-` / `Being` at a line end comes out `WellBeing`. Restored only
         # when the paper prints `well-being` inline, never prints it glued (by
@@ -7255,6 +7848,13 @@ def _normalize_text(
     t = re.sub(r"[ \t]{2,}", " ", t)
     report._track("S6_whitespace_normalization", before, t, "whitespace_normalized")
 
+    # S6u: a URL or DOI cut by a line break is joined with no space, BEFORE S7/S8
+    # and every later line join turn the cut into a space (`science.a ac4716`).
+    # See _rejoin_broken_urls for the two-sided gate.
+    before = t
+    t = _rejoin_broken_urls(t)
+    report._track("S6u_url_line_break_rejoin", before, t, "url_line_breaks_joined")
+
     # S7: Hyphenation repair. The trailing letter is matched as a lookahead so a
     # run of consecutive `word-\nword-\nword` breaks all join in one pass — a
     # `re.sub` of `(g1)-\n(g2)` consumes g2 and resumes after it, missing the
@@ -7296,6 +7896,7 @@ def _normalize_text(
         before = t
         t = _a1_stat_linebreak_repair(t)
         report._track("A1_stat_linebreak_repair", before, t, "stats_repaired")
+
 
     # S9: Header/footer removal
     before = t
@@ -7800,6 +8401,18 @@ def _normalize_text(
             # the page-number keys one step below.
             count=sum(_removed_per_line.values()),
         )
+    # ── P0t: the article's running title on its later pages (2.4.156) ──
+    # After P0q, on purpose: see the P0t note at `_strip_page_top_running_title`.
+    before = t
+    t, _p0t_removed = _strip_page_top_running_title(t)
+    for _s, _n in _p0t_removed.items():
+        for _ in range(_n):
+            record_fallback("running_title_stripped", detail=_s[:120])
+        record_fallback("running_title_kept_on_page_1", detail=_s[:120])
+    report._track(
+        "P0t_running_title_strip", before, t, "running_titles_stripped",
+        count=sum(_p0t_removed.values()),
+    )
     # Strip standalone page numbers - 1-3 digit unconditionally.
     #
     # The character class is [ TAB], NOT the whitespace class. Under
@@ -8575,9 +9188,13 @@ def _normalize_text(
         # pdftotext sometimes wraps long DOIs across a line, e.g.
         # "(doi:10.\n1007/s10683-020-09663-x)". Rejoin them. The `doi:` prefix
         # in the lookbehind chain is load-bearing — without it the rule
-        # would damage decimals at line ends in normal prose.
+        # would damage decimals at line ends in normal prose. The lookahead
+        # refuses the next entry of a numbered list: `doi: 10.1371/journal.pmed.
+        # 0020124.` / `10. C. G. Begley` (10.1126/science.aac4716, refs 9-10) is
+        # a DOI that ends the entry plus the number `10.` of the next one.
         before = t
-        t = re.sub(r"(doi:\s*\S*?\d)\.\s*\n\s*(\d)", r"\1.\2", t, flags=re.IGNORECASE)
+        t = re.sub(r"(doi:\s*\S*?\d)\.\s*\n\s*(\d)(?!\d{0,2}\.[ \t])", r"\1.\2", t,
+                   flags=re.IGNORECASE)
         report._track("A7_doi_rejoin", before, t, "doi_rejoined")
 
         # ── R2 + R3: References-section repairs (Request 9) ──────────────
@@ -8648,6 +9265,12 @@ def _normalize_text(
             # sequential 1..N or 1..N-with-gaps sequence followed by the
             # same number of entry-shaped lines, and pair them up before
             # the continuation pass runs.
+            # With the page geometry, pair each number with the entry it is
+            # printed beside (exact); the text-only pairing below stays the
+            # fallback for whatever the geometry did not settle.
+            refs_text, n_paired = _pair_reference_numbers_via_layout(refs_text, _w0s_layout)
+            if n_paired:
+                record_fallback("r3_reference_numbers_paired_via_layout", detail=str(n_paired))
             refs_text = _pair_two_column_bibliography(refs_text)
 
             # R3 first: continuation join must run before R2 because R2's
@@ -8668,6 +9291,11 @@ def _normalize_text(
             # not merge.
             cur_entry = -1
             saw_blank = False
+            # The number of the last numbered entry started. An entry numbered
+            # exactly one more opens a new entry even when its first author is
+            # lowercase ("99. de Kock W", 10.1098/rsos.240120), which the
+            # capital-letter start patterns cannot see.
+            last_num = None
             for line in lines:
                 stripped = line.strip()
                 if not stripped:
@@ -8675,6 +9303,18 @@ def _normalize_text(
                     saw_blank = True
                     continue
                 is_start = _looks_like_ref_start(stripped)
+                num_m = _NUMBERED_REF_LEAD_RE.match(stripped)
+                if not is_start and num_m and last_num is not None and int(num_m.group(1)) == last_num + 1:
+                    is_start = True
+                if (
+                    not is_start
+                    and cur_entry >= 0
+                    and _REF_START_AUTHOR_YEAR_ANY.match(stripped)
+                    and _entry_is_complete(joined[cur_entry])
+                ):
+                    is_start = True
+                if is_start and num_m:
+                    last_num = int(num_m.group(1))
                 bridged = False
                 if cur_entry >= 0 and not is_start:
                     if saw_blank:

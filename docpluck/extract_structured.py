@@ -51,9 +51,11 @@ from .tables.captions import (
     CaptionMatch,
     caption_anchor_is_in_text_reference,
     find_caption_matches,
+    printed_continuation_heads,
     printed_continuation_label,
 )
 from .tables.render import cells_to_html, sync_header_rows
+from .tables.caption_rows import move_caption_rows_out_of_grid
 from .tables.whitespace import grid_is_body_prose
 from .resources import incomplete_method_pieces
 from .telemetry import fallback_scope, record_fallback
@@ -145,6 +147,9 @@ def extract_pdf_structured(
             _raw_text=_raw_text,
             _page_count=_page_count,
         )
+        # A grid that opens with its own label / caption lines hands them back
+        # to the caption before any channel reads the header.
+        move_caption_rows_out_of_grid(result.get("tables"))
     # `header_rows` says what the html's <thead> did, on every path.
     sync_header_rows(result.get("tables"))
     result["fallbacks"] = dict(fb.counters)
@@ -757,7 +762,8 @@ def _extract_pdf_structured(
     n_uncaptioned = 0
     page_words: Optional[list[str]] = None
     raw_pages: list[str] = []
-    for ct in uncaptioned_candidates:
+    # Page order, so a table that runs over three pages links page by page.
+    for ct in sorted(uncaptioned_candidates, key=lambda g: g.get("page") or 0):
         if any(ct is t for t in tables):
             continue
         page = ct.get("page") or 0
@@ -790,6 +796,30 @@ def _extract_pdf_structured(
             ct["caption_status"] = "matched"
             ct["continuation_of"] = cont[0]
             record_fallback("camelot_candidate_is_printed_continuation", detail=f"p{page} {cont[0]}")
+            tables.append(ct)
+            continue
+        # A grid at the top of the page after a table that runs to its page foot,
+        # with that table's columns at its x-extent, is the table's next page.
+        # With the page's own "Table N (continued)" head as well it is `matched`;
+        # on geometry alone it gets the distinct status `continuation` -- linked,
+        # never claimed as verified.
+        grids = [*tables, *(g for g in camelot_tables if not any(g is t for t in tables))]
+        link = _continuation_link(
+            ct,
+            [g for g in grids if (g.get("page") or 0) == page - 1],
+            [g for g in grids if (g.get("page") or 0) == page],
+            raw_pages[page - 1] if 1 <= page <= len(raw_pages) else "",
+        )
+        if link is not None:
+            parent_label, head = link
+            ct["label"] = parent_label
+            ct["caption"] = head
+            ct["caption_status"] = "matched" if head else "continuation"
+            ct["continuation_of"] = parent_label
+            record_fallback(
+                "camelot_candidate_is_continuation",
+                detail=f"p{page} {parent_label} {'printed' if head else 'geometry'}",
+            )
             tables.append(ct)
             continue
         n_uncaptioned += 1
@@ -2155,6 +2185,59 @@ def _column_body_text(
     except Exception as exc:
         record_fallback("column_body_rebuild_exception", detail=type(exc).__name__)
         return None
+
+
+def _grid_n_cols(t) -> int:
+    return max((int(c.get("c", 0)) + int(c.get("colspan", 1) or 1) for c in (t.get("cells") or ())), default=0)
+
+
+def _real_bbox(t):
+    try:
+        x0, y0, x1, y1 = (float(v) for v in (t.get("bbox") or ()))
+    except (TypeError, ValueError):
+        return None
+    return (x0, y0, x1, y1) if x1 > x0 and y1 > y0 else None
+
+
+def _continuation_link(ct, prev_page_grids, same_page_grids, page_text):
+    """``(parent_label, printed_head_or_None)`` when an uncaptioned grid continues
+    the table that ends the previous page, else None.
+
+    A table that runs over a page break reaches the next page with no caption.
+    The link needs ALL of: the previous page's LOWEST grid carries a label; this
+    grid is the TOPMOST on its page; both have the same number of columns; and
+    they span the same horizontal extent (left edges within 10 pt, horizontal
+    overlap at least 85% of the wider span). A continuation head the page prints
+    on a line of its own ("Table 1. (continued)") is returned as the second item
+    when it names the same table; a head naming a DIFFERENT table refuses the
+    link. Camelot bboxes are PDF coordinates (y grows upward).
+    """
+    page = ct.get("page") or 0
+    cb = _real_bbox(ct)
+    n_cols = _grid_n_cols(ct)
+    if cb is None or n_cols < 2:
+        return None
+    prev = [(b, t) for t in prev_page_grids if (t.get("page") or 0) == page - 1 and (b := _real_bbox(t))]
+    if not prev:
+        return None
+    lowest_b, parent = min(prev, key=lambda bt: bt[0][1])
+    label = parent.get("label")
+    if not label or _grid_n_cols(parent) != n_cols:
+        return None
+    for t in same_page_grids:
+        b = _real_bbox(t)
+        if t is not ct and b is not None and (t.get("page") or 0) == page and b[3] > cb[3]:
+            return None  # another grid sits above it
+    if abs(cb[0] - lowest_b[0]) > 10.0:
+        return None
+    overlap = min(cb[2], lowest_b[2]) - max(cb[0], lowest_b[0])
+    wider = max(cb[2] - cb[0], lowest_b[2] - lowest_b[0])
+    if wider <= 0 or overlap / wider < 0.85:
+        return None
+    heads = printed_continuation_heads(page_text or "")
+    if heads and label not in heads:
+        return None
+    return label, heads.get(label)
 
 
 def _bbox_overlap_fraction(a, b) -> float:

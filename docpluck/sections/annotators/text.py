@@ -387,6 +387,40 @@ def _looks_like_table_cell(text: str, heading_end: int, heading_was_line_isolate
     return False
 
 
+# The words a wrapped sentence can break after but a paragraph cannot end on.
+_DANGLING_LINE_END_WORDS = frozenset(
+    "the a an of in on at to for from with by and or into onto about via per "
+    "our their its his her this these those see than as".split()
+)
+
+
+def _previous_line_ends_mid_sentence(text: str, line_start: int) -> bool:
+    """True when the line directly before ``line_start`` (single newline, no
+    blank line between) ends on an article, preposition, conjunction or
+    possessive: the sentence wraps onto this line, so a canonical heading word
+    here is that sentence's object ("summarized in the" / "Supplemental
+    Materials."), never a heading. 10.1177/01461672251327169 p5.
+    """
+    if line_start <= 0 or text[line_start - 1] != "\n":
+        return False
+    prev_start = text.rfind("\n", 0, line_start - 1) + 1
+    prev = text[prev_start:line_start - 1].rstrip(" \t")
+    if not prev or not prev[-1:].isalpha():
+        return False
+    last = prev.rsplit(None, 1)[-1]
+    return last in _DANGLING_LINE_END_WORDS
+
+
+def _previous_line_ends_lowercase(text: str, line_start: int) -> bool:
+    """True when the line directly before ``line_start`` (single newline)
+    ends on a lowercase letter -- an unfinished sentence."""
+    if line_start <= 0 or text[line_start - 1] != "\n":
+        return False
+    prev_start = text.rfind("\n", 0, line_start - 1) + 1
+    prev = text[prev_start:line_start - 1].rstrip(" \t")
+    return bool(prev) and prev[-1].islower()
+
+
 def _prior_paragraph_is_sentence_terminated(text: str, line_start: int) -> bool:
     """Return True if the paragraph immediately preceding the character at
     ``text[line_start]`` ends with a sentence terminator (``.`` ``!`` ``?``,
@@ -625,6 +659,19 @@ def annotate_text(text: str) -> list[BlockHint]:
             labelled_appendix = bool(_APPENDIX_NUMBERED_LABEL.match(after_heading))
 
         if not (preceded_by_blank or followed_by_capital or at_end_of_line):
+            continue
+        if not preceded_by_blank and (
+            _previous_line_ends_mid_sentence(text, line_start)
+            or (
+                # "...are available in the online\nSupplemental Material." --
+                # the words close a sentence the line above left open: a full
+                # stop ends the line, and the line above ends on a lowercase
+                # word (10.1177/0956797615612694 p10, Note 2).
+                re.match(r"[ \t]*\.[ \t]*(?:\n|$)", after_heading)
+                and _previous_line_ends_lowercase(text, line_start)
+            )
+        ):
+            seen_offsets.add(start)
             continue
 
         # 2026-05-25 guard (Cluster A, finding #10 on ip_feldman_2025_pspb):

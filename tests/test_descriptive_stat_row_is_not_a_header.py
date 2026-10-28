@@ -36,3 +36,15 @@ def test_sutin_2015_table_1_age_row_is_a_record():
     assert "Age (years)" in {r["row_label"] for r in recs}
     for r in recs:
         assert not any("68.33" in h for h in r["header"]), r["header"]
+
+
+def test_estimate_with_bracketed_ci_counts_as_data():
+    # 10.1177/0956797615601103 Table 3 (p6): "Age | 2.26 [2.08, 2.46]* | ..."
+    # under "Model 1 | Model 2 | Model 3" / "Predictor | (n = 5,079) | ...".
+    row = ["Age", "2.26 [2.08, 2.46]*", "2.34 [2.14, 2.55]*", "2.24 [2.04, 2.45]*"]
+    assert _is_header_like_row(row) is False
+    assert _is_header_like_row(["Black", "1.74 [1.19, 2.54]**", "—", "0.89 [0.59, 1.35]"]) is False
+
+
+def test_bracketed_header_labels_stay_header():
+    assert _is_header_like_row(["Predictor", "HR [95% CI]", "HR [95% CI]"]) is True

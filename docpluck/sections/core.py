@@ -319,7 +319,9 @@ def _synthesize_abstract_from_leading_unknown(
     no abstract heading was detected.
 
     Triggers when ALL of the following hold:
-      - First section is `unknown` AND ≥1500 chars long.
+      - First section is `unknown` AND ≥1200 chars long (title block plus a ≥600-char
+        prose paragraph; furniture strips such as watermarks must not push a
+        real front span under the floor).
       - There is NO existing `abstract` section anywhere.
       - There is at least one canonical body section (methods/results/
         discussion/literature_review/general_discussion) downstream — i.e.
@@ -347,7 +349,7 @@ def _synthesize_abstract_from_leading_unknown(
     head = sections[0]
     if head.canonical_label != SectionLabel.unknown:
         return sections
-    if len(head.text) < 1500:
+    if len(head.text) < 1200:
         return sections
     # Find the first long prose paragraph (≥600 chars, no internal \n\n).
     paragraphs = []

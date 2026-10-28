@@ -2,20 +2,71 @@
 
 ## [Unreleased]
 
-Three fixes from a check of 10 psychology papers docpluck had never processed, each read against
-the rasterized pages by two models.
+Fixes from a check of 10 psychology papers docpluck had never processed (each read against the
+rasterized pages by two models) and from defects reported by downstream consumers.
 
-- **Digit ranges split across a line keep their hyphen (normalization, new step W0u).** pdftotext
-  drops a line-end hyphen even between digits, so `pp. 101-` / `125)` came out `pp. 101125`
-  (10.1111/jasp.12453, pp. 24 and 29). The hyphen is restored when the layout channel prints the
-  `101-` fragment and a word opening with `125`, and never prints `101125`. Layout-aware paths only
-  (render, structured, body); `normalize_text` without a layout is unchanged.
-- **A data row printed as `M = x, SD = y` is no longer read as a header row (tables).** The first
-  row of 10.1177/0956797615601103 Table 1 (p4) went into the header, so every flattened record of the
-  table carried the Age values as its column labels and the Age row was lost.
-- **A row label wrapped before its `×` joins its row (tables).** `Feeling Respected` / `× Culture`
-  (10.1177/0956797615612694 Table 1, p5) became a main-effect row plus an empty group heading, so the
-  interaction coefficients were published under the main effect.
+### Normalization
+
+- **Plain-text callers now get line-end hyphen repairs (`extract_pdf`).** pdftotext drops a real
+  hyphen at a line end (`Self-` / `Compassion` -> `SelfCompassion`, `pp. 101-` / `125` ->
+  `101125`). `extract_pdf` now runs one extra `pdftotext -bbox` pass on the same file and feeds its
+  words to the layout-gated restore steps, so `normalize_text(extract_pdf(...))` gets them without a
+  layout (new kwarg `restore_line_end_hyphens=True`; about +10-16% extraction time measured on
+  three papers). A failed pass records `line_end_hyphen_words_unavailable`.
+- **Digit ranges split across a line keep their hyphen (new step W0u).** `pp. 101-` / `125)` came
+  out `pp. 101125` (10.1111/jasp.12453, pp. 24 and 29). A raised exponent glued to its base
+  (`10` + `6`) is read as one printed run and never split.
+- **A hyphen inside a DOI at a line end is restored (new step W0v)** (`10.3233/NHA-170036`,
+  `10.1007/s11031-006-9025-x`), on every path including `extract_pdf`.
+- **A URL or DOI broken across a line is rejoined without a space (new step S6u)**
+  (`https://doi.or g/...`, `science.a ac4716`), so reference DOIs resolve again. A comma, a list
+  number, a second URL, a bare number under a web URL, and prose words keep the break.
+- **A numbered reference's number is no longer glued onto the previous entry's DOI.**
+- **Documents whose font encodes the printed hyphen as U+00AD keep their hyphens (new step S0h).**
+  10.1126/science.aac4716 lost every hyphen, page-range dash and table minus sign (`-0.327` read
+  `0.327`). Document-level gate; a real invisible soft hyphen is still removed.
+- **Compounds of three or more parts broken after an inner hyphen are restored**
+  (`intent-totreat` -> `intent-to-treat`).
+- **Running titles repeated at the top or bottom of later pages, publisher watermark sentences and
+  "Downloaded from" stamps are removed**; a subheading after a page break is still recognised.
+- **ORCID URLs are kept** (they were deleted since 2.4.7), and "Electronic Supplementary Material"
+  body lines and the "Correspondence concerning this article" note are no longer dropped.
+
+### Tables
+
+- **Every flattened record carries `fields_raw`**: each typed number's token exactly as printed,
+  keyed like `fields` (`{"p": ".050"}`), so printed precision survives. Additive.
+- **Descriptive cells are typed** (`M (SD)`, `b (SE)`, `n (%)`, `59%`, `est [CI]`) when the cell,
+  row label, column header or table note says what they hold: one record per arm column, carrying
+  `fields["group"]`. New `fields` keys `SE`, `count`, `pct`. Tables without such cells are unchanged.
+- **A data row printed as `M = x, SD = y`, or an estimate with a bracketed interval, is no longer
+  read as a header row** (10.1177/0956797615601103 Table 1, p4).
+- **A row label wrapped before its `×` joins its row** (10.1177/0956797615612694 Table 1, p5).
+- **A value-less lowercase sub-heading is no longer glued onto the row above it**
+  (10.1098/rsos.250908 Table 15: `monogamy liberal change` -> `monogamy`).
+- **A grid that starts with its own caption lines, label or running head hands them back to the
+  caption**, so the html header is the column row (e.g. 10.1016/j.jesp.2021.104154 Table 3).
+- **A table with no numbers no longer takes its first data rows into the header**
+  (10.1177/19485506211056761 Table 1).
+- **Nested spanning headers are no longer read as arm groups.** A label alone on its header line
+  spans the columns under it; labels printed side by side are column names
+  (10.1001/jamanetworkopen.2023.48333 Tables 1 and 3: bogus groups such as `HR (95% CI)` are gone and
+  the estimates carry their real row labels; typed values unchanged).
+- **A table page with no caption directly below the previous page's table, with the same columns
+  and width, is labelled as its continuation** (`continuation_of`; `caption_status`
+  `"continuation"` when the page prints no head). The render heads it "Table N (continued, page P)"
+  right after its table.
+
+### Sections and references
+
+- **Reference numbers the text channel separates from their entries are paired back via the
+  layout** (10.1098/rsos.240120 refs 1-127 once each, in order; 10.1371/journal.pmed.1004323).
+- **A group, bare-surname or full-first-name author starts its own reference entry**; a wrapped
+  initial or a journal line ending in its year does not.
+- **A wrapped "Supplemental Materials." no longer opens a false section** that swallowed Method
+  (10.1177/01461672251327169).
+- **An abstract without a printed heading is kept** when the leading text is between 1200 and 1500
+  characters (10.1037/a0012616).
 
 ## [2.4.155] - 2026-10-25 - normalization 1.9.78 - table extraction 2.4.26 - sectioning 1.2.8 - references 1.0.0 (new) - body scope 1.0.0 (new)
 

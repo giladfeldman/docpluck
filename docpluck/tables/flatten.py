@@ -28,8 +28,15 @@ What we emit: per body row, a `FlattenedRow` dict with
     parallel-arm row's arm label, and `p_text`, the p number exactly as the
     cell prints it, e.g. ".050" beside `p` = 0.05), Mann-Whitney `U` and `z`,
     and `<key>_op` (`eta2_op`, `d_op`, ...) beside a statistic whose cell prints
-    an inequality ("< 0.001"), absent otherwise. Empty dict when nothing is
-    recognized.
+    an inequality ("< 0.001"), absent otherwise. `SE`, `count` (int) and `pct`
+    come from two-number cells ("b (SE)", "n (%)", "59%"), typed with `M`/`SD`
+    from "M (SD)" only when the cell, row label, column header or the table's
+    own note states what the parentheses hold; each such column of a row is its
+    own record, its `group` that column's header lines. Empty dict when nothing
+    is recognized.
+  * `fields_raw` -- keyed like `fields`: each typed number's token exactly as
+    the cell prints it (`"-1.40"` beside `t` = -1.4), present only when that
+    token parses back to exactly the value.
 
 Canonical contract: docpluck always emits these records as a sidecar
 `<paper>.tables.jsonl` next to the rendered `.md`. The `render_pdf_to_markdown`
@@ -55,6 +62,7 @@ from .cell_cleaning import (
     _SUP_CLOSE,
     _drop_running_header_rows,
     _is_group_separator,
+    _header_row_count,
     _is_header_like_row,
     _merge_continuation_rows,
     _merge_significance_marker_rows,
@@ -94,6 +102,10 @@ class FlattenedRow(TypedDict):
     raw_cells: list[str]            # Body-row cells (same len as header)
     sentence: str                   # Best-effort flattened English
     fields: dict[str, object]       # Structured parsed values (may be empty)
+    # The number each typed value in `fields` was read from, exactly as the cell
+    # prints it (`"-1.40"` beside `fields["t"]` = -1.4), keyed like `fields`.
+    # A key is present only when its token parses back to exactly that value.
+    fields_raw: dict[str, str]
     # The source table's `caption_status` (2026-09-24, owner decision "option B").
     # A row from an "uncaptioned_candidate" table comes from a grid NO caption
     # claimed -- about half of those are real statistical tables, about half are
@@ -268,14 +280,7 @@ def _clean_grid(
     if len(merged) < 2:
         return [], []
 
-    n_header = 1
-    for k in range(1, min(3, len(merged))):
-        if _is_group_separator(merged[k], n_cols):
-            break
-        if _is_header_like_row(merged[k]):
-            n_header = k + 1
-        else:
-            break
+    n_header = _header_row_count(merged, n_cols)
     # The document's own declaration out-ranks the heuristic, downward only.
     if declared_header_rows and declared_header_rows >= 1:
         n_header = min(n_header, declared_header_rows)
@@ -696,6 +701,42 @@ def _p_printed(s: str) -> Optional[str]:
     txt = (s or "").strip().lstrip("p").strip().lstrip(":=").strip()
     m = _P_OP_RE.match(txt)
     return m.group(2) if m else None
+
+
+# A number token as a cell prints it: an optional sign glyph (hyphen, U+2212
+# minus, en-dash) directly before digits, APA leading-dot allowed.
+_PRINTED_NUM_RE = re.compile(r"[-+−–]?(?:\d+(?:\.\d*)?|\.\d+)")
+
+
+def _printed_token(text: str, value: float, last: bool = False) -> Optional[str]:
+    """The number token in ``text`` that prints ``value``, or ``None``.
+
+    Read for `fields_raw`: a consumer judging a value within half a unit of its
+    last printed decimal needs the digits the cell prints, which a JSON number
+    loses (``-1.40`` -> -1.4). The token must parse back to EXACTLY ``value``; a
+    sign glyph that was a range separator ("0.10-0.67") is dropped from the
+    token only when the bare digits then match. A value docpluck repaired (a
+    minus restored from the page's text layer) has no such token and gets
+    ``None`` -- absent rather than a printed string that disagrees with the
+    value. ``last`` picks the right-most match (an interval's upper bound)."""
+    if not text:
+        return None
+    exact: list[str] = []
+    unsigned: list[str] = []
+    for m in _PRINTED_NUM_RE.finditer(text):
+        tok = m.group(0)
+        try:
+            v = float(tok.replace("−", "-").replace("–", "-"))
+        except ValueError:
+            continue
+        if v == value:
+            exact.append(tok)
+        elif tok[0] in "-–" and float(tok[1:]) == value:
+            unsigned.append(tok[1:])
+    hits = exact or unsigned
+    if not hits:
+        return None
+    return hits[-1] if last else hits[0]
 
 
 def _parse_p_cell(s: str) -> tuple[Optional[str], Optional[float]]:
@@ -1307,6 +1348,237 @@ def _recover_blank_roles(
     return override
 
 
+# ── Two-number cells: M (SD), n (%), b (SE), estimate [CI] ──────────────────
+#
+# A descriptive or coefficient table packs two numbers into one cell: "4.47
+# (0.81)", "260 (52.0)", "1.16*** (0.28)", "2.36 [2.26, 2.47]". The SHAPE does
+# not say which pair it is -- the same "4.47 (0.81)" is a mean and SD in one
+# table and a coefficient and its SE in the next -- so a pair is typed only on
+# evidence the table states: the cell itself ("M = 68.33, SD = 10.48", "59%"),
+# the column header ("M (SD)"), the row label ("Age, mean (SD)"), or, for a
+# whole column, the table's header rows, caption or note ("Data are means
+# (standard deviations)") when they state exactly one reading of the
+# parentheses. Until 2.4.155 every such table flattened to label-only records
+# (10.1037/a0012616 Tables 1, 2, 4; 10.1111/jasp.12453 Tables 1-2;
+# 10.1177/0956797615601103 Tables 1-3; 10.1177/0956797615612694 Table 1).
+
+_PAIR_NUM = r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)"
+_PAIR_UNSIGNED = r"(?:\d+(?:\.\d+)?|\.\d+)"
+_PAIR_MARKS = r"(?:\s?[a-z]|\s*[*∗†‡§¶#]+)?"
+# "4.47 (0.81)", "1.16*** (0.28)", "260 (52.0%)". Read after `_fold_minus`.
+_PAREN_PAIR_RE = re.compile(
+    rf"^\s*({_PAIR_NUM}){_PAIR_MARKS}\s*\(\s*({_PAIR_UNSIGNED})\s*(%?)\s*\){_PAIR_MARKS}\s*$"
+)
+_COUNT_RE = re.compile(r"^\s*(\d{1,3}(?:[,\u2009\u202f ]\d{3})+|\d+)\s*\(\s*(" + _PAIR_UNSIGNED + r")\s*%?\s*\)\s*$")
+_PM_PAIR_RE = re.compile(rf"^\s*({_PAIR_NUM})\s*±\s*({_PAIR_UNSIGNED})\s*$")
+# A cell that names both of its numbers: "M = 68.33, SD = 10.48".
+_INLINE_M_SD_RE = re.compile(
+    rf"^\s*(?:M|Mean)\s*=\s*({_PAIR_NUM})\s*[,;]\s*SD\s*=\s*({_PAIR_UNSIGNED})\s*$"
+)
+_PCT_CELL_RE = re.compile(rf"^\s*({_PAIR_UNSIGNED})\s*%\s*$")
+# "2.36 [2.26, 2.47]**": an estimate and a comma-separated interval.
+_EST_BRACKET_RE = re.compile(
+    rf"^\s*{_PAIR_NUM}{_PAIR_MARKS}\s*[\[(]\s*{_PAIR_NUM}\s*,\s*{_PAIR_NUM}\s*[\])]{_PAIR_MARKS}\s*$"
+)
+
+_PAIR_VERB = r"(?:are\s+|is\s+)?(?:given\s+|shown\s+|reported\s+|presented\s+|displayed\s+|listed\s+)?"
+# The phrases a header, row label or note uses to state each reading.
+_MSD_PHRASE_RE = re.compile(
+    r"(?:\bM|\b[Mm]eans?|\bMEANS?)\s*(?:\(\s*(?:SDs?|S\.D\.)\s*\)|±\s*SDs?\b)"
+)
+_MSD_NOTE_RE = re.compile(
+    r"\bmeans?\s*\(\s*(?:SDs?|S\.D\.|standard\s+deviations?)\s*\)"
+    r"|\bmeans?\s*(?:,|and|&)\s*(?:the\s+)?(?:SDs?\b|standard\s+deviations?)"
+    r"|(?:\bSDs?\b|standard\s+deviations?)\s+" + _PAIR_VERB
+    + r"(?:in|within)\s+(?:the\s+)?parenthes[ie]s",
+    re.I,
+)
+_SE_PHRASE_RE = re.compile(
+    r"(?:\b[Bb]|β|\b[Ee]stimates?|\b[Cc]oef(?:ficient)?s?\.?)\s*\(\s*SEs?\s*\)"
+)
+_SE_NOTE_RE = re.compile(
+    r"(?:\bSEs?\b|standard\s+errors?)\s+" + _PAIR_VERB
+    + r"(?:in|within)\s+(?:the\s+)?parenthes[ie]s",
+    re.I,
+)
+_NPCT_PHRASE_RE = re.compile(r"(?:\b[nN]|\bNo\.)\s*\(\s*%\s*\)|\(\s*[nN]\s*,\s*%\s*\)")
+_NPCT_NOTE_RE = re.compile(
+    r"(?:\b[nN]|\bNo\.|\bnumber)\s*\(\s*%\s*\)"
+    r"|\bpercent(?:age)?s?\s+" + _PAIR_VERB + r"(?:in|within)\s+(?:the\s+)?parenthes[ie]s",
+)
+# Other things a table may put in parentheses: a mean's SE, a median's IQR, a
+# test statistic or p-value ("t-values in parentheses"). Stated anywhere in the
+# table, they make its parentheses ambiguous.
+_OTHER_PAREN_NOTE_RE = re.compile(
+    r"\bmeans?\s*(?:\(\s*(?:SEs?|SEM|standard\s+errors?)\s*\)|(?:and|&)\s+standard\s+errors?)"
+    r"|\bM\s*\(\s*SEM?\s*\)|\bmedian|\bIQR\b|interquartile"
+    r"|\b[tzp][\s\-]?(?:values?|statistics?|scores?)\s+" + _PAIR_VERB
+    + r"(?:in|within)\s+(?:the\s+)?parenthes[ie]s",
+    re.I,
+)
+_CI_NOTE_RE = re.compile(
+    r"confidence\s+intervals?|credible\s+intervals?|\b(?:CI|CrI|HDI|HPD)s?\b|\bC\.I\.",
+    re.I,
+)
+_OTHER_BRACKET_NOTE_RE = re.compile(
+    r"\brange\b|\bmin(?:imum)?\s*[,–\-]\s*max|\bIQR\b|interquartile|\bmedian"
+    r"|\bquartiles?\b|\bpercentiles?\b|\bQ1\b|\bQ3\b"
+    r"|(?:\bSDs?\b|standard\s+deviations?|standard\s+errors?)\s+" + _PAIR_VERB
+    + r"(?:in|within)\s+(?:square\s+)?brackets",
+    re.I,
+)
+
+
+def _pair_kind_from_text(text: str) -> Optional[str]:
+    """The reading a header or row label states for its two-number cells:
+    ``M_SD``, ``est_SE`` or ``n_pct``, or ``None`` when it states none or more
+    than one."""
+    s = _strip_fold_sentinels(text or "")
+    kinds = {
+        k for k, rx in (("M_SD", _MSD_PHRASE_RE), ("est_SE", _SE_PHRASE_RE),
+                        ("n_pct", _NPCT_PHRASE_RE))
+        if rx.search(s)
+    }
+    return next(iter(kinds)) if len(kinds) == 1 else None
+
+
+def _pair_group_label(header: str) -> str:
+    """A pair column's arm label: its header without the "M (SD)" phrase
+    ("Control M (SD)" -> "Control", "Means (SD) / Belief" -> "Belief")."""
+    s = _strip_fold_sentinels(header or "")
+    for rx in (_MSD_PHRASE_RE, _SE_PHRASE_RE, _NPCT_PHRASE_RE):
+        s = rx.sub(" ", s)
+    s = re.sub(r"\s+", " ", s).strip(" ,:;")
+    # A header fragment with no letters ("=" from a split "(n = 50)") names no arm.
+    return s if re.search(r"[^\W\d_]", s) else ""
+
+
+def _table_pair_kinds(vocab: str) -> tuple[Optional[str], bool]:
+    """``(paren_kind, bracket_is_ci)`` stated by a table's header rows, caption
+    and note. ``paren_kind`` is set only when exactly one reading of a
+    parenthesised number is stated; ``bracket_is_ci`` when an interval is named
+    and no other bracketed quantity (a range, an SD in brackets) is."""
+    v = _strip_fold_sentinels(vocab or "")
+    stated = {
+        k for k, rx in (("M_SD", _MSD_NOTE_RE), ("M_SD", _MSD_PHRASE_RE),
+                        ("est_SE", _SE_NOTE_RE), ("est_SE", _SE_PHRASE_RE),
+                        ("n_pct", _NPCT_NOTE_RE), ("other", _OTHER_PAREN_NOTE_RE))
+        if rx.search(v)
+    }
+    paren = next(iter(stated)) if len(stated) == 1 and "other" not in stated else None
+    bracket = bool(_CI_NOTE_RE.search(v)) and not _OTHER_BRACKET_NOTE_RE.search(v)
+    return paren, bracket
+
+
+def _parse_pair_cell(kind: str, cell: str) -> Optional[dict[str, float]]:
+    """The two numbers of a pair cell under ``kind``, or ``None`` when the cell
+    does not have that kind's shape. A cell that names its own numbers
+    ("M = 4.4, SD = 0.8", "59%") is read whatever ``kind`` says."""
+    s = _fold_minus(_strip_fold_sentinels(cell or "")).strip()
+    if not s:
+        return None
+    m = _INLINE_M_SD_RE.match(s)
+    if m:
+        return {"M": float(m.group(1)), "SD": float(m.group(2))}
+    m = _PCT_CELL_RE.match(s)
+    if m:
+        v = float(m.group(1))
+        return {"pct": v} if 0.0 <= v <= 100.0 else None
+    if kind == "n_pct":
+        m = _COUNT_RE.match(s)
+        if m and float(m.group(2)) <= 100.0:
+            return {"count": float(re.sub(r"[,\u2009\u202f ]", "", m.group(1))),
+                    "pct": float(m.group(2))}
+        return None
+    if kind in ("M_SD", "est_SE"):
+        m = _PAREN_PAIR_RE.match(s)
+        if m and not m.group(3):
+            a, b = float(m.group(1)), float(m.group(2))
+            return {"M": a, "SD": b} if kind == "M_SD" else {"est": a, "SE": b}
+        if kind == "M_SD":
+            m = _PM_PAIR_RE.match(s)
+            if m:
+                return {"M": float(m.group(1)), "SD": float(m.group(2))}
+        return None
+    return None
+
+
+def _self_labelled_kind(cell: str) -> Optional[str]:
+    """``"M_SD"`` for "M = 4.4, SD = 0.8", ``"pct"`` for "59%", else ``None``."""
+    s = _fold_minus(_strip_fold_sentinels(cell or "")).strip()
+    if _INLINE_M_SD_RE.match(s):
+        return "M_SD"
+    if _PCT_CELL_RE.match(s):
+        return "pct"
+    return None
+
+
+def _pair_column_kinds(
+    header: list[str],
+    body: list[list[str]],
+    label_col: int,
+    skip: set[int],
+    vocab: str,
+) -> dict[int, str]:
+    """Columns whose cells are pairs of one kind by the column header, or by
+    the table's own statement when most of the column has that kind's shape.
+    A kind read from the table's statement (not the column's header) carries a
+    trailing ``?``: see `_row_pair_kinds`."""
+    paren, bracket = _table_pair_kinds(vocab)
+    out: dict[int, str] = {}
+    for ci in range(len(header)):
+        if ci == label_col or ci in skip:
+            continue
+        hk = _pair_kind_from_text(header[ci])
+        if hk:
+            out[ci] = hk
+            continue
+        vals = [v for v in _column_values(body, ci) if not re.fullmatch(r"[\s—–\-/]*", v)]
+        folded = [_fold_minus(_strip_fold_sentinels(v)) for v in vals]
+        if paren and _frac_match(folded, lambda v: _parse_pair_cell(paren, v) is not None):
+            out[ci] = paren + "?"
+        elif bracket and _frac_match(folded, lambda v: bool(_EST_BRACKET_RE.match(v))):
+            out[ci] = "est_ci"
+    return out
+
+
+def _row_pair_kinds(
+    row: list[str],
+    label_col: int,
+    candidates: set[int],
+    col_kinds: dict[int, str],
+) -> dict[int, str]:
+    """``{col: kind}`` for this row's pair cells that parse. The cell's own
+    labels win, then the row label ("Female, No. (%)"), then the column."""
+    label = row[label_col] if label_col < len(row) else ""
+    row_kind = _pair_kind_from_text(label)
+    out: dict[int, str] = {}
+    for ci in sorted(candidates):
+        cell = row[ci] if ci < len(row) else ""
+        if not (cell or "").strip():
+            continue
+        for kind in (_self_labelled_kind(cell), row_kind, col_kinds.get(ci)):
+            if not kind:
+                continue
+            if kind.endswith("?"):
+                # Only the note says "means (SD)": a note admits exceptions
+                # ("unless otherwise noted"), and "12 (48)" in a Female row is a
+                # count and a percentage. A mean or a coefficient read on the
+                # note's word alone must print a decimal point.
+                kind = kind[:-1]
+                lead = re.match(r"\s*[-+−–]?(\d*\.?\d+)", _strip_fold_sentinels(cell))
+                if kind in ("M_SD", "est_SE") and not (lead and "." in lead.group(1)):
+                    continue
+            if kind == "est_ci":
+                if _EST_BRACKET_RE.match(_fold_minus(_strip_fold_sentinels(cell))):
+                    out[ci] = kind
+                break
+            if _parse_pair_cell(kind, cell) is not None:
+                out[ci] = kind
+                break
+    return out
+
+
 # ── Row flattening ──────────────────────────────────────────────────────────
 
 
@@ -1368,12 +1640,23 @@ def _flatten_one_row(
     roles_override: Optional[dict[int, str]] = None,
     effect_hint: Optional[str] = None,
     level_context: Optional[str] = None,
+    label_idx: Optional[int] = None,
 ) -> FlattenedRow:
-    row_label, label_col = _pick_row_label(row)
+    if label_idx is not None and label_idx < len(row):
+        # The caller knows the label column (a pair column's sub-row): an empty
+        # label stays empty instead of promoting the value cell to label.
+        row_label, label_col = (row[label_idx] or "").strip(), label_idx
+    else:
+        row_label, label_col = _pick_row_label(row)
     # A row whose "label" is itself a marked value ("0.17***") is a line of
     # values Camelot split off its labelled row: its marked values are not
     # typed (they would be published under a number, not a variable).
     label_is_value = _parse_number(_strip_value_mark((row_label or "").strip())) is not None
+    # A label with digits and no letters ("36.8 (16.0-65.9)") is a value that a
+    # broken grouping put in the label column: the record cannot say what it
+    # measures, so no pair cell is typed under it.
+    label_names_nothing = bool(re.search(r"\d", row_label or "")) and not re.search(
+        r"[^\W\d_]", row_label or "")
 
     # Find the F-with-df regex by role name so the list-ordering can shift
     # without breaking the lookup.
@@ -1383,13 +1666,23 @@ def _flatten_one_row(
     # recovery) wins over the grid-header classification for that column.
     roles: dict[int, str] = {}
     df_from_header: dict[int, tuple[int, int]] = {}
+    pair_cols: dict[str, list[int]] = {}
+    pair_keys: set[str] = set()
     for ci, h in enumerate(header):
         if ci == label_col:
             continue
         if roles_override and ci in roles_override:
-            roles[ci] = roles_override[ci]
+            if roles_override[ci]:  # "" = typed elsewhere (a pair column's own record)
+                roles[ci] = roles_override[ci]
             continue
         role = _classify_column(h)
+        if role is None and not label_names_nothing:
+            # A two-number cell whose header or own text states the pair:
+            # "M (SD)", "b (SE)", "n (%)"; "M = 4.4, SD = 0.8", "59%".
+            role = _pair_kind_from_text(h) or (
+                _self_labelled_kind(row[ci]) if ci < len(row) else None)
+            if role is not None:
+                pair_cols.setdefault(role, []).append(ci)
         if role == "F_with_df":
             m = f_with_df_re.match((h or "").strip().rstrip(",:."))
             if m:
@@ -1397,6 +1690,13 @@ def _flatten_one_row(
             roles[ci] = "F"
         elif role is not None:
             roles[ci] = role
+
+    # Two columns of one pair kind in one record (two arms' "M (SD)") would
+    # overwrite each other: neither is typed here.
+    for _kind, _cols in pair_cols.items():
+        if len(_cols) > 1:
+            for _c in _cols:
+                roles.pop(_c, None)
 
     # Structural η²p inference for an unlabeled estimate column in an F-test
     # results table whose effect-size header glyph was dropped by the font
@@ -1425,6 +1725,8 @@ def _flatten_one_row(
     # Pull per-role values out of the body row.
     role_vals: dict[str, str] = {}
     role_nums: dict[str, float] = {}
+    # The cell text each typed value was read from, for `fields_raw`.
+    src: dict[str, str] = {}
     for ci, role in roles.items():
         if ci >= len(row):
             continue
@@ -1446,11 +1748,13 @@ def _flatten_one_row(
             if m:
                 role_nums["df1"] = float(m.group(1))
                 role_nums["df2"] = float(m.group(2))
+                src["df1"] = src["df2"] = raw
         elif role == "CI":
             lo, hi = _parse_ci_cell(raw)
             if lo is not None and hi is not None:
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
+                src["CI"] = raw
         elif role == "est":
             # A recovered point-estimate column (its interval is a sibling CI
             # column). Bare value, no inline interval.
@@ -1486,12 +1790,26 @@ def _flatten_one_row(
                 ):
                     eff_key = "est"
                 role_nums[eff_key] = est
+                src[eff_key] = raw
                 role_vals[eff_key] = est_raw.strip() if est_op else raw
                 if est_op:
                     role_vals[eff_key + "_op"] = est_op
-        elif role == "est_ci":
+        elif role in ("M_SD", "est_SE", "n_pct", "pct"):
+            vals = _parse_pair_cell(role, raw)
+            for k, v in (vals or {}).items():
+                role_nums[k] = v
+                pair_keys.add(k)
+                src[k] = raw
+                role_vals[k] = _printed_token(raw, v) or _fmt_num(v)
+            if vals and "est" in vals:
+                m = _SE_PHRASE_RE.search(_strip_fold_sentinels(header[ci]))
+                role_vals["est_label"] = (
+                    m.group(0).split("(")[0].strip() if m else "estimate")
+        elif role in ("est_ci", "est_ci_pair"):
             # Combined estimate-and-interval cell, e.g. "-1.01% (-10.36-8.34)"
-            # or "0.76 [.50, 1.02]".
+            # or "0.76 [.50, 1.02]". A pair column's estimate is typed from its
+            # own header only: the table-wide hint reads the whole caption and
+            # note, where "vitamin D" names no Cohen's d (tier-2 review).
             est_op, est_raw = _split_leading_op(raw)
             est = _parse_leading_number(est_raw)
             if est is not None and _WORDED_INTERVAL_RE.search(_strip_fold_sentinels(raw)):
@@ -1503,7 +1821,8 @@ def _flatten_one_row(
                 est_op, est_raw = None, ""
                 raw = ""
             if est is not None:
-                eff_key = _effect_key(header[ci], effect_hint_eff)
+                eff_key = _effect_key(
+                    header[ci], None if role == "est_ci_pair" else effect_hint_eff)
                 if (
                     eff_key == "eta2"
                     and not _effect_type_for(header[ci])
@@ -1511,24 +1830,31 @@ def _flatten_one_row(
                 ):
                     eff_key = "est"
                 role_nums[eff_key] = est
+                src[eff_key] = raw
                 role_vals[eff_key] = (
                     re.split(r"[\[(]", est_raw, maxsplit=1)[0].strip() or _fmt_num(est)
                 )
                 if est_op:
                     role_vals[eff_key + "_op"] = est_op
                 if eff_key == "est":
-                    role_vals["est_label"] = _est_label_from_header(header[ci])
+                    # A pair column's header names its arm ("Model 1"), not
+                    # its estimate.
+                    role_vals["est_label"] = (
+                        "estimate" if role == "est_ci_pair"
+                        else _est_label_from_header(header[ci]))
             # The estimate anchors the CI sign when the bounds are hyphen-glued.
             lo, hi = _parse_ci_cell(raw, estimate=est)
             if lo is not None and hi is not None:
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
+                src["CI"] = raw
         elif role == "df" and _DF_PAIR_RE.match(raw):
             # A column headed "df" in an F-test table prints the PAIR "1, 114"
             # (10.1525/collabra.90203 Table 9); `_parse_number` reads neither.
             m = _DF_PAIR_RE.match(raw)
             role_nums["df1"] = float(m.group(1))
             role_nums["df2"] = float(m.group(2))
+            src["df1"] = src["df2"] = raw
         else:
             n = _parse_number(raw)
             if n is None:
@@ -1548,6 +1874,8 @@ def _flatten_one_row(
                         role_vals[role + "_op"] = op
             if n is not None:
                 role_nums[role] = n
+                src[role] = raw
+                pair_keys.discard(role)
 
     # Inline self-labeled statistic recovery: a cell like "r = .67" / "d = 0.32"
     # states its own type, so type it even when the COLUMN header is generic
@@ -1564,6 +1892,7 @@ def _flatten_one_row(
         if key in role_nums:
             continue
         role_nums[key] = val
+        src[key] = row[ci]
         # Store only the numeric part as the display value — the sentence
         # assembler re-prefixes the field name ("r = …"), so keeping the inline
         # "r = " here would double it ("r = r = .67").
@@ -1574,6 +1903,8 @@ def _flatten_one_row(
     if "CI_lo" in role_nums and "CI_hi" in role_nums:
         role_nums["CI_lower"] = role_nums.pop("CI_lo")
         role_nums["CI_upper"] = role_nums.pop("CI_hi")
+        src["CI_lower"] = src.get("CI_lo", "")
+        src["CI_upper"] = src.get("CI_hi", "")
 
     # Resolve df: prefer explicit "df" cell; else F-with-df header.
     df_val = role_nums.get("df")
@@ -1582,6 +1913,7 @@ def _flatten_one_row(
     for ci, (a, b) in df_from_header.items():
         if df1_val is None and df2_val is None:
             df1_val, df2_val = float(a), float(b)
+            src["df1"] = src["df2"] = header[ci]
 
     # Validity guards — a parsed value that violates a statistic's domain is
     # garbage, not data. Drop it (and its sentence part) rather than emit an
@@ -1662,14 +1994,15 @@ def _flatten_one_row(
     fields: dict[str, object] = {}
     if group:
         fields["group"] = group
-    for k in ("t", "F", "chi2", "U", "z", "r", "d", "eta2", "M", "SD", "est", "BF01"):
+    for k in ("t", "F", "chi2", "U", "z", "r", "d", "eta2", "M", "SD", "est", "SE",
+              "BF01", "pct"):
         if k in role_nums:
             fields[k] = role_nums[k]
             # The printed inequality, when there is one (additive: absent on a
             # printed equality, so every existing reader sees the same record).
             if role_vals.get(k + "_op"):
                 fields[k + "_op"] = role_vals[k + "_op"]
-    for k in ("n", "N"):
+    for k in ("n", "N", "count"):
         if k in role_nums:
             v = role_nums[k]
             fields[k] = int(v) if v == int(v) else v
@@ -1699,6 +2032,37 @@ def _flatten_one_row(
         ci_label=_interval_label(ci_level, ci_kind),
     )
 
+    # The printed token of every typed number, keyed like `fields` (additive).
+    fields_raw: dict[str, str] = {}
+    for k, v in fields.items():
+        if k == "CI_level" or isinstance(v, bool) or not isinstance(v, (int, float)):
+            continue
+        if k == "p":
+            tok = fields.get("p_text")
+            if not (isinstance(tok, str) and _printed_token(tok, v) == tok):
+                tok = None
+        elif k in ("CI_lower", "CI_upper"):
+            # Read the bounds inside the interval's bracket, never the estimate
+            # printed before it ("0.50 [0.5, 0.9]").
+            text = src.get(k) or src.get("CI", "")
+            cut = max(text.rfind("["), text.rfind("("))
+            tok = _printed_token(text[cut + 1:] if cut >= 0 else text, v,
+                                 last=k == "CI_upper")
+        else:
+            # The second number of a pair cell is the right-most match
+            # ("0.50 (0.5)": SD is "0.5", not M's "0.50").
+            tok = _printed_token(src.get(k, ""), v, last=k in ("SD", "SE", "pct")
+                                 and k in pair_keys)
+            if tok is None and k == "count":
+                # "66,471 (48.2)", "131 805 (95.1)": the count as printed,
+                # thousands separators kept.
+                m = re.match(r"\s*(\d{1,3}(?:[,   ]\d{3})+)\b",
+                             _strip_fold_sentinels(src.get(k, "")))
+                if m and int(re.sub(r"\D", "", m.group(1))) == v:
+                    tok = m.group(1)
+        if tok is not None:
+            fields_raw[k] = tok
+
     return FlattenedRow(
         table_id=table_id,
         page=page,
@@ -1709,6 +2073,9 @@ def _flatten_one_row(
         raw_cells=[_strip_fold_sentinels(c) for c in row],
         sentence=sentence,
         fields=fields,
+        fields_raw=fields_raw,
+        # Internal, removed by `flatten_table`: the keys a pair cell typed.
+        _pair_keys=pair_keys & set(fields),
     )
 
 
@@ -1837,6 +2204,12 @@ def _assemble_sentence(
         parts.append(f"M {eq('M')} {role_vals['M']}")
     elif "SD" in role_nums:
         parts.append(f"SD {eq('SD')} {role_vals['SD']}")
+    if "SE" in role_nums:
+        parts.append(f"SE = {role_vals['SE']}")
+    if "count" in role_nums and "pct" in role_nums:
+        parts.append(f"n = {role_vals['count']} ({role_vals['pct']}%)")
+    elif "pct" in role_nums:
+        parts.append(f"{role_vals['pct']}%")
 
     if "p" in role_nums:
         op = role_vals.get("p_op", "=")
@@ -1897,6 +2270,79 @@ def _top_row_arm_cols(grid: list[list[str]]) -> set[int]:
     if any(i < len(below) and (below[i] or "").strip() for i in cols):
         return set()
     return cols
+
+
+def _header_line_levels(
+    grid: list[list[str]], header: list[str], first_body_row: list[str]
+) -> Optional[tuple[set[int], dict[int, str]]]:
+    """Which folded columns may start an arm, read from the header LINES.
+
+    Several printed header lines fold into one header cell, and the fold mark
+    cannot tell a spanning label ("UACR, mg/g" over Low / Medium / High) from a
+    column's own name wrapped onto two lines ("Medium" / "(n = 7604)"). The grid
+    can: a column name sits in a line of names printed side by side (``Total |
+    Low | Medium | High``), a spanning label stands alone in its line with empty
+    cells beside it. 10.1001/jamanetworkopen.2023.48333 p5 Table 1 folded
+    "No. (weighted %)", "UACR, mg/g", "Medium" and "High" into four "arms" and
+    handed the P value to "High".
+
+    Returns ``None`` (no opinion: the old rules decide) when every arm label
+    comes from one header line or a label cannot be found in the grid. Otherwise
+    ``(allowed, relabel)``. A label printed beside other labels in its line is
+    a column name and starts no arm. The arms are the lone labels of the
+    deepest line holding two or more (``relabel`` gives such a column's folded
+    header from that line down, dropping a label printed over all the arms).
+    When no line holds two, the lone labels are nested, not parallel, and
+    ``allowed`` is empty: no grouping."""
+    starts = [i for i, h in enumerate(header) if _MERGE_SEPARATOR in (h or "")]
+    if len(starts) < 2:
+        return None
+
+    def _ws(c: str) -> str:
+        return re.sub(r"\s+", " ", (c or "")).strip()
+
+    key = [_ws(c) for c in first_body_row]
+    h = next((r for r, row in enumerate(grid) if [_ws(c) for c in row][:len(key)] == key), None)
+    if not h:
+        return None
+    rows = [[_ws(c) for c in row] for row in grid[:h]]
+
+    def _label(s: int) -> str:
+        return _ws(header[s].split(_MERGE_SEPARATOR, 1)[0])
+
+    def _line_of(s: int) -> Optional[int]:
+        return next((r for r, row in enumerate(rows) if s < len(row) and row[s] == _label(s)), None)
+
+    line = {s: _line_of(s) for s in starts}
+    if any(v is None for v in line.values()) or len(set(line.values())) < 2:
+        return None
+
+    # A spanning label stands alone in its line: no label in the column on
+    # either side (the row-label column does not count). Labels printed side
+    # by side are column names.
+    def _lone(r: int, c: int) -> bool:
+        row = rows[r]
+        return c >= 1 and c < len(row) and bool(row[c]) and not any(
+            1 <= j < len(row) and row[j] for j in (c - 1, c + 1))
+
+    lone = {r: [c for c in range(len(rows[r])) if _lone(r, c)] for r in range(len(rows))}
+    # Parallel arms are the spanning labels of ONE line: the deepest line with
+    # two or more ("AARP" / "PLCO" / "AHS" under a "Participants, No. (%)" line
+    # over all of them, 10.1001/jamanetworkopen.2024.18729 p5 Table 2).
+    arm_lines = [r for r in lone if len(lone[r]) >= 2 and all(c in starts for c in lone[r])]
+    if arm_lines:
+        r = max(arm_lines)
+        relabel = {}
+        for c in lone[r]:
+            parts = header[c].split(_MERGE_SEPARATOR)
+            k = next((i for i, part in enumerate(parts) if _ws(part) == rows[r][c]), 0)
+            if k:
+                relabel[c] = _MERGE_SEPARATOR.join(parts[k:])
+        return set(lone[r]), relabel
+    # No line holds two: the spanning labels are nested (a units line over a
+    # grouping line, "No. (weighted %)" over "UACR, mg/g" over Low / Medium /
+    # High), not parallel arms. No grouping.
+    return set(), {}
 
 
 def _arms_by_role_repeat(
@@ -1960,6 +2406,7 @@ def _detect_column_groups(
     header: list[str],
     spans: dict[int, int] | None = None,
     arm_cols: set[int] | None = None,
+    allowed_starts: set[int] | None = None,
 ) -> Optional[tuple[list[int], list[tuple[str, list[int]]]]]:
     """Detect parallel column groups from a folded super-header.
 
@@ -2021,6 +2468,11 @@ def _detect_column_groups(
         # nothing to stand on, so the grouping stays what it was (tier-2
         # review, Sonnet, 2026-10-14: restricting to <2 starts returned no
         # grouping at all, the last-arm-wins shape this change exists to end).
+    # After the top-row rule (which binds centred arms by their sub-header
+    # roles): column names under a spanning label start no arm, and nested spanning
+    # labels are not parallel arms (`_header_line_levels`).
+    if allowed_starts is not None:
+        starts = [i for i in starts if i in allowed_starts]
     if len(starts) < 2:
         return None
     n = len(header)
@@ -2332,6 +2784,7 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
     )
     for r in rows:
         r["caption_status"] = status
+        r.pop("_pair_keys", None)
     return rows
 
 
@@ -2383,8 +2836,11 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
     # k-splittable data cells -- and cannot be produced by a header, so when it
     # is present the arms are the rows' own and a header grouping is not.
     packed = _detect_packed_arms(header, body)
+    header_levels = _header_line_levels(grid, header, body[0])
     grouped = None if packed is not None else _detect_column_groups(
-        header, printed_spans or None, _top_row_arm_cols(grid) or None
+        [header_levels[1].get(i, h) for i, h in enumerate(header)] if header_levels else header,
+        printed_spans or None, _top_row_arm_cols(grid) or None,
+        header_levels[0] if header_levels else None,
     ) if _allow_groups else None
 
     # Blank-header column-role recovery (non-grouped tables only — grouped
@@ -2448,6 +2904,80 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
 
     out: list[FlattenedRow] = []
     n_cols = len(header)
+
+    # Two-number pair columns (see `_pair_column_kinds`): in an ungrouped table
+    # the columns of one row are often ARMS ("Imaginal exposure | In vivo
+    # exposure", each "M (SD)"), so each pair column of a row becomes its own
+    # record with `group` = its header, exactly like a parallel-arm table. A
+    # table with ONE pair column keeps one record per row.
+    pair_label_col = 0
+    pair_candidates: set[int] = set()
+    pair_col_kinds: dict[int, str] = {}
+    # A header cell that is itself a pair or a number ("2.36 [2.26, 2.47]") means
+    # a data row was taken for the header: a pair typed under it would carry a
+    # value as its arm label, so the table gets no pair records at all.
+    header_is_data = any(
+        _EST_BRACKET_RE.match(v) or _PAREN_PAIR_RE.match(v) or _NUM_RE.match(v)
+        or _self_labelled_kind(v)
+        for v in (_fold_minus(_strip_fold_sentinels(h or "")) for h in header)
+        if v
+    )
+    if grouped is None and not header_is_data:
+        padded = [(list(r) + [""] * n_cols)[:n_cols] for r in body
+                  if not _is_group_separator(r, n_cols)]
+        typed = {
+            ci for ci in range(n_cols)
+            if _classify_column(header[ci]) or (roles_override and ci in roles_override)
+        }
+        pair_label_col = next((ci for ci in range(n_cols) if ci not in typed), 0)
+        pair_candidates = {
+            ci for ci in range(n_cols) if ci != pair_label_col and ci not in typed
+        }
+        pair_col_kinds = _pair_column_kinds(
+            header, padded, pair_label_col, typed, vocab_all)
+    row_pairs: dict[int, dict[int, str]] = {}
+    if pair_candidates:
+        for row_idx, row in enumerate(body):
+            if not _is_group_separator(row, n_cols):
+                rp = _row_pair_kinds((list(row) + [""] * n_cols)[:n_cols],
+                                     pair_label_col, pair_candidates, pair_col_kinds)
+                if rp:
+                    row_pairs[row_idx] = rp
+    pair_cols_all = {ci for rp in row_pairs.values() for ci in rp}
+    # Each pair record is labelled with its column's own header lines, every
+    # header row top to bottom ("(1)" / "Indiana" -> "(1) Indiana", so the two
+    # "Indiana" columns of 10.1177/23780231221103044 Table 1 stay apart). A
+    # spanning label printed over two columns reaches only the column it was
+    # folded into, so two columns may still share a label ("Model 2" under two
+    # outcomes); the arm boundaries are not guessed to tell them apart.
+    # The table's own "Table 2  Comparisons of ..." line, left in a header row
+    # when it shares its cell with the title, names the table, not the arm.
+    lab_key = _alnum_key(table.get("label") or "")
+    cap_key = _alnum_key(table.get("caption") or "")
+
+    def _column_label(ci: int) -> str:
+        parts: list[str] = []
+        for hr in header_rows:
+            t = _strip_fold_sentinels(hr[ci] if ci < len(hr) else "")
+            k = _alnum_key(t)
+            if lab_key and k.startswith(lab_key) and not k[len(lab_key):][:1].isdigit():
+                # Drop the longest leading run of words that is the caption's
+                # own text (the header split may have folded it into the arm).
+                words = t.split()
+                cut = max((i for i in range(1, len(words) + 1)
+                           if _alnum_key(" ".join(words[:i])) in cap_key), default=0)
+                t = " ".join(words[cut:])
+            if t and t not in parts:
+                parts.append(t)
+        return _pair_group_label(" ".join(parts))
+
+    pair_labels = {ci: _column_label(ci) for ci in pair_cols_all}
+    # One pair column with no arm of its own ("M (SD)" beside t and p) joins the
+    # row's record. Otherwise each pair column with an arm label is its own
+    # record; a pair column with NO label among several is left untyped (its
+    # value stays in `raw_cells`): its record could not say which arm it is.
+    split_pairs = len(pair_cols_all) >= 2 or any(pair_labels.values())
+
     for row_idx, row in enumerate(body):
         if _is_group_separator(row, n_cols):
             continue
@@ -2458,14 +2988,47 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
             row = list(row[:n_cols])
 
         if grouped is None:
-            out.append(
-                _flatten_one_row(
-                    table_id, page, label, row_idx, header, row,
-                    roles_override=roles_override,
-                    effect_hint=effect_hint,
-                    level_context=level_context,
+            rp = row_pairs.get(row_idx, {})
+            if not split_pairs:
+                over = dict(roles_override or {})
+                over.update({ci: ("est_ci_pair" if k == "est_ci" else k)
+                             for ci, k in rp.items()})
+                out.append(
+                    _flatten_one_row(
+                        table_id, page, label, row_idx, header, row,
+                        roles_override=over or None,
+                        effect_hint=effect_hint,
+                        level_context=level_context,
+                    )
                 )
+                continue
+            # The row's other columns (a t, a p) stay one record with no
+            # group; it is kept when it types anything or the row has no pair.
+            over = dict(roles_override or {})
+            over.update({ci: "" for ci in pair_cols_all})
+            main = _flatten_one_row(
+                table_id, page, label, row_idx, header, row,
+                roles_override=over,
+                effect_hint=effect_hint,
+                level_context=level_context,
             )
+            if main["fields"] or not any(pair_labels.get(ci) for ci in rp):
+                out.append(main)
+            for ci, kind in sorted(rp.items()):
+                if not pair_labels.get(ci):
+                    continue
+                out.append(
+                    _flatten_one_row(
+                        table_id, page, label, row_idx,
+                        [header[pair_label_col], header[ci]],
+                        [row[pair_label_col], row[ci]],
+                        group=pair_labels[ci],
+                        roles_override={1: "est_ci_pair" if kind == "est_ci" else kind},
+                        effect_hint=effect_hint,
+                        level_context=level_context,
+                        label_idx=0,
+                    )
+                )
             continue
 
         # Parallel-group table: emit one record per (row × arm). Shared label
@@ -2491,8 +3054,14 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
     # for an arm label (10.5465/amle.2017.0488 p13 Table 5: "Academic" / "Book" /
     # "WoS" from "Academic Source" / "Book Citations" / "WoS Citations"). Such a
     # table is flattened as an ungrouped one: one record per row.
+    # A count or percentage typed from a self-labelled cell ("67.6%") does not
+    # make a grouping real: it types under any arm label, value or not.
+    # Nor does a pair typed from a header phrase or the cell's own labels: the
+    # ungrouped pass below types EVERY pair column under the table's own
+    # statement, each under its own header.
     if grouped is not None and out and not any(
-        k != "group" for r in out for k in (r.get("fields") or {})
+        k not in ("group", "count", "pct") and k not in r.get("_pair_keys", ())
+        for r in out for k in (r.get("fields") or {})
     ):
         record_fallback("flatten_untyped_grouping_dropped", detail=f"{label}: {len(out)} records")
         return _flatten_table_rows(table, _allow_groups=False)

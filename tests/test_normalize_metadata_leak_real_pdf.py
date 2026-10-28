@@ -202,15 +202,20 @@ def test_p1_strips_creative_commons_license_block():
     assert "This work is licensed under a Creative Commons" not in out
 
 
-def test_p1_strips_correspondence_concerning_block():
+def test_p1_retains_correspondence_note_as_its_own_paragraph():
+    # 2.4.156: the corresponding author's address is the authors' data. P1
+    # deleted only the note's FIRST line and stranded the wrapped address
+    # lines in the Introduction (10.1037/a0012616 p1). It is now kept whole
+    # and set off as its own paragraph, which the render labels as a note.
     text = (
-        "Intro.\n\n"
-        "Correspondence concerning this article should be addressed to "
-        "Author Name, Department of X, University of Y.\n\n"
+        "Intro sentence ends here.\n"
+        "Correspondence concerning this article should be addressed to Richard\n"
+        "A. Author, School of X, University of Y.\n\n"
         "Body." + "\n\nbody. " * 200
     )
     out = _strip_frontmatter_metadata_leaks(text)
-    assert "Correspondence concerning this article" not in out
+    assert ("Intro sentence ends here.\n\nCorrespondence concerning this article "
+            "should be addressed to Richard\nA. Author, School of X") in out
 
 
 def test_p0_strips_bare_uppercase_running_header():

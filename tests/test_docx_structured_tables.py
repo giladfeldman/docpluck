@@ -691,15 +691,18 @@ def test_clean_grid_does_not_promote_past_a_declared_header_count():
     the mechanism. The shape is 10.5281/zenodo.21911212 Table 10: an APA
     "M [95% CI]" row whose cells are values-with-intervals, which
     `_DATA_VALUE_CELL_RE` does not full-match, so the row reads as header text.
+    Since a bracketed "15.04, CI 13.93-16.16" cell now counts as data, the control
+    grid prints the interval in words ("15.04, CI 13.93-16.16"), a form the
+    heuristic still misreads -- the mechanism under test is unchanged.
     """
     grid = [
         ["Measure", "Group", "Pre", "Post", "Change", "p"],
-        ["Numeracy", "CG", "15.04 [13.93, 16.16]", "14.91 [13.33, 16.48]",
-         "-0.13 [-2.05, 1.79]", ".891"],
-        ["Numeracy", "PG", "14.32 [13.19, 15.45]", "22.09 [20.50, 23.67]",
-         "7.77 [5.85, 9.69]", "< .001"],
-        ["Numeracy", "EXG", "14.44 [13.31, 15.57]", "22.08 [20.49, 23.66]",
-         "7.63 [5.71, 9.55]", "< .001"],
+        ["Numeracy", "CG", "15.04, CI 13.93-16.16", "14.91, CI 13.33-16.48",
+         "-0.13, CI -2.05-1.79", ".891"],
+        ["Numeracy", "PG", "14.32, CI 13.19-15.45", "22.09, CI 20.50-23.67",
+         "7.77, CI 5.85-9.69", "< .001"],
+        ["Numeracy", "EXG", "14.44, CI 13.31-15.57", "22.08, CI 20.49-23.66",
+         "7.63, CI 5.71-9.55", "< .001"],
     ]
     # Without the declaration the heuristic eats the first two data rows.
     _hdr_guessed, body_guessed = _clean_grid(grid)
@@ -711,7 +714,7 @@ def test_clean_grid_does_not_promote_past_a_declared_header_count():
     hdr, body = _clean_grid(grid, declared_header_rows=1)
     assert len(hdr) == 1, f"declared 1 header row, got {len(hdr)}"
     assert len(body) == 3, f"declared 1 header row, expected 3 body rows, got {len(body)}"
-    assert any("7.77 [5.85, 9.69]" in c for r in body for c in r), (
+    assert any("7.77, CI 5.85-9.69" in c for r in body for c in r), (
         "the PG arm's change score and its interval must reach the body"
     )
 

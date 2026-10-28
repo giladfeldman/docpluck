@@ -39,7 +39,14 @@ def test_table1_words_are_not_glued(jama_tables_camelot_off):
     t1 = next(t for t in jama_tables_camelot_off if t.get("label") == "Table 1")
     assert t1.get("cell_geometry") == "whitespace_native"
     text = " | ".join(c["text"] for c in t1["cells"])
-    assert "Baseline Characteristics of the Study" in text
+    # The page prints "Table 1. Baseline Characteristics of the Study
+    # Participants" as the caption ABOVE the table's rule (p6, rasterized
+    # 2026-10-28). The whitespace grid captured it as its first row; since
+    # 2.4.156 `tables.caption_rows` hands that row back to the caption (it is
+    # the caption's text, verbatim). So the spacing of that line is checked
+    # where it now lives -- the caption -- and the cells keep the body words.
+    assert "Baseline Characteristics of the Study" in t1["caption"]
+    assert not re.search(r"BaselineCharacteristics|oftheStudy", t1["caption"])
     assert "Non-Hispanic White" in text
     assert not re.search(r"BaselineCharacteristics|Non-HispanicWhite|oftheStudy", text)
 
@@ -48,8 +55,14 @@ def test_no_character_is_lost_or_added(jama_tables_camelot_off):
     # Only spaces may change: the non-space characters of every cell are the same
     # multiset the glued version carried (pinned on two known cells).
     t1 = next(t for t in jama_tables_camelot_off if t.get("label") == "Table 1")
-    squeezed = {re.sub(r"\s+", "", c["text"]) for c in t1["cells"]}
-    assert "Table1.BaselineCharacteristicsoftheStudyParticipantsa" in squeezed
+    squeezed = [re.sub(r"\s+", "", c["text"]) for c in t1["cells"]]
+    # The caption line left the grid (see the test above): its characters must
+    # be in the caption exactly, and in no cell any more -- moved, not lost, not
+    # doubled.
+    assert re.sub(r"\s+", "", t1["caption"]) == "Table1.BaselineCharacteristicsoftheStudyParticipantsa"
+    assert not any("BaselineCharacteristics" in c for c in squeezed)
+    # A body cell keeps its characters too.
+    assert "Non-HispanicWhite" in " ".join(squeezed)
 
 
 def test_spacing_does_not_change_which_grids_are_kept():

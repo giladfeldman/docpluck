@@ -6,38 +6,38 @@
   "captured_from": "docpluck v2.4.155",
   "fixtures": {
     "amj_lattice": {
-      "sha256": "5affc38e5e66a386986dd8d5bce45e3c536c1432fe0ca0552b1aaf4655b83471",
-      "bytes": 127085,
+      "sha256": "bacbd708cf6fde8d0eef5879fa2cbc1e760a67015b01dcd5b9cbbfb50c56e05c",
+      "bytes": 127115,
       "method": "pdftotext_default+column_corrected:5,11,27,28,29"
     },
     "apa_chan_feldman_lineless": {
-      "sha256": "18361ae386d13f87a3907512ea53889b4ff5c3f8850f4e3cda053457dff3a65a",
-      "bytes": 82076,
+      "sha256": "24aa9941fa0a28ee56cb1ef72ddfd8b9e41af87d97961ee53827833e616484ea",
+      "bytes": 82082,
       "method": "pdftotext_default+column_corrected:8,12,21,22,24"
     },
     "apa_chen_jesp_lineless": {
-      "sha256": "9d602702f58a130681a35be1c3304e208756c31281e91eabe9a3fde78e1660a8",
-      "bytes": 137529,
+      "sha256": "fcc421bafe2aa23f525166b69850cc7f55fce70b4a87ae5411f6cdf60ff45bfe",
+      "bytes": 137536,
       "method": "pdftotext_default+column_corrected:2,3,5,9,16,18,19,20"
     },
     "apa_efendic_affect": {
-      "sha256": "c4375c67424cb63de12f0b5f4f9ee4bcd6bcb81ee011f86d0498f13b7538142a",
-      "bytes": 52470,
+      "sha256": "9620060821d84095f7dde98461ba5f1b253a02272625039261ea39084c9b6a2f",
+      "bytes": 52475,
       "method": "pdftotext_default+column_corrected:10,11,12"
     },
     "apa_ip_feldman_pspb": {
-      "sha256": "d03c6996fbc2f9ac911a97142955a44f24c625ff72530ddcf143dd7376b2e023",
-      "bytes": 89488,
+      "sha256": "d56b012ae9198dcf879f2ebd0ee2ae7f49b7ad9b996a980614a06091f91bdabb",
+      "bytes": 89499,
       "method": "pdftotext_default+column_corrected:5,8,15,18,19"
     },
     "bmc_lattice": {
-      "sha256": "55d2b47e0162986d491e4664d226643993cc78723a7e2de48d6a46c373f9d954",
-      "bytes": 42494,
+      "sha256": "c37337970d3cfc07261763aabae4007ad27ae70488e9477df7ce2adaf51024f4",
+      "bytes": 42498,
       "method": "pdftotext_default+column_corrected:9,10"
     },
     "ieee_figure_heavy": {
-      "sha256": "09482a7e4039443b193b224a3a3090d3ca1ba1bd645d251b17d17c664c4f1127",
-      "bytes": 81922,
+      "sha256": "9b4c33be859c82c480dc80e3dbc10f02366bc7fde75d3b74caa4aa8db55a7daa",
+      "bytes": 81933,
       "method": "pdftotext_default+column_corrected:8,12,14"
     },
     "ieee_lattice": {
@@ -46,23 +46,23 @@
       "method": "pdftotext_default"
     },
     "jama_lattice": {
-      "sha256": "66fb41f835f4a903e31f5cd0ecd0182ddafdd4308e816ad6f0a22a32d619591e",
-      "bytes": 51090,
+      "sha256": "18e6318b019c8324281faaeb02fd00bc90bdd904b4c4a0d840fb35acaafb43ba",
+      "bytes": 51094,
       "method": "pdftotext_default+column_corrected:1"
     },
     "nat_comms_figure_only": {
-      "sha256": "692ab41f9712675411d00597422daaef492ebf7726503a0c9d5a8b0b50b08fa6",
-      "bytes": 77728,
+      "sha256": "38187d61fb652ba2e2532d503adf842f3bd1945cce1dfdcd824d2c73c3e7338c",
+      "bytes": 77732,
       "method": "pdftotext_default+column_corrected:8,9,11,12,13"
     },
     "nature_minimal_rule": {
-      "sha256": "19a6baf9e0e8b872b6db91e7b40fd49dca03f8640efd2eabf72a13605596851d",
-      "bytes": 82447,
+      "sha256": "7afbe32040b2c4d14eb6b799a28582e96dbcf8c8995c1b4c2e29ab58d2b727d2",
+      "bytes": 82453,
       "method": "pdftotext_default+column_corrected:2,9,10,11"
     },
     "scirep_minimal_rule": {
-      "sha256": "ce9f2292c2529ad3759ef965312080788c4f3df709137c04496d6aa068d4ef0b",
-      "bytes": 58362,
+      "sha256": "9f8fd02926bd60026bba00f4d61a8528fb4ca666b8b0bae1f39f9d2b0ed7e171",
+      "bytes": 58363,
       "method": "pdftotext_default"
     }
   }

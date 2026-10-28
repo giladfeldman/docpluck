@@ -556,11 +556,15 @@ class TestP0_RunningHeaderFooterPatterns_v246:
         assert "Body sentence." in result
         assert "More body." in result
 
-    def test_orcid_url_stripped(self):
-        text = "Body.\nhttps://orcid.org/0000-0002-1234-5678\nMore body.\n"
+    def test_orcid_url_line_is_kept(self):
+        # An author's ORCID iD is data, not page furniture (2.4.156). Placed
+        # past the first-page header zone, where H0's bare-URL banner rule
+        # applies to every URL line regardless.
+        filler = "".join(f"Body sentence number {i} of the article.\n" for i in range(120))
+        text = filler + "ORCID iDs\nA. Author\nhttps://orcid.org/0000-0002-1234-5678\nMore body.\n"
         result = norm(text, "standard")
-        assert "orcid.org/0000-0002-1234-5678" not in result
-        assert "Body." in result
+        assert "https://orcid.org/0000-0002-1234-5678" in result
+        assert "More body." in result
 
     def test_affiliation_line_preserved_in_prose_context(self):
         """The Dept/University pattern must only match standalone lines, not

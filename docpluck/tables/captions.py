@@ -235,7 +235,25 @@ def printed_continuation_label(cells) -> "tuple[str, str] | None":
     return None
 
 
+def printed_continuation_heads(page_text: str) -> "dict[str, str]":
+    """``{"Table 1": "Table 1. (continued)"}`` for every continuation head a page
+    prints on a line of its own (the head may sit ABOVE the grid, outside it, so
+    :func:`printed_continuation_label` cannot see it). Lines are read one at a
+    time and the pattern is anchored at both ends, so a mention inside prose
+    ("see Table 6 (continued)") never counts.
+    """
+    out: "dict[str, str]" = {}
+    for line in (page_text or "").splitlines():
+        if len(line) > 60:
+            continue
+        m = _CONTINUED_HEAD_RE.match(line)
+        if m:
+            out.setdefault(f"Table {m.group('num')}", re.sub(r"\s+", " ", line.strip()))
+    return out
+
+
 __all__ = [
+    "printed_continuation_heads",
     "printed_continuation_label",
     "TABLE_CAPTION_RE",
     "FIGURE_CAPTION_RE",

@@ -3141,15 +3141,25 @@ def _promote_isolated_titlecase_subsection_headings(
         # labels.  Without this guard, "Supplemental Materials" appearing
         # mid-paragraph (because pdftotext split "...summarized in the\n\n
         # Supplemental Materials\n\nThere were...") gets falsely promoted.
-        if not _prev_paragraph_is_sentence_terminated(lines, i):
+        # A page break sitting on its own line between the candidate and the
+        # text above it (left where a running title opened the page) is a
+        # boundary: the line above belongs to another page, so it is neither
+        # an unfinished sentence nor a sibling label of the candidate
+        # (10.1525/collabra.77608 p11 "Replication: Dichotomized numeracy").
+        k = i - 1
+        _crossed_page_break = False
+        while k >= 0 and not lines[k].strip():
+            if "\f" in lines[k]:
+                _crossed_page_break = True
+            k -= 1
+        if not _crossed_page_break and not _prev_paragraph_is_sentence_terminated(lines, i):
             out.append(line)
             continue
         # Previous non-blank line must NOT itself be a short isolated
         # title-case line (sibling-label / glossary-sidebar / figure-
         # caption fragment shape).
-        k = i - 1
-        while k >= 0 and not lines[k].strip():
-            k -= 1
+        if _crossed_page_break:
+            k = -1
         if k >= 0:
             prev = lines[k].strip()
             if (
@@ -6259,6 +6269,25 @@ def _trailing_single_level_section_number(body_text: str, doc_text: str):
     return m if sub.search(doc_text or "") else None
 
 
+def _table_heading_and_caption(t: dict, label: str, cap: str) -> tuple[str, str]:
+    """The ``### `` heading and the italic caption line for a table.
+
+    A later page of a table that runs over pages (``continuation_of``) is headed
+    ``Table N (continued, page P)`` so it is never mistaken for a second Table N.
+    One linked by position and column layout alone (``caption_status ==
+    "continuation"``; the page prints no caption or continued head) says so.
+    """
+    if not t.get("continuation_of"):
+        return label, cap
+    head = f"{label} (continued, page {t.get('page')})"
+    if t.get("caption_status") == "continuation" and not cap:
+        cap = (
+            f"Continues {t.get('continuation_of')} from the previous page; linked by position "
+            "and column layout (this page prints no caption or continued head)."
+        )
+    return head, cap
+
+
 def _locate_caption_anchor(text: str, label: str, caption: str) -> int:
     """Locate the char offset of a Table/Figure caption inside ``text``.
 
@@ -6441,9 +6470,14 @@ def _render_sections_to_markdown(
     # table. They get their own clearly labelled section at the end instead --
     # retained, and marked as unverified (owner directive 2026-09-24).
     uncaptioned_candidates: list[dict] = []
+    continuations: list[dict] = []
     for t in tables:
         if t.get("caption_status") == "uncaptioned_candidate":
             uncaptioned_candidates.append(t)
+            continue
+        if t.get("continuation_of"):
+            # Placed after its own table below.
+            continuations.append(t)
             continue
         idx = _locate_caption_anchor(text, t.get("label") or "Table", t.get("caption") or "")
         if idx >= 0:
@@ -6457,6 +6491,32 @@ def _render_sections_to_markdown(
         else:
             unlocated_figures.append(f)
 
+    # A table's later pages follow the table itself: placed at the anchor of the
+    # nearest earlier page of the same table (stable sort keeps them after it),
+    # or right after it among the unlocated tables when it was not anchored.
+    # Failing both (no parent page found), a page that prints its own "Table N
+    # (continued)" head is placed at that head, else with the unlocated tables.
+    for t in sorted(continuations, key=lambda c: c.get("page") or 0):
+        parent = t.get("continuation_of")
+        prior = [
+            (p_idx, item) for p_idx, kind, item in placements
+            if kind == "table" and item.get("label") == parent
+            and (item.get("page") or 0) < (t.get("page") or 0)
+        ]
+        if prior:
+            p_idx = max(prior, key=lambda pi: pi[1].get("page") or 0)[0]
+            placements.append((p_idx, "table", t))
+            continue
+        in_unlocated = [i for i, u in enumerate(unlocated_tables) if u.get("label") == parent]
+        if in_unlocated:
+            unlocated_tables.insert(in_unlocated[-1] + 1, t)
+            continue
+        cap = (t.get("caption") or "").strip()
+        idx = _locate_caption_anchor(text, t.get("label") or "Table", cap) if cap else -1
+        if idx >= 0:
+            placements.append((idx, "table", t))
+        else:
+            unlocated_tables.append(t)
     placements.sort(key=lambda p: p[0])
     consumed: set[int] = set()
 
@@ -6536,12 +6596,13 @@ def _render_sections_to_markdown(
             label = item.get("label") or ("Table" if kind == "table" else "Figure")
             cap = item.get("caption") or ""
             if kind == "table":
+                head, cap = _table_heading_and_caption(item, label, cap)
                 cells = item.get("cells") or []
                 html = item.get("html") or (cells_to_html(cells) if cells else "")
                 raw_t = (item.get("raw_text") or "").strip()
                 completeness_marker = _table_completeness_marker(cells, raw_t)
                 if html:
-                    body_chunks.append(f"\n### {label}\n")
+                    body_chunks.append(f"\n### {head}\n")
                     if completeness_marker:
                         body_chunks.append(completeness_marker)
                     if cap:
@@ -6571,7 +6632,7 @@ def _render_sections_to_markdown(
                     # grid couldn't be reconstructed. Matches the Tables
                     # tab's behaviour in the SaaS UI (it shows raw_text
                     # under an amber notice when no html is present).
-                    body_chunks.append(f"\n### {label}\n")
+                    body_chunks.append(f"\n### {head}\n")
                     if completeness_marker:
                         body_chunks.append(completeness_marker)
                     if cap:
@@ -6599,7 +6660,7 @@ def _render_sections_to_markdown(
                     # The `*{cap}*` italic line is kept immediately after the
                     # heading so `_suppress_orphan_table_cell_text` still
                     # recognizes it and drops any linearized orphan cell-rows.
-                    body_chunks.append(f"\n### {label}\n")
+                    body_chunks.append(f"\n### {head}\n")
                     if completeness_marker:
                         body_chunks.append(completeness_marker)
                     body_chunks.append(f"*{cap}*\n")
@@ -6656,12 +6717,12 @@ def _render_sections_to_markdown(
             out_chunks.append("## Tables (unlocated in body)\n\n")
             for t in renderable_tables:
                 label = t.get("label") or "Table"
-                cap = t.get("caption") or ""
+                head, cap = _table_heading_and_caption(t, label, t.get("caption") or "")
                 cells = t.get("cells") or []
                 html = t.get("html") or (cells_to_html(cells) if cells else "")
                 raw_t = (t.get("raw_text") or "").strip()
                 completeness_marker = _table_completeness_marker(cells, raw_t)
-                out_chunks.append(f"### {label}\n")
+                out_chunks.append(f"### {head}\n")
                 if completeness_marker:
                     out_chunks.append(completeness_marker)
                 if cap:

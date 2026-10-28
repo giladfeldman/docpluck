@@ -46,7 +46,10 @@ def test_wang_2015_table_1_interaction_row_keeps_its_label():
     p = custody_path("fulltext", "10.1177__0956797615612694.pdf")
     tables = extract_pdf_structured(p.read_bytes())["tables"]
     t1 = next(t for t in tables if t.get("label") == "Table 1")
-    recs = {r["row_label"]: r for r in flatten_table(t1)}
-    assert "Feeling Respected × Culture" in recs, sorted(recs)
-    assert "–1.89" in " ".join(recs["Feeling Respected × Culture"]["raw_cells"]) or \
-        "-1.89" in " ".join(recs["Feeling Respected × Culture"]["raw_cells"])
+    recs = [r for r in flatten_table(t1)]
+    labels = {r["row_label"] for r in recs}
+    assert "Feeling Respected × Culture" in labels, sorted(labels)
+    # one record per experiment column; the Experiment 1 estimate is -1.89
+    cells = " ".join(c for r in recs if r["row_label"] == "Feeling Respected × Culture"
+                     for c in r["raw_cells"])
+    assert "–1.89" in cells or "-1.89" in cells

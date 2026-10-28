@@ -26,6 +26,14 @@ TableRendering = Literal["lattice", "whitespace", "isolated", "markup"]
 #                              (2.4.155) a grid that opens with the page's own
 #                              printed "TABLE N (Continued)" head; such a table
 #                              also carries `continuation_of`.
+#                              Also (2.4.156) a grid under such a head printed
+#                              ABOVE it, when the grid's geometry agrees.
+#   "continuation"          -- (2.4.156) a grid with no caption and no printed
+#                              continued head, linked to the table that ends the
+#                              previous page by position and column layout (top
+#                              of the page, same column count, same x-extent).
+#                              `label` and `continuation_of` name that table;
+#                              linked, not verified by a printed caption.
 #   "none_found"            -- no caption, but the table itself is certain: the
 #                              file DECLARES it (a DOCX `w:tbl`).
 #   "uncaptioned_candidate" -- a PDF grid Camelot found on a page where no
@@ -34,7 +42,7 @@ TableRendering = Literal["lattice", "whitespace", "isolated", "markup"]
 #                              uncertain content) but NOT verified to be a
 #                              table: it may be a title block or prose laid out
 #                              in columns. `label` and `caption` are None.
-CaptionStatus = Literal["matched", "none_found", "uncaptioned_candidate"]
+CaptionStatus = Literal["matched", "continuation", "none_found", "uncaptioned_candidate"]
 
 # What the table's CONTENT is, as opposed to its caption (2026-09-25). One string,
 # following the `cell_geometry` precedent of "<state>" or "<state>:<reason>":
