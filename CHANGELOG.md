@@ -1,34 +1,34 @@
 # Changelog
 
-## [Unreleased]
+## [2.4.156] - 2026-10-29 - normalization 1.9.79 - table extraction 2.4.27 - sectioning 1.2.9
 
 Fixes from a check of 10 psychology papers docpluck had never processed (each read against the
 rasterized pages by two models) and from defects reported by downstream consumers.
 
 ### Normalization
 
-- **Plain-text callers now get line-end hyphen repairs (`extract_pdf`).** pdftotext drops a real
+- **Plain-text callers now get line-end hyphen repairs (`extract_pdf`).** [REPAIR, ours: the page prints it, extraction lost it] pdftotext drops a real
   hyphen at a line end (`Self-` / `Compassion` -> `SelfCompassion`, `pp. 101-` / `125` ->
   `101125`). `extract_pdf` now runs one extra `pdftotext -bbox` pass on the same file and feeds its
   words to the layout-gated restore steps, so `normalize_text(extract_pdf(...))` gets them without a
   layout (new kwarg `restore_line_end_hyphens=True`; about +10-16% extraction time measured on
   three papers). A failed pass records `line_end_hyphen_words_unavailable`.
-- **Digit ranges split across a line keep their hyphen (new step W0u).** `pp. 101-` / `125)` came
+- **Digit ranges split across a line keep their hyphen (new step W0u).** [REPAIR, ours: the page prints it, extraction lost it] `pp. 101-` / `125)` came
   out `pp. 101125` (10.1111/jasp.12453, pp. 24 and 29). A raised exponent glued to its base
   (`10` + `6`) is read as one printed run and never split.
-- **A hyphen inside a DOI at a line end is restored (new step W0v)** (`10.3233/NHA-170036`,
+- **A hyphen inside a DOI at a line end is restored (new step W0v)** [REPAIR, ours: the page prints it, extraction lost it] (`10.3233/NHA-170036`,
   `10.1007/s11031-006-9025-x`), on every path including `extract_pdf`.
-- **A URL or DOI broken across a line is rejoined without a space (new step S6u)**
+- **A URL or DOI broken across a line is rejoined without a space (new step S6u)** [REPAIR, ours: the page prints it, extraction lost it]
   (`https://doi.or g/...`, `science.a ac4716`), so reference DOIs resolve again. A comma, a list
   number, a second URL, a bare number under a web URL, and prose words keep the break.
-- **A numbered reference's number is no longer glued onto the previous entry's DOI.**
-- **Documents whose font encodes the printed hyphen as U+00AD keep their hyphens (new step S0h).**
+- **A numbered reference's number is no longer glued onto the previous entry's DOI.** [REPAIR, ours: the page prints it, extraction lost it]
+- **Documents whose font encodes the printed hyphen as U+00AD keep their hyphens (new step S0h).** [REPAIR, ours: the page prints it, extraction lost it]
   10.1126/science.aac4716 lost every hyphen, page-range dash and table minus sign (`-0.327` read
   `0.327`). Document-level gate; a real invisible soft hyphen is still removed.
-- **Compounds of three or more parts broken after an inner hyphen are restored**
+- **Compounds of three or more parts broken after an inner hyphen are restored** [REPAIR, ours: the page prints it, extraction lost it]
   (`intent-totreat` -> `intent-to-treat`).
 - **Running titles repeated at the top or bottom of later pages, publisher watermark sentences and
-  "Downloaded from" stamps are removed**; a subheading after a page break is still recognised.
+  "Downloaded from" stamps are removed (new step P0t; new watermark patterns)** [FURNITURE: page furniture, not article text]; a subheading after a page break is still recognised.
 - **ORCID URLs are kept** (they were deleted since 2.4.7), and "Electronic Supplementary Material"
   body lines and the "Correspondence concerning this article" note are no longer dropped.
 
@@ -52,6 +52,9 @@ rasterized pages by two models) and from defects reported by downstream consumer
   10.1177/0956797615612694 Table 1; 10.5334/irsp.945 Table 3). A line counts only when it reads
   like a short title, sits in a column of values directly under a data row, and continues no
   cell above it; wrapped label words, footnote lines and row-spanning labels are left as they were.
+- **A row label printed alone directly above a data row opens the table body; it is no longer taken
+  for a header line** (10.1001/jamanetworkopen.2023.16111 Table 2: `Continued smoking` over
+  `Baseline 4.31 (3.67)`), so the first block's records keep their block label like the second's.
 - **A grid that starts with its own caption lines, label or running head hands them back to the
   caption**, so the html header is the column row (e.g. 10.1016/j.jesp.2021.104154 Table 3).
 - **A table with no numbers no longer takes its first data rows into the header**

@@ -349,6 +349,8 @@ def _bbox_word_layout(bbox_html: str):
 def _restore_line_end_hyphens(text: str, pdf_path: str, timeout: int) -> str:
     """Re-hyphenate compounds and digit ranges pdftotext joined at a line end.
 
+    Class: REPAIR (ours) -- the page prints each hyphen; pdftotext removed it.
+
     Uses the page's own words from ``pdftotext -bbox`` (same engine and file as
     the text, so a word the text prints glued mid-line is glued in the words
     too) and the gates of ``normalize.recover_doi_hyphens_via_layout`` (W0v),
