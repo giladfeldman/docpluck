@@ -852,6 +852,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
 
     rows = _attach_detached_sign_rows(rows)
     lowercase_labels = _labels_are_lowercase(rows)
+    section_rows = _recurring_section_rows(rows)
     out: list[list[str]] = []
     for row_i, row in enumerate(rows):
         nxt = rows[row_i + 1] if row_i + 1 < len(rows) else None
@@ -884,7 +885,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                     parent[i] = parent[i] + _MERGE_SEPARATOR + v
             continue
 
-        if _is_section_row_label(row):
+        if row_i in section_rows or _is_section_row_label(row):
             # Don't merge — emit as a separate row so the renderer can
             # surface the spanning section label as its own table row.
             out.append([(c or "").strip() for c in row])
@@ -935,7 +936,15 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                     and (out[-1][0] or "").strip()
                     and _is_data_row(out[-1])
                     and not _labels_next_row(nxt, new_label_too=True)
-                    and (not lowercase_labels or _label_breaks_off(out[-1][0]))
+                    # In a lowercase-label table a sub-heading is a phrase
+                    # ("liberal change"); a lone word under a data row is still
+                    # a wrap (10.1098/rsos.250908 Table 14, p17: "ethnic" /
+                    # "minorities", "romantic" / "partner").
+                    and (
+                        not lowercase_labels
+                        or _label_breaks_off(out[-1][0])
+                        or len(first.split()) == 1
+                    )
                 )
             )
         ):
@@ -1171,6 +1180,83 @@ def _is_header_like_row(row: list[str]) -> bool:
     return True
 
 
+# A section line reads like a short title: it starts with a capital letter,
+# runs at most 8 words, and holds no comma, semicolon, closing full stop or
+# decimal/percent value. Wrapped label words ("seeding", "(liberal items)"),
+# footnote lines ("Abbreviations: CVH, cardiovascular health; eGFR,") and body
+# prose leaking into the grid do not.
+_SECTION_LINE_RE = re.compile(
+    r"(?=[A-Z][A-Za-z]{2})(?!(?:\S+\s+){8})(?!.*\d[.%])[^,;]*[^,;.\s]\Z"
+)
+
+
+def _lone_text_col(row: list[str]) -> int | None:
+    """Column of the single non-empty cell of ``row`` when that cell is text
+    off the label column; None otherwise."""
+    nz = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+    if len(nz) != 1 or nz[0][0] == 0:
+        return None
+    i, v = nz[0]
+    if _DATA_VALUE_CELL_RE.match(v) or not _SECTION_LINE_RE.match(v):
+        return None
+    return i
+
+
+def _recurring_section_rows(grid: list[list[str]]) -> set[int]:
+    """Indices of section lines that recur in one column with a data row between.
+
+    A lone text cell off the label column is a section line, not a wrapped
+    header line, when the same column prints another lone text line further
+    down with a data row between them: "Posttreatment" ... "Follow-up"
+    (10.1037/a0012616 Table 4, p7), "Outcome variable: feeling respected" ...
+    "Outcome variable: punishment ..." (10.1177/0956797615612694 Table 1, p5).
+    Taken into the header, the first became the group of every record in BOTH
+    blocks. A header wrapped onto a second line in one column has no such twin.
+    """
+    by_col: dict[int, list[int]] = {}
+    seen_data = False
+    for i, r in enumerate(grid):
+        col = _lone_text_col(r)
+        if col is not None:
+            # Below the first data row a section line follows a data row and
+            # sits under no text in its own column. Otherwise it continues the
+            # cell above ("c. Gosling" / "imprinting", "Study 2: US American" /
+            # "Study 5: US American", "Harvard University (Harvard Business" /
+            # "School)"). Above the first data row the text over it is the
+            # column header.
+            prev = grid[i - 1] if i else []
+            above = (prev[col] or "").strip() if col < len(prev) else ""
+            if not seen_data or (
+                any(_DATA_VALUE_CELL_RE.match((c or "").strip()) for c in prev[1:])
+                and (not above or _DATA_VALUE_CELL_RE.match(above))
+            ):
+                by_col.setdefault(col, []).append(i)
+        seen_data = seen_data or any(
+            _DATA_VALUE_CELL_RE.match((c or "").strip()) for c in r[1:]
+        )
+    found: set[int] = set()
+    for col, idx in by_col.items():
+        # A section line sits in a column of values. In a column of labels a
+        # lone line is a label spanning the rows around it ("Opt-in default"
+        # centred beside "Positive Framing" / "Negative Framing",
+        # 10.15626/mp.2022.3108 Table S9, p40).
+        cells = [
+            (grid[k][col] or "").strip()
+            for k in range(idx[0] + 1, len(grid))
+            if k not in idx and col < len(grid[k])
+        ]
+        n_data = sum(1 for c in cells if _DATA_VALUE_CELL_RE.match(c))
+        if n_data <= sum(1 for c in cells if c) - n_data:
+            continue
+        for a, b in zip(idx, idx[1:]):
+            if any(
+                _DATA_VALUE_CELL_RE.match((c or "").strip())
+                for k in range(a + 1, b) for c in grid[k][1:]
+            ):
+                found.update((a, b))
+    return found
+
+
 def _header_row_count(merged: list[list[str]], n_cols: int) -> int:
     """How many of ``merged``'s top rows form the header (1 to 3).
 
@@ -1187,8 +1273,9 @@ def _header_row_count(merged: list[list[str]], n_cols: int) -> int:
         for row in merged[1:] for c in row if (c or "").strip()
     )
     n_header = 1
+    section_rows = _recurring_section_rows(merged)
     for k in range(1, min(3, len(merged))):
-        if _is_group_separator(merged[k], n_cols):
+        if _is_group_separator(merged[k], n_cols) or k in section_rows:
             break
         if not _is_header_like_row(merged[k]):
             break

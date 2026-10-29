@@ -43,7 +43,15 @@ rasterized pages by two models) and from defects reported by downstream consumer
   read as a header row** (10.1177/0956797615601103 Table 1, p4).
 - **A row label wrapped before its `×` joins its row** (10.1177/0956797615612694 Table 1, p5).
 - **A value-less lowercase sub-heading is no longer glued onto the row above it**
-  (10.1098/rsos.250908 Table 15: `monogamy liberal change` -> `monogamy`).
+  (10.1098/rsos.250908 Table 15: `monogamy liberal change` -> `monogamy`); a single wrapped word
+  still joins its label (Table 14: `ethnic` / `minorities` -> `ethnic minorities`).
+- **A section line printed under the column header is not folded into a header cell** when the
+  same column prints another section line further down (10.1037/a0012616 Table 4: `Posttreatment`
+  / `Follow-up`). Every record of both blocks had carried the first one in `fields["group"]`, so
+  follow-up means were labelled post-treatment. Such a line now stays its own row (also
+  10.1177/0956797615612694 Table 1; 10.5334/irsp.945 Table 3). A line counts only when it reads
+  like a short title, sits in a column of values directly under a data row, and continues no
+  cell above it; wrapped label words, footnote lines and row-spanning labels are left as they were.
 - **A grid that starts with its own caption lines, label or running head hands them back to the
   caption**, so the html header is the column row (e.g. 10.1016/j.jesp.2021.104154 Table 3).
 - **A table with no numbers no longer takes its first data rows into the header**

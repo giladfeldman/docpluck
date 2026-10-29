@@ -93,3 +93,38 @@ def test_enumerated_labels_are_not_lowercase_labels():
     assert [r[0] for r in out][1:] == [
         "a. Virgin rat", "b. Hurricane seeding", "c. Gosling imprinting", "d. Y-test",
     ]
+
+
+def test_single_word_wrap_in_a_lowercase_table_still_joins():
+    # 10.1098/rsos.250908 Table 14 (p17, printed sideways, rasterized
+    # 2026-10-28): "ethnic" / "minorities" and "romantic" / "partner" are one
+    # label each on two lines. A sub-heading of that table family is a phrase
+    # ("liberal change"); a lone lowercase word under a data row is a wrap.
+    rows = [
+        ["item", "M (s.d.)", "t", "p"],
+        ["terrorism", "80.4 (29.7)", "53.9", "< 0.001"],
+        ["ethnic", "82.8 (26.5)", "63.0", "< 0.001"],
+        ["minorities", "", "", ""],
+        ["businessman", "79.9 (29.1)", "54.5", "< .001"],
+        ["romantic", "79.9 (27.2)", "58.4", "< .001"],
+        ["partner", "", "", ""],
+        ["police officer", "79.7 (31.2)", "50.8", "< .001"],
+    ]
+    out = _merge_continuation_rows([r[:] for r in rows])
+    assert [r[0] for r in out] == [
+        "item", "terrorism", "ethnic minorities", "businessman",
+        "romantic partner", "police officer",
+    ]
+
+
+def test_rsos_250908_wrapped_labels_keep_both_words():
+    from docpluck.extract_structured import extract_pdf_structured
+    from docpluck.tables.flatten import flatten_table
+    from docpluck.testing.corpus import custody_path
+
+    p = custody_path("fulltext", "10.1098__rsos.250908.pdf")
+    tables = extract_pdf_structured(p.read_bytes())["tables"]
+    labels = {r["row_label"] for t in tables for r in flatten_table(t)}
+    assert "ethnic minorities" in labels
+    assert "romantic partner" in labels
+    assert "ethnic" not in labels and "romantic" not in labels
