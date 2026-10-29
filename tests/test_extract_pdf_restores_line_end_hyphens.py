@@ -81,3 +81,48 @@ def test_extract_pdf_restores_a_doi_hyphen_at_a_line_end():
     text, _ = extract_pdf(p.read_bytes())
     assert "10.3233/NHA-170036" in text
     assert "10.3233/NHA170036" not in text
+
+
+class _Done:
+    def __init__(self, returncode: int, stdout: str):
+        self.returncode, self.stdout = returncode, stdout
+
+
+_BBOX = (
+    '<doc>\n<page width="612" height="792">\n'
+    '<word xMin="1" yMin="1" xMax="2" yMax="2">Self-</word>\n'
+    '<word xMin="1" yMin="3" xMax="2" yMax="4">Compassion</word>\n'
+    "</page>\n</doc>\n"
+)
+
+
+@pytest.mark.parametrize("outcome", ["timeout", "returncode", "no_pages"])
+def test_a_failed_words_pass_is_recorded_and_keeps_the_text(monkeypatch, outcome):
+    import subprocess
+
+    from docpluck import extract
+    from docpluck.telemetry import fallback_scope
+
+    def fake_run(*args, **kwargs):
+        if outcome == "timeout":
+            raise subprocess.TimeoutExpired(cmd="pdftotext", timeout=1)
+        if outcome == "returncode":
+            return _Done(1, "")
+        return _Done(0, "<doc>\n</doc>\n")
+
+    monkeypatch.setattr(extract.subprocess, "run", fake_run)
+    text = "a SelfCompassion scale"
+    with fallback_scope() as fb:
+        out = extract._restore_line_end_hyphens(text, "unused.pdf", 5)
+    assert out == text
+    assert fb.counters.get("line_end_hyphen_words_unavailable") == 1
+
+
+def test_a_healthy_words_pass_records_no_fallback(monkeypatch):
+    from docpluck import extract
+    from docpluck.telemetry import fallback_scope
+
+    monkeypatch.setattr(extract.subprocess, "run", lambda *a, **k: _Done(0, _BBOX))
+    with fallback_scope() as fb:
+        extract._restore_line_end_hyphens("a SelfCompassion scale", "unused.pdf", 5)
+    assert "line_end_hyphen_words_unavailable" not in fb.counters

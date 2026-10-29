@@ -1277,6 +1277,16 @@ def _header_row_count(merged: list[list[str]], n_cols: int) -> int:
     for k in range(1, min(3, len(merged))):
         if _is_group_separator(merged[k], n_cols) or k in section_rows:
             break
+        # A row label printed alone directly above a data row opens a body
+        # block ("Continued smoking" over "Baseline 4.31 (3.67)",
+        # 10.1001/jamanetworkopen.2023.16111 Table 2); its twin further down
+        # is a body row too.
+        if (not text_only and (merged[k][0] or "").strip()
+                and not any((c or "").strip() for c in merged[k][1:])
+                and k + 1 < len(merged)
+                and any(_is_data_value_cell((c or "").strip())
+                        for c in merged[k + 1][1:])):
+            break
         if not _is_header_like_row(merged[k]):
             break
         if text_only and all((c or "").strip() for c in merged[k - 1][:n_cols]) \

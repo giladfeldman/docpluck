@@ -176,14 +176,8 @@ def test_amj_1_figure_captions_no_chart_data_leak():
                 f"{label} caption still contains {forbidden!r}: {cap!r}"
             )
 
-@pytest.mark.xfail(
-    reason="pdftotext glyph collapse: chart-embedded text for Figure 7 "
-    "renders 'Meta-Processes' (AI-gold truth) as 'MetaProcesses' (hyphen "
-    "lost at the pdftotext layer). Queued cycle 15g (G1 — pdftotext glyph "
-    "collapse). The library output is also free of chart-data leak, which "
-    "is what this test family asserts.",
-    strict=False,
-)
+# Was xfail (pdftotext dropped the line-end hyphen of "Meta-Processes"); the
+# line-end hyphen repair in extract_pdf (2.4.156) restores it.
 def test_amj_1_figure_7_meta_processes_preserved():
     """Figure 7's caption should preserve ``Meta-Processes`` per AI-gold.
 
