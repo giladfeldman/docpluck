@@ -7272,6 +7272,99 @@ def _value_followed_fraction(
     return hits / len(positions)
 
 
+def _shared_follower(
+    lines: list[str], positions: list[int], stripped: set[str] = frozenset()
+) -> tuple[str, float]:
+    """How often a repeated line is followed by the SAME continuation.
+
+    A wrapped caption printed under several figures repeats as a BLOCK: its
+    first line and its continuation repeat together. A running header does not:
+    the next line is whatever body text the page holds. If the strip took the
+    first line and left the continuation, every copy after the first would
+    open mid-sentence with its subject deleted.
+
+    Measured 2026-10-28 on `ieee_access_2` (10 IEEE corpus PDFs; the caption of
+    its Figures 6-29): `RRMSE percentage across parameter ranges of [0, 1] for
+    each respective parameter with γ` occurs 24 times on 24 pages, at most once
+    per page, so the once-per-page arm took 23 copies and 23 captions began
+    `the y-axis of each subfigure, β the x-axis ...`. The continuation opens
+    with the same words in 24 of 24 copies; its TAIL differs between copies,
+    because earlier steps rewrap it, which is why the key is the opening
+    characters and not the whole line.
+
+    Followers that are themselves in ``stripped`` cast no vote: a two-line
+    running header goes as a pair, and PMC's `Author Manuscript` overlay
+    sitting under a header is furniture under furniture.
+
+    Same skipping as :func:`_value_followed_fraction`: blank lines and a bare
+    page break are passed over, and the first line with content decides.
+    Returns ``(key, share)``; ``("", 0.0)`` when nothing votes.
+    """
+    if not positions:
+        return "", 0.0
+    followers: collections.Counter[str] = collections.Counter()
+    for i in positions:
+        for j in range(i + 1, min(i + 3, len(lines))):
+            nxt = lines[j].strip().strip(PAGE_BREAK).strip()
+            if not nxt:
+                continue
+            if nxt not in stripped:
+                followers[nxt[:_FOLLOWER_KEY_CHARS]] += 1
+            break
+    if not followers:
+        return "", 0.0
+    key, n = followers.most_common(1)[0]
+    return key, n / len(positions)
+
+
+_FOLLOWER_WORD_RE = re.compile(r"[^\W\d_]{2,}")
+_FOLLOWER_URL_RE = re.compile(r"(?i)^\s*(?:https?://|www\.|doi[:.\s])")
+
+
+def _is_prose_follower(key: str) -> bool:
+    """True when a follower's opening carries a word, so it can continue a passage.
+
+    Measured 2026-10-28 over the 125-PDF test corpus, on the lines guard (d)
+    refused to strip before this check existed: 12 papers.
+      CONTENT, 3 papers: the ieee_access_2 caption (follower `the y-axis of
+      each subfigure`, also 10.1109/access.2025.3645087); the row labels
+      `Race (reference: White)` -> `Black`, `Age (reference: 25-34 years)` ->
+      `35-44 years` and `Average weekly paid work hours` -> `Log weekly
+      earning` in 10.1177/23780231251314667, each the row label of five
+      separate tables (Tables 4, 5A, 5B, 5C and one on page 28).
+      FURNITURE, 9 papers: a second furniture line that a content guard had
+      spared. BMC's `https://doi.org/10.1186/...` under the running head (5),
+      Scientific Reports' `(2023) 13:23018 |` under `Vol:.(1234567890)` (3;
+      the year-in-parentheses guard spares it), and a lone `|` (1).
+    HELD-OUT CHECK, same day: 100 PDFs strided from the article repository,
+    none in the test corpus. Guard (d) fired in 2. One is content: the legend
+    entries `Unaggregated data` / `Aggregated data` under six figures of
+    10.1177/09567976211046884. One is furniture, kept: Science Advances'
+    footer `Squazzoni et al., Sci. Adv. 2021; 7 : eabd0299` over the date line
+    `6 January 2021` (10.1126/sciadv.abd0299), which is under 15 characters and
+    so never a strip candidate. Over both samples: 4 papers fired, 3 correct,
+    1 kept a footer in every copy (visible, reversible). Requiring a follower
+    of 15+ characters would drop that footer but delete the row labels
+    `Race (reference: White)` (follower `Black`) again, so it is not done.
+
+    In the fitting sample no furniture follower carried a word outside a URL and
+    every content follower carried at least one. That is an observation on
+    this corpus and a held-out sample, not a property of furniture: the check
+    was fitted to it. A URL or DOI line is treated as furniture whatever words
+    it spells.
+    """
+    if _FOLLOWER_URL_RE.match(key):
+        return False
+    return bool(_FOLLOWER_WORD_RE.search(key))
+
+
+#: Opening characters of a follower that must match for two copies of a
+#: repeated line to count as one repeated passage. 30 characters is about five
+#: words: long enough that body text after a running header does not collide by
+#: chance, short enough to survive a rewrap of the follower's tail.
+_FOLLOWER_KEY_CHARS = 30
+
+
 def _normalize_text(
     text: str,
     level: NormalizationLevel,
@@ -8273,6 +8366,42 @@ def _normalize_text(
             repeated.add(s)
             repeated_arm[s] = _arm
             repeated_pages[s] = tuple(sorted(set(pages)))
+    #   (d) A REPEATED BLOCK IS CONTENT, NOT FURNITURE (2026-10-28). If the
+    #       same line comes right after this one in at least 80% of its copies,
+    #       and the strip would leave that line in place, the two lines are one
+    #       repeated passage: a figure caption printed under each figure, say.
+    #       Taking the first line and leaving the rest deletes the caption's
+    #       subject from every copy but one. A two-line running header still
+    #       goes, because both of its lines are in `repeated`. See
+    #       `_shared_follower` for the measured case.
+    #       The check repeats until nothing changes. A three-line passage
+    #       A / B / C where A and B qualify and C does not: B is spared first,
+    #       because C follows it; A is then followed by a line that stays, so
+    #       it is spared on the next round. Judging once would keep B and
+    #       strip A, the orphaning this guard exists to stop (consult round
+    #       2026-10-28, Sonnet).
+    #       SCOPED TO THE ONCE-PER-PAGE ARM, the only one measured: the
+    #       watermark arm already requires several copies per page, and the
+    #       unpaginated fallback is kept verbatim (see its comment) so an
+    #       unmeasured channel does not change.
+    #       KNOWN COST, accepted: furniture whose second line is spared by a
+    #       content guard, or is too short to be a candidate, and
+    #       carries a word, is now kept in every copy. Measured: 1 of 225 PDFs
+    #       (10.1126/sciadv.abd0299's footer over `6 January 2021`); see
+    #       `_is_prose_follower`. That is the visible, reversible direction.
+    _changed = True
+    while _changed:
+        _changed = False
+        for s in sorted(repeated):
+            if repeated_arm.get(s) != "once_per_page":
+                continue
+            _follower, _share = _shared_follower(lines, line_positions[s], repeated)
+            if _follower and _share >= 0.80 and _is_prose_follower(_follower):
+                repeated.discard(s)
+                repeated_arm.pop(s, None)
+                repeated_pages.pop(s, None)
+                record_fallback("repeated_line_kept_continued_block", detail=s[:120])
+                _changed = True
     if repeated:
         # RULE 0g. This deletes lines and, until 2026-08-22, did so with no
         # count, no `changes_made` key and no log line -- an inline list
