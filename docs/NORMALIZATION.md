@@ -202,6 +202,10 @@ Before: "The results showed\nthat participants in the treatment\ncondition perfo
 After:  "The results showed that participants in the treatment condition performed better"
 ```
 
+**S8m — significance mark rejoined to its legend (v2.4.157).** A line holding only 1-4 of `*`, `†`, `‡`
+directly above a line that opens `p < .05` (or `>`, `=`, `≤`, `≥`) is joined to it: `*` / `p < .05` ->
+`*p < .05`. Recorded as `significance_marks_rejoined`.
+
 ---
 
 ### S9 — Header/footer removal
@@ -488,7 +492,7 @@ consumers, not bookkeeping:
 | W0j sig. A | `2`-for-minus in a contrast-coding note | INFERENTIAL, self-corroborating | the `+ X.X = <word>` twin on the same line is a second emitted token |
 | **W0j sig. B** | `Mchange = 20.14` | **INFERENTIAL** | keys on the variable NAME. `20.14` is not impossible in that slot, only implausible. Records `w0j_mstat_sign_inferred_from_variable_name` on every firing |
 | W0m | `β` extracted as `b`, proven by the layout font | **TYPOGRAPHIC** | the coefficient value is part of the identity |
-| W0p | a superscript footnote marker fused into a number (`2,5801`) | **TYPOGRAPHIC** | font size + baseline. Emits caret notation (`2,580^1`) — lossless, never deletion |
+| W0p | a superscript marker fused into a number (`2,5801`) or after a word (`emotions,1`), or a raised exponent with its sign (`10-14`) | **TYPOGRAPHIC** | font size + baseline. Emits caret notation (`2,580^1`, `10^-14`) — lossless, never deletion. Since v2.4.157 a site must be a whole token on the page the glyphs were seen on; a token printed on that page more often than the layout shows raised copies is left unmarked (`w0p_ambiguous_positional_pairing`) |
 | **W0q** | a CI upper bound whose minus is DETACHED (`[-0.58,  -  0.18]`) | **TYPOGRAPHIC** | new in v2.4.134 |
 | **W0s** | `=` / minus drawn by an operator-only font whose map says `5` / `2` (`t 5 20.63`) | **TYPOGRAPHIC, two origins** | declared font repertoire AND the rasterized glyph (a bar); both must agree, per word. New in v2.4.147; step key `W0s_operator_glyph_layout` |
 | **W0t** | a compound hyphen pdftotext dehyphenated away at a line end (`Well-` / `Being` -> `WellBeing`) | **TYPOGRAPHIC** (layout word counts) | new in v1.9.73 / v2.4.153; layout-gated; step key `W0t_semantic_hyphen_layout`. Restores `A-B` only when the paper prints `A-B` inline, no layout word holds `AB` in a hyphen-free stretch, and the layout has at least as many `A-` line-end fragments as the text has glued sites of every restored compound starting `A`; never inside a URL or DOI. A paper that prints the word glued even once keeps every glued copy |
@@ -549,6 +553,7 @@ S6u URL / DOI broken across a line rejoined without a space (v2.4.156; refuses a
     comma, a list number, a second URL, a bare number under a web URL, and prose)
 S7  Hyphenation repair
 S8  Mid-sentence line break joining
+S8m Significance mark rejoined to its legend line (v2.4.157)
 A1  Statistical line break repair  ← before S9 (prevents page number stripping)
 S9  Header/footer removal
     (limit consecutive newlines to 2)

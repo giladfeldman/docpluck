@@ -1,5 +1,128 @@
 # Changelog
 
+## [2.4.157] - 2026-10-31 - normalization 1.9.80 - table extraction 2.4.28 - render 1.0.4 - sectioning 1.2.9
+
+Fixes from the 2026-10-28 debt bundle and from the canary audit of 10.1177/01461672251327169
+(13 findings, all present before this release, all addressed here). Changes were measured with a
+two-arm render diff over the 28-paper baseline and a 100-paper sample, and changed tables and
+removed lines were read against the page images by a second model.
+
+### Tables
+
+- **A table found only by its caption takes its width and depth from its own rules.** [REPAIR, ours: the page prints it, extraction lost it]
+  When no grid is located under a caption, the region was the caption's width, so columns to the
+  right of a short caption were dropped and the grid shipped as complete (10.1080/02699931.2024.2434156
+  Table 8 kept 6 of 10 columns). The region now runs to the end of the rule drawn under the caption and
+  down to the table's closing rule, when at least three rules of that width are found with no other
+  caption between them, or two rules with the table's `Note.`/`Source` opening directly under the last.
+  Rules drawn as lines, thin rectangles or curves, and as touching per-column segments, all count. When
+  the caption's rule family is not found, the first narrower rule at the caption's left edge is tried.
+- **A whitespace-detected region that stops above the table's closing rule is extended to it.**
+  [REPAIR, ours] A table printed in two panels under one caption lost its second panel
+  (10.1177/01461672251327169 Table 2: hypotheses 2c-5 missing).
+- **Inside a region bounded by its own rules, worded rows are not trimmed as prose.** [REPAIR, ours]
+  A deviations or design table of sentence-like cells lost every row from its fourth on
+  (10.1177/01461672251327169 Table 5: 11 of 52 rows kept).
+- **Two text lines printed side by side in one cell keep page order and a space.** [REPAIR, ours]
+  Where Camelot finds fewer columns than the page prints, two lines on one baseline land in one cell;
+  they were appended in the wrong order with no separator ("...negative emotional eventsIV1: estimation
+  of positive..."). Only Camelot's own text lines are read, and a cell is rewritten only when its text is
+  exactly those lines, and only in a table already accepted: which grids pass the table gates is decided
+  on the text as read, as before. Recorded as `camelot_cell_side_by_side_lines`. The cell still holds
+  both printed columns; splitting them is not done.
+- **Rows of a word table that wrap are joined** when no row of the table carries data, and a caption's
+  last sentence printed as the table's first row is recognised only when the caption ends with it.
+- **Column labels printed as stacks of short lines fold into one header row**
+  ("Actual / intensity / average" -> `Actual<br>intensity<br>average`, the same line breaks the
+  super-header fold writes, so `flatten` reads group headers as before). A fourth header row is read
+  only under stacked label lines (was 3 rows at most).
+  Nothing folds onto a row holding a data value, and a cell with an unclosed parenthesis ("Boys (N" |
+  "15)", a spanner split across columns) or a line with no letter or digit (a lost glyph) is never
+  folded.
+- **In a table whose labels open lowercase, a lowercase cell is not read as a wrapped line**
+  (10.1098/rsos.140072 Table 2: four rows had been joined into one).
+- A trailing-prose trim now records `camelot_prose_tail_rows_trimmed` when it removes rows.
+- New region key: `CandidateRegion.rule_bounded`.
+- **A row label that overflows into the next column returns to the stub.** [REPAIR, ours] In a
+  stream table a label wider than the stub column was assigned to the column it overlapped most by
+  fraction, leaving the stub empty and the label among the values (10.1177/01461672251327169 Table 6).
+  The label moves back only when it is a word, starts in the stub, overlaps the stub more than its
+  own column, ends within half the next column, is the whole cell, its row holds another value and an
+  empty stub, it is the only such line in its row, and the table's other rows are mostly labelled.
+  Applied after the table gates, kept only if the table's shape is unchanged. Recorded as
+  `camelot_row_label_returned_to_stub`.
+- **A long panel label above a short column label is not folded into it.** [REPAIR, ours] A header
+  line of 25+ characters filling only the first column, over a stub label a third its length or
+  less, stays its own header row (10.1177/01461672251327169 Table 2); a wrapped stub label such as
+  `Response latency` / `ms` still folds.
+- **A lowercase row under finished one-word cells stays its own row** in a table of words; a
+  labelled row joins the row above only when a cell above it visibly breaks off, or when it leaves
+  empty a column its row fills (a wrapped line carries only the cells that wrapped:
+  10.1177/00031224241253268 Table 1 "Individual-level" / "analysis").
+- The caption-only rule fallback takes only rules narrower than the caption's rule family, and a
+  caption line also matches `FIG.`, `Exhibit`, `Box` and `Supplementary Table/Figure` as a boundary.
+
+### Normalization
+
+- **W0p marks a superscript only on its own page and as a whole token.** [REPAIR, ours] The fused
+  form was replaced at its first occurrence anywhere in the text, which rewrote `10–30 years` on
+  another page to `10^-30` and produced `SD = 12.^10`, `14.^6`, `160^0`, `20^11`. Those are gone.
+  When the same token appears on a page more times than the layout shows raised copies of it, none
+  is marked (recorded as `w0p_ambiguous_positional_pairing`). The footnote appendix that F0 places
+  after the last page no longer shifts page alignment.
+- **A raised minus is part of the exponent:** `p < 10-14` -> `p < 10^-14`, `5.81 × 10-48` ->
+  `5.81 × 10^-48`, when the layout proves the sign and digits are smaller and raised.
+- **A footnote mark raised after a word is marked:** `emotions,1` -> `emotions,^1`, when the layout
+  shows 1-3 digits smaller and raised against the word's own letters.
+- **The reference page-number scrub keeps a digit printed inline between words**
+  ("Registered report stage 1 manuscript template" lost its "1").
+- **A significance mark split from its legend is rejoined** (new step S8m): a line of only `*`, `†`
+  or `‡` marks followed by `p < .05` is joined back to it (`*` / `p < .05` -> `*p < .05`). Recorded
+  as `significance_marks_rejoined`.
+
+### Render
+
+- **A table's text-channel copy in the body is replaced by a marker.** [notation: duplicate removed,
+  labelled] pdftotext linearizes a table into the body while the render also places it as a
+  structured `### Table N` block, so each cell appeared twice. A run of body lines is replaced by a
+  `<!-- table-text-duplicate: ... -->` marker only when every line is found in one table and the run
+  is proven a copy (4+ lines, and 3+ long lines found verbatim or 5+ specific numbers). A
+  sentence-shaped line is matched only against a structured grid's cells (a cell wrapped over several
+  grid rows counts as one), never a flat-list fallback or caption, and nothing after a table's `Note.`
+  counts as the table's text. Recorded as `render_grid_copied_line_block_suppressed`.
+- **A table's note left in the body next to its copy moves into the table's block** (a `Note.` /
+  `Source.` paragraph, or footnotes printed as a lone mark over their text), unless the block already
+  shows it. A marker left mid-sentence moves to the end of that paragraph.
+- **Headings set in the paper's heading style are promoted.** Plain lines in the font and size that 3+
+  existing headings use, flush with the column margin, 12 words or fewer, become headings
+  (10.1177/01461672251327169 "Data Analysis Strategy", "Replication Measures", "Extension Measures").
+  The line must look like a heading: it opens with a capital or a section number, holds a 3-letter
+  word, is not a figure or table label, does not end in `.,;:` or an open word ("and", "of"), has
+  balanced parentheses, and the line under it does not carry on its sentence. A heading wrapped over
+  two or three lines (each printed flush with, or centred under, the one above in the same style)
+  becomes one heading, including when the first line was already a heading; two headings in a row
+  at different levels stay two. A heading that runs in to its
+  paragraph (the line under it opens in the heading style) is not promoted.
+- **Body lines are never marked as a copy of a grid the render later removes as a phantom table**
+  (10.1098/rsos.241348), so no text is replaced by a marker pointing at a table that is not shipped.
+- **A caret footnote mark (`^1`) in a table's title line no longer stops the title being matched.**
+- Straight and curly quotes are folded when a body caption is matched against its table's caption.
+- **A heading set smaller than the section headings around it is promoted one level lower**
+  (`####`), when its own font and size are not already used by a heading and a `###` heading of the
+  same font is no more than 1.35x larger (10.1177/01461672251327169 "Replication/Extension Measures").
+- A body line is never marked as a table copy on numbers alone when its comparison signs (`<`, `>`,
+  `=`) do not appear in the table, and a table whose closing tag shares its opening line is read
+  correctly.
+
+### Known, not fixed here (logged)
+
+- 10.1177/01461672251327169 Table 4: the top block prints three columns over a two-column body; the
+  two right-hand columns share one cell (now in page order, separated).
+- 10.1177/01461672231191356 Table 6 keeps 2 of 7 correlation columns (pre-existing).
+- 10.1177/01461672251327169 Table 4: the nested side-by-side lists are not separated into columns.
+- Body prose repeated verbatim in a table's cells can be replaced by the duplicate marker; telling a
+  table copy from a deliberate repetition needs position, not content.
+
 ## [2.4.156] - 2026-10-29 - normalization 1.9.79 - table extraction 2.4.27 - sectioning 1.2.9
 
 Fixes from a check of 10 psychology papers docpluck had never processed (each read against the
