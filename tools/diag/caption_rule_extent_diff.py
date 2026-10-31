@@ -14,6 +14,9 @@ status and the count of numeric tokens the table carries (cells, or raw_text whe
 has no cells) -- a numeric token present in B and absent in A is content the change lost.
 
 A SCREEN, NOT AN ORACLE: a changed table still has to be read against its page raster.
+The numeric count scores content LOST only; content the wider region GAINED (prose or a
+neighbouring table pulled in) and a different cell assignment show only as a changed
+shape, so read every changed table, not just those with lost numbers.
 
 Usage:  python tools/diag/caption_rule_extent_diff.py [--limit N | --sample N] [--workers N]
 """
@@ -64,7 +67,9 @@ def _run(item: tuple[str, str]) -> tuple[str, list[str], list[str]]:
 
     def hooked(page_obj, caption_bbox, *, band_bottom):
         r = orig(page_obj, caption_bbox, band_bottom=band_bottom)
-        if r is not None and r[0] > caption_bbox[2] + 0.5:
+        # Any extent can change the region: wider, deeper (a narrower rule
+        # family under a whitespace region), or rule_bounded alone.
+        if r is not None:
             cap = cur.get("cap")
             fired.append((cap.page if cap else -1, cap.label if cap else "?"))
         return r
@@ -117,6 +122,7 @@ def main() -> int:
     ap.add_argument("--sample", type=int, default=None,
                     help="a seeded sample of the shared repository instead of the baseline")
     args = ap.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8")  # page text holds ligatures (U+FB03)
     corpus = sampled_corpus(args.sample) if args.sample else baseline_corpus(args.limit)
     print(coverage_line())
     n_fired = n_lost = 0

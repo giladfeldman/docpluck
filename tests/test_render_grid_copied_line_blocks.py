@@ -216,3 +216,40 @@ def test_a_grid_the_render_later_strips_does_not_count():
     out = _suppress_grid_copied_line_blocks(md)
     assert "table-text-duplicate" not in out
     assert all(line in out[:out.index("### Table")] for line in COPY)
+
+
+_P_ROWS = [("p < .01", "a"), ("p < .02", "b"), ("p < .03", "c"), ("p < .04", "d"), ("p < .05", "and")]
+
+
+def _p_table(one_line=False):
+    rows = "".join(f"<tr><td>{a}</td><td>{b}</td></tr>" for a, b in _P_ROWS).replace("<", "&lt;").replace(
+        "&lt;tr>", "<tr>").replace("&lt;/tr>", "</tr>").replace("&lt;td>", "<td>").replace("&lt;/td>", "</td>")
+    sep = "" if one_line else "\n"
+    return f"### Table 1\n\n<table>{sep}{rows}{sep}</table>\n"
+
+
+def test_a_line_whose_operators_are_not_in_the_table_is_kept():
+    """Consult 2026-10-31 (Sol, reproduced): "p > .01" .. "p > .04 and p > .05"
+    vanished behind a duplicate marker for a table printing "p < .01" .. "p <
+    .05": the numbers and words matched and the operators were not compared."""
+    body = ["p > .01", "p > .02", "p > .03", "p > .04 and p > .05"]
+    doc = "## Results\n\n" + "\n".join(body) + "\n\n" + _p_table()
+    out = _suppress_grid_copied_line_blocks(doc)
+    assert "table-text-duplicate" not in out
+    for line in body:
+        assert line in out
+
+
+def test_text_after_a_one_line_table_is_still_judged():
+    """Consult 2026-10-31 (Sonnet): a table emitted on one line never closed the
+    table state, so every line after it was treated as table markup."""
+    doc = ("## Results\n\n" + _p_table(one_line=True) + "\n## Discussion\n\n" + "\n".join(COPY)
+           + "\n\n## Tables\n\n" + _table_block())
+    out = _suppress_grid_copied_line_blocks(doc)
+    assert "table-text-duplicate: 4 lines of Table 5" in out
+
+
+def test_a_copy_with_the_tables_own_operators_is_still_a_copy():
+    body = ["p < .01", "p < .02", "p < .03", "p < .04 and p < .05"]
+    out = _suppress_grid_copied_line_blocks("## Results\n\n" + "\n".join(body) + "\n\n" + _p_table())
+    assert "table-text-duplicate" in out

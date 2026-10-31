@@ -125,3 +125,14 @@ def test_an_already_folded_paragraph_is_not_split_back():
             ["or a subgroup analysis", "Test statistic"]]
     out = _fold_super_header_rows(rows)
     assert len(out) == 1 and out[0][0].endswith("or a subgroup analysis"), out
+
+
+def test_a_wrapped_stub_label_with_its_unit_still_folds():
+    """Consult 2026-10-31 (Sol, reproduced): "Response latency" over "ms" is
+    one printed stub label; the panel-label rule kept it as two header rows.
+    Every confirmed panel label or stray line in the 128-paper sample was 35+
+    characters, so the rule needs 25."""
+    from docpluck.tables.cell_cleaning import _fold_super_header_rows
+
+    assert _fold_super_header_rows([["Response latency", ""], ["ms", "Mean"]]) == [
+        [f"Response latency{BR}ms", "Mean"]]

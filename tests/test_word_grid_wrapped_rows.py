@@ -87,3 +87,33 @@ def test_a_table_set_in_lowercase_keeps_its_rows():
     ]
     out = _merge(rows)
     assert [r[0] for r in out] == [r[0] for r in rows]
+
+
+def test_a_lowercase_row_under_finished_cells_stays_its_own_row():
+    """Consult 2026-10-31 (Sol): capitalisation alone joined four distinct rows
+    into three ("Apple orange" | "Fruit / citrus"). A labelled row joins only
+    when a cell above it visibly breaks off."""
+    rows = [
+        ["Name", "Kind"],
+        ["Apple", "Fruit"],
+        ["orange", "citrus"],
+        ["Banana", "Fruit"],
+        ["Cherry", "Fruit"],
+    ]
+    assert [r[0] for r in _merge(rows)] == [r[0] for r in rows]
+
+
+def test_a_sparse_lowercase_line_under_one_word_cells_joins_its_row():
+    """10.1177/00031224241253268 Table 1 (p11): "Individual-level" / "analysis"
+    and "Lynching" / "participation" are cells wrapped over two lines. The
+    wrapped line fills only some of the columns its row fills, which a row of
+    its own (the Apple / orange case above) does not."""
+    out = _merge([
+        ["Type of Analysis", "Independent Variable", "Dependent Variable", "Level of Analysis", "Geographic Scope"],
+        ["Individual-level", "Names known", "Lynching", "Individual", "Mexico City"],
+        ["analysis", "", "participation", "", ""],
+        ["Analysis of mechanisms", "Names known", "Solidarity, peer pressure", "Individual", "Mexico City"],
+    ])
+    assert out[1][0] == "Individual-level analysis"
+    assert out[1][2] == "Lynching / participation"
+    assert len(out) == 3

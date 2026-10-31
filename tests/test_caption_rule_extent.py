@@ -159,3 +159,28 @@ def test_a_ruled_comparison_table_keeps_its_four_columns():
     text = " ".join(c["text"] for c in t3["cells"])
     assert "disclosenot" not in text
     assert "We conducted the study using Qualtrics" not in text
+
+
+def test_the_fallback_family_is_narrower_than_the_separator():
+    """Consult 2026-10-31 (Sonnet): the fallback for a separator wider than the
+    table (10.1177/01461672251327169 p4) admitted ANY other width, so a wider
+    frame or page-wide rule under the caption could become the table's right
+    edge. Only a narrower family is the table's."""
+    wider = [_curve(48.0, 560.0, y) for y in (80.0, 120.0, 200.0)]
+    page = _page(curves=[_curve(48.0, 487.8, 61.8), *wider])
+    assert _caption_rule_extent(page, CAPTION, band_bottom=310.8) is None
+    narrower = [_curve(48.0, 420.0, y) for y in (80.0, 120.0, 200.0)]
+    page = _page(curves=[_curve(48.0, 487.8, 61.8), *narrower])
+    assert _caption_rule_extent(page, CAPTION, band_bottom=310.8) == (420.0, 201.5)
+
+
+def test_other_caption_labels_stop_the_walk_too():
+    """Consult 2026-10-31 (Sonnet): "FIG. 3", "Exhibit 2", "Box 1" and
+    "Supplementary Table 2" captions did not stop the walk, so the next
+    object's rules were taken as this table's."""
+    for first, second in (("FIG.", "3"), ("Exhibit", "2"), ("Box", "1"), ("Supplementary", "Table")):
+        page = _page(
+            curves=[_curve(48.0, 487.8, y) for y in (61.8, 74.0, 221.0, 282.0, 306.0)],
+            words=[_word(first, 48.0, 272.0), _word(second, 80.0, 272.0)],
+        )
+        assert _caption_rule_extent(page, CAPTION, band_bottom=310.8) == (487.8, 222.5), first

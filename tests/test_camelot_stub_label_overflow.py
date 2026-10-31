@@ -122,3 +122,26 @@ def test_a_note_line_running_across_the_table_stays():
     ct.df.iloc[1, 1] = note
     ct.textlines[2] = _tl(66.04, 268.0, 293.0, 301.0, note)
     assert return_overflowing_stub_labels(ct) == 0
+
+
+def test_a_value_with_an_exponent_letter_stays():
+    """Consult 2026-10-31 (Sol, reproduced): "1.23e-12", right-aligned and
+    overflowing left into an empty stub, passed "has a letter" on its "e" and
+    moved into the stub. A row label has a word of two or more letters."""
+    ct = _table6()
+    ct.df.iloc[1, 1] = "1.23e-12"
+    ct.textlines[2] = _tl(66.04, 195.9, 293.0, 301.0, "1.23e-12")
+    assert return_overflowing_stub_labels(ct) == 0
+
+
+def test_two_candidates_in_one_row_move_neither():
+    """Consult 2026-10-31 (Sonnet): two lines of one row both qualifying would
+    each be written into the stub, the second over the first."""
+    ct = _table6()
+    ct.df.iloc[1, 2] = "Second label"
+    ct.textlines.append(_tl(66.5, 200.0, 293.0, 301.0, "Second label"))
+    extra = pd.DataFrame([[f"Row {k}", "1", "2", "3"] for k in range(4)])
+    ct.df = pd.concat([ct.df, extra], ignore_index=True)
+    before = list(ct.df.iloc[1])
+    return_overflowing_stub_labels(ct)
+    assert list(ct.df.iloc[1]) == before

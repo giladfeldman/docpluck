@@ -229,7 +229,11 @@ def _joined_horizontal_strokes(page_obj) -> list[dict]:
     return out
 
 
-_CAPTION_LINE_RE = re.compile(r"^(?:Table|TABLE|Figure|FIGURE|Fig\.)\s*[A-Z]?\d")
+# Any object's caption line stops the rule walk ("FIG. 3", "Exhibit 2", "Box 1",
+# "Supplementary Table 2" too; consult 2026-10-31).
+_CAPTION_LINE_RE = re.compile(
+    r"^(?:(?:Table|TABLE|Figure|FIGURE|Fig\.|FIG\.|Exhibit|EXHIBIT|Box|BOX)\s*[A-Z]?\d"
+    r"|(?:Supplementa(?:ry|l)|SUPPLEMENTA(?:RY|L))\s+(?:Table|TABLE|Figure|FIGURE|Fig\.))")
 
 
 def _caption_rule_extent(page_obj, caption_bbox: Bbox, *, band_bottom: float) -> tuple[float, float] | None:
@@ -269,7 +273,7 @@ def _caption_rule_extent(page_obj, caption_bbox: Bbox, *, band_bottom: float) ->
     below = sorted(
         (r for r in _joined_horizontal_strokes(page_obj)
          if abs(r["x0"] - cx0) <= _CAPTION_RULE_X0_TOL_PT
-         and abs(r["x1"] - x1) > _CAPTION_RULE_X0_TOL_PT
+         and r["x1"] < x1 - _CAPTION_RULE_X0_TOL_PT  # narrower (consult 2026-10-31)
          and cbottom - 1.0 <= r["top"] <= cbottom + _CAPTION_RULE_GAP_PT + _NEXT_RULE_FAMILY_PT),
         key=lambda r: r["top"],
     )

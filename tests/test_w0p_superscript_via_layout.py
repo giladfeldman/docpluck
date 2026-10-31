@@ -236,8 +236,38 @@ def test_unaligned_pages_touch_only_a_unique_token():
 def test_a_trailing_page_break_keeps_pages_aligned():
     """pdftotext ends its text with a form feed: one layout page, two segments."""
     layout = _FakeLayout(_run("10", 9.0, 50.0) + _run("5", 5.4, 49.0))
-    text = "BF10 > 105: and BF10 > 105.\f"
-    assert recover_superscript_via_layout(text, layout) == "BF10 > 10^5: and BF10 > 105.\f"
+    text = "BF10 > 105: strong.\f"
+    assert recover_superscript_via_layout(text, layout) == "BF10 > 10^5: strong.\f"
+
+
+def test_two_copies_on_a_page_and_one_raised_are_left_alone():
+    """Consult 2026-10-31 (Sol, reproduced): a page printing an ordinary `103`
+    and, later, `10` + raised `3` had the FIRST copy rewritten ("Count 10^3;
+    exponent 103"). The page bound says which page, not which copy; with more
+    copies than raised sites the text is left as printed."""
+    layout = _FakeLayout(_run("103", 10.0, 100.0) + _run("10", 10.0, 120.0)
+                         + _run("3", 7.0, 117.0))
+    text = "Count 103; exponent 103"
+    assert recover_superscript_via_layout(text, layout) == text
+
+
+def test_every_copy_raised_is_every_copy_marked():
+    layout = _FakeLayout(_run("10", 10.0, 100.0) + _run("3", 7.0, 97.0)
+                         + _run("10", 10.0, 120.0) + _run("3", 7.0, 117.0))
+    assert recover_superscript_via_layout("a 103 and b 103", layout) == "a 10^3 and b 10^3"
+
+
+def test_the_footnote_appendix_keeps_pages_aligned():
+    """Consult 2026-10-31 (Sonnet): F0 appends the page footnotes after a
+    newline, two form feeds and a newline, so the text had more pages than the
+    layout and every paper with footnotes lost the page bound. The appendix is
+    set aside for the pairing."""
+    layout = _FakeLayout(_run("x", 9.0, 10.0),
+                         _run("10", 9.0, 630.7) + _run("–3", 5.4, 629.6))
+    text = "the last 10–3 years\fin a 10–3 HCl\n\f\f\nA footnote."
+    assert recover_superscript_via_layout(text, layout) == (
+        "the last 10–3 years\fin a 10^-3 HCl\n\f\f\nA footnote."
+    )
 
 
 # ── a marker raised after a WORD (10.1177/01461672251327169 p1) ─────────

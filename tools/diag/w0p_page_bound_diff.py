@@ -6,9 +6,10 @@ raised sign (`10` + raised `–3` -> `10^-3`); (2) a site must be a whole token 
 page the glyphs were seen on (it used to be the first bare-substring hit anywhere).
 
 Per corpus paper: run ``normalize_text`` with the layout, capture W0p's INPUT text,
-then apply both the shipped rule (arm A) and the pre-change rule (arm B, reconstructed
-below: digit-only markers, first substring hit in the whole text) to that same input,
-and print every line that differs. A SCREEN: each differing site still has to be read
+then apply both the shipped rule (arm A) and the pre-change rule (arm B, the function
+as committed at ``_ARM_B_COMMIT``, loaded from git) to that same input, and print every
+line that differs (each line cut to 200 characters; a long line can hide a second site,
+so read the page, not only the printed excerpt). A SCREEN: each differing site still has to be read
 against its page.
 
 Usage:  python tools/diag/w0p_page_bound_diff.py [--limit N | --sample N] [--workers N]
@@ -27,16 +28,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tools.diag._corpus import baseline_corpus, coverage_line, sampled_corpus  # noqa: E402
 
 
-def _arm_b(text: str, layout) -> str:
-    """The rule as shipped before 2026-10-30."""
-    from docpluck.normalize import _W0P_SIGNS, _layout_superscript_fusions
+# The last commit before the 2026-10-30 change. Arm B is that commit's own
+# ``recover_superscript_via_layout`` loaded from git, not a reconstruction: a
+# reconstruction built on today's detector inherits today's new branches (word
+# markers, consult 2026-10-31) and reports them as "no change".
+_ARM_B_COMMIT = "11da59a"
+_ARM_B_FN = None
 
-    for _page, fused, repaired in _layout_superscript_fusions(layout):
-        if any(ch in fused for ch in _W0P_SIGNS):
-            continue  # sign-opened markers did not exist
-        if text.count(fused):
-            text = text.replace(fused, repaired, 1)
-    return text
+
+def _arm_b(text: str, layout) -> str:
+    """The rule as shipped at ``_ARM_B_COMMIT``."""
+    global _ARM_B_FN
+    if _ARM_B_FN is None:
+        import subprocess
+        import types
+        root = Path(__file__).resolve().parents[2]
+        src = subprocess.run(["git", "show", f"{_ARM_B_COMMIT}:docpluck/normalize.py"],
+                             cwd=root, capture_output=True, text=True, encoding="utf-8",
+                             check=True).stdout
+        mod = types.ModuleType("docpluck._normalize_arm_b")
+        mod.__package__ = "docpluck"
+        sys.modules[mod.__name__] = mod  # dataclasses look their module up here
+        exec(compile(src, f"normalize@{_ARM_B_COMMIT}", "exec"), mod.__dict__)
+        _ARM_B_FN = mod.recover_superscript_via_layout
+    return _ARM_B_FN(text, layout)
 
 
 def _run(item: tuple[str, str]) -> tuple[str, list[str]]:
@@ -87,6 +102,7 @@ def main() -> int:
     ap.add_argument("--sample", type=int, default=None)
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
+    sys.stdout.reconfigure(encoding="utf-8")  # page text holds ligatures (U+FB03)
     corpus = sampled_corpus(args.sample) if args.sample else baseline_corpus(args.limit)
     print(coverage_line())
     n = 0

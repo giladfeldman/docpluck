@@ -5460,7 +5460,7 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
         if s.startswith("<table"):
             in_html = True
         fixed[k] = in_struct or in_fence or in_html or s.startswith("<!--")
-        if s.startswith("</table>"):
+        if "</table>" in s:  # a table may be emitted on one line
             in_html = False
 
     def covered(line: str, label: str) -> str:
@@ -5483,10 +5483,12 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
             # Not a sentence and not one cell: cells of one row the text
             # channel printed on one line ("[-0.01, 0.16] [0.04, 0.20]") are
             # judged by their words and numbers, like a short line.
-        ln_nums, ln_words, _ = _grid_tokens(s)
+        ln_nums, ln_words, ln_syms = _grid_tokens(s)
         if not ln_nums and not ln_words:
             return "short" if s in hay else ""
-        if ln_words <= words and not (ln_nums - nums):
+        # The operators and marks must be the table's too: "p > .01" is not a
+        # copy of "p < .01" (consult 2026-10-31, Sol).
+        if ln_words <= words and not (ln_nums - nums) and all(c in hay for c in ln_syms):
             return "short"
         return ""
 
@@ -6238,7 +6240,10 @@ def _promote_layout_styled_headings(md: str, layout_doc) -> str:
     if not styled:
         return md
     from collections import Counter
-    body_style, _ = Counter(e[1] for e in styled if not e[1][0].startswith("~")).most_common(1)[0]
+    plain = Counter(e[1] for e in styled if not e[1][0].startswith("~")).most_common(1)
+    if not plain:  # every line mixes fonts: no body style to learn from
+        return md
+    body_style = plain[0][0]
     starts = Counter((pi, round(x0)) for pi, st, _k, x0, _t, _x1 in styled if st == body_style)
     margins = {k for k, n in starts.items() if n >= _MARGIN_MIN_LINES}
 

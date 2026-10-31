@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import re
 import threading
+from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -274,6 +275,9 @@ def _separate(ct, *, record: bool = True) -> int:
 # is added or dropped; the text moves left.
 
 STUB_LABEL_EVENT = "camelot_row_label_returned_to_stub"
+# A row label holds a word: two letters in a row ("1.23e-12" does not; consult
+# 2026-10-31, Sol).
+_LABEL_WORD_RE = re.compile(r"[^\W\d_]{2}")
 
 
 def return_overflowing_stub_labels(ct, *, record: bool = True) -> int:
@@ -322,7 +326,7 @@ def _return_stub_labels(ct, *, record: bool = True) -> int:
             # label (10.1037/a0025767 p12, p14).
             nxt = cols[ci + 1] if ci + 1 < len(cols) else (c1, c1)
             ends_near = tl.x1 <= c1 + (float(nxt[1]) - float(nxt[0])) / 2.0
-            if (_overlap(tl.x0, tl.x1, c0, c1) < in_stub and any(ch.isalpha() for ch in want)
+            if (_overlap(tl.x0, tl.x1, c0, c1) < in_stub and _LABEL_WORD_RE.search(want)
                     and any(others) and ends_near):
                 moves.append((ri, ci))
             break
@@ -332,6 +336,10 @@ def _return_stub_labels(ct, *, record: bool = True) -> int:
     # (10.1111/j.1558-5646.1994.tb01351.x p6), moving some of them broke the
     # grid's value / SE pairing.
     in_stub_rows = sum(1 for r in range(len(df)) if str(df.iloc[r, 0]).strip())
+    # Two candidates in one row would both be written into its one stub cell:
+    # such a row is left as read (consult 2026-10-31).
+    per_row = Counter(ri for ri, _ in moves)
+    moves = [(ri, ci) for ri, ci in moves if per_row[ri] == 1]
     if not moves or in_stub_rows < 2 * len(moves):
         return 0
     for ri, ci in moves:

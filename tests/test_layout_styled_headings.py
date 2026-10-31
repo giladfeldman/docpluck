@@ -246,3 +246,16 @@ def test_a_title_sized_level_3_line_does_not_demote_a_heading():
                               "Day 1: Exploration", "Body text under the heading goes on here.", ""])
     out = _promote_layout_styled_headings(md, layout).split("\n")
     assert "### Day 1: Exploration" in out, out[-6:]
+
+
+def test_a_layout_of_only_mixed_style_lines_does_not_crash():
+    """Consult 2026-10-31 (Sol, reproduced): with every line in mixed fonts the
+    body-style count was empty and ``most_common(1)[0]`` raised IndexError,
+    aborting the render. No body style means nothing to learn: unchanged."""
+    chars = []
+    for k, ch in enumerate("Mixedfontline"):
+        chars.append({"text": ch, "fontname": "ABCDEF+" + ("A" if k % 2 else "B"), "size": 10.0,
+                      "top": 50.0, "x0": 50.0 + 5 * k, "x1": 55.0 + 5 * k, "upright": True})
+    layout = SimpleNamespace(pages=[SimpleNamespace(chars=chars)])
+    md = "## Method\nBody"
+    assert _promote_layout_styled_headings(md, layout) == md

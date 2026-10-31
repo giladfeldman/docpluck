@@ -880,6 +880,16 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
                 return False
             if not lower and not _cell_looks_incomplete(p):
                 return False
+        # A labelled row also needs a cell above it that breaks off, or must
+        # leave empty a column its row fills (a wrapped line carries only the
+        # cells that wrapped: "Individual-level" / "analysis", "Lynching" /
+        # "participation", 10.1177/00031224241253268 Table 1). Lowercase under
+        # finished cells that fills every column its row fills ("Apple" |
+        # "Fruit" / "orange" | "citrus") is a row of its own (consult 2026-10-31).
+        if labelled and not any(_cell_looks_incomplete(parent[i]) for i, _ in nz):
+            filled = {i for i, c in enumerate(parent) if (c or "").strip()}
+            if filled <= {i for i, _ in nz}:
+                return False
         return True
 
     rows = _attach_detached_sign_rows(rows)
@@ -1623,16 +1633,18 @@ def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
         return [sub] + header_rows[2:]
     if len(populated_sup_idx) == n:
         return header_rows
-    # A line set only over the stub and at least three times as long as the
-    # stub label below it is a panel label or a stray line running across the
-    # table, not a stacked line of that label (one label's lines share its
-    # column's width). It stays its own header row (10.1177/01461672251327169
-    # Table 2: "Replication: prevalence estimations<br>No").
+    # A line set only over the stub, 25+ characters and at least three times
+    # as long as the stub label below it, is a panel label or a stray line
+    # running across the table, not a stacked line of that label (one label's
+    # lines share its column's width). It stays its own header row
+    # (10.1177/01461672251327169 Table 2: "Replication: prevalence
+    # estimations<br>No"). Every confirmed case in the 128-paper sample was 35+
+    # characters; "Response latency" / "ms" is one label and still folds.
     s0, b0 = (sup[0] or "").strip(), (sub[0] or "").strip()
     # Only a single printed line: a label already folded from several lines
     # (a note paragraph spread over header rows, 10.1037/a0025767 p13-14) is
     # not split back apart.
-    if (populated_sup_idx == [0] and b0 and len(s0) >= 15 and len(s0) >= 3 * len(b0)
+    if (populated_sup_idx == [0] and b0 and len(s0) >= 25 and len(s0) >= 3 * len(b0)
             and _MERGE_SEPARATOR not in s0
             and sum(1 for c in sub if (c or "").strip()) >= 2):
         return [header_rows[0]] + _fold_super_header_rows(header_rows[1:])

@@ -1298,6 +1298,10 @@ def _detect_running_heads(layout, *, position: str) -> set[str]:
     return out
 
 
+# F0's footnote appendix opens with this; text after it is not page text.
+_F0_APPENDIX_SEP = "\n\f\f\n"
+
+
 def _f0_strip_running_and_footnotes(
     raw_text: str, layout, table_regions: list[dict] | None = None,
 ) -> tuple[str, list[tuple[int, int]], list[str]]:
@@ -1529,7 +1533,7 @@ def _f0_strip_running_and_footnotes(
 
     body = "".join(out_parts)
     if footnote_chunks:
-        appendix = "\n\f\f\n" + "\n\n".join(footnote_chunks)
+        appendix = _F0_APPENDIX_SEP + "\n\n".join(footnote_chunks)
     else:
         appendix = ""
     return body + appendix, footnote_raw_spans, footnote_raw_texts
@@ -6465,13 +6469,27 @@ def recover_superscript_via_layout(text: str, layout) -> str:
     # is a WHOLE token (no digit after it, no digit or separator before it) on
     # the SAME page (the text's form feeds), and when the text's pages do not
     # line up with the layout's, only a token that occurs exactly once is touched.
+    # F0 appends the page footnotes after "\n\f\f\n"; set aside, they would
+    # leave the text with more pages than the layout and lose the page bound
+    # on every paper with footnotes (consult 2026-10-31).
+    appendix = ""
+    cut = text.find(_F0_APPENDIX_SEP)
+    if cut >= 0:
+        text, appendix = text[:cut], text[cut:]
     pages = text.split(PAGE_BREAK)
     n_layout = len(getattr(layout, "pages", ()) or ())
     # pdftotext ends the text with a page break, which leaves one empty segment.
     paged = len(pages) == n_layout or (
         len(pages) == n_layout + 1 and not pages[-1].strip()
     )
-    for page_index, fused, repaired in _layout_superscript_fusions(layout):
+    fusions = list(_layout_superscript_fusions(layout))
+    # Raised sites per (page, token) not yet applied: the page bound says which
+    # page, not which copy, so a page with more copies of the token than raised
+    # sites is left as printed (consult 2026-10-31: an ordinary "103" before
+    # "10" + raised "3" was the copy rewritten).
+    pending = collections.Counter((p, f) for p, f, _ in fusions)
+    for page_index, fused, repaired in fusions:
+        pending[(page_index, fused)] -= 1
         variants = [fused]
         if any(ch in fused for ch in _W0P_SIGNS):
             # The text channel may already carry the sign folded to another dash.
@@ -6489,19 +6507,18 @@ def recover_superscript_via_layout(text: str, layout) -> str:
             record_fallback("w0p_no_text_match_for_layout_evidence", detail=fused)
             continue
         if len(hits) > 1:
-            # Several copies of the token on the one page the glyphs were seen on:
-            # the first is taken (the repair is lossless -- `2,580^1` keeps both
-            # readings). Without page alignment there is no such bound, so the
-            # site is left alone.
-            record_fallback("w0p_ambiguous_positional_pairing", detail=f"{fused}x{len(hits)}")
-            if not paged:
+            # Several copies: taken only when every copy on the page is a raised
+            # site (this one plus those still pending); never without paging.
+            if not paged or len(hits) != 1 + pending[(page_index, fused)]:
+                record_fallback("w0p_ambiguous_positional_pairing",
+                                detail=f"{fused}x{len(hits)}")
                 continue
         m = hits[0]
         if paged:
             pages[page_index] = segment[:m.start()] + repaired + segment[m.end():]
         else:
             text = text[:m.start()] + repaired + text[m.end():]
-    return PAGE_BREAK.join(pages) if paged else text
+    return (PAGE_BREAK.join(pages) if paged else text) + appendix
 
 
 def recover_dropped_minus_via_layout(text: str, layout, _counter: list[int] | None = None) -> str:
