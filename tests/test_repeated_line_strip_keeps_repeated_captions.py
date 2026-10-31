@@ -118,6 +118,12 @@ def test_the_veto_cascades_through_a_three_line_block():
     out, report = _norm(_pages([a, b, c], 6))
     assert out.count(c) == 6, "fixture: guard (a) should spare line C"
     assert out.count(b) == 6
-    assert out.count(a) == 6, "B was kept but A, the line before it, was stripped"
     kept = report.fallback_details.get("repeated_line_kept_continued_block", {})
-    assert a in kept and b in kept
+    assert a in kept and b in kept, "RULE 0g kept B but not A, the line before it"
+    # Since 2.4.156 the running-title step (a later, separate step) removes A,
+    # which in this fixture is a journal name: a real running head. Only that
+    # step may take it; any other removal is the orphaning this test pins.
+    titled = report.fallback_details.get("running_title_stripped", {})
+    assert out.count(a) == 6 or titled.get(a) == 5, (
+        "A was removed by something other than the running-title step"
+    )

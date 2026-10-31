@@ -29,6 +29,7 @@ from __future__ import annotations
 import os
 import sys
 from collections import Counter
+from contextlib import contextmanager
 from contextvars import ContextVar
 
 from docpluck.resources import (
@@ -52,6 +53,25 @@ _FALLBACK_DETAILS: dict[str, Counter[str]] = {}
 # could observe half-done.
 _SINKS: ContextVar[tuple["fallback_scope", ...]] = ContextVar("_SINKS", default=())
 
+# True inside :func:`discarded_fallbacks`: a trial computation whose result may
+# be thrown away records nothing, so a kept result is never counted twice.
+_DISCARDED: ContextVar[bool] = ContextVar("_DISCARDED", default=False)
+
+
+@contextmanager
+def discarded_fallbacks():
+    """Record no fallback inside the block (this context only).
+
+    For a second, trial pass over input the first pass already recorded
+    (``camelot_extract``: a table re-converted with side-by-side cell lines
+    separated). The caller records what the trial changed, if it is kept.
+    """
+    token = _DISCARDED.set(True)
+    try:
+        yield
+    finally:
+        _DISCARDED.reset(token)
+
 
 def record_fallback(event: str, *, detail: str | None = None) -> None:
     """Record that a fallback path fired.
@@ -67,6 +87,8 @@ def record_fallback(event: str, *, detail: str | None = None) -> None:
     a real corruption arrived indistinguishable. Details are now counted per
     event and travel with it.
     """
+    if _DISCARDED.get():
+        return
     _FALLBACK_COUNTERS[event] += 1
     if detail:
         _FALLBACK_DETAILS.setdefault(event, Counter())[detail] += 1

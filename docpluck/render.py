@@ -27,6 +27,7 @@ to v2.3.0 — v2.2.0 uses Camelot for table cells.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -5199,6 +5200,379 @@ def _strip_running_header_lines_in_unstructured_table_fences(text: str) -> str:
     return cleaned
 
 
+# A text-channel line long enough that finding it VERBATIM inside a table's cell
+# text cannot be chance: a body sentence is not a substring of a grid by accident.
+_COPY_LONG_LINE_CHARS = 25
+_COPY_MIN_LONG_LINES = 3
+_COPY_MIN_SPECIFIC_NUMBERS = 5
+_COPY_MIN_LINES = 4
+_COPY_DASHES = str.maketrans({c: "-" for c in "‐‑‒–—−"})
+_COPY_QUOTES = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
+_COPY_SECTION_RE = re.compile(r"^#{2,3}\s")
+_COPY_LEADING_LABEL_RE = re.compile(r"^\*?table\s+\d+[.:]\s*", re.I)
+_COPY_NOTE_RE = re.compile(r"^notes?\s*[.:]", re.I)
+
+
+def _copy_is_sentence(line: str) -> bool:
+    """A line shaped like running prose: 8+ words, at least 70% lowercase."""
+    words = re.findall(r"[A-Za-z][A-Za-z'-]*", line)
+    return len(words) >= 8 and sum(w.islower() for w in words) >= 0.7 * len(words)
+
+
+def _copy_norm(s: str) -> str:
+    s = unicodedata.normalize("NFKC", s).translate(_COPY_DASHES).translate(_COPY_QUOTES)
+    s = re.sub(r"<br\s*/?>", " ", s).replace("*", "")
+    # An em dash the text channel spells "--" is the grid's one dash.
+    s = re.sub(r"-{2,}", "-", s)
+    return re.sub(r"\s+", " ", s).strip().casefold()
+
+
+_COPY_MARKER_RE = re.compile(r"^<!-- table-text-duplicate: \d+ lines of Table (\S+?)'s ")
+_TABLE_NOTE_START_RE = re.compile(r"^(?:notes?|sources?)\s*[.:]", re.I)
+_SIG_LEGEND_LINE_RE = re.compile(r"^(?:[*†‡]+|[*†‡]*\s*p\s*[<>=≤≥]\s*\.?\d)")
+_SENTENCE_OPEN_END_RE = re.compile(r"[A-Za-z0-9,]$")
+
+
+def _settle_table_copy_markers(text: str) -> str:
+    """Finish what replacing a table's text copy with a marker leaves behind.
+
+    1. The table's note ("Note." / "Source." / the significance legend) printed
+       right after its copy stays in the body: it moves into the table's own
+       ``### Table N`` block, under the grid, unless the block already shows it.
+       A move, never a deletion.
+    2. A copy pdftotext dropped into the middle of a sentence leaves the marker
+       there: "a reviewer" / marker / "was kind to review" (10.1177/
+       01461672251327169 p14, Table 10). When the line before the marker leaves
+       its sentence open and the line after opens lowercase, the two lines are
+       rejoined and the marker moves to the end of that paragraph.
+    """
+    if not text or "table-text-duplicate" not in text:
+        return text
+    lines = text.split("\n")
+    k = len(lines) - 1
+    while k >= 0:
+        m = _COPY_MARKER_RE.match(lines[k])
+        if not m:
+            k -= 1
+            continue
+        label = m.group(1)
+        marker = lines[k]
+        # 1. the note right under the copy
+        j = k + 1
+        while j < len(lines) and not lines[j].strip():
+            j += 1
+        note: list[str] = []
+        if j < len(lines) and (
+            _TABLE_NOTE_START_RE.match(lines[j].strip())
+            or _footnote_mark_opens(lines, j)
+        ):
+            e = j
+            while e < len(lines) and lines[e].strip() and not lines[e].startswith(("#", "<", "`")):
+                e += 1
+            note = lines[j:e]
+            anchor = _note_anchor_in_block(lines, label, note)
+            if anchor is not None:
+                del lines[j:e]
+                if anchor > j:
+                    anchor -= e - j
+                lines[anchor + 1:anchor + 1] = ["", *note]
+                if anchor < k:
+                    k += len(note) + 1
+                record_fallback("render_table_note_moved_into_block", detail=f"Table {label}")
+        # 2. a copy dropped mid-sentence
+        p = k - 1
+        while p >= 0 and not lines[p].strip():
+            p -= 1
+        q = k + 1
+        while q < len(lines) and not lines[q].strip():
+            q += 1
+        if (
+            p >= 0 and q < len(lines)
+            and not lines[p].startswith(("#", "<", "`", "*", ">", "|"))
+            and _SENTENCE_OPEN_END_RE.search(lines[p].rstrip())
+            and re.match(r"[a-z]", lines[q].lstrip())
+        ):
+            e = q
+            while e < len(lines) and lines[e].strip():
+                e += 1
+            para = lines[q:e]
+            lines[p + 1:e] = para + ["", marker]
+            record_fallback("render_table_copy_marker_moved_out_of_sentence",
+                            detail=f"Table {label}")
+        k = p if p >= 0 else -1
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
+
+
+_FOOTNOTE_MARK_LINE_RE = re.compile(r"^[a-z*†‡§]$")
+
+
+def _footnote_mark_opens(lines: list[str], j: int) -> bool:
+    """A table footnote printed as its raised mark alone on a line, the
+    footnote text on the next ("a" / "The target article sometimes ...",
+    10.1177/01461672251327169 p4, Table 2's notes a-c)."""
+    return bool(
+        _FOOTNOTE_MARK_LINE_RE.match(lines[j].strip())
+        and j + 1 < len(lines)
+        and len(lines[j + 1].split()) >= 3
+        and not lines[j + 1].startswith(("#", "<", "`"))
+    )
+
+
+def _note_anchor_in_block(lines: list[str], label: str, note: list[str]) -> int | None:
+    """Index of the line under which ``### Table <label>``'s grid ends (its last
+    ``</table>`` or closing fence), or None when there is no such block or it
+    already shows the note's first line."""
+    head = next((i for i, ln in enumerate(lines)
+                 if re.match(rf"^###\s+Table\s+{re.escape(label)}\s*$", ln)), None)
+    if head is None:
+        return None
+    end = head + 1
+    while end < len(lines) and not _COPY_SECTION_RE.match(lines[end]):
+        end += 1
+    # A lone footnote mark ("a") is in any block; test the first line of text.
+    probe = next((ln for ln in note if len(ln.split()) >= 3), note[0])
+    if _copy_norm(probe) in _copy_norm("\n".join(lines[head:end])):
+        return None
+    anchor = None
+    for i in range(head, end):
+        s = lines[i].strip()
+        if s.startswith("</table>") or s == "```":
+            anchor = i
+    return anchor
+
+
+def _structured_table_text_by_label(text: str) -> dict:
+    """``{"6": (normalized cell text, token set, number multiset)}`` for every
+    ``### Table N`` block the render placed: the cells of its ``<table>`` (row by
+    row, cells joined by a space -- the text channel reads a row the same way)
+    or, with no grid, its ``unstructured-table`` flat list, plus its caption."""
+    import html as _html
+    # Only grids that survive `_strip_phantom_camelot_tables` (a later pass)
+    # count: 10.1098/rsos.241348 Table 1's grid is stripped there, and its
+    # body copy, matched against that grid, was the only copy left.
+    text = _strip_phantom_camelot_tables(text)
+    out: dict = {}
+    lines = text.split("\n")
+    i = 0
+    while i < len(lines):
+        m = _GRID_HEADING_RE.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        j = i + 1
+        while j < len(lines) and not _COPY_SECTION_RE.match(lines[j]):
+            j += 1
+        block = "\n".join(lines[i + 1:j])
+        # A table ends at its note. Text captured after a "Note." line is the
+        # body text the capture ran into, not the table: on
+        # 10.2478/v10059-011-0005-y Table 4's flat list ends with its note and then
+        # a Discussion paragraph, and matching that paragraph deleted its only
+        # body copy. Nothing from the note on counts as the table's text.
+        parts = []
+        grid_parts = []
+        columns: dict = {}
+        for row in re.findall(r"<tr>(.*?)</tr>", block, re.S):
+            cells = [_html.unescape(re.sub(r"<[^>]+>", " ", c))
+                     for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row, re.S)]
+            joined = " ".join(cells)
+            if _COPY_NOTE_RE.match(joined.strip()):
+                break
+            parts.append(joined)
+            grid_parts.append(joined)
+            for ci, cell in enumerate(cells):
+                if cell.strip():
+                    columns.setdefault(ci, []).append(cell)
+        for fence in re.findall(r"```unstructured-table\n(.*?)```", block, re.S):
+            kept = []
+            for fl in fence.split("\n"):
+                if _COPY_NOTE_RE.match(fl.strip()):
+                    break
+                kept.append(fl)
+            parts.append(" ".join(kept))
+        for cap in re.findall(r"^\*(.+?)\*\s*$", block, re.M):
+            parts.append(cap)
+        if parts:
+            # A cell the grid wraps over several rows is one line in the text
+            # channel ("Participants were asked to make" / "estimations of ..."):
+            # each column read top to bottom is searched too. Its tokens are
+            # NOT counted again -- the number multiset stays the grid's own.
+            base = _copy_norm(" \n ".join(parts))
+            nums, words, _syms = _grid_tokens(base)
+            col_hay = " \n ".join(_copy_norm(" ".join(c)) for c in columns.values())
+            hay = base + " \n " + col_hay
+            grid_hay = _copy_norm(" \n ".join(grid_parts)) + " \n " + col_hay
+            prev = out.get(m.group(1))
+            if prev:
+                hay = prev[0] + " \n " + hay
+                grid_hay = prev[3] + " \n " + grid_hay
+                nums = prev[2] + nums
+                words = prev[1] | words
+            out[m.group(1)] = (hay, words, nums, grid_hay)
+        i = j
+    return out
+
+
+def _suppress_grid_copied_line_blocks(text: str) -> str:
+    """Replace a block of body lines that is a verbatim copy of a structured table.
+
+    pdftotext linearizes a table into the body column; the render also places the
+    table as a structured ``### Table N`` block. ``_suppress_orphan_table_cell_text``
+    removes the copy only when a ``Table N.`` caption line opens it and the copy
+    carries 3+ decimal numbers, so a copy whose caption sits elsewhere (or at its
+    end), and any table of words, stays in the body. Measured on
+    10.1177/01461672251327169: the text copies of Tables 2, 3 and 5 (hypotheses,
+    design comparison, deviations) and the ~460 loose values of Table 6 sat in the
+    Introduction, Method and Results beside their structured blocks (canary
+    2026-10-30).
+
+    A block is a run of body lines (single blank lines allowed, headings and
+    structured blocks break it) in which EVERY line is found in ONE table: a line
+    of 25+ characters as an exact substring of that table's cell text (after
+    folding case, dashes, quotes and whitespace), a shorter line by its words and
+    numbers. It is replaced only with proof that it is a copy: 3+ long lines, or
+    5+ specific numbers (decimal or 3+ digits) whose multiset the table holds.
+    A heading of 3+ words inside such a block is part of the copy when its text is
+    in the table (the hallucinated ``### Reasons for change``, a column header).
+    One line not in the table keeps the whole block: a table is never
+    half-suppressed. The block gives way to a ``table-text-duplicate`` marker.
+    Typographic evidence only: the test is the table's own text.
+    """
+    if not text or "### Table" not in text:
+        return text
+    tables = _structured_table_text_by_label(text)
+    if not tables:
+        return text
+    lines = text.split("\n")
+    n = len(lines)
+    # Lines inside structured blocks, HTML tables and fences are never body.
+    fixed = [False] * n
+    in_struct = in_fence = in_html = False
+    for k, ln in enumerate(lines):
+        s = ln.strip()
+        if _GRID_HEADING_RE.match(ln):
+            in_struct = True
+        elif _COPY_SECTION_RE.match(ln):
+            in_struct = False
+        if s.startswith("```"):
+            in_fence = not in_fence
+            fixed[k] = True
+            continue
+        if s.startswith("<table"):
+            in_html = True
+        fixed[k] = in_struct or in_fence or in_html or s.startswith("<!--")
+        if s.startswith("</table>"):
+            in_html = False
+
+    def covered(line: str, label: str) -> str:
+        """'long', 'short' or '' (not in the table)."""
+        hay, words, nums, grid_hay = tables[label]
+        s = _COPY_LEADING_LABEL_RE.sub("", _copy_norm(line)) if re.match(
+            rf"^\*?Table\s+{label}\b", line.strip()) else _copy_norm(line)
+        if not s:
+            return "short"
+        if len(s) >= _COPY_LONG_LINE_CHARS:
+            # A sentence is matched only against a structured grid's cells. A
+            # flat-list fallback or a caption can run on into the body text after
+            # the table (10.1016/j.jesp.2021.104154 Table 1: the list ran into
+            # "6.3. Results" and its paragraph, and that paragraph's body copy --
+            # the only real one -- was deleted as a duplicate).
+            if _copy_is_sentence(line):
+                return "long" if s in grid_hay else ""
+            if s in hay:
+                return "long"
+            # Not a sentence and not one cell: cells of one row the text
+            # channel printed on one line ("[-0.01, 0.16] [0.04, 0.20]") are
+            # judged by their words and numbers, like a short line.
+        ln_nums, ln_words, _ = _grid_tokens(s)
+        if not ln_nums and not ln_words:
+            return "short" if s in hay else ""
+        if ln_words <= words and not (ln_nums - nums):
+            return "short"
+        return ""
+
+    def is_heading(ln: str) -> bool:
+        return bool(_COPY_SECTION_RE.match(ln))
+
+    drop: dict = {}  # start index -> (end index exclusive, label, n lines)
+    taken = [False] * n
+    for label in tables:
+        k = 0
+        while k < n:
+            if fixed[k] or taken[k] or not lines[k].strip() or is_heading(lines[k]):
+                k += 1
+                continue
+            start, end, long_n, block_nums, blank = k, k, 0, Counter(), 0
+            body = []
+            m = k
+            while m < n and not fixed[m] and not taken[m]:
+                ln = lines[m]
+                if not ln.strip():
+                    blank += 1
+                    if blank > 1:
+                        break
+                    m += 1
+                    continue
+                if is_heading(ln):
+                    head = ln.lstrip("#").strip()
+                    if len(head.split()) >= 3 and covered(head, label) and body:
+                        body.append(m)
+                        m += 1
+                        blank = 0
+                        continue
+                    break
+                # A raised footnote mark alone over text the table does not
+                # hold opens the table's footnotes: the copy ends above it.
+                if _footnote_mark_opens(lines, m) and not covered(lines[m + 1], label):
+                    break
+                kind = covered(ln, label)
+                if not kind:
+                    break
+                blank = 0
+                body.append(m)
+                if kind == "long":
+                    long_n += 1
+                block_nums.update(_grid_tokens(_copy_norm(ln))[0])
+                end = m + 1
+                m += 1
+            body = [b for b in body if b < end]
+            # A heading may not close the block: it would be a real section's.
+            while body and is_heading(lines[body[-1]]):
+                body.pop()
+            specific = sum(c for v, c in block_nums.items()
+                           if "." in v or len(v.lstrip("-")) >= 3)
+            proven = long_n >= _COPY_MIN_LONG_LINES or (
+                specific >= _COPY_MIN_SPECIFIC_NUMBERS and not (block_nums - tables[label][2])
+            )
+            if len(body) >= _COPY_MIN_LINES and proven:
+                end = body[-1] + 1
+                for b in range(start, end):
+                    taken[b] = True
+                drop[start] = (end, label, len(body))
+                k = end
+            else:
+                k = max(k + 1, start + 1)
+    if not drop:
+        return text
+    out: list[str] = []
+    k = 0
+    while k < n:
+        if k in drop:
+            end, label, count = drop[k]
+            record_fallback("render_grid_copied_line_block_suppressed",
+                            detail=f"Table {label}:{count}")
+            out.append(
+                f"<!-- table-text-duplicate: {count} lines of Table {label}'s "
+                f"text-channel copy omitted here; every line is in the structured "
+                f"Table {label}. Other loose lines of this table, if any, were not "
+                f"verified and are kept -->"
+            )
+            k = end
+            continue
+        out.append(lines[k])
+        k += 1
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out))
+
+
 # FIG-3c (v2.4.51): a body line that begins a figure-caption run inline.
 # pdftotext linearizes a figure's caption into the running text column, so
 # the caption appears once inline in body prose and once as the spliced
@@ -5219,6 +5593,7 @@ _INLINE_FIG_CAPTION_LABEL_RE = re.compile(r"^(?:Figure|FIGURE|Fig\.)\s+\d+\b")
 # that pdftotext serialised in body order).
 _INLINE_TABLE_CAPTION_LABEL_RE = re.compile(r"^(?:Table|TABLE|Tab\.)\s+\d+\b")
 _ITALIC_TABLE_CAPTION_RE = re.compile(r"^\*(Table\s+(\d+)[\.\:].+?)\*\s*$")
+_CAPTION_QUOTE_FOLD = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"', "`": "'"})
 
 
 def _suppress_inline_duplicate_table_captions(text: str) -> str:
@@ -5277,7 +5652,11 @@ def _suppress_inline_duplicate_table_captions(text: str) -> str:
         if abs(i - heading_idx) <= 5:
             continue
         candidate = re.sub(r"\s+", " ", cm.group(1)).strip()
-        if candidate.lower() != block_caption.lower():
+        # Quotes folded: the body copy went through normalization (straight
+        # apostrophe) and the block caption did not (10.1177/01461672251327169
+        # Table 9: "(2011)'s" in the body, "(2011)’s" in the block).
+        if (candidate.lower().translate(_CAPTION_QUOTE_FOLD)
+                != block_caption.lower().translate(_CAPTION_QUOTE_FOLD)):
             continue
         # Drop this inline caption + tighten surrounding blank lines.
         drop.add(i)
@@ -5755,6 +6134,264 @@ def _title_text_from_chars(page1, y_min: float, y_max: float, title_size: float)
     return " ".join(line_texts)
 
 
+_HEADING_STYLE_MIN_PROVEN = 3
+_HEADING_MAX_WORDS = 12
+
+
+def _layout_style_lines(layout_doc) -> list[tuple[int, tuple[str, float], str, float, float, float]]:
+    """Every printed line set entirely in ONE font at ONE size.
+
+    ``[(page_index, (fontname, size), key, x0, top)]`` in page order, where ``key``
+    is the line's letters and digits lowercased (spacing differs between the
+    layout's glyphs and the text channel). A line is the glyphs sharing a
+    baseline, split where the horizontal gap exceeds the glyph size (the
+    gutter between columns; a word space is about a third of it).
+    """
+    out: list[tuple[int, tuple[str, float], str, float, float]] = []
+    for pi, page in enumerate(getattr(layout_doc, "pages", ()) or ()):
+        rows: dict[int, list] = {}
+        for c in getattr(page, "chars", ()) or ():
+            if c.get("upright", True) and c["text"].strip():
+                rows.setdefault(round(c["top"]), []).append(c)
+        for top in sorted(rows):
+            cs = sorted(rows[top], key=lambda c: c["x0"])
+            seg = [cs[0]]
+            for prev, c in zip(cs, cs[1:]):
+                if c["x0"] - prev["x1"] > max(c["size"], prev["size"]):
+                    out.extend(_style_line(pi, seg))
+                    seg = []
+                seg.append(c)
+            out.extend(_style_line(pi, seg))
+    return out
+
+
+def _style_line(pi: int, cs: list) -> list[tuple[int, tuple[str, float], str, float, float, float]]:
+    styles = {(c.get("fontname", "").split("+")[-1], round(c["size"], 1)) for c in cs}
+    key = re.sub(r"[^a-z0-9]", "", "".join(c["text"] for c in cs).lower())
+    if not key:
+        return []
+    if len(styles) != 1:
+        # A line in more than one style is kept as "~<first glyph's font>": a
+        # run-in heading's second line ("Between Risks and Benefits. We ...").
+        style = ("~" + cs[0].get("fontname", "").split("+")[-1], round(cs[0]["size"], 1))
+    else:
+        style = styles.pop()
+    return [(pi, style, key, cs[0]["x0"], cs[0]["top"], cs[-1]["x1"])]
+
+
+def _heading_key(line: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", line.lower())
+
+
+# What a heading line's TEXT may look like: it opens with a capital letter (or
+# a section number before one), holds a word of 3+ letters, and is not a figure
+# or table label. Measured 2026-10-30 over 128 papers, style alone promoted
+# "49.35", "(1 - δ)", "(2002)", "Figure 5" and "reject decision".
+_HEADING_LABEL_RE = re.compile(r"^(?:fig(?:ure)?\.?|table|tab\.)\s*\d", re.I)
+_HEADING_START_RE = re.compile(r"^(?:\d+(?:\.\d+)*\.?\s+)?[A-Z]")
+_HEADING_OPEN_END_RE = re.compile(
+    r"\b(?:and|or|of|the|for|in|on|with|a|an|to|by|from|at|as|vs\.?|versus)$", re.I)
+
+
+def _heading_text_shape(s: str, *, first: bool = True) -> bool:
+    """``first=False`` checks a second (wrapped) line, which may open lowercase."""
+    if not s or len(s.split()) > _HEADING_MAX_WORDS or s[-1] in ".,;:":
+        return False
+    if s.startswith(("#", "*", "_", "<", ">", "|", "`", "-", "+", "!", "[")):
+        return False
+    if _HEADING_LABEL_RE.match(s) or not re.search(r"[A-Za-z]{3}", s):
+        return False
+    if first and s.count("(") != s.count(")"):
+        return False  # a caption or sentence cut mid-parenthesis
+    return bool(_HEADING_START_RE.match(s)) if first else True
+
+
+# A column margin is an x position where at least this many body lines start.
+_MARGIN_MIN_LINES = 3
+
+
+def _promote_layout_styled_headings(md: str, layout_doc) -> str:
+    """Promote a plain line the page prints in the paper's own heading style.
+
+    Typographic, not inferential: the style is LEARNED from this paper. When at
+    least three headings the render already found are printed in one font at
+    one size, and that is not the body's font, a standalone plain line printed
+    wholly in that style, starting at a column margin, is a heading too. The
+    same font at a smaller size (never below the body size) is the next
+    heading level, provided the line is printed on one page only (a running
+    head repeats). 10.1177/01461672251327169 p8 sets "Data Analysis Strategy"
+    in GillSansMTPro-MediumItalic 12 pt like "Measures" and "Participants",
+    and "Replication Measures" / "Extension Measures" in the same font at
+    10 pt; all three were left as body lines because their line shape (no
+    blank line before, a label under them) fails the shape-based promoters.
+
+    A run-in heading ("Prevalence Estimation Error: Item-Level Independent
+    Samples t-Tests. We ...") opens an indented paragraph in the same 10 pt
+    italic; its first line starts at the paragraph indent, not the margin, so
+    it is never taken.
+
+    Only lines after the first ``## `` heading, outside fences and tables.
+    """
+    if not md or layout_doc is None:
+        return md
+    styled = _layout_style_lines(layout_doc)
+    if not styled:
+        return md
+    from collections import Counter
+    body_style, _ = Counter(e[1] for e in styled if not e[1][0].startswith("~")).most_common(1)[0]
+    starts = Counter((pi, round(x0)) for pi, st, _k, x0, _t, _x1 in styled if st == body_style)
+    margins = {k for k, n in starts.items() if n >= _MARGIN_MIN_LINES}
+
+    def _flush(pi: int, x0: float) -> bool:
+        return any((pi, round(x0) + d) in margins for d in (-1, 0, 1))
+
+    by_key: dict[str, set] = {}
+    pages_of: dict[str, set] = {}
+    run_in: set[str] = set()
+    for i, (pi, style, key, x0, top, x1) in enumerate(styled):
+        if style[0].startswith("~"):
+            continue
+        pages_of.setdefault(key, set()).add(pi)
+        flush = _flush(pi, x0)
+        if flush:
+            by_key.setdefault(key, set()).add(style)
+        # A heading wrapped over two lines in one style: the line printed
+        # directly UNDER it in the same column -- not the next line in the
+        # list, which on a two-column page is the other column's line. The
+        # second line starts flush with the first, or is centred under it
+        # (10.1177/0146167214563672 "Liberals May Be More Individualistic" /
+        # "Analytically"). A centred pair needs one of its lines on the margin
+        # (10.5465/amc.2022.0006: the first line starts 2 pt inside it).
+        for pj, style2, key2, x2, top2, x3 in styled[i + 1:i + 40]:
+            if pj != pi:
+                break
+            if not (0 < top2 - top <= 2.0 * style[1]):
+                continue
+            if flush and style2 == ("~" + style[0], style[1]) and abs(x2 - x0) <= 2.0:
+                # the line under it opens in its style and runs on in another:
+                # the heading runs in to its paragraph (10.1177/19485506211056761
+                # "Naturally Occurring Incidental Mood and the Negative
+                # Relationship" / "Between Risks and Benefits. We conducted")
+                run_in.add(key)
+                break
+            if (style2 == style
+                    and ((flush and abs(x2 - x0) <= 2.0)
+                         or ((flush or _flush(pj, x2))
+                             and abs((x2 + x3) - (x0 + x1)) <= 4.0))):
+                by_key.setdefault(key + key2, set()).add(style)
+                pages_of.setdefault(key + key2, set()).add(pi)
+                break
+
+    lines = md.split("\n")
+    proven: Counter = Counter()
+    proven_l3: set = set()
+    for ln in lines:
+        m = re.match(r"(#{2,3}) (.+)$", ln)
+        if m:
+            for style in by_key.get(_heading_key(m.group(2)), ()):
+                proven[style] += 1
+                if len(m.group(1)) == 3:
+                    proven_l3.add(style)
+    proven_any = set(proven)
+    candidates = [st for st, n in proven.items()
+                  if n >= _HEADING_STYLE_MIN_PROVEN and st != body_style
+                  and st[1] >= body_style[1]]
+    if not candidates:
+        return md
+    head_style = max(candidates, key=lambda st: proven[st])
+
+    def _is_heading_style(key: str) -> bool:
+        styles = by_key.get(key, set())
+        if head_style in styles:
+            return True
+        return len(pages_of.get(key, ())) == 1 and any(
+            st[0] == head_style[0] and body_style[1] <= st[1] < head_style[1]
+            for st in styles
+        )
+
+    out: list[str] = []
+    seen_section = in_fence = in_table = False
+    skip_to = -1
+    for i, ln in enumerate(lines):
+        if i <= skip_to:
+            continue
+        s = ln.strip()
+        if s.startswith("```"):
+            in_fence = not in_fence
+        elif s.startswith("<table"):
+            in_table = True
+        elif s.startswith("</table"):
+            in_table = False
+        if s.startswith("## "):
+            seen_section = True
+        if not (
+            seen_section and not in_fence and not in_table and s
+            and _heading_text_shape(s)
+            and i + 1 < len(lines) and lines[i + 1].strip()
+            and (_is_heading_style(_heading_key(s))
+                 or _is_heading_style(_heading_key(s) + _heading_key(lines[i + 1])))
+            and _heading_key(s) not in run_in
+        ):
+            out.append(ln)
+            continue
+        # The second line of a heading already promoted above it joins that
+        # heading (10.1177/0146167210386968 "Predicting the Nature of
+        # Prime-to-Behavior" / "Effects in Interpersonal Contexts").
+        k = len(out) - 1
+        while k >= 0 and not out[k].strip():
+            k -= 1
+        if k >= 0 and len(out) - 1 - k <= 1:
+            m_prev = re.match(r"(#{2,6}) (.+)$", out[k])
+            if m_prev and _is_heading_style(_heading_key(m_prev.group(2)) + _heading_key(s)):
+                out[k] = f"{m_prev.group(1)} {m_prev.group(2)} {s}"
+                if lines[i + 1].strip() and out[-1].strip():
+                    out.append("")
+                continue
+        # A heading wrapped over two or three lines in the same style is one
+        # heading (10.5465/amc.2022.0006 "A SYNTHESIS AND EVALUATION OF THE
+        # CSR" / "LITERATURE, WITH RECOMMENDATIONS FOR" / "FUTURE RESEARCH").
+        # Two headings in a row are not (10.1177/01461672251327169 p8: "Data
+        # Analysis Strategy" 12 pt over "Replication Measures" 10 pt).
+        j, last = i, s
+        while j - i < 2 and j + 1 < len(lines):
+            cand = lines[j + 1].strip()
+            if not (_heading_text_shape(cand, first=False)
+                    and _is_heading_style(_heading_key(last) + _heading_key(cand))):
+                break
+            s, last, j = f"{s} {cand}", cand, j + 1
+        nxt = lines[j + 1].strip() if j + 1 < len(lines) else ""
+        # A heading is not cut mid-phrase, and the line under it does not
+        # carry on its sentence. Refused, its lines all stay as printed, so a
+        # later line of it is not promoted on its own.
+        if (_HEADING_OPEN_END_RE.search(s) or not nxt or nxt[:1].islower()
+                or nxt.startswith(("#", "<", "`", "|"))):
+            out.extend(lines[i:j + 1])
+            skip_to = j
+            continue
+        skip_to = j
+        if out and out[-1].strip():
+            out.append("")
+        # A line is one level below ### only when no ##/### heading already
+        # uses its style and a ### heading uses the same face larger
+        # (10.1177/01461672251327169 p8: "Replication Measures" 11.6 pt under
+        # "Data Analysis Strategy" 14 pt). Compared with the most used style
+        # alone, true level-3 lines were demoted wherever that style is the
+        # larger level above (10.3389/fpsyg.2023.1170855 "Empathy" 13.2 pt,
+        # set like "Veracity" ###; Sonnet page check, 2026-10-31).
+        k1 = _heading_key(lines[i].strip())
+        own = (set(by_key.get(k1, ()))
+               | set(by_key.get(k1 + _heading_key(lines[i + 1].strip()), ())))
+        # The larger ### face is the next level up only when the sizes are
+        # neighbours (14/11.6, 13.2/12.1); a ### title fragment set at 3x the
+        # size is not a heading level above (10.1111/j.0956-7976.2004.00737.x
+        # "Day 1: CVS Exploration and Assessment" under a 33 pt title).
+        lower = not (own & proven_any) and any(
+            st[0] == o[0] and o[1] < st[1] <= 1.35 * o[1] for st in proven_l3 for o in own)
+        out.append(f"{'####' if lower else '###'} {s}")
+        out.append("")
+    return "\n".join(out)
+
+
 def _compute_layout_title(layout_doc: LayoutDoc) -> Optional[str]:
     """Identify the article title from page-1 layout spans.
 
@@ -6082,7 +6719,9 @@ def _apply_title_rescue(out: str, title_text: str) -> str:
                 break
             if line_j.startswith("#"):
                 break
-            tokens = re.findall(r"\w+", head_lines[j].lower())
+            # A raised marker the text channel writes as "^1" is glued in the
+            # layout's glyph run ("Petrillo1"): compare without the caret.
+            tokens = re.findall(r"\w+", head_lines[j].lower().replace("^", ""))
             accumulated.extend(tokens)
             if len(accumulated) > len(title_tokens) * 2.5:
                 break
@@ -7349,6 +7988,8 @@ def _render_pdf_to_markdown(
     md = _step(_report, "_fix_hyphenated_line_breaks", _fix_hyphenated_line_breaks, md)
     md = _step(_report, "_join_multiline_caption_paragraphs", _join_multiline_caption_paragraphs, md)
     md = _step(_report, "_suppress_orphan_table_cell_text", _suppress_orphan_table_cell_text, md)
+    md = _step(_report, "_suppress_grid_copied_line_blocks", _suppress_grid_copied_line_blocks, md)
+    md = _step(_report, "_settle_table_copy_markers", _settle_table_copy_markers, md)
     md = _step(_report, "_demote_inline_footnotes_to_blockquote", _demote_inline_footnotes_to_blockquote, md)
     md = _step(_report, "_label_frontmatter_note_paragraphs", _label_frontmatter_note_paragraphs, md)
     md = _step(_report, "_promote_study_subsection_headings", _promote_study_subsection_headings, md)
@@ -7634,6 +8275,7 @@ def _render_pdf_to_markdown(
     # is the anchor).
     md = _step(_report, "_strip_pre_title_heading_noise", _strip_pre_title_heading_noise, md)
     md = _step(_report, "_italicize_known_subtitle_badges", _italicize_known_subtitle_badges, md)
+    md = _step(_report, "_promote_layout_styled_headings", _promote_layout_styled_headings, md, layout_doc)
     # v2.4.83: runs LAST — strip the redundant ``Table N.`` / ``Figure N.``
     # label from a caption that sits directly under its ``### Table N`` heading.
     # Must follow the caption-detecting passes above that key on the prefix.

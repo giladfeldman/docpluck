@@ -98,9 +98,27 @@ def _caption_rows_at_top(rows: list[list[str]], label: Optional[str],
     if lab and block.startswith(lab):
         labelled = True
     if j > i and not labelled:
-        if len(block) < _MIN_UNLABELLED_KEY or not cap.endswith(block):
+        if not cap.endswith(block):
+            return 0
+        if len(block) < _MIN_UNLABELLED_KEY and not _closes_the_caption(rows[i:j], caption):
             return 0
     return j
+
+
+def _closes_the_caption(rows: list[list[str]], caption: Optional[str]) -> bool:
+    """A short tail is still the caption's when it is ONE cell that ends the
+    caption's sentence: same text, same closing period. A spanner the caption
+    absorbed does not carry the period ("Participant group, mean (SD)a").
+    10.1177/01461672251327169 Table 10 (p15): the region began on the
+    caption's second line, "Outcomes (Extension).", which became the first
+    header cell ("Outcomes (Extension).<br>Measure")."""
+    if len(rows) != 1:
+        return False
+    cells = [(c or "").strip() for c in rows[0] if (c or "").strip()]
+    if len(cells) != 1 or not re.search(r"[.!?]$", cells[0]):
+        return False
+    cap = re.sub(r"\s+", " ", caption or "").strip()
+    return cap.endswith(re.sub(r"\s+", " ", cells[0]))
 
 
 def move_caption_rows_out_of_grid(tables: list | None) -> None:

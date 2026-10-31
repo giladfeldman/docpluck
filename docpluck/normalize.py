@@ -1675,6 +1675,29 @@ def _r2_is_body_phrase(digit_str: str, refs_text: str, match_pos: int) -> bool:
     return False
 
 
+def _r2_printed_inline(raw: str, refs_text: str, m: "re.Match[str]", digit_str: str) -> bool:
+    """True if the extraction printed ``word digit word`` on ONE line.
+
+    A page number that leaks into a reference sits on its own line (or at a
+    page break) and reaches the entry only when the reference lines are
+    joined. A digit the extractor emitted inside a line, between the same two
+    words, is part of the title: 10.1177/01461672251327169 p17 prints
+    "Registered report stage 1 manuscript template." on one line, and the
+    paper's page 1 put "1" in the page-number set, so R2 deleted it
+    ("stage manuscript"). Typographic evidence: where the renderer put the
+    digit, not which word precedes it.
+    """
+    before = re.search(r"([A-Za-z]+)\s*$", refs_text[:m.start() + len(m.group(1))])
+    after = re.match(r"\s*([A-Za-z]+)", refs_text[m.end() - len(m.group(2)):])
+    if not before or not after:
+        return False
+    return bool(re.search(
+        rf"(?<![A-Za-z]){re.escape(before.group(1))}[ \t]+{re.escape(digit_str)}"
+        rf"[ \t]+{re.escape(after.group(1))}(?![A-Za-z])",
+        raw,
+    ))
+
+
 def _looks_like_ref_start(line: str) -> bool:
     return bool(
         _REF_START_VANCOUVER.match(line)
@@ -5933,10 +5956,53 @@ def _layout_negative_coefficients(layout) -> dict[str, int]:
     return counts
 
 
-def _layout_superscript_fusions(layout) -> list[tuple[str, str]]:
+# A raised sign glyph that may open a superscript marker (an exponent's minus).
+_W0P_SIGNS = "-\u2212\u2013"
+
+
+_W0P_WORD_PUNCT = ",.;:)"
+
+
+def _layout_word_marker(chars, i: int) -> tuple[str, str, int] | None:
+    """A footnote marker raised after a WORD: `emotions,` + raised `1`.
+
+    pdftotext prints it as `emotions,1`, which reads as a number in running
+    text (10.1177/01461672251327169 p1: "peers' positive emotions,1 and that").
+    Same evidence as the number case: the digits are smaller AND raised against
+    the word's own letters. Returns `(fused, repaired, next_index)` or None.
+    Only when `chars[i]` starts the word (no letter before it on its line).
+    """
+    if not chars[i]["text"].isalpha():
+        return None
+    if i > 0 and chars[i - 1]["text"].isalpha() and abs(chars[i - 1]["top"] - chars[i]["top"]) < 0.01:
+        return None
+    size, top = chars[i]["size"], chars[i]["top"]
+
+    def _same(c) -> bool:
+        return abs(c["size"] - size) < 0.01 and abs(c["top"] - top) < 0.01
+
+    j = i
+    while j < len(chars) and chars[j]["text"].isalpha() and _same(chars[j]):
+        j += 1
+    if j - i < 2:
+        return None
+    if j < len(chars) and chars[j]["text"] in _W0P_WORD_PUNCT and _same(chars[j]):
+        j += 1
+    k = j
+    while (k < len(chars) and chars[k]["text"].isdigit()
+           and chars[k]["size"] < size * 0.9 and chars[k]["top"] < top - 0.5):
+        k += 1
+    if k == j or k - j > 3:
+        return None
+    word = "".join(c["text"] for c in chars[i:j])
+    marker = "".join(c["text"] for c in chars[j:k])
+    return word + marker, word + "^" + marker, k
+
+
+def _layout_superscript_fusions(layout) -> list[tuple[int, str, str]]:
     """Find `(fused, base, marker)` runs the LAYOUT proves are superscripts.
 
-    Returns `[(fused_token, repaired_token), ...]` in reading order.
+    Returns `[(page_index, fused_token, repaired_token), ...]` in reading order.
 
     A footnote marker is typographically a superscript, but pdftotext renders a
     positioned glyph as an ordinary digit — the paper that motivated this
@@ -5944,8 +6010,8 @@ def _layout_superscript_fusions(layout) -> list[tuple[str, str]]:
     the text channel has nothing to key on. Font size plus baseline are the only
     evidence, and they live here.
     """
-    out: list[tuple[str, str]] = []
-    for page in getattr(layout, "pages", ()) or ():
+    out: list[tuple[int, str, str]] = []
+    for page_index, page in enumerate(getattr(layout, "pages", ()) or ()):
         chars = [c for c in (getattr(page, "chars", ()) or ())
                  if c.get("upright", True)]
         i = 0
@@ -5958,20 +6024,37 @@ def _layout_superscript_fusions(layout) -> list[tuple[str, str]]:
                    and abs(chars[j]["top"] - chars[i]["top"]) < 0.01):
                 j += 1
             if j == i or not any(c["text"].isdigit() for c in chars[i:j]):
+                word = _layout_word_marker(chars, i)
+                if word is not None:
+                    out.append((page_index, word[0], word[1]))
+                    i = word[2]
+                    continue
                 i += 1
                 continue
             base_size, base_top = chars[i]["size"], chars[i]["top"]
-            # a marker run: digits, SMALLER and RAISED, immediately after
+
+            def _raised(c) -> bool:
+                return c["size"] < base_size * 0.9 and c["top"] < base_top - 0.5
+
+            # a marker run: digits, SMALLER and RAISED, immediately after. It may
+            # open with a raised sign: `10` + raised `–3` is the exponent 10^-3
+            # (10.1098/rsos.240120 p17 "10–3 HCl"); unmarked, the text reads the
+            # range-like "10-3".
             k = j
+            if (k + 1 < len(chars) and chars[k]["text"] in _W0P_SIGNS
+                    and _raised(chars[k]) and chars[k + 1]["text"].isdigit()
+                    and _raised(chars[k + 1])):
+                k += 1
             while (k < len(chars)
                    and chars[k]["text"].isdigit()
-                   and chars[k]["size"] < base_size * 0.9
-                   and chars[k]["top"] < base_top - 0.5):
+                   and _raised(chars[k])):
                 k += 1
-            if k > j:
+            if k > j and chars[k - 1]["text"].isdigit():
                 base = "".join(c["text"] for c in chars[i:j])
                 marker = "".join(c["text"] for c in chars[j:k])
-                out.append((base + marker, base + "^" + marker))
+                sign_free = marker.lstrip(_W0P_SIGNS)
+                caret = "^-" + sign_free if sign_free != marker else "^" + marker
+                out.append((page_index, base + marker, base + caret))
                 i = k
                 continue
             i = j
@@ -6374,28 +6457,51 @@ def recover_superscript_via_layout(text: str, layout) -> str:
     """
     if not text or layout is None:
         return text
-    for fused, repaired in _layout_superscript_fusions(layout):
-        n = text.count(fused)
-        if not n:
+    # WHERE the evidence was seen decides where it may be applied. The fused
+    # token was once replaced at its FIRST occurrence anywhere in the text, as a
+    # bare substring: on 10.1098/rsos.240120 the layout proves `10` + raised
+    # `–3` on p17 ("10–3 HCl"), and the first textual `10–3` was the start of
+    # "10–30 years" on p6 -- rewritten to the false exponent `10^-30`. So a site
+    # is a WHOLE token (no digit after it, no digit or separator before it) on
+    # the SAME page (the text's form feeds), and when the text's pages do not
+    # line up with the layout's, only a token that occurs exactly once is touched.
+    pages = text.split(PAGE_BREAK)
+    n_layout = len(getattr(layout, "pages", ()) or ())
+    # pdftotext ends the text with a page break, which leaves one empty segment.
+    paged = len(pages) == n_layout or (
+        len(pages) == n_layout + 1 and not pages[-1].strip()
+    )
+    for page_index, fused, repaired in _layout_superscript_fusions(layout):
+        variants = [fused]
+        if any(ch in fused for ch in _W0P_SIGNS):
+            # The text channel may already carry the sign folded to another dash.
+            variants += [re.sub("[" + re.escape(_W0P_SIGNS) + "]", sign, fused)
+                         for sign in _W0P_SIGNS]
+        alternation = "|".join(re.escape(v) for v in dict.fromkeys(variants))
+        before = r"(?<![A-Za-z])" if fused[:1].isalpha() else r"(?<![\d.,])"
+        site = re.compile(before + r"(?:" + alternation + r")(?!\d)")
+        if paged:
+            segment = pages[page_index]
+            hits = list(site.finditer(segment))
+        else:
+            hits = list(site.finditer(text))
+        if not hits:
             record_fallback("w0p_no_text_match_for_layout_evidence", detail=fused)
             continue
-        if n > 1:
-            # POSITIONAL PAIRING, DECLARED. `replace(..., 1)` assigns the layout's
-            # evidence to the FIRST textual occurrence — the same class W0h/W0m
-            # were converted away from this release, because a glyph proven on
-            # one page licensed rewriting a token anywhere in the paper.
-            #
-            # Not converted here, and the reason is a measurement rather than a
-            # judgement: W0p's key is a WHOLE FUSED TOKEN (`2,5801`), not a bare
-            # coefficient, so collisions are far rarer than W0h's; and the repair
-            # is LOSSLESS — `2,580^1` keeps both readings recoverable, so a
-            # mis-placed caret is visible and reversible where a fabricated minus
-            # is neither. Recording the ambiguity is what turns "rare" from an
-            # assumption into a number; convert it the day this counter is
-            # non-zero on real papers.
-            record_fallback("w0p_ambiguous_positional_pairing", detail=f"{fused}x{n}")
-        text = text.replace(fused, repaired, 1)
-    return text
+        if len(hits) > 1:
+            # Several copies of the token on the one page the glyphs were seen on:
+            # the first is taken (the repair is lossless -- `2,580^1` keeps both
+            # readings). Without page alignment there is no such bound, so the
+            # site is left alone.
+            record_fallback("w0p_ambiguous_positional_pairing", detail=f"{fused}x{len(hits)}")
+            if not paged:
+                continue
+        m = hits[0]
+        if paged:
+            pages[page_index] = segment[:m.start()] + repaired + segment[m.end():]
+        else:
+            text = text[:m.start()] + repaired + text[m.end():]
+    return PAGE_BREAK.join(pages) if paged else text
 
 
 def recover_dropped_minus_via_layout(text: str, layout, _counter: list[int] | None = None) -> str:
@@ -7993,6 +8099,15 @@ def _normalize_text(
     t = re.sub(r"([a-z,;])\n(?=[a-zα-ω])", r"\1 ", t)
     report._track("S8_line_break_joining", before, t, "line_breaks_joined")
 
+    # S8m (2026-10-31): a raised significance mark sits on its own baseline, so
+    # pdftotext emits "*" / "p < .05. **p < .01." as two lines. A line holding
+    # only 1-4 marks rejoins the next line when that line opens a p-value
+    # legend ("p ," is what a lost "<" glyph leaves). 25 splits in 12 of 128
+    # sample papers; nothing else follows a lone mark this way.
+    before = t
+    t = re.sub(r"(?m)^([*†‡]{1,4})\n(?=p ?[<>=,≤≥] ?\.?\d)", r"\1", t)
+    report._track("S8m_significance_mark_rejoin", before, t, "significance_marks_rejoined")
+
     # For academic level: join stat line breaks BEFORE stripping page numbers,
     # because standalone numbers like "484" on their own line might be stat values
     # that got split from "p =\n484". S9 would strip them as page numbers.
@@ -9510,6 +9625,8 @@ def _normalize_text(
                 def _r2_repl(m, _pg=pg_str, _refs=_captured_refs, _c=_r2_strip_count):
                     if _r2_is_body_phrase(_pg, _refs, m.start() + len(m.group(1))):
                         return m.group(0)  # preserve — body phrase
+                    if _r2_printed_inline(text, _refs, m, _pg):
+                        return m.group(0)  # preserve — printed on one line
                     _c[0] += 1
                     return " "
                 refs_text = pat.sub(_r2_repl, refs_text)

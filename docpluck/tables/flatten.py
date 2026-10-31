@@ -66,6 +66,7 @@ from .cell_cleaning import (
     _is_header_like_row,
     _merge_continuation_rows,
     _merge_significance_marker_rows,
+    _fold_stacked_label_rows,
     _fold_super_header_rows,
     _fold_suffix_continuation_columns,
     _strip_leader_dots,
@@ -290,6 +291,7 @@ def _clean_grid(
     header_rows = merged[:n_header]
     body = merged[n_header:]
 
+    header_rows = _fold_stacked_label_rows(header_rows)
     header_rows = _fold_super_header_rows(header_rows)
     header_rows = _fold_suffix_continuation_columns(header_rows)
     return header_rows, body

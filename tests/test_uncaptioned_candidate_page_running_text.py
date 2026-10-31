@@ -125,6 +125,11 @@ def test_a_page_one_masthead_grid_is_deduplicated_and_recorded():
     r = extract_pdf_structured(require_corpus_pdf("asa/am_sociol_rev_3.pdf").read_bytes())
     left = [t for t in _candidates(r) if t["page"] == 1 and "The Author(s)" in _text(t)]
     assert not left, f"page-1 masthead grid still kept: {[t['id'] for t in left]}"
-    assert "p1" in r["fallback_details"].get("camelot_candidate_is_page_masthead", {}), (
-        f"the masthead dedupe did not run or was not recorded: {r['fallback_details']}"
+    # Since side-by-side lines in one cell keep page order (2026-10-31), every
+    # line of this grid is found in the page text, so the running-text check
+    # (which runs first) takes it; either recorded reason is the dedupe.
+    fd = r["fallback_details"]
+    assert ("p1" in fd.get("camelot_candidate_is_page_masthead", {})
+            or "p1" in fd.get("camelot_candidate_is_page_running_text", {})), (
+        f"the masthead dedupe did not run or was not recorded: {fd}"
     )

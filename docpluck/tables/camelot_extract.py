@@ -29,9 +29,15 @@ from docpluck.tables.cell_cleaning import repair_cells
 from docpluck.tables.cell_geometry import ZERO_BBOX, camelot_cell_bboxes
 from docpluck.tables.bottom_extend import extend_to_table_bottom
 from docpluck.tables.column_split import resplit_merged_columns
+from docpluck.tables.camelot_cell_join import (
+    SIDE_BY_SIDE_EVENT,
+    STUB_LABEL_EVENT,
+    return_overflowing_stub_labels,
+    separate_side_by_side_lines,
+)
 from docpluck.tables.dropped_glyphs import restore_dropped_signs
 from docpluck.tables.render import cells_to_html
-from docpluck.telemetry import record_fallback
+from docpluck.telemetry import discarded_fallbacks, record_fallback
 from docpluck.tempfiles import unlink_temp_pdf
 
 
@@ -706,6 +712,47 @@ def capture_quality(
     return confidence, whitespace_pct
 
 
+def _convert_keeping_gates(ct, layout, convert):
+    """``convert()`` the table as read; if it is kept, ship the cell text with
+    side-by-side lines separated (``separate_side_by_side_lines``) and row
+    labels that ran on past the stub returned to it
+    (``return_overflowing_stub_labels``).
+
+    The gates decide on the text as read, exactly as before the separation
+    existed. Run before them, it changed which page grids passed: on
+    10.5465/annals.2016.0011 p10 a two-column prose grid, rewritten, stopped
+    failing the prose trim, claimed the "Table 2" caption, and the journal list
+    the record had carried as raw text was replaced by a 6x2 grid of caption and
+    body lines (2026-10-31 suite). The rewritten table is converted again with
+    its telemetry discarded and kept only when it has the same shape as the
+    accepted one.
+    """
+    as_read = ct.df.copy()
+    restore_dropped_signs(ct, layout)
+    td = convert()
+    if td is None:
+        return None
+    accepted = ct.df
+    ct.df = as_read.copy()
+    changed = separate_side_by_side_lines(ct, record=False)
+    moved = return_overflowing_stub_labels(ct, record=False)
+    td2 = None
+    if changed or moved:
+        with discarded_fallbacks():
+            restore_dropped_signs(ct, layout)
+            td2 = convert()
+    if (td2 is not None and td2.get("n_rows") == td.get("n_rows")
+            and td2.get("n_cols") == td.get("n_cols")):
+        page = getattr(ct, "page", "?")
+        if changed:
+            record_fallback(SIDE_BY_SIDE_EVENT, detail=f"p{page}:{changed}")
+        if moved:
+            record_fallback(STUB_LABEL_EVENT, detail=f"p{page}:{moved}")
+        return td2
+    ct.df = accepted
+    return td
+
+
 def _camelot_table_to_dict(
     ct,
     idx: int,
@@ -716,6 +763,7 @@ def _camelot_table_to_dict(
     allow_categorical: bool = False,
     own_caption_number: int | None = None,
     layout=None,
+    rule_bounded: bool = False,
 ) -> Table | None:
     """Convert one Camelot table object into a docpluck Table dict, applying the
     shared row-cleaning pipeline (running-header strip, caption-row drop, prose
@@ -787,11 +835,18 @@ def _camelot_table_to_dict(
     row_matrix = [row_matrix[i] for i in _k]
     keep_rows = [keep_rows[i] for i in _k]
     # Trim trailing prose rows (Camelot sometimes bundles a small real table at
-    # the top of a 2-column page with body prose below).
-    _k = _keep_after_prose_tail_trim(row_matrix)
-    row_matrix = [row_matrix[i] for i in _k]
-    keep_rows = [keep_rows[i] for i in _k]
-    if not _is_table_like(row_matrix):
+    # the top of a 2-column page with body prose below). Not in a region that
+    # ends at the table's own closing rule: no body prose lies inside it, and a
+    # table of worded cells read as "prose" lost every row from its fourth on
+    # (10.1177/01461672251327169 Table 5: 53 Camelot rows, 11 kept).
+    if not rule_bounded:
+        _k = _keep_after_prose_tail_trim(row_matrix)
+        if len(_k) < len(row_matrix):
+            record_fallback("camelot_prose_tail_rows_trimmed",
+                            detail=f"{len(row_matrix)}->{len(_k)}")
+        row_matrix = [row_matrix[i] for i in _k]
+        keep_rows = [keep_rows[i] for i in _k]
+    if not _is_table_like(row_matrix) and not rule_bounded:
         record_fallback("camelot_table_failed_table_likeness_gate",
                         detail=f"{len(row_matrix)}rows")
         return None
@@ -870,7 +925,10 @@ def _camelot_table_to_dict(
     if id_prefix.startswith("region"):
         from .whitespace import _trim_trailing_prose_rows, _whitespace_grid_is_clean
         rows_before = len({c["r"] for c in cells})
-        cells = _trim_trailing_prose_rows(cells, allow_categorical=allow_categorical)
+        # A region that ends at the table's own closing rule holds no body text
+        # below the table to trim (`detect._caption_rule_extent`).
+        if not rule_bounded:
+            cells = _trim_trailing_prose_rows(cells, allow_categorical=allow_categorical)
         rows_after = len({c["r"] for c in cells})
         if rows_after < rows_before:
             # A ROW DELETION MUST LEAVE A TRACE. This trim cuts from the first
@@ -884,6 +942,7 @@ def _camelot_table_to_dict(
             cells,
             allow_categorical=allow_categorical,
             own_caption_number=own_caption_number,
+            rule_bounded=rule_bounded,
         ):
             # A REJECTION IS A DELETION AND MUST LEAVE A TRACE — the same norm
             # the three sibling gates at the top of this function already
@@ -985,6 +1044,9 @@ def _camelot_table_to_dict(
         "cells": cells,
         "html": html,
         "raw_text": "\n".join(raw_row_texts),
+        # Private: the region lay between the table's own rules (dropped by
+        # extract_structured before any table is returned).
+        "_rule_bounded": rule_bounded,
         # Whether `cells[].bbox` is real, and if not, why - never silent.
         "cell_geometry": geometry_reason,
         # Internal-only pairing hint: the table's own absorbed caption number, if
@@ -1128,9 +1190,10 @@ def extract_tables_camelot(
             ct = extend_to_table_bottom(camelot, tmp_path, ct)
             # A minus drawn in a TeX/MathTime symbol font is missing from
             # Camelot's text lines; the page's text layer still holds it.
-            restore_dropped_signs(ct, layout)
-            td = _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold,
-                                        layout=layout)
+            td = _convert_keeping_gates(
+                ct, layout,
+                lambda: _camelot_table_to_dict(ct, idx, accuracy_threshold=accuracy_threshold,
+                                               layout=layout))
             if td is not None:
                 out.append(td)
         return out
@@ -1250,16 +1313,16 @@ def extract_tables_camelot_by_region(
             ct = extend_to_table_bottom(
                 camelot, tmp_path, resplit_merged_columns(camelot, tmp_path, tables[ti], layout)
             )
-            restore_dropped_signs(ct, layout)
-            td = _camelot_table_to_dict(
+            td = _convert_keeping_gates(ct, layout, lambda: _camelot_table_to_dict(
                 ct, 0,
                 accuracy_threshold=accuracy_threshold,
                 id_prefix="region_t",
                 label=spec.get("label"),
-                allow_categorical=bool(spec.get("isolate")),
+                allow_categorical=bool(spec.get("isolate") or spec.get("rule_bounded")),
+                rule_bounded=bool(spec.get("rule_bounded")),
                 own_caption_number=spec.get("number"),
                 layout=layout,
-            )
+            ))
             if td is not None:
                 td["id"] = f"region_{spec['key']}"
                 appended = getattr(ct, "_docpluck_appended_cells", 0)

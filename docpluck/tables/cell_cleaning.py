@@ -34,6 +34,7 @@ v2.3.0 spec (`an internal handoff doc (2026-05-11)`).
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import TYPE_CHECKING, Sequence
 
 from docpluck.telemetry import record_fallback
@@ -850,7 +851,47 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
         s = (label or "").strip()
         return bool(s) and bool(_WRAP_PUNCT_END.search(s) or _CONJUNCTION_END.search(s))
 
+    # In a table of WORDS (no data value anywhere: a design, deviations or
+    # hypotheses table) the wrap of a text cell is trusted when the evidence is
+    # in the cell itself: the cell above breaks off mid-phrase ("Same, with an"
+    # / "extension", "... in the United" / "States.", 10.1177/01461672251327169
+    # Table 5, p9), or the line opens lowercase. A row carrying its own label
+    # joins only when it has at least two cells and every one is a lowercase
+    # wrap of the text cell above it ("Replication" / "classification",
+    # "Close to far" / "replication"): one lowercase line alone in the label
+    # column can be another column's text (see ``_is_data_row``).
+    def _word_grid_wrap(row: list[str], parent: list[str], labelled: bool) -> bool:
+        nz = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+        if not nz or (labelled and len(nz) < 2):
+            return False
+        for i, v in nz:
+            if i >= len(parent):
+                return False
+            p = (parent[i] or "").strip()
+            if not p or not re.search(r"[A-Za-z]", p) or _DATA_VALUE_CELL_RE.match(p):
+                return False
+            # A lowercase opening is evidence only in a column whose rows open
+            # with a capital: 10.1098/rsos.140072 Table 2 prints every label and
+            # description lowercase ("overt aggression" / "restrained
+            # aggression"), and its four rows were joined into one.
+            lower = (bool(_LOWER_WORD_START.match(v)) and not re.search(r"\d", v)
+                     and i in capital_columns)
+            if labelled and not lower:
+                return False
+            if not lower and not _cell_looks_incomplete(p):
+                return False
+        return True
+
     rows = _attach_detached_sign_rows(rows)
+    word_grid = len(rows) >= 3 and not any(_is_data_row(r) for r in rows)
+    # Columns whose cells, on rows that carry a label, mostly open with a capital.
+    capital_columns: set[int] = set()
+    for ci in range(max((len(r) for r in rows), default=0)):
+        opens = [(r[ci] or "").strip()[:1] for r in rows
+                 if r and (r[0] or "").strip() and ci < len(r) and (r[ci] or "").strip()]
+        letters = [o for o in opens if o.isalpha()]
+        if letters and 2 * sum(o.isupper() for o in letters) > len(letters):
+            capital_columns.add(ci)
     lowercase_labels = _labels_are_lowercase(rows)
     section_rows = _recurring_section_rows(rows)
     out: list[list[str]] = []
@@ -874,7 +915,10 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             out
             and first
             and rest_has_content
-            and _text_cell_wrap(row, out[-1], label_ok=True)
+            and (
+                _text_cell_wrap(row, out[-1], label_ok=True)
+                or (word_grid and _word_grid_wrap(row, out[-1], labelled=True))
+            )
             and not _labels_next_row(nxt)
         ):
             parent = out[-1]
@@ -898,6 +942,7 @@ def _merge_continuation_rows(rows: list[list[str]]) -> list[list[str]]:
             and (
                 _looks_prose_like(row[1:])
                 or (_text_cell_wrap(row, out[-1]) and not _labels_next_row(nxt))
+                or (word_grid and _word_grid_wrap(row, out[-1], labelled=False))
             )
             and not _prose_onto_value(row, out[-1])
             and not _row_has_own_values(row, out[-1])
@@ -1257,8 +1302,13 @@ def _recurring_section_rows(grid: list[list[str]]) -> set[int]:
     return found
 
 
+# A spanner over three stacked label lines is four header rows
+# (10.1177/01461672251327169 Table 7, p12).
+_MAX_HEADER_ROWS = 4
+
+
 def _header_row_count(merged: list[list[str]], n_cols: int) -> int:
-    """How many of ``merged``'s top rows form the header (1 to 3).
+    """How many of ``merged``'s top rows form the header (1 to 4).
 
     A header-like row below the first extends the header. In a grid that holds
     no data value anywhere below its first row, "header-like" separates nothing
@@ -1274,8 +1324,13 @@ def _header_row_count(merged: list[list[str]], n_cols: int) -> int:
     )
     n_header = 1
     section_rows = _recurring_section_rows(merged)
-    for k in range(1, min(3, len(merged))):
+    for k in range(1, min(_MAX_HEADER_ROWS, len(merged))):
         if _is_group_separator(merged[k], n_cols) or k in section_rows:
+            break
+        # A fourth header row only under stacked label lines (stub cell empty,
+        # 10.1177/01461672251327169 Table 7); under a labelled row it is the
+        # heuristic eating one more data row (10.5281/zenodo.21911212 Table 10).
+        if k >= 3 and (merged[k - 1][0] or "").strip():
             break
         # A row label printed alone directly above a data row opens a body
         # block ("Continued smoking" over "Baseline 4.31 (3.67)",
@@ -1455,6 +1510,69 @@ def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
 _SUFFIX_OPEN_PUNCT_RE = re.compile(r"[-—–:]\s*$")
 
 
+_STACKED_LABEL_MAX_WORDS = 3
+
+
+def _has_label_char(s: str) -> bool:
+    """A letter, digit or % -- not a modifier letter or accent (U+02C6 "ˆ"
+    stands in for a lost "=" in 10.1080/01650250143000102 Table 3)."""
+    return any(c == "%" or unicodedata.category(c) in ("Lu", "Ll", "Lt", "Lo", "Nd", "No")
+               for c in s)
+
+
+def _fold_stacked_label_rows(header_rows: list[list[str]]) -> list[list[str]]:
+    """Join column labels printed as a stack of short lines into one row.
+
+    10.1177/01461672251327169 Table 7 (p12) prints "Actual / intensity /
+    average", "Intensity / estimate / mean", "Error / mean" and "Error / SD"
+    as stacks over the column row "Experiences | average | mean | mean | SD |
+    t-stat ...", under a spanner row ("Participant-level analyses"). Each
+    line came out as a header row of its own, so no column had its name.
+
+    Working up from the last header row, a row joins the row below when its
+    stub cell is empty, every cell is a short label, and every cell sits over
+    a filled cell of the row directly below it -- a column of stacked lines.
+    The spanner fails that test (nothing is printed directly under it before
+    the column row), so it stays its own row. The lines join with the same
+    line break the super-header fold uses (``flatten`` reads it); a line
+    ending in a hyphen joins without one ("Well-" / "being").
+
+    Nothing folds onto a bottom row that holds a data value (the header count
+    can take the first data row: 10.1525/collabra.117677 Table 1 "... | NA"),
+    and a cell with an unclosed parenthesis is a spanner split across columns,
+    not a stacked line (10.1080/01650250143000102 Table 3 "Boys (N" | "15)").
+    """
+    if len(header_rows) < 2:
+        return header_rows
+    n = max(len(r) for r in header_rows)
+    rows = [list(r) + [""] * (n - len(r)) for r in header_rows]
+    if any(_is_data_value_cell((c or "").strip()) for c in rows[-1] if (c or "").strip()):
+        return header_rows
+    folded = rows[-1]
+    k = len(rows) - 2
+    while k >= 0:
+        row, below = rows[k], rows[k + 1]
+        cells = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+        if (
+            not cells
+            or (row[0] or "").strip()
+            or any(len(v.split()) > _STACKED_LABEL_MAX_WORDS or _is_data_value_cell(v)
+                   or v.count("(") != v.count(")") or not _has_label_char(v)
+                   for _, v in cells)
+            or any(not (below[i] or "").strip() for i, _ in cells)
+        ):
+            break
+        folded = [
+            ((row[i] or "").strip() + ("" if (row[i] or "").strip().endswith("-") else _MERGE_SEPARATOR) + f)
+            if (row[i] or "").strip() else f
+            for i, f in enumerate(folded)
+        ]
+        k -= 1
+    if k == len(rows) - 2:
+        return header_rows
+    return rows[:k + 1] + [folded]
+
+
 def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
     """Fold a super-header row into the row directly below it, column-wise."""
     if len(header_rows) < 2:
@@ -1505,6 +1623,19 @@ def _fold_super_header_rows(header_rows: list[list[str]]) -> list[list[str]]:
         return [sub] + header_rows[2:]
     if len(populated_sup_idx) == n:
         return header_rows
+    # A line set only over the stub and at least three times as long as the
+    # stub label below it is a panel label or a stray line running across the
+    # table, not a stacked line of that label (one label's lines share its
+    # column's width). It stays its own header row (10.1177/01461672251327169
+    # Table 2: "Replication: prevalence estimations<br>No").
+    s0, b0 = (sup[0] or "").strip(), (sub[0] or "").strip()
+    # Only a single printed line: a label already folded from several lines
+    # (a note paragraph spread over header rows, 10.1037/a0025767 p13-14) is
+    # not split back apart.
+    if (populated_sup_idx == [0] and b0 and len(s0) >= 15 and len(s0) >= 3 * len(b0)
+            and _MERGE_SEPARATOR not in s0
+            and sum(1 for c in sub if (c or "").strip()) >= 2):
+        return [header_rows[0]] + _fold_super_header_rows(header_rows[1:])
     for i in populated_sup_idx:
         if not (sub[i] or "").strip():
             return header_rows
@@ -1738,6 +1869,7 @@ def cells_grid_to_html(
     header_rows = merged[:n_header]
     body = merged[n_header:]
 
+    header_rows = _fold_stacked_label_rows(header_rows)
     header_rows = _fold_super_header_rows(header_rows)
     header_rows = _fold_suffix_continuation_columns(header_rows)
 

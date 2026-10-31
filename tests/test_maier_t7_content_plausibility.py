@@ -96,6 +96,11 @@ def test_maier_table7_data_is_recoverable_without_camelot():
 
     t7 = next((t for t in result["tables"] if t.get("label") == "Table 7"), None)
     assert t7 is not None, "Table 7 caption not detected"
-    raw = t7.get("raw_text") or ""
-    missing = [v for v in _GOLD_T7_VALUES if v not in raw]
-    assert not missing, f"raw_text channel no longer captures Table 7: missing {missing}"
+    # Without Camelot the values used to arrive only as raw_text; since the
+    # caption-only region reaches the table's own rules (2026-10-30) the
+    # whitespace path captures them as cells. Either channel proves the premise.
+    haystack = (t7.get("raw_text") or "") + " ".join(
+        (c.get("text") or "") for c in (t7.get("cells") or [])
+    )
+    missing = [v for v in _GOLD_T7_VALUES if v not in haystack]
+    assert not missing, f"no non-Camelot channel captures Table 7: missing {missing}"

@@ -102,6 +102,16 @@ def _unstructured_blocks(md: str) -> str:
     return re.sub(r"\s+", " ", "\n".join(blocks))
 
 
+def _table_section(md: str, n: int) -> str:
+    """Whitespace-normalized text of ``### Table n`` up to the next heading,
+    tags stripped, whichever form the table took (structured grid or
+    ``unstructured-table`` fallback). Since 2.4.157 chan_feldman Table 1 is a
+    structured grid: its region runs between its own rules."""
+    m = re.search(rf"^### Table {n}\n(.*?)(?=^#{{2,3}} |\Z)", md, re.DOTALL | re.MULTILINE)
+    assert m, f"Table {n} missing from the render"
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", m.group(1)))
+
+
 @pytest.fixture(scope="module")
 def chan_md() -> str:
     key = "10.1080__02699931.2024.2434156"
@@ -114,7 +124,7 @@ def chan_md() -> str:
 def test_t1_note_anchor_trims_trailing_prose(chan_md: str):
     """Table 1: body prose after the ``Note:`` footnote must be trimmed from the
     fallback block (FAIL at HEAD — it was swallowed)."""
-    blocks = _unstructured_blocks(chan_md)
+    blocks = _unstructured_blocks(chan_md) + _table_section(chan_md, 1)
     assert "Our main focus was the replication" not in blocks, (
         "chan_feldman T1 still swallows post-Note Discussion prose — the "
         "Note-anchor trim in _extract_table_body_text did not fire."
@@ -125,7 +135,7 @@ def test_t1_note_anchor_trims_trailing_prose(chan_md: str):
 def test_t1_table_content_and_note_retained(chan_md: str):
     """FP guard: the Note-anchor must KEEP the table content + the note itself
     (hypotheses come before the note; trimming starts after it)."""
-    blocks = _unstructured_blocks(chan_md)
+    blocks = _table_section(chan_md, 1)
     assert "There is a positive association" in blocks, "T1 hypothesis content lost (over-trim)"
     # The note moved from the cell list to Table["footnote"]; the rendered
     # Markdown keeps the body copy pdftotext already gave it (render prints

@@ -500,6 +500,11 @@ def _extract_pdf_structured(
         for which, td in (("region", region_td), ("auto", auto_td)):
             if td is None or not grid_is_body_prose(td.get("cells") or []):
                 continue
+            # A region between the table's own top and closing rules holds no
+            # body text: a design or measures table of sentence-like cells
+            # (10.1177/01461672251327169 Table 4, p7) is its content.
+            if which == "region" and td.get("_rule_bounded"):
+                continue
             record_fallback(
                 "table_candidate_rejected_as_body_prose",
                 detail=f"{cap.label or '?'}:{which}",
@@ -861,6 +866,7 @@ def _extract_pdf_structured(
     from .tables.arm_spans import anchor_super_header_spans
     for t in tables:
         t.pop("_caption_hint_number", None)
+        t.pop("_rule_bounded", None)
         # A spanning super-header label ("Target article" / "Replication") lost
         # its span in Camelot; read it back off the page's rules so flatten binds
         # each column to the arm the page prints it under. Every PDF table passes
@@ -1653,6 +1659,10 @@ def _region_driven_capture(
                 # stream column detection isn't computed across both narrow
                 # columns at once (which collapses each to 1 column).
                 "isolate": col is not None,
+                # The region ends at the table's own closing rule, so the rows
+                # inside are the table's: a table of worded cells (a design or
+                # deviations table) is not body prose to be trimmed away.
+                "rule_bounded": bool(getattr(region, "rule_bounded", False)),
             })
             cap_by_key[key] = c
             if col is not None:
@@ -3197,6 +3207,17 @@ def _trim_table_caption_at_cell_region(region: str, *, lone_symbols: bool = True
         )
     ):
         cut_line_idx = nonblank[1][0]
+        # A title line that ends on a connective ("... Study 3 Versus") is
+        # not finished: its next line, when that line closes the sentence,
+        # is the title's end, not a column header
+        # (10.1177/01461672251327169 Table 9, p14: "Versus" / "Replication.").
+        nxt = nonblank[1][1].strip()
+        if (
+            _ends_on_connective(first)
+            and re.search(r"[.!?][\"'\)\]]?$", nxt)
+            and len(nonblank) >= 3
+        ):
+            cut_line_idx = nonblank[2][0]
         return "\n".join(lines[:cut_line_idx])
     # Fallback rule: nonblank[0] is just a bare label ("TABLE 13") or an
     # unterminated title that may wrap. Locate the linearized cell region
@@ -3214,6 +3235,17 @@ def _trim_table_caption_at_cell_region(region: str, *, lone_symbols: bool = True
             cut_line_idx = window[0][0]
             return "\n".join(lines[:cut_line_idx])
     return region
+
+
+_CONNECTIVE_END_RE = re.compile(
+    r"\b(?:versus|vs\.?|and|or|of|with|between|the|a|an|to|for|in|on|by|from|among)$",
+    re.IGNORECASE,
+)
+
+
+def _ends_on_connective(line: str) -> bool:
+    """True when ``line`` ends on a word that cannot end a title."""
+    return bool(_CONNECTIVE_END_RE.search(line.rstrip()))
 
 
 def _accumulated_is_label_only(text: str) -> bool:

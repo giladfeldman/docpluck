@@ -190,3 +190,82 @@ def test_without_layout_the_step_does_not_claim_to_have_run():
         "Overall, N = 2,5801 participants.", NormalizationLevel.academic
     )
     assert "W0p_superscript_layout" not in report.steps_applied
+
+
+# ── page and token bounds (2026-10-30) ─────────────────────────────────
+
+def test_a_raised_minus_exponent_is_marked():
+    """10.1098/rsos.240120 p17 prints `10` + raised `–3` ("10–3 HCl")."""
+    layout = _FakeLayout(_run("10", 9.0, 630.7) + _run("\u20133", 5.4, 629.6))
+    assert recover_superscript_via_layout("a 10\u20133 HCl", layout) == "a 10^-3 HCl"
+
+
+def test_a_lone_raised_sign_is_not_a_marker():
+    layout = _FakeLayout(_run("10", 9.0, 630.7) + _run("\u2013", 5.4, 629.6))
+    assert recover_superscript_via_layout("a 10\u2013 b", layout) == "a 10\u2013 b"
+
+
+def test_evidence_on_one_page_never_rewrites_another_page():
+    """The same paper prints "10–30 years" on p6; the layout's `10`+`–3` is on
+    p17. The first textual `10–3` used to be rewritten to `10^-30 years`."""
+    layout = _FakeLayout(_run("x", 9.0, 10.0),
+                         _run("10", 9.0, 630.7) + _run("\u20133", 5.4, 629.6))
+    text = "the last 10\u201330 years\fin a 10\u20133 HCl"
+    assert recover_superscript_via_layout(text, layout) == (
+        "the last 10\u201330 years\fin a 10^-3 HCl"
+    )
+
+
+def test_a_longer_number_is_not_a_site():
+    """`2,5801` must not be found inside `2,58012`."""
+    layout = _FakeLayout(_run("2,580", 8.0, 80.52) + _run("1", 6.64, 78.94))
+    assert recover_superscript_via_layout("N = 2,58012", layout) == "N = 2,58012"
+
+
+def test_unaligned_pages_touch_only_a_unique_token():
+    """Text pages that do not line up with the layout's give no page bound, so
+    a token printed twice is left alone rather than guessed."""
+    layout = _FakeLayout(_run("2,580", 8.0, 80.52) + _run("1", 6.64, 78.94),
+                         _run("x", 8.0, 10.0))
+    assert recover_superscript_via_layout("N = 2,5801 and N = 2,5801", layout) == (
+        "N = 2,5801 and N = 2,5801"
+    )
+    assert recover_superscript_via_layout("N = 2,5801", layout) == "N = 2,580^1"
+
+
+def test_a_trailing_page_break_keeps_pages_aligned():
+    """pdftotext ends its text with a form feed: one layout page, two segments."""
+    layout = _FakeLayout(_run("10", 9.0, 50.0) + _run("5", 5.4, 49.0))
+    text = "BF10 > 105: and BF10 > 105.\f"
+    assert recover_superscript_via_layout(text, layout) == "BF10 > 10^5: and BF10 > 105.\f"
+
+
+# ── a marker raised after a WORD (10.1177/01461672251327169 p1) ─────────
+
+def _word_line():
+    return (_run("positive ", 9.5, 400.0) + _run("emotions,", 9.5, 400.0)
+            + _run("1", 6.5, 397.8) + _run(" and", 9.5, 400.0))
+
+
+def test_a_raised_marker_after_a_word_is_marked():
+    """The page prints `emotions,` + raised `1`; pdftotext gives `emotions,1`."""
+    layout = _FakeLayout(_word_line())
+    assert recover_superscript_via_layout(
+        "peers' positive emotions,1 and that", layout
+    ) == "peers' positive emotions,^1 and that"
+
+
+def test_a_word_marker_needs_a_word_start():
+    """`emotions,1` inside a longer token (`xemotions,1`) is not this site."""
+    layout = _FakeLayout(_word_line())
+    assert recover_superscript_via_layout("xemotions,1 and", layout) == "xemotions,1 and"
+
+
+def test_same_size_digits_after_a_word_are_not_a_marker():
+    layout = _FakeLayout(_run("Study ", 9.5, 400.0) + _run("Item1", 9.5, 400.0))
+    assert recover_superscript_via_layout("Study Item1 here", layout) == "Study Item1 here"
+
+
+def test_four_raised_digits_after_a_word_are_not_a_marker():
+    layout = _FakeLayout(_run("emotions", 9.5, 400.0) + _run("1234", 6.5, 397.8))
+    assert recover_superscript_via_layout("emotions1234", layout) == "emotions1234"

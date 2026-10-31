@@ -1256,6 +1256,7 @@ def _whitespace_grid_is_clean(
     allow_categorical: bool = False,
     own_caption_number: int | None = None,
     rotated_frame: bool = False,
+    rule_bounded: bool = False,
 ) -> bool:
     """Accept a whitespace/char grid ONLY when it looks like a real DATA table.
 
@@ -1390,7 +1391,11 @@ def _whitespace_grid_is_clean(
     # NOT a stat/label cell), and reject when such rows are a large share of the
     # grid. A real data/label table has almost none (its cells are numbers and
     # short labels), so this never trips a clean table.
-    if total_rows and prose_cell_rows * 3 >= total_rows:
+    # ``rule_bounded``: the region ends at the table's own closing rule
+    # (`detect._caption_rule_extent`), so its rows lie between the table's rules
+    # and cannot be over-captured body text; a table of worded cells (a
+    # deviations table: 10.1177/01461672251327169 Table 5) is still a table.
+    if total_rows and prose_cell_rows * 3 >= total_rows and not rule_bounded:
         return False
     if allow_categorical:
         # Categorical table: no numeric requirement. The grid must still be

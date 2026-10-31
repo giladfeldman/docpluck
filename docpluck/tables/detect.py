@@ -24,6 +24,7 @@ layout text at offsets that belong to the text channel's string).
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Literal
@@ -44,6 +45,9 @@ class CandidateRegion:
     bbox: Bbox                        # pdfplumber top-down: (x0, top, x1, bottom)
     geometry_signal: GeometrySignal
     caption_match: CaptionMatch | None
+    # True when the bbox ends at the table's own closing rule
+    # (`_caption_rule_extent`): what lies inside is the table, not body text.
+    rule_bounded: bool = False
 
 
 SEARCH_BELOW_PT: float = 250.0
@@ -97,6 +101,34 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
 
     full_bbox = _union(caption_bbox, geom_bbox)
 
+    # A caption_only band is the caption's width -- unless the table's own top
+    # rule, drawn directly under the caption from the caption's left edge, says
+    # the table is wider. See ``_caption_top_rule_x1``.
+    rule_bounded = False
+    if signal == "caption_only":
+        extent = _caption_rule_extent(
+            page_obj, caption_bbox, band_bottom=float(getattr(page_obj, "height", 0.0) or full_bbox[3])
+        )
+        if extent is not None and extent[0] > full_bbox[2]:
+            rule_x1, rule_bottom = extent
+            full_bbox = (full_bbox[0], full_bbox[1], rule_x1, rule_bottom)
+            rule_bounded = True
+    elif signal == "whitespace":
+        # An aligned run stops where the alignment breaks: at a panel heading
+        # inside the table. 10.1177/01461672251327169 p4 (Table 2) prints two
+        # panels, "Replication: prevalence estimations" and "Extensions:
+        # intensity estimations", each under its own header rule, between one
+        # top rule and one closing rule of the table's width; the run ended at
+        # the first panel's rule and rows 2c-6e stayed loose in the body. The
+        # region is taken down to the table's closing rule (never across
+        # another caption, never wider), only when that rule lies below it.
+        extent = _caption_rule_extent(
+            page_obj, caption_bbox, band_bottom=float(getattr(page_obj, "height", 0.0) or full_bbox[3])
+        )
+        if extent is not None and extent[1] > full_bbox[3] + _PANEL_EXTEND_MIN_PT:
+            full_bbox = (full_bbox[0], full_bbox[1], full_bbox[2], extent[1])
+            rule_bounded = True
+
     # A GRID-located region must span the full width of the rows it already
     # contains — see ``_widen_to_left_aligned_rows``. Gated on having actually
     # located a grid: the ``caption_only`` fallback found none, so its band is a
@@ -116,7 +148,11 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
     if signal == "whitespace":
         full_bbox = _widen_to_left_aligned_rows(layout, page=cap.page, bbox=full_bbox)
 
-    footnote = _detect_footnote_below(
+    # Not below a region that ends at the table's closing rule: what follows that
+    # rule is the note or the body, and on 10.1177/01461672251327169 p6 (Table 3)
+    # the "footnote" taken in was three lines of Method prose, which the grid
+    # then carried as rows. The note stays in the text channel.
+    footnote = None if rule_bounded else _detect_footnote_below(
         layout, page=cap.page, bbox=full_bbox, grid_bottom_known=(signal == "lattice")
     )
     if footnote is not None:
@@ -128,7 +164,211 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
         bbox=full_bbox,
         geometry_signal=signal,
         caption_match=cap,
+        rule_bounded=rule_bounded,
     )
+
+
+# A table's top rule sits within this many points below its caption line, and
+# starts within this many points of the caption's left edge.
+_CAPTION_RULE_GAP_PT: float = 12.0
+_CAPTION_RULE_X0_TOL_PT: float = 6.0
+# An aligned-run region is taken down to the closing rule only when that rule
+# is more than a line below the run's end (a run ending at its own closing
+# rule is already complete).
+_PANEL_EXTEND_MIN_PT: float = 12.0
+# How far below the caption's own rule a narrower table rule may start.
+_NEXT_RULE_FAMILY_PT: float = 30.0
+# A stroke is a rule when it is at most this tall and at least 5x wider than tall.
+_RULE_MAX_THICKNESS_PT: float = 2.0
+
+
+def _thin_horizontal_strokes(page_obj) -> list[dict]:
+    """Horizontal rules however the PDF draws them: as a line, or as a thin
+    filled rect or curve.
+
+    ``_coalesced_horizontal_rules`` reads ``lines`` only. Taylor & Francis pages
+    draw every table rule as a filled 0.5pt-tall CURVE and have no ``lines`` at
+    all (`10.1080/02699931.2024.2434156` p9 and p13: 0 lines, 0 rects, 22 and 16
+    curves), so that reader sees no rule on them."""
+    out: list[dict] = []
+    for o in (*(page_obj.lines or ()), *(page_obj.rects or ()), *(page_obj.curves or ())):
+        try:
+            x0, x1, top, bottom = float(o["x0"]), float(o["x1"]), float(o["top"]), float(o["bottom"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        height = bottom - top
+        if height <= _RULE_MAX_THICKNESS_PT and (x1 - x0) > max(height, 0.5) * 5:
+            out.append({"x0": x0, "x1": x1, "top": top, "bottom": bottom})
+    return out
+
+
+# Collinear segments closer than this join into one rule.
+_RULE_JOIN_GAP_PT: float = 2.0
+
+
+def _joined_horizontal_strokes(page_obj) -> list[dict]:
+    """``_thin_horizontal_strokes`` with collinear touching segments joined.
+
+    Some tables draw each rule as one segment per column, end to end: on
+    10.1177/01461672251327169 p9 (Table 5) the header rule at y=103 and the
+    closing rule at y=654 are four segments each (x=63-144, 144-237, 237-442,
+    442-564) while the top rule at y=84 is one stroke from 63 to 564. Read
+    segment by segment, only the top rule spans the table, the closing rule is
+    never found, and the region stopped at a third of the table's height. Joined,
+    they are what the page prints: three rules from x=63 to x=564."""
+    strokes = sorted(_thin_horizontal_strokes(page_obj), key=lambda r: (round(r["top"]), r["x0"]))
+    out: list[dict] = []
+    for r in strokes:
+        prev = out[-1] if out else None
+        if (prev is not None and abs(r["top"] - prev["top"]) <= 1.0
+                and r["x0"] <= prev["x1"] + _RULE_JOIN_GAP_PT):
+            prev["x1"] = max(prev["x1"], r["x1"])
+            prev["bottom"] = max(prev["bottom"], r["bottom"])
+            continue
+        out.append(dict(r))
+    return out
+
+
+_CAPTION_LINE_RE = re.compile(r"^(?:Table|TABLE|Figure|FIGURE|Fig\.)\s*[A-Z]?\d")
+
+
+def _caption_rule_extent(page_obj, caption_bbox: Bbox, *, band_bottom: float) -> tuple[float, float] | None:
+    """``(x1, bottom)`` of a caption_only table bounded by its own rules, or None.
+
+    ``x1`` is the right end of the table's top rule (``_caption_top_rule_x1``).
+    ``bottom`` is the table's closing rule: the last rule of the SAME extent
+    below the top rule, down to ``band_bottom`` (the caller passes the page
+    bottom: a tall table's closing rule lies far below a fixed search band --
+    p9 Table 4 closes at y=583), stopping before a rule that has another caption
+    line above it (a stacked table's top rule). Required: at least two such
+    rules below the top rule -- header rule and closing rule. With fewer the one
+    rule found may be the header rule, the table's extent is not proven, and the
+    result is None: the region is left exactly as it was. Widening it but
+    keeping the search band's depth let Camelot take in the note and body text
+    under the table (10.1080/23743603.2021.1878340 p15 Table 3: two prose rows
+    joined the grid and the per-arm records were lost).
+
+    Why the bottom matters: widened to the table's width but left at the band's
+    depth, the region reaches into the two-column body prose under the table
+    and Camelot's grid fails the clean gate (`10.1080/02699931.2024.2434156` p7
+    Table 2: three rules at y=62/74/122, prose from y~170; the band ran to
+    y=311 and the region grid was refused).
+    """
+    x1 = _caption_top_rule_x1(page_obj, caption_bbox)
+    if x1 is None:
+        return None
+    found = _rule_family_extent(page_obj, caption_bbox, x1, band_bottom)
+    if found is not None:
+        return found
+    # The rule under the caption can be a separator wider than the table: on
+    # 10.1177/01461672251327169 p4 it runs x=48-549 at y=84, and Table 2's own
+    # six rules run x=48-510 from y=103 down to y=643. When the first width has
+    # too few rules, the next family starting at the caption's edge directly
+    # below it (within _NEXT_RULE_FAMILY_PT) is the table's.
+    cx0, _ctop, _cx1, cbottom = caption_bbox
+    below = sorted(
+        (r for r in _joined_horizontal_strokes(page_obj)
+         if abs(r["x0"] - cx0) <= _CAPTION_RULE_X0_TOL_PT
+         and abs(r["x1"] - x1) > _CAPTION_RULE_X0_TOL_PT
+         and cbottom - 1.0 <= r["top"] <= cbottom + _CAPTION_RULE_GAP_PT + _NEXT_RULE_FAMILY_PT),
+        key=lambda r: r["top"],
+    )
+    if not below:
+        return None
+    return _rule_family_extent(page_obj, caption_bbox, below[0]["x1"], band_bottom)
+
+
+def _rule_family_extent(page_obj, caption_bbox: Bbox, x1: float, band_bottom: float) -> tuple[float, float] | None:
+    """``(x1, bottom)`` from the rules of one width (``x1``) starting at the
+    caption's left edge, below the caption; None with fewer than three."""
+    cx0, _ctop, _cx1, cbottom = caption_bbox
+    same = sorted(
+        (r for r in _joined_horizontal_strokes(page_obj)
+         if abs(r["x0"] - cx0) <= _CAPTION_RULE_X0_TOL_PT
+         and abs(r["x1"] - x1) <= _CAPTION_RULE_X0_TOL_PT
+         and cbottom - 1.0 <= r["top"] <= band_bottom),
+        key=lambda r: r["top"],
+    )
+    # A curve or rect reports both of its edges; one drawn rule, one entry.
+    rules: list[dict] = []
+    for r in same:
+        if rules and r["top"] - rules[-1]["top"] <= _RULE_MAX_THICKNESS_PT:
+            continue
+        rules.append(r)
+    # pdfplumber splits "Table 9." into the words "Table" and "9.", so a label
+    # word is read together with the word after it on its line.
+    words = list(page_obj.words or ())
+    caption_tops = []
+    for i, w in enumerate(words):
+        if abs(float(w["x0"]) - cx0) > _CAPTION_RULE_X0_TOL_PT:
+            continue
+        text = str(w.get("text", ""))
+        nxt = words[i + 1] if i + 1 < len(words) else None
+        if nxt is not None and abs(float(nxt["top"]) - float(w["top"])) <= 1.0:
+            text = text + " " + str(nxt.get("text", ""))
+        if _CAPTION_LINE_RE.match(text):
+            caption_tops.append(float(w["top"]))
+    kept = rules[:1]
+    for r in rules[1:]:
+        if any(kept[-1]["top"] < t < r["top"] for t in caption_tops):
+            break
+        kept.append(r)
+    if len(kept) < 3 and not (len(kept) == 2 and _note_opens_under(words, cx0, kept[-1])):
+        return None
+    return (x1, kept[-1]["bottom"] + 1.0)
+
+
+# The first line under a table's closing rule, when the table has a note.
+_NOTE_UNDER_RULE_RE = re.compile(r"^(?:Notes?|Sources?)\s*[.:]", re.IGNORECASE)
+_NOTE_UNDER_RULE_GAP_PT: float = 14.0
+
+
+def _note_opens_under(words: list, cx0: float, rule: dict) -> bool:
+    """True when the first line under ``rule``, at the caption's left edge, is a
+    table note ("Note. All materials ..."). With only a top rule and one more
+    rule, the second could be a header rule; a note printed directly under it
+    says it closes the table (10.1177/01461672251327169 p7, Table 4: rules at
+    y=84 and y=647, "Note." at y=650)."""
+    below = sorted(
+        (w for w in words
+         if abs(float(w["x0"]) - cx0) <= _CAPTION_RULE_X0_TOL_PT
+         and rule["bottom"] <= float(w["top"]) <= rule["bottom"] + _NOTE_UNDER_RULE_GAP_PT),
+        key=lambda w: float(w["top"]),
+    )
+    return bool(below) and bool(_NOTE_UNDER_RULE_RE.match(str(below[0].get("text", ""))))
+
+
+def _caption_top_rule_x1(page_obj, caption_bbox: Bbox) -> float | None:
+    """Right end of the table's top rule, when one is drawn directly under the
+    caption starting at the caption's left edge; else None.
+
+    WHY. When no grid geometry is found the region falls back to ``caption_only``
+    at the CAPTION's width. A one-line caption is often narrower than its table,
+    and the columns right of the caption's end are never handed to Camelot -- the
+    grid is delivered as complete with those columns missing. Measured on
+    `10.1080/02699931.2024.2434156`: p13 Table 8's caption ends at x=310.9, its
+    correlation columns 2-5 sit at x=311-484, and the grid kept column 1 only;
+    p9 Table 4's caption ends at x=226.3 over a design table printed to x=487.8,
+    and the grid was 2x2. Both draw a rule from x=48.0 to x=487.8 under the
+    caption.
+
+    WHY A RULE AND NOT THE PAGE'S CONTENT WIDTH. Widening a caption_only band to
+    the page content is the documented regression on that same p13 (Table 9's
+    8 columns collapsed to 2). A rule is the table's own printed statement of its
+    width: it starts under the caption's left edge, lies within a line height of
+    it, and a table rule does not cross into a neighbouring table in another page
+    column (whose rules start at that column's edge, not this caption's).
+    Typographic evidence; paper-, font- and publisher-agnostic.
+    """
+    cx0, _ctop, cx1, cbottom = caption_bbox
+    best: float | None = None
+    for r in _joined_horizontal_strokes(page_obj):
+        if not (cbottom - 1.0 <= r["top"] <= cbottom + _CAPTION_RULE_GAP_PT):
+            continue
+        if abs(r["x0"] - cx0) > _CAPTION_RULE_X0_TOL_PT or r["x1"] <= cx1:
+            continue
+        best = r["x1"] if best is None else max(best, r["x1"])
+    return best
 
 
 @dataclass(frozen=True)
