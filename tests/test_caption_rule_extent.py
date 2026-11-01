@@ -184,3 +184,24 @@ def test_other_caption_labels_stop_the_walk_too():
             words=[_word(first, 48.0, 272.0), _word(second, 80.0, 272.0)],
         )
         assert _caption_rule_extent(page, CAPTION, band_bottom=310.8) == (487.8, 222.5), first
+
+
+# ---- page furniture is never a table's closing rule (/ship canary 2026-11-01) ----
+
+_PLOS = "vancouver/plos_med_1.pdf"  # 10.1371/journal.pmed.1004323
+
+
+def test_a_page_footer_rule_is_not_a_tables_closing_rule():
+    """10.1371/journal.pmed.1004323 draws a full-width rule at y=744 on every page,
+    the same width as its table rules. Taken as Table 5's closing rule (p11, the
+    table closes at y=309), the region ran through the Results paragraph and the
+    Discussion opening, which became grid rows; the body copy of "During the
+    study, 15 SAEs occurred" was then dropped as a duplicate of the grid."""
+    tables = _tables_of(_PLOS)
+    for label in ("Table 2", "Table 4", "Table 5"):
+        text = " ".join(c["text"] for c in tables[label]["cells"])
+        assert "PLOS Medicine" not in text and "Discussion" not in text, label
+    t5 = " ".join(c["text"] for c in tables["Table 5"]["cells"])
+    assert "During the study" not in t5
+    assert "Main findings" not in t5
+

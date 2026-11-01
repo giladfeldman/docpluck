@@ -38,8 +38,16 @@ The local FastAPI service must be running with the current library:
 
 ```
 cd <app-checkout>/service
-python -m uvicorn app.main:app --port 6117 --env-file .env --workers 4
+python -m uvicorn app.main:app --port 6117 --env-file .env --workers 4 --timeout-worker-healthcheck 1800
 ```
+
+`--timeout-worker-healthcheck 1800` is required with `--workers`: uvicorn's
+supervisor pings each worker and kills one that does not answer within 5 s (the
+default), and a worker busy with a Camelot-heavy paper (nat-comms-3, ~750 s)
+cannot answer. The harness then reports `ConnectionResetError` regressions that
+are not extraction failures (measured 2026-11-01: 3/3 levels reset at the
+default, 3/3 ok at 1800, same code). Railway runs one process, so prod has no
+supervisor ping.
 
 The service uses whatever `docpluck` is importable — for local dev that is the
 editable working-tree install, so it always reflects HEAD. (`requirements.txt`

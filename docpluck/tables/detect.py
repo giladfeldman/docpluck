@@ -105,9 +105,11 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
     # rule, drawn directly under the caption from the caption's left edge, says
     # the table is wider. See ``_caption_top_rule_x1``.
     rule_bounded = False
+    furniture = _furniture_rule_keys(layout)
     if signal == "caption_only":
         extent = _caption_rule_extent(
-            page_obj, caption_bbox, band_bottom=float(getattr(page_obj, "height", 0.0) or full_bbox[3])
+            page_obj, caption_bbox, band_bottom=float(getattr(page_obj, "height", 0.0) or full_bbox[3]),
+            furniture=furniture,
         )
         if extent is not None and extent[0] > full_bbox[2]:
             rule_x1, rule_bottom = extent
@@ -121,9 +123,11 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
         # top rule and one closing rule of the table's width; the run ended at
         # the first panel's rule and rows 2c-6e stayed loose in the body. The
         # region is taken down to the table's closing rule (never across
-        # another caption, never wider), only when that rule lies below it.
+        # another caption, never wider, never to a page's running rule), only
+        # when that rule lies below it.
         extent = _caption_rule_extent(
-            page_obj, caption_bbox, band_bottom=float(getattr(page_obj, "height", 0.0) or full_bbox[3])
+            page_obj, caption_bbox, band_bottom=float(getattr(page_obj, "height", 0.0) or full_bbox[3]),
+            furniture=furniture,
         )
         if extent is not None and extent[1] > full_bbox[3] + _PANEL_EXTEND_MIN_PT:
             full_bbox = (full_bbox[0], full_bbox[1], full_bbox[2], extent[1])
@@ -236,7 +240,9 @@ _CAPTION_LINE_RE = re.compile(
     r"|(?:Supplementa(?:ry|l)|SUPPLEMENTA(?:RY|L))\s+(?:Table|TABLE|Figure|FIGURE|Fig\.))")
 
 
-def _caption_rule_extent(page_obj, caption_bbox: Bbox, *, band_bottom: float) -> tuple[float, float] | None:
+def _caption_rule_extent(
+    page_obj, caption_bbox: Bbox, *, band_bottom: float, furniture: frozenset = frozenset()
+) -> tuple[float, float] | None:
     """``(x1, bottom)`` of a caption_only table bounded by its own rules, or None.
 
     ``x1`` is the right end of the table's top rule (``_caption_top_rule_x1``).
@@ -261,7 +267,7 @@ def _caption_rule_extent(page_obj, caption_bbox: Bbox, *, band_bottom: float) ->
     x1 = _caption_top_rule_x1(page_obj, caption_bbox)
     if x1 is None:
         return None
-    found = _rule_family_extent(page_obj, caption_bbox, x1, band_bottom)
+    found = _rule_family_extent(page_obj, caption_bbox, x1, band_bottom, furniture)
     if found is not None:
         return found
     # The rule under the caption can be a separator wider than the table: on
@@ -279,10 +285,12 @@ def _caption_rule_extent(page_obj, caption_bbox: Bbox, *, band_bottom: float) ->
     )
     if not below:
         return None
-    return _rule_family_extent(page_obj, caption_bbox, below[0]["x1"], band_bottom)
+    return _rule_family_extent(page_obj, caption_bbox, below[0]["x1"], band_bottom, furniture)
 
 
-def _rule_family_extent(page_obj, caption_bbox: Bbox, x1: float, band_bottom: float) -> tuple[float, float] | None:
+def _rule_family_extent(
+    page_obj, caption_bbox: Bbox, x1: float, band_bottom: float, furniture: frozenset = frozenset()
+) -> tuple[float, float] | None:
     """``(x1, bottom)`` from the rules of one width (``x1``) starting at the
     caption's left edge, below the caption; None with fewer than three."""
     cx0, _ctop, _cx1, cbottom = caption_bbox
@@ -290,7 +298,8 @@ def _rule_family_extent(page_obj, caption_bbox: Bbox, x1: float, band_bottom: fl
         (r for r in _joined_horizontal_strokes(page_obj)
          if abs(r["x0"] - cx0) <= _CAPTION_RULE_X0_TOL_PT
          and abs(r["x1"] - x1) <= _CAPTION_RULE_X0_TOL_PT
-         and cbottom - 1.0 <= r["top"] <= band_bottom),
+         and cbottom - 1.0 <= r["top"] <= band_bottom
+         and _rule_key(r) not in furniture),
         key=lambda r: r["top"],
     )
     # A curve or rect reports both of its edges; one drawn rule, one entry.
@@ -320,6 +329,46 @@ def _rule_family_extent(page_obj, caption_bbox: Bbox, x1: float, band_bottom: fl
     if len(kept) < 3 and not (len(kept) == 2 and _note_opens_under(words, cx0, kept[-1])):
         return None
     return (x1, kept[-1]["bottom"] + 1.0)
+
+
+# A rule drawn at the same place on at least this many pages, and on at least
+# half of them, is page furniture: a running header or footer rule.
+_FURNITURE_MIN_PAGES: int = 3
+_FURNITURE_CACHE: dict[int, tuple[object, frozenset]] = {}
+
+
+def _rule_key(r: dict) -> tuple[int, int, int]:
+    return (round(r["x0"]), round(r["x1"]), round(r["top"]))
+
+
+def _furniture_rule_keys(layout) -> frozenset:
+    """Rules repeated at one position across the document's pages.
+
+    10.1371/journal.pmed.1004323 draws a full-width rule at y=744 above the
+    footer of every page, the same width as its table rules. Taken as a table's
+    closing rule, it carried Tables 2, 4 and 5 down through the body prose to the
+    page bottom. A table's rule does not recur at one position on most pages; a
+    page's running rule does. Geometry only, publisher-agnostic."""
+    pages = list(getattr(layout, "pages", None) or ())
+    if len(pages) < _FURNITURE_MIN_PAGES:
+        return frozenset()
+    hit = _FURNITURE_CACHE.get(id(layout))
+    if hit is not None and hit[0] is layout:
+        return hit[1]
+    counts: dict = defaultdict(int)
+    for p in pages:
+        try:
+            keys = {_rule_key(r) for r in _joined_horizontal_strokes(p)}
+        except Exception:  # noqa: BLE001 - an unreadable page adds no furniture
+            continue
+        for k in keys:
+            counts[k] += 1
+    need = max(_FURNITURE_MIN_PAGES, (len(pages) + 1) // 2)
+    found = frozenset(k for k, n in counts.items() if n >= need)
+    if len(_FURNITURE_CACHE) > 8:
+        _FURNITURE_CACHE.clear()
+    _FURNITURE_CACHE[id(layout)] = (layout, found)
+    return found
 
 
 # The first line under a table's closing rule, when the table has a note.

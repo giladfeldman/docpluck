@@ -275,3 +275,54 @@ def test_values_reused_by_a_later_table_are_not_a_copy_of_the_earlier_one():
     tail = out.split("Table 6: Comparison with the original study.")[1]
     for line in COPY:
         assert line in tail.split("### Table 5")[0], "Table 6's own text is kept"
+
+
+def test_a_line_of_words_with_no_number_must_be_in_the_table_verbatim():
+    """10.15626/MP.2022.3108 Table 2 (canary 2026-11-01): the label line
+    "[Positive frame, Opt-out]:" was judged present by its words alone (each is
+    in another condition's label), so the first condition, which only the body
+    holds, was dropped with the copy."""
+    stim = "Notify me about more health surveys."
+    conds = ["Positive frame, Opt-out", "Positive frame, Opt-in", "Positive frame, No-default",
+             "Negative frame, Opt-out", "Negative frame, Opt-in"]
+    breaker = "This sentence was written by the authors and is not in any table."
+    table = ("### Table 2\n\n*Study stimuli.*\n\n```unstructured-table\n"
+             + "\n".join(f"[{c}]:\n{stim}\nYes\nNo" for c in conds[1:]) + "\n" + stim + "\n```\n")
+    body = "\n".join(f"[{c}]:\n{stim}\nYes\nNo" for c in conds) + "\n" + breaker
+    out = _suppress_grid_copied_line_blocks(PROSE_BEFORE + "\n" + body + "\n\n## Results\n\n" + table)
+    assert "[Positive frame, Opt-out]:" in out
+    # The same block, with the table holding every label, is a copy.
+    full = "\n".join(f"[{c}]:\n{stim}\nYes\nNo" for c in conds)
+    table_full = f"### Table 2\n\n*Study stimuli.*\n\n```unstructured-table\n{full}\n```\n"
+    out = _suppress_grid_copied_line_blocks(PROSE_BEFORE + "\n" + body + "\n\n## Results\n\n" + table_full)
+    assert "table-text-duplicate" in out
+
+
+def test_a_table_line_the_methods_also_quote_does_not_keep_the_copy():
+    """10.1177/01461672251327169 Table 4 (/ship QA 2026-11-01): the Measures
+    section quotes a response-scale line that Table 4 also holds, so the body
+    prints it twice and the table once. That is the paper quoting itself, not a
+    sign the copy is ambiguous: the copy is still a copy."""
+    quoted = COPY[0]
+    doc = (PROSE_BEFORE + "\n" + quoted + "\n\n## Results\n\n" + "\n".join(COPY)
+           + "\n\n" + _table_block())
+    out = _suppress_grid_copied_line_blocks(doc)
+    assert "table-text-duplicate" in out
+    assert out.count(quoted) == 2  # the Methods quote and the grid cell
+
+
+def test_a_word_line_is_matched_ignoring_spacing():
+    """10.1177/01461672251327169 Table 6 (canary 2026-11-01): the grid holds
+    "Thought about distant friends/family" and the text channel printed
+    "friends/ family". Rejecting that one line split the copy, and its first
+    lines stayed loose in the Results."""
+    labels = ["Negative experiences", "Had fight/argument", "Thought about distant friends/family",
+              "Received low grade", "Were rejected by someone"]
+    cells = [(lab, "0.41 [0.22, 0.60]") for lab in labels]
+    rows = "\n".join(f"    <tr><td>{a}</td><td>{b}</td></tr>" for a, b in cells)
+    table = f"### Table 6\n\n*Misestimation by item.*\n\n<table>\n{rows}\n</table>\n"
+    body = "\n".join(labels).replace("friends/family", "friends/ family") + "\n" + \
+        "\n".join(b for _, b in cells)
+    out = _suppress_grid_copied_line_blocks(PROSE_BEFORE + "\n" + body + "\n\n## Results\n\n" + table)
+    assert "table-text-duplicate" in out
+    assert "friends/ family" not in out

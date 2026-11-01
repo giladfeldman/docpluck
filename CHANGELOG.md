@@ -19,7 +19,10 @@ removed lines were read against the page images by a second model.
   the caption's rule family is not found, the first narrower rule at the caption's left edge is tried.
 - **A whitespace-detected region that stops above the table's closing rule is extended to it.**
   [REPAIR, ours] A table printed in two panels under one caption lost its second panel
-  (10.1177/01461672251327169 Table 2: hypotheses 2c-5 missing).
+  (10.1177/01461672251327169 Table 2: hypotheses 2c-5 missing). A rule drawn at one position on
+  most pages (a running header or footer rule) is never a table's closing rule, in either case: on
+  10.1371/journal.pmed.1004323 the full-width footer rule carried Tables 2, 4 and 5 down through the
+  Results and Discussion opening, which became grid rows.
 - **Inside a region bounded by its own rules, worded rows are not trimmed as prose.** [REPAIR, ours]
   A deviations or design table of sentence-like cells lost every row from its fourth on
   (10.1177/01461672251327169 Table 5: 11 of 52 rows kept).
@@ -91,7 +94,10 @@ removed lines were read against the page images by a second model.
   grid rows counts as one), never a flat-list fallback or caption, and nothing after a table's `Note.`
   counts as the table's text. Text that sits past the body caption of a later structured table
   is never taken as a copy of an earlier one (a comparison table reusing the original study's
-  values, 10.1017/s1930297500009189 Table 16). Recorded as `render_grid_copied_line_block_suppressed`.
+  values, 10.1017/s1930297500009189 Table 16). A line of words with no number must be in the table
+  verbatim (spacing aside), not matched by its words alone (10.15626/MP.2022.3108 Table 2: a stimulus condition
+  label the table's list lacks was dropped as a duplicate because each of its words is in another
+  condition's label). Recorded as `render_grid_copied_line_block_suppressed`.
 - **A table's note left in the body next to its copy moves into the table's block** (a `Note.` /
   `Source.` paragraph, or footnotes printed as a lone mark over their text), unless the block already
   shows it. A marker left mid-sentence moves to the end of that paragraph.

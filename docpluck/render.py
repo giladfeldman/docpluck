@@ -5467,6 +5467,8 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
         if "</table>" in s:  # a table may be emitted on one line
             in_html = False
 
+    tight_hay: dict = {}  # label -> the table's text with all whitespace removed
+
     def covered(line: str, label: str) -> str:
         """'long', 'short' or '' (not in the table)."""
         hay, words, nums, grid_hay = tables[label]
@@ -5488,8 +5490,16 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
             # channel printed on one line ("[-0.01, 0.16] [0.04, 0.20]") are
             # judged by their words and numbers, like a short line.
         ln_nums, ln_words, ln_syms = _grid_tokens(s)
-        if not ln_nums and not ln_words:
-            return "short" if s in hay else ""
+        if not ln_nums:
+            # Words alone are matched verbatim: "[Positive frame, Opt-out]:" has
+            # every word in the table's other condition labels, but not that
+            # label (10.15626/MP.2022.3108 Table 2, canary 2026-11-01). Spacing
+            # is not compared: the grid's "friends/family" is the text channel's
+            # "friends/ family" (10.1177/01461672251327169 Table 6, canary
+            # 2026-11-01).
+            if label not in tight_hay:
+                tight_hay[label] = re.sub(r"\s+", "", hay)
+            return "short" if re.sub(r"\s+", "", s) in tight_hay[label] else ""
         # The operators and marks must be the table's too: "p > .01" is not a
         # copy of "p < .01" (consult 2026-10-31, Sol).
         if ln_words <= words and not (ln_nums - nums) and all(c in hay for c in ln_syms):
