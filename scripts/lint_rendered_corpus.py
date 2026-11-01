@@ -90,6 +90,12 @@ _TABLE_NOTE_BLOCK_START = re.compile(
 )
 
 
+# The paper's own ORCID back matter ("ORCID", "ORCID iD", "## ORCID iDs"): the
+# render keeps the names and URLs it prints there (since 2.4.156), so OR does not
+# flag a URL under that label; the next section heading ends the block.
+_ORCID_LABEL = re.compile(r"^(?:#+\s*)?ORCID(?:\s+iDs?)?\s*$", re.IGNORECASE)
+
+
 def lint_file(path: Path) -> list[tuple[int, str, str, str]]:
     """Return defects as (line_no, tag, description, line_text) tuples."""
     if not path.exists() or path.suffix != ".md":
@@ -97,15 +103,23 @@ def lint_file(path: Path) -> list[tuple[int, str, str, str]]:
     text = path.read_text(encoding="utf-8", errors="replace")
     defects: list[tuple[int, str, str, str]] = []
     in_table_note_block = False
+    in_orcid_block = False
     for i, line in enumerate(text.split("\n"), start=1):
         stripped = line.strip()
         if not stripped:
             in_table_note_block = False
             continue
+        if _ORCID_LABEL.match(stripped):
+            in_orcid_block = True
+            continue
+        if stripped.startswith("#"):
+            in_orcid_block = False
         if _TABLE_NOTE_BLOCK_START.match(stripped):
             in_table_note_block = True
         for tag, pat, desc in _LINT_PATTERNS:
             if tag == "FN" and in_table_note_block:
+                continue
+            if tag == "OR" and in_orcid_block:
                 continue
             if pat.match(stripped):
                 defects.append((i, tag, desc, stripped[:120]))

@@ -5412,6 +5412,10 @@ def _structured_table_text_by_label(text: str) -> dict:
     return out
 
 
+# A table caption line in the body: "Table 15: ...", "TABLE 4", "*Table 2. ...*".
+_BODY_TABLE_CAPTION_RE = re.compile(r"^\*?(?:Table|TABLE)\s+(\d+)\b(?:[.:]|\s*$)")
+
+
 def _suppress_grid_copied_line_blocks(text: str) -> str:
     """Replace a block of body lines that is a verbatim copy of a structured table.
 
@@ -5495,6 +5499,29 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
     def is_heading(ln: str) -> bool:
         return bool(_COPY_SECTION_RE.match(ln))
 
+    # The last body caption line ("Table 15: ...") at or above each line, and
+    # where each table's own body caption first appears. A block that sits past
+    # the caption of ANOTHER structured table, which itself comes after this
+    # table's caption, is that later table's text reusing the values (an
+    # original-vs-replication comparison), never a copy of the earlier table:
+    # 10.1017/s1930297500009189 Table 16 (/ship QA 2026-10-31).
+    last_caption: list = [None] * n
+    first_caption: dict = {}
+    cur = None
+    for k, ln in enumerate(lines):
+        cm = None if fixed[k] else _BODY_TABLE_CAPTION_RE.match(ln.strip())
+        if cm:
+            cur = (cm.group(1), k)
+            first_caption.setdefault(cm.group(1), k)
+        last_caption[k] = cur
+
+    def past_another_caption(start: int, label: str) -> bool:
+        lc = last_caption[start]
+        if lc is None or lc[0] == label or lc[0] not in tables:
+            return False
+        own = first_caption.get(label)
+        return own is None or own < lc[1]
+
     drop: dict = {}  # start index -> (end index exclusive, label, n lines)
     taken = [False] * n
     for label in tables:
@@ -5545,7 +5572,7 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
             proven = long_n >= _COPY_MIN_LONG_LINES or (
                 specific >= _COPY_MIN_SPECIFIC_NUMBERS and not (block_nums - tables[label][2])
             )
-            if len(body) >= _COPY_MIN_LINES and proven:
+            if len(body) >= _COPY_MIN_LINES and proven and not past_another_caption(body[0], label):
                 end = body[-1] + 1
                 for b in range(start, end):
                     taken[b] = True

@@ -253,3 +253,25 @@ def test_a_copy_with_the_tables_own_operators_is_still_a_copy():
     body = ["p < .01", "p < .02", "p < .03", "p < .04 and p < .05"]
     out = _suppress_grid_copied_line_blocks("## Results\n\n" + "\n".join(body) + "\n\n" + _p_table())
     assert "table-text-duplicate" in out
+
+
+def test_values_reused_by_a_later_table_are_not_a_copy_of_the_earlier_one():
+    """10.1017/s1930297500009189 Table 16 (p20) compares the original study's
+    betas with the replication's, so its rows repeat values printed in Tables 1
+    and 8. Table 16's grid caught one row of eight, and its body text, sitting
+    past Table 15's caption, was replaced by markers pointing at Tables 1 and 8:
+    the replication betas survived nowhere (/ship QA 2026-10-31). A block that
+    sits past a later table's caption is that later table's text, not a copy of
+    a table whose caption came before."""
+    doc = ("## Method\n\nTable 5: Classification of the Replication.\n\n"
+           + "\n".join(COPY)
+           + "\n\n## Results\n\nTable 6: Comparison with the original study.\n\n"
+           + "\n".join(COPY)
+           + "\n\n" + _table_block("5")
+           + "\n" + _grid("6", [("Effect", "Original", "Replication"),
+                               ("Anchoring", "0.41", "0.38")]))
+    out = _suppress_grid_copied_line_blocks(doc)
+    assert out.count("lines of Table 5's text-channel copy") == 1, "the first copy still goes"
+    tail = out.split("Table 6: Comparison with the original study.")[1]
+    for line in COPY:
+        assert line in tail.split("### Table 5")[0], "Table 6's own text is kept"

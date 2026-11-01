@@ -89,7 +89,9 @@ removed lines were read against the page images by a second model.
   is proven a copy (4+ lines, and 3+ long lines found verbatim or 5+ specific numbers). A
   sentence-shaped line is matched only against a structured grid's cells (a cell wrapped over several
   grid rows counts as one), never a flat-list fallback or caption, and nothing after a table's `Note.`
-  counts as the table's text. Recorded as `render_grid_copied_line_block_suppressed`.
+  counts as the table's text. Text that sits past the body caption of a later structured table
+  is never taken as a copy of an earlier one (a comparison table reusing the original study's
+  values, 10.1017/s1930297500009189 Table 16). Recorded as `render_grid_copied_line_block_suppressed`.
 - **A table's note left in the body next to its copy moves into the table's block** (a `Note.` /
   `Source.` paragraph, or footnotes printed as a lone mark over their text), unless the block already
   shows it. A marker left mid-sentence moves to the end of that paragraph.
