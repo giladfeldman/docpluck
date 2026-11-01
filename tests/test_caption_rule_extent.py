@@ -205,3 +205,39 @@ def test_a_page_footer_rule_is_not_a_tables_closing_rule():
     assert "During the study" not in t5
     assert "Main findings" not in t5
 
+
+
+def _frule(y, x0=50.0, x1=550.0):
+    return {"x0": x0, "x1": x1, "top": y, "bottom": y + 0.5}
+
+
+def _fpage(rules, caption: bool):
+    words = [{"text": "Results", "x0": 50.0, "top": 30.0}]
+    if caption:
+        words = [{"text": "Table", "x0": 50.0, "top": 40.0}, {"text": "3.", "x0": 80.0, "top": 40.0}] + words
+    return SimpleNamespace(words=words, _rules=rules)
+
+
+def test_a_table_series_closing_rule_repeated_on_caption_pages_is_not_furniture(monkeypatch):
+    """Consult 2026-11-01 (Sol reproduced, Sonnet concurred): one table per page
+    in the same slot repeats its own rules at one position on every page. Taken
+    as furniture, the closing rule was dropped and the region stopped at an inner
+    rule or lost its extent. A running footer rule also sits on caption-free
+    pages; only that one is furniture."""
+    import docpluck.tables.detect as det
+    monkeypatch.setattr(det, "_joined_horizontal_strokes", lambda p: [dict(r) for r in p._rules])
+    det._FURNITURE_CACHE.clear()
+    table = [_frule(62), _frule(74), _frule(100), _frule(122)]
+    footer = _frule(744)
+    series = SimpleNamespace(pages=[_fpage(table + [footer], caption=True) for _ in range(4)])
+    found = det._furniture_rule_keys(series)
+    assert det._rule_key(_frule(122)) not in found
+    assert det._rule_key(footer) not in found  # never on a caption-free page here
+    # The same footer, also on pages with no caption, is a running rule.
+    det._FURNITURE_CACHE.clear()
+    mixed = SimpleNamespace(pages=[_fpage(table + [footer], caption=True) for _ in range(2)]
+                            + [_fpage([footer], caption=False) for _ in range(2)])
+    found = det._furniture_rule_keys(mixed)
+    assert det._rule_key(footer) in found
+    assert det._rule_key(_frule(122)) not in found
+    det._FURNITURE_CACHE.clear()

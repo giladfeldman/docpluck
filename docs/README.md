@@ -1021,11 +1021,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.157',            # docpluck itself
+# {'version': '2.4.158',            # docpluck itself
 #  'git_sha': '…',
 #  'normalize_version': '1.9.80',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.9',   #   independently of the package version
-#  'table_extraction_version': '2.4.28',
+#  'table_extraction_version': '2.4.29',
 #  'references_version': '1.0.0',
 #  'body_scope_version': '1.0.0',
 #  'python_version': '3.14.5',      # the interpreter…

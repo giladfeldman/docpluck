@@ -341,6 +341,23 @@ def _rule_key(r: dict) -> tuple[int, int, int]:
     return (round(r["x0"]), round(r["x1"]), round(r["top"]))
 
 
+def _page_opens_a_caption(page_obj) -> bool:
+    """True if a line on the page starts with an object label ("Table 2",
+    "Fig. 1"); a mention inside a sentence is not a line start."""
+    words = list(getattr(page_obj, "words", None) or ())
+    for i, w in enumerate(words):
+        prev = words[i - 1] if i else None
+        if prev is not None and abs(float(prev["top"]) - float(w["top"])) <= 1.0:
+            continue  # not the first word of its line
+        text = str(w.get("text", ""))
+        nxt = words[i + 1] if i + 1 < len(words) else None
+        if nxt is not None and abs(float(nxt["top"]) - float(w["top"])) <= 1.0:
+            text = text + " " + str(nxt.get("text", ""))
+        if _CAPTION_LINE_RE.match(text):
+            return True
+    return False
+
+
 def _furniture_rule_keys(layout) -> frozenset:
     """Rules repeated at one position across the document's pages.
 
@@ -348,7 +365,15 @@ def _furniture_rule_keys(layout) -> frozenset:
     footer of every page, the same width as its table rules. Taken as a table's
     closing rule, it carried Tables 2, 4 and 5 down through the body prose to the
     page bottom. A table's rule does not recur at one position on most pages; a
-    page's running rule does. Geometry only, publisher-agnostic."""
+    page's running rule does. Geometry only, publisher-agnostic.
+
+    A rule must also recur on a page that opens no caption line. A table series
+    laid out in the same slot on every page (one table per page, a table
+    continued across pages) repeats its OWN closing rule, but only on pages that
+    carry a caption; dropping that rule cut the table at an inner panel rule or
+    lost its extent (consult 2026-11-01, Sol and Sonnet). A running rule also
+    sits on the pages with no table or figure. A paper whose every page has a
+    caption keeps every rule: the extent then reads as before this filter."""
     pages = list(getattr(layout, "pages", None) or ())
     if len(pages) < _FURNITURE_MIN_PAGES:
         return frozenset()
@@ -356,15 +381,19 @@ def _furniture_rule_keys(layout) -> frozenset:
     if hit is not None and hit[0] is layout:
         return hit[1]
     counts: dict = defaultdict(int)
+    free_counts: dict = defaultdict(int)  # occurrences on pages that open no caption
     for p in pages:
         try:
             keys = {_rule_key(r) for r in _joined_horizontal_strokes(p)}
         except Exception:  # noqa: BLE001 - an unreadable page adds no furniture
             continue
+        free = not _page_opens_a_caption(p)
         for k in keys:
             counts[k] += 1
+            if free:
+                free_counts[k] += 1
     need = max(_FURNITURE_MIN_PAGES, (len(pages) + 1) // 2)
-    found = frozenset(k for k, n in counts.items() if n >= need)
+    found = frozenset(k for k, n in counts.items() if n >= need and free_counts[k] >= 1)
     if len(_FURNITURE_CACHE) > 8:
         _FURNITURE_CACHE.clear()
     _FURNITURE_CACHE[id(layout)] = (layout, found)

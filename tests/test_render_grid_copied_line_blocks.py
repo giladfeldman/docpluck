@@ -326,3 +326,30 @@ def test_a_word_line_is_matched_ignoring_spacing():
     out = _suppress_grid_copied_line_blocks(PROSE_BEFORE + "\n" + body + "\n\n## Results\n\n" + table)
     assert "table-text-duplicate" in out
     assert "friends/ family" not in out
+
+
+def test_a_word_line_must_match_on_word_boundaries():
+    """Consult 2026-11-01 (Sol reproduced, Sonnet concurred): with every space
+    removed, the body line "Notes" matched a table whose adjacent cells are "No"
+    and "tes", and "Total" matched inside "Subtotal"; the real line was dropped
+    with the copy block below it."""
+    rows = list(ROWS) + [("No", "tes", "Subtotal of the replication facets."),
+                         ("Overall", "Same", "Summary across the replication facets.")]
+    body_rows = "\n".join(
+        "    <tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
+    table = (f"### Table 5\n\n*Classification of the Replication.*\n\n<table>\n{body_rows}\n</table>\n")
+    for real in ("Notes", "Total"):
+        doc = PROSE_BEFORE + "\n" + real + "\n" + "\n".join(COPY) + "\n\n## Results\n\n" + table
+        out = _suppress_grid_copied_line_blocks(doc)
+        assert "table-text-duplicate" in out
+        assert "\n" + real + "\n" in out, real
+    # Spacing beside punctuation still matches: "friends/ family" is "friends/family".
+    rows2 = list(ROWS) + [("Thought about distant friends/family", "Same", "x")]
+    body_rows2 = "\n".join(
+        "    <tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows2)
+    table2 = (f"### Table 5\n\n*Classification of the Replication.*\n\n<table>\n{body_rows2}\n</table>\n")
+    doc = (PROSE_BEFORE + "\nThought about distant friends/ family\n" + "\n".join(COPY)
+           + "\n\n## Results\n\n" + table2)
+    out = _suppress_grid_copied_line_blocks(doc)
+    assert "friends/ family" not in out
+

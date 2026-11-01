@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.4.158] - 2026-11-01 - normalization 1.9.80 - table extraction 2.4.29 - render 1.0.5 - sectioning 1.2.9
+
+Fixes from a second-model review (2026-11-01, Sol and Sonnet) of the last two 2.4.157 fixes.
+
+- **Tables: a table series' own closing rule is no longer taken for a page's running rule.** A
+  rule now counts as page furniture only if it also recurs on a page that opens no table or figure
+  caption. One table per page in the same slot repeats its own closing rule only on caption pages;
+  treating it as furniture cut the table at an inner rule. The 10.1371/journal.pmed.1004323 footer
+  rule is still recognized.
+- **Render: a word-only body line is a table copy only on word boundaries.** Spaces beside
+  punctuation are still ignored ("friends/ family"), but "Notes" no longer matches the cells "No"
+  "tes", and "Total" no longer matches inside "Subtotal"; such a line stays in the body.
+
 ## [2.4.157] - 2026-10-31 - normalization 1.9.80 - table extraction 2.4.28 - render 1.0.4 - sectioning 1.2.9
 
 Fixes from the 2026-10-28 debt bundle and from the canary audit of 10.1177/01461672251327169

@@ -5227,6 +5227,13 @@ def _copy_norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().casefold()
 
 
+def _punct_tight(s: str) -> str:
+    """Whitespace collapsed, and dropped where it touches punctuation, so
+    "friends/ family" reads as "friends/family" but "No tes" stays two words."""
+    s = re.sub(r"\s+", " ", s)
+    return re.sub(r" ?([^\w\s]) ?", r"\1", s).strip()
+
+
 _COPY_MARKER_RE = re.compile(r"^<!-- table-text-duplicate: \d+ lines of Table (\S+?)'s ")
 _TABLE_NOTE_START_RE = re.compile(r"^(?:notes?|sources?)\s*[.:]", re.I)
 _SIG_LEGEND_LINE_RE = re.compile(r"^(?:[*†‡]+|[*†‡]*\s*p\s*[<>=≤≥]\s*\.?\d)")
@@ -5493,13 +5500,23 @@ def _suppress_grid_copied_line_blocks(text: str) -> str:
         if not ln_nums:
             # Words alone are matched verbatim: "[Positive frame, Opt-out]:" has
             # every word in the table's other condition labels, but not that
-            # label (10.15626/MP.2022.3108 Table 2, canary 2026-11-01). Spacing
-            # is not compared: the grid's "friends/family" is the text channel's
-            # "friends/ family" (10.1177/01461672251327169 Table 6, canary
-            # 2026-11-01).
+            # label (10.15626/MP.2022.3108 Table 2, canary 2026-11-01). A space
+            # beside punctuation is not compared: the grid's "friends/family" is
+            # the text channel's "friends/ family" (10.1177/01461672251327169
+            # Table 6, canary 2026-11-01). A space between two letters is, and
+            # the line must start and end on a word boundary: "Notes" is not the
+            # cells "No" "tes", "Total" is not inside "Subtotal" (consult
+            # 2026-11-01, Sol and Sonnet).
             if label not in tight_hay:
-                tight_hay[label] = re.sub(r"\s+", "", hay)
-            return "short" if re.sub(r"\s+", "", s) in tight_hay[label] else ""
+                tight_hay[label] = _punct_tight(hay)
+            # The boundary is required only at a word-character end: a line
+            # ending in "]" meets the next cell's word once spaces beside
+            # punctuation are dropped ("[replication]UCLA").
+            t = _punct_tight(s)
+            pre = r"(?<!\w)" if t[:1].isalnum() else ""
+            post = r"(?!\w)" if t[-1:].isalnum() else ""
+            return "short" if re.search(
+                pre + re.escape(t) + post, tight_hay[label]) else ""
         # The operators and marks must be the table's too: "p > .01" is not a
         # copy of "p < .01" (consult 2026-10-31, Sol).
         if ln_words <= words and not (ln_nums - nums) and all(c in hay for c in ln_syms):
@@ -7552,7 +7569,7 @@ def _dedupe_label_in_table_figure_caption(text: str) -> str:
 # render channel was the ONLY one of the three with no version of its own, so a
 # render change had nowhere to be recorded except the package number. It has one
 # now, and `RenderReport` carries it.
-RENDER_VERSION = "1.0.4"  # v1.0.4 (v2.4.157): a table's text-channel copy in the body is replaced by a labelled marker; table notes move into the table block; headings set in the paper's heading style are promoted (one level lower when set smaller). Previous: v1.0.3 (v2.4.155): an acknowledgment / previous-version note left in the front zone is labelled as a blockquote; a text copy of a table ending at a numbered section is matched against its grid up to that section; no heading promoter writes inside a fenced block; a table caption block's row labels are not promoted to subsections. Previous: v1.0.2 (v2.4.134): the render channel becomes a telemetry CONSUMER, not just a producer. `render_pdf_to_markdown` calls `extract_pdf_structured` and `extract_sections` internally and DISCARDED both of their reports, so every fallback recorded beneath the function that produces the user-visible .md - a table dropped by the likeness gate, a repair refused as ambiguous, a symbol font flagged as corrupt - was invisible to every caller. Found by an independent review of the very release whose headline was that telemetry now reaches consumers, which is the same defect one layer up for the third time. The public name is now a thin wrapper holding a `fallback_scope` (a `with` block, so an exception mid-chain cannot leak a sink into the next render in this context) and the chain moved to `_render_pdf_to_markdown`; `RenderReport` gains `fallbacks` / `fallback_details`. NOTE the rename broke `tools/diag/render_deletion_scan.py`, which scrapes that function's source for `_step(_report, ...)` calls - and it REFUSED TO RUN rather than report a clean zero, which is the instrument guard built one release earlier working exactly as designed against the session that wrote it. # v1.0.1 (v2.4.132): removed_lines compares stripped-to-stripped and treats a reflow (a line merged into a longer one) as survival — the two instrument defects that made the repaired deletion gate report 84 false positives on its first genuine run; `_carries_statistical_content` absorbs the Greek/R²/BF arms from the figure-caption suppressor's private duplicate detector (one concept, one table) and gains the integer-valued Greek case `χ2(1) = 4` that matched NEITHER half; `_AFFIL_CITATION_RE` gains three structural citation markers (bracketed reference number, arXiv id, DOI) after a numbered bibliography was stripped as an author-affiliation block on 10.48550/arxiv.2406.11713 — the class the guard's own comment says it was written to prevent, walked back in through a citation style neither APA-shaped arm covered; `_strip_phantom_camelot_tables` inspects `<th>` as well as `<td>`; `_rescue_title_from_layout` is wrapped in `_step` (it deletes, and was the one chain step invisible to RenderReport); `report=` is the public spelling of the telemetry parameter. # v1.0.0 (v2.4.130): the chain gains telemetry for the first time.
+RENDER_VERSION = "1.0.5"  # v1.0.5 (v2.4.158): a word-only body line is a table copy only on word boundaries. Previous: v1.0.4 (v2.4.157): a table's text-channel copy in the body is replaced by a labelled marker; table notes move into the table block; headings set in the paper's heading style are promoted (one level lower when set smaller). Previous: v1.0.3 (v2.4.155): an acknowledgment / previous-version note left in the front zone is labelled as a blockquote; a text copy of a table ending at a numbered section is matched against its grid up to that section; no heading promoter writes inside a fenced block; a table caption block's row labels are not promoted to subsections. Previous: v1.0.2 (v2.4.134): the render channel becomes a telemetry CONSUMER, not just a producer. `render_pdf_to_markdown` calls `extract_pdf_structured` and `extract_sections` internally and DISCARDED both of their reports, so every fallback recorded beneath the function that produces the user-visible .md - a table dropped by the likeness gate, a repair refused as ambiguous, a symbol font flagged as corrupt - was invisible to every caller. Found by an independent review of the very release whose headline was that telemetry now reaches consumers, which is the same defect one layer up for the third time. The public name is now a thin wrapper holding a `fallback_scope` (a `with` block, so an exception mid-chain cannot leak a sink into the next render in this context) and the chain moved to `_render_pdf_to_markdown`; `RenderReport` gains `fallbacks` / `fallback_details`. NOTE the rename broke `tools/diag/render_deletion_scan.py`, which scrapes that function's source for `_step(_report, ...)` calls - and it REFUSED TO RUN rather than report a clean zero, which is the instrument guard built one release earlier working exactly as designed against the session that wrote it. # v1.0.1 (v2.4.132): removed_lines compares stripped-to-stripped and treats a reflow (a line merged into a longer one) as survival — the two instrument defects that made the repaired deletion gate report 84 false positives on its first genuine run; `_carries_statistical_content` absorbs the Greek/R²/BF arms from the figure-caption suppressor's private duplicate detector (one concept, one table) and gains the integer-valued Greek case `χ2(1) = 4` that matched NEITHER half; `_AFFIL_CITATION_RE` gains three structural citation markers (bracketed reference number, arXiv id, DOI) after a numbered bibliography was stripped as an author-affiliation block on 10.48550/arxiv.2406.11713 — the class the guard's own comment says it was written to prevent, walked back in through a citation style neither APA-shaped arm covered; `_strip_phantom_camelot_tables` inspects `<th>` as well as `<td>`; `_rescue_title_from_layout` is wrapped in `_step` (it deletes, and was the one chain step invisible to RenderReport); `report=` is the public spelling of the telemetry parameter. # v1.0.0 (v2.4.130): the chain gains telemetry for the first time.
 
 
 def removed_lines(before: str, after: str) -> list:

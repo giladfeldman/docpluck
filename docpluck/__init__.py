@@ -115,7 +115,7 @@ from .references import (
     parse_references,
 )
 
-__version__ = "2.4.157"
+__version__ = "2.4.158"
 __author__ = "Gilad Feldman"
 __license__ = "MIT"
 

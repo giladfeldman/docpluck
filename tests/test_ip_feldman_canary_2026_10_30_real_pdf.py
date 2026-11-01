@@ -102,6 +102,12 @@ def test_table_text_copies_are_out_of_the_body(md):
         "Replication: Emotional prevalence and emotional intensity in self were combined",
         "[-0.01, 0.16] [0.04, 0.20]",
         "4--Intensity estimates of negative emotions (extension)",
+        # 2.4.158 commit canary (2026-11-01): a word line ending in "]" or "."
+        # meets the next cell's word once spaces beside punctuation are dropped;
+        # a word boundary demanded there left these Table 4/5 lines loose.
+        "\nLoneliness [replication]\n",
+        "\nRumination [replication]\n",
+        "\nReplication: Online.\n",
     ):
         assert line not in body, line
 
