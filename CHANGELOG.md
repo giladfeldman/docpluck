@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.4.159] - 2026-11-11 - normalization 1.9.80 - table extraction 2.4.30 - render 1.0.6 - sectioning 1.2.9
+
+Fixes from the 2026-11-11 debt bundle. Each change was measured with a two-arm diff (new code against the
+old behaviour, in one process) over the 125-paper test manifest, and every changed table was read against
+the page image.
+
+### Tables
+
+- **Two captions that score the same are told apart by position.** [REPAIR, ours] A grid now goes to the
+  nearest caption printed above it; before, the earlier caption in text order won, so one page could hand
+  the same grid to two tables (10.1525/collabra.90203 p9: Table 4 carried a copy of Table 5's numbers).
+- **A grid holding only a small part of its printed table is set aside for the full text.** [REPAIR, ours]
+  When a grid's words and numbers cover under a quarter of the table text the page prints under its caption
+  (at least 40 tokens, cut at the note line or at prose), the table ships as that text and the grid is kept
+  as a rejected candidate. Never applied when the grid carries at least as many numbers as the text, or when
+  the journal prints its captions under its tables. 10.15626/mp.2022.3108 Table 10 (2-row header grid ->
+  six predictor rows), 10.1016/j.jesp.2021.104154 Table 13 (a copy of Table 12 -> its own 12x6 grid).
+  New fallback event `table_candidate_rejected_as_partial_grid`.
+- **A side-by-side table's text ends at its note or at a numbered section heading.** [REPAIR, ours]
+- **A minus sign printed on the line above its number joins it.** [NOTATION] Only the exact three-row shape:
+  a row of lone signs, a labelled row with those columns empty, a row of unsigned numbers in exactly those
+  columns (10.15626/mp.2022.3108 Table S8, Z = -0.798). Event `table_straddling_sign_cell_joined`.
+- **Raised footnote letters in table cells are marked `^a`.** [NOTATION] "NAd" -> "NA^d", "errora" ->
+  "error^a" only when the layout shows the letter smaller and raised, the token is never printed as a
+  plain word, and the cells hold no more copies than the layout has raised sites. Works on PDFs that emit
+  no space characters (word gaps from geometry). Event `table_letter_marker_marked`.
+- **A page that prints "Table N (continued)" labels its topmost grid Table N** (`continuation_of`), when
+  exactly one such head is on the page and Table N appeared earlier. "Table 1. (Continued.)" is now read.
+- **A confidence interval printed lower > upper passes through** with `fields["CI_order"] = "descending"`
+  (before, both bounds were dropped). Docpluck does not fix the paper.
+- **An unreadable page in the running-rule scan is recorded** (`table_furniture_page_unreadable`), not
+  skipped silently.
+
+### Render
+
+- **A body copy of a table is still recognized when its cells carry `^a` markers.** The marker is
+  docpluck's notation, not the paper's; the copy test now ignores it on both sides. Without this the
+  text copies of 10.1177/01461672251327169 Tables 1 and 2 returned to the Introduction.
+
 ## [2.4.158] - 2026-11-01 - normalization 1.9.80 - table extraction 2.4.29 - render 1.0.5 - sectioning 1.2.9
 
 Fixes from a second-model review (2026-11-01, Sol and Sonnet) of the last two 2.4.157 fixes.

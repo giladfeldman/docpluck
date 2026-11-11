@@ -359,9 +359,54 @@ def repair_cells(cells: "list[Cell]", *, layout=None) -> "list[Cell]":
     # there is no evidence and the cell passes through as declared.
     from docpluck.glyph_evidence import apply_to_cells
     apply_to_cells(cells, layout)
+    _mark_raised_letter_markers(cells, layout)
     for c in cells:
         c["text"] = clean_cell_text(c.get("text") or "")
     return cells
+
+
+def _mark_raised_letter_markers(cells: "list[Cell]", layout) -> None:
+    """Mark a table footnote letter the layout proves raised: ``errora`` -> ``error^a``.
+
+    10.1177/01461672251327169 Tables 1-2 (p3-4): "Estimation errora",
+    "well-being.a" -- the "a" is 5.85 pt and raised against the 9 pt word, a
+    footnote marker the text layer glues onto the word. Same notation as W0p's
+    body-text word marker (``emotions,^1``). A site is rewritten only when the
+    cells hold no more copies of the fused token than the layout counted raised
+    sites, so a word that merely ends in that letter elsewhere is never touched.
+    """
+    if layout is None or not cells:
+        return
+    from collections import Counter
+
+    from docpluck.normalize import layout_letter_marker_fusions
+
+    try:
+        fusions = layout_letter_marker_fusions(layout)
+    except Exception as exc:  # evidence unavailable: cells pass through as declared
+        record_fallback("table_letter_marker_scan_exception", detail=type(exc).__name__)
+        return
+    if not fusions:
+        return
+    sites: dict[str, re.Pattern] = {}
+    seen: Counter = Counter()
+    for (fused, _rep) in fusions:
+        sites[fused] = re.compile(r"(?<![A-Za-z])" + re.escape(fused) + r"(?![A-Za-z0-9])")
+    for c in cells:
+        for fused, pat in sites.items():
+            seen[fused] += len(pat.findall(c.get("text") or ""))
+    marked = 0
+    for (fused, repaired), n in fusions.items():
+        if not seen[fused] or seen[fused] > n:
+            continue
+        for c in cells:
+            text = c.get("text") or ""
+            new, k = sites[fused].subn(repaired, text)
+            if k:
+                c["text"] = new
+                marked += k
+    if marked:
+        record_fallback("table_letter_marker_marked", detail=str(marked))
 
 
 def _html_escape(s: str | None, clean=None) -> str:
@@ -492,6 +537,56 @@ _LONE_MINUS = "−"
 _UNSIGNED_NUMBER_CELL_RE = re.compile(r"^\d*\.?\d+(?:[*∗†‡]+|[a-z])?$")
 
 
+def _filled(row: list[str]) -> list[int]:
+    return [j for j, c in enumerate(row) if (c or "").strip()]
+
+
+def _attach_straddling_sign_cells(rows: list[list[str]]) -> list[list[str]]:
+    """Join a signed number whose cell wrapped ABOVE and BELOW its own row.
+
+    A word-processor table centres each row vertically, so a cell that wraps
+    onto two lines straddles its row's baseline: the sign on the line above, the
+    digits on the line below, and the row's other cells between them. The table
+    backend reads that as three rows (10.15626/mp.2022.3108 p39 Table S8, Z of
+    the Intercept, raster-checked 2026-11-11: the page prints "-" over "0.798";
+    the grid read ``-`` / ``Intercept -0.258 0.323 <empty> 0.425 ...`` /
+    ``0.798``, so the value shipped as +0.798 on a row of its own).
+
+    Typographic evidence only: row ``i`` holds nothing but lone signs (``-`` or
+    ``−``), row ``i+1`` is a labelled row with exactly those columns empty, and
+    row ``i+2`` holds nothing but unsigned numbers in exactly those columns. A
+    lone sign in a row of its own cannot be a not-applicable placeholder -- a
+    placeholder sits in a data row beside its label. Any other shape is left
+    as captured.
+    """
+    out = [list(r) for r in rows]
+    gone: set[int] = set()
+    i = 0
+    while i + 2 < len(out):
+        top, mid, bot = out[i], out[i + 1], out[i + 2]
+        cols = _filled(top)
+        if (
+            cols
+            and 0 not in cols
+            and all((top[j] or "").strip() in ("-", _LONE_MINUS) for j in cols)
+            and _filled(bot) == cols
+            and all(_UNSIGNED_NUMBER_CELL_RE.match((bot[j] or "").strip()) for j in cols)
+            and mid and (mid[0] or "").strip()
+            and all(j < len(mid) and not (mid[j] or "").strip() for j in cols)
+            and len(_filled(mid)) >= 2
+        ):
+            for j in cols:
+                while len(mid) <= j:
+                    mid.append("")
+                mid[j] = (top[j] or "").strip() + (bot[j] or "").strip()
+            gone.update((i, i + 2))
+            record_fallback("table_straddling_sign_cell_joined", detail=f"{len(cols)} cells")
+            i += 3
+            continue
+        i += 1
+    return [r for k, r in enumerate(out) if k not in gone]
+
+
 def _attach_detached_sign_rows(rows: list[list[str]]) -> list[list[str]]:
     """Give a row of lone minus signs back to the numbers they belong to.
 
@@ -507,7 +602,7 @@ def _attach_detached_sign_rows(rows: list[list[str]]) -> list[list[str]]:
     parenthesis, a bracket or a word. When no neighbour qualifies the row is kept
     as captured (and ``_is_fragment_continuation`` refuses to fold onto it).
     """
-    out = [list(r) for r in rows]
+    out = [list(r) for r in _attach_straddling_sign_cells(rows)]
     gone: set[int] = set()
     for i, row in enumerate(out):
         nz = [j for j, c in enumerate(row) if (c or "").strip()]

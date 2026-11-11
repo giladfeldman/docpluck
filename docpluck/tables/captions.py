@@ -205,7 +205,9 @@ def _page_for_offset(offset: int, page_offsets: list[int]) -> int:
 # unlabelled candidate.
 _CONTINUED_HEAD_RE = re.compile(
     r"^\s*(?:TABLE|Table)\s+(?P<num>[A-Z]?\d+[a-z]?)\s*[.:]?\s*"
-    r"\(?\s*(?:continued|cont(?:'d|d)?\.?)\s*\)?\s*$",
+    # "(Continued.)" with the period inside the parenthesis: Cambridge UP,
+    # 10.1017/s0007123424000024 p11 "Table 1. (Continued.)".
+    r"\(?\s*(?:continued\.?|cont(?:'d|d)?\.?)\s*\)?\.?\s*$",
     re.IGNORECASE,
 )
 

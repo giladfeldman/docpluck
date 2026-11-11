@@ -63,7 +63,6 @@ from .cell_cleaning import (
     _drop_running_header_rows,
     _is_group_separator,
     _header_row_count,
-    _is_header_like_row,
     _merge_continuation_rows,
     _merge_significance_marker_rows,
     _fold_stacked_label_rows,
@@ -1975,23 +1974,22 @@ def _flatten_one_row(
             record_fallback("ci_upper_minus_reattached_from_detached_dash",
                             detail=f"[{_lo}, {_hi}]")
 
-    if (
+    ci_descending = (
         "CI_lower" in role_nums
         and "CI_upper" in role_nums
         and role_nums["CI_lower"] > role_nums["CI_upper"]
-    ):
-        # A DESCENDING interval is impossible, so the pair is not trustworthy —
-        # but dropping it deletes the whole CI from the sidecar with no trace,
-        # and a reversed CI is precisely the shape docpluck commits to passing
-        # THROUGH so a consumer can flag the paper's own error. Recorded so the
-        # class is at least countable while the drop stands.
+    )
+    if ci_descending:
+        # A DESCENDING interval is the paper's own error when the page prints it
+        # (10.1177/01461672251327169 p11 Table 6: "-0.83 [0.92, 0.74]"). It is
+        # PASSED THROUGH as printed -- docpluck extracts, it does not fix the
+        # paper -- and LABELLED (fields["CI_order"] = "descending") so a consumer
+        # can flag it. Until 2.4.159 the pair was dropped, which hid exactly the
+        # error a checker exists to find.
         record_fallback(
-            "flatten_dropped_descending_ci",
+            "flatten_passed_descending_ci",
             detail=f"[{role_nums['CI_lower']}, {role_nums['CI_upper']}]",
         )
-        role_nums.pop("CI_lower")
-        role_nums.pop("CI_upper")
-        role_vals.pop("CI", None)
 
     fields: dict[str, object] = {}
     if group:
@@ -2023,6 +2021,8 @@ def _flatten_one_row(
     if "CI_lower" in role_nums:
         fields["CI_lower"] = role_nums["CI_lower"]
         fields["CI_upper"] = role_nums["CI_upper"]
+        if ci_descending:
+            fields["CI_order"] = "descending"
         if ci_level is not None:
             fields["CI_level"] = ci_level
             # CI / CrI / HDI: a credible interval is not graded as a confidence

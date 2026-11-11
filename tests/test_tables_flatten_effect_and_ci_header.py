@@ -8,9 +8,9 @@ d and interval in the table reached consumers untyped: ESCImate measured on
 v2.4.147 that the table's three printed sign errors could not be checked.
 
 The paper's own sign errors (``−0.32 [−0.40, 0.24]``) must pass through as
-printed -- docpluck extracts, it does not fix the paper. (A DESCENDING interval
-such as ``−0.83 [0.92, 0.74]`` is dropped by the existing, recorded
-``flatten_dropped_descending_ci`` policy; this file does not change that.)
+printed -- docpluck extracts, it does not fix the paper. A DESCENDING interval
+such as ``−0.83 [0.92, 0.74]`` passes through too, labelled
+``fields["CI_order"] == "descending"`` (it was dropped until 2.4.159).
 """
 from __future__ import annotations
 
@@ -52,6 +52,19 @@ def test_other_headers_keep_their_role(header):
     assert _classify_column(header) != "est_ci"
 
 
+def test_a_printed_descending_interval_passes_through_labelled():
+    rows = flatten_table(_table([
+        ["Experiences", "t-stat", "p", "Cohen’s d and CI"],
+        ["Talked to friends", "−3.10", ".002", "−0.83 [0.92, 0.74]"],
+        ["Had fight/argument", "−24.47", "<.001", "−1.00 [−1.10, −0.90]"],
+    ]))
+    by = {r["row_label"]: r["fields"] for r in rows}
+    f = by["Talked to friends"]
+    assert (f["d"], f["CI_lower"], f["CI_upper"], f["CI_order"]) == (
+        pytest.approx(-0.83), pytest.approx(0.92), pytest.approx(0.74), "descending")
+    assert "CI_order" not in by["Had fight/argument"]
+
+
 def test_table6_shape_types_d_and_interval_verbatim():
     rows = flatten_table(_table([
         ["Experiences", "t-stat", "p", "Cohen’s d and CI"],
@@ -80,8 +93,12 @@ def test_table6_real_pdf_carries_typed_d_and_ci():
     t6 = next(t for t in r["tables"] if t.get("label") == "Table 6")
     rows = flatten_table(t6)
     typed = [x["fields"] for x in rows if "d" in x["fields"] and "CI_lower" in x["fields"]]
-    # p.11 prints 19 d-and-CI cells; 1 is descending ([0.92, 0.74]) and dropped.
-    assert len(typed) >= 15, len(typed)
+    # p.11 prints 19 d-and-CI cells; 1 is descending ([0.92, 0.74]), the paper's
+    # own error, passed through as printed and labelled.
+    assert len(typed) >= 16, len(typed)
+    desc = [f for f in typed if f.get("CI_order") == "descending"]
+    assert [(f["d"], f["CI_lower"], f["CI_upper"]) for f in desc] == [(-0.83, 0.92, 0.74)], desc
+    assert all("CI_order" not in f for f in typed if f["CI_lower"] <= f["CI_upper"])
     vals = {(f["d"], f["CI_lower"], f["CI_upper"]) for f in typed}
     assert (-1.0, -1.1, -0.9) in vals
     # The three printed sign errors arrive as printed.

@@ -5967,7 +5967,21 @@ _W0P_SIGNS = "-\u2212\u2013"
 _W0P_WORD_PUNCT = ",.;:)"
 
 
-def _layout_word_marker(chars, i: int) -> tuple[str, str, int] | None:
+def _layout_gap(a, b) -> bool:
+    """True when a word space separates layout chars ``a`` and ``b``.
+
+    Some PDFs (JAMA Network Open tables, 10.1001/jamanetworkopen.2023.47449 p7)
+    emit no space glyphs at all: "Current age" is ten chars with a 1.5 pt gap
+    (0.21 em) and the next cell starts 125 pt away. Kerning inside a word is
+    ~0, so a gap over 0.15 em is a word boundary.
+    """
+    try:
+        return b["x0"] - a["x1"] > 0.15 * max(a["size"], b["size"])
+    except (KeyError, TypeError):
+        return False
+
+
+def _layout_word_marker(chars, i: int, *, letters: bool = False) -> tuple[str, str, int] | None:
     """A footnote marker raised after a WORD: `emotions,` + raised `1`.
 
     pdftotext prints it as `emotions,1`, which reads as a number in running
@@ -5978,29 +5992,96 @@ def _layout_word_marker(chars, i: int) -> tuple[str, str, int] | None:
     """
     if not chars[i]["text"].isalpha():
         return None
-    if i > 0 and chars[i - 1]["text"].isalpha() and abs(chars[i - 1]["top"] - chars[i]["top"]) < 0.01:
+    if (i > 0 and chars[i - 1]["text"].isalpha()
+            and abs(chars[i - 1]["top"] - chars[i]["top"]) < 0.01
+            and not (letters and _layout_gap(chars[i - 1], chars[i]))):
         return None
     size, top = chars[i]["size"], chars[i]["top"]
 
     def _same(c) -> bool:
         return abs(c["size"] - size) < 0.01 and abs(c["top"] - top) < 0.01
 
+    def _next(j) -> bool:  # chars[j] continues the word (letters mode: no space gap)
+        return not (letters and _layout_gap(chars[j - 1], chars[j]))
+
     j = i
-    while j < len(chars) and chars[j]["text"].isalpha() and _same(chars[j]):
+    while j < len(chars) and chars[j]["text"].isalpha() and _same(chars[j]) and (j == i or _next(j)):
         j += 1
     if j - i < 2:
         return None
-    if j < len(chars) and chars[j]["text"] in _W0P_WORD_PUNCT and _same(chars[j]):
+    if j < len(chars) and chars[j]["text"] in _W0P_WORD_PUNCT and _same(chars[j]) and _next(j):
         j += 1
+    if letters and j < len(chars) and not _next(j):
+        return None
     k = j
-    while (k < len(chars) and chars[k]["text"].isdigit()
+    # ``letters``: a table's footnote letter (10.1177/01461672251327169 p3
+    # Table 1 "Estimation error" + raised "a", 5.85 pt against 9 pt). Used for
+    # table cells only; body text keeps digit markers.
+    while (k < len(chars)
+           and (chars[k]["text"].isdigit()
+                or (letters and chars[k]["text"].isascii() and chars[k]["text"].islower()))
            and chars[k]["size"] < size * 0.9 and chars[k]["top"] < top - 0.5):
         k += 1
-    if k == j or k - j > 3:
+    if k == j or k - j > (2 if letters else 3):
+        return None
+    if letters and not chars[k - 1]["text"].isalpha():
         return None
     word = "".join(c["text"] for c in chars[i:j])
     marker = "".join(c["text"] for c in chars[j:k])
     return word + marker, word + "^" + marker, k
+
+
+def layout_letter_marker_fusions(layout) -> "collections.Counter[tuple[str, str]]":
+    """``{(fused, repaired): n}`` for every word carrying a raised footnote LETTER.
+
+    Same evidence as W0p's word marker -- the marker is smaller than AND raised
+    above its own word's letters -- with a lowercase letter as the marker
+    (``errora`` -> ``error^a``). For the table channel, where table footnotes
+    are lettered; computed once per layout and cached on it.
+    """
+    cached = getattr(layout, "_letter_marker_fusions", None)
+    if cached is not None:
+        return cached
+    out: collections.Counter = collections.Counter()
+    plain: collections.Counter = collections.Counter()
+    for page in getattr(layout, "pages", ()) or ():
+        chars = [c for c in (getattr(page, "chars", ()) or ()) if c.get("upright", True)]
+        i = 0
+        while i < len(chars):
+            word = _layout_word_marker(chars, i, letters=True)
+            if word is not None and word[1][-1:].isalpha():
+                out[(word[0], word[1])] += 1
+                i = word[2]
+                continue
+            # An ordinary word: letters and word punctuation at ONE size and baseline.
+            c0 = chars[i]
+            if c0["text"].isalpha() and not (
+                i > 0 and chars[i - 1]["text"].isalpha()
+                and abs(chars[i - 1]["top"] - c0["top"]) < 0.01
+                and not _layout_gap(chars[i - 1], c0)
+            ):
+                j = i
+                while (j < len(chars)
+                       and (chars[j]["text"].isalpha() or chars[j]["text"] in _W0P_WORD_PUNCT)
+                       and abs(chars[j]["size"] - c0["size"]) < 0.01
+                       and abs(chars[j]["top"] - c0["top"]) < 0.01
+                       and (j == i or not _layout_gap(chars[j - 1], chars[j]))):
+                    j += 1
+                plain["".join(c["text"] for c in chars[i:j])] += 1
+                i = max(j, i + 1)
+                continue
+            i += 1
+    # A fused token that the document ALSO prints as an ordinary word ("Item" +
+    # raised "s" beside a plain "Items") cannot be told apart in a cell's text:
+    # keep only tokens never printed at one size.
+    for key in list(out):
+        if plain[key[0]]:
+            del out[key]
+    try:
+        layout._letter_marker_fusions = out
+    except Exception:  # a layout object that refuses attributes is not cached
+        pass
+    return out
 
 
 def _layout_superscript_fusions(layout) -> list[tuple[int, str, str]]:
