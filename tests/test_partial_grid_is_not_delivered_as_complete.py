@@ -1,4 +1,4 @@
-"""A grid holding only a small part of its printed table is set aside (d-095325).
+"""A grid holding only a small part of its printed table is set aside.
 
 10.15626/mp.2022.3108 p10 Table 10: once captions tie-break by position, a
 lattice pass hands Table 10 a 2-row header-only grid while the page prints six

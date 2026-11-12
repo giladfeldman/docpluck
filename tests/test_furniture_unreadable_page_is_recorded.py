@@ -1,4 +1,4 @@
-"""An unreadable page in the running-rule scan is recorded, not skipped silently (d-2ca28f).
+"""An unreadable page in the running-rule scan is recorded, not skipped silently.
 
 `_furniture_rule_keys` counts how many pages repeat a rule; a page whose strokes
 cannot be read drops out of that count. Before 2.4.159 it dropped out with no

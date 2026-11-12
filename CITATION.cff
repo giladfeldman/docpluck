@@ -14,8 +14,8 @@ authors:
 repository-code: "https://github.com/giladfeldman/docpluck"
 url: "https://docpluck.app"
 license: MIT
-version: "2.4.158"
-date-released: "2026-11-01"
+version: "2.4.159"
+date-released: "2026-11-11"
 keywords:
   - meta-science
   - PDF extraction

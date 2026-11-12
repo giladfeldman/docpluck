@@ -386,7 +386,7 @@ def _furniture_rule_keys(layout) -> frozenset:
         try:
             keys = {_rule_key(r) for r in _joined_horizontal_strokes(p)}
         except Exception as exc:  # noqa: BLE001 - an unreadable page adds no furniture
-            # Said, not silent (d-2ca28f): a skipped page lowers the counts the
+            # Said, not silent: a skipped page lowers the counts the
             # running-rule test reads, so a consumer can see the filter ran blind.
             from ..telemetry import record_fallback
             record_fallback("table_furniture_page_unreadable",

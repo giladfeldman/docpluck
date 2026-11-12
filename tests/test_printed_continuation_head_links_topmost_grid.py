@@ -7,6 +7,10 @@ shipped as `uncaptioned_candidate` (a consumer reading only captioned tables los
 continuation link needs the PREVIOUS page's lowest grid to carry the label with
 the same column count, and in s0007123424000024 pages 9-10 (unlabelled, 6
 columns against Table 1's 7) broke that chain.
+
+The grid must also line up horizontally with Table N's grid on an earlier page:
+10.1017/jdm.2023.48 p6 prints "Table 1. (Continued)." over a narrower stimulus box
+(consult 2026-11-11, Sonnet).
 """
 from __future__ import annotations
 
@@ -15,14 +19,17 @@ import pytest
 from docpluck.extract_structured import _printed_head_link
 
 
-def _grid(page, top, bottom):
+def _grid(page, top, bottom, x0=50.0, x1=500.0, label=None):
     # Camelot boxes: PDF coordinates, y grows upward (x0, y0, x1, y1).
-    return {"page": page, "bbox": (50.0, bottom, 500.0, top)}
+    return {"page": page, "bbox": (x0, bottom, x1, top), "label": label}
+
+
+T1 = [_grid(10, 700, 100, label="Table 1")]  # Table 1 on the page before
 
 
 def test_topmost_grid_under_a_printed_head_is_linked():
     g = _grid(11, 700, 300)
-    assert _printed_head_link(g, [g], "902\nTable 1. (Continued.)\nStudy", {"Table 1"}) == (
+    assert _printed_head_link(g, [g], "902\nTable 1. (Continued.)\nStudy", T1) == (
         "Table 1", "Table 1. (Continued.)",
     )
 
@@ -30,9 +37,10 @@ def test_topmost_grid_under_a_printed_head_is_linked():
 @pytest.mark.parametrize(
     "page_text, earlier",
     [
-        ("Table 1. (Continued.)", set()),                       # Table 1 never seen before
-        ("Table 1. (Continued.)\nTable 2 (continued)", {"Table 1", "Table 2"}),  # two heads
-        ("see Table 1 (continued) for the rest of the items in the long list", {"Table 1"}),  # prose
+        ("Table 1. (Continued.)", []),                          # Table 1 never seen before
+        ("Table 1. (Continued.)\nTable 2 (continued)",
+         T1 + [_grid(10, 90, 50, label="Table 2")]),           # two heads
+        ("see Table 1 (continued) for the rest of the items in the long list", T1),  # prose
     ],
 )
 def test_refusals(page_text, earlier):
@@ -42,7 +50,12 @@ def test_refusals(page_text, earlier):
 
 def test_a_lower_grid_is_not_linked():
     upper, lower = _grid(11, 700, 500), _grid(11, 400, 100)
-    assert _printed_head_link(lower, [upper, lower], "Table 1. (Continued.)", {"Table 1"}) is None
+    assert _printed_head_link(lower, [upper, lower], "Table 1. (Continued.)", T1) is None
+
+
+def test_a_grid_of_another_width_is_not_linked():
+    box = _grid(11, 700, 300, x0=150.0, x1=400.0)
+    assert _printed_head_link(box, [box], "Table 1. (Continued.)", T1) is None
 
 
 @pytest.mark.parametrize(

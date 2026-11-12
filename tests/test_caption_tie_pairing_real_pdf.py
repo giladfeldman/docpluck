@@ -42,7 +42,7 @@ def test_maier_table_4_keeps_its_own_design_rows(maier):
         assert printed in text, f"Table 4 lost {printed!r}"
 
 
-@pytest.mark.xfail(strict=True, reason="d-c10801: the text body of a text-heavy table stops at its "
+@pytest.mark.xfail(strict=True, reason="open since 2026-11-11: the text body of a text-heavy table stops at its "
                    "first long wrapped line ('...information retrieved'), so the later rows are missing")
 def test_maier_table_4_text_reaches_its_last_row(maier):
     text = _text(maier["Table 4"])

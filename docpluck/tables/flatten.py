@@ -1980,14 +1980,18 @@ def _flatten_one_row(
         and role_nums["CI_lower"] > role_nums["CI_upper"]
     )
     if ci_descending:
-        # A DESCENDING interval is the paper's own error when the page prints it
-        # (10.1177/01461672251327169 p11 Table 6: "-0.83 [0.92, 0.74]"). It is
-        # PASSED THROUGH as printed -- docpluck extracts, it does not fix the
-        # paper -- and LABELLED (fields["CI_order"] = "descending") so a consumer
-        # can flag it. Until 2.4.159 the pair was dropped, which hid exactly the
-        # error a checker exists to find.
+        # A DESCENDING interval: the page may print it (the paper's own error,
+        # 10.1177/01461672251327169 p11 Table 6: "-0.83 [0.92, 0.74]") or our
+        # channel may have lost a minus on both bounds -- the record cannot tell
+        # which. A parsed statistic with an unresolved conflict fails closed: the
+        # TYPED bounds are withheld, as before 2.4.159. What changed is that the
+        # case is now visible: fields["CI_order"] = "descending" says the row
+        # printed one, and fields_raw keeps the two printed tokens, so a checker
+        # can flag the paper without being handed sign-wrong numbers (consult
+        # 2026-11-11, Sonnet). Docpluck does not fix the paper; it does not hide
+        # the conflict either.
         record_fallback(
-            "flatten_passed_descending_ci",
+            "flatten_dropped_descending_ci",
             detail=f"[{role_nums['CI_lower']}, {role_nums['CI_upper']}]",
         )
 
@@ -2018,11 +2022,11 @@ def _flatten_one_row(
     ci_level, ci_kind = _interval_level(header, group)
     if ci_level is None and level_context:
         ci_level, ci_kind = _interval_level([level_context], None)
-    if "CI_lower" in role_nums:
+    if ci_descending:
+        fields["CI_order"] = "descending"
+    elif "CI_lower" in role_nums:
         fields["CI_lower"] = role_nums["CI_lower"]
         fields["CI_upper"] = role_nums["CI_upper"]
-        if ci_descending:
-            fields["CI_order"] = "descending"
         if ci_level is not None:
             fields["CI_level"] = ci_level
             # CI / CrI / HDI: a credible interval is not graded as a confidence
@@ -2064,6 +2068,16 @@ def _flatten_one_row(
                     tok = m.group(1)
         if tok is not None:
             fields_raw[k] = tok
+    if ci_descending:
+        # The withheld bounds keep their printed tokens: the row says it printed a
+        # descending interval, and here is what it printed.
+        for k in ("CI_lower", "CI_upper"):
+            text = src.get(k) or src.get("CI", "")
+            cut = max(text.rfind("["), text.rfind("("))
+            tok = _printed_token(text[cut + 1:] if cut >= 0 else text, role_nums[k],
+                                 last=k == "CI_upper")
+            if tok is not None:
+                fields_raw[k] = tok
 
     return FlattenedRow(
         table_id=table_id,

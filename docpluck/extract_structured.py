@@ -497,6 +497,10 @@ def _extract_pdf_structured(
     # {id(cap): Table} — candidates rejected as body prose, kept so the fallback loop
     # can put one back rather than emit an empty table.
     prose_rejected: dict[int, Table] = {}
+    # Captions whose grid was set aside as partial, and the text tables that
+    # replaced them (read by the candidate step below).
+    partial_caps: set[int] = set()
+    partial_replacements: list[Table] = []
     for cap in table_captions:
         auto_td = auto_by_cap.get(id(cap))
         region_td = region_tables.get(id(cap))
@@ -510,10 +514,11 @@ def _extract_pdf_structured(
                 if which == "region" and td.get("_rule_bounded"):
                     continue
                 reason = "table_candidate_rejected_as_body_prose"
-            elif _grid_sits_under_caption(layout_doc, td, cap, table_captions) and _grid_covers_little_of_printed_table(
-                td, _extract_table_body_text(rejoined, cap, next_boundary_by_id.get(id(cap)))
-            ):
+            elif (place := _grid_sits_under_caption(layout_doc, td, cap, table_captions)) and                     _grid_covers_little_of_printed_table(
+                        td, _extract_table_body_text(rejoined, cap, next_boundary_by_id.get(id(cap))),
+                        own_grid=place == "under"):
                 reason = "table_candidate_rejected_as_partial_grid"
+                partial_caps.add(id(cap))
             else:
                 continue
             record_fallback(reason, detail=f"{cap.label or '?'}:{which}")
@@ -762,6 +767,8 @@ def _extract_pdf_structured(
                         "table_content_not_captured",
                         detail=f"{cap.label or '?'}:{status.split(':', 1)[1]}",
                     )
+                if id(cap) in partial_caps and (isolated.get("raw_text") or "").strip():
+                    partial_replacements.append(isolated)
                 tables.append(isolated)
             cap_of_table[id(tables[-1])] = cap
 
@@ -799,6 +806,18 @@ def _extract_pdf_structured(
         if _candidate_is_page_masthead(ct, page):
             record_fallback("camelot_candidate_is_page_masthead", detail=f"p{page}")
             continue
+        # A grid of a table that was set aside as partial and replaced by the
+        # table's text: when that text carries the grid's words, the grid is a
+        # copy, not extra content (10.1080/02699931.2024.2434156 p11: Table 6's
+        # fragment grid, which had absorbed a line of body prose, came back as
+        # an uncaptioned candidate beside the full Table 6 text).
+        if any(
+            (t.get("page") or 0) == page
+            and _grid_words_covered_by_text(ct, t.get("raw_text") or "") >= 0.9
+            for t in partial_replacements
+        ):
+            record_fallback("camelot_candidate_is_set_aside_partial_grid", detail=f"p{page}")
+            continue
         # A grid that OPENS with the page's own "TABLE N (Continued)" head is the
         # continuation of Table N, not an unverified candidate: the page names
         # it. Labelled with that table, `matched`, and marked `continuation_of`
@@ -827,7 +846,7 @@ def _extract_pdf_structured(
             link = _printed_head_link(
                 ct, [g for g in grids if (g.get("page") or 0) == page],
                 raw_pages[page - 1] if 1 <= page <= len(raw_pages) else "",
-                {t.get("label") for t in tables if t.get("label") and (t.get("page") or 0) < page},
+                [t for t in tables if t.get("label") and (t.get("page") or 0) < page],
             )
         if link is not None:
             parent_label, head = link
@@ -2273,9 +2292,18 @@ def _continuation_link(ct, prev_page_grids, same_page_grids, page_text):
     return label, heads.get(label)
 
 
-def _printed_head_link(ct, same_page_grids, page_text, earlier_labels):
+def _same_x_extent(a, b) -> bool:
+    """Left edges within 10 pt and horizontal overlap >= 85% of the wider span --
+    the column-extent test `_continuation_link` applies to a table's next page."""
+    if abs(a[0] - b[0]) > 10.0:
+        return False
+    wider = max(a[2], b[2]) - min(a[0], b[0])
+    return wider > 0 and (min(a[2], b[2]) - max(a[0], b[0])) / wider >= 0.85
+
+
+def _printed_head_link(ct, same_page_grids, page_text, earlier_tables):
     """``(label, printed_head)`` when the page prints ONE "Table N (continued)"
-    head, Table N appeared on an earlier page, and ``ct`` is the topmost grid
+    head, Table N appeared on an earlier page with the same column extent, and ``ct`` is the topmost grid
     on the page; else None.
 
     The page names the table, so the previous page's grid geometry is not
@@ -2284,16 +2312,22 @@ def _printed_head_link(ct, same_page_grids, page_text, earlier_labels):
     pages of the same table that themselves could not be linked). Measured on
     the 125-paper manifest: 7 of 29 head pages gained their label, none changed
     to a wrong one. 10.1177/1948550620948973 p8 stays unlabelled: its only kept
-    grid is a 3-row fragment under a dropped page-high grid (debt d-c6f8b9).
+    grid is a 3-row fragment under a dropped page-high grid (logged 2026-11-11).
     """
     heads = printed_continuation_heads(page_text or "")
     if len(heads) != 1:
         return None
     label, head = next(iter(heads.items()))
-    if label not in earlier_labels:
-        return None
     cb = _real_bbox(ct)
     if cb is None:
+        return None
+    # The grid must span Table N's own columns on an earlier page: a page that
+    # prints "Table 1. (Continued)." can hold a different object as its topmost
+    # grid (10.1017/jdm.2023.48 p6, a stimulus box narrower than Table 1;
+    # consult 2026-11-11, Sonnet).
+    earlier = [b for b in (_real_bbox(t) for t in earlier_tables if t.get("label") == label)
+               if b is not None]
+    if not any(_same_x_extent(cb, b) for b in earlier):
         return None
     for t in same_page_grids:
         b = _real_bbox(t)
@@ -2539,6 +2573,24 @@ _PARTIAL_GRID_MIN_BODY_TOKENS = 40
 _PARTIAL_GRID_MAX_SHARE = 0.25
 
 
+def _grid_words_covered_by_text(td: Table, text: str) -> float:
+    """Share of a grid's word and number tokens (as a multiset) found in ``text``;
+    0.0 for a grid with no tokens."""
+    grid = _COVERAGE_TOKEN_RE.findall(
+        " ".join((c.get("text") or "") for c in (td.get("cells") or ())).lower())
+    if not grid:
+        return 0.0
+    remaining: dict[str, int] = {}
+    for tok in _COVERAGE_TOKEN_RE.findall((text or "").lower()):
+        remaining[tok] = remaining.get(tok, 0) + 1
+    hit = 0
+    for tok in grid:
+        if remaining.get(tok, 0) > 0:
+            remaining[tok] -= 1
+            hit += 1
+    return hit / len(grid)
+
+
 def _looks_like_wrapped_prose(line: str) -> bool:
     """A line of running text: long, several words, mostly lowercase words."""
     s = line.strip()
@@ -2569,10 +2621,10 @@ def _printed_table_lines(body_text: str) -> str:
     return "\n".join(kept)
 
 
-def _grid_covers_little_of_printed_table(td: Table, body_text: str) -> bool:
+def _grid_covers_little_of_printed_table(td: Table, body_text: str, *, own_grid: bool = True) -> bool:
     """True when a candidate grid holds only a small part of its printed table.
 
-    The completeness test of d-095325: the words and numbers the grid carries,
+    The completeness test (logged 2026-10-06): the words and numbers the grid carries,
     against those the text channel reads between the caption and the table's
     end (``_extract_table_body_text``). 10.15626/mp.2022.3108 p10 Table 10: a
     lattice pass gridded only its 2-row header (about 12 tokens) while the
@@ -2603,7 +2655,11 @@ def _grid_covers_little_of_printed_table(td: Table, body_text: str) -> bool:
     # ("1.79 0.69" read as one token run) matches few body tokens one-for-one yet
     # carries every value; the text fallback of a full-width table on a
     # two-column page can hold only a few of its columns (10.1109/access.2024.3421281
-    # p12 Table 4: grid 88 numbers, text body 42).
+    # p12 Table 4: grid 88 numbers, text body 42). Not for a grid that belongs to
+    # the caption ABOVE it (``own_grid=False``): its numbers are that table's and
+    # ship there (10.1016/j.jesp.2021.104154 p14, Table 12's grid).
+    if not own_grid:
+        return True
     return _count_numbers(grid_text) <= _count_numbers(_printed_table_lines(body_text))
 
 
@@ -2633,8 +2689,10 @@ def _caption_gap_above_table(layout_doc, camelot_table: Table, cap: CaptionMatch
         return None
 
 
-def _grid_sits_under_caption(layout_doc, camelot_table: Table, cap: CaptionMatch, page_captions=()) -> bool:
-    """False when the layout shows the caption printed BELOW the grid (or cannot say).
+def _grid_sits_under_caption(layout_doc, camelot_table: Table, cap: CaptionMatch, page_captions=()) -> "str | None":
+    """``"under"`` (grid under its caption), ``"foreign"`` (caption under the
+    grid, ANOTHER caption above it: the grid is that table's), or None (caption
+    printed under its own table, or position unknown -- not judged).
 
     The completeness test compares a grid with the text that follows its
     caption. Where a journal prints the caption under the table (Ubiquity Press,
@@ -2647,14 +2705,14 @@ def _grid_sits_under_caption(layout_doc, camelot_table: Table, cap: CaptionMatch
         cap_box = _bbox_of_caption_line(page_obj, cap)
         bbox = camelot_table.get("bbox")
         if cap_box is None or not bbox or not any(bbox):
-            return False
+            return None
         h = float(page_obj.height)
         grid_top = h - max(float(bbox[1]), float(bbox[3]))
         grid_bottom = h - min(float(bbox[1]), float(bbox[3]))
         # Caption at or above the grid's bottom: judged (a grid often starts a
         # few points above its caption's bottom, the caption line captured with it).
         if float(cap_box[1]) < grid_bottom - 2.0:
-            return True
+            return "under"
         # Caption below the grid. Judged only when ANOTHER table caption sits
         # above the grid: then the grid is that table's, handed to this caption
         # (10.1016/j.jesp.2021.104154 p14, Table 12's grid paired with the Table
@@ -2666,10 +2724,10 @@ def _grid_sits_under_caption(layout_doc, camelot_table: Table, cap: CaptionMatch
                 continue
             ob = _bbox_of_caption_line(page_obj, other)
             if ob is not None and float(ob[3]) <= grid_top + 20.0:
-                return True
-        return False
+                return "foreign"
+        return None
     except Exception:
-        return False
+        return None
 
 
 def _find_caption_for_table(

@@ -27,9 +27,16 @@ the page image.
   plain word, and the cells hold no more copies than the layout has raised sites. Works on PDFs that emit
   no space characters (word gaps from geometry). Event `table_letter_marker_marked`.
 - **A page that prints "Table N (continued)" labels its topmost grid Table N** (`continuation_of`), when
-  exactly one such head is on the page and Table N appeared earlier. "Table 1. (Continued.)" is now read.
-- **A confidence interval printed lower > upper passes through** with `fields["CI_order"] = "descending"`
-  (before, both bounds were dropped). Docpluck does not fix the paper.
+  exactly one such head is on the page and the grid spans the same columns as Table N's grid on an earlier
+  page (a stimulus box under 10.1017/jdm.2023.48 p6's "Table 1. (Continued)." stays a candidate).
+  "Table 1. (Continued.)" is now read.
+- **A grid set aside as partial is not shipped twice.** When the replacing table text carries at least 90%
+  of the grid's words, the grid is a copy and is not kept as an uncaptioned candidate
+  (event `camelot_candidate_is_set_aside_partial_grid`; 10.1080/02699931.2024.2434156 p11).
+- **A confidence interval printed lower > upper is labelled, not silently dropped.** The typed bounds
+  stay out of `fields` (a consumer must not read a reversed interval as `CI_lower`/`CI_upper`);
+  `fields["CI_order"] = "descending"` says why, and `fields_raw` keeps both bounds as printed. Event
+  `flatten_dropped_descending_ci` as before.
 - **An unreadable page in the running-rule scan is recorded** (`table_furniture_page_unreadable`), not
   skipped silently.
 
@@ -38,6 +45,11 @@ the page image.
 - **A body copy of a table is still recognized when its cells carry `^a` markers.** The marker is
   docpluck's notation, not the paper's; the copy test now ignores it on both sides. Without this the
   text copies of 10.1177/01461672251327169 Tables 1 and 2 returned to the Introduction.
+- **A continuation page's grid is no longer deleted as a "phantom" table.** A later page of a table has
+  no header row, so its first data row becomes the header; a sentence there read as absorbed body prose
+  and the whole grid was removed from the render (10.1017/s0007123424000024 p10, while `tables` kept
+  every cell). Grids under a `### Table N (continued, page P)` heading are now left in place, as
+  uncaptioned candidates already were.
 
 ## [2.4.158] - 2026-11-01 - normalization 1.9.80 - table extraction 2.4.29 - render 1.0.5 - sectioning 1.2.9
 
