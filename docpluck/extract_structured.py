@@ -2685,7 +2685,9 @@ def _caption_gap_above_table(layout_doc, camelot_table: Table, cap: CaptionMatch
             return None
         grid_top = float(page_obj.height) - max(float(bbox[1]), float(bbox[3]))
         return grid_top - float(cap_box[3])
-    except Exception:
+    except Exception as exc:
+        # The tie-break then falls back to text order; say so.
+        record_fallback("table_caption_gap_unreadable", detail=f"p{cap.page}:{type(exc).__name__}")
         return None
 
 
@@ -2726,7 +2728,9 @@ def _grid_sits_under_caption(layout_doc, camelot_table: Table, cap: CaptionMatch
             if ob is not None and float(ob[3]) <= grid_top + 20.0:
                 return "foreign"
         return None
-    except Exception:
+    except Exception as exc:
+        # The partial-grid guard is then not applied to this grid; say so.
+        record_fallback("table_caption_position_unreadable", detail=f"p{cap.page}:{type(exc).__name__}")
         return None
 
 

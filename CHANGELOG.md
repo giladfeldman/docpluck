@@ -4,7 +4,14 @@
 
 Fixes from the 2026-11-11 debt bundle. Each change was measured with a two-arm diff (new code against the
 old behaviour, in one process) over the 125-paper test manifest, and every changed table was read against
-the page image.
+the page image. Firings in the manifest (38 of 125 papers fire any new rule): raised footnote letters 73
+in 17 papers; partial-grid set-aside 16 in 14 papers; caption tie-break 2 in 2 papers; straddling sign 1;
+printed continuation head 7 pages of 29 head pages (measured before the column-extent requirement, which
+then refused one wrong link, 10.1017/jdm.2023.48 p6); set-aside grid not re-kept 1.
+Every firing whose table changed was read against the page: two tables are still wrong after the change
+(10.48550/arxiv.2406.11713 Table 9, wrong before as well; 10.1525/collabra.90203 Table 4 now carries its own
+text but truncated), both logged. New events for unreadable layout: `table_caption_gap_unreadable`,
+`table_caption_position_unreadable`, `layout_letter_marker_cache_unavailable`.
 
 ### Tables
 

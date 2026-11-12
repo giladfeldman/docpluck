@@ -6079,8 +6079,10 @@ def layout_letter_marker_fusions(layout) -> "collections.Counter[tuple[str, str]
             del out[key]
     try:
         layout._letter_marker_fusions = out
-    except Exception:  # a layout object that refuses attributes is not cached
-        pass
+    except Exception as exc:
+        # Not cached: the next call recomputes the same answer; recorded so a
+        # slow table pass on such an object can be traced here.
+        record_fallback("layout_letter_marker_cache_unavailable", detail=type(exc).__name__)
     return out
 
 
