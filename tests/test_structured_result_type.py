@@ -23,6 +23,10 @@ def test_structured_result_fields():
         # arrived identical. Kept separate from `fallbacks` so that stays a flat
         # `dict[str, int]` a consumer can threshold on.
         "fallback_details",
+        # 2026-11-13 (v2.4.160): an empty `tables`/`figures` says whether
+        # extraction ran ("ok") or failed, and which fonts had glyphs the text
+        # layer could not map. Announced in the consumer notice.
+        "tables_status", "figures_status", "unmapped_glyph_fonts",
     }
     assert set(hints.keys()) == expected
 

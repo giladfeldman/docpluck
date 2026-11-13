@@ -78,6 +78,16 @@ def extract_docx_structured(
     sync_header_rows(result.get("tables"))
     result["fallbacks"] = dict(fb.counters)
     result["fallback_details"] = fb.details
+    # See `StructuredResult.tables_status`. DOCX figures are not extracted at
+    # all, so `figures == []` is never evidence of a figure-free document.
+    from .resources import component_status
+
+    result["tables_status"] = component_status(
+        fb.counters,
+        grids_shipped=sum(1 for t in result.get("tables") or [] if t.get("cells")),
+    )
+    result["figures_status"] = "not_run:docx_figures_not_extracted"
+    result["unmapped_glyph_fonts"] = []   # glyph-name repair is a PDF-font concern
     return result
 
 

@@ -13,7 +13,7 @@ from ..normalize import NormalizationLevel
 from .taxonomy import SectionLabel, Confidence, DetectedVia
 from .types import Section, SectionedDocument, sectioning_text_id
 
-SECTIONING_VERSION = "1.2.9"  # v1.2.9 (v2.4.156): a wrapped "Supplemental Materials." no longer opens a section; an unheaded abstract of 1200-1500 characters is kept; group, bare-surname and full-first-name authors start a reference entry; reference numbers split from their entries are paired back via the layout. Previous: v1.2.8 (v2.4.155): references found under a German "Literatur" heading, as an unheaded numbered list of reference entries, and under a "References" heading that follows an abbreviation list; "Literature Survey" is a literature review, not the bibliography; a numbered appendix label opens its appendix whatever the previous paragraph ended with, and a lettered panel ("Appendix 5A.") stays inside its appendix. # v1.2.7 (v2.4.155): a CRediT contribution line ("Funding acquisition: ...", "Methodology: ..." inside a role list) is never a canonical heading. # v1.2.6 (v2.4.152): DOCX and HTML normalized_text IS normalized now (it was the raw markup reconstruction); markup heading hints are carried to the normalized offsets by sections/_offsets.line_offset_mapper. # v1.2.5 (v2.4.137): THE HEADING GUARD SKIPS PAGE BREAKS AND CONTROL CHARACTERS. _prior_paragraph_is_sentence_terminated is the corroboration a canonical heading needs when only 'preceded by a blank line' admits it; its walk covered space/tab/newline and nothing else. F0 deliberately KEEPS the form feed (L-052), so a heading first on a page had a bare form feed before it and was rejected; pdftotext glues control characters onto real lines, so a running header ending 'et al.' + U+0008 was rejected too. Neither is evidence that a sentence was left unfinished. SKIPPING IS NOT ADMITTING: the character underneath must still be a real terminator, which is what keeps the guard's founding case -- a column-wrapped CRediT list ending in a semicolon -- rejected. Measured blast radius over 30 held-out PMC papers: 39 canonical headings are rejected by this guard and EXACTLY 3 are furniture-blocked (1 backspace, 2 form feeds); the other 36 (20 by a letter, 9 by a comma, 6 by semicolon / paren / colon / digit) are unchanged. ALSO IN THIS VERSION: the boundary-aware truncation pass, disabled in v1.6.1 by setting _NO_TRUNCATE = set(SectionLabel) -- a set holding EVERY label, so the loop's first statement always continued -- had been UNREACHABLE ever since. ~45 lines deleted; is_section_boundary is kept, tested, and now DECLARED as having no production call site.  # # v1.2.4 (v2.4.124): the keywords-branch cut must leave keyword CONTENT behind. _synthesize_introduction_if_bloated_front_matter cut the keywords span at the FIRST blank-line paragraph break; Taylor & Francis serialises the block as KEYWORDS / blank / values, so that break sits between the LABEL and its own VALUES. xiao_2021_crsp therefore produced a 10-character keywords section holding only its own label, while its values became the synthesized Introduction opening line -- the document reads as though the keyword list were the Introduction first sentence. The cut now scans forward past any break whose kept span holds no non-blank line other than the metadata LABEL itself (_is_metadata_label_line, resolved through the canonical taxonomy rather than a private word list). Degenerate spans (label only, or no break at all) bail out unchanged instead of manufacturing an empty section. NOTE: render.py _demote_metadata_label_headings previously blamed this symptom on R4 column-aware extraction reordering the front-matter -- WRONG on both counts (the raw text has label and values adjacent and in order, and the word Introduction does not occur in that paper source at all; the heading is synthesized). That comment is corrected in the same change.  # v1.2.3 (v2.4.105): taxonomy gains Sage/APA back-matter heading variants — "declaration of conflicting interests" (conflict_of_interest), "authorship declaration" (author_contributions), "orcid ids" (author_note). These rendered as body text on ip_feldman/PSPB because they immediately precede their paragraph (no blank line) so only canonical-heading recognition can promote them. Only the plural "orcid ids" heading form is canonical (a bare/inline "ORCID:" is not, to avoid false-matching an identifier line).
+SECTIONING_VERSION = "1.2.10"  # v1.2.10 (2026-11-13, v2.4.160): Section.pages maps page starts through rewritten text (boundary_offsets); an unmappable or out-of-order page start fails closed to () and is counted as section_pages_unmappable. Previous: v1.2.9 (v2.4.156): a wrapped "Supplemental Materials." no longer opens a section; an unheaded abstract of 1200-1500 characters is kept; group, bare-surname and full-first-name authors start a reference entry; reference numbers split from their entries are paired back via the layout. Previous: v1.2.8 (v2.4.155): references found under a German "Literatur" heading, as an unheaded numbered list of reference entries, and under a "References" heading that follows an abbreviation list; "Literature Survey" is a literature review, not the bibliography; a numbered appendix label opens its appendix whatever the previous paragraph ended with, and a lettered panel ("Appendix 5A.") stays inside its appendix. # v1.2.7 (v2.4.155): a CRediT contribution line ("Funding acquisition: ...", "Methodology: ..." inside a role list) is never a canonical heading. # v1.2.6 (v2.4.152): DOCX and HTML normalized_text IS normalized now (it was the raw markup reconstruction); markup heading hints are carried to the normalized offsets by sections/_offsets.line_offset_mapper. # v1.2.5 (v2.4.137): THE HEADING GUARD SKIPS PAGE BREAKS AND CONTROL CHARACTERS. _prior_paragraph_is_sentence_terminated is the corroboration a canonical heading needs when only 'preceded by a blank line' admits it; its walk covered space/tab/newline and nothing else. F0 deliberately KEEPS the form feed (L-052), so a heading first on a page had a bare form feed before it and was rejected; pdftotext glues control characters onto real lines, so a running header ending 'et al.' + U+0008 was rejected too. Neither is evidence that a sentence was left unfinished. SKIPPING IS NOT ADMITTING: the character underneath must still be a real terminator, which is what keeps the guard's founding case -- a column-wrapped CRediT list ending in a semicolon -- rejected. Measured blast radius over 30 held-out PMC papers: 39 canonical headings are rejected by this guard and EXACTLY 3 are furniture-blocked (1 backspace, 2 form feeds); the other 36 (20 by a letter, 9 by a comma, 6 by semicolon / paren / colon / digit) are unchanged. ALSO IN THIS VERSION: the boundary-aware truncation pass, disabled in v1.6.1 by setting _NO_TRUNCATE = set(SectionLabel) -- a set holding EVERY label, so the loop's first statement always continued -- had been UNREACHABLE ever since. ~45 lines deleted; is_section_boundary is kept, tested, and now DECLARED as having no production call site.  # # v1.2.4 (v2.4.124): the keywords-branch cut must leave keyword CONTENT behind. _synthesize_introduction_if_bloated_front_matter cut the keywords span at the FIRST blank-line paragraph break; Taylor & Francis serialises the block as KEYWORDS / blank / values, so that break sits between the LABEL and its own VALUES. xiao_2021_crsp therefore produced a 10-character keywords section holding only its own label, while its values became the synthesized Introduction opening line -- the document reads as though the keyword list were the Introduction first sentence. The cut now scans forward past any break whose kept span holds no non-blank line other than the metadata LABEL itself (_is_metadata_label_line, resolved through the canonical taxonomy rather than a private word list). Degenerate spans (label only, or no break at all) bail out unchanged instead of manufacturing an empty section. NOTE: render.py _demote_metadata_label_headings previously blamed this symptom on R4 column-aware extraction reordering the front-matter -- WRONG on both counts (the raw text has label and values adjacent and in order, and the word Introduction does not occur in that paper source at all; the heading is synthesized). That comment is corrected in the same change.  # v1.2.3 (v2.4.105): taxonomy gains Sage/APA back-matter heading variants — "declaration of conflicting interests" (conflict_of_interest), "authorship declaration" (author_contributions), "orcid ids" (author_note). These rendered as body text on ip_feldman/PSPB because they immediately precede their paragraph (no blank line) so only canonical-heading recognition can promote them. Only the plural "orcid ids" heading form is canonical (a bare/inline "ORCID:" is not, to avoid false-matching an identifier line).
 
 
 def _detect_format(file_bytes: bytes) -> str:
@@ -54,6 +54,53 @@ def _normalize_markup_text(text, hints, level, preserve_math_glyphs):
             continue
         moved.append(replace(h, char_start=s, char_end=e, text=normalized[s:e]))
     return normalized, moved
+
+
+def _text_page_offsets(raw_text: str, normalized: str) -> tuple[int, ...]:
+    """Where each page starts in ``normalized``, from the TEXT channel alone.
+
+    ``Section.pages`` was ``()`` on every section (d-a6645c, d-66c8db): page
+    starts existed only on the layout path, which this function deliberately
+    does not run (LESSONS L-001). pdftotext ends every page with a form feed,
+    but normalization does not keep all of them (measured 2026-11-13 on 25
+    corpus papers: 22 lost 2-9 of them), so the RAW text's form feeds are
+    carried to the normalized text with the same line aligner the markup
+    branches use. Returns ``()`` (pages unknown) when the raw text has no form
+    feed or the mapping is not monotone -- never a guessed page.
+    """
+    from ._offsets import boundary_offsets
+
+    if "\f" not in raw_text:
+        return ()
+    starts = []
+    i = raw_text.find("\f")
+    while i != -1:
+        if i + 1 < len(raw_text):
+            starts.append(i + 1)
+        i = raw_text.find("\f", i + 1)
+    mapped = boundary_offsets(raw_text, normalized, starts)
+    if any(m is None for m in mapped):
+        from ..telemetry import record_fallback
+        record_fallback("section_pages_unmappable",
+                        detail=f"page {mapped.index(None) + 2} start not found")
+        return ()
+    offsets = [0, *mapped]
+    if any(b < a for a, b in zip(offsets, offsets[1:])):
+        from ..telemetry import record_fallback
+        record_fallback("section_pages_unmappable", detail="page starts out of order")
+        return ()
+    # A page with real content that maps to ZERO length means normalization
+    # reshaped the lines around its break and the aligner sent the whole run to
+    # one point (10.1016/j.jesp.2009.12.010: pages 9-11 all mapped to one
+    # offset, putting page-9 text on page 11). That page's boundaries are not
+    # known, so no page is reported -- never a wrong one.
+    raw_pages = raw_text.split("\f")
+    for k in range(1, len(offsets)):
+        if offsets[k] == offsets[k - 1] and len("".join(raw_pages[k - 1].split())) > 200:
+            from ..telemetry import record_fallback
+            record_fallback("section_pages_unmappable", detail=f"page {k}")
+            return ()
+    return tuple(offsets)
 
 
 def extract_sections(
@@ -187,7 +234,7 @@ def extract_sections(
         hints = annotate_text(normalized)
         sections = partition_into_sections(
             normalized, hints, source_format="pdf",
-            page_offsets=report.page_offsets,
+            page_offsets=report.page_offsets or _text_page_offsets(raw_text, normalized),
         )
         return SectionedDocument(
             sections=sections,

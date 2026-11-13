@@ -126,6 +126,19 @@ def extract_pdf(
 
         text = result.stdout
         method = "pdftotext_default"
+        # NO TEXT LAYER IS A FAILURE, NOT AN EMPTY PAPER (d-23c3f7). A scanned
+        # or image-only PDF came back as a bare form feed with a clean method,
+        # `ok` statuses and no event (ESCImate 2026-09-07: a 0-character
+        # extraction returned silently). The `_failed` piece is the form the
+        # consumers' degraded-result guards already read. docpluck runs no OCR.
+        if not text.strip():
+            record_fallback("no_text_layer", detail=f"pages={max(1, text.count(chr(12)))}")
+            method += "+text_layer_failed:no_text_layer"
+        else:
+            _blank = [i + 1 for i, pg in enumerate(text.split(chr(12))[:-1] or [text])
+                      if not pg.strip()]
+            if _blank:   # a page with no text (blank, or an image); diagnostic only
+                record_fallback("pages_without_text", detail=",".join(map(str, _blank[:50])))
         # Recorded, not silent: which fonts were remapped, and which H-named glyphs
         # the table does not cover (those reach the text as the extractor emits them).
         method += glyph_report.method_suffix

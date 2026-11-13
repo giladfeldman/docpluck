@@ -160,3 +160,16 @@ def test_pypdf_trailer_size_warning_is_not_printed(caplog):
     assert all(f.filter(rec) is False for f in logging.getLogger("pypdf._writer").filters
                if isinstance(f, glyph_names._TrailerSizeFilter))
     assert any(isinstance(f, glyph_names._TrailerSizeFilter) for f in logging.getLogger("pypdf._writer").filters)
+
+
+def test_unmapped_glyph_fonts_is_a_structured_field():
+    """d-8afcbe (2026-11-13): the same report as a response field, not only an event."""
+    from docpluck import extract_pdf_structured
+
+    pdf = _pdf({"F1": _PLAIN, "F2": _pi("/H12345")}, "BT /F2 12 Tf 72 700 Td (!!) Tj ET")
+    res = extract_pdf_structured(pdf)
+    assert res["unmapped_glyph_fonts"] == [
+        {"font": "ABCDEF+Universal-GreekwithMathPi", "glyph_names": ["H12345"], "char_count": 2}
+    ]
+    plain = _pdf({"F1": _PLAIN}, "BT /F1 12 Tf 72 700 Td (Hello) Tj ET")
+    assert extract_pdf_structured(plain)["unmapped_glyph_fonts"] == []

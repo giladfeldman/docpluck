@@ -170,6 +170,77 @@ def is_render_failure(exc: BaseException | None) -> bool:
 # not make a result incomplete (Sonnet review, 2026-10-01).
 DIAGNOSTIC_ONLY_EVENTS = frozenset({"symbol_font_scan_exception"})
 
+# Which `*_exception` events cost the TABLE channel something (a lost pass, a
+# skipped region, a table not built) versus the text channel only. Every
+# `record_fallback("<x>_exception")` literal in the package must sit in exactly
+# one of these sets or DIAGNOSTIC_ONLY_EVENTS -- `tests/test_component_status.py`
+# greps the package and fails on an unclassified event, so a new catch site
+# cannot silently read as "tables ok".
+TABLE_CHANNEL_EXCEPTION_EVENTS = frozenset({
+    "cell_geometry_cell_exception", "bottom_extend_exception", "bottom_extend_text_exception",
+    "camelot_cell_side_by_side_exception", "camelot_column_resplit_exception",
+    "camelot_extract_exception", "camelot_html_render_exception",
+    "camelot_input_decrypt_exception",
+    "camelot_lattice_exception", "camelot_region_exception",
+    "camelot_row_label_stub_exception", "camelot_stream_exception",
+    "camelot_table_frame_exception", "camelot_table_shape_exception",
+    "caption_column_rebuild_exception", "docx_table_extraction_exception",
+    "lattice_augment_merge_exception", "lattice_augment_scan_exception",
+    "lattice_augment_setup_exception", "lattice_renderer_probe_exception",
+    "recurring_rotated_lines_exception", "region_driven_extract_exception",
+    "region_driven_region_exception", "region_driven_setup_exception",
+    "rotated_table_read_exception",
+    "table_letter_marker_scan_exception", "table_note_region_exception",
+    "whitespace_cells_region_exception", "whitespace_cells_setup_exception",
+})
+TEXT_CHANNEL_EXCEPTION_EVENTS = frozenset({
+    "column_body_rebuild_exception", "column_correction_exception",
+    "column_interleave_detector_exception", "count_pages_exception",
+    "docx_omml_inline_exception", "dropped_glyphs_restore_exception",
+    "dropped_glyphs_text_exception", "glyph_name_char_count_exception",
+    "glyph_name_repair_exception", "glyph_raster_exception",
+})
+# Camelot could not run at all: no grid from it, for any table.
+TABLES_FAILED_EVENTS = frozenset({
+    "camelot_extract_exception", "camelot_not_installed",
+    "camelot_all_flavors_failed", "docx_table_extraction_exception",
+})
+
+
+def component_status(
+    counters: dict[str, int],
+    *,
+    not_run_reason: str | None = None,
+    grids_shipped: int = 0,
+) -> str:
+    """One word a consumer can branch on for the TABLE channel of a result.
+
+    ``tables == []`` used to mean both "this paper prints no table" and "the
+    table pass crashed" (d-6736e7). This field tells them apart, beside the
+    unchanged ``tables`` list:
+
+    * ``"ok"`` -- every table pass ran to completion.
+    * ``"partial:<event>,..."`` -- a pass was lost or a region skipped; the
+      tables that ship are real but there may be fewer, or thinner, than the
+      page prints.
+    * ``"failed:<event>,..."`` -- the main table extractor did not run and no
+      other path built a grid (``grids_shipped == 0``): an empty or cell-less
+      ``tables`` here says NOTHING about the paper. When a backup path still
+      built grids, the same events read ``partial`` instead.
+    * ``"not_run:<reason>"`` -- deliberately skipped (Camelot disabled by
+      environment, or no text to anchor captions on).
+    """
+    if not_run_reason:
+        return f"not_run:{not_run_reason}"
+    fired = sorted(e for e in counters if counters[e])
+    failed = [e for e in fired if e in TABLES_FAILED_EVENTS]
+    if failed and not grids_shipped:
+        return "failed:" + ",".join(failed)
+    partial = sorted(set(failed) | {e for e in fired if e in TABLE_CHANNEL_EXCEPTION_EVENTS})
+    if partial:
+        return "partial:" + ",".join(partial)
+    return "ok"
+
 
 def incomplete_method_pieces(counters: dict[str, int]) -> list[str]:
     """The ``method`` pieces that say this result is not the full extraction.

@@ -91,6 +91,8 @@ now been burned by three times.
 
 from __future__ import annotations
 
+from ..telemetry import record_fallback
+
 import re
 from collections import Counter
 from typing import Any
@@ -234,6 +236,8 @@ def camelot_cell_bboxes(
                 x2, y2 = float(cell.x2), float(cell.y2)
             except Exception as exc:  # noqa: BLE001
                 note_if_exhausted(exc, where="cell_geometry_cell")
+                record_fallback("cell_geometry_cell_exception",
+                                detail=f"r{r}c{c} {type(exc).__name__}")
                 row.append(ZERO_BBOX)
                 continue
             if x2 <= x1 or y2 <= y1:

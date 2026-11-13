@@ -48,6 +48,9 @@ def test_git_state_tracks_the_tree_within_one_process(monkeypatch):
         return real_run(cmd, *args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
+    # This test is about clean -> dirty; a source edit during the run would
+    # (correctly) read `stale`, which test_version_git_identity_scope pins.
+    monkeypatch.setattr(version_mod, "_LOADED_AT", float("inf"))
     first = version_mod._resolve_git_state()
     state["porcelain"] = " M docpluck/normalize.py\n"
     second = version_mod._resolve_git_state()

@@ -1,5 +1,92 @@
 # Changelog
 
+## [2.4.160] - 2026-11-13 - normalization 1.9.81 - table extraction 2.4.31 - render 1.0.6 - sectioning 1.2.10
+
+Release A of the 2026-11-13 debt bundle. Ordered by harm to consumers. Every change was measured with
+`tools/diag/release_value_diff.py` (this tree against v2.4.159, 125-paper manifest, normalization events now
+counted too). 21 of 125 papers changed. Every changed table and every changed body-text line was read.
+
+Firings in the manifest:
+
+| Event | Count |
+|---|---|
+| running-text check after ligature folding | 184 -> 188 |
+| caption rows moved to the caption | 155 -> 161 |
+| note rows moved to the footnote | 24 -> 28 |
+| table text cut at the window (new `table_text_cut_at_window`) | 33 |
+| statistic left split from its value by a blank line (new `a1_stat_split_by_blank_line_left`) | 66, in 5 papers whose text changed |
+| repeated lines stripped | 1360 -> 1354 (six row labels now kept) |
+
+Our own first diff caught one regression, which was fixed before release: a footnote letter fused to a header ("Model 2d") typed the hazard ratios of 10.1001/jamanetworkopen.2023.48333 Table 3 as Cohen's d.
+
+### Silent failures now say so (new fields; nothing removed)
+
+- **`tables_status` / `figures_status`** on every structured result: `ok`, `partial:<events>`,
+  `failed:<events>` or `not_run:<reason>`. `tables == []` used to mean both "no table printed" and "the
+  table pass crashed". Each `*_exception` event is classified as costing the table channel or not; a test
+  fails on any unclassified one. (d-6736e7)
+- **A PDF with no text layer is a failure, not an empty paper.** Its `method` gains
+  `+text_layer_failed:no_text_layer`, with event `no_text_layer`; pages without text are listed in
+  `pages_without_text`. docpluck runs no OCR. (d-23c3f7)
+- **The version receipt's `git_state` can now be `stale`.** That happens when the code on disk changed after
+  the process loaded it. `git_sha`/`git_state` describe docpluck's own checkout only. A copy installed inside
+  another repository no longer reports that repository's commit. (d-2244e2, d-5bf4ee, d-fcb3d3)
+- **`unmapped_glyph_fonts`** on the structured result lists each font whose glyphs the text layer could not
+  map (font, glyph names, character count). Before, this was only a fallback count. (d-8afcbe)
+- **Each flattened row carries `unparsed`**: every cell that was not typed, with its column, header, text
+  and reason (`column_role_unknown`, `repeated_pair_kind`, `value_not_parsed`,
+  `pair_column_without_arm_label`). (d-6bff50)
+- **F0 counts every running head or footer line it deletes** (`f0_furniture_line_removed`). (d-338ea7)
+- **A table text cut by the 1500-character window is counted** (`table_text_cut_at_window`). Before, a cut
+  table text looked complete. The trailing-heading trim no longer pops data rows such as
+  `Item 10  10.00 (3.11) .10`. (d-927624, d-1352e2)
+- **`include_uncaptioned`** (default `True`, unchanged output) lets a consumer withhold uncaptioned table
+  candidates. Withheld candidates are counted. (d-be5166)
+
+### Tables
+
+- **Copy-protected PDFs keep their tables.** A PDF that forbids copying but has an empty user password is
+  decrypted before Camelot reads it. 10.1016/j.evolhumbehav.2014.02.004 went from 0 cells to Table 2's 77
+  cells; all 48 M/SD values were checked against the page image. A PDF that needs a real password is left
+  as it is and counted (`camelot_input_encrypted_needs_password`). (d-e23197)
+- **Ligatures no longer break comparisons between the text and the table channels.** pdftotext keeps
+  "ﬁ"/"ﬀ" where Camelot spells them out. Every comparison between the two now folds them (NFKC): the
+  running-text check, grid coverage, the partial-grid guard, caption-to-grid token overlap, note-row
+  survival, caption-row keys in `caption_rows` and `flatten`, and the F0 furniture key. A prose block on
+  10.1017/s1930297500003193 p6 no longer ships as an uncaptioned table. Note and caption lines now leave
+  four of its tables' grids. Part of d-58ce8d.
+- **`fields["est_kind"]`** is `"ratio"` (null 1) or `"difference"` (null 0) when the column header names the
+  measure. It is absent otherwise, never guessed. (d-cdda61)
+- **A caption or note no longer types a column from a stray letter.** "Odds ratios for vitamin D" typed an
+  "Estimate [95% CI]" column as Cohen's d. Symbols read from captions, header rows and notes are now
+  case-exact, and a lone d/g must not touch a letter, digit or `^`, nor be followed by a word. The same rule
+  now guards the blank-column recovery gate.
+- `tables/confidence.py`, a dead second implementation with different thresholds, is deleted. (d-5e9b45)
+
+### Text (normalization 1.9.81)
+
+- **Statistic line joins cross one line break, never a blank line.** A census of 125 papers found 27 of 440
+  joins crossing a blank line, and 25 of them were wrong: a table header glued onto a body cell, or an
+  equation glued onto its next line. `p`, `OR`, `CI` and `RR` must now be whole tokens ("coup\n=" is not
+  p). The two comma rules still cross one blank line. (d-73fb4a)
+- **A value printed with a leading dot (".03") counts as a value-only line**, looked up to 4 lines ahead.
+  Six appendix row labels ("Have a college degree", 10.1177/23780231251314667) are no longer stripped as
+  repeated furniture. (d-8930b8)
+
+### Sections (sectioning 1.2.10)
+
+- **`Section.pages` is filled from the text channel.** It was `()` on every section. Page starts are mapped
+  through normalization's rewrites. An unmappable or out-of-order start fails closed to `()` and is counted
+  (`section_pages_unmappable`). On 125 papers: pages filled for 84, failed closed for 41. Of 462 headings
+  checked against the printed page, 454 agree. 8 are one page early where normalization moves
+  back matter across a page break (logged, d-b46f12). (d-a6645c, d-66c8db)
+
+### Tools
+
+- `tools/diag/release_value_diff.py` (new): what a tree changes for consumers, value by value, against a
+  released tag, with firing counts per event.
+- `scripts/check_debt_trace.py` and `scripts/check_skill_paths.py` (new local gates).
+
 ## [2.4.159] - 2026-11-11 - normalization 1.9.80 - table extraction 2.4.30 - render 1.0.6 - sectioning 1.2.9
 
 Fixes from the 2026-11-11 debt bundle. Each change was measured with a two-arm diff (new code against the

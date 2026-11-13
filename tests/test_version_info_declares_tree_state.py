@@ -58,6 +58,9 @@ def test_the_state_matches_what_git_actually_reports():
         capture_output=True, text=True, timeout=10,
     )
     expected = "dirty" if porcelain.stdout.strip() else "clean"
+    from docpluck import version as _v
+    if _v._source_changed_since_load():   # a source edit during this run (2.4.160)
+        expected = "stale"
     assert info["git_state"] == expected, (
         f"git says {expected!r}, the receipt says {info['git_state']!r}"
     )

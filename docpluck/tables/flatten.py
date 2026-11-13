@@ -53,6 +53,7 @@ Triage cluster: `an internal triage doc (2026-05-14)` → EC-T1.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Optional, TypedDict
 
 from . import CaptionStatus, Cell, Table
@@ -106,6 +107,11 @@ class FlattenedRow(TypedDict):
     # prints it (`"-1.40"` beside `fields["t"]` = -1.4), keyed like `fields`.
     # A key is present only when its token parses back to exactly that value.
     fields_raw: dict[str, str]
+    # Value-bearing cells of this row that reached no field, each with why:
+    # ``{"col", "header", "cell", "reason"}``, reason one of
+    # ``column_role_unknown`` / ``repeated_pair_kind`` / ``value_not_parsed``.
+    # ``[]`` when every numeric cell was typed (2026-11-13, d-6bff50).
+    unparsed: list[dict[str, object]]
     # The source table's `caption_status` (2026-09-24, owner decision "option B").
     # A row from an "uncaptioned_candidate" table comes from a grid NO caption
     # claimed -- about half of those are real statistical tables, about half are
@@ -152,7 +158,9 @@ def _cells_to_grid(cells: list[Cell]) -> list[list[str]]:
 
 
 def _alnum_key(s: str) -> str:
-    return re.sub(r"[^0-9a-z]", "", (s or "").lower())
+    # NFKC first: a grid cell spells a ligature out where the caption keeps it,
+    # and stripping the glyph would turn "deﬁnition" into "denition".
+    return re.sub(r"[^0-9a-z]", "", unicodedata.normalize("NFKC", s or "").lower())
 
 
 def _drop_leading_caption_rows(
@@ -446,6 +454,43 @@ def _effect_type_for(label: str) -> Optional[str]:
     return None
 
 
+# The TABLE-WIDE hint reads the caption, the note and every header row, where a
+# lone letter is usually not a statistic: "vitamin D", "Study D", "Appendix D",
+# and `\bOR\b` under re.I is the word "or". Found 2026-11-13 while adding
+# est_kind: an "Estimate [95% CI]" column of a table captioned "Odds ratios for
+# vitamin D" was typed `d` = 1.42 -- an odds ratio delivered as Cohen's d. In
+# this wider text a one- or two-letter symbol counts only in the case the
+# statistic is printed in (italic d, g; OR); the spelled-out names still count
+# in any case. A column's OWN header keeps `_EFFECT_TYPE_PATTERNS`.
+# A lone "d"/"g" in a caption, header row or note is far more often a footnote
+# letter than the statistic: "Model 2d" (a letter fused to a number,
+# 10.1001/jamanetworkopen.2023.48333 Table 3, whose hazard ratios read as
+# Cohen's d in the first 2026-11-13 diff), "^d", or a note line opening
+# "d Adjusted for age". So the bare symbol counts only with no letter, digit
+# or "^" before it and no word after it ("d [95% CI]", "d =", "(d)").
+_LONE_SYMBOL = r"(?<![A-Za-z0-9^]){sym}(?![A-Za-z0-9])(?!\s+[A-Za-z])"
+_VOCAB_CASE_EXACT = {
+    "cohens_d": re.compile(r"(?i:cohen\W{0,2}s?\s*d\b)|"
+                           + _LONE_SYMBOL.format(sym=r"d(?:\s*z)?")),
+    "hedges_g": re.compile(r"(?i:hedges\W{0,2}s?\s*g\b)|" + _LONE_SYMBOL.format(sym="g")),
+    "odds_ratio": re.compile(r"(?<![A-Za-z])OR(?![A-Za-z])|(?i:odds\s*ratio)"),
+}
+_VOCAB_EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    (et, _VOCAB_CASE_EXACT.get(et, pat)) for et, pat in _EFFECT_TYPE_PATTERNS
+]
+
+
+def _vocab_effect_type(vocab: str) -> Optional[str]:
+    """`_effect_type_for` for the table-wide vocabulary (case-exact symbols)."""
+    s = (vocab or "").strip()
+    if not s:
+        return None
+    for et, pat in _VOCAB_EFFECT_TYPE_PATTERNS:
+        if pat.search(s):
+            return et
+    return None
+
+
 # Effect-type → canonical field key. Only the unambiguous effect sizes are
 # promoted to a typed key; everything else stays the generic `est` (paired with
 # its CI), which the consumer routes by est+CI+p (Request 11 §2.4, §4).
@@ -454,6 +499,38 @@ _EFFECT_TYPE_KEY = {
     "eta_squared_partial": "eta2",
     "eta_squared": "eta2",
 }
+
+
+# Whether a generic `est` is a RATIO (null 1) or a DIFFERENCE (null 0), so a
+# CI-excludes-null check reads the right null (d-cdda61, a consumer request
+# 2026-08-21 §4.2.3). Typographic: the column header must NAME the measure. A
+# header that names both kinds, or neither, gives no `est_kind` -- never a
+# guessed null.
+# The abbreviations are case-SENSITIVE: `or` is an English word (`Mean or
+# median`), and `_EFFECT_TYPE_PATTERNS`' odds-ratio entry is not (logged), so
+# its table-wide hint is not trusted for a ratio here.
+_RATIO_EST_RE = re.compile(
+    r"(?<![A-Za-z])(?:a?OR|RR|HR|IRR|aHR|aRR)(?![A-Za-z])"
+    r"|(?i:odds\s*ratio|risk\s*ratio|hazard\s*ratio|rate\s*ratio|relative\s*risk)",
+)
+_DIFFERENCE_EST_TYPES = frozenset({
+    "cohens_d", "hedges_g", "pearson_r", "mean_difference", "risk_difference",
+})
+
+
+def _est_kind(header_cell: str) -> Optional[str]:
+    """``"ratio"`` / ``"difference"`` when the column header names exactly one
+    kind of measure, else ``None``. The table-wide caption hint is NOT used:
+    `\\bd\\b` reads "vitamin D" as Cohen's d, and a wrong null is worse than
+    none."""
+    s = _strip_fold_sentinels(header_cell or "")
+    ratio = bool(_RATIO_EST_RE.search(s))
+    diff = _effect_type_for(s) in _DIFFERENCE_EST_TYPES
+    if ratio and diff:
+        return None
+    if ratio or diff:
+        return "ratio" if ratio else "difference"
+    return None
 
 
 def _effect_key(header_cell: str, hint: Optional[str]) -> str:
@@ -1145,9 +1222,13 @@ def _recover_blank_roles(
     #       combined estimate+interval column (the t-/F-with-effect shape).
     # Tables that are neither (regression OR tables, bare correlation matrices)
     # are left exactly as the grid-header path produced them.
+    # The lone "d" is case-exact and footnote-letter-safe (`_VOCAB_CASE_EXACT`):
+    # read case-insensitively, "Appendix D", "^d" and a note line "d Adjusted
+    # for age" each opened this gate (sibling of the 2026-11-13 caption fix).
     has_typed_effect = bool(
-        re.search(
-            r"\bd\s*z?\b|\bd\s+or\s+d\b|cohen|η|\beta[\s_\-]?(?:squared|sq|p|2)\b",
+        _VOCAB_CASE_EXACT["cohens_d"].search(vocab_text)
+        or re.search(
+            r"\bd\s+or\s+d\b|cohen|η|\beta[\s_\-]?(?:squared|sq|p|2)\b",
             vocab_text,
             re.I,
         )
@@ -1666,6 +1747,7 @@ def _flatten_one_row(
     # Classify each non-label column. A `roles_override` entry (from blank-header
     # recovery) wins over the grid-header classification for that column.
     roles: dict[int, str] = {}
+    typed_elsewhere: set[int] = set()
     df_from_header: dict[int, tuple[int, int]] = {}
     pair_cols: dict[str, list[int]] = {}
     pair_keys: set[str] = set()
@@ -1675,6 +1757,8 @@ def _flatten_one_row(
         if roles_override and ci in roles_override:
             if roles_override[ci]:  # "" = typed elsewhere (a pair column's own record)
                 roles[ci] = roles_override[ci]
+            else:
+                typed_elsewhere.add(ci)
             continue
         role = _classify_column(h)
         if role is None and not label_names_nothing:
@@ -1694,10 +1778,12 @@ def _flatten_one_row(
 
     # Two columns of one pair kind in one record (two arms' "M (SD)") would
     # overwrite each other: neither is typed here.
+    repeated_pair_cols: set[int] = set()
     for _kind, _cols in pair_cols.items():
         if len(_cols) > 1:
             for _c in _cols:
                 roles.pop(_c, None)
+                repeated_pair_cols.add(_c)
 
     # Structural η²p inference for an unlabeled estimate column in an F-test
     # results table whose effect-size header glyph was dropped by the font
@@ -1728,7 +1814,16 @@ def _flatten_one_row(
     role_nums: dict[str, float] = {}
     # The cell text each typed value was read from, for `fields_raw`.
     src: dict[str, str] = {}
+    # Which columns put a value in `role_nums` (for `unparsed` below): each
+    # iteration credits the PREVIOUS column with the keys that appeared since.
+    typed_cols: set[int] = set()
+    _seen_keys: set[str] = set()
+    _prev_ci: Optional[int] = None
     for ci, role in roles.items():
+        if _prev_ci is not None and set(role_nums) - _seen_keys:
+            typed_cols.add(_prev_ci)
+        _seen_keys = set(role_nums)
+        _prev_ci = ci
         if ci >= len(row):
             continue
         raw = (row[ci] or "").strip()
@@ -1792,6 +1887,8 @@ def _flatten_one_row(
                     eff_key = "est"
                 role_nums[eff_key] = est
                 src[eff_key] = raw
+                if eff_key == "est" and _est_kind(header[ci]):
+                    role_vals["est_kind"] = _est_kind(header[ci])
                 role_vals[eff_key] = est_raw.strip() if est_op else raw
                 if est_op:
                     role_vals[eff_key + "_op"] = est_op
@@ -1802,6 +1899,8 @@ def _flatten_one_row(
                 pair_keys.add(k)
                 src[k] = raw
                 role_vals[k] = _printed_token(raw, v) or _fmt_num(v)
+            if vals and "est" in vals and _est_kind(header[ci]):
+                role_vals["est_kind"] = _est_kind(header[ci])
             if vals and "est" in vals:
                 m = _SE_PHRASE_RE.search(_strip_fold_sentinels(header[ci]))
                 role_vals["est_label"] = (
@@ -1832,6 +1931,8 @@ def _flatten_one_row(
                     eff_key = "est"
                 role_nums[eff_key] = est
                 src[eff_key] = raw
+                if eff_key == "est" and _est_kind(header[ci]):
+                    role_vals["est_kind"] = _est_kind(header[ci])
                 role_vals[eff_key] = (
                     re.split(r"[\[(]", est_raw, maxsplit=1)[0].strip() or _fmt_num(est)
                 )
@@ -2006,6 +2107,9 @@ def _flatten_one_row(
             # printed equality, so every existing reader sees the same record).
             if role_vals.get(k + "_op"):
                 fields[k + "_op"] = role_vals[k + "_op"]
+    if "est" in fields and role_vals.get("est_kind"):
+        # ratio -> the null is 1; difference -> 0 (d-cdda61). Absent = unknown.
+        fields["est_kind"] = role_vals["est_kind"]
     for k in ("n", "N", "count"):
         if k in role_nums:
             v = role_nums[k]
@@ -2079,6 +2183,30 @@ def _flatten_one_row(
             if tok is not None:
                 fields_raw[k] = tok
 
+    # Which value-bearing cells reached no field, and why (d-6bff50, a
+    # consumer request 2026-08-21 §4.2.1): an empty or partial `fields` said
+    # nothing about what was left behind. Reasons: `column_role_unknown` (the
+    # header names no statistic this parser types), `repeated_pair_kind` (two
+    # "M (SD)"-type columns in one record, neither typed), `value_not_parsed`
+    # (the column has a role, the cell's text did not parse as one).
+    if _prev_ci is not None and set(role_nums) - _seen_keys:
+        typed_cols.add(_prev_ci)
+    unparsed: list[dict[str, object]] = []
+    for ci, cell in enumerate(row):
+        c = (cell or "").strip()
+        if (ci == label_col or not c or not re.search(r"\d", c) or ci in typed_cols
+                or ci in typed_elsewhere):
+            continue
+        reason = ("repeated_pair_kind" if ci in repeated_pair_cols
+                  else "value_not_parsed" if ci in roles
+                  else "column_role_unknown")
+        unparsed.append({
+            "col": ci,
+            "header": _strip_fold_sentinels(header[ci]) if ci < len(header) else "",
+            "cell": _strip_fold_sentinels(c),
+            "reason": reason,
+        })
+
     return FlattenedRow(
         table_id=table_id,
         page=page,
@@ -2090,6 +2218,7 @@ def _flatten_one_row(
         sentence=sentence,
         fields=fields,
         fields_raw=fields_raw,
+        unparsed=unparsed,
         # Internal, removed by `flatten_table`: the keys a pair cell typed.
         _pair_keys=pair_keys & set(fields),
     )
@@ -2878,7 +3007,7 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
         [" ".join(hr) for hr in header_rows]
         + [cap_vocab or "", table.get("footnote") or ""]
     )
-    effect_hint = _effect_type_for(vocab_all)
+    effect_hint = _vocab_effect_type(vocab_all)
     # Where an interval level stated outside the column's own header is read
     # from (every header row, the caption, the note): "95% CI" in a note.
     level_context = vocab_all
@@ -3028,6 +3157,16 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
                 effect_hint=effect_hint,
                 level_context=level_context,
             )
+            # A pair column with no arm label is left untyped (above); the row
+            # says so instead of dropping it in silence (d-6bff50).
+            for ci in sorted(rp):
+                if not pair_labels.get(ci) and (row[ci] or "").strip():
+                    main["unparsed"].append({
+                        "col": ci, "header": _strip_fold_sentinels(header[ci]),
+                        "cell": _strip_fold_sentinels(row[ci].strip()),
+                        "reason": "pair_column_without_arm_label",
+                    })
+            main["unparsed"].sort(key=lambda u: u["col"])
             if main["fields"] or not any(pair_labels.get(ci) for ci in rp):
                 out.append(main)
             for ci, kind in sorted(rp.items()):

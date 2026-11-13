@@ -29,6 +29,7 @@ Each move is recorded (``table_caption_rows_moved_to_caption``).
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Optional
 
 from ..telemetry import record_fallback
@@ -43,7 +44,9 @@ _MIN_LINE_KEY = 12
 
 
 def _key(s: str) -> str:
-    return re.sub(r"[^0-9a-z]", "", (s or "").lower())
+    # NFKC first: a grid cell spells a ligature out where the caption keeps it,
+    # and stripping the glyph would turn "deﬁnition" into "denition".
+    return re.sub(r"[^0-9a-z]", "", unicodedata.normalize("NFKC", s or "").lower())
 
 
 def _caption_rows_at_top(rows: list[list[str]], label: Optional[str],
@@ -117,8 +120,8 @@ def _closes_the_caption(rows: list[list[str]], caption: Optional[str]) -> bool:
     cells = [(c or "").strip() for c in rows[0] if (c or "").strip()]
     if len(cells) != 1 or not re.search(r"[.!?]$", cells[0]):
         return False
-    cap = re.sub(r"\s+", " ", caption or "").strip()
-    return cap.endswith(re.sub(r"\s+", " ", cells[0]))
+    cap = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", caption or "")).strip()
+    return cap.endswith(re.sub(r"\s+", " ", unicodedata.normalize("NFKC", cells[0])))
 
 
 def move_caption_rows_out_of_grid(tables: list | None) -> None:

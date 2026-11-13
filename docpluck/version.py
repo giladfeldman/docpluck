@@ -64,9 +64,11 @@ unpinnable input.
 from __future__ import annotations
 
 import platform
+import os
 import re
 import shutil
 import subprocess
+import time
 import sys
 import unicodedata
 from functools import lru_cache
@@ -80,6 +82,12 @@ from pathlib import Path
 from typing import Sequence
 
 UNKNOWN = "unknown"
+
+# When this process loaded docpluck (version.py is imported by the package
+# __init__). A source file modified after this moment means the process may be
+# running code the tree no longer has, or a lazily imported module the receipt's
+# SHA never described -- `stale` (see _resolve_git_state).
+_LOADED_AT = time.time()
 NOT_INSTALLED = "not installed"
 
 #: External Python engines we report, keyed by receipt key. The value is
@@ -124,6 +132,47 @@ _ENGINE_MODULES: dict[str, tuple[str, tuple[str, ...]]] = {
 _PDFTOTEXT_VERSION_RE = re.compile(r"pdftotext\s+version\s+(\S+)", re.IGNORECASE)
 
 
+def _pkg_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _source_changed_since_load() -> bool:
+    """True when any ``.py`` file of the loaded package changed after load."""
+    try:
+        return any(f.stat().st_mtime > _LOADED_AT for f in _pkg_dir().rglob("*.py"))
+    except OSError:
+        return False
+
+
+def _own_repo_root() -> Path | None:
+    """The docpluck checkout this module was loaded from, or ``None``.
+
+    ``git -C <dir>`` walks UP until it finds a repository. A wheel installed in
+    a ``.venv`` inside a consumer's project therefore answered ``rev-parse`` and
+    ``status`` for the CONSUMER's repository, and the receipt attributed the
+    consumer's HEAD and cleanliness to docpluck (d-5bf4ee, d-fcb3d3; seen
+    2026-10-24: 2.4.154 installed under a ScienceArena worktree reported that
+    worktree's HEAD). A checkout counts only when its top level is exactly the
+    directory that holds this package. Never raises.
+    """
+    repo_root = _pkg_dir().parent
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return None
+        top = Path(result.stdout.strip()).resolve()
+        if os.path.normcase(str(top)) != os.path.normcase(str(repo_root.resolve())):
+            return None
+        return repo_root
+    except Exception:
+        return None
+
+
 @lru_cache(maxsize=1)
 def _resolve_git_sha() -> str:
     """Best-effort resolution of the docpluck git SHA.
@@ -134,8 +183,9 @@ def _resolve_git_sha() -> str:
     **A SHA ALONE IS NOT AN IDENTITY.** Read it with :func:`_resolve_git_state`
     — see that function for why.
     """
-    pkg_dir = Path(__file__).resolve().parent
-    repo_root = pkg_dir.parent
+    repo_root = _own_repo_root()
+    if repo_root is None:
+        return UNKNOWN
     try:
         result = subprocess.run(
             ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
@@ -187,14 +237,24 @@ def _resolve_git_state() -> str:
     ``service/app/identity.py``, which already had to solve this at the service
     boundary because the library did not offer it. One concept, one table — a
     second spelling of the same state is how two receipts come to disagree.
-    (The service's third value, ``stale``, is not reproduced here: it means the
-    on-disk version differs from the loaded one, which only the process that
-    imported the module can know.)
+    **``stale``** (added 2.4.160, the service's third value): a docpluck
+    source file in this checkout changed AFTER this process loaded docpluck.
+    The process then runs code the tree no longer shows, and any module it
+    imports lazily from now on comes from a tree the SHA may not describe.
+    ESCImate measured exactly that on 2026-10-30: a long-running process
+    reported ``clean`` while returning 8 rows where the code it was labelled
+    with returned 5. ``stale`` outranks ``dirty`` and ``clean``, as in the
+    service. Both ``dirty`` and ``stale`` disqualify a receipt; ``unknown``
+    does not (see ``get_version_info``).
 
     ``unknown`` when docpluck came from a wheel or PyPI — there is no tree to
     be dirty. Never raises.
     """
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = _own_repo_root()
+    if repo_root is None:
+        return UNKNOWN
+    if _source_changed_since_load():
+        return "stale"
     try:
         result = subprocess.run(
             ["git", "-C", str(repo_root), "status", "--porcelain"],
@@ -419,7 +479,9 @@ def get_version_info() -> dict:
         body_scope_version:       ``BODY_SCOPE_VERSION`` from ``body.py`` (which
                                   sections ``extract_pdf_body`` keeps as body text).
         git_sha:                  Git SHA of the docpluck checkout, or ``"unknown"``.
-        git_state:                ``"clean"``, ``"dirty"`` or ``"unknown"``. **Read it
+        git_state:                ``"clean"``, ``"dirty"``, ``"stale"`` or ``"unknown"``.
+                                  ``"stale"`` = a source file changed after this process
+                                  loaded docpluck. **Read it
                                   with ``git_sha``, never instead of it** — under an
                                   editable install (how most of this portfolio consumes
                                   docpluck) a dirty tree runs code the SHA does not
@@ -434,7 +496,7 @@ def get_version_info() -> dict:
                                   ``git_sha`` come back ``"unknown"``. A consumer gate
                                   spelled ``git_state != "clean"`` therefore REFUSES
                                   exactly the install it was built to require. Only the
-                                  explicit value ``"dirty"`` disqualifies.
+                                  explicit values ``"dirty"`` and ``"stale"`` disqualify.
 
                                   Not hypothetical: measured 2026-08-28, a consumer
                                   built that gate from a handoff written by this repo,

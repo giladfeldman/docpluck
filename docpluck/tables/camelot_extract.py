@@ -14,6 +14,7 @@ silently fall back to the existing pdfplumber path.
 
 from __future__ import annotations
 
+import io
 import re
 import tempfile
 import threading
@@ -678,6 +679,39 @@ def _camelot_flavor(ct) -> str | None:
     return str(flavor) if flavor else None
 
 
+def _camelot_input_bytes(pdf_bytes: bytes) -> bytes:
+    """The bytes Camelot reads: glyph-name repaired and, when the PDF is
+    encrypted with an EMPTY user password, decrypted in memory (d-e23197).
+
+    A "copy: no" permission flag made Camelot's pdfminer raise
+    PDFTextExtractionNotAllowed on every flavor, so the paper lost every table
+    while pdftotext and pdfplumber, which do not enforce the flag, read the same
+    page (10.1016/j.evolhumbehav.2014.02.004: AES-256, print yes, copy no; after
+    decrypting with '' page 28 gives the 11 x 10 lattice with every M/SD
+    correct). The decrypted copy gives Camelot only what the text channel
+    already reads. A PDF that needs a real password is left as it is and
+    counted: its tables are not extracted, and that is said.
+    """
+    data = repair_glyph_names(pdf_bytes)[0]  # Linotype Pi repair; docpluck/glyph_names.py
+    try:
+        import pypdf
+
+        reader = pypdf.PdfReader(io.BytesIO(data))
+        if not reader.is_encrypted:
+            return data
+        if not reader.decrypt(""):
+            record_fallback("camelot_input_encrypted_needs_password")
+            return data
+        writer = pypdf.PdfWriter(clone_from=reader)
+        buf = io.BytesIO()
+        writer.write(buf)
+        record_fallback("camelot_input_decrypted_empty_password")
+        return buf.getvalue()
+    except Exception as exc:
+        record_fallback("camelot_input_decrypt_exception", detail=type(exc).__name__)
+        return data
+
+
 def _unlink_temp_pdf(tmp_path: str, *held) -> None:
     """Deprecated alias for :func:`docpluck.tempfiles.unlink_temp_pdf`.
 
@@ -1092,7 +1126,7 @@ def extract_tables_camelot(
         return []
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(repair_glyph_names(pdf_bytes)[0])  # Linotype Pi repair; docpluck/glyph_names.py
+        tmp.write(_camelot_input_bytes(pdf_bytes))
         tmp_path = tmp.name
 
     # How many flavors RAISED. A clean run that finds nothing on a PDF with no
@@ -1285,7 +1319,7 @@ def extract_tables_camelot_by_region(
         by_page.setdefault(int(spec["page"]), []).append(spec)
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(repair_glyph_names(pdf_bytes)[0])  # Linotype Pi repair; docpluck/glyph_names.py
+        tmp.write(_camelot_input_bytes(pdf_bytes))
         tmp_path = tmp.name
 
     def _match_and_emit(specs: list[dict], tables: list) -> None:
