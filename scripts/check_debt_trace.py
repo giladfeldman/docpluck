@@ -25,6 +25,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ID = re.compile(r"\bd-[0-9a-f]{6}\b")
 NEEDS_ID = re.compile(r"^(fix|feat|perf)(\(|:|!)")
+# A release may cite an item it deliberately leaves open: the residual it logged
+# ("logged as d-x"), an item it fixes only in part ("part of d-x"), or "open d-x".
+# Those are listed, never failed; any other open citation still fails --release.
+OPEN_CITE = re.compile(r"(?:logged as|part of|open)\s+(d-[0-9a-f]{6})\b", re.I)
 
 
 def _git(*args: str) -> str:
@@ -66,22 +70,27 @@ def main(argv: list[str] | None = None) -> int:
     log = _git("log", "--format=%H%x1f%B%x1e", f"{since}..HEAD")
     problems: list[str] = []
     cited: set[str] = set()
+    cited_open: set[str] = set()
     n = 0
     for entry in filter(str.strip, log.split("\x1e")):
         sha, _, body = entry.strip().partition("\x1f")
         subject = body.strip().splitlines()[0] if body.strip() else ""
         ids = set(ID.findall(body))
         cited |= ids
+        cited_open |= set(OPEN_CITE.findall(body))
         n += 1
         if NEEDS_ID.match(subject) and not ids and "no-debt" not in body:
             problems.append(f"{sha[:7]} cites no debt id (add d-xxxxxx or 'no-debt'): {subject[:80]}")
     for i in sorted(cited):
         if i not in states:
             problems.append(f"{i} is cited but is not a debt item in TODO.md")
-        elif a.release and not states[i]:
+        elif a.release and not states[i] and i not in cited_open:
             problems.append(f"{i} is cited by this release but still open in TODO.md")
     print(f"COVERAGE: {n} commits {since}..HEAD, {len(cited)} debt ids cited, "
           f"{len(states)} items in TODO.md")
+    for i in sorted(cited_open):
+        print(f"  cited as still open (by the commit's own words): {i}"
+              + ("" if not states.get(i) else " -- now closed"))
     for p in problems:
         print("  " + p)
     print("DEBT TRACE: " + ("FAIL" if problems else "PASS"))
