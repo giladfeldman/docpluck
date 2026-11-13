@@ -358,7 +358,7 @@ We chose (1). The two-tuple `(text, method)` contract is pinned by the SaaS serv
 
 Internally the two functions share the PDF parse via the v1.6.0 `LayoutDoc` abstraction; structured extraction costs ~3-5× more than text-only because of the geometric clustering pass, not because of duplicated parsing.
 
-Confidence is scored in two stages — `score_table()` returns the raw pre-clamp value (used for the isolation fall-back decision at threshold 0.4); `clamp_confidence()` applies per-rendering floor/ceiling to produce the user-visible `Table.confidence`. The separation matters: the whitespace floor is 0.4, equal to the threshold — clamping inside `score_table()` would silently absorb the fall-back signal.
+Confidence is computed in one place, inline in `docpluck/tables/camelot_extract.py`, as Camelot's accuracy fraction times (1 - whitespace share). An earlier two-stage scorer (`tables/confidence.py`: `score_table` / `clamp_confidence` with an isolation threshold) was never called by the pipeline and was deleted in 2.4.160.
 
 See `an internal design doc` for full data model and detection algorithm.
 
