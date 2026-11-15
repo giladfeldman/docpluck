@@ -163,7 +163,7 @@ def test_pypdf_trailer_size_warning_is_not_printed(caplog):
 
 
 def test_unmapped_glyph_fonts_is_a_structured_field():
-    """d-8afcbe (2026-11-13): the same report as a response field, not only an event."""
+    """(2026-11-13) the same report as a response field, not only an event."""
     from docpluck import extract_pdf_structured
 
     pdf = _pdf({"F1": _PLAIN, "F2": _pi("/H12345")}, "BT /F2 12 Tf 72 700 Td (!!) Tj ET")

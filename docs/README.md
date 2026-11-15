@@ -633,14 +633,16 @@ explain_symbol("η")                   # 'eta'
 Copying the tables into your own code is how two tools end up disagreeing about what
 `chi2` means. Ask the contract. Full prose reference: [SYMBOL_CONTRACT.md](./SYMBOL_CONTRACT.md).
 
-### `extract_pdf_structured(pdf_bytes, *, thorough=False, table_text_mode="raw", max_input_bytes=None, extract_timeout_seconds=120) → StructuredResult`
+### `extract_pdf_structured(pdf_bytes, *, thorough=False, table_text_mode="raw", max_input_bytes=None, extract_timeout_seconds=120, include_uncaptioned=True) → StructuredResult`
 
 Text plus tables and figures from a PDF; see [Structured extraction](#structured-extraction-v20)
 for the modes and [Output schemas](#output-schemas) for every field. `table_text_mode` is
 `"raw"` (table text stays in `text`) or `"placeholder"` (table and figure regions are replaced
 by `[Label: caption]` markers). `extract_timeout_seconds` bounds the text extraction.
 `TABLE_EXTRACTION_VERSION` versions the table pipeline and is echoed as
-`result["table_extraction_version"]`.
+`result["table_extraction_version"]`. `include_uncaptioned=False` (since 2.4.160) withholds
+tables whose `caption_status` is `uncaptioned_candidate`, counting each in `fallbacks` as
+`uncaptioned_candidates_withheld`; the default keeps them, so default output is unchanged.
 
 ### `extract_docx_structured(docx_bytes, *, max_input_bytes=None) → StructuredResult`
 
@@ -831,6 +833,8 @@ what `docpluck extract --structured` prints).
 | `table_extraction_version` | `str` | `TABLE_EXTRACTION_VERSION` |
 | `fallbacks` | `dict[str, int]` | fallback events for this document |
 | `fallback_details` | `dict[str, dict[str, int]]` | which font, token or exception each event names |
+| `tables_status`, `figures_status` | `str` | (since 2.4.160) the pass's own verdict: `ok`, `partial:<events>` (output produced, a rescue fired), `failed:<events>` (nothing it trusts) or `not_run:<reason>`. An empty `tables` list means "no table found" only when `tables_status` is `ok` |
+| `unmapped_glyph_fonts` | `list[dict]` | (since 2.4.160) one `{font, glyph_names, char_count}` per font whose glyphs have no verified Unicode mapping; those characters reach the text as the file declares them. `[]` when none |
 
 ### `Table`
 
@@ -890,6 +894,10 @@ what `docpluck extract --structured` prints).
 | `fields` | `dict` | parsed statistical values (may be empty); descriptive cells add `M`, `SD`, `SE`, `count` (int), `pct` and a per-column `group` (see "Two-number cells" above) |
 | `fields_raw` | `dict[str, str]` | for each typed number in `fields`, the token the cell prints (`"-1.40"`, `".050"`); keyed like `fields`, may be empty |
 | `caption_status` | `str` | the source table's `caption_status` |
+| `unparsed` | `list[dict]` | (since 2.4.160) one `{col, header, text, reason}` per value-bearing cell that reached no field, with the reason (e.g. `column_role_unknown`); `[]` when every numeric cell was typed |
+
+`fields["est_kind"]` (since 2.4.160), on a row with a generic `est`, is `"ratio"` (null value 1)
+or `"difference"` (null value 0) when the header names exactly one; absent means "not stated".
 
 `render_flattened_inline(records, *, table_id, label=None, version=None)` renders one table's
 rows as a Markdown block bounded by HTML-comment markers.
@@ -1021,11 +1029,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.159',            # docpluck itself
+# {'version': '2.4.160',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.80',   # in-repo pipeline versions, bumped
-#  'sectioning_version': '1.2.9',   #   independently of the package version
-#  'table_extraction_version': '2.4.30',
+#  'normalize_version': '1.9.81',   # in-repo pipeline versions, bumped
+#  'sectioning_version': '1.2.10',   #   independently of the package version
+#  'table_extraction_version': '2.4.31',
 #  'references_version': '1.0.0',
 #  'body_scope_version': '1.0.0',
 #  'python_version': '3.14.5',      # the interpreter…

@@ -42,7 +42,7 @@ TABLE_KEYS = {
 ROW_KEYS = {
     "caption_status", "fields", "fields_raw", "header", "label", "page", "raw_cells",
     "row_idx", "row_label", "sentence", "table_id",
-    "unparsed",  # added 2026-11-13 (d-6bff50); announced in the consumer notice
+    "unparsed",  # added 2026-11-13; announced in the consumer notice
 }
 ROW_FIELD_KEYS = {"F", "d", "df", "df1", "df2", "p", "p_op", "p_text", "t"}
 SECTION_KEYS = {
@@ -58,7 +58,7 @@ NORMALIZATION_KEYS = {
 STRUCTURED_KEYS = {
     "fallback_details", "fallbacks", "figures", "figures_status", "method",
     "page_count", "table_extraction_version", "tables", "tables_status", "text",
-    # added 2026-11-13 (d-8afcbe); announced in the consumer notice
+    # added 2026-11-13; announced in the consumer notice
     "unmapped_glyph_fonts",
 }
 CAPTION_STATUSES = {"matched", "continuation", "none_found", "uncaptioned_candidate"}
@@ -114,7 +114,7 @@ def test_section_and_normalization_report_keys(structured):
     assert len(secs) == 4
     for sec in secs:
         assert set(vars(sec)) == SECTION_KEYS
-        # Declared and now populated (d-a6645c, d-66c8db): was () on every section.
+        # Declared and now populated: was () on every section.
         assert sec.pages == (1,), (sec.label, sec.pages)
     _, rep = normalize_text(s["text"], NormalizationLevel.academic)
     assert set(rep.to_dict()) == NORMALIZATION_KEYS

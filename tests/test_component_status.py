@@ -1,4 +1,4 @@
-"""`tables_status` / `figures_status`: an empty list must say WHY it is empty (d-6736e7).
+"""`tables_status` / `figures_status`: an empty list must say WHY it is empty.
 
 Owner decision 2026-11-13: keep `tables == []`, add a status beside it. These tests
 pin (1) the classification is total -- every `*_exception` event the package can

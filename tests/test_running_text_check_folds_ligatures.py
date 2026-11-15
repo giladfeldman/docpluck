@@ -1,4 +1,4 @@
-"""A prose grid is recognised as its page's running text across a ligature (d-58ce8d).
+"""A prose grid is recognised as its page's running text across a ligature.
 
 The text channel keeps U+FB01 / U+FB00 where Camelot's pdfminer spells the
 letters out. On 10.1017/s1930297500003193 p6, a grid line holding "first" was

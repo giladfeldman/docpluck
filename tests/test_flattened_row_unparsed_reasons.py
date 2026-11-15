@@ -1,4 +1,4 @@
-"""Each flattened row says which value cells reached no field, and why (d-6bff50).
+"""Each flattened row says which value cells reached no field, and why.
 
 A consumer saw `fields == {}` (or a partial one) with no way to tell which
 cells were dropped or why. Failed on v2.4.159 (no `unparsed` key).

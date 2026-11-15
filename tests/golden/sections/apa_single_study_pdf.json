@@ -1,5 +1,5 @@
 {
-  "sectioning_version": "1.2.9",
+  "sectioning_version": "1.2.10",
   "source_format": "pdf",
   "sections": [
     {
@@ -7,7 +7,9 @@
       "canonical_label": "abstract",
       "char_start": 0,
       "char_end": 37,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Abstract"
@@ -17,7 +19,9 @@
       "canonical_label": "introduction",
       "char_start": 37,
       "char_end": 63,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Introduction"
@@ -27,7 +31,9 @@
       "canonical_label": "methods",
       "char_start": 63,
       "char_end": 87,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Methods"
@@ -37,7 +43,9 @@
       "canonical_label": "results",
       "char_start": 87,
       "char_end": 112,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Results"
@@ -47,7 +55,9 @@
       "canonical_label": "discussion",
       "char_start": 112,
       "char_end": 138,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Discussion"
@@ -57,7 +67,9 @@
       "canonical_label": "references",
       "char_start": 138,
       "char_end": 170,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "References"

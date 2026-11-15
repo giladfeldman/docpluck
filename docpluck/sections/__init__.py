@@ -59,7 +59,7 @@ def _normalize_markup_text(text, hints, level, preserve_math_glyphs):
 def _text_page_offsets(raw_text: str, normalized: str) -> tuple[int, ...]:
     """Where each page starts in ``normalized``, from the TEXT channel alone.
 
-    ``Section.pages`` was ``()`` on every section (d-a6645c, d-66c8db): page
+    ``Section.pages`` was ``()`` on every section: page
     starts existed only on the layout path, which this function deliberately
     does not run (LESSONS L-001). pdftotext ends every page with a form feed,
     but normalization does not keep all of them (measured 2026-11-13 on 25

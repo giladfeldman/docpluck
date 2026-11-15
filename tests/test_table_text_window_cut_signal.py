@@ -1,4 +1,4 @@
-"""A table text cut by the 1500-char window must say so (d-927624).
+"""A table text cut by the 1500-char window must say so.
 
 Before: the walk stopped silently at the window's far end while non-prose
 table lines were still waiting, so a truncated table text was
@@ -55,7 +55,7 @@ def test_table_ended_by_prose_records_nothing():
 
 
 def test_capitalised_data_rows_are_not_trimmed_as_headings():
-    """d-1352e2: the trailing-heading trim popped every `Item NN  x.xx (y.yy) .zz` row."""
+    """The trailing-heading trim popped every `Item NN  x.xx (y.yy) .zz` row."""
     rows = "".join(f"Item {i:02d}   {i}.{i % 10}0   ({i % 7}.{i % 9}1)   .{i:02d}\n"
                    for i in range(1, 11))
     text = _CAPTION + "\n" + rows

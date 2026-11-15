@@ -656,7 +656,7 @@ _A1_REFUSED_BLANK_JOIN = re.compile(
 
 def _a1_stat_linebreak_repair(text: str) -> str:
     """Rejoin statistics broken across lines, without crossing a page break."""
-    # W5a (2026-11-13, d-73fb4a): every join below crosses ONE line break,
+    # W5a (2026-11-13): every join below crosses ONE line break,
     # never a blank line, and a lone `p` / `OR` / `CI` / `RR` must be a whole
     # token. Census on 125 corpus papers (intercepting this function): 27 of
     # 440 joins crossed a blank line, 25 of them gluing a table header onto a
@@ -682,17 +682,27 @@ def _a1_stat_linebreak_repair(text: str) -> str:
         # where "01", "11" etc. are short column-bleed fragments on their own
         # lines. Must run before the simple `p =\n digit` rule below, otherwise
         # the first fragment gets interpreted as the value.
+        # These two rules DELETE the fragments, so each firing is counted
+        # (`a1_column_bleed_fragments_dropped`), and `p` must be a whole token:
+        # without the guard "Group\n12\n= .28" became "Group = .28" (the `p` of
+        # "Group"), deleting the 12 (consult 2026-11-13, reproduced). They keep
+        # crossing blank lines: their documented shape has them. Census on 125
+        # papers: 0 firings either way.
+        def _bleed(m: re.Match) -> str:
+            record_fallback("a1_column_bleed_fragments_dropped")
+            return f"{m.group(1)} {m.group(2)}"
+
         t = re.sub(
-            r"([pP])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([<=>])",
-            r"\1 \2",
+            r"((?<![A-Za-z])[pP])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([<=>])",
+            _bleed,
             t,
         )
         # Same pattern with column-bleed BETWEEN operator and value:
         # `p =\n01\n11\n.28` → `p = .28`. Must run before the simple
         # `p =\n digit` rule below to avoid eating the first fragment.
         t = re.sub(
-            r"([pP]\s*[<=>])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([-.\d])",
-            r"\1 \2",
+            r"((?<![A-Za-z])[pP]\s*[<=>])\s*\n(?:\s*\d{1,3}\s*\n){1,4}\s*([-.\d])",
+            _bleed,
             t,
         )
 
@@ -708,11 +718,28 @@ def _a1_stat_linebreak_repair(text: str) -> str:
         # Guard 2 — next-line value must match 0?\.\d+ (valid p-value format;
         #   rejects section numbers like 8.3, page numbers like 1024, footnotes).
         # See MetaESCI D5 audit (2026-04-12): old [^\n]{1,20} ate real p-values.
-        t = re.sub(r"(p\s*[<=>]\s*)[a-zA-Z][^\n]{0,19}\n\s*(0?\.\d+)", r"\1\2", t)
+        # Guard 3 (2026-11-13, consult, reproduced): `p` is a whole token and the
+        # value is on the NEXT line, never past a blank one -- "group = A" /
+        # blank / ".45" became "group = .45". The deleted garbage is counted.
+        def _garbage(m: re.Match) -> str:
+            record_fallback("a1_column_garbage_dropped")
+            return m.group(1) + m.group(2)
+
+        t = re.sub(r"((?<![A-Za-z])p[ \t]*[<=>][ \t]*)[a-zA-Z][^\n]{0,19}" + nl + r"(0?\.\d+)",
+                   _garbage, t)
+
+        # The comma rules may cross ONE blank line (their only such firing in
+        # 125 papers was right: 10.5334/irsp.571). Each such join is counted
+        # (`a1_comma_join_across_blank_line`) so its rate stays visible.
+        def _comma(m: re.Match) -> str:
+            if m.group(0).count("\n") > 1:
+                record_fallback("a1_comma_join_across_blank_line")
+            return f"{m.group(1)} {m.group(2)}"
+
         # Rejoin test stat → p-value across line break: "t(23) = 2.34,\n p < .001"
-        t = re.sub(r"([,;])" + nl_blank + r"(p\s*[<=>])", r"\1 \2", t)
+        t = re.sub(r"([,;])" + nl_blank + r"(p\s*[<=>])", _comma, t)
         # Rejoin effect size → CI across line break: "d = 0.45,\n 95% CI"
-        t = re.sub(r"([,;])" + nl_blank + r"(\d+%\s*CI)", r"\1 \2", t)
+        t = re.sub(r"([,;])" + nl_blank + r"(\d+%\s*CI)", _comma, t)
         # Counted on what is LEFT, so a split the column-bleed rules did join
         # is not reported.
         for _ in _A1_REFUSED_BLANK_JOIN.finditer(t):
@@ -1533,7 +1560,7 @@ def _f0_strip_running_and_footnotes(
 
         if k and _usable(k) and (k in header_footer_keys
                                  or (k in edge_keys and idx in at_page_edge)):
-            # Counted (d-338ea7): F0 deleted furniture without a trace, and a
+            # Counted: F0 deleted furniture without a trace, and a
             # consumer could not tell 0 lines removed from 300.
             record_fallback("f0_furniture_line_removed")
             _drop()
@@ -7456,8 +7483,11 @@ def normalize_text(
 #: bracketed, percentaged, or carrying significance asterisks. Deliberately
 #: narrow: it must contain a digit and nothing that is not part of a numeric
 #: presentation, so a sentence containing a number does not match.
-#: APA leading-dot values (`.35`, `-.35`, `<.001`) count (d-8930b8): before
+#: APA leading-dot values (`.35`, `-.35`, `<.001`) count: before
 #: 2026-11-13 they did not, so a label above one read as not value-followed.
+#: How many lines below a repeated line its "immediate neighbour" may sit,
+#: blank lines and bare page breaks passed over. One window for both votes.
+_NEIGHBOUR_LOOKAHEAD = 4
 _VALUE_ONLY_LINE = re.compile(r"^[\[\(<>=+−-]*\s*\.?\d[\d.,%*\s\]\)]*$")
 
 
@@ -7494,8 +7524,8 @@ def _value_followed_fraction(
     hits = 0
     for i in positions:
         # Up to 4 lines ahead: label / blank / blank / value is one neighbour
-        # (d-8930b8: the 2-line window returned "not followed" for it).
-        for j in range(i + 1, min(i + 5, len(lines))):
+        # (the 2-line window returned "not followed" for it).
+        for j in range(i + 1, min(i + 1 + _NEIGHBOUR_LOOKAHEAD, len(lines))):
             nxt = lines[j].strip().strip(PAGE_BREAK).strip()
             if not nxt:
                 continue
@@ -7544,7 +7574,10 @@ def _shared_follower(
         return "", 0.0
     followers: collections.Counter[str] = collections.Counter()
     for i in positions:
-        for j in range(i + 1, min(i + 3, len(lines))):
+        # The same window as `_value_followed_fraction` (consult round 2,
+        # 2026-11-13: this one stopped after 2 lines, so a caption whose
+        # continuation sat under two blank lines cast no vote and lost it).
+        for j in range(i + 1, min(i + 1 + _NEIGHBOUR_LOOKAHEAD, len(lines))):
             nxt = lines[j].strip().strip(PAGE_BREAK).strip()
             if not nxt:
                 continue

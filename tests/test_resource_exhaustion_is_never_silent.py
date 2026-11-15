@@ -213,7 +213,11 @@ def test_cell_geometry_labels_an_exhausted_cell():
     layout = SimpleNamespace(pages=[SimpleNamespace(width=612.0, height=792.0)])
     with fallback_scope() as fb:
         camelot_cell_bboxes(ct, layout=layout, page=1)
-    assert fb.details.get(RESOURCE_EXHAUSTED) == {"cell_geometry_cell": 1}, fb.counters
+    # Counted ONCE: the handler records `cell_geometry_cell_exception`, and the
+    # telemetry hook labels the in-flight MemoryError under that event. A second
+    # note_if_exhausted in the same handler made it 2 (2.4.160 suite, 2026-11-15).
+    assert fb.counters.get(RESOURCE_EXHAUSTED) == 1, fb.counters
+    assert fb.details.get(RESOURCE_EXHAUSTED) == {"cell_geometry_cell_exception": 1}, fb.counters
 
 
 # ── end to end: the real extraction path ────────────────────────────────────

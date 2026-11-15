@@ -1,4 +1,4 @@
-"""F0 says how many furniture lines it deleted (d-338ea7).
+"""F0 says how many furniture lines it deleted.
 
 F0 dropped running heads and footers with no trace: `steps_changed` got F0
 only when a footnote moved, and nothing counted the deletions, so a consumer

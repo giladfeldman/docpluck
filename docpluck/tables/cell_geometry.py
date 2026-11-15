@@ -235,7 +235,9 @@ def camelot_cell_bboxes(
                 x1, y1 = float(cell.x1), float(cell.y1)
                 x2, y2 = float(cell.x2), float(cell.y2)
             except Exception as exc:  # noqa: BLE001
-                note_if_exhausted(exc, where="cell_geometry_cell")
+                # record_fallback labels an in-flight MemoryError itself
+                # (resource_exhausted, detail = this event); a second
+                # note_if_exhausted here counted one failure twice.
                 record_fallback("cell_geometry_cell_exception",
                                 detail=f"r{r}c{c} {type(exc).__name__}")
                 row.append(ZERO_BBOX)

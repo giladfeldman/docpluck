@@ -1,4 +1,4 @@
-"""A1 statistic rejoin crosses ONE line break, never a blank line (W5a, d-73fb4a).
+"""A1 statistic rejoin crosses ONE line break, never a blank line (W5a).
 
 Census 2026-11-13 on 125 corpus papers: 27 of 440 A1 joins crossed a blank
 line, 25 of them gluing a table header onto a body cell. Each refusal case

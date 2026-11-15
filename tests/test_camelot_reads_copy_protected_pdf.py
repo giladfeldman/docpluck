@@ -1,4 +1,4 @@
-"""A copy-protected PDF with an empty user password reaches Camelot decrypted (d-e23197).
+"""A copy-protected PDF with an empty user password reaches Camelot decrypted.
 
 Before 2026-11-13 Camelot's pdfminer raised PDFTextExtractionNotAllowed on such a
 PDF and the paper lost every table (10.1016/j.evolhumbehav.2014.02.004: tables
@@ -50,3 +50,21 @@ def test_plain_pdf_untouched_and_silent():
         out = _camelot_input_bytes(src)
     assert out == src
     assert not fb.counters
+
+
+def test_glyph_repair_reads_the_decrypted_copy(monkeypatch):
+    """Consult round 2 (Sonnet, 2026-11-13): the glyph-name repair ran on the
+    still-encrypted bytes, before decryption. pypdf reads an empty-password
+    file's fonts anyway, so this pins the order, not a reproduced wrong value.
+    Failed on v2.4.160."""
+    from docpluck.tables import camelot_extract as ce
+
+    seen = []
+
+    def spy(data):
+        seen.append(pypdf.PdfReader(io.BytesIO(data)).is_encrypted)
+        return data, None
+
+    monkeypatch.setattr(ce, "repair_glyph_names", spy)
+    ce._camelot_input_bytes(_pdf(""))
+    assert seen == [False]

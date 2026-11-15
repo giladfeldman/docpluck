@@ -1,4 +1,4 @@
-"""Every comparison between the table channel and the text channel folds ligatures (d-58ce8d class).
+"""Every comparison between the table channel and the text channel folds ligatures.
 
 pdftotext keeps U+FB01/U+FB00 ("ﬁ", "ﬀ") where Camelot's pdfminer and pdfplumber spell
 the letters out, so an equality test between the two channels failed on every

@@ -681,7 +681,7 @@ def _camelot_flavor(ct) -> str | None:
 
 def _camelot_input_bytes(pdf_bytes: bytes) -> bytes:
     """The bytes Camelot reads: glyph-name repaired and, when the PDF is
-    encrypted with an EMPTY user password, decrypted in memory (d-e23197).
+    encrypted with an EMPTY user password, decrypted in memory.
 
     A "copy: no" permission flag made Camelot's pdfminer raise
     PDFTextExtractionNotAllowed on every flavor, so the paper lost every table
@@ -692,24 +692,33 @@ def _camelot_input_bytes(pdf_bytes: bytes) -> bytes:
     already reads. A PDF that needs a real password is left as it is and
     counted: its tables are not extracted, and that is said.
     """
-    data = repair_glyph_names(pdf_bytes)[0]  # Linotype Pi repair; docpluck/glyph_names.py
+    # Decrypt first, then repair glyph names, so the repair and Camelot read one
+    # and the same document (consult round 2, 2026-11-13; pypdf reads the fonts
+    # of an empty-password file either way, so no wrong value was reproduced --
+    # this is ordering hygiene). The decrypted copy is used only if it re-opens
+    # unencrypted with the same page count; otherwise the original goes on, counted.
+    data = pdf_bytes
     try:
         import pypdf
 
-        reader = pypdf.PdfReader(io.BytesIO(data))
-        if not reader.is_encrypted:
-            return data
-        if not reader.decrypt(""):
-            record_fallback("camelot_input_encrypted_needs_password")
-            return data
-        writer = pypdf.PdfWriter(clone_from=reader)
-        buf = io.BytesIO()
-        writer.write(buf)
-        record_fallback("camelot_input_decrypted_empty_password")
-        return buf.getvalue()
+        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+        if reader.is_encrypted:
+            if not reader.decrypt(""):
+                record_fallback("camelot_input_encrypted_needs_password")
+            else:
+                writer = pypdf.PdfWriter(clone_from=reader)
+                buf = io.BytesIO()
+                writer.write(buf)
+                out = buf.getvalue()
+                check = pypdf.PdfReader(io.BytesIO(out))
+                if check.is_encrypted or len(check.pages) != len(reader.pages):
+                    record_fallback("camelot_input_decrypted_copy_invalid")
+                else:
+                    record_fallback("camelot_input_decrypted_empty_password")
+                    data = out
     except Exception as exc:
         record_fallback("camelot_input_decrypt_exception", detail=type(exc).__name__)
-        return data
+    return repair_glyph_names(data)[0]  # Linotype Pi repair; docpluck/glyph_names.py
 
 
 def _unlink_temp_pdf(tmp_path: str, *held) -> None:

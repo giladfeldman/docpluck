@@ -1,4 +1,4 @@
-"""git_sha / git_state describe docpluck's OWN checkout or nothing (d-5bf4ee, d-fcb3d3).
+"""git_sha / git_state describe docpluck's OWN checkout or nothing.
 
 A wheel inside a consumer's repository used to report the consumer's HEAD and
 cleanliness as docpluck's: ``git -C`` walks up to the enclosing repository.

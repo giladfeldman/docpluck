@@ -1,4 +1,4 @@
-"""Section.pages from the text channel's form feeds (d-a6645c, d-66c8db).
+"""Section.pages from the text channel's form feeds.
 
 Synthetic text only. The raw form feeds are carried to the normalized text by
 the line aligner; a page that collapses to nothing fails closed to () rather

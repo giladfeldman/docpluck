@@ -24,62 +24,93 @@ Our own first diff caught one regression, which was fixed before release: a foot
 - **`tables_status` / `figures_status`** on every structured result: `ok`, `partial:<events>`,
   `failed:<events>` or `not_run:<reason>`. `tables == []` used to mean both "no table printed" and "the
   table pass crashed". Each `*_exception` event is classified as costing the table channel or not; a test
-  fails on any unclassified one. (d-6736e7)
+  fails on any unclassified one.
 - **A PDF with no text layer is a failure, not an empty paper.** Its `method` gains
   `+text_layer_failed:no_text_layer`, with event `no_text_layer`; pages without text are listed in
-  `pages_without_text`. docpluck runs no OCR. (d-23c3f7)
+  `pages_without_text`. docpluck runs no OCR.
 - **The version receipt's `git_state` can now be `stale`.** That happens when the code on disk changed after
   the process loaded it. `git_sha`/`git_state` describe docpluck's own checkout only. A copy installed inside
-  another repository no longer reports that repository's commit. (d-2244e2, d-5bf4ee, d-fcb3d3)
+  another repository no longer reports that repository's commit.
 - **`unmapped_glyph_fonts`** on the structured result lists each font whose glyphs the text layer could not
-  map (font, glyph names, character count). Before, this was only a fallback count. (d-8afcbe)
+  map (font, glyph names, character count). Before, this was only a fallback count.
 - **Each flattened row carries `unparsed`**: every cell that was not typed, with its column, header, text
   and reason (`column_role_unknown`, `repeated_pair_kind`, `value_not_parsed`,
-  `pair_column_without_arm_label`). (d-6bff50)
-- **F0 counts every running head or footer line it deletes** (`f0_furniture_line_removed`). (d-338ea7)
+  `pair_column_without_arm_label`).
+- **F0 counts every running head or footer line it deletes** (`f0_furniture_line_removed`).
 - **A table text cut by the 1500-character window is counted** (`table_text_cut_at_window`). Before, a cut
   table text looked complete. The trailing-heading trim no longer pops data rows such as
-  `Item 10  10.00 (3.11) .10`. (d-927624, d-1352e2)
+  `Item 10  10.00 (3.11) .10`.
 - **`include_uncaptioned`** (default `True`, unchanged output) lets a consumer withhold uncaptioned table
-  candidates. Withheld candidates are counted. (d-be5166)
+  candidates. Withheld candidates are counted.
 
 ### Tables
 
 - **Copy-protected PDFs keep their tables.** A PDF that forbids copying but has an empty user password is
   decrypted before Camelot reads it. 10.1016/j.evolhumbehav.2014.02.004 went from 0 cells to Table 2's 77
   cells; all 48 M/SD values were checked against the page image. A PDF that needs a real password is left
-  as it is and counted (`camelot_input_encrypted_needs_password`). (d-e23197)
+  as it is and counted (`camelot_input_encrypted_needs_password`).
 - **Ligatures no longer break comparisons between the text and the table channels.** pdftotext keeps
   "ﬁ"/"ﬀ" where Camelot spells them out. Every comparison between the two now folds them (NFKC): the
   running-text check, grid coverage, the partial-grid guard, caption-to-grid token overlap, note-row
   survival, caption-row keys in `caption_rows` and `flatten`, and the F0 furniture key. A prose block on
   10.1017/s1930297500003193 p6 no longer ships as an uncaptioned table. Note and caption lines now leave
-  four of its tables' grids. Part of d-58ce8d.
+  four of its tables' grids.
 - **`fields["est_kind"]`** is `"ratio"` (null 1) or `"difference"` (null 0) when the column header names the
-  measure. It is absent otherwise, never guessed. (d-cdda61)
+  measure. It is absent otherwise, never guessed.
 - **A caption or note no longer types a column from a stray letter.** "Odds ratios for vitamin D" typed an
   "Estimate [95% CI]" column as Cohen's d. Symbols read from captions, header rows and notes are now
   case-exact, and a lone d/g must not touch a letter, digit or `^`, nor be followed by a word. The same rule
   now guards the blank-column recovery gate.
-- `tables/confidence.py`, a dead second implementation with different thresholds, is deleted. (d-5e9b45)
+- `tables/confidence.py`, a dead second implementation with different thresholds, is deleted.
 
 ### Text (normalization 1.9.81)
 
 - **Statistic line joins cross one line break, never a blank line.** A census of 125 papers found 27 of 440
   joins crossing a blank line, and 25 of them were wrong: a table header glued onto a body cell, or an
   equation glued onto its next line. `p`, `OR`, `CI` and `RR` must now be whole tokens ("coup\n=" is not
-  p). The two comma rules still cross one blank line. (d-73fb4a)
+  p). The two comma rules still cross one blank line.
 - **A value printed with a leading dot (".03") counts as a value-only line**, looked up to 4 lines ahead.
   Six appendix row labels ("Have a college degree", 10.1177/23780231251314667) are no longer stripped as
-  repeated furniture. (d-8930b8)
+  repeated furniture.
 
 ### Sections (sectioning 1.2.10)
 
 - **`Section.pages` is filled from the text channel.** It was `()` on every section. Page starts are mapped
   through normalization's rewrites. An unmappable or out-of-order start fails closed to `()` and is counted
-  (`section_pages_unmappable`). On 125 papers: pages filled for 84, failed closed for 41. Of 462 headings
-  checked against the printed page, 454 agree. 8 are one page early where normalization moves
-  back matter across a page break (logged, d-b46f12). (d-a6645c, d-66c8db)
+  (`section_pages_unmappable`). On 125 papers: pages filled for 85, failed closed for 40. Of 467 headings
+  checked against the printed page, 459 agree. 8 are one page early where normalization moves
+  back matter across a page break.
+
+### Fixes from the second-model review (Sonnet and Haiku, 2026-11-13)
+
+Each finding was reproduced on invented text before it was fixed; each test failed on the first 2.4.160 commit.
+
+- **A column header's own effect symbol is read in its printed case and never as a designator letter.**
+  "Vitamin D (95% CI)", "Study d [95% CI]", "panel (d)" and "(a) (b) (c) (d)" typed Cohen's d; "R [95% CI]"
+  typed Pearson r; "Mean or median" typed an odds ratio. "d", "Cohen's d", "Between-group d", "g", "r",
+  "OR" and "MD" still type.
+- **A unit in the header vetoes the ratio reading of `est_kind`.** "HR (bpm) [95% CI]" is heart rate, not a
+  hazard ratio. A difference with a unit ("Mean difference (ms)") stays a difference.
+- **The A1 column-bleed and garbage rules need `p` as a whole token**, and each deletion is counted
+  (`a1_column_bleed_fragments_dropped`, `a1_column_garbage_dropped`). "Group / 12 / = .28" became
+  "Group = .28", and "group = A / blank / .45" became "group = .45". The comma joins that cross a blank line
+  are counted too (`a1_comma_join_across_blank_line`).
+- **A section page boundary is not put on an earlier copy of its first line.** When the key text occurs twice in
+  the search window, the whole line is tried, then the page's next line. The first match stands only when no line
+  of the page is unique; it is counted (`section_page_boundary_ambiguous`: 5 firings in 125 papers). Refusing it
+  outright measured worse: 3 papers lost every page number although their first matches agreed with the page.
+  With this rule, pages are filled for 85 papers (was 84) and 459 checked headings agree, with the same 8 disagreeing.
+- **The repeated-block vote looks as far ahead as the value vote** (4 lines). A caption whose continuation
+  sat under two blank lines lost its vote.
+- **A protected PDF is decrypted before the glyph-name repair**, and the decrypted copy is used only if it
+  reopens unencrypted with the same page count (`camelot_input_decrypted_copy_invalid` otherwise). pypdf
+  reads the fonts of an empty-password file either way, so no wrong value was reproduced here.
+- The ligature fold stays NFKC, which also folds superscript digits ("¹" to "1"). The folded strings are
+  only compared, never emitted.
+- **A memory failure on one table cell is counted once.** Earlier in this release a second recorder was
+  added to the handler, so `resource_exhausted` read 2 for one failure. It now reads 1, with the detail
+  `cell_geometry_cell_exception`. A scan of every exception handler found no other handler that records
+  one failure twice.
 
 ### Tools
 

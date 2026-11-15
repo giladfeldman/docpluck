@@ -126,7 +126,7 @@ def extract_pdf(
 
         text = result.stdout
         method = "pdftotext_default"
-        # NO TEXT LAYER IS A FAILURE, NOT AN EMPTY PAPER (d-23c3f7). A scanned
+        # NO TEXT LAYER IS A FAILURE, NOT AN EMPTY PAPER. A scanned
         # or image-only PDF came back as a bare form feed with a clean method,
         # `ok` statuses and no event (ESCImate 2026-09-07: a 0-character
         # extraction returned silently). The `_failed` piece is the form the

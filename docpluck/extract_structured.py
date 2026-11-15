@@ -117,14 +117,14 @@ class StructuredResult(TypedDict):
     # corruption.
     fallback_details: dict[str, dict[str, int]]
     # Whether the table / figure channels RAN, beside the unchanged lists
-    # (d-6736e7, owner decision 2026-11-13): `tables == []` alone could not
+    # (owner decision 2026-11-13): `tables == []` alone could not
     # tell "the paper prints no table" from "the table pass crashed". Values:
     # "ok" | "partial:<events>" | "failed:<events>" | "not_run:<reason>"; see
     # `resources.component_status`.
     tables_status: str
     figures_status: str
     # Fonts whose glyph NAMES the repair table does not cover, so their
-    # characters reach the text as the extractor emits them (d-8afcbe, a
+    # characters reach the text as the extractor emits them (a
     # consumer request 2026-10-05): ``[{"font", "glyph_names", "char_count"}]``,
     # ``[]`` when there are none. Was only a `fallbacks` event before.
     unmapped_glyph_fonts: list[dict]
@@ -147,7 +147,7 @@ def extract_pdf_structured(
     ``include_uncaptioned`` (default ``True``, the output every release since
     2.4.97 has shipped): ``False`` withholds every table whose
     ``caption_status == "uncaptioned_candidate"`` -- a grid no caption claims.
-    Added 2026-11-13 (d-be5166, owner decision): Scimeto counts those rows as a
+    Added 2026-11-13 (owner decision): Scimeto counts those rows as a
     "seen but not checked" outcome and asked for them to stay in the default
     output; ScienceArena scores every emitted table and is better served
     without them. Withheld candidates are COUNTED, never silent:
@@ -2470,7 +2470,7 @@ def _fold(text: str) -> str:
     a ligature glyph (U+FB01 `fi`, U+FB00 `ff`) where Camelot's pdfminer spells
     it out, so a prose grid's lines were never found on their own page and the
     copy went out as an uncaptioned candidate (10.1017/s1930297500003193 p6;
-    measured 2026-11-13, d-58ce8d)."""
+    measured 2026-11-13)."""
     return unicodedata.normalize("NFKC", text).lower()
 
 
@@ -4827,7 +4827,7 @@ def _extract_table_body_text_and_reason(
         elif quote_lines_left:
             quote_lines_left -= 1
 
-    # The 1500-char WINDOW, not the table, ended the text (d-927624): the walk
+    # The 1500-char WINDOW, not the table, ended the text: the walk
     # used every line of a region the window clipped (no page break, no next
     # caption, no note, no prose stop) and the line waiting past the window is
     # still table-shaped. A cut table text is otherwise indistinguishable from
@@ -4873,7 +4873,7 @@ def _extract_table_body_text_and_reason(
         ) and len(last) < 200
         # A short capitalised line with two or more numeric cells is a DATA
         # row ("Total   120   45.2 (3.1)"), not the next section's heading
-        # (d-1352e2: every row of a 10-row table was popped from the bottom).
+        # (every row of a 10-row table was popped from the bottom).
         n_numeric = sum(1 for tok in last.split() if _NUMERIC_CELL_TOKEN.match(tok))
         is_titlecase_heading = (
             10 < len(last) < 50

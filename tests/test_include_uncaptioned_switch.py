@@ -1,4 +1,4 @@
-"""`include_uncaptioned=False` withholds uncaptioned candidates, and counts them (d-be5166).
+"""`include_uncaptioned=False` withholds uncaptioned candidates, and counts them.
 
 Default stays True: Scimeto asked (2026-10-13) that candidates stay in default output.
 """

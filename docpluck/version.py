@@ -150,7 +150,7 @@ def _own_repo_root() -> Path | None:
     ``git -C <dir>`` walks UP until it finds a repository. A wheel installed in
     a ``.venv`` inside a consumer's project therefore answered ``rev-parse`` and
     ``status`` for the CONSUMER's repository, and the receipt attributed the
-    consumer's HEAD and cleanliness to docpluck (d-5bf4ee, d-fcb3d3; seen
+    consumer's HEAD and cleanliness to docpluck (seen
     2026-10-24: 2.4.154 installed under a ScienceArena worktree reported that
     worktree's HEAD). A checkout counts only when its top level is exactly the
     directory that holds this package. Never raises.

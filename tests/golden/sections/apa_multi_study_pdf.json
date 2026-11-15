@@ -1,5 +1,5 @@
 {
-  "sectioning_version": "1.2.9",
+  "sectioning_version": "1.2.10",
   "source_format": "pdf",
   "sections": [
     {
@@ -7,7 +7,9 @@
       "canonical_label": "abstract",
       "char_start": 0,
       "char_end": 29,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Abstract"
@@ -17,7 +19,9 @@
       "canonical_label": "introduction",
       "char_start": 29,
       "char_end": 55,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Introduction"
@@ -27,7 +31,9 @@
       "canonical_label": "methods",
       "char_start": 55,
       "char_end": 81,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Methods"
@@ -37,7 +43,9 @@
       "canonical_label": "results",
       "char_start": 81,
       "char_end": 107,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Results"
@@ -47,7 +55,9 @@
       "canonical_label": "methods",
       "char_start": 107,
       "char_end": 133,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Methods"
@@ -57,7 +67,9 @@
       "canonical_label": "results",
       "char_start": 133,
       "char_end": 159,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "Results"
@@ -67,7 +79,9 @@
       "canonical_label": "general_discussion",
       "char_start": 159,
       "char_end": 190,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "General Discussion"
@@ -77,7 +91,9 @@
       "canonical_label": "references",
       "char_start": 190,
       "char_end": 222,
-      "pages": [],
+      "pages": [
+        1
+      ],
       "confidence": "high",
       "detected_via": "heading_match",
       "heading_text": "References"

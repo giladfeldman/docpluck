@@ -1,4 +1,4 @@
-"""A row label followed by an APA leading-dot value is value-followed (d-8930b8).
+"""A row label followed by an APA leading-dot value is value-followed.
 
 `_value_followed_fraction` is the discriminator that keeps a repeated table row
 label from being deleted as a watermark. Before 2026-11-13 `.35`, `-.35` and

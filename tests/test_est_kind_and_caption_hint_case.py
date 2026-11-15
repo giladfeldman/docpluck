@@ -1,4 +1,4 @@
-"""`est_kind` names a generic estimate's null (d-cdda61), and a caption letter
+"""`est_kind` names a generic estimate's null, and a caption letter
 no longer types a column (found 2026-11-13).
 
 * `est_kind`: "ratio" (null 1) or "difference" (null 0) when the column header

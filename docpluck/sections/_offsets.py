@@ -19,6 +19,8 @@ import bisect
 import difflib
 from collections.abc import Callable
 
+from ..telemetry import record_fallback
+
 
 def _line_starts(s: str) -> list[int]:
     out = [0]
@@ -104,6 +106,7 @@ def boundary_offsets(src: str, dst: str, src_offsets: list[int]) -> list[int | N
             last = found
             continue
         found = None
+        first_ambiguous = None
         for k in range(li, len(a)):
             if "\f" in a[k] and k > li:
                 break          # the page ended without a findable line
@@ -121,11 +124,31 @@ def boundary_offsets(src: str, dst: str, src_offsets: list[int]) -> list[int | N
             hi = (starts_b[equal[eq_src[p]]] + len(b[equal[eq_src[p]]])
                   if p < len(eq_src) else len(dst))
             pos = dst.find(key, max(lo, last), hi)
+            if pos != -1 and dst.find(key, pos + 1, hi) != -1:
+                # The key occurs twice in the window: the first hit may be the
+                # previous page's tail (consult round 2, 2026-11-13). Lengthen
+                # it to the whole line; if that is still not unique, try the
+                # page's next line. Only when no line of the page is unique
+                # does the first hit stand, counted: refusing it outright sent
+                # 3 of 125 papers to no pages at all (one unknown boundary
+                # blanks a paper), and in all 3 the first hit agreed with the
+                # printed page.
+                whole = " ".join(a[k].replace("\f", "").split())
+                wpos = dst.find(whole, max(lo, last), hi)
+                if wpos != -1 and dst.find(whole, wpos + 1, hi) == -1:
+                    pos = wpos
+                else:
+                    if first_ambiguous is None:
+                        first_ambiguous = pos
+                    continue
             if pos != -1:
                 # Mid-line is right: a rejoined line puts the page's first
                 # words after the previous page's last words on one line.
                 found = pos
                 break
+        if found is None and first_ambiguous is not None:
+            record_fallback("section_page_boundary_ambiguous")
+            found = first_ambiguous
         out.append(found)
         if found is not None:
             last = found

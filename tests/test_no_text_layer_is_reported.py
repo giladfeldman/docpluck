@@ -1,4 +1,4 @@
-"""A PDF with no text layer is reported as a failure, never as an empty paper (d-23c3f7).
+"""A PDF with no text layer is reported as a failure, never as an empty paper.
 
 ESCImate 2026-09-07: a 0-character extraction came back with a clean method and
 no event. The `_failed` method piece is what consumers' degraded guards read.

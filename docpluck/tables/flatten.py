@@ -110,7 +110,7 @@ class FlattenedRow(TypedDict):
     # Value-bearing cells of this row that reached no field, each with why:
     # ``{"col", "header", "cell", "reason"}``, reason one of
     # ``column_role_unknown`` / ``repeated_pair_kind`` / ``value_not_parsed``.
-    # ``[]`` when every numeric cell was typed (2026-11-13, d-6bff50).
+    # ``[]`` when every numeric cell was typed (2026-11-13).
     unparsed: list[dict[str, object]]
     # The source table's `caption_status` (2026-09-24, owner decision "option B").
     # A row from an "uncaptioned_candidate" table comes from a grid NO caption
@@ -405,10 +405,18 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 # Effect-type hint for an est_ci / est column, keyed on the effect word in the
 # header (or the recovered vocab). Lets a downstream consumer route a parsed
 # estimate semantically (Request 11 §2.4). Unmatched ⇒ no hint emitted.
+# The one- and two-letter SYMBOLS are matched in the case the statistic is
+# printed in (italic d, g, r; OR, MD), never case-insensitively, and never
+# fused to a letter, digit or "^" (a footnote letter: "Estimate^d", "Model 2d").
+# Until consult round 2 (2026-11-13) a column's own header "Vitamin D (95% CI)"
+# typed d (`\bd\b` under re.I), "R" (a multiple correlation) typed Pearson r,
+# and "Mean or median" typed an odds ratio. A letter that designates a study,
+# panel, model or condition is removed first (`_strip_letter_designators`).
+_HEADER_SYMBOL = r"(?<![A-Za-z0-9^]){sym}(?![A-Za-z0-9])"
 _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("cohens_d",            re.compile(r"\b(?:d\s*z|d|cohen)\b", re.I)),
-    ("hedges_g",            re.compile(r"\b(?:g|hedges)\b", re.I)),
-    ("pearson_r",           re.compile(r"^\s*r\b", re.I)),
+    ("cohens_d",            re.compile(r"(?i:cohen)|" + _HEADER_SYMBOL.format(sym=r"d(?:\s*z)?"))),
+    ("hedges_g",            re.compile(r"(?i:hedges)|" + _HEADER_SYMBOL.format(sym="g"))),
+    ("pearson_r",           re.compile(r"^\s*r(?![A-Za-z0-9])")),
     # `eta` IS A SUBSTRING OF ORDINARY ENGLISH. Until 2026-08-22 these two
     # alternatives ended in a bare, unanchored `eta`, and `_effect_type_for` is
     # run over the whole CAPTION AND FOOTNOTE (`_effect_type_for(vocab_all)`
@@ -437,15 +445,33 @@ _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "eta_squared",
         re.compile(r"η\s*²?|η2|(?<![A-Za-z])eta(?![A-Za-z])", re.I),
     ),
-    ("odds_ratio",          re.compile(r"\bOR\b|odds\s*ratio", re.I)),
+    ("odds_ratio",          re.compile(r"(?<![A-Za-z])OR(?![A-Za-z])|(?i:odds\s*ratio)")),
     ("risk_difference",     re.compile(r"risk\s*diff", re.I)),
-    ("mean_difference",     re.compile(r"mean\s*diff|\bMD\b|difference\s+in\s+means", re.I)),
+    ("mean_difference",     re.compile(r"(?<![A-Za-z])MD(?![A-Za-z])|(?i:mean\s*diff|difference\s+in\s+means)")),
 ]
+
+# A letter that names a study, panel, model, condition or figure part, not a
+# statistic: "Study d", "panel (d)", "Experiment D", "Model 2d" -- and a run of
+# two or more parenthesised single letters, "(a) (b) (c) (d)", is a panel list.
+_LETTER_DESIGNATOR_RE = re.compile(
+    # not "group"/"sample"/"subjects": "Between-group d" IS Cohen's d
+    r"(?i:(?<![-\w])(?:stud(?:y|ies)|experiments?|exp\.|panels?|appendix|models?"
+    r"|figures?|fig\.|tables?|sections?|waves?|sites?|parts?)"
+    r"\s*\d*\s*\(?[A-Za-z]\)?)(?![A-Za-z0-9])"
+)
+_PAREN_LETTER_RE = re.compile(r"\(\s*[A-Za-z]\s*\)")
+
+
+def _strip_letter_designators(s: str) -> str:
+    s = _LETTER_DESIGNATOR_RE.sub(" ", s)
+    if len({m.group(0).strip("() ").lower() for m in _PAREN_LETTER_RE.finditer(s)}) >= 2:
+        s = _PAREN_LETTER_RE.sub(" ", s)
+    return s
 
 
 def _effect_type_for(label: str) -> Optional[str]:
     """Best-effort semantic effect-type for an estimate column header/label."""
-    s = (label or "").strip()
+    s = _strip_letter_designators((label or "").strip()).strip()
     if not s:
         return None
     for et, pat in _EFFECT_TYPE_PATTERNS:
@@ -482,7 +508,7 @@ _VOCAB_EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 
 def _vocab_effect_type(vocab: str) -> Optional[str]:
     """`_effect_type_for` for the table-wide vocabulary (case-exact symbols)."""
-    s = (vocab or "").strip()
+    s = _strip_letter_designators((vocab or "").strip()).strip()
     if not s:
         return None
     for et, pat in _VOCAB_EFFECT_TYPE_PATTERNS:
@@ -502,7 +528,7 @@ _EFFECT_TYPE_KEY = {
 
 
 # Whether a generic `est` is a RATIO (null 1) or a DIFFERENCE (null 0), so a
-# CI-excludes-null check reads the right null (d-cdda61, a consumer request
+# CI-excludes-null check reads the right null (a consumer request
 # 2026-08-21 §4.2.3). Typographic: the column header must NAME the measure. A
 # header that names both kinds, or neither, gives no `est_kind` -- never a
 # guessed null.
@@ -512,6 +538,14 @@ _EFFECT_TYPE_KEY = {
 _RATIO_EST_RE = re.compile(
     r"(?<![A-Za-z])(?:a?OR|RR|HR|IRR|aHR|aRR)(?![A-Za-z])"
     r"|(?i:odds\s*ratio|risk\s*ratio|hazard\s*ratio|rate\s*ratio|relative\s*risk)",
+)
+# A header carrying a physical unit or a reliability wording is measuring
+# something else under the same letters: "HR (bpm)" is heart rate, "RR
+# (breaths/min)" respiratory rate, "ICC" / "inter-rater" an agreement index.
+# Consult round 2, 2026-11-13: "HR (bpm) [95% CI]" was given est_kind "ratio".
+_NOT_AN_EFFECT_UNIT_RE = re.compile(
+    r"(?i:\bbpm\b|\bbeats?\b|\bbreaths?\b|/\s*min\b|mm\s*hg|\breliab|inter-?\s*rater"
+    r"|\bICC\b|heart\s*rate|respiratory\s*rate|\bkg\b|\bms\b|\bmg\b|\bcm\b)"
 )
 _DIFFERENCE_EST_TYPES = frozenset({
     "cohens_d", "hedges_g", "pearson_r", "mean_difference", "risk_difference",
@@ -524,7 +558,8 @@ def _est_kind(header_cell: str) -> Optional[str]:
     `\\bd\\b` reads "vitamin D" as Cohen's d, and a wrong null is worse than
     none."""
     s = _strip_fold_sentinels(header_cell or "")
-    ratio = bool(_RATIO_EST_RE.search(s))
+    # a unit vetoes only the RATIO reading: "Mean difference (ms)" is still a difference
+    ratio = bool(_RATIO_EST_RE.search(s)) and not _NOT_AN_EFFECT_UNIT_RE.search(s)
     diff = _effect_type_for(s) in _DIFFERENCE_EST_TYPES
     if ratio and diff:
         return None
@@ -2108,7 +2143,7 @@ def _flatten_one_row(
             if role_vals.get(k + "_op"):
                 fields[k + "_op"] = role_vals[k + "_op"]
     if "est" in fields and role_vals.get("est_kind"):
-        # ratio -> the null is 1; difference -> 0 (d-cdda61). Absent = unknown.
+        # ratio -> the null is 1; difference -> 0. Absent = unknown.
         fields["est_kind"] = role_vals["est_kind"]
     for k in ("n", "N", "count"):
         if k in role_nums:
@@ -2183,7 +2218,7 @@ def _flatten_one_row(
             if tok is not None:
                 fields_raw[k] = tok
 
-    # Which value-bearing cells reached no field, and why (d-6bff50, a
+    # Which value-bearing cells reached no field, and why (a
     # consumer request 2026-08-21 §4.2.1): an empty or partial `fields` said
     # nothing about what was left behind. Reasons: `column_role_unknown` (the
     # header names no statistic this parser types), `repeated_pair_kind` (two
@@ -3158,7 +3193,7 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
                 level_context=level_context,
             )
             # A pair column with no arm label is left untyped (above); the row
-            # says so instead of dropping it in silence (d-6bff50).
+            # says so instead of dropping it in silence.
             for ci in sorted(rp):
                 if not pair_labels.get(ci) and (row[ci] or "").strip():
                     main["unparsed"].append({

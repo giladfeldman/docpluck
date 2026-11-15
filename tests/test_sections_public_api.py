@@ -10,7 +10,7 @@ def test_sections_namespace_exports():
         Confidence,
         DetectedVia,
     )
-    assert SECTIONING_VERSION == "1.2.9"
+    assert SECTIONING_VERSION == "1.2.10"
     assert Section is not None
     assert SectionedDocument is not None
     assert SectionLabel.abstract.value == "abstract"

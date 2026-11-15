@@ -216,7 +216,7 @@ def component_status(
     """One word a consumer can branch on for the TABLE channel of a result.
 
     ``tables == []`` used to mean both "this paper prints no table" and "the
-    table pass crashed" (d-6736e7). This field tells them apart, beside the
+    table pass crashed". This field tells them apart, beside the
     unchanged ``tables`` list:
 
     * ``"ok"`` -- every table pass ran to completion.

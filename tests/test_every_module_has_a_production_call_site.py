@@ -34,7 +34,7 @@ _REPO = Path(__file__).resolve().parents[1]
 _PKG = _REPO / "docpluck"
 
 # Modules with no production importer as of 2026-09-05, each with the decision owed.
-# `docpluck.tables.confidence` left the list 2026-11-13: DELETED (d-5e9b45) -- a second,
+# `docpluck.tables.confidence` left the list 2026-11-13: DELETED -- a second,
 # different confidence formula nothing called; the shipped one is in camelot_extract.
 # `docpluck.figures.detect` left the list 2026-09-25: DELETED, not wired -- on the Nature
 # figure-only fixture it found 0 of the 5 figures the live caption-driven path finds.
