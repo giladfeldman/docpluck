@@ -18,7 +18,6 @@ copied byte-identical from the consumers' fixture (sha256 pinned below).
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 import pytest
 
@@ -30,8 +29,11 @@ from docpluck import (
     normalize_text,
 )
 
-_PDF = Path(__file__).parent / "fixtures" / "consumer_contract" / "contract-structure.pdf"
-_PDF_SHA = "8763a44cb3c5584011b1bc609e30a10fe793f25b4d2a5981d7c5e495a74379cd"
+from tests.fixtures.consumer_contract.build import build_contract_structure_pdf
+
+# Built on demand (the repo keeps no PDFs, so a committed fixture could not run on
+# a clone); reportlab's invariant mode makes the bytes, and so this hash, stable.
+_PDF_SHA = "88e1a3888b964db3cb8f092c79aff1b59adf650dc87dd40d4ce3c1fb4d7b6bfa"
 
 TABLE_KEYS = {
     "accuracy", "bbox", "camelot_flavor", "caption", "caption_status", "cell_geometry",
@@ -79,7 +81,7 @@ SYMBOL_PROBES = [
 
 @pytest.fixture(scope="module")
 def structured():
-    data = _PDF.read_bytes()
+    data = build_contract_structure_pdf()
     assert hashlib.sha256(data).hexdigest() == _PDF_SHA, "fixture changed"
     return data, extract_pdf_structured(data)
 
