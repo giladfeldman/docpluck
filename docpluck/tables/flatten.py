@@ -112,6 +112,12 @@ class FlattenedRow(TypedDict):
     # ``column_role_unknown`` / ``repeated_pair_kind`` / ``value_not_parsed``.
     # ``[]`` when every numeric cell was typed (2026-11-13).
     unparsed: list[dict[str, object]]
+    # The keys of `fields` whose column NO header names: their role was
+    # recovered from data shape, caption tokens or column position, not read
+    # from a printed column header. ``[]`` when every typed field sits under a
+    # header that names it (2026-11-16, ESCImate request). A consumer that
+    # needs printed evidence for a statistic's identity filters on this.
+    typed_without_header: list[str]
     # The source table's `caption_status` (2026-09-24, owner decision "option B").
     # A row from an "uncaptioned_candidate" table comes from a grid NO caption
     # claimed -- about half of those are real statistical tables, about half are
@@ -680,10 +686,16 @@ def _classify_column(header: str) -> Optional[str]:
     # is still recognized — otherwise the whole "Replication…95% CI" string never
     # matches and the column's role is lost (collabra.90203 T10 CI, DP-5).
     if _MERGE_SEPARATOR in h:
-        for part in reversed([p.strip() for p in h.split(_MERGE_SEPARATOR) if p.strip()]):
+        parts = [p.strip() for p in h.split(_MERGE_SEPARATOR) if p.strip()]
+        for part in reversed(parts):
             role = _classify_column(part)
             if role:
                 return role
+        # One label printed on two lines ("d or dz" over "[95%CI]",
+        # 10.1525/collabra.77859 Table 4): neither line names the role alone,
+        # the label read whole does.
+        if len(parts) >= 2:
+            return _classify_column(" ".join(parts))
         return None
     # Strip a single trailing punct (`,`, `:`, `.`) that some PDFs include.
     h = h.rstrip(",:.")
@@ -1758,7 +1770,14 @@ def _flatten_one_row(
     effect_hint: Optional[str] = None,
     level_context: Optional[str] = None,
     label_idx: Optional[int] = None,
+    no_header_cols: Optional[set[int]] = None,
 ) -> FlattenedRow:
+    # `no_header_cols`: the columns whose role came from blank-header recovery
+    # (`_recover_blank_roles`: data shape, caption tokens, position) rather than
+    # from a header naming the column. Every field typed from one is listed in
+    # the record's `typed_without_header`, so a consumer can tell a printed
+    # header from an inferred role (ESCImate, 2026-11-15).
+    no_header = set(no_header_cols or ())
     if label_idx is not None and label_idx < len(row):
         # The caller knows the label column (a pair column's sub-row): an empty
         # label stays empty instead of promoting the value cell to label.
@@ -1843,6 +1862,7 @@ def _flatten_one_row(
             v = _parse_number((row[blank_cols[0]] or "").strip())
             if v is not None and 0.0 <= v <= 1.0:
                 roles[blank_cols[0]] = "est"
+                no_header.add(blank_cols[0])
 
     # Pull per-role values out of the body row.
     role_vals: dict[str, str] = {}
@@ -1854,9 +1874,15 @@ def _flatten_one_row(
     typed_cols: set[int] = set()
     _seen_keys: set[str] = set()
     _prev_ci: Optional[int] = None
+    # The keys each column put in `role_nums` (same crediting as `typed_cols`).
+    col_keys: dict[int, set[str]] = {}
+    # Effect keys (d, eta2) named by the table-wide caption/note vocabulary
+    # rather than by the column's own header: also typed without a header.
+    hint_keys: set[str] = set()
     for ci, role in roles.items():
         if _prev_ci is not None and set(role_nums) - _seen_keys:
             typed_cols.add(_prev_ci)
+            col_keys[_prev_ci] = set(role_nums) - _seen_keys
         _seen_keys = set(role_nums)
         _prev_ci = ci
         if ci >= len(row):
@@ -1920,6 +1946,8 @@ def _flatten_one_row(
                     and not (0.0 <= est <= 1.0)
                 ):
                     eff_key = "est"
+                if eff_key != "est" and not _effect_type_for(header[ci]):
+                    hint_keys.add(eff_key)   # named by the caption/note, not the column
                 role_nums[eff_key] = est
                 src[eff_key] = raw
                 if eff_key == "est" and _est_kind(header[ci]):
@@ -1964,6 +1992,8 @@ def _flatten_one_row(
                     and not (0.0 <= est <= 1.0)
                 ):
                     eff_key = "est"
+                if eff_key != "est" and not _effect_type_for(header[ci]):
+                    hint_keys.add(eff_key)   # named by the caption/note, not the column
                 role_nums[eff_key] = est
                 src[eff_key] = raw
                 if eff_key == "est" and _est_kind(header[ci]):
@@ -2226,6 +2256,15 @@ def _flatten_one_row(
     # (the column has a role, the cell's text did not parse as one).
     if _prev_ci is not None and set(role_nums) - _seen_keys:
         typed_cols.add(_prev_ci)
+        col_keys[_prev_ci] = set(role_nums) - _seen_keys
+    # Field keys typed from a column no header names. CI_lo / CI_hi were renamed
+    # to CI_lower / CI_upper above; a key the guards dropped is not listed.
+    _renamed = {"CI_lo": "CI_lower", "CI_hi": "CI_upper"}
+    typed_without_header = sorted(
+        k for k in {_renamed.get(k, k) for ci in no_header for k in col_keys.get(ci, ())}
+        | hint_keys
+        if k in fields
+    )
     unparsed: list[dict[str, object]] = []
     for ci, cell in enumerate(row):
         c = (cell or "").strip()
@@ -2254,6 +2293,7 @@ def _flatten_one_row(
         fields=fields,
         fields_raw=fields_raw,
         unparsed=unparsed,
+        typed_without_header=typed_without_header,
         # Internal, removed by `flatten_table`: the keys a pair cell typed.
         _pair_keys=pair_keys & set(fields),
     )
@@ -2772,15 +2812,27 @@ def _detect_column_groups(
 # leading point estimate). Used to split a packed parallel-arm cell into one
 # value per arm. The number branch is tried first so ``".07 [-.17,.31]"`` stays
 # a single group rather than splitting the estimate from its interval.
+# The printed comparison operator ("< .001") and a trailing significance or
+# footnote mark ("0.40***", ".05†") belong to their number's group. Until
+# 2026-11-16 neither was in the pattern, so a split dropped them:
+# 10.1080/23743603.2021.1878340 Table 3 (p15) prints "< .001" for two arms whose
+# rows the grid merged ("< .001 < .001"), and each arm's record read p = .001
+# with p_op "=" (ESCImate, 2026-11-15).
 _VALUE_GROUP_RE = re.compile(
     r"(?:"
+    r"(?:[<>≤≥=]\s*)?"  # optional printed comparison operator
     r"[+\-−]?(?:\d+\.?\d*|\.\d+)"  # signed number
+    r"(?:\*{1,3}|[†‡§])?"  # optional significance / footnote mark
     r"(?:\s*\([^)]*\))?"  # optional (SD)
     r"(?:\s*\[[^\]]*\])?"  # optional [CI]
     r"|"
     r"\[[^\]]*\]"  # OR a standalone bracketed interval
     r")"
 )
+# A character that changes what a value means (an operator, a sign, a mark):
+# a split that leaves one of these outside every group would publish the value
+# without it, so the cell is left whole instead.
+_MEANINGFUL_LEFTOVER_RE = re.compile(r"[<>≤≥=±+\-−*†‡§]")
 
 
 def _split_value_groups(cell: str, k: int) -> Optional[list[str]]:
@@ -2801,6 +2853,8 @@ def _split_value_groups(cell: str, k: int) -> Optional[list[str]]:
         return None
     nospace = lambda x: re.sub(r"\s", "", x)  # noqa: E731
     if len("".join(nospace(g) for g in groups)) < 0.8 * len(nospace(s)):
+        return None
+    if _MEANINGFUL_LEFTOVER_RE.search(_VALUE_GROUP_RE.sub("", s)):
         return None
     return groups
 
@@ -2940,6 +2994,7 @@ def _flatten_packed_arms(
                 roles_override=recovered,
                 effect_hint=effect_hint,
                 level_context=" ".join(s for s in (caption, footnote) if s),
+                no_header_cols=set(recovered or ()),
             )
         )
     return out
@@ -2968,6 +3023,42 @@ def flatten_table(table: Table) -> list[FlattenedRow]:
     return rows
 
 
+_UPPER_LABEL_MAX_CHARS = 60
+
+
+def _inherit_upper_header_labels(header_rows: list[list[str]]) -> list[str]:
+    """The column-header line, with each blank cell of the last header row
+    taken from the nearest label printed above it in the same column.
+
+    A header row that names most columns, over a second row that fills only a
+    spanned pair ("95% CI" over "Lower | Upper"), cannot fold: the super-header
+    fold refuses a label with nothing printed under it. Until 2026-11-16 the
+    last row was then the whole header, so every column named only in the row
+    above read as blank, and blank-column recovery typed those columns by
+    position: 10.1016/j.jesp.2021.104154 Table 15 (p16) prints "Mean Difference
+    | t | df | p | Cohen's d | 95% CI" over "Lower | Upper", and the Mean
+    Difference (0.19) was published as t while the printed t (1.31) reached no
+    field (ESCImate, 2026-11-15). The label sits physically in that column:
+    typographic evidence, not inference. A cell the last row does print is
+    never replaced, and a long prose line is not a label.
+    """
+    header = list(header_rows[-1])
+    if len(header_rows) < 2:
+        return header
+    for ci in range(len(header)):
+        if (header[ci] or "").strip():
+            continue
+        for hr in reversed(header_rows[:-1]):
+            v = (hr[ci] if ci < len(hr) else "") or ""
+            v = v.strip()
+            if not v:
+                continue
+            if len(_strip_fold_sentinels(v)) <= _UPPER_LABEL_MAX_CHARS and not _NUM_RE.match(v):
+                header[ci] = v
+            break
+    return header
+
+
 def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[FlattenedRow]:
     """Flatten a structured `Table` into per-row `FlattenedRow` records.
 
@@ -2989,7 +3080,7 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
     # Use the FINAL header row as the canonical column-header line. (When the
     # table has a super-header + sub-header, _fold_super_header_rows already
     # concatenated them so the last header row carries the full label.)
-    header = header_rows[-1]
+    header = _inherit_upper_header_labels(header_rows)
 
     table_id = table.get("id") or table.get("label") or "table"
     page = int(table.get("page") or 0)
@@ -3179,6 +3270,7 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
                         roles_override=over or None,
                         effect_hint=effect_hint,
                         level_context=level_context,
+                        no_header_cols=set(roles_override or ()),
                     )
                 )
                 continue
@@ -3191,6 +3283,7 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
                 roles_override=over,
                 effect_hint=effect_hint,
                 level_context=level_context,
+                no_header_cols=set(roles_override or ()),
             )
             # A pair column with no arm label is left untyped (above); the row
             # says so instead of dropping it in silence.

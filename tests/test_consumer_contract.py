@@ -45,6 +45,7 @@ ROW_KEYS = {
     "caption_status", "fields", "fields_raw", "header", "label", "page", "raw_cells",
     "row_idx", "row_label", "sentence", "table_id",
     "unparsed",  # added 2026-11-13; announced in the consumer notice
+    "typed_without_header",  # added 2026-11-16 (Release B); announced in its notice
 }
 ROW_FIELD_KEYS = {"F", "d", "df", "df1", "df2", "p", "p_op", "p_text", "t"}
 SECTION_KEYS = {
