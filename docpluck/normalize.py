@@ -6135,7 +6135,12 @@ def layout_letter_marker_fusions(layout) -> "collections.Counter[tuple[str, str]
         if plain[key[0]]:
             del out[key]
     try:
-        layout._letter_marker_fusions = out
+        # `LayoutDoc` is a frozen dataclass, so a plain assignment raised and
+        # the cache never stored: every table rescanned the whole paper (~44%
+        # of ESCImate's browser time on table-heavy papers, 2026-11-15). The
+        # cache is not a field (not compared, not hashed), so writing it past
+        # the frozen guard changes nothing a caller can observe but the time.
+        object.__setattr__(layout, "_letter_marker_fusions", out)
     except Exception as exc:
         # Not cached: the next call recomputes the same answer; recorded so a
         # slow table pass on such an object can be traced here.
