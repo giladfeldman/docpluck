@@ -1088,10 +1088,30 @@ def _trim_trailing_prose_rows(
             for r in row_indices
         ]
     # Find the first index that starts a run of >= _PROSE_RUN_MIN prose rows.
+    #
+    # ONLY BELOW THE FIRST DATA ROW. This trims prose captured BELOW a table, so
+    # a run that begins above every data row is the table's own caption lines and
+    # worded column headers, not body text. Cutting there deleted the whole grid:
+    # 10.1016/j.jesp.2009.12.010 p5 Table 3's region grid ("Table 3" / its title /
+    # two header rows, then 3 data rows) went 7 -> 0 rows, and the Camelot
+    # fallback that replaced it lost the first data row.
+    # A data row is a non-prose row with at least two filled cells: the bare
+    # "Table 3" label line is neither prose nor data.
+    first_data = next(
+        (
+            i for i, f in enumerate(prose_flags)
+            if not f and sum(1 for c in by_row[row_indices[i]] if (c.get("text") or "").strip()) >= 2
+        ),
+        None,
+    )
+    if first_data is None:
+        first_data = 0  # no data row at all: an all-prose grid is cut as before
     cut_pos: int | None = None
     run = 0
     run_start = 0
     for i, is_prose in enumerate(prose_flags):
+        if i < first_data:
+            continue
         if is_prose:
             if run == 0:
                 run_start = i
@@ -1369,8 +1389,17 @@ def _whitespace_grid_is_clean(
         # FIRST column is exempt when a clean data cell sits in another column of
         # the same row. Not on the upright path: together with `marker_letters`
         # it let garbled upright grids through (see `_CLEAN_DATA_ALLOWED_RE`).
-        row_has_data_beside_label = rotated_frame and any(
-            _cell_is_clean_data(rt, marker_letters=True)
+        #
+        # UPRIGHT TOO, WITH THE STRICT DATA TEST (2026-11-16). An upright table
+        # labels its rows the same way: 10.1016/j.jesp.2009.12.010 p5 Table 3
+        # ("Positive Expectations Ps (all 17 of whom accepted final offer)" |
+        # 7.24 | 6.41 | 5.59 | 5.53) had 3 of its 3 data rows counted as prose
+        # and the grid rejected, and the Camelot fallback lost a row. What let
+        # garbled upright grids through was `marker_letters`, which stays
+        # rotated-only here; the exemption itself needs a strictly clean number
+        # in another column of the same row, which absorbed prose does not have.
+        row_has_data_beside_label = any(
+            _cell_is_clean_data(rt, marker_letters=rotated_frame)
             for c, rt in zip(row_cells, rep_texts)
             if c["c"] != 0 and rt
         )

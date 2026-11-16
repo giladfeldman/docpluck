@@ -64,7 +64,12 @@ from docpluck.testing import require_corpus_pdf
 B1_LIVE_FIXTURES = [
     ("maier_2023_collabra.pdf", 11, 50),      # min 50 cells (actual: 465 post-cycle-4)
     pytest.param(
-        "chan_feldman_2025_cogemo.pdf", 8, 50,
+        # 2026-11-16: the whitespace builder now reads Tables 2 (p7) and 8 (p13)
+        # (87 cells; the long row labels pass its clean gate) -- the published
+        # result already had both from Camelot -- while the other six regions
+        # still give 0 cells, so the bar is 200: 50 no longer tells "two tables
+        # read" from "the defect closed".
+        "chan_feldman_2025_cogemo.pdf", 8, 200,
         marks=pytest.mark.xfail(
             strict=True,
             reason=(

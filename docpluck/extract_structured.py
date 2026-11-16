@@ -629,6 +629,7 @@ def _extract_pdf_structured(
                 layout_doc = extract_pdf_layout(pdf_bytes)
             _whitespace_cells = _wc
             _region_for_caption_fn = _rfc
+            _mark_caption_position(layout_doc, table_captions, method_pieces)
         except Exception as exc:
             exc_name = type(exc).__name__
             record_fallback("whitespace_cells_setup_exception", detail=exc_name)
@@ -955,6 +956,7 @@ def _extract_pdf_structured(
     for t in tables:
         t.pop("_caption_hint_number", None)
         t.pop("_rule_bounded", None)
+        t.pop("_above_caption", None)
         # A spanning super-header label ("Target article" / "Replication") lost
         # its span in Camelot; read it back off the page's rules so flatten binds
         # each column to the arm the page prints it under. Every PDF table passes
@@ -1027,6 +1029,7 @@ def _extract_pdf_structured(
         )
         # Picker bookkeeping never reaches a consumer, whichever path built t.
         t.pop("_appended_cells", None)
+        _fold_unicode_minus(t)
 
     return {
         "text": text_out,
@@ -1517,6 +1520,30 @@ def _table_cell_count(td: Optional[Table]) -> int:
     return sum(1 for c in (td.get("cells") or []) if (c.get("text") or "").strip())
 
 
+def _bbox_width(t: Table) -> float:
+    b = t.get("bbox") or (0.0, 0.0, 0.0, 0.0)
+    return float(b[2]) - float(b[0])
+
+
+def _fold_unicode_minus(t: Table) -> None:
+    """U+2212 -> ASCII '-' in what a table hands a consumer (hard rule: always
+    normalize U+2212). The whitespace and cluster builders fold at construction,
+    but the Camelot repair chain (`cell_cleaning.clean_cell_text`) keeps the
+    printed glyph, because the cleaning steps read a lone U+2212 cell as a
+    detached minus sign and a lone hyphen as a placeholder. So the fold runs
+    here, after every cleaning step, on the cell text, HTML and raw text alike:
+    10.1080/02699931.2024.2434156 p13 Table 8 shipped 22 cells as "−.28***"
+    while its body text read "-.28"."""
+    for c in t.get("cells") or []:
+        text = c.get("text")
+        if isinstance(text, str) and "−" in text:
+            c["text"] = text.replace("−", "-")
+    for key in ("html", "raw_text"):
+        val = t.get(key)
+        if isinstance(val, str) and "−" in val:
+            t[key] = val.replace("−", "-")
+
+
 def _pick_better_table(
     region_td: Optional[Table], auto_td: Optional[Table]
 ) -> Optional[Table]:
@@ -1545,8 +1572,24 @@ def _pick_better_table(
     # below would wrongly pick it.
     if region_td.get("_side_by_side"):
         return region_td
+    # A region found ABOVE its caption in a document that prints captions under
+    # its tables is bounded by that table's own geometry; an auto-detect grid
+    # more than half again as wide straddles the page's text columns, and its
+    # extra columns are the neighbouring column's prose (10.48550/arxiv.2406.11713:
+    # Tables 3, 4, 8 and 10 lost to page-wide grids of prose, x=40-550, against
+    # one-column regions; its Table 11 grid, inside the column, still competes
+    # on columns as below).
+    if region_td.get("_above_caption") and _bbox_width(auto_td) > 1.5 * _bbox_width(region_td) > 0:
+        return region_td
     rc = int(region_td.get("n_cols") or 0)
     ac = int(auto_td.get("n_cols") or 0)
+    # ... but a grid read from the table's drawn cell rules (lattice) keeps the
+    # caption unless the above-caption region finds more columns: on equal
+    # columns the region's wrapped row labels, split into label-only rows,
+    # outcount the lattice grid's whole cells (10.1038/s41598-023-50588-1 p5
+    # Table 2: 43 rows with ten labels cut off their numbers, against 25).
+    if region_td.get("_above_caption") and auto_td.get("camelot_flavor") == "lattice" and rc <= ac:
+        return auto_td
     r_cells = _table_cell_count(region_td)
     a_cells = _table_cell_count(auto_td)
     if rc < ac:
@@ -1564,6 +1607,24 @@ def _pick_better_table(
     # Equal column count: prefer the fuller grid; tie goes to the incumbent.
     return region_td if r_cells > a_cells else auto_td
 
+
+
+def _mark_caption_position(layout_doc, table_captions, method_pieces: list[str]) -> None:
+    """Decide once per document whether it prints table captions UNDER the
+    tables (`detect.document_prints_captions_below`) and store the answer on the
+    layout, where every `_region_for_caption` call reads it. Recorded in the
+    method string when true, so the different search is never silent."""
+    if layout_doc is None or hasattr(layout_doc, "_captions_below_tables"):
+        return
+    try:
+        from .tables.detect import document_prints_captions_below
+        below = document_prints_captions_below(layout_doc, table_captions)
+    except Exception as exc:
+        record_fallback("caption_position_exception", detail=type(exc).__name__)
+        below = False
+    object.__setattr__(layout_doc, "_captions_below_tables", below)
+    if below:
+        method_pieces.append("captions_below_tables")
 
 
 def _region_driven_capture(
@@ -1600,6 +1661,7 @@ def _region_driven_capture(
         record_fallback("region_driven_setup_exception", detail=type(exc).__name__)
         return empty, cap_column_by_id, layout_doc
 
+    _mark_caption_position(layout_doc, table_captions, method_pieces)
     pages = getattr(layout_doc, "pages", None) or ()
 
     # Group captions per page (top-to-bottom) so the next-caption bottom-clip can
@@ -1610,6 +1672,7 @@ def _region_driven_capture(
 
     specs: list[dict] = []
     cap_by_key: dict[str, CaptionMatch] = {}
+    above_keys: set[str] = set()
     for page, caps in by_page.items():
         if not (1 <= page <= len(pages)):
             continue
@@ -1668,7 +1731,12 @@ def _region_driven_capture(
             # region starts at the caption line (minus a small margin for the
             # caption glyphs' own ascent), never higher.
             this_cap_top = cap_top_td.get(id(c))
-            if this_cap_top is not None and top < this_cap_top - _REGION_TOP_MARGIN_PT:
+            # Except where the document prints captions under its tables and the
+            # region was found above this caption on purpose (`above_caption`).
+            if (
+                this_cap_top is not None and top < this_cap_top - _REGION_TOP_MARGIN_PT
+                and not getattr(region, "above_caption", False)
+            ):
                 top = this_cap_top - _REGION_TOP_MARGIN_PT
             # Side-by-side bottom clip: a column's region extends a fixed distance
             # below the caption and overshoots into the body prose that flows
@@ -1753,6 +1821,8 @@ def _region_driven_capture(
                 "rule_bounded": bool(getattr(region, "rule_bounded", False)),
             })
             cap_by_key[key] = c
+            if getattr(region, "above_caption", False):
+                above_keys.add(key)
             if col is not None:
                 cap_column_by_id[id(c)] = (page, col[0], col[1])
 
@@ -1774,6 +1844,8 @@ def _region_driven_capture(
         # isolated/whitespace path uses — so ids stay deterministic and match the
         # recognized-prefix invariant (test_table_ids_unique_and_sequential).
         td["id"] = f"t{cap.number}"
+        if key in above_keys:
+            td["_above_caption"] = True
         col_info = cap_column_by_id.get(id(cap))
         cap_text = None
         if col_info is not None:

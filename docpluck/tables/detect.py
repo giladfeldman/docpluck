@@ -48,6 +48,9 @@ class CandidateRegion:
     # True when the bbox ends at the table's own closing rule
     # (`_caption_rule_extent`): what lies inside is the table, not body text.
     rule_bounded: bool = False
+    # True when the table was found ABOVE its caption, in a document that prints
+    # captions under their tables (`document_prints_captions_below`).
+    above_caption: bool = False
 
 
 SEARCH_BELOW_PT: float = 250.0
@@ -88,6 +91,35 @@ def _region_for_caption(layout: LayoutDoc, cap: CaptionMatch) -> CandidateRegion
     # into the result. Keyed on a layout invariant, paper-agnostic.
     below_bbox = _extend(caption_bbox, dy=SEARCH_BELOW_PT, direction="down")
     above_bbox = _extend(caption_bbox, dy=SEARCH_ABOVE_PT, direction="up")
+
+    # A DOCUMENT THAT PRINTS CAPTIONS UNDER ITS TABLES (set once per document by
+    # the caller, see `document_prints_captions_below`): the table is above the
+    # caption, and what lies below is the next table or body text. Searching
+    # below first gave 10.48550/arxiv.2406.11713 p8 "Table 4" the grid of
+    # Table 5, printed directly under Table 4's caption. Above only: when no
+    # grid is found there, no region -- never the band below.
+    if getattr(layout, "_captions_below_tables", False):
+        # Up to the previous caption (table or figure) in this column, else the
+        # page top: the fixed SEARCH_ABOVE_PT band is sized for a stacked
+        # neighbour, and cut that paper's 300pt-tall p7 Table 3 to its bottom
+        # nine rows, losing the row of the paper's own model.
+        top_limit = _previous_caption_bottom(layout, cap, caption_bbox)
+        above_bbox = (above_bbox[0], top_limit if top_limit is not None else 0.0,
+                      above_bbox[2], above_bbox[3])
+        if above_bbox[3] - above_bbox[1] <= 1.0:
+            return None
+        detected = _detect_geometry_widen_aware(layout, page=cap.page, search_bbox=above_bbox)
+        if detected is None:
+            return None
+        signal, geom_bbox = detected
+        return CandidateRegion(
+            label=cap.label,
+            page=cap.page,
+            bbox=_union(caption_bbox, geom_bbox),
+            geometry_signal=signal,
+            caption_match=cap,
+            above_caption=True,
+        )
 
     detected = _detect_geometry_widen_aware(layout, page=cap.page, search_bbox=below_bbox)
     if detected is None:
@@ -448,14 +480,181 @@ def _caption_top_rule_x1(page_obj, caption_bbox: Bbox) -> float | None:
     Typographic evidence; paper-, font- and publisher-agnostic.
     """
     cx0, _ctop, cx1, cbottom = caption_bbox
+    strokes = _joined_horizontal_strokes(page_obj)
+    # The gap is measured from the caption BLOCK's last line. A caption printed
+    # as a label line over a title line ("Table 2" / "Assessments (and changes
+    # in assessment) of confederate's final offer.") puts the top rule under the
+    # title: on 10.1016/j.jesp.2009.12.010 p4 it lies 12.6pt below the label
+    # line and 3.6pt below the title, and measured from the label it was missed,
+    # leaving the region the width of the word "Table 2".
+    cbottom = _caption_block_bottom(page_obj, caption_bbox, strokes)
     best: float | None = None
-    for r in _joined_horizontal_strokes(page_obj):
+    for r in strokes:
         if not (cbottom - 1.0 <= r["top"] <= cbottom + _CAPTION_RULE_GAP_PT):
             continue
         if abs(r["x0"] - cx0) > _CAPTION_RULE_X0_TOL_PT or r["x1"] <= cx1:
             continue
         best = r["x1"] if best is None else max(best, r["x1"])
     return best
+
+
+# A caption's continuation line starts within this gap below the previous line
+# (a line break inside one paragraph, never a paragraph or table gap) ...
+_CAPTION_LINE_GAP_PT: float = 4.0
+# ... and a caption block is at most this many lines.
+_CAPTION_MAX_LINES: int = 4
+
+
+# How far left of a caption's start another caption may begin and still be in
+# the same page column (one caption centred, the other flush left).
+_CENTRED_CAPTION_SLACK_PT: float = 80.0
+
+
+def _previous_caption_bottom(layout: LayoutDoc, cap: CaptionMatch, caption_bbox: Bbox) -> float | None:
+    """Bottom of the nearest caption block printed above ``caption_bbox`` in the
+    same page column, or None. Bounds an ABOVE search, so a caption-below
+    document's region never reaches past the preceding table's caption into
+    that table (10.48550/arxiv.2406.11713 p8: Table 5's grid sits between
+    Table 4's caption and Table 5's)."""
+    page_obj = layout.pages[cap.page - 1]
+    cx0, ctop, cx1, _cb = caption_bbox
+    words = list(page_obj.words or ())
+    strokes = _joined_horizontal_strokes(page_obj)
+    best: float | None = None
+    for i, w in enumerate(words):
+        wtop = float(w.get("top", 0.0))
+        if wtop >= ctop - 1.0:
+            continue
+        # Same page column, allowing for a centred caption: 10.48550/arxiv.2406.11713
+        # p13 Table 10's caption starts at x=360, Table 9's above it at x=309.
+        wx0 = float(w.get("x0", 0.0))
+        if wx0 < cx0 - _CENTRED_CAPTION_SLACK_PT or wx0 > max(cx1, cx0 + 150.0):
+            continue
+        # A caption begins its line; "Figure 4" mid-sentence in body text does not.
+        if any(
+            abs(float(o.get("top", 0.0)) - wtop) <= 1.0
+            and wx0 - 15.0 <= float(o.get("x1", 0.0)) <= wx0
+            for o in words if o is not w
+        ):
+            continue
+        text = str(w.get("text", ""))
+        nxt = words[i + 1] if i + 1 < len(words) else None
+        if nxt is not None and abs(float(nxt.get("top", 0.0)) - wtop) <= 1.0:
+            text = text + " " + str(nxt.get("text", ""))
+        if not _CAPTION_LINE_RE.match(text):
+            continue
+        prev_bbox = (float(w["x0"]), wtop, float(w["x1"]), float(w.get("bottom", wtop)))
+        bottom = _caption_block_bottom(page_obj, prev_bbox, strokes)
+        if bottom < ctop:
+            best = bottom if best is None else max(best, bottom)
+    return best
+
+
+# A caption has its table's closing rule directly above it when such a rule lies
+# within this many points of the caption's top.
+_RULE_ABOVE_CAPTION_PT: float = 18.0
+# The band above / below a caption read for the table's numeric rows.
+_CAPTION_GRID_BAND_PT: float = 120.0
+# A row is a numeric row when at least this many of its words are numbers.
+_NUMERIC_ROW_MIN_TOKENS: int = 3
+_NUMERIC_TOKEN_RE = re.compile(r"^[<>=(\[]?[-−]?\d*\.?\d+[)\],*†%]*$")
+
+
+def _numeric_rows_in_band(page_obj, x0: float, x1: float, top: float, bottom: float) -> int:
+    rows: dict[int, int] = defaultdict(int)
+    for w in page_obj.words or ():
+        wt = float(w.get("top", 0.0))
+        if not (top <= wt <= bottom):
+            continue
+        if not (x0 - 5.0 <= float(w.get("x0", 0.0)) <= x1 + 5.0):
+            continue
+        if _NUMERIC_TOKEN_RE.match(str(w.get("text", "")).strip()):
+            rows[round(wt / 3.0)] += 1
+    return sum(1 for n in rows.values() if n >= _NUMERIC_ROW_MIN_TOKENS)
+
+
+def document_prints_captions_below(layout: LayoutDoc, captions: list[CaptionMatch]) -> bool:
+    """True when this document prints its table captions UNDER the tables.
+
+    Per-document typographic evidence, both signals required, each measured on
+    the 85-paper corpus census of 2026-11-16 (398 table captions):
+
+    * every located caption has a horizontal rule directly above it (the
+      table's closing rule);
+    * at least 3 captions, and at least half of them, have numeric rows above
+      and none below.
+
+    Corpus firing count 2026-11-16: 4 of 101 PDFs, all of which do print
+    captions under their tables -- 10.48550/arxiv.2406.11713 and three
+    Scientific Reports papers (10.1038/s41598-023-50588-1 pages 5-6 read;
+    -50423-7, -50401-z). The Scientific Reports tables are ruled grids that keep
+    their captions through `_pick_better_table`; their output is identical with
+    the flag forced off. Only the arXiv paper's tables change.
+    """
+    located = []
+    for cap in captions:
+        if not (1 <= cap.page <= len(layout.pages)):
+            continue
+        page_obj = layout.pages[cap.page - 1]
+        bb = _bbox_of_caption_line(page_obj, cap)
+        if bb is not None:
+            located.append((page_obj, bb))
+    if len(located) < 3:
+        return False
+    rule_above = grid_above = 0
+    for page_obj, (x0, top, x1, bottom) in located:
+        strokes = _thin_horizontal_strokes(page_obj)
+        if any(
+            0.0 <= top - s["bottom"] <= _RULE_ABOVE_CAPTION_PT
+            and s["x1"] > x0 and s["x0"] < max(x1, x0 + 100.0)
+            for s in strokes
+        ):
+            rule_above += 1
+        right = max(x1, x0 + 250.0)
+        above = _numeric_rows_in_band(page_obj, x0, right, top - _CAPTION_GRID_BAND_PT, top - 1.0)
+        below = _numeric_rows_in_band(page_obj, x0, right, bottom + 1.0, bottom + _CAPTION_GRID_BAND_PT)
+        if above >= 2 and below < 2:
+            grid_above += 1
+    n = len(located)
+    return rule_above == n and grid_above >= 3 and grid_above * 2 >= n
+
+
+def _caption_block_bottom(page_obj, caption_bbox: Bbox, strokes: list[dict]) -> float:
+    """Bottom of the caption block that begins with ``caption_bbox``'s line.
+
+    Following text lines join the block while each starts at the caption's left
+    edge, lies within ``_CAPTION_LINE_GAP_PT`` below the line above it, and no
+    horizontal rule crosses the gap. Typographic evidence only: what is a
+    caption line is decided by position and spacing, never by its words."""
+    cx0, _ctop, _cx1, bottom = caption_bbox
+    rows: dict[int, list[dict]] = defaultdict(list)
+    for c in getattr(page_obj, "chars", None) or ():
+        if not _is_upright(c):
+            continue
+        if float(c.get("top", 0.0)) > bottom - 0.5:
+            rows[round(float(c.get("top", 0.0)))].append(c)
+    lines = []
+    for key in sorted(rows):
+        cs = rows[key]
+        lines.append((
+            min(float(c.get("top", 0.0)) for c in cs),
+            max(float(c.get("bottom", 0.0)) for c in cs),
+            min(float(c.get("x0", 0.0)) for c in cs),
+        ))
+    for _ in range(_CAPTION_MAX_LINES - 1):
+        nxt = next((ln for ln in lines if ln[0] > bottom - 0.5), None)
+        if nxt is None:
+            break
+        top, nbottom, x0 = nxt
+        if top - bottom > _CAPTION_LINE_GAP_PT or abs(x0 - cx0) > _CAPTION_RULE_X0_TOL_PT:
+            break
+        if any(
+            bottom - 0.5 <= s["top"] <= top + 0.5 and s["x0"] <= cx0 + _CAPTION_RULE_X0_TOL_PT
+            for s in strokes
+        ):
+            break
+        bottom = nbottom
+    return bottom
 
 
 @dataclass(frozen=True)

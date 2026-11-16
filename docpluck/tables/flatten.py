@@ -419,8 +419,17 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 # and "Mean or median" typed an odds ratio. A letter that designates a study,
 # panel, model or condition is removed first (`_strip_letter_designators`).
 _HEADER_SYMBOL = r"(?<![A-Za-z0-9^]){sym}(?![A-Za-z0-9])"
+# "Cohen" NAMES A FAMILY, NOT A STATISTIC. The cohens_d pattern matched the bare
+# name until 2026-11-16, so "Cohen's h", "Cohen's w", "Cohen's f" and
+# "Cohen's kappa" columns were all typed d: 10.1098/rsos.250367 p17 Table 10
+# delivered its "Cohen's h and CI" and "Cohen's w and CI" columns to a consumer
+# as Cohen's d. Now the name counts only with the d after it (d, dz, d_z, d_av,
+# d_rm, d_s), across a stacked-header line break too.
+_COHENS_D_NAME = (
+    r"(?i:cohen\W{0,2}s?(?:\s|\x00BR\x00)*d(?:\s*_?\s*(?:z|av|rm|s))?)(?![A-Za-z])"
+)
 _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("cohens_d",            re.compile(r"(?i:cohen)|" + _HEADER_SYMBOL.format(sym=r"d(?:\s*z)?"))),
+    ("cohens_d",            re.compile(_COHENS_D_NAME + "|" + _HEADER_SYMBOL.format(sym=r"d(?:\s*z)?"))),
     ("hedges_g",            re.compile(r"(?i:hedges)|" + _HEADER_SYMBOL.format(sym="g"))),
     ("pearson_r",           re.compile(r"^\s*r(?![A-Za-z0-9])")),
     # `eta` IS A SUBSTRING OF ORDINARY ENGLISH. Until 2026-08-22 these two
@@ -1272,10 +1281,14 @@ def _recover_blank_roles(
     # The lone "d" is case-exact and footnote-letter-safe (`_VOCAB_CASE_EXACT`):
     # read case-insensitively, "Appendix D", "^d" and a note line "d Adjusted
     # for age" each opened this gate (sibling of the 2026-11-13 caption fix).
+    # "Cohen" alone names a family (h, w, f, kappa), not a typed effect: see
+    # `_COHENS_D_NAME`. (`_COMPETING_EFFECT_RE` keeps the bare name on purpose:
+    # there any Cohen statistic is a reason NOT to guess eta-squared.)
     has_typed_effect = bool(
         _VOCAB_CASE_EXACT["cohens_d"].search(vocab_text)
+        or re.search(_COHENS_D_NAME, vocab_text)
         or re.search(
-            r"\bd\s+or\s+d\b|cohen|η|\beta[\s_\-]?(?:squared|sq|p|2)\b",
+            r"\bd\s+or\s+d\b|η|\beta[\s_\-]?(?:squared|sq|p|2)\b",
             vocab_text,
             re.I,
         )
