@@ -170,7 +170,8 @@ def _diff_paper(a: dict, b: dict) -> dict:
     return d
 
 
-def _cached_arm(request: str, papers: list[Path], cache: Path, workers: int) -> list[dict]:
+def _cached_arm(request: str, papers: list[Path], cache: Path, workers: int,
+                batch: int = 25) -> list[dict]:
     """Dump every paper with one specimen; reuse a cached dump of a CLEAN commit."""
     is_tree = Path(request).resolve() == Path(_corpus._REPO_ROOT).resolve()
     if is_tree:
@@ -192,9 +193,24 @@ def _cached_arm(request: str, papers: list[Path], cache: Path, workers: int) -> 
         if [d["paper"] for d in data] == [p.name for p in papers]:
             print(f"arm {request}: cached dump {f.name}")
             return data
-    arms = _corpus.run_arms(dump_paper, [str(p) for p in papers], [request], workers=workers)
-    print(f"arm {request}: imported {arms[0].resolved} version {arms[0].version}")
-    data = arms[0].results
+    # Dumped in batches, each saved as it finishes: the machine's job queue stops
+    # any job at 60 minutes, and a whole-arm dump of 125 papers can run past that.
+    # A stopped run, re-run, starts at the first batch not yet on disk.
+    data = []
+    for start in range(0, len(papers), batch):
+        part = papers[start:start + batch]
+        bf = cache / f"{sha}.dump{DUMP_SCHEMA}.b{start:04d}-{len(part)}.json" if sha else None
+        if bf and bf.exists():
+            got = json.loads(bf.read_text(encoding="utf-8"))
+            if [d["paper"] for d in got] == [p.name for p in part]:
+                data += got
+                continue
+        arms = _corpus.run_arms(dump_paper, [str(p) for p in part], [request], workers=workers)
+        print(f"arm {request}: papers {start + 1}-{start + len(part)} of {len(papers)}, "
+              f"imported {arms[0].resolved} version {arms[0].version}", flush=True)
+        if bf:
+            bf.write_text(json.dumps(arms[0].results), encoding="utf-8")
+        data += arms[0].results
     if f:
         f.write_text(json.dumps(data), encoding="utf-8")
     return data
@@ -205,6 +221,8 @@ def main(argv=None) -> int:
     ap.add_argument("--base", required=True, help="git ref of the released specimen, e.g. v2.4.159")
     ap.add_argument("--head", default=".", help="specimen to compare (default this tree)")
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--batch", type=int, default=25,
+                    help="papers per saved batch; a stopped run resumes at the next batch")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--cache", default=os.path.join(tempfile.gettempdir(), "docpluck_value_diff"))
     ap.add_argument("--json", help="write the full diff here (outside the repo)")
@@ -218,8 +236,8 @@ def main(argv=None) -> int:
           + (f", first {args.limit} only" if args.limit else ""))
     cache = Path(args.cache)
     cache.mkdir(parents=True, exist_ok=True)
-    base = _cached_arm(args.base, papers, cache, args.workers)
-    head = _cached_arm(_corpus._REPO_ROOT if args.head == "." else args.head, papers, cache, args.workers)
+    base = _cached_arm(args.base, papers, cache, args.workers, args.batch)
+    head = _cached_arm(_corpus._REPO_ROOT if args.head == "." else args.head, papers, cache, args.workers, args.batch)
 
     # Windows consoles default to cp1252; article text is not.
     if hasattr(sys.stdout, "reconfigure"):

@@ -894,7 +894,8 @@ what `docpluck extract --structured` prints).
 | `fields` | `dict` | parsed statistical values (may be empty); descriptive cells add `M`, `SD`, `SE`, `count` (int), `pct` and a per-column `group` (see "Two-number cells" above) |
 | `fields_raw` | `dict[str, str]` | for each typed number in `fields`, the token the cell prints (`"-1.40"`, `".050"`); keyed like `fields`, may be empty |
 | `caption_status` | `str` | the source table's `caption_status` |
-| `unparsed` | `list[dict]` | (since 2.4.160) one `{col, header, text, reason}` per value-bearing cell that reached no field, with the reason (e.g. `column_role_unknown`); `[]` when every numeric cell was typed |
+| `unparsed` | `list[dict]` | (since 2.4.160) one `{col, header, cell, reason}` per value-bearing cell that reached no field; `[]` when every numeric cell was typed. Reasons: `column_role_unknown` (no header names the column), `value_not_parsed` (a typed column whose cell gave no value, e.g. one cell printing two stacked results), `repeated_pair_kind`, `pair_column_without_arm_label`, and (since 2.4.161) `field_bound_by_later_column`: a later column of the same row bound the same field, the record is that later block whole, and this earlier cell and every field it wrote are left out |
+| `typed_without_header` | `list[str]` | (since 2.4.161) the keys of `fields` whose column role was inferred (data shape, caption words, position) rather than named by a printed header; `[]` when every field came from a printed header |
 
 `fields["est_kind"]` (since 2.4.160), on a row with a generic `est`, is `"ratio"` (null value 1)
 or `"difference"` (null value 0) when the header names exactly one; absent means "not stated".

@@ -271,11 +271,11 @@ def test_chan_feldman_rendered_markdown_prints_2bii_as_the_page_does():
     assert "2bii" in rows and "2bi" in rows, "Table 9 hypothesis rows not rendered"
     ci_2bii = rows["2bii"][-2].replace(" ", "")
     ci_2bi = rows["2bi"][-2].replace(" ", "")
-    assert ci_2bii == "[−0.52,0.33]", (
+    assert ci_2bii == "[-0.52,0.33]", (
         f"2bii must pass through as printed; got {rows['2bii'][-2]!r} (DP-17)"
     )
     # The printed detached dash on 2bi is still reattached (typographic).
-    assert ci_2bi == "[−0.78,−0.67]", rows["2bi"]
+    assert ci_2bi == "[-0.78,-0.67]", rows["2bi"]
 
 
 def test_inferential_ci_upper_rule_has_no_production_call_site():

@@ -71,6 +71,9 @@ CaptionStatus = Literal["matched", "continuation", "none_found", "uncaptioned_ca
 #       body_prose_overshoot  everything after the caption was body prose that
 #                             belongs to the surrounding section.
 #       no_text_after_caption nothing at all followed the caption.
+#       grid_copies_another_table  the grid read for this caption was another
+#                             captioned table's rows on the same page; the
+#                             values stay in that table (2026-11-16).
 # Before this field an empty capture and a furniture-only capture were both
 # indistinguishable from a table that had been read: 10.1038/s41467-024-45528-0
 # Table 4 shipped `raw_text="Article"` (the page's running header) as its content.

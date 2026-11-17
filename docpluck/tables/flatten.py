@@ -61,6 +61,7 @@ from .cell_cleaning import (
     _MERGE_SEPARATOR,
     _SUP_OPEN,
     _SUP_CLOSE,
+    _drop_duplicate_sign_rows,
     _drop_running_header_rows,
     _is_group_separator,
     _header_row_count,
@@ -109,7 +110,8 @@ class FlattenedRow(TypedDict):
     fields_raw: dict[str, str]
     # Value-bearing cells of this row that reached no field, each with why:
     # ``{"col", "header", "cell", "reason"}``, reason one of
-    # ``column_role_unknown`` / ``repeated_pair_kind`` / ``value_not_parsed``.
+    # ``column_role_unknown`` / ``repeated_pair_kind`` / ``value_not_parsed`` /
+    # ``field_bound_by_later_column`` (2026-11-16).
     # ``[]`` when every numeric cell was typed (2026-11-13).
     unparsed: list[dict[str, object]]
     # The keys of `fields` whose column NO header names: their role was
@@ -269,7 +271,7 @@ def _clean_grid(
     for row in grid:
         norm.append([(c or "").strip() if c is not None else "" for c in row])
 
-    norm = _drop_running_header_rows(norm)
+    norm = _drop_duplicate_sign_rows(_drop_running_header_rows(norm))
     if len(norm) < 2:
         return [], []
 
@@ -430,8 +432,11 @@ _COHENS_D_NAME = (
 )
 _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("cohens_d",            re.compile(_COHENS_D_NAME + "|" + _HEADER_SYMBOL.format(sym=r"d(?:\s*z)?"))),
-    ("hedges_g",            re.compile(r"(?i:hedges)|" + _HEADER_SYMBOL.format(sym="g"))),
-    ("pearson_r",           re.compile(r"^\s*r(?![A-Za-z0-9])")),
+    # "Hedges" is an author name too ("Hedges and Olkin", "Hedges' correction"):
+    # the name counts only with the g after it, as for Cohen's d.
+    ("hedges_g",            re.compile(r"(?i:hedges\W{0,2}s?(?:\s|\x00BR\x00)*g)(?![A-Za-z])|" + _HEADER_SYMBOL.format(sym="g"))),
+    # not r squared ("r²", "r^2") or Spearman's "r_s"
+    ("pearson_r",           re.compile(r"^\s*r(?![A-Za-z0-9_²³^])")),
     # `eta` IS A SUBSTRING OF ORDINARY ENGLISH. Until 2026-08-22 these two
     # alternatives ended in a bare, unanchored `eta`, and `_effect_type_for` is
     # run over the whole CAPTION AND FOOTNOTE (`_effect_type_for(vocab_all)`
@@ -484,15 +489,41 @@ def _strip_letter_designators(s: str) -> str:
     return s
 
 
+# A NEIGHBOURING STATISTIC under a typed one's name (Release B consult,
+# 2026-11-16). Generalized eta squared (ηG², "generalized η²") is not eta
+# squared, and was delivered in the `eta2` field; a log odds ratio is tested
+# against 0, not 1, and was typed as an odds ratio with the ratio null; a
+# standardized mean difference is on another scale from a raw mean difference.
+# Each is left untyped (generic `est`, no hint): a missing type is cheaper
+# than a wrong one.
+_GENERALIZED_ETA_RE = re.compile(
+    r"(?i:generali[sz]ed\s*[\-_]?\s*(?:η|eta))|η\s*[²2]?\s*[_\-]?\s*G(?![A-Za-z])"
+    r"|(?<![A-Za-z])eta[\s\-_]*(?:squared?|sq|2)?[\s\-_]*G(?![A-Za-z])"
+)
+_LOG_SCALE_RE = re.compile(r"(?i:(?<![A-Za-z])(?:log|ln|logit)(?![A-Za-z])|log-?\s*odds)")
+_STANDARDIZED_MD_RE = re.compile(r"(?i:standardi[sz]ed\s+mean\s+diff|\bSMD\b)")
+_VARIANT_VETO = {
+    "eta_squared": _GENERALIZED_ETA_RE,
+    "eta_squared_partial": _GENERALIZED_ETA_RE,
+    "odds_ratio": _LOG_SCALE_RE,
+    "mean_difference": _STANDARDIZED_MD_RE,
+}
+
+
+def _first_effect_type(s: str, patterns) -> Optional[str]:
+    for et, pat in patterns:
+        if pat.search(s):
+            veto = _VARIANT_VETO.get(et)
+            return None if veto is not None and veto.search(s) else et
+    return None
+
+
 def _effect_type_for(label: str) -> Optional[str]:
     """Best-effort semantic effect-type for an estimate column header/label."""
     s = _strip_letter_designators((label or "").strip()).strip()
     if not s:
         return None
-    for et, pat in _EFFECT_TYPE_PATTERNS:
-        if pat.search(s):
-            return et
-    return None
+    return _first_effect_type(s, _EFFECT_TYPE_PATTERNS)
 
 
 # The TABLE-WIDE hint reads the caption, the note and every header row, where a
@@ -526,10 +557,7 @@ def _vocab_effect_type(vocab: str) -> Optional[str]:
     s = _strip_letter_designators((vocab or "").strip()).strip()
     if not s:
         return None
-    for et, pat in _VOCAB_EFFECT_TYPE_PATTERNS:
-        if pat.search(s):
-            return et
-    return None
+    return _first_effect_type(s, _VOCAB_EFFECT_TYPE_PATTERNS)
 
 
 # Effect-type → canonical field key. Only the unambiguous effect sizes are
@@ -574,7 +602,8 @@ def _est_kind(header_cell: str) -> Optional[str]:
     none."""
     s = _strip_fold_sentinels(header_cell or "")
     # a unit vetoes only the RATIO reading: "Mean difference (ms)" is still a difference
-    ratio = bool(_RATIO_EST_RE.search(s)) and not _NOT_AN_EFFECT_UNIT_RE.search(s)
+    ratio = (bool(_RATIO_EST_RE.search(s)) and not _NOT_AN_EFFECT_UNIT_RE.search(s)
+             and not _LOG_SCALE_RE.search(s))  # a log ratio's null is 0, not 1
     diff = _effect_type_for(s) in _DIFFERENCE_EST_TYPES
     if ratio and diff:
         return None
@@ -680,13 +709,23 @@ def _infer_anova_eta2_hint(
     return True
 
 
+_HEADER_GLYPH_FOLD = str.maketrans({
+    "‐": "-", "‑": "-", "‒": "-",              # hyphen, NB hyphen, figure dash
+    " ": " ", " ": " ", " ": " ", " ": " ",  # no-break / figure / thin spaces
+})
+
+
 def _classify_column(header: str) -> Optional[str]:
     """Return the canonical role for a column header, or None if unrecognized.
 
     F-with-df (e.g. ``F(1, 998)``) returns ``"F_with_df"`` so the caller can
     later extract the df pair from the header itself.
     """
-    h = (header or "").strip()
+    # Header words joined by a Unicode hyphen or spaced by a no-break / thin space
+    # are the same words ("p‑value" with U+2011, 10.1186/s12889-023-17078-5
+    # Table 6, matched no role). Camelot cells never pass through normalize.py,
+    # which folds the same glyphs in the body text.
+    h = (header or "").translate(_HEADER_GLYPH_FOLD).strip()
     if not h:
         return None
     # A folded super-header cell ("Replication\x00BR\x0095% CI") carries the GROUP
@@ -897,6 +936,28 @@ def _parse_p_cell(s: str) -> tuple[Optional[str], Optional[float]]:
 # separator is U+2013, and they disambiguate themselves.)
 _RANGE_SEP_RE = re.compile(r"\s*(?:–|—|―|\bto\b)\s*")
 _PAREN_RE = re.compile(r"\(([^()]*)\)")
+# The interval of a combined cell printed in square brackets, "1.00 [0.96–1.04]".
+_BRACKET_RE = re.compile(r"\[([^\[\]]*)\]")
+
+
+class _WriteLog(dict):
+    """A dict that remembers which keys were assigned since `written` was
+    cleared, equal values included."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.written: set = set()
+
+    def __setitem__(self, key, value) -> None:
+        self.written.add(key)
+        super().__setitem__(key, value)
+
+
+# A decimal with its own bracketed or parenthesised companion ("0.69 [.44, .94]",
+# "4.09 (1.51)"). Two in one cell are two stacked results. Decimal only: a
+# citation glued into a cell ("2023;6(12)", 10.1001/jamanetworkopen.2023.48333
+# Table 2) is not a result.
+_STACKED_RESULT_RE = re.compile(r"(?<![\d.])-?\d*\.\d+%?\s*[\[(][^\[\]()]*[\])]")
 # Two signed decimals joined by a single ASCII hyphen — the AMBIGUOUS case the
 # distinct-glyph split above could not resolve (e.g. "-11.2-7.5").
 _HYPHEN_CI_RE = re.compile(r"^\s*(-?)\s*(\d*\.?\d+)\s*-\s*(-?)\s*(\d*\.?\d+)\s*$")
@@ -917,8 +978,10 @@ def _to_signed_float(s: str) -> Optional[float]:
 
 def _parse_leading_number(s: str) -> Optional[float]:
     """Leading numeric token of a combined estimate cell, e.g.
-    ``-1.01% (-10.36-8.34)`` → ``-1.01``. Stops at the first ``(``."""
-    head = (s or "").split("(", 1)[0]
+    ``-1.01% (-10.36-8.34)`` → ``-1.01``. Stops at the first ``(`` or ``[``:
+    a cell that is only an interval, ``[0.32, 0.74]``, has no estimate (its
+    lower bound is not one)."""
+    head = re.split(r"[\[(]", s or "", maxsplit=1)[0]
     return _to_signed_float(head)
 
 
@@ -1001,7 +1064,11 @@ def _parse_ci_cell(
     # (0.48, 0.15)). The dash/hyphen branches already fold internally.
     s = _fold_minus(s)
     parens = _PAREN_RE.findall(s)
-    for body in ([parens[-1]] if parens else []) + [s]:
+    brackets = _BRACKET_RE.findall(s)
+    # A wrapped interval is tried before the whole cell: on the whole cell a
+    # range split of "1.00 [0.96–1.04]" takes the estimate as the lower bound.
+    for body in (([parens[-1]] if parens else []) + ([brackets[-1]] if brackets else [])
+                 + [s]):
         b = (body or "").strip().strip("[]")
         # 1. comma-separated
         m = _CI_INLINE_RE.search(b)
@@ -1878,10 +1945,10 @@ def _flatten_one_row(
                 no_header.add(blank_cols[0])
 
     # Pull per-role values out of the body row.
-    role_vals: dict[str, str] = {}
-    role_nums: dict[str, float] = {}
+    role_vals: dict[str, str] = _WriteLog()
+    role_nums: dict[str, float] = _WriteLog()
     # The cell text each typed value was read from, for `fields_raw`.
-    src: dict[str, str] = {}
+    src: dict[str, str] = _WriteLog()
     # Which columns put a value in `role_nums` (for `unparsed` below): each
     # iteration credits the PREVIOUS column with the keys that appeared since.
     typed_cols: set[int] = set()
@@ -1892,16 +1959,78 @@ def _flatten_one_row(
     # Effect keys (d, eta2) named by the table-wide caption/note vocabulary
     # rather than by the column's own header: also typed without a header.
     hint_keys: set[str] = set()
+    # Two columns of one record bind the same field: the row prints two blocks
+    # (Original | Replication, several arms, Model 1 | Model 2) and the record
+    # is the LAST block, whole. Every field of an earlier cell the later
+    # column displaces goes with that cell -- its interval, operator and
+    # printed text too -- and the cell is listed in `unparsed` as
+    # `field_bound_by_later_column`. Keeping the first column, or the column
+    # nearer the record's other fields, was page-checked and mixed studies in
+    # one record (10.1016/j.jesp.2020.104052 Table 1: M from the Original, n
+    # and SD from the Replication; 10.1186/s12889-023-17390-0 Table 1).
+    _snap: tuple[dict, dict, dict] = ({}, {}, {})
+    overwritten_cols: set[int] = set()
+    # The `role_vals` / `src` keys each column wrote.
+    col_written: dict[int, tuple[set, set]] = {}
+
+    def _note_written(col: int) -> None:
+        col_written[col] = (set(role_vals.written), set(src.written))
+
+    def _settle_overwrites(col: int) -> None:
+        # Keyed on what the later column WROTE, equal values included: two
+        # intervals sharing a bound (1.00-1.02 | 0.99-1.02) are still two.
+        over = {k for k in _snap[0] if k in role_nums.written}
+        if not over:
+            return
+        later_nums = set(role_nums.written) & set(role_nums)
+        later_vals = set(role_vals.written)
+        later_src = set(src.written)
+        for c, ks in list(col_keys.items()):
+            if not ks & over:
+                continue
+            for k in ks - later_nums:
+                role_nums.pop(k, None)
+            wrote_vals, wrote_src = col_written.get(c, (set(), set()))
+            for k in wrote_vals - later_vals:
+                role_vals.pop(k, None)
+            for k in wrote_src - later_src:
+                src.pop(k, None)
+            col_keys[c] = set()
+            typed_cols.discard(c)
+            overwritten_cols.add(c)
+        # A bound that lost its partner goes with it: an interval or a df pair
+        # is never half one block's (10.1186/s12916-023-03229-3).
+        for pair in (("CI_lower", "CI_upper"), ("CI_lo", "CI_hi"), ("df1", "df2")):
+            if (pair[0] in role_nums) != (pair[1] in role_nums):
+                for k in pair:
+                    role_nums.pop(k, None)
+                    src.pop(k, None)
+        col_keys[col] = set(col_keys.get(col, set())) | later_nums
+        typed_cols.add(col)
+
     for ci, role in roles.items():
+        if _prev_ci is not None:
+            _note_written(_prev_ci)
+            _settle_overwrites(_prev_ci)
+        for d in (role_nums, role_vals, src):
+            d.written.clear()
+        _snap = (dict(role_nums), dict(role_vals), dict(src))
         if _prev_ci is not None and set(role_nums) - _seen_keys:
             typed_cols.add(_prev_ci)
-            col_keys[_prev_ci] = set(role_nums) - _seen_keys
+            col_keys[_prev_ci] = col_keys.get(_prev_ci, set()) | (set(role_nums) - _seen_keys)
         _seen_keys = set(role_nums)
         _prev_ci = ci
         if ci >= len(row):
             continue
         raw = (row[ci] or "").strip()
         if not raw:
+            continue
+        # Two stacked results in one cell (".69 [.44, .94] .39 [.21, .57]",
+        # 10.1525/collabra.77859 Table 1): no single value is the cell's.
+        # Read with the line-break markers as spaces: a merged continuation
+        # cell prints each result over two lines (10.1177/17470218241255916
+        # Table 7, "0.79 / [0.68, 0.89] / 0.87 / [0.77, 0.98]").
+        if len(_STACKED_RESULT_RE.findall(_strip_fold_sentinels(raw))) >= 2:
             continue
         role_vals[role] = raw
         if role == "p":
@@ -2056,6 +2185,9 @@ def _flatten_one_row(
                 role_nums[role] = n
                 src[role] = raw
                 pair_keys.discard(role)
+    if _prev_ci is not None:
+        _note_written(_prev_ci)
+        _settle_overwrites(_prev_ci)
 
     # Inline self-labeled statistic recovery: a cell like "r = .67" / "d = 0.32"
     # states its own type, so type it even when the COLUMN header is generic
@@ -2266,10 +2398,12 @@ def _flatten_one_row(
     # nothing about what was left behind. Reasons: `column_role_unknown` (the
     # header names no statistic this parser types), `repeated_pair_kind` (two
     # "M (SD)"-type columns in one record, neither typed), `value_not_parsed`
-    # (the column has a role, the cell's text did not parse as one).
+    # (the column has a role, the cell's text did not parse as one),
+    # `field_bound_by_later_column` (a later column of this record bound the
+    # same field; the record is that later block, whole).
     if _prev_ci is not None and set(role_nums) - _seen_keys:
         typed_cols.add(_prev_ci)
-        col_keys[_prev_ci] = set(role_nums) - _seen_keys
+        col_keys[_prev_ci] = col_keys.get(_prev_ci, set()) | (set(role_nums) - _seen_keys)
     # Field keys typed from a column no header names. CI_lo / CI_hi were renamed
     # to CI_lower / CI_upper above; a key the guards dropped is not listed.
     _renamed = {"CI_lo": "CI_lower", "CI_hi": "CI_upper"}
@@ -2281,10 +2415,12 @@ def _flatten_one_row(
     unparsed: list[dict[str, object]] = []
     for ci, cell in enumerate(row):
         c = (cell or "").strip()
-        if (ci == label_col or not c or not re.search(r"\d", c) or ci in typed_cols
+        if ci not in overwritten_cols and (
+                ci == label_col or not c or not re.search(r"\d", c) or ci in typed_cols
                 or ci in typed_elsewhere):
             continue
-        reason = ("repeated_pair_kind" if ci in repeated_pair_cols
+        reason = ("field_bound_by_later_column" if ci in overwritten_cols
+                  else "repeated_pair_kind" if ci in repeated_pair_cols
                   else "value_not_parsed" if ci in roles
                   else "column_role_unknown")
         unparsed.append({
@@ -2633,6 +2769,34 @@ def _arms_by_role_repeat(
     if row_stats:
         groups.append(("", row_stats))
     return [i for i in outside if i not in row_stats], groups
+
+
+def _shared_value_columns(
+    body: list[list[str]], label_cols: list[int],
+    groups: list[tuple[str, list[int]]],
+) -> set[int]:
+    """The columns outside every arm that print the SAME statistic the arms do.
+
+    The first label column is the row label and always stays shared, and so
+    does a column of another kind (a shared "N", an interpretation). A column
+    outside the arms whose cells state the statistic the arm cells state
+    ("d = -0.39" beside arms printing "d = 0.01") is one arm's data that no arm
+    label stands over: the arm boundaries beside it are suspect."""
+    def kinds(col: int) -> list[str]:
+        ks = []
+        for r in body:
+            hit = _inline_stat_field((r[col] if col < len(r) else "") or "")
+            if hit is not None:
+                ks.append(hit[0])
+        return ks
+
+    arm_kinds = {k for _, cols in groups for c in cols for k in kinds(c)}
+    out: set[int] = set()
+    for i in label_cols[1:]:
+        ks = kinds(i)
+        if len(ks) >= 2 and set(ks) & arm_kinds:
+            out.add(i)
+    return out
 
 
 def _detect_column_groups(
@@ -3126,6 +3290,14 @@ def _flatten_table_rows(table: Table, _allow_groups: bool = True) -> list[Flatte
         printed_spans or None, _top_row_arm_cols(grid) or None,
         header_levels[0] if header_levels else None,
     ) if _allow_groups else None
+    # Columns of VALUES outside every arm mean the arm boundaries are not where
+    # the values are: 10.1017/jdm.2024.31 Table 5 p11 prints each d one column
+    # left of its "Target" / "Replication" label, so the Target d (-0.39) was
+    # copied into the Replication record and, with the shared column dropped,
+    # the Replication d (0.01) fell inside the Target arm. Such a grouping
+    # cannot say which arm a value belongs to; the table is flattened ungrouped.
+    if grouped is not None and _shared_value_columns(body, grouped[0], grouped[1]):
+        grouped = None
 
     # Blank-header column-role recovery (non-grouped tables only — grouped
     # tables already resolve roles per arm). When the grid header leaves stat

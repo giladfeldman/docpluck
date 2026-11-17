@@ -37,7 +37,7 @@ def test_table_5_body_ends_at_its_note(hurst_tables):
     t5 = hurst_tables["Table 5"]
     raw = t5["raw_text"]
     # The last printed row ends the body; the note is carried as the footnote.
-    assert raw.rstrip().endswith("Hostility −.52 −.52"), raw[-300:]
+    assert raw.rstrip().endswith("Hostility -.52 -.52"), raw[-300:]
     assert "are in bold." in (t5.get("footnote") or "")
     assert "Number of full biological siblings" in raw
     for prose in ("Life History Strategies and Attachment", "moderation analyses", "Hayes"):

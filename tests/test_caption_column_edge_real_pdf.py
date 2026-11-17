@@ -44,12 +44,12 @@ def test_neighbour_edge_ignores_a_narrow_word_gap_in_the_centre():
 
 
 _IP_T10_ROWS = {
-    "Loneliness": [".29***", "−.21***", ".07"],
-    "Rumination/brooding": [".22***", "−.10*", ".04"],
-    "Depressive symptoms": [".29***", "−.20***", ".07"],
-    "Satisfaction with life": ["−.18***", ".24***", ".05"],
-    "Subjective happiness": ["−.28***", ".34***", ".10"],
-    "Number of confidants": ["−.07", ".15**", ".02"],
+    "Loneliness": [".29***", "-.21***", ".07"],
+    "Rumination/brooding": [".22***", "-.10*", ".04"],
+    "Depressive symptoms": [".29***", "-.20***", ".07"],
+    "Satisfaction with life": ["-.18***", ".24***", ".05"],
+    "Subjective happiness": ["-.28***", ".34***", ".10"],
+    "Number of confidants": ["-.07", ".15**", ".02"],
     # printed on two lines; the second line "(extension)" is its own grid row
     "Social orientation scale": [".13**", ".01", ".02"],
 }

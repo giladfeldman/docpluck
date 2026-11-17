@@ -187,8 +187,8 @@ def test_an_under_segmented_grid_is_refused(monkeypatch):
     assert t4["cells"] == [] and t4["content_status"] == "raw_text"
     assert "Table 4:raw_text:column_fused_in_cell" in result["fallback_details"]["rotated_table_read"]
     raw = t4["raw_text"]
-    assert raw.index("Omission will be associated with a bias towards lower") < raw.index("−0.45")
-    assert "[−0.69," in raw and "Signal" in raw
+    assert raw.index("Omission will be associated with a bias towards lower") < raw.index("-0.45")
+    assert "[-0.69," in raw and "Signal" in raw
 
 
 def test_the_refusal_is_what_stops_the_fused_grid(monkeypatch):
@@ -198,7 +198,7 @@ def test_the_refusal_is_what_stops_the_fused_grid(monkeypatch):
 
     monkeypatch.setattr(W, "_grid_has_inner_gutter", lambda cells_words: False)
     t4 = _table(_structured(_JESP, camelot=False, monkeypatch=monkeypatch), "Table 4")
-    fused = [c["text"] for c in t4["cells"] if "−1.21" in c["text"] and "−1.46" in c["text"]]
+    fused = [c["text"] for c in t4["cells"] if "-1.21" in c["text"] and "-1.46" in c["text"]]
     fused += [c["text"] for c in t4["cells"] if "-1.21" in c["text"] and "-1.46" in c["text"]]
     assert fused, [c["text"] for c in t4["cells"]][:20]
 

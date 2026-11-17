@@ -41,7 +41,13 @@ def test_a_merged_estimate_cell_is_not_worded():
     """The continuation merge joins lines with a sentinel whose letters are not
     words: 10.1177/17470218241255916 Table 7 (p14, raster checked 2026-10-25)
     prints 0.79 [0.68, 0.89] for problem 1's replication, and the merged cell
-    must still give d = 0.79."""
+    must still give its estimate.
+
+    Release B (2026-11-16): the column is Cohen's h, so the field is `est`, not
+    `d`. Problem 1's two sub-rows merge into one cell holding two results,
+    0.79 [0.68, 0.89] over 0.87 [0.77, 0.98]; that cell is listed, never bound
+    as 0.79 with the second result's interval. Problem 2's single result,
+    1.05, still binds."""
     from docpluck.extract_structured import extract_pdf_structured
     from docpluck.tables.flatten import flatten_table
 
@@ -51,5 +57,8 @@ def test_a_merged_estimate_cell_is_not_worded():
         for t in extract_pdf_structured(p.read_bytes())["tables"]
         if t.get("label") == "Table 7" and t.get("page") == 14
     )
-    ds = [r["fields"].get("d") for r in flatten_table(t) if r["fields"].get("group") == "Replication"]
-    assert 0.79 in ds, ds
+    reps = [r for r in flatten_table(t) if r["fields"].get("group") == "Replication"]
+    fs = [r["fields"] for r in reps]
+    assert 1.05 in [f.get("est") for f in fs], fs
+    assert not any(f.get("est") == 0.79 and f.get("CI_lower") == 0.77 for f in fs), fs
+    assert any("0.79" in u["cell"] and "0.87" in u["cell"] for r in reps for u in r["unparsed"])

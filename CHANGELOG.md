@@ -1,5 +1,93 @@
 # Changelog
 
+## [2.4.161] - 2026-11-17 - normalization 1.9.82 - table extraction 2.4.32 - render 1.0.6 - sectioning 1.2.10
+
+Release B of the 2026-11-13 debt bundle: tables. Measured with `tools/diag/release_value_diff.py`, this tree
+against v2.4.160 on the 125-paper manifest: 66 of 125 papers changed, 0 extraction errors. Changed records were
+checked against the rasterized page by a second model (Sonnet) and by us; every regression found was fixed,
+watched failing in a test, and the diff re-run. Sections and rendering are unchanged. Normalized body text is
+byte-identical on all 125 PDFs; the text-cleaning fixes below came from consumer reports about Word files and
+change Word and HTML output only (`normalization_step_removed_most_text` and `normalized_text_empty`: 0 firings).
+
+Firings in the manifest that moved:
+
+| Event | Count |
+|---|---|
+| repeated sign row dropped (new `table_duplicate_sign_row_dropped`) | 25 |
+| grid copied from a neighbouring table (new `table_grid_copies_a_neighbour`) | 1 |
+| caption rows moved to the caption | 161 -> 172 |
+| note region found above a caption | 30 -> 33 |
+| letter-marker cache unavailable (the scan was never cached) | 1490 -> 0 |
+| region grids failing the clean gate | 110 -> 83 |
+
+### One record, one study
+
+- **A later column binding the same field wins whole.** A row printing two blocks (Original | Replication,
+  Model 1 | Model 2) used to keep the last column's value and silently keep the earlier column's other
+  fields (its interval, its operator). The record is now the later block; the earlier cell and every field
+  it wrote are left out and listed in `unparsed` with the new reason `field_bound_by_later_column`. Choosing
+  the first column or the nearer column was tried and page-checked: both mixed two studies in one record
+  (10.1016/j.jesp.2020.104052 Table 1; 10.1186/s12889-023-17390-0 Table 1). Two intervals sharing a bound
+  crashed the earlier attempt (10.1186/s12916-023-03229-3 Table 3); a half interval or half df pair is never
+  left behind.
+- **A cell printing two stacked results is not bound** (`value_not_parsed`), including when each result is
+  wrapped over two lines (10.1525/collabra.77859 Table 1; 10.1177/17470218241255916 Table 7, which gave 0.79
+  with the next result's interval). A footer citation glued into a cell ("2023;6(12)") is not a second result.
+- **A grid copied from a neighbouring table is removed.** 10.15626/mp.2022.3108 published Table 9's lower rows
+  as Table 10. The copy is cleared and Table 10 keeps its own printed text (`raw_text`); with no text it is
+  `not_captured:grid_copies_another_table`. Tables printed side by side keep their own values (10.5334/irsp.946).
+- **A row of lone minus signs that copies the signs of the row above is dropped.** It is our reader's duplicate:
+  10.1093/sf/soaf022 Table 3 published the standard error "(40.24)" as "-(40.24)".
+
+### Effect types and fields
+
+- **Cohen's h, w, f and kappa, Hedges' g variants, r-squared, generalized eta squared, log odds ratios and
+  SMD are no longer typed as Cohen's d**; they stay `est`. A log odds ratio has no ratio null.
+- **`typed_without_header`** on every flattened row: the fields whose column role was inferred, not printed.
+- **A column takes the label printed above it** when its lower header cell is blank (10.1016/j.jesp.2021.104154
+  Table 15 published a mean difference as t). A packed cell keeps its `<` operator (10.1080/23743603.2021.1878340).
+- **Intervals are read inside their brackets**: "1.00 [0.96–1.04]" no longer takes the estimate as the lower
+  bound (10.1186/s12889-023-17078-5 Table 6), and a cell holding only an interval has no estimate.
+- **`p‑value` headers with a Unicode hyphen are p**; "95 % CI" with a thin space is CI.
+- **ASCII minus in every table and figure field** (cells, raw text, HTML, caption, footnote): U+2212 becomes `-`,
+  as in the text.
+
+### Table regions
+
+- **Documents that print captions under their tables are searched above the caption**
+  (`+captions_below_tables` in `method`); leading caption and header rows stay with the table
+  (10.1016/j.jesp.2009.12.010 Tables 2 and 3).
+
+### Text (normalization 1.9.82): a cleaning step never deletes a Word document's content
+
+Reported by ESCImate (2026-11-16): two Word preregistrations (10.1037/amp0001385) came back with empty normalized
+text and no event. A sweep of every Word file in the article repository found two more members of the class.
+
+- **T0 (table-of-contents strip) needs most of a paragraph's lines to be contents lines.** A Word file joins
+  paragraphs with single line breaks, so the whole document was one "paragraph"; one form blank ("_______")
+  deleted all 15,838 characters. Both preregistrations now keep their text.
+- **The repeated-line strip keeps a line followed by a value in text with no page breaks**, as it already did on
+  paginated text. A Word table of 54 meta-analyses lost 42 of its 43 "Psychological Bulletin" journal cells.
+- **A bare DOI alone on its line is not joined to a number line under it.** The same table's DOIs were glued to
+  the next cells: "10.1037/a0028601" / "277" / "2" became "10.1037/a00286012772". A DOI cut after its reference
+  text still joins.
+- **Any cleaning step that leaves under half of a text of 1,000+ characters records
+  `normalization_step_removed_most_text`** (`<step>:<before>-><after>`), whatever the step.
+- **A blank result always says so.** A Word file or HTML page with no text now returns method
+  `mammoth+text_layer_failed:no_text_layer` / `beautifulsoup+text_layer_failed:no_text_layer` with event
+  `no_text_layer`, the same signal a PDF without a text layer already gave. A non-blank text that normalization
+  leaves blank records `normalized_text_empty` (`<before>-><after>`) at any length. Reported by ESCImate the same day:
+  the service answered 200 with empty text.
+
+### Speed
+
+- **The letter-marker scan is cached** on the layout. It was never stored, so every table rescanned the whole
+  paper (about 44% of a browser-side run on table-heavy papers).
+
+### Docs
+
+- `unparsed` entries carry the key `cell`, not `text` as the 2.4.160 docs said.
+
 ## [2.4.160] - 2026-11-13 - normalization 1.9.81 - table extraction 2.4.31 - render 1.0.6 - sectioning 1.2.10
 
 Release A of the 2026-11-13 debt bundle. Ordered by harm to consumers. Every change was measured with

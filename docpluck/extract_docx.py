@@ -371,7 +371,7 @@ def extract_docx(
           - text: Extracted plain text with block/inline-aware formatting.
             When ``sections`` is not None, only text from the requested
             sections is included.
-          - method: Always "mammoth".
+          - method: "mammoth"; "mammoth+text_layer_failed:no_text_layer" when no text was found.
 
     Raises:
         ValueError: If the DOCX is malformed (mammoth raises — we re-raise).
@@ -404,10 +404,16 @@ def extract_docx(
     result = mammoth.convert_to_html(io.BytesIO(docx_bytes))
     html = result.value
     text = html_to_text(html)
+    method = "mammoth"
+    # NO TEXT IS A FAILURE, NOT AN EMPTY DOCUMENT (ESCImate 2026-11-16): the same
+    # event and method piece as a PDF with no text layer, so one consumer guard fits all.
+    if not text.strip():
+        record_fallback("no_text_layer", detail="docx")
+        method += "+text_layer_failed:no_text_layer"
 
     if sections is not None:
         from .sections import extract_sections
         doc = extract_sections(docx_bytes)
-        return doc.text_for(*sections), "mammoth"
+        return doc.text_for(*sections), method
 
-    return text, "mammoth"
+    return text, method

@@ -186,7 +186,7 @@ def extract_html(
           - text: Extracted plain text (see html_to_text for formatting details).
             When ``sections`` is not None, only text from the requested
             sections is included.
-          - method: Always "beautifulsoup".
+          - method: "beautifulsoup"; "beautifulsoup+text_layer_failed:no_text_layer" when no text was found.
 
     Requires:
         beautifulsoup4 and lxml (install with `pip install docpluck[html]`).
@@ -206,10 +206,17 @@ def extract_html(
 
     html = html_bytes.decode('utf-8', errors='replace')
     text = html_to_text(html)
+    method = "beautifulsoup"
+    # NO TEXT IS A FAILURE, NOT AN EMPTY DOCUMENT (ESCImate 2026-11-16): the same
+    # event and method piece as a PDF with no text layer.
+    if not text.strip():
+        from .telemetry import record_fallback
+        record_fallback("no_text_layer", detail="html")
+        method += "+text_layer_failed:no_text_layer"
 
     if sections is not None:
         from .sections import extract_sections
         doc = extract_sections(html_bytes)
-        return doc.text_for(*sections), "beautifulsoup"
+        return doc.text_for(*sections), method
 
-    return text, "beautifulsoup"
+    return text, method

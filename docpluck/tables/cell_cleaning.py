@@ -1545,6 +1545,38 @@ def _row_can_be_a_running_header(row: list[str]) -> bool:
     )
 
 
+_LONE_SIGN = frozenset({"-", "−", "+"})
+
+
+def _drop_duplicate_sign_rows(rows: list[list[str]]) -> list[list[str]]:
+    """Drop a row that holds only lone sign glyphs, each under a cell of the
+    row above that already starts with that sign.
+
+    10.1093/sf/soaf022 Table 3 (p12) prints each cutpoint once ("−73.57", the
+    minus in a raised math font, one glyph per number in the file); the table
+    reader returned the minus a second time as a row of its own, which the
+    continuation merge then glued onto the standard error printed below:
+    "-(40.24)", a negative SE the page does not print. The page's sign is kept
+    where it is; only the copy our reader made is dropped.
+    """
+    out: list[list[str]] = []
+    for row in rows:
+        cells = [(i, (c or "").strip()) for i, c in enumerate(row) if (c or "").strip()]
+        if out and cells and all(c in _LONE_SIGN for _, c in cells):
+            above = out[-1]
+
+            def _same_sign(i: int, c: str) -> bool:
+                a = (above[i] if i < len(above) else "") or ""
+                a = a.strip().replace("−", "-")
+                return a[:1] == c.replace("−", "-") and len(a) > 1
+            if all(_same_sign(i, c) for i, c in cells):
+                record_fallback("table_duplicate_sign_row_dropped",
+                                detail=f"{len(cells)}cells")
+                continue
+        out.append(row)
+    return out
+
+
 def _drop_running_header_rows(rows: list[list[str]]) -> list[list[str]]:
     """Drop top rows of the grid that look like leaked running headers /
     page numbers rather than real column labels.
@@ -1927,7 +1959,7 @@ def cells_grid_to_html(
         norm.append([(c or "").strip() if c is not None else "" for c in row])
 
     before_rh = len(norm)
-    norm = _drop_running_header_rows(norm)
+    norm = _drop_duplicate_sign_rows(_drop_running_header_rows(norm))
     if len(norm) < 2:
         record_fallback("cells_grid_to_html_empty_after_running_header_strip",
                         detail=f"{before_rh}->{len(norm)}")

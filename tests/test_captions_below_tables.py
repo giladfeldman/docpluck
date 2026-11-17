@@ -113,3 +113,25 @@ def test_a_ruled_grid_keeps_its_caption_and_its_wrapped_labels():
     assert ["Alcohol drinking history", "1.568 (1.388–1.773)", "< 0.001",
             "1.364 (1.197–1.554)", "< 0.001", "0.114"] in rows
     assert not any(row and row[0][:1].isdigit() for row in rows)
+
+
+def _grid(texts, x0, x1, **extra):
+    cells = [{"r": i // 3, "c": i % 3, "text": t} for i, t in enumerate(texts)]
+    return {"cells": cells, "bbox": (x0, 0.0, x1, 100.0), "n_cols": 3, **extra}
+
+
+def test_a_narrow_above_caption_region_does_not_displace_a_wider_numeric_table():
+    # Release B consult 2026-11-16: the 1.5x width rule let a partial region beat
+    # a complete wide grid. The wide grid wins when it is no less numeric.
+    from docpluck.extract_structured import _pick_better_table
+    region = _grid(["Model", "1.2", "3.4"], 50.0, 200.0, _above_caption=True)
+    auto = _grid(["Model", "1.2", "3.4", "5.6", "7.8", "0.9"], 50.0, 550.0)
+    assert _pick_better_table(region, auto) is auto
+
+
+def test_an_above_caption_region_still_beats_a_page_wide_grid_of_prose():
+    from docpluck.extract_structured import _pick_better_table
+    region = _grid(["Model", "1.2", "3.4"], 50.0, 200.0, _above_caption=True)
+    auto = _grid(["Model", "1.2", "the left column", "of body text", "and the right", "column"],
+                 40.0, 550.0)
+    assert _pick_better_table(region, auto) is region
