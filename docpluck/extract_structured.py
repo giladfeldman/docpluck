@@ -549,6 +549,9 @@ def _extract_pdf_structured(
     # {id(table): caption} for every table paired with a caption, whichever path
     # produced it -- the anchor `_attach_table_notes` reads each note from.
     cap_of_table: dict[int, CaptionMatch] = {}
+    # The side-by-side / rotated reading each caption was given, so a later
+    # rebuild of its own text reads the same column, never the gutter-crossing text.
+    own_read_kwargs: dict[int, dict] = {}
     # {id(cap): Table} — candidates rejected as body prose, kept so the fallback loop
     # can put one back rather than emit an empty table.
     prose_rejected: dict[int, Table] = {}
@@ -715,6 +718,13 @@ def _extract_pdf_structured(
                 layout_doc, cap, page=sbs_col[0],
                 col_x0=sbs_col[1], col_x1=sbs_col[2],
             )
+        own_read_kwargs[id(cap)] = dict(
+            caption_override=sbs_caption,
+            body_override=sbs_body,
+            layout_page=layout_page,
+            rotated_furniture=_rotated_furniture if layout_doc is not None else None,
+            rotated_read=rotated_read,
+        )
         if cells:
             n_rows = max((c["r"] for c in cells), default=-1) + 1
             n_cols = max((c["c"] for c in cells), default=-1) + 1
@@ -832,7 +842,8 @@ def _extract_pdf_structured(
         cap = cap_of_table.get(id(t))
         if cap is None:
             return None
-        return _isolated_table_from_caption(cap, rejoined, next_boundary_by_id.get(id(cap)))
+        return _isolated_table_from_caption(cap, rejoined, next_boundary_by_id.get(id(cap)),
+                                            **own_read_kwargs.get(id(cap), {}))
 
     _drop_grids_copied_from_a_neighbour(tables, rebuild=_own_text)
 
@@ -2569,6 +2580,13 @@ def _drop_grids_copied_from_a_neighbour(tables: list, rebuild=None) -> None:
                                 detail=f"{t.get('label')}<-{o.get('label')}")
                 own = rebuild(t) if rebuild is not None else None
                 own_text = ((own or {}).get("raw_text") or "").strip()
+                # The rebuilt text must not carry the copied values either: a
+                # text read that crosses into the neighbour (side by side, or a
+                # caption printed under its table) would ship them again.
+                if own_text and _decimal_tokens({"cells": [{"text": own_text}]}) & mine & theirs:
+                    record_fallback("table_own_text_carries_neighbour_values",
+                                    detail=f"{t.get('label')}<-{o.get('label')}")
+                    own_text = ""
                 t.update({
                     "cells": [], "n_rows": None, "n_cols": None, "header_rows": None,
                     "html": None, "raw_text": "", "cell_geometry": "no_cells",

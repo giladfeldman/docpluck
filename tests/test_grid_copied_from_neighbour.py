@@ -79,3 +79,14 @@ def test_the_cleared_copy_keeps_its_own_printed_text():
     _drop_grids_copied_from_a_neighbour(
         [t9, t10], rebuild=lambda t: {"raw_text": own, "content_status": "raw_text"})
     assert t10["cells"] == [] and t10["raw_text"] == own and t10["content_status"] == "raw_text"
+
+
+def test_a_rebuilt_text_carrying_the_neighbour_values_is_refused():
+    """The rebuilt text is only kept when it is the table's OWN text. A read
+    that crosses into the neighbour (a caption under its table, a side-by-side
+    gutter) carries the copied values again, so it is refused and labelled."""
+    t9, t10 = _t("Table 9", 10, NINE), _t("Table 10", 10, TEN)
+    leaked = "Signal\n0.66 [0.47, 0.94]\n0.75 [0.53, 1.05]"
+    _drop_grids_copied_from_a_neighbour(
+        [t9, t10], rebuild=lambda t: {"raw_text": leaked, "content_status": "raw_text"})
+    assert t10["raw_text"] == "" and t10["content_status"] == "not_captured:grid_copies_another_table"

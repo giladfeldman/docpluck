@@ -36,6 +36,9 @@ Firings in the manifest that moved:
 - **A grid copied from a neighbouring table is removed.** 10.15626/mp.2022.3108 published Table 9's lower rows
   as Table 10. The copy is cleared and Table 10 keeps its own printed text (`raw_text`); with no text it is
   `not_captured:grid_copies_another_table`. Tables printed side by side keep their own values (10.5334/irsp.946).
+  The own text is read the same way the table was first read (its own column when printed side by side, the
+  rotated read when turned); if it still carries the copied values it is refused, recorded as
+  `table_own_text_carries_neighbour_values`, and the table is left with no content.
 - **A row of lone minus signs that copies the signs of the row above is dropped.** It is our reader's duplicate:
   10.1093/sf/soaf022 Table 3 published the standard error "(40.24)" as "-(40.24)".
 
@@ -65,12 +68,14 @@ text and no event. A sweep of every Word file in the article repository found tw
 
 - **T0 (table-of-contents strip) needs most of a paragraph's lines to be contents lines.** A Word file joins
   paragraphs with single line breaks, so the whole document was one "paragraph"; one form blank ("_______")
-  deleted all 15,838 characters. Both preregistrations now keep their text.
+  deleted all 15,838 characters. Both preregistrations now keep their text. A contents line is an entry ending in
+  its page number ("Methods ______ 19"), a bare leader line, or a contents heading; a form field with no page
+  number ("Participant name: ______", "Signature: ________") is never one, so a short form is not deleted.
 - **The repeated-line strip keeps a line followed by a value in text with no page breaks**, as it already did on
   paginated text. A Word table of 54 meta-analyses lost 42 of its 43 "Psychological Bulletin" journal cells.
 - **A bare DOI alone on its line is not joined to a number line under it.** The same table's DOIs were glued to
-  the next cells: "10.1037/a0028601" / "277" / "2" became "10.1037/a00286012772". A DOI cut after its reference
-  text still joins.
+  the next cells: "10.1037/a0028601" / "277" / "2" became "10.1037/a00286012772". This holds for an upper-case
+  DOI and for one opened by "(", "<" or a quote. A DOI cut after its reference text still joins.
 - **Any cleaning step that leaves under half of a text of 1,000+ characters records
   `normalization_step_removed_most_text`** (`<step>:<before>-><after>`), whatever the step.
 - **A blank result always says so.** A Word file or HTML page with no text now returns method
