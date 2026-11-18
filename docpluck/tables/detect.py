@@ -557,7 +557,9 @@ _RULE_ABOVE_CAPTION_PT: float = 18.0
 _CAPTION_GRID_BAND_PT: float = 120.0
 # A row is a numeric row when at least this many of its words are numbers.
 _NUMERIC_ROW_MIN_TOKENS: int = 3
-_NUMERIC_TOKEN_RE = re.compile(r"^[<>=(\[]?[-−]?\d*\.?\d+[)\],*†%]*$")
+# "12", "12.5" or ".5". Written without "\d*\.?\d+", which retries every split of
+# a digit run and was quadratic (a 20,000-digit word took 15 s).
+_NUMERIC_TOKEN_RE = re.compile(r"^[<>=(\[]?[-−]?(?:\d+(?:\.\d+)?|\.\d+)[)\],*†%]*$")
 
 
 def _numeric_rows_in_band(page_obj, x0: float, x1: float, top: float, bottom: float) -> int:
