@@ -428,13 +428,17 @@ _HEADER_SYMBOL = r"(?<![A-Za-z0-9^]){sym}(?![A-Za-z0-9])"
 # as Cohen's d. Now the name counts only with the d after it (d, dz, d_z, d_av,
 # d_rm, d_s), across a stacked-header line break too.
 _COHENS_D_NAME = (
-    r"(?i:cohen\W{0,2}s?(?:\s|\x00BR\x00)*d(?:\s*_?\s*(?:z|av|rm|s))?)(?![A-Za-z])"
+    r"(?i:cohen\W{0,2}s?(?:\s|\x00BR\x00){0,3}d(?:\s{0,3}_?\s{0,3}(?:z|av|rm|s))?)(?![A-Za-z])"
 )
+# BOUNDED GAPS. Two unbounded runs of the same class side by side ("\s*[_-]?\s*")
+# backtrack quadratically, three cubically: one header cell of 2,000 spaces after
+# "eta" took 41 s (2026-11-18). A printed header puts at most a few spaces between
+# a symbol and its subscript, so each gap is bounded ({0,3}, {0,6}).
 _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("cohens_d",            re.compile(_COHENS_D_NAME + "|" + _HEADER_SYMBOL.format(sym=r"d(?:\s*z)?"))),
     # "Hedges" is an author name too ("Hedges and Olkin", "Hedges' correction"):
     # the name counts only with the g after it, as for Cohen's d.
-    ("hedges_g",            re.compile(r"(?i:hedges\W{0,2}s?(?:\s|\x00BR\x00)*g)(?![A-Za-z])|" + _HEADER_SYMBOL.format(sym="g"))),
+    ("hedges_g",            re.compile(r"(?i:hedges\W{0,2}s?(?:\s|\x00BR\x00){0,3}g)(?![A-Za-z])|" + _HEADER_SYMBOL.format(sym="g"))),
     # not r squared ("r²", "r^2") or Spearman's "r_s"
     ("pearson_r",           re.compile(r"^\s*r(?![A-Za-z0-9_²³^])")),
     # `eta` IS A SUBSTRING OF ORDINARY ENGLISH. Until 2026-08-22 these two
@@ -454,10 +458,10 @@ _EFFECT_TYPE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "eta_squared_partial",
         re.compile(
-            r"η\s*[²2]?\s*[_\-]?\s*p(?![A-Za-z])"
-            r"|ηp\s*²"
-            r"|partial\s*[\-_]?\s*(?:η|eta)(?![A-Za-z])"
-            r"|(?<![A-Za-z])eta[\s\-_]*(?:squared?|sq|2)?[\s\-_]*(?:p(?![A-Za-z])|partial)",
+            r"η\s{0,3}[²2]?\s{0,3}[_\-]?\s{0,3}p(?![A-Za-z])"
+            r"|ηp\s{0,3}²"
+            r"|partial\s{0,3}[\-_]?\s{0,3}(?:η|eta)(?![A-Za-z])"
+            r"|(?<![A-Za-z])eta[\s\-_]{0,6}(?:squared?|sq|2)?[\s\-_]{0,6}(?:p(?![A-Za-z])|partial)",
             re.I,
         ),
     ),
@@ -497,8 +501,8 @@ def _strip_letter_designators(s: str) -> str:
 # Each is left untyped (generic `est`, no hint): a missing type is cheaper
 # than a wrong one.
 _GENERALIZED_ETA_RE = re.compile(
-    r"(?i:generali[sz]ed\s*[\-_]?\s*(?:η|eta))|η\s*[²2]?\s*[_\-]?\s*G(?![A-Za-z])"
-    r"|(?<![A-Za-z])eta[\s\-_]*(?:squared?|sq|2)?[\s\-_]*G(?![A-Za-z])"
+    r"(?i:generali[sz]ed\s{0,3}[\-_]?\s{0,3}(?:η|eta))|η\s{0,3}[²2]?\s{0,3}[_\-]?\s{0,3}G(?![A-Za-z])"
+    r"|(?<![A-Za-z])eta[\s\-_]{0,6}(?:squared?|sq|2)?[\s\-_]{0,6}G(?![A-Za-z])"
 )
 _LOG_SCALE_RE = re.compile(r"(?i:(?<![A-Za-z])(?:log|ln|logit)(?![A-Za-z])|log-?\s*odds)")
 _STANDARDIZED_MD_RE = re.compile(r"(?i:standardi[sz]ed\s+mean\s+diff|\bSMD\b)")
