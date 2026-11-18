@@ -2330,7 +2330,10 @@ _PURE_TOC_LEADER_RE = re.compile(r"^\s*_{3,}\s*\d{0,4}\s*$")
 # A contents ENTRY: a leader run that ends the line with its page number
 # ("Methods ____________ 19"). A form blank ("Signature: ________") carries no
 # page number, so it is never a contents line.
-_TOC_ENTRY_RE = re.compile(r"_{3,}\s*\d{1,4}\s*$")
+# The lookbehind starts a match only at the first "_" of a run: without it a
+# long run of underscores is tried from every position (quadratic: 40,000
+# underscores took 90 s).
+_TOC_ENTRY_RE = re.compile(r"(?<!_)_{3,}\s*\d{1,4}\s*$")
 _TOC_HEADING_RE = re.compile(
     r"^\s*(?:Table\s+of\s+Contents|List\s+of\s+(?:Supplementary\s+)?(?:Figures?|Tables?))\s*$",
     re.IGNORECASE,

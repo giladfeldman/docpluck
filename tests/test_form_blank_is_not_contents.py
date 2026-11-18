@@ -47,3 +47,21 @@ def test_bare_doi_line_does_not_swallow_digit_lines(text):
 def test_doi_cut_mid_suffix_still_joins():
     assert _rejoin_broken_urls("Appetite. doi:10.1093/ije/1234\n567\nNext") == (
         "Appetite. doi:10.1093/ije/1234567\nNext")
+
+
+def test_contents_entry_pattern_is_linear_in_a_long_underscore_run():
+    """A form line of tens of thousands of underscores once took 90 s to test
+    (the pattern retried from every underscore). Doubling the run must not
+    quadruple the time."""
+    import time
+
+    from docpluck.normalize import _TOC_ENTRY_RE
+
+    times = []
+    for n in (20000, 40000):
+        line = "_" * n + "x"
+        t0 = time.perf_counter()
+        assert _TOC_ENTRY_RE.search(line) is None
+        times.append(time.perf_counter() - t0)
+    assert times[1] < 0.5, times
+    assert _TOC_ENTRY_RE.search("Methods ____________ 19")
