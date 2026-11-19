@@ -4,13 +4,13 @@ Usage (from the repo root):
     python scripts/publish_pypi.py v2.4.161            # build, check, upload
     python scripts/publish_pypi.py v2.4.161 --dry-run  # build and check only
 
-The token lives in the gitignored file .env.local at the repo root, one line:
+The token lives in a gitignored file at the repo root, .env.local (read first) or .env, one line:
     PYPI_TOKEN=pypi-...
 The script never prints it. It is passed to twine through the environment of the
 upload process only.
 
 What it does, in order, and stops at the first failure:
-1. Refuses if .env.local is not ignored by git (a token must never be committable).
+1. Refuses if the token file is not ignored by git (a token must never be committable).
 2. Exports the TAG (git archive), not the working folder, into a temporary
    directory, so uncommitted edits can never reach PyPI.
 3. Checks that the version inside the tag equals the tag name.
@@ -33,7 +33,8 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ENV_FILE = ROOT / ".env.local"
+ENV_FILES = (ROOT / ".env.local", ROOT / ".env")
+ENV_FILE = ENV_FILES[0]
 TOKEN_KEY = "PYPI_TOKEN"
 PYPI_JSON = "https://pypi.org/pypi/docpluck/json"
 
@@ -90,9 +91,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dry-run", action="store_true", help="build and check only; no upload")
     args = ap.parse_args(argv)
 
-    if not env_file_is_ignored():
-        raise SystemExit(f"REFUSING: {ENV_FILE.name} is not ignored by git. Add it to .gitignore first.")
-    token = None if args.dry_run else read_token()
+    env_file = next((f for f in ENV_FILES if f.is_file()), ENV_FILE)
+    if not env_file_is_ignored(env_file):
+        raise SystemExit(f"REFUSING: {env_file.name} is not ignored by git. Add it to .gitignore first.")
+    token = None if args.dry_run else read_token(env_file)
 
     want = args.tag.lstrip("v")
     if want in pypi_versions():

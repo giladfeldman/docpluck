@@ -12,8 +12,13 @@ pp = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pp)
 
 
-def test_env_local_is_ignored_by_git():
-    assert pp.env_file_is_ignored(_ROOT / ".env.local")
+@pytest.mark.parametrize("name", [".env.local", ".env"])
+def test_token_files_are_ignored_by_git(name):
+    assert pp.env_file_is_ignored(_ROOT / name)
+
+
+def test_env_local_is_read_before_env():
+    assert [f.name for f in pp.ENV_FILES] == [".env.local", ".env"]
 
 
 def test_a_tracked_path_is_not_ignored():
