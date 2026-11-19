@@ -163,3 +163,8 @@ tests/corpora.local.json
 # disk, where the project skills read them; they are no longer published.
 /CLAUDE.md
 /LESSONS.md
+
+# Local secrets (the PyPI upload token for scripts/publish_pypi.py). Never committed.
+.env
+.env.local
+.env.*.local
