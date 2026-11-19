@@ -1,5 +1,61 @@
 # Changelog
 
+## [2.4.162] - 2026-11-19 - normalization 1.9.83 - table extraction 2.4.33 - render 1.0.6 - sectioning 1.2.10
+
+Class sweep of 2026-11-18: one number shape read the same way in every code path, and a value kept with the
+result it belongs to. `tests/test_class_parity_numbers_and_binding.py` crosses every number shape with every
+column role and cell kind (218 cases; 100 of the first 210 failed on 2.4.161). Measured on the 125-paper
+manifest against v2.4.161, table detection and text extraction held fixed: 16 papers and 132 of 11,948
+flattened records changed, 0 extraction errors, and normalized body text gave the same statistic tokens on
+all 125 papers. Every changed group was read against its table. Sections and the default render are
+unchanged; the opt-in `flatten_tables_inline` render follows the records.
+
+| Change in the records | Count |
+|---|---|
+| values now typed from US-grouped numbers (`n`, `M`, `SD`) | 27 n, 17 M, 4 SD |
+| `n` now the row's last block instead of a neighbouring column | 14 |
+| earlier-block statistics left out (`F`, `df1`/`df2`, `df`) | 15 F, 12 df pairs, 3 df |
+| new reason `block_displaced_by_later_column` | 38 cells |
+| new reason `value_out_of_domain` (were `value_not_parsed`) | 9 cells |
+| new reason `cell_shape_not_estimate_interval` | 13 cells, 1 published estimate withdrawn |
+| new reason `interval_not_parsed` | 7 cells |
+
+### One number reader
+
+- **A comma-grouped number is read as one US number in every cell shape.** Single columns left "1,234" untyped
+  while "n (%)" cells read it, and a combined "estimate [CI]" cell read the first digit run ("1,234" -> 1,
+  "0,05" -> 0, "1,234.5" -> 1). One shared token now serves every reader, `fields_raw` included. Numbers
+  printed with a decimal comma are still never typed (English + US scope).
+- **A sign separated from its number by a space is refused in combined cells too** ("- 2.10" was +2.10).
+
+### Values stay with their own result
+
+- **A header's df belongs to its own column.** "F(1, 98) | F(2, 200)" published F(1, 98) beside the second
+  column's F. `t(45)` and `χ2(2)` headers now carry their df like `F(a, b)`.
+- **A repeated statistic starts a second block, and the earlier block goes whole.** "F(1,98) | p | t | p"
+  kept the first block's F beside the second block's p; "M | SD | n | M | n" kept the first arm's SD. A
+  repeated interval alone is not a second block: "U | z | p | r | LL | UL | d | LL | UL" keeps U, z, p and r
+  (10.1016/j.jesp.2021.104154 Table 3).
+- **A cell without an interval under an estimate-and-interval header is not an estimate.** "1403 (23 697)", a
+  death count and its total under a spanning "HR (95% CI)", was published as a hazard ratio of 1403
+  (10.1001/jamanetworkopen.2023.48333 Table 2). An interval cut at the cell edge ("0.218 [0.137,") keeps its
+  estimate.
+
+### Nothing dropped without a reason
+
+- **One domain table for every statistic.** p, r and η² in [0, 1]; n and N positive integers; SD, SE, F, χ²
+  and U non-negative; df positive. Negative SDs, η² above 1 and zero df were published before, and a value
+  refused in a non-last column left no trace. A withheld value is listed as `value_out_of_domain`.
+- **Half a combined cell read is listed**: `estimate_not_parsed` or `interval_not_parsed`.
+
+### Text
+
+- **A4 leaves a bracketed US-grouped number whole.** "t(1,234.5)" was respaced to "t(1, 234.5)", a df pair the
+  paper never printed, while "t(1,234)" was left alone.
+
+Consumers: a record can carry fewer fields where a row printed two blocks, and more where numbers are grouped.
+Code that switches on `unparsed` reasons gains four values.
+
 ## [2.4.161] - 2026-11-17 - normalization 1.9.82 - table extraction 2.4.32 - render 1.0.6 - sectioning 1.2.10
 
 Release B of the 2026-11-13 debt bundle: tables. Measured with `tools/diag/release_value_diff.py`, this tree

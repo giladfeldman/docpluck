@@ -368,6 +368,12 @@ _ROLE_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("t",     re.compile(r"^\s*t(?:[\s\-]?value|[\s\-]?stat(?:istic)?)?\s*$")),
     # F_with_df must precede the bare-F pattern; ordering is load-bearing.
     ("F_with_df", re.compile(r"^\s*F\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*$")),
+    # The same "statistic(df)" header for the one-df statistics: "t(45)",
+    # "t(45.3)" (Welch), "χ2(2)". Until 2.4.162 only F carried its df in the
+    # header, and a "t(45)" column was left untyped (class sweep 2026-11-18).
+    ("t_with_df", re.compile(r"^\s*t\s*\(\s*(\d+(?:\.\d+)?)\s*\)\s*$")),
+    ("chi2_with_df", re.compile(
+        r"^\s*(?:χ\s*²?|χ2|chi[\s\-]?(?:square|sq|2))\s*\(\s*(\d+)\s*\)\s*$", re.I)),
     ("F",     re.compile(r"^\s*F(?:[\s\-]?value|[\s\-]?stat(?:istic)?)?\s*$")),
     ("chi2",  re.compile(r"^\s*(?:χ\s*²?|χ2|chi[\s\-]?(?:square|sq|2))\s*$", re.I)),
     ("r",     re.compile(r"^\s*r\s*$")),
@@ -784,8 +790,46 @@ def _names_an_effect(lead: str) -> bool:
 # the leading number: "95%CI scarf: [55-72%]". A plain estimate cell has at most
 # a single superscript letter there ("0.25a [..]").
 _WORDED_INTERVAL_RE = re.compile(r"^\s*[-+−–]?\d*\.?\d+[^\[(]*?[A-Za-z]{2,}[^\[(]*[\[(]")
-_NUM_RE = re.compile(r"^\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
-_P_OP_RE = re.compile(r"^\s*([<>=]+)?\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*$")
+# ONE number token as a cell prints it, under the English + US convention
+# (docs/SCOPE.md): digits with an optional decimal part, or an integer part
+# grouped in threes by a comma or a thin / narrow no-break space ("1,234",
+# "12,345.6", "1 234"). Every reader in this module builds on it, so a token is
+# read the same way in a single-statistic column, a combined "estimate [CI]"
+# cell, a pair cell and an interval bound. Until 2.4.162 each reader kept its
+# own copy and they disagreed: "1,234" was untyped in an N column, 1234 in an
+# "n (%)" cell and 1 in a "d [95% CI]" cell, and "0,05" read as 0 there (class
+# sweep 2026-11-18, tests/test_class_parity_numbers_and_binding.py). A comma
+# that does not group exactly three digits ("0,05", "2,21") is not a US number:
+# no reader types it, and it passes through as printed.
+# Two interval bounds with a separator between them: comma, semicolon, a dash
+# of any kind, or "to" (an ASCII space alone never separates two bounds). A
+# separator at the cell's end is an interval the cell edge cut ("0.218 [0.137,",
+# 10.1016/j.joep.2020.102350 Table 1): still interval-shaped.
+_INTERVAL_SEP_RE = re.compile(
+    r"\d[^\d\[\]()]*?(?:[,;–—−-]|\bto\b)(?:[^\d\[\]()]*?\d|\s*$)")
+# Record keys that describe an interval, not a statistic of their own.
+_INTERVAL_KEYS = frozenset({"CI_lower", "CI_upper", "CI_lo", "CI_hi", "CI_level", "CI_kind"})
+_GROUP_SEP = "[,  ]"
+_UNSIGNED_NUM = rf"(?:\d{{1,3}}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?|\d*\.?\d+)"
+_GROUP_SEP_RE = re.compile(_GROUP_SEP)
+
+
+def _num_value(tok: str) -> float:
+    """The float a `_UNSIGNED_NUM`-shaped token prints (group separators removed)."""
+    return float(_GROUP_SEP_RE.sub("", tok))
+
+
+_NUM_RE = re.compile(rf"^\s*([-+]?{_UNSIGNED_NUM}(?:[eE][-+]?\d+)?)\s*$")
+_P_OP_RE = re.compile(rf"^\s*([<>=]+)?\s*([-+]?{_UNSIGNED_NUM}(?:[eE][-+]?\d+)?)\s*$")
+# A signed number token inside a longer text, never a fragment of a bigger
+# number: not glued to a digit, point or group separator on either side, so
+# "0,05" yields no token at all rather than "0" (see `_to_signed_float`).
+_SIGNED_TOKEN_RE = re.compile(
+    rf"(?<![\d.  ,])[-+]?{_UNSIGNED_NUM}(?!\d|[.  ,]\d)")
+# A sign set apart from its digits by a space ("- 2.10", "– 2.10"): single-value
+# columns refuse it (`_NUM_RE` admits no space after the sign), so every other
+# reader refuses it too -- dropping the dash would publish a positive value.
+_DETACHED_SIGN_RE = re.compile(r"[-−–]\s+$")
 # Comma-separated CI bounds. Allow a leading-dot decimal (APA omits the leading
 # zero: ".50", ".003") as well as the full "0.50" form — `\d*\.\d+`.
 _CI_INLINE_RE = re.compile(
@@ -865,7 +909,7 @@ def _parse_number(s: str) -> Optional[float]:
     if not m:
         return None
     try:
-        return float(m.group(1))
+        return _num_value(m.group(1))
     except ValueError:
         return None
 
@@ -882,7 +926,8 @@ def _p_printed(s: str) -> Optional[str]:
 
 # A number token as a cell prints it: an optional sign glyph (hyphen, U+2212
 # minus, en-dash) directly before digits, APA leading-dot allowed.
-_PRINTED_NUM_RE = re.compile(r"[-+−–]?(?:\d+(?:\.\d*)?|\.\d+)")
+_PRINTED_NUM_RE = re.compile(
+    rf"[-+−–]?(?:\d{{1,3}}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?(?!\d)|\d+(?:\.\d*)?|\.\d+)")
 
 
 def _printed_token(text: str, value: float, last: bool = False) -> Optional[str]:
@@ -903,12 +948,12 @@ def _printed_token(text: str, value: float, last: bool = False) -> Optional[str]
     for m in _PRINTED_NUM_RE.finditer(text):
         tok = m.group(0)
         try:
-            v = float(tok.replace("−", "-").replace("–", "-"))
+            v = _num_value(tok.replace("−", "-").replace("–", "-"))
         except ValueError:
             continue
         if v == value:
             exact.append(tok)
-        elif tok[0] in "-–" and float(tok[1:]) == value:
+        elif tok[0] in "-–" and _num_value(tok[1:]) == value:
             unsigned.append(tok[1:])
     hits = exact or unsigned
     if not hits:
@@ -927,7 +972,7 @@ def _parse_p_cell(s: str) -> tuple[Optional[str], Optional[float]]:
         return None, None
     op, val = m.group(1), m.group(2)
     try:
-        f = float(val)
+        f = _num_value(val)
     except ValueError:
         return op, None
     return (op or "="), f
@@ -968,14 +1013,20 @@ _HYPHEN_CI_RE = re.compile(r"^\s*(-?)\s*(\d*\.?\d+)\s*-\s*(-?)\s*(\d*\.?\d+)\s*$
 
 
 def _to_signed_float(s: str) -> Optional[float]:
-    """First signed decimal in `s`, with U+2212 minus folded to ASCII."""
+    """First signed number token in `s`, with U+2212 minus folded to ASCII.
+
+    The token is a whole `_UNSIGNED_NUM`, never a fragment: "0,05" and "2,21"
+    have none (they were read as 0 and 2 until 2.4.162), "1,234" is 1234. A sign
+    set apart by a space ("- 2.10") is refused, as `_parse_number` refuses it,
+    rather than read as +2.10."""
     if not s:
         return None
-    m = re.search(r"[-+]?\d*\.?\d+", _fold_minus(s).replace("%", ""))
-    if not m:
+    t = _fold_minus(s).replace("%", "")
+    m = _SIGNED_TOKEN_RE.search(t)
+    if not m or _DETACHED_SIGN_RE.search(t[:m.start()]):
         return None
     try:
-        return float(m.group(0))
+        return _num_value(m.group(0))
     except ValueError:
         return None
 
@@ -1328,7 +1379,8 @@ def _recover_blank_roles(
     # If the grid already names a core test statistic (t / F / r / χ²), the
     # header row is intact enough — recovering blank stragglers there mis-binds
     # values. The header-stripped tables we target have NO recognized statistic.
-    if {grid_role[ci] for ci in recognized} & {"t", "F", "F_with_df", "r", "chi2"}:
+    if {grid_role[ci] for ci in recognized} & {"t", "F", "F_with_df", "t_with_df",
+                                               "chi2_with_df", "r", "chi2"}:
         return {}
 
     # Statistic vocabulary present anywhere we can read it: the grid headers
@@ -1575,14 +1627,21 @@ def _recover_blank_roles(
 # (10.1037/a0012616 Tables 1, 2, 4; 10.1111/jasp.12453 Tables 1-2;
 # 10.1177/0956797615601103 Tables 1-3; 10.1177/0956797615612694 Table 1).
 
-_PAIR_NUM = r"[-+]?(?:\d+(?:\.\d+)?|\.\d+)"
-_PAIR_UNSIGNED = r"(?:\d+(?:\.\d+)?|\.\d+)"
+# The pair readers use the module's one number token (`_UNSIGNED_NUM`), so
+# "1,234.5 (12.3)" is read like "1,234" in a single column (until 2.4.162 the
+# pair copy admitted no group separator and left that cell untyped).
+_PAIR_NUM = rf"[-+]?{_UNSIGNED_NUM}"
+_PAIR_UNSIGNED = _UNSIGNED_NUM
 _PAIR_MARKS = r"(?:\s?[a-z]|\s*[*∗†‡§¶#]+)?"
 # "4.47 (0.81)", "1.16*** (0.28)", "260 (52.0%)". Read after `_fold_minus`.
 _PAREN_PAIR_RE = re.compile(
     rf"^\s*({_PAIR_NUM}){_PAIR_MARKS}\s*\(\s*({_PAIR_UNSIGNED})\s*(%?)\s*\){_PAIR_MARKS}\s*$"
 )
-_COUNT_RE = re.compile(r"^\s*(\d{1,3}(?:[,\u2009\u202f ]\d{3})+|\d+)\s*\(\s*(" + _PAIR_UNSIGNED + r")\s*%?\s*\)\s*$")
+# A count also admits an ASCII space between its groups ("131 805 (95.1)"):
+# the "(pct)" that must follow anchors the reading. A bare cell does not -- "1
+# 234" alone may be two merged cells.
+_COUNT_RE = re.compile(
+    rf"^\s*(\d{{1,3}}(?:(?:{_GROUP_SEP}| )\d{{3}})+|\d+)\s*\(\s*({_PAIR_UNSIGNED})\s*%?\s*\)\s*$")
 _PM_PAIR_RE = re.compile(rf"^\s*({_PAIR_NUM})\s*±\s*({_PAIR_UNSIGNED})\s*$")
 # A cell that names both of its numbers: "M = 68.33, SD = 10.48".
 _INLINE_M_SD_RE = re.compile(
@@ -1692,26 +1751,26 @@ def _parse_pair_cell(kind: str, cell: str) -> Optional[dict[str, float]]:
         return None
     m = _INLINE_M_SD_RE.match(s)
     if m:
-        return {"M": float(m.group(1)), "SD": float(m.group(2))}
+        return {"M": _num_value(m.group(1)), "SD": _num_value(m.group(2))}
     m = _PCT_CELL_RE.match(s)
     if m:
-        v = float(m.group(1))
+        v = _num_value(m.group(1))
         return {"pct": v} if 0.0 <= v <= 100.0 else None
     if kind == "n_pct":
         m = _COUNT_RE.match(s)
-        if m and float(m.group(2)) <= 100.0:
+        if m and _num_value(m.group(2)) <= 100.0:
             return {"count": float(re.sub(r"[,\u2009\u202f ]", "", m.group(1))),
-                    "pct": float(m.group(2))}
+                    "pct": _num_value(m.group(2))}
         return None
     if kind in ("M_SD", "est_SE"):
         m = _PAREN_PAIR_RE.match(s)
         if m and not m.group(3):
-            a, b = float(m.group(1)), float(m.group(2))
+            a, b = _num_value(m.group(1)), _num_value(m.group(2))
             return {"M": a, "SD": b} if kind == "M_SD" else {"est": a, "SE": b}
         if kind == "M_SD":
             m = _PM_PAIR_RE.match(s)
             if m:
-                return {"M": float(m.group(1)), "SD": float(m.group(2))}
+                return {"M": _num_value(m.group(1)), "SD": _num_value(m.group(2))}
         return None
     return None
 
@@ -1887,6 +1946,8 @@ def _flatten_one_row(
     roles: dict[int, str] = {}
     typed_elsewhere: set[int] = set()
     df_from_header: dict[int, tuple[int, int]] = {}
+    # A one-df statistic's header df ("t(45)", "χ2(2)"), keyed by its column.
+    df_one_from_header: dict[int, float] = {}
     pair_cols: dict[str, list[int]] = {}
     pair_keys: set[str] = set()
     for ci, h in enumerate(header):
@@ -1911,6 +1972,12 @@ def _flatten_one_row(
             if m:
                 df_from_header[ci] = (int(m.group(1)), int(m.group(2)))
             roles[ci] = "F"
+        elif role in ("t_with_df", "chi2_with_df"):
+            m = next(p for r, p in _ROLE_PATTERNS if r == role).match(
+                (h or "").translate(_HEADER_GLYPH_FOLD).strip().rstrip(",:."))
+            if m:
+                df_one_from_header[ci] = float(m.group(1))
+            roles[ci] = role.split("_")[0]
         elif role is not None:
             roles[ci] = role
 
@@ -1972,8 +2039,21 @@ def _flatten_one_row(
     # nearer the record's other fields, was page-checked and mixed studies in
     # one record (10.1016/j.jesp.2020.104052 Table 1: M from the Original, n
     # and SD from the Replication; 10.1186/s12889-023-17390-0 Table 1).
+    #
+    # The earlier block goes WHOLE, not only the cell whose key the later column
+    # repeats: every typed column up to the last displaced one. Until 2.4.162 a
+    # row printing "F(1, 98) | p | t | p" kept the first block's F beside the
+    # second block's p ("t = 2.10, F(1, 98) = 4.20, p = .041"), and "M | SD | n
+    # | M | n" kept the first arm's SD -- one record, two results (the ESCImate
+    # 0.7.23 class in table form; class sweep 2026-11-18). Those cells are
+    # listed as `block_displaced_by_later_column`.
     _snap: tuple[dict, dict, dict] = ({}, {}, {})
     overwritten_cols: set[int] = set()
+    block_displaced_cols: set[int] = set()
+    # Cells the row does not type although it printed them, with the reason
+    # (`estimate_not_parsed` / `interval_not_parsed` for half a combined cell,
+    # `value_out_of_domain`, `df_conflicts_with_header`).
+    partial_cols: dict[int, str] = {}
     # The `role_vals` / `src` keys each column wrote.
     col_written: dict[int, tuple[set, set]] = {}
 
@@ -1989,9 +2069,18 @@ def _flatten_one_row(
         later_nums = set(role_nums.written) & set(role_nums)
         later_vals = set(role_vals.written)
         later_src = set(src.written)
+        displaced = [c for c, ks in col_keys.items() if ks & over]
+        last_displaced = max(displaced) if displaced else -1
+        # Only a repeated STATISTIC starts a second block. A repeated interval
+        # alone is each estimate's own CI ("U | z | p | r | LL | UL | d | LL |
+        # UL", one comparison per row: 10.1016/j.jesp.2021.104154 Table 3), so
+        # it displaces the earlier interval, never the row's other statistics.
+        whole_block = bool(over - _INTERVAL_KEYS)
         for c, ks in list(col_keys.items()):
             if not ks & over:
-                continue
+                if not whole_block or not ks or c >= last_displaced or c == col:
+                    continue
+                block_displaced_cols.add(c)
             for k in ks - later_nums:
                 role_nums.pop(k, None)
             wrote_vals, wrote_src = col_written.get(c, (set(), set()))
@@ -2129,6 +2218,19 @@ def _flatten_one_row(
                 est = None
                 est_op, est_raw = None, ""
                 raw = ""
+            # An "estimate (interval)" cell prints two bounds with a separator
+            # between them. A bracket holding one number, or two numbers with
+            # only a space between them, is a different shape: a count and its
+            # total, "1403 (23 697)" under a spanning "HR (95% CI)" header
+            # (10.1001/jamanetworkopen.2023.48333 Table 2), was published as
+            # a hazard ratio of 1403. The cell is listed, never typed.
+            _open = re.search(r"[\[(]", raw)
+            _head, _tail = (raw[:_open.start()], raw[_open.start():]) if _open else (raw, "")
+            if (est is not None and re.search(r"\d", _tail)
+                    and not _INTERVAL_SEP_RE.search(_tail)):
+                partial_cols[ci] = "cell_shape_not_estimate_interval"
+                est = None
+                raw = ""
             if est is not None:
                 eff_key = _effect_key(
                     header[ci], None if role == "est_ci_pair" else effect_hint_eff)
@@ -2161,6 +2263,13 @@ def _flatten_one_row(
                 role_nums["CI_lower"] = lo
                 role_nums["CI_upper"] = hi
                 src["CI"] = raw
+            # Half a combined cell typed and the other half printed but not
+            # read: the row says which half, instead of the column counting as
+            # typed and the other number vanishing (class sweep 2026-11-18).
+            if est is None and re.search(r"\d", _head) and lo is not None:
+                partial_cols[ci] = "estimate_not_parsed"
+            elif est is not None and lo is None and re.search(r"\d", _tail):
+                partial_cols[ci] = "interval_not_parsed"
         elif role == "df" and _DF_PAIR_RE.match(raw):
             # A column headed "df" in an F-test table prints the PAIR "1, 114"
             # (10.1525/collabra.90203 Table 9); `_parse_number` reads neither.
@@ -2222,14 +2331,46 @@ def _flatten_one_row(
         src["CI_lower"] = src.get("CI_lo", "")
         src["CI_upper"] = src.get("CI_hi", "")
 
-    # Resolve df: prefer explicit "df" cell; else F-with-df header.
+    # Credit the last role column now: the df binding and the domain guards
+    # below need to know which column put each key in the record.
+    if _prev_ci is not None and set(role_nums) - _seen_keys:
+        typed_cols.add(_prev_ci)
+        col_keys[_prev_ci] = col_keys.get(_prev_ci, set()) | (set(role_nums) - _seen_keys)
+        _seen_keys = set(role_nums)
+
+    def _cols_with(key: str) -> list[int]:
+        return sorted(c for c, ks in col_keys.items() if key in ks)
+
+    # Resolve df: an explicit "df" cell, else the df printed in the header of the
+    # column whose statistic the record holds -- that column's, never another's.
+    # Until 2.4.162 the first "F(a, b)" header in the row lent its df to any F:
+    # "F(1, 98) | F(2, 200)" published F(1, 98) = <the F(2, 200) value> (class
+    # sweep 2026-11-18). When the statistic's own header df and an explicit df
+    # cell disagree, the header wins (it labels that very value) and the df cell
+    # is listed as `df_conflicts_with_header`.
     df_val = role_nums.get("df")
     df1_val = role_nums.get("df1")
     df2_val = role_nums.get("df2")
-    for ci, (a, b) in df_from_header.items():
-        if df1_val is None and df2_val is None:
-            df1_val, df2_val = float(a), float(b)
-            src["df1"] = src["df2"] = header[ci]
+    _f_cols = [c for c in _cols_with("F") if c in df_from_header]
+    if _f_cols:
+        _a, _b = (float(x) for x in df_from_header[_f_cols[-1]])
+        if df1_val is not None and (df1_val, df2_val) != (_a, _b):
+            for c in _cols_with("df1"):
+                partial_cols[c] = "df_conflicts_with_header"
+                typed_cols.discard(c)
+        df1_val, df2_val = _a, _b
+        src["df1"] = src["df2"] = header[_f_cols[-1]]
+    for _k in ("t", "chi2"):
+        _own = [c for c in _cols_with(_k) if c in df_one_from_header]
+        if not _own:
+            continue
+        _v = df_one_from_header[_own[-1]]
+        if df_val is not None and df_val != _v:
+            for c in _cols_with("df"):
+                partial_cols[c] = "df_conflicts_with_header"
+                typed_cols.discard(c)
+        df_val = _v
+        src["df"] = header[_own[-1]]
 
     # Validity guards — a parsed value that violates a statistic's domain is
     # garbage, not data. Drop it (and its sentence part) rather than emit an
@@ -2243,24 +2384,49 @@ def _flatten_one_row(
     # none or docpluck discarded one it could not parse. An out-of-domain value
     # is usually a capture defect — a column mis-assignment or a glyph
     # corruption — so the count is a lead, not just bookkeeping.
-    if "r" in role_nums and not (-1.0 <= role_nums["r"] <= 1.0):
-        record_fallback("flatten_dropped_out_of_domain_field",
-                        detail=f"r={role_nums['r']}")
-        role_nums.pop("r")
-        role_vals.pop("r", None)
-        role_vals.pop("r_op", None)
-    if "p" in role_nums and not (0.0 <= role_nums["p"] <= 1.0):
-        record_fallback("flatten_dropped_out_of_domain_field",
-                        detail=f"p={role_nums['p']}")
-        role_nums.pop("p")
-        role_vals.pop("p", None)
-        role_vals.pop("p_op", None)
-    for k in ("n", "N"):
-        if k in role_nums and (role_nums[k] <= 0 or role_nums[k] != int(role_nums[k])):
-            record_fallback("flatten_dropped_out_of_domain_field",
-                            detail=f"{k}={role_nums[k]}")
-            role_nums.pop(k)
+    #
+    # One domain table for every statistic (class sweep 2026-11-18). Until
+    # 2.4.162 only r, p and n/N were guarded, so a negative SD, F, χ² or U, an
+    # η² above 1 or a df of 0 was published as a number; and a guarded value
+    # dropped from any column but the last left the row with no trace (the
+    # column still counted as typed). The cell is now listed in `unparsed` as
+    # `value_out_of_domain` wherever it sits.
+    def _withhold(keys: tuple[str, ...], detail: str) -> None:
+        record_fallback("flatten_dropped_out_of_domain_field", detail=detail)
+        for k in keys:
+            role_nums.pop(k, None)
             role_vals.pop(k, None)
+            role_vals.pop(k + "_op", None)
+            src.pop(k, None)
+            for c in _cols_with(k):
+                col_keys[c].discard(k)
+                if not col_keys[c]:
+                    typed_cols.discard(c)
+                partial_cols[c] = "value_out_of_domain"
+        if "p" in keys:
+            role_vals.pop("p_text", None)
+
+    _DOMAIN = {
+        "r": lambda v: -1.0 <= v <= 1.0,
+        "p": lambda v: 0.0 <= v <= 1.0,
+        "eta2": lambda v: 0.0 <= v <= 1.0,
+        "n": lambda v: v > 0 and v == int(v),
+        "N": lambda v: v > 0 and v == int(v),
+        "SD": lambda v: v >= 0.0,
+        "SE": lambda v: v >= 0.0,
+        "F": lambda v: v >= 0.0,
+        "chi2": lambda v: v >= 0.0,
+        "U": lambda v: v >= 0.0,
+    }
+    for k, ok in _DOMAIN.items():
+        if k in role_nums and not ok(role_nums[k]):
+            _withhold((k,), f"{k}={role_nums[k]}")
+    if df_val is not None and df_val <= 0:
+        _withhold(("df",), f"df={df_val}")
+        df_val = None
+    if df1_val is not None and (df1_val < 1 or (df2_val is not None and df2_val <= 0)):
+        _withhold(("df1", "df2"), f"df=({df1_val}, {df2_val})")
+        df1_val = df2_val = None
     # DETACHED minus on a CI UPPER bound (B7 / GLYPH, table channel). The page
     # prints `[−0.78, – 0.67]`; pdftotext keeps the dash but detaches it, and
     # the lexical CI parse reads the bound as +0.67. Reattach it ONLY when that
@@ -2419,11 +2585,13 @@ def _flatten_one_row(
     unparsed: list[dict[str, object]] = []
     for ci, cell in enumerate(row):
         c = (cell or "").strip()
-        if ci not in overwritten_cols and (
+        if ci not in overwritten_cols and ci not in partial_cols and (
                 ci == label_col or not c or not re.search(r"\d", c) or ci in typed_cols
                 or ci in typed_elsewhere):
             continue
-        reason = ("field_bound_by_later_column" if ci in overwritten_cols
+        reason = ("block_displaced_by_later_column" if ci in block_displaced_cols
+                  else "field_bound_by_later_column" if ci in overwritten_cols
+                  else partial_cols[ci] if ci in partial_cols
                   else "repeated_pair_kind" if ci in repeated_pair_cols
                   else "value_not_parsed" if ci in roles
                   else "column_role_unknown")
