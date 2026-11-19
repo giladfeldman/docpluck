@@ -88,6 +88,10 @@ text and no event. A sweep of every Word file in the article repository found tw
 
 - **The letter-marker scan is cached** on the layout. It was never stored, so every table rescanned the whole
   paper (about 44% of a browser-side run on table-heavy papers).
+- **Three patterns no longer slow down on long runs of one character**: the effect-size header patterns
+  after "eta", "generalized", "Cohen's" or "Hedges'" (2,000 spaces took 41 s), the contents-entry pattern
+  (40,000 underscores took 90 s) and the numeric-word pattern that counts a table's number rows near a
+  caption (a 20,000-digit word took 15 s). Each is linear now and matches the same text.
 
 ### Docs
 
