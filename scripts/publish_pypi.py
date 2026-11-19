@@ -14,7 +14,8 @@ What it does, in order, and stops at the first failure:
 2. Exports the TAG (git archive), not the working folder, into a temporary
    directory, so uncommitted edits can never reach PyPI.
 3. Checks that the version inside the tag equals the tag name.
-4. Refuses if PyPI already has that version (PyPI never accepts a re-upload).
+4. Stops if PyPI already has both the sdist and the wheel for that version. If an
+   earlier upload left only one of them, uploads the missing file (--skip-existing).
 5. Builds the sdist and wheel, runs `twine check`.
 6. Uploads, then reads PyPI back until it lists the version.
 """
@@ -29,6 +30,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.error  # noqa: F401  (URLError is caught as OSError in the poll)
 import urllib.request
 from pathlib import Path
 
@@ -63,9 +65,27 @@ def env_file_is_ignored(env_file: Path = ENV_FILE) -> bool:
     return r.returncode == 0
 
 
-def pypi_versions() -> set[str]:
+TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+NEEDED = {"sdist", "wheel"}
+
+
+def pypi_files(version: str) -> list[str] | None:
+    """Filenames PyPI holds for this version; None if PyPI has no such version."""
     with urllib.request.urlopen(PYPI_JSON, timeout=30) as resp:
-        return set(json.load(resp)["releases"])
+        releases = json.load(resp)["releases"]
+    if version not in releases:
+        return None
+    return [f["filename"] for f in releases[version]]
+
+
+def kinds(filenames: list[str]) -> set[str]:
+    out = set()
+    for name in filenames:
+        if name.endswith(".tar.gz"):
+            out.add("sdist")
+        elif name.endswith(".whl"):
+            out.add("wheel")
+    return out
 
 
 def export_tag(tag: str, dest: Path) -> None:
@@ -94,12 +114,19 @@ def main(argv: list[str] | None = None) -> int:
     env_file = next((f for f in ENV_FILES if f.is_file()), ENV_FILE)
     if not env_file_is_ignored(env_file):
         raise SystemExit(f"REFUSING: {env_file.name} is not ignored by git. Add it to .gitignore first.")
-    token = None if args.dry_run else read_token(env_file)
 
+    if not TAG_RE.match(args.tag):
+        raise SystemExit(f"Tag {args.tag!r} is not of the form v<major>.<minor>.<patch>.")
     want = args.tag.lstrip("v")
-    if want in pypi_versions():
-        print(f"PyPI already has docpluck {want}; nothing to do.")
+    have = kinds(pypi_files(want) or [])
+    if NEEDED <= have:
+        print(f"PyPI already has docpluck {want} (sdist and wheel); nothing to do.")
         return 0
+    if have:
+        # A half-finished earlier upload. PyPI accepts a file it never received, so the
+        # missing one is built from the same tag and uploaded (--skip-existing below).
+        print(f"PyPI has docpluck {want} but is missing: {', '.join(sorted(NEEDED - have))}.")
+    token = None if args.dry_run else read_token(env_file)  # after the "already published" exit
 
     with tempfile.TemporaryDirectory(prefix="docpluck-publish-") as tmp:
         tmpd = Path(tmp)
@@ -116,14 +143,20 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         env = {**os.environ, "TWINE_USERNAME": "__token__", "TWINE_PASSWORD": token,
                "TWINE_NON_INTERACTIVE": "1"}
-        subprocess.run([sys.executable, "-m", "twine", "upload", *files], env=env, check=True)
+        subprocess.run([sys.executable, "-m", "twine", "upload", "--skip-existing", *files],
+                       env=env, check=True)
 
     for _ in range(12):
-        if want in pypi_versions():
-            print(f"PUBLISHED: PyPI lists docpluck {want}.")
+        try:
+            have = kinds(pypi_files(want) or [])
+        except OSError as exc:  # URLError and timeouts; the upload itself already succeeded
+            print(f"(could not read PyPI yet: {exc.__class__.__name__}; retrying)")
+            have = set()
+        if NEEDED <= have:
+            print(f"PUBLISHED: PyPI lists docpluck {want} with sdist and wheel.")
             return 0
         time.sleep(10)
-    print(f"Uploaded, but PyPI does not list {want} yet after 2 minutes; check {PYPI_JSON}.")
+    print(f"Uploaded, but PyPI does not list both files for {want} after 2 minutes; check {PYPI_JSON}.")
     return 1
 
 
