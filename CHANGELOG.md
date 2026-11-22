@@ -4,7 +4,8 @@
 
 Class sweep of 2026-11-18: one number shape read the same way in every code path, and a value kept with the
 result it belongs to. `tests/test_class_parity_numbers_and_binding.py` crosses every number shape with every
-column role and cell kind (218 cases; 100 of the first 210 failed on 2.4.161). Measured on the 125-paper
+column role and cell kind (268 cases; 100 of the first 210 failed on 2.4.161, and 41 more were added
+after the cross-model review found two further members). Measured on the 125-paper
 manifest against v2.4.161, table detection and text extraction held fixed: 16 papers and 132 of 11,948
 flattened records changed, 0 extraction errors, and normalized body text gave the same statistic tokens on
 all 125 papers. Every changed group was read against its table. Sections and the default render are
@@ -25,7 +26,10 @@ unchanged; the opt-in `flatten_tables_inline` render follows the records.
 - **A comma-grouped number is read as one US number in every cell shape.** Single columns left "1,234" untyped
   while "n (%)" cells read it, and a combined "estimate [CI]" cell read the first digit run ("1,234" -> 1,
   "0,05" -> 0, "1,234.5" -> 1). One shared token now serves every reader, `fields_raw` included. Numbers
-  printed with a decimal comma are still never typed (English + US scope).
+  printed with a decimal comma are still never typed (English + US scope); a group never starts with 0, so
+  "0,125" and "< 0,001" stay untyped.
+- **A tight "1,234" in a df column is a df pair only beside an F.** Under a t or χ² it was split into
+  df1 = 1, df2 = 234; it is now the one df 1,234. `fields_raw` keeps both halves of a tight "2,100" pair.
 - **A sign separated from its number by a space is refused in combined cells too** ("- 2.10" was +2.10).
 
 ### Values stay with their own result

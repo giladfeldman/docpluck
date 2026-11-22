@@ -810,7 +810,11 @@ _INTERVAL_SEP_RE = re.compile(
 # Record keys that describe an interval, not a statistic of their own.
 _INTERVAL_KEYS = frozenset({"CI_lower", "CI_upper", "CI_lo", "CI_hi", "CI_level", "CI_kind"})
 _GROUP_SEP = "[,  ]"
-_UNSIGNED_NUM = rf"(?:\d{{1,3}}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?|\d*\.?\d+)"
+# A US thousands group never starts with 0: "0,125" is a decimal comma (EU,
+# passed through untyped), never 125 (tier-2 review of the class sweep: "0,125"
+# was published as d = 125 and "< 0,001" as p < 1).
+_GROUP_LEAD = r"[1-9]\d{0,2}"
+_UNSIGNED_NUM = rf"(?:{_GROUP_LEAD}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?|\d*\.?\d+)"
 _GROUP_SEP_RE = re.compile(_GROUP_SEP)
 
 
@@ -927,7 +931,9 @@ def _p_printed(s: str) -> Optional[str]:
 # A number token as a cell prints it: an optional sign glyph (hyphen, U+2212
 # minus, en-dash) directly before digits, APA leading-dot allowed.
 _PRINTED_NUM_RE = re.compile(
-    rf"[-+−–]?(?:\d{{1,3}}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?(?!\d)|\d+(?:\.\d*)?|\.\d+)")
+    rf"[-+−–]?(?:{_GROUP_LEAD}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?(?!\d)|\d+(?:\.\d*)?|\.\d+)")
+# The same tokens without grouping: a tight df pair "2,100" prints df1 = 2.
+_PLAIN_NUM_RE = re.compile(r"[-+−–]?(?:\d+(?:\.\d*)?|\.\d+)")
 
 
 def _printed_token(text: str, value: float, last: bool = False) -> Optional[str]:
@@ -943,19 +949,23 @@ def _printed_token(text: str, value: float, last: bool = False) -> Optional[str]
     value. ``last`` picks the right-most match (an interval's upper bound)."""
     if not text:
         return None
-    exact: list[str] = []
-    unsigned: list[str] = []
-    for m in _PRINTED_NUM_RE.finditer(text):
-        tok = m.group(0)
-        try:
-            v = _num_value(tok.replace("−", "-").replace("–", "-"))
-        except ValueError:
-            continue
-        if v == value:
-            exact.append(tok)
-        elif tok[0] in "-–" and _num_value(tok[1:]) == value:
-            unsigned.append(tok[1:])
-    hits = exact or unsigned
+    hits: list[str] = []
+    for token_re in (_PRINTED_NUM_RE, _PLAIN_NUM_RE):
+        exact: list[str] = []
+        unsigned: list[str] = []
+        for m in token_re.finditer(text):
+            tok = m.group(0)
+            try:
+                v = _num_value(tok.replace("−", "-").replace("–", "-"))
+            except ValueError:
+                continue
+            if v == value:
+                exact.append(tok)
+            elif tok[0] in "-–" and _num_value(tok[1:]) == value:
+                unsigned.append(tok[1:])
+        hits = exact or unsigned
+        if hits:
+            break
     if not hits:
         return None
     return hits[-1] if last else hits[0]
@@ -1171,6 +1181,8 @@ _CI_ONLY_RE = re.compile(
 )
 # A bare integer df pair in ONE cell: "1, 114", "2, 998".
 _DF_PAIR_RE = re.compile(r"^\s*(\d+)\s*,\s*(\d+)\s*$")
+# The df-pair shape that is also one US-grouped number: "1,234".
+_TIGHT_GROUPED_RE = re.compile(r"^\s*[1-9]\d{0,2},\d{3}\s*$")
 # A p-value-shaped cell: optional comparison op + a decimal in [0, 1] range
 # (one leading digit at most), or an "N/A" filler.
 _P_SHAPE_RE = re.compile(r"^\s*[<>=]?\s*[01]?\.\d+\s*$")
@@ -1641,7 +1653,7 @@ _PAREN_PAIR_RE = re.compile(
 # the "(pct)" that must follow anchors the reading. A bare cell does not -- "1
 # 234" alone may be two merged cells.
 _COUNT_RE = re.compile(
-    rf"^\s*(\d{{1,3}}(?:(?:{_GROUP_SEP}| )\d{{3}})+|\d+)\s*\(\s*({_PAIR_UNSIGNED})\s*%?\s*\)\s*$")
+    rf"^\s*({_GROUP_LEAD}(?:(?:{_GROUP_SEP}| )\d{{3}})+|\d+)\s*\(\s*({_PAIR_UNSIGNED})\s*%?\s*\)\s*$")
 _PM_PAIR_RE = re.compile(rf"^\s*({_PAIR_NUM})\s*±\s*({_PAIR_UNSIGNED})\s*$")
 # A cell that names both of its numbers: "M = 68.33, SD = 10.48".
 _INLINE_M_SD_RE = re.compile(
@@ -2270,7 +2282,11 @@ def _flatten_one_row(
                 partial_cols[ci] = "estimate_not_parsed"
             elif est is not None and lo is None and re.search(r"\d", _tail):
                 partial_cols[ci] = "interval_not_parsed"
-        elif role == "df" and _DF_PAIR_RE.match(raw):
+        elif (role == "df" and _DF_PAIR_RE.match(raw)
+              and not (_TIGHT_GROUPED_RE.match(raw) and "F" not in roles.values())):
+            # A tight "1,234" is a df PAIR only beside an F: a t or chi-square
+            # has one df, so there it is the US number 1,234 (tier-2 review of
+            # the class sweep: "1,234" under t was published as df1 = 1, df2 = 234).
             # A column headed "df" in an F-test table prints the PAIR "1, 114"
             # (10.1525/collabra.90203 Table 9); `_parse_number` reads neither.
             m = _DF_PAIR_RE.match(raw)

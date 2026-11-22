@@ -9525,7 +9525,7 @@ def _normalize_text(
         # two-number reading -- `t(1, 234.5)` -- while `t(1,234)` was left whole.
         # A tight F df pair printed as `F(1,234.5)` is ambiguous between the two
         # readings; it passes through as printed, which keeps both recoverable.
-        _A4_GROUPED = re.compile(r"[\[(]\s*[-+]?\d{1,3},\d{3}(?:\.\d+)?\s*[\])]")
+        _A4_GROUPED = re.compile(r"[\[(]\s*[-+]?[1-9]\d{0,2},\d{3}(?:\.\d+)?\s*[\])]")
 
         def _a4_spacing(template: str):
             rep = keep_break_in_rejoin(template)

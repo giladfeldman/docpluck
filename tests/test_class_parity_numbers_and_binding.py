@@ -56,7 +56,9 @@ SINGLE = {"N": "n", "n": "n", "t": "t", "F": "F", "chi2": "chi2", "z": "z", "U":
 GROUPED = [("1,234", 1234.0), ("12,345,678", 12345678.0), ("110,111", 110111.0),
            ("1 234", 1234.0), ("1 234", 1234.0)]
 # Comma shapes that are not US numbers.
-NOT_US = ["0,05", "2,21", "1,23456", "12,3456", "1,2"]
+# A leading-zero group ("0,125", "< 0,001") is a decimal comma: US grouping never
+# prints "0,ddd" (tier-2 review: "0,125" was d = 125, "< 0,001" was p < 1).
+NOT_US = ["0,05", "2,21", "1,23456", "12,3456", "1,2", "0,125", "0,001", "< 0,001"]
 # A sign separated from its digits by a space.
 DETACHED = ["- 2.10", "– 2.10", "− 2.10"]
 
@@ -88,6 +90,23 @@ def test_a_non_us_comma_number_is_never_typed(header, printed):
                                                  "d", "p", "r", "est")}, (cell, fields)
         if not fields:
             assert unparsed.get(1) in ("value_not_parsed", "interval_not_parsed"), unparsed
+
+
+def test_leading_zero_decimal_comma_bounds_are_never_typed():
+    f, _, u = _one([["Group", "LL", "UL", "d"], ["B", "0,100", "0,200", "0,15"]])
+    assert not f, f
+    assert set(u.values()) == {"value_not_parsed"}, u
+
+
+@pytest.mark.parametrize("stat,cell,want", [
+    ("t", "1,234", {"df": 1234}), ("chi2", "1,234", {"df": 1234}),
+    ("F", "2,100", {"df1": 2, "df2": 100}), ("F", "1, 98", {"df1": 1, "df2": 98})])
+def test_a_df_cell_is_a_pair_only_beside_an_f(stat, cell, want):
+    # A t or chi-square has one df: "1,234" there was split into df1 = 1, df2 = 234.
+    f, raw, _ = _one([["Group", stat, "df", "p"], ["A", "4.2", cell, ".04"]])
+    assert {k: f.get(k) for k in want} == want, f
+    assert not ({"df", "df1", "df2"} - set(want)) & set(f), f
+    assert set(want) <= set(raw), raw
 
 
 @pytest.mark.parametrize("header", sorted(SINGLE) + ["d [95% CI]"])
