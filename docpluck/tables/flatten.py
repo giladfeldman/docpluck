@@ -111,7 +111,12 @@ class FlattenedRow(TypedDict):
     # Value-bearing cells of this row that reached no field, each with why:
     # ``{"col", "header", "cell", "reason"}``, reason one of
     # ``column_role_unknown`` / ``repeated_pair_kind`` / ``value_not_parsed`` /
-    # ``field_bound_by_later_column`` (2026-11-16).
+    # ``field_bound_by_later_column`` (2026-11-16); since 2.4.162 also
+    # ``block_displaced_by_later_column``, ``value_out_of_domain``,
+    # ``cell_shape_not_estimate_interval``, ``estimate_not_parsed``,
+    # ``interval_not_parsed``, ``interval_of_untyped_column``,
+    # ``header_df_out_of_domain`` and
+    # ``df_conflicts_with_header``.
     # ``[]`` when every numeric cell was typed (2026-11-13).
     unparsed: list[dict[str, object]]
     # The keys of `fields` whose column NO header names: their role was
@@ -637,6 +642,14 @@ _COMPETING_EFFECT_RE = re.compile(
     re.I,
 )
 
+# The shared number token (see the ONE-number-token note before `_NUM_RE`),
+# defined here because the self-labelled cell pattern below builds on it.
+_GROUP_SEP = "[,  ]"
+# A US thousands group never starts with 0: "0,125" is a decimal comma (EU,
+# passed through untyped), never 125 (tier-2 review of the class sweep: "0,125"
+# was published as d = 125 and "< 0,001" as p < 1).
+_GROUP_LEAD = r"[1-9]\d{0,2}"
+_UNSIGNED_NUM = rf"(?:{_GROUP_LEAD}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?|\d*\.?\d+)"
 # A cell that SELF-LABELS its statistic inline, e.g. "r = .67", "r = -.73",
 # "d = 0.32", "dz = 0.40", "η² = .008". The token names the field; the number is
 # the value. This is the strongest possible signal (the cell states its own
@@ -646,7 +659,7 @@ _COMPETING_EFFECT_RE = re.compile(
 # signed value (APA leading-dot allowed). Anchored at cell start.
 _INLINE_STAT_CELL_RE = re.compile(
     r"^\s*(r|d\s*z|dz|d|g|η\s*²?\s*p?|η2p?|eta\s*p?2?)\s*=\s*"
-    r"([-+]?\d*\.?\d+)\s*$",
+    rf"([-+]?{_UNSIGNED_NUM})\s*$",
     re.I,
 )
 # Inline token → canonical field key. (Mirrors `_EFFECT_TYPE_KEY`, but keyed on
@@ -668,7 +681,7 @@ def _inline_stat_field(cell: str) -> Optional[tuple[str, float]]:
         return None
     tok = m.group(1)
     try:
-        val = float(m.group(2))
+        val = _num_value(m.group(2))
     except ValueError:
         return None
     for pat, key in _INLINE_STAT_KEY:
@@ -807,14 +820,12 @@ _WORDED_INTERVAL_RE = re.compile(r"^\s*[-+−–]?\d*\.?\d+[^\[(]*?[A-Za-z]{2,}[
 # 10.1016/j.joep.2020.102350 Table 1): still interval-shaped.
 _INTERVAL_SEP_RE = re.compile(
     r"\d[^\d\[\]()]*?(?:[,;–—−-]|\bto\b)(?:[^\d\[\]()]*?\d|\s*$)")
+# Column roles an interval is never the interval of (see
+# `_interval_of_untyped_column`): p-values, counts, df and other intervals.
+_NOT_AN_ESTIMATE_ROLES = frozenset({"p", "n", "N", "df", "df1", "df2", "df_pair",
+                                    "CI", "CI_lo", "CI_hi", "BF01"})
 # Record keys that describe an interval, not a statistic of their own.
 _INTERVAL_KEYS = frozenset({"CI_lower", "CI_upper", "CI_lo", "CI_hi", "CI_level", "CI_kind"})
-_GROUP_SEP = "[,  ]"
-# A US thousands group never starts with 0: "0,125" is a decimal comma (EU,
-# passed through untyped), never 125 (tier-2 review of the class sweep: "0,125"
-# was published as d = 125 and "< 0,001" as p < 1).
-_GROUP_LEAD = r"[1-9]\d{0,2}"
-_UNSIGNED_NUM = rf"(?:{_GROUP_LEAD}(?:{_GROUP_SEP}\d{{3}})+(?:\.\d+)?|\d*\.?\d+)"
 _GROUP_SEP_RE = re.compile(_GROUP_SEP)
 
 
@@ -836,8 +847,20 @@ _SIGNED_TOKEN_RE = re.compile(
 _DETACHED_SIGN_RE = re.compile(r"[-−–]\s+$")
 # Comma-separated CI bounds. Allow a leading-dot decimal (APA omits the leading
 # zero: ".50", ".003") as well as the full "0.50" form — `\d*\.\d+`.
+#
+# Each bound is a whole `_DEC_NUM`, never the tail of a bigger number: until
+# the 2.4.162 review the bounds were a private `\d*\.\d+` read with
+# `re.search`, so "1,234.50, 2.5" gave (234.5, 2.5) and "[0,05.5, 0.10]" gave
+# (5.5, 0.10) -- the fragment defect `_SIGNED_TOKEN_RE` exists to stop.
+# `_parse_ci_cell` also refuses a sign set apart from the lower bound ("[- 0.9,
+# 1.5]" was (0.9, 1.5)) and a third number in the interval ("[1.1, 2.2, 3.3]"
+# lost 3.3 with no trace).
+_CI_LEVEL_LABEL_RE = re.compile(
+    r"^\s*\d{2}(?:\.\d+)?\s*%\s*(?:CI|C\.I\.|HDI|CrI|confidence interval|credible interval)?\s*:?\s*",
+    re.I)
+_DEC_NUM = rf"(?:{_GROUP_LEAD}(?:{_GROUP_SEP}\d{{3}})+\.\d+|\d*\.\d+)"
 _CI_INLINE_RE = re.compile(
-    r"\[?\s*([-+]?\d*\.\d+)\s*,\s*([-+]?\d*\.\d+)\s*\]?"
+    rf"(?<![\d.])(?<!{_GROUP_SEP})([-+]?{_DEC_NUM})\s*,\s*([-+]?{_DEC_NUM})(?!\d|[.]\d|{_GROUP_SEP}\d)"
 )
 
 
@@ -1019,7 +1042,8 @@ class _WriteLog(dict):
 _STACKED_RESULT_RE = re.compile(r"(?<![\d.])-?\d*\.\d+%?\s*[\[(][^\[\]()]*[\])]")
 # Two signed decimals joined by a single ASCII hyphen — the AMBIGUOUS case the
 # distinct-glyph split above could not resolve (e.g. "-11.2-7.5").
-_HYPHEN_CI_RE = re.compile(r"^\s*(-?)\s*(\d*\.?\d+)\s*-\s*(-?)\s*(\d*\.?\d+)\s*$")
+_HYPHEN_CI_RE = re.compile(
+    rf"^\s*(-?)\s*({_UNSIGNED_NUM})\s*-\s*(-?)\s*({_UNSIGNED_NUM})\s*$")
 
 
 def _to_signed_float(s: str) -> Optional[float]:
@@ -1063,7 +1087,7 @@ def _resolve_hyphen_ci(
     m = _HYPHEN_CI_RE.match(t)
     if not m:
         return None, None
-    mag1, mag2 = float(m.group(2)), float(m.group(4))
+    mag1, mag2 = _num_value(m.group(2)), _num_value(m.group(4))
     sign1 = -1.0 if m.group(1) == "-" else 1.0
     sign2 = -1.0 if m.group(3) == "-" else 1.0
     primary = (sign1 * mag1, sign2 * mag2)
@@ -1130,6 +1154,14 @@ def _parse_ci_cell(
     s = _fold_minus(s)
     parens = _PAREN_RE.findall(s)
     brackets = _BRACKET_RE.findall(s)
+    # Two wrapped number pairs ("[0.1, 0.9] [0.2, 0.3]") are two intervals: no
+    # one of them is the cell's. Until the 2.4.162 review the last one was
+    # kept and the first dropped with no trace; the combined-cell reader
+    # already refused the same cell. Refused, so the cell is listed.
+    # (Each group holds no bracket of its own, so the inner call cannot recurse.)
+    if sum(1 for g in parens + brackets
+           if _parse_ci_cell(g, estimate)[0] is not None) > 1:
+        return None, None
     # A wrapped interval is tried before the whole cell: on the whole cell a
     # range split of "1.00 [0.96–1.04]" takes the estimate as the lower bound.
     for body in (([parens[-1]] if parens else []) + ([brackets[-1]] if brackets else [])
@@ -1138,13 +1170,26 @@ def _parse_ci_cell(
         # 1. comma-separated
         m = _CI_INLINE_RE.search(b)
         if m:
+            # A sign set apart from the lower bound, or another number before
+            # or after the pair: the body is not one two-bound interval.
+            # Refused (the cell is listed in `unparsed`), never read as a
+            # positive bound or as two of three numbers. A combined "0.50
+            # [0.1, 0.9]" cell reaches this on its bracket body first.
+            # The interval's own level label ("95% CI: 0.1, 0.9") is not a
+            # number of the interval.
+            pre = _CI_LEVEL_LABEL_RE.sub("", b[:m.start()])
+            if (_DETACHED_SIGN_RE.search(b[:m.start()])
+                    or re.search(r"\d", pre)
+                    or re.search(r"\d", b[m.end():])):
+                continue
             try:
-                return float(m.group(1)), float(m.group(2))
+                return _num_value(m.group(1)), _num_value(m.group(2))
             except ValueError:
                 pass
         # 2. distinct range glyph (en/em-dash, " to ")
         parts = _RANGE_SEP_RE.split(b, maxsplit=1)
-        if len(parts) == 2:
+        if len(parts) == 2 and all(
+                len(_SIGNED_TOKEN_RE.findall(_fold_minus(x))) <= 1 for x in parts):
             lo, hi = _to_signed_float(parts[0]), _to_signed_float(parts[1])
             if lo is not None and hi is not None:
                 return lo, hi
@@ -1176,8 +1221,8 @@ def _parse_ci_cell(
 # Requires either a bracket OR a decimal point so a bare integer pair ("1, 114")
 # is left to the df-pair detector instead.
 _CI_ONLY_RE = re.compile(
-    r"^\s*[\[(]\s*[-+]?\d*\.?\d+\s*[,–—\-]\s*[-+]?\d*\.?\d+\s*[\])]\s*$"
-    r"|^\s*[-+]?\d*\.\d+\s*[,–—]\s*[-+]?\d*\.?\d+\s*$"
+    rf"^\s*[\[(]\s*[-+]?{_UNSIGNED_NUM}\s*[,–—\-]\s*[-+]?{_UNSIGNED_NUM}\s*[\])]\s*$"
+    rf"|^\s*[-+]?{_DEC_NUM}\s*[,–—]\s*[-+]?{_UNSIGNED_NUM}\s*$"
 )
 # A bare integer df pair in ONE cell: "1, 114", "2, 998".
 _DF_PAIR_RE = re.compile(r"^\s*(\d+)\s*,\s*(\d+)\s*$")
@@ -1188,7 +1233,7 @@ _TIGHT_GROUPED_RE = re.compile(r"^\s*[1-9]\d{0,2},\d{3}\s*$")
 _P_SHAPE_RE = re.compile(r"^\s*[<>=]?\s*[01]?\.\d+\s*$")
 _NA_RE = re.compile(r"^\s*n\s*/?\s*a\s*$", re.I)
 # A single bare number (a candidate test statistic / effect / BF cell).
-_BARE_NUM_RE = re.compile(r"^\s*[-+]?\d*\.?\d+\s*$")
+_BARE_NUM_RE = re.compile(rf"^\s*[-+]?{_UNSIGNED_NUM}\s*$")
 _BARE_INT_RE = re.compile(r"^\s*\d+\s*$")
 
 
@@ -2069,6 +2114,46 @@ def _flatten_one_row(
     # The `role_vals` / `src` keys each column wrote.
     col_written: dict[int, tuple[set, set]] = {}
 
+    def _interval_of_untyped_column(col: int) -> bool:
+        # An interval column is the interval of the value printed just before
+        # it (skipping other interval columns: "LL | UL"). When that value sits
+        # in a column no header role types ("g", "Beta", a header this parser
+        # does not know), the interval is ITS interval: binding it to an
+        # earlier statistic of the row published, for "d | 95% CI | g | 95%
+        # CI", d = 0.5 with g's interval (review of 2.4.162; the ESCImate
+        # 0.7.23 class in table form). The cell is listed as
+        # `interval_of_untyped_column`, never typed.
+        for p in range(col - 1, -1, -1):
+            if p == label_col:
+                return False
+            r = roles.get(p)
+            if r in ("CI", "CI_lo", "CI_hi"):
+                continue
+            if r is not None:
+                return False
+            cell = (row[p] or "").strip() if p < len(row) else ""
+            # A spacer column (no header, nothing printed in this row) is no
+            # value: Camelot emits phantom empty columns between a statistic
+            # and its interval ("d | | 95% CI"). Skip it, as an interval column.
+            if not (header[p] if p < len(header) else "").strip() and not re.search(r"\d", cell):
+                continue
+            # A cell that names its own statistic ("r = .63" under a generic
+            # "Effect size" header, 10.1080/02699931.2024.2434156 Table 9) is
+            # typed by the inline reader below: the interval is that value's.
+            # Any other cell is the untyped value, readable or not: a blank,
+            # a dash, "- 0.4" or "0,4" under "g" is still g's (review of
+            # 2.4.162: an unreadable g cell let g's interval bind to d).
+            if _inline_stat_field(cell) is not None:
+                return False
+            # Withheld only where the row also holds an earlier statistic the
+            # interval could be read as belonging to. "Variable | aOR | 95% CI
+            # | p" with "aOR" untyped keeps its interval as before: no other
+            # statistic of the record can claim it (10.1038/s41598-023-50460-2
+            # Table 3, 10.1186/s12916-023-03180-3 Table 7).
+            return any(roles.get(q) not in _NOT_AN_ESTIMATE_ROLES
+                       for q in range(p) if q != label_col and q in roles)
+        return False
+
     def _note_written(col: int) -> None:
         col_written[col] = (set(role_vals.written), set(src.written))
 
@@ -2136,6 +2221,9 @@ def _flatten_one_row(
         # cell prints each result over two lines (10.1177/17470218241255916
         # Table 7, "0.79 / [0.68, 0.89] / 0.87 / [0.77, 0.98]").
         if len(_STACKED_RESULT_RE.findall(_strip_fold_sentinels(raw))) >= 2:
+            continue
+        if role in ("CI", "CI_lo", "CI_hi") and _interval_of_untyped_column(ci):
+            partial_cols[ci] = "interval_of_untyped_column"
             continue
         role_vals[role] = raw
         if role == "p":
@@ -2338,6 +2426,12 @@ def _flatten_one_row(
         # assembler re-prefixes the field name ("r = …"), so keeping the inline
         # "r = " here would double it ("r = r = .67").
         role_vals[key] = _fmt_num(val)
+        # The cell typed a field: it is not also listed in `unparsed` as
+        # `column_role_unknown` (until the 2.4.162 review it was both), and the
+        # key is credited to this cell, not to the last role column.
+        typed_cols.add(ci)
+        col_keys.setdefault(ci, set()).add(key)
+        _seen_keys.add(key)
 
     # Consolidate separate CI_lo / CI_hi columns into CI_lower / CI_upper so
     # the assembler sees a single CI primitive.
@@ -2367,6 +2461,9 @@ def _flatten_one_row(
     df_val = role_nums.get("df")
     df1_val = role_nums.get("df1")
     df2_val = role_nums.get("df2")
+    # The column whose HEADER printed the df the record holds (None: a df cell).
+    _df_hdr_col: Optional[int] = None
+    _df12_hdr_col: Optional[int] = None
     _f_cols = [c for c in _cols_with("F") if c in df_from_header]
     if _f_cols:
         _a, _b = (float(x) for x in df_from_header[_f_cols[-1]])
@@ -2376,6 +2473,7 @@ def _flatten_one_row(
                 typed_cols.discard(c)
         df1_val, df2_val = _a, _b
         src["df1"] = src["df2"] = header[_f_cols[-1]]
+        _df12_hdr_col = _f_cols[-1]
     for _k in ("t", "chi2"):
         _own = [c for c in _cols_with(_k) if c in df_one_from_header]
         if not _own:
@@ -2387,6 +2485,7 @@ def _flatten_one_row(
                 typed_cols.discard(c)
         df_val = _v
         src["df"] = header[_own[-1]]
+        _df_hdr_col = _own[-1]
 
     # Validity guards — a parsed value that violates a statistic's domain is
     # garbage, not data. Drop it (and its sentence part) rather than emit an
@@ -2440,9 +2539,16 @@ def _flatten_one_row(
     if df_val is not None and df_val <= 0:
         _withhold(("df",), f"df={df_val}")
         df_val = None
+        # A df printed in a header has no cell of its own to list: the row
+        # names the header's column, so the withheld df leaves a trace in the
+        # record and not only in the process-wide counter (review of 2.4.162).
+        if _df_hdr_col is not None:
+            partial_cols[_df_hdr_col] = "header_df_out_of_domain"
     if df1_val is not None and (df1_val < 1 or (df2_val is not None and df2_val <= 0)):
         _withhold(("df1", "df2"), f"df=({df1_val}, {df2_val})")
         df1_val = df2_val = None
+        if _df12_hdr_col is not None:
+            partial_cols[_df12_hdr_col] = "header_df_out_of_domain"
     # DETACHED minus on a CI UPPER bound (B7 / GLYPH, table channel). The page
     # prints `[−0.78, – 0.67]`; pdftotext keeps the dash but detaches it, and
     # the lexical CI parse reads the bound as +0.67. Reattach it ONLY when that

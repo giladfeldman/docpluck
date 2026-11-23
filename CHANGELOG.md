@@ -1,15 +1,18 @@
 # Changelog
 
-## [2.4.162] - 2026-11-19 - normalization 1.9.83 - table extraction 2.4.33 - render 1.0.6 - sectioning 1.2.10
+## [2.4.162] - 2026-11-23 - normalization 1.9.83 - table extraction 2.4.33 - render 1.0.6 - sectioning 1.2.10
 
 Class sweep of 2026-11-18: one number shape read the same way in every code path, and a value kept with the
 result it belongs to. `tests/test_class_parity_numbers_and_binding.py` crosses every number shape with every
-column role and cell kind (268 cases; 100 of the first 210 failed on 2.4.161, and 41 more were added
-after the cross-model review found two further members). Measured on the 125-paper
+column role and cell kind (307 cases; 100 of the first 210 failed on 2.4.161, 41 more were added
+after the cross-model review found two further members, and 39 after three code-review rounds, 26 of which failed
+on the release candidate and 13 guard behaviour (3 of them an empty spacer column between a statistic and its interval) that must not change). Measured on the 125-paper
 manifest against v2.4.161, table detection and text extraction held fixed: 16 papers and 132 of 11,948
 flattened records changed, 0 extraction errors, and normalized body text gave the same statistic tokens on
 all 125 papers. Every changed group was read against its table. Sections and the default render are
-unchanged; the opt-in `flatten_tables_inline` render follows the records.
+unchanged; the opt-in `flatten_tables_inline` render follows the records. After the code review's fixes,
+`tools/diag/release_value_diff.py --base v2.4.161` (full extraction per paper) reports 13 of 125 papers
+changed, 167 row-level differences, 0 errors; the 4 papers those fixes added were read against their tables.
 
 | Change in the records | Count |
 |---|---|
@@ -20,6 +23,8 @@ unchanged; the opt-in `flatten_tables_inline` render follows the records.
 | new reason `value_out_of_domain` (were `value_not_parsed`) | 9 cells |
 | new reason `cell_shape_not_estimate_interval` | 13 cells, 1 published estimate withdrawn |
 | new reason `interval_not_parsed` | 7 cells |
+| new reason `interval_of_untyped_column` (CI no longer bound beside another statistic) | 3 papers, 7 records |
+| interval cells refused (a merged SE and CI read as one interval) | 1 record |
 
 ### One number reader
 
@@ -30,7 +35,15 @@ unchanged; the opt-in `flatten_tables_inline` render follows the records.
   "0,125" and "< 0,001" stay untyped.
 - **A tight "1,234" in a df column is a df pair only beside an F.** Under a t or χ² it was split into
   df1 = 1, df2 = 234; it is now the one df 1,234. `fields_raw` keeps both halves of a tight "2,100" pair.
-- **A sign separated from its number by a space is refused in combined cells too** ("- 2.10" was +2.10).
+- **A sign separated from its number by a space is refused in combined cells and interval bounds too**
+  ("- 2.10" was +2.10; "[- 0.9, 1.5]" was the interval 0.9 to 1.5).
+- **An interval bound is a whole number.** "1,234.50, 2.5" was read from its tail as (234.5, 2.5) and
+  "[0,05.5, 0.10]" as (5.5, 0.10); a cell with a third number ("[1.1, 2.2, 3.3]", or an SE run into its
+  interval, "0.20  2.96 – 3.72", 10.5334/irsp.946) lost a number with no trace, and a CI cell printing two
+  intervals ("[0.1, 0.9] [0.2, 0.3]") kept the last. These cells are now listed. A level label ("95% CI: 0.1,
+  0.9") is not counted as a third number.
+- **A self-labelled cell shares the number token** ("d = 1,234" is typed) and is no longer also listed as
+  `column_role_unknown` when it was typed.
 
 ### Values stay with their own result
 
@@ -40,6 +53,13 @@ unchanged; the opt-in `flatten_tables_inline` render follows the records.
   kept the first block's F beside the second block's p; "M | SD | n | M | n" kept the first arm's SD. A
   repeated interval alone is not a second block: "U | z | p | r | LL | UL | d | LL | UL" keeps U, z, p and r
   (10.1016/j.jesp.2021.104154 Table 3).
+- **An interval belongs to the value printed just before it.** "d | 95% CI | g | 95% CI", with "g" a header
+  this parser does not type, published d with g's interval and dropped d's own. When an interval follows a
+  value no header role types and the row holds an earlier statistic it could be read as belonging to, it is
+  listed as `interval_of_untyped_column` (an odds ratio's bounds beside a log-odds z, 10.15626/mp.2022.3108;
+  a reliability interval beside a mean, 10.1037/cns0000401 Table 3). Where no statistic can claim it ("aOR |
+  95% CI | p"), it is kept as before. The untyped value need not be readable: a blank, a dash or "- 0.4" under
+  "g" still owns g's interval.
 - **A cell without an interval under an estimate-and-interval header is not an estimate.** "1403 (23 697)", a
   death count and its total under a spanning "HR (95% CI)", was published as a hazard ratio of 1403
   (10.1001/jamanetworkopen.2023.48333 Table 2). An interval cut at the cell edge ("0.218 [0.137,") keeps its
@@ -49,7 +69,8 @@ unchanged; the opt-in `flatten_tables_inline` render follows the records.
 
 - **One domain table for every statistic.** p, r and η² in [0, 1]; n and N positive integers; SD, SE, F, χ²
   and U non-negative; df positive. Negative SDs, η² above 1 and zero df were published before, and a value
-  refused in a non-last column left no trace. A withheld value is listed as `value_out_of_domain`.
+  refused in a non-last column left no trace. A withheld value is listed as `value_out_of_domain`; a df printed
+  in a header ("t(0)", "F(0, 30)") has no cell, so its column is listed as `header_df_out_of_domain`.
 - **Half a combined cell read is listed**: `estimate_not_parsed` or `interval_not_parsed`.
 
 ### Text

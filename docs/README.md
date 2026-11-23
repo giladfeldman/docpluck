@@ -894,7 +894,7 @@ what `docpluck extract --structured` prints).
 | `fields` | `dict` | parsed statistical values (may be empty); descriptive cells add `M`, `SD`, `SE`, `count` (int), `pct` and a per-column `group` (see "Two-number cells" above) |
 | `fields_raw` | `dict[str, str]` | for each typed number in `fields`, the token the cell prints (`"-1.40"`, `".050"`); keyed like `fields`, may be empty |
 | `caption_status` | `str` | the source table's `caption_status` |
-| `unparsed` | `list[dict]` | (since 2.4.160) one `{col, header, cell, reason}` per value-bearing cell that reached no field; `[]` when every numeric cell was typed. Reasons: `column_role_unknown` (no header names the column), `value_not_parsed` (a typed column whose cell gave no value, e.g. one cell printing two stacked results), `repeated_pair_kind`, `pair_column_without_arm_label`, and (since 2.4.161) `field_bound_by_later_column`: a later column of the same row bound the same field, the record is that later block whole, and this earlier cell and every field it wrote are left out |
+| `unparsed` | `list[dict]` | (since 2.4.160) one `{col, header, cell, reason}` per value-bearing cell that reached no field; `[]` when every numeric cell was typed. Reasons: `column_role_unknown` (no header names the column), `value_not_parsed` (a typed column whose cell gave no value, e.g. one cell printing two stacked results), `repeated_pair_kind`, `pair_column_without_arm_label`, and (since 2.4.161) `field_bound_by_later_column`: a later column of the same row bound the same field, the record is that later block whole, and this earlier cell and every field it wrote are left out; and (since 2.4.162) `block_displaced_by_later_column` (a statistic repeated later in the row starts a second block, and every cell of the earlier block is left out; a repeated interval alone does not start one), `value_out_of_domain` (the cell parsed but is impossible for its statistic: p, r or η² outside [0, 1], a negative SD/SE/F/χ²/U, a non-positive or fractional n, a df of 0), `cell_shape_not_estimate_interval` (a cell under an estimate-and-interval header that prints no interval, so no estimate is read from it), `estimate_not_parsed` and `interval_not_parsed` (one half of a combined estimate [interval] cell was read and the other was not; treat `interval_not_parsed` as no interval), and `interval_of_untyped_column` (an interval printed after a value in a column no header role types, such as "g" or "Beta": it is that value's interval, so it is never bound to another statistic of the row; listed only where the row holds an earlier statistic it could be read as belonging to), and `header_df_out_of_domain` (a df printed in the column's header, such as `t(0)`, is impossible and was left out; the statistic itself is kept), `df_conflicts_with_header` (a df printed in the cell disagrees with the df printed in the F column's header, so the df columns are left untyped) |
 | `typed_without_header` | `list[str]` | (since 2.4.161) the keys of `fields` whose column role was inferred (data shape, caption words, position) rather than named by a printed header; `[]` when every field came from a printed header |
 
 `fields["est_kind"]` (since 2.4.160), on a row with a generic `est`, is `"ratio"` (null value 1)
@@ -1030,11 +1030,11 @@ all of them:
 from docpluck import get_version_info
 
 get_version_info()
-# {'version': '2.4.161',            # docpluck itself
+# {'version': '2.4.162',            # docpluck itself
 #  'git_sha': '…',
-#  'normalize_version': '1.9.82',   # in-repo pipeline versions, bumped
+#  'normalize_version': '1.9.83',   # in-repo pipeline versions, bumped
 #  'sectioning_version': '1.2.10',   #   independently of the package version
-#  'table_extraction_version': '2.4.32',
+#  'table_extraction_version': '2.4.33',
 #  'references_version': '1.0.0',
 #  'body_scope_version': '1.0.0',
 #  'python_version': '3.14.5',      # the interpreter…

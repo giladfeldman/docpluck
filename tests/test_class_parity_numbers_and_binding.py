@@ -239,6 +239,97 @@ def test_combined_cell_whose_interval_did_not_parse_is_listed():
     assert u.get(1) == "interval_not_parsed"
 
 
+# ── Review of 2.4.162: the interval reader is a reader too ──────────────────
+# Members of the same three classes found in the interval-bound reader and in
+# interval binding. Each case is one printed interval and the one reading every
+# path must give it: the CI column, the combined "estimate [CI]" cell.
+
+@pytest.mark.parametrize("ci", ["[- 0.9, 1.5]", "(- 0.9, 1.5)", "- 0.9, 1.5"])
+def test_a_ci_bound_with_a_detached_sign_is_refused_not_positive(ci):
+    f, _, u = _one([["Effect", "d", "95% CI"], ["A", "0.50", ci]])
+    assert f.get("d") == 0.5 and "CI_lower" not in f, f
+    assert u == {2: "value_not_parsed"}, u
+    f, _, u = _one([["Effect", "d [95% CI]"], ["A", f"0.50 [{ci.strip('[]()')}]"]])
+    assert f.get("d") == 0.5 and "CI_lower" not in f, f
+    assert u == {1: "interval_not_parsed"}, u
+
+
+@pytest.mark.parametrize("ci,lo,hi", [("[1,200.5, 1,300.5]", 1200.5, 1300.5),
+                                      ("[0.1, 0.9]", 0.1, 0.9),
+                                      ("[-0.48, 0.15]", -0.48, 0.15),
+                                      (".50, 1.02", 0.5, 1.02)])
+def test_a_ci_bound_is_a_whole_number(ci, lo, hi):
+    f, r, u = _one([["Effect", "M", "95% CI"], ["A", "1.0", ci]])
+    assert (f.get("CI_lower"), f.get("CI_upper")) == (lo, hi), (f, u)
+
+
+@pytest.mark.parametrize("ci", ["[0,05.5, 0.10]", "[1.1, 2.2, 3.3]", "[1.1, 2.2,3.3]",
+                                "[0.5, 1.1, 2.2]"])
+def test_a_ci_cell_that_is_not_two_whole_bounds_is_listed(ci):
+    # "[0,05.5, 0.10]" was (5.5, 0.10): the tail of "0,05.5". Three numbers lost
+    # the third with no trace.
+    f, r, u = _one([["Effect", "d", "95% CI"], ["A", "0.5", ci]])
+    assert f.get("d") == 0.5 and "CI_lower" not in f and "CI_lower" not in r, (f, r)
+    assert u == {2: "value_not_parsed"}, u
+
+
+def test_a_grouped_lower_bound_is_not_read_from_its_tail():
+    # "1,234.50, 2.5" was (234.5, 2.5). Read whole it is (1234.5, 2.5): a
+    # descending interval, which the record flags and does not type.
+    f, r, u = _one([["Effect", "d", "95% CI"], ["A", "0.5", "1,234.50, 2.5"]])
+    assert r.get("CI_lower") == "1,234.50" and f.get("CI_order") == "descending", (f, r)
+
+
+@pytest.mark.parametrize("stat", ["g", "Hedges g", "Mdn", "foo"])
+def test_an_interval_after_an_untyped_value_is_never_bound_to_an_earlier_statistic(stat):
+    # "d | 95% CI | g | 95% CI" published d = 0.5 with g's interval [0.0, 0.8]
+    # and dropped d's own [0.1, 0.9].
+    f, _, u = _one([["Effect", "d", "95% CI", stat, "95% CI"],
+                    ["A", "0.5", "[0.1, 0.9]", "0.4", "[0.0, 0.8]"]])
+    assert (f.get("d"), f.get("CI_lower"), f.get("CI_upper")) == (0.5, 0.1, 0.9), (f, u)
+    assert u.get(4) == "interval_of_untyped_column", u
+
+
+def test_an_interval_of_an_untyped_value_is_kept_when_no_statistic_can_claim_it():
+    # "Variable | aOR | 95% CI | p": no typed statistic of the record precedes
+    # the untyped value, so its interval is kept as before
+    # (10.1038/s41598-023-50460-2 Table 3 shape).
+    f, _, u = _one([["Variable", "aOR", "95% CI", "p"], ["Age", "0.95", "[0.91, 0.98]", ".004"]])
+    assert (f.get("CI_lower"), f.get("CI_upper"), f.get("p")) == (0.91, 0.98, 0.004), (f, u)
+    assert 2 not in u, u
+
+
+@pytest.mark.parametrize("first", ["p", "n"])
+def test_an_untyped_value_after_a_non_estimate_column_keeps_its_interval(first):
+    f, _, u = _one([["Variable", first, "aOR", "95% CI"], ["Age", "12", "0.95", "[0.91, 0.98]"]]
+                   if first == "n" else
+                   [["Variable", first, "aOR", "95% CI"], ["Age", ".004", "0.95", "[0.91, 0.98]"]])
+    assert (f.get("CI_lower"), f.get("CI_upper")) == (0.91, 0.98), (f, u)
+
+
+def test_an_interval_after_a_self_labelled_value_still_binds():
+    # 10.1080/02699931.2024.2434156 Table 9: "Effect size" header, "r = .63" cells.
+    f, _, u = _one([["Hypothesis", "p", "Effect size", "CI"], ["1a", "<.001", "r = .63", "[0.56, 0.70]"]])
+    assert (f.get("r"), f.get("CI_lower"), f.get("CI_upper")) == (0.63, 0.56, 0.7), (f, u)
+    assert u == {}, u
+
+
+def test_an_interval_after_its_own_typed_statistic_still_binds():
+    # 10.1016/j.jesp.2021.104154 Table 3 shape: each estimate's own LL | UL.
+    f, _, u = _one([["Effect", "U", "z", "p", "r", "LL", "UL", "d", "LL", "UL"],
+                    ["A", "120", "2.1", ".03", ".30", ".10", ".50", ".40", ".20", ".60"]])
+    assert (f.get("r"), f.get("d"), f.get("CI_lower"), f.get("CI_upper")) == (0.3, 0.4, 0.2, 0.6)
+
+
+@pytest.mark.parametrize("cell,key,val", [("d = 0.32", "d", 0.32), ("r = .30", "r", 0.3),
+                                          ("d = 1,234", "d", 1234.0)])
+def test_a_self_labelled_cell_is_typed_and_not_also_listed(cell, key, val):
+    # The inline reader shares the number token; a cell it types is not also
+    # listed as `column_role_unknown` (it was both).
+    f, _, u = _one([["Effect", "Effect size"], ["A", cell]])
+    assert f.get(key) == val and u == {}, (f, u)
+
+
 # ── TEXT ────────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("src", ["t(1,234.5) = 2.10", "F(12,345.6) = 2.10",
@@ -257,3 +348,41 @@ def test_normalization_still_spaces_a_real_interval(src, want):
     out = normalize_text(f"The interval was {src} in the sample.", NormalizationLevel.academic)
     out = out[0] if isinstance(out, tuple) else out
     assert want in out
+
+
+@pytest.mark.parametrize("g_cell", ["- 0.4", "0,4", "", "–"])
+def test_an_unreadable_or_blank_untyped_value_still_owns_its_interval(g_cell):
+    # Review of 2.4.162, attempt 2: an unreadable g cell let g's interval bind to d.
+    f, _, u = _one([["Effect", "d", "95% CI", "g", "95% CI"],
+                    ["A", "0.5", "[0.1, 0.9]", g_cell, "[-0.8, 0.0]"]])
+    assert (f.get("d"), f.get("CI_lower"), f.get("CI_upper")) == (0.5, 0.1, 0.9), (f, u)
+    assert u.get(4) == "interval_of_untyped_column", u
+
+
+@pytest.mark.parametrize("cell", ["[0.1, 0.9] [0.2, 0.3]", "(0.1, 0.9)(0.2,0.3)"])
+def test_a_ci_cell_printing_two_intervals_is_listed_in_every_reader(cell):
+    f, r, u = _one([["Effect", "d", "CI"], ["A", "0.5", cell]])
+    assert "CI_lower" not in f and "CI_lower" not in r, (f, r)
+    assert u == {2: "value_not_parsed"}, u
+
+
+@pytest.mark.parametrize("cell", ["95% CI: 0.1, 0.9", "95% 0.1, 0.9", "CI 0.1, 0.9"])
+def test_an_interval_level_label_is_not_a_third_number(cell):
+    f, _, u = _one([["Effect", "d", "95% CI"], ["A", "0.5", cell]])
+    assert (f.get("CI_lower"), f.get("CI_upper")) == (0.1, 0.9), (f, u)
+
+
+@pytest.mark.parametrize("header", ["t(0)", "F(0, 30)", "χ2(0)"])
+def test_a_withheld_header_df_leaves_a_trace_in_the_record(header):
+    f, _, u = _one([["Effect", header, "p"], ["A", "2.1", ".04"]])
+    assert "df" not in f and "df1" not in f, f
+    assert u == {1: "header_df_out_of_domain"}, u
+
+
+@pytest.mark.parametrize("hdr,cell", [("", ""), (" ", ""), ("", "-")])
+def test_a_spacer_column_between_a_statistic_and_its_interval_is_skipped(hdr, cell):
+    # Review of 2.4.162, attempt 3: Camelot's phantom empty columns ("d | | 95% CI")
+    # must not make d's own interval look like an untyped value's.
+    f, _, u = _one([["Var", "d", hdr, "95% CI"], ["A", "0.5", cell, "[0.1, 0.9]"]])
+    assert (f.get("d"), f.get("CI_lower"), f.get("CI_upper")) == (0.5, 0.1, 0.9), (f, u)
+    assert 3 not in u, u
