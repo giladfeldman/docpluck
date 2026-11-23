@@ -79,7 +79,12 @@ changed, 167 row-level differences, 0 errors; the 4 papers those fixes added wer
   paper never printed, while "t(1,234)" was left alone.
 
 Consumers: a record can carry fewer fields where a row printed two blocks, and more where numbers are grouped.
-Code that switches on `unparsed` reasons gains four values.
+Code that switches on `unparsed` reasons gains eight values: `block_displaced_by_later_column`,
+`value_out_of_domain`, `cell_shape_not_estimate_interval`, `estimate_not_parsed`, `interval_not_parsed`,
+`interval_of_untyped_column`, `header_df_out_of_domain`, and `df_conflicts_with_header` (a df cell that disagrees
+with the df printed in its statistic's header, "F(1, 98)" over a df cell "2, 200"; the header's df is kept and
+the cell is listed). This list was corrected after the tag: the tagged CHANGELOG said "four values" and did not
+name `df_conflicts_with_header`.
 
 ## [2.4.161] - 2026-11-17 - normalization 1.9.82 - table extraction 2.4.32 - render 1.0.6 - sectioning 1.2.10
 
